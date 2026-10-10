@@ -44,6 +44,7 @@ import {
   type VistaCalendario,
 } from '@/lib/calendar/vista';
 import { useAgendasCompartidas, useCalendariosCompartidos } from '@/hooks/use-calendar-shares';
+import type { EventoCompartidoDTO } from '@/lib/services/calendar-shares';
 import { MonthView } from '@/components/calendar/month-view';
 import { WeekView } from '@/components/calendar/week-view';
 import { TimeGridView } from '@/components/calendar/time-grid-view';
@@ -137,7 +138,10 @@ export default function CalendarioPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventoProyectoDTO | null>(null);
-  const [detalle, setDetalle] = useState<{ evento: MiEventoDTO; compartidoPor: OrigenCompartido | null } | null>(null);
+  // G01 (UI-01): un evento compartido llega reducido (EventoCompartidoDTO), nunca como MiEventoDTO.
+  const [detalle, setDetalle] = useState<
+    { evento: MiEventoDTO; compartidoPor: null } | { evento: EventoCompartidoDTO; compartidoPor: OrigenCompartido } | null
+  >(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
   // localStorage solo existe en el navegador: se lee después de montar.
@@ -179,7 +183,7 @@ export default function CalendarioPage() {
 
   // Eventos de calendarios compartidos, indexados para abrir su detalle.
   const eventosCompartidos = useMemo(() => {
-    const mapa = new Map<string, { evento: MiEventoDTO; origen: OrigenCompartido }>();
+    const mapa = new Map<string, { evento: EventoCompartidoDTO; origen: OrigenCompartido }>();
     for (const persona of personasCompartidas) {
       const agenda = agendasCompartidas.get(persona.idUsuario);
       if (!agenda) continue;
@@ -528,7 +532,7 @@ export default function CalendarioPage() {
         evento={detalle?.evento ?? null}
         open={detailOpen}
         onOpenChange={setDetailOpen}
-        editable={detalle !== null && !detalle.compartidoPor && ledProjectIds.has(detalle.evento.idProyecto)}
+        editable={detalle !== null && detalle.compartidoPor === null && ledProjectIds.has(detalle.evento.idProyecto)}
         compartidoPor={detalle?.compartidoPor ?? null}
         onEditar={handleEditarDesdeDetalle}
       />

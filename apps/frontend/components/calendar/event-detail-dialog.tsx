@@ -19,6 +19,7 @@ import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
 import { TIPO_EVENTO_ESTILO, TONO_CLASES } from '@/lib/calendar/paleta';
 import { formatTime, toDateKey } from '@/lib/calendar/utils';
 import type { MiEventoDTO } from '@/lib/services/events';
+import type { EventoCompartidoDTO } from '@/lib/services/calendar-shares';
 import { RECORDATORIO_OPTIONS, requiereLink, requiereUbicacion } from './event-form.schema';
 
 function formatDia(date: Date): string {
@@ -52,23 +53,98 @@ function Fila({ icon, label, children }: { icon: ReactNode; label: string; child
   );
 }
 
+
+/**
+ * G01 (UI-01): detalle de solo lectura de un evento de una agenda compartida.
+ * Nunca recibe (ni podría pintar) descripción, enlace, ubicación, invitados
+ * ni recordatorio; con OCUPADO ni siquiera título o proyecto.
+ */
+function DetalleCompartido({
+  evento,
+  open,
+  onOpenChange,
+  compartidoPor,
+}: {
+  evento: EventoCompartidoDTO;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  compartidoPor: { nombre: string } | null;
+}) {
+  const detalle = evento.visibilidad === 'DETALLE' ? evento : null;
+  const tipo = detalle ? TIPO_EVENTO_ESTILO[detalle.tipoEvento] : null;
+  const estilo = detalle ? MODALIDAD_ESTILO[detalle.modalidad] : null;
+  const inicio = new Date(evento.fechaInicio);
+  const fin = new Date(evento.fechaFin);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[90dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[520px]">
+        <DialogHeader className="shrink-0 gap-2 border-b border-outline-variant/35 px-4 pb-4 pt-5 pr-12 text-left sm:px-6">
+          {tipo && estilo && (
+            <div className="flex flex-wrap gap-tight">
+              <span className={`pill inline-flex w-fit items-center gap-1 ${TONO_CLASES[tipo.tono].bloque}`}>
+                <tipo.icon className="size-3" aria-hidden="true" />
+                {tipo.label}
+              </span>
+              <span className="pill pill-neutral inline-flex w-fit items-center gap-1">
+                <estilo.icon className="size-3" aria-hidden="true" />
+                {estilo.label}
+              </span>
+            </div>
+          )}
+          <DialogTitle className="text-xl font-bold break-words text-on-surface">{detalle ? detalle.tituloEvento : 'Ocupado'}</DialogTitle>
+          <DialogDescription className="text-sm text-on-surface-variant">
+            {detalle ? detalle.proyecto.tituloProyecto : 'Actividad de un proyecto al que no perteneces: solo se muestra el horario.'}
+          </DialogDescription>
+          {compartidoPor && (
+            <p className="type-meta inline-flex items-center gap-1">
+              <Eye className="size-3.5" aria-hidden="true" />
+              Calendario de {compartidoPor.nombre} · solo lectura
+            </p>
+          )}
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
+          <Fila icon={<CalendarDays className="size-4" />} label="Cuándo">
+            <span className="first-letter:uppercase">{formatRangoEvento(inicio, fin)}</span>
+          </Fila>
+        </div>
+
+        <DialogFooter className="shrink-0 gap-2 border-t border-outline-variant/35 px-4 py-4 sm:justify-between sm:px-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="h-10 rounded-md border-outline-variant text-xs font-bold sm:ml-auto"
+          >
+            Cerrar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /**
  * HU-184 (T-324): detalle de un evento al hacer clic en el calendario. Antes
  * el clic abría directo el formulario (líder) o navegaba al proyecto (resto);
  * ahora todos ven primero qué, cuándo, dónde y cómo, y solo quien lidera el
  * proyecto tiene "Editar" y "Eliminar evento". Un evento de un calendario
  * compartido se ve en solo lectura y sin enlace al proyecto (quien lo ve
- * puede no ser integrante).
+ * puede no ser integrante). G01 (UI-01): un evento compartido llega como
+ * `EventoCompartidoDTO` (sin descripción, enlace, ubicación, invitados ni
+ * recordatorio) y se pinta con `DetalleCompartido`: solo tipo/modalidad,
+ * título y proyecto cuando hay DETALLE, y siempre el "cuándo".
  */
 export function EventDetailDialog({
-  evento,
+  evento: eventoProp,
   open,
   onOpenChange,
   editable,
   onEditar,
   compartidoPor = null,
 }: {
-  evento: MiEventoDTO | null;
+  evento: MiEventoDTO | EventoCompartidoDTO | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** El usuario lidera el proyecto del evento. */
@@ -78,11 +154,17 @@ export function EventDetailDialog({
   compartidoPor?: { nombre: string } | null;
 }) {
   const { cancelarEvento, isPending } = useCancelEvent();
-  // Nombres de los invitados: solo si soy del proyecto (en uno compartido no tengo acceso al equipo).
-  const idProyectoEquipo = evento && !compartidoPor && evento.invitados.length > 0 ? evento.idProyecto : 0;
+  const compartido = eventoProp && 'visibilidad' in eventoProp ? eventoProp : null;
+  const propio = eventoProp && !('visibilidad' in eventoProp) ? eventoProp : null;
+  // Nombres de los invitados: solo en un evento propio con invitados (en uno compartido no llegan).
+  const idProyectoEquipo = propio && propio.invitados.length > 0 ? propio.idProyecto : 0;
   const { members } = useProjectMembers(idProyectoEquipo);
 
-  if (!evento) return null;
+  if (compartido) {
+    return <DetalleCompartido evento={compartido} open={open} onOpenChange={onOpenChange} compartidoPor={compartidoPor} />;
+  }
+  if (!propio) return null;
+  const evento = propio;
 
   const estilo = MODALIDAD_ESTILO[evento.modalidad];
   const tipo = TIPO_EVENTO_ESTILO[evento.tipoEvento];

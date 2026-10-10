@@ -18,6 +18,7 @@ vi.mock('../hooks/use-project-members', () => membersMock);
 
 import { EventDetailDialog, formatRangoEvento } from '../components/calendar/event-detail-dialog';
 import type { MiEventoDTO } from '../lib/services/events';
+import type { EventoCompartidoDTO } from '../lib/services/calendar-shares';
 
 afterEach(() => {
   cleanup();
@@ -166,25 +167,64 @@ describe('EventDetailDialog (HU-184 T-324)', () => {
     expect(screen.getByText('Sin recordatorio')).toBeInTheDocument();
   });
 
-  it('un evento de un calendario compartido es de solo lectura, sin enlace al proyecto ni edición', () => {
+  // G01-C08 (UI-01): antes este caso recibía el DTO completo (con invitados, link, descripción)
+  // y verificaba que se mostrara "1 invitado". Esa expectativa codificaba la fuga F262-01: un
+  // evento compartido llega ahora como EventoCompartidoDTO y el diálogo no puede pintar nada privado.
+  it('un evento de un calendario compartido con DETALLE es de solo lectura: tipo, título, proyecto y cuándo, nada más', () => {
+    const compartido: EventoCompartidoDTO = {
+      idEvento: 7,
+      fechaInicio: new Date(2026, 9, 8, 9, 0).toISOString(),
+      fechaFin: new Date(2026, 9, 8, 10, 30).toISOString(),
+      visibilidad: 'DETALLE',
+      tituloEvento: 'Taller de diseño',
+      tipoEvento: 'TUTORIA',
+      modalidad: 'MIXTA',
+      proyecto: { idProyecto: 3, tituloProyecto: 'App de tutorías' },
+    };
     render(
-      <EventDetailDialog
-        evento={evento({ invitados: [4] })}
-        open
-        onOpenChange={vi.fn()}
-        editable
-        onEditar={vi.fn()}
-        compartidoPor={{ nombre: 'Luis Hernández' }}
-      />,
+      <EventDetailDialog evento={compartido} open onOpenChange={vi.fn()} editable onEditar={vi.fn()} compartidoPor={{ nombre: 'Luis Hernández' }} />,
       { wrapper },
     );
 
+    expect(screen.getByRole('heading', { name: 'Taller de diseño' })).toBeInTheDocument();
+    expect(screen.getByText('App de tutorías')).toBeInTheDocument();
+    expect(screen.getByText('Tutoría')).toHaveClass('bg-cal-1');
+    expect(screen.getByText('Híbrida')).toBeInTheDocument();
+    expect(screen.getByText(/09:00–10:30/)).toBeInTheDocument();
     expect(screen.getByText('Calendario de Luis Hernández · solo lectura')).toBeInTheDocument();
+    for (const privado of ['Link de la sesión', 'Descripción', 'Abrir en el mapa', 'Recordatorio', 'Para quién', 'Dónde']) {
+      expect(screen.queryByText(privado)).not.toBeInTheDocument();
+    }
     expect(screen.queryByRole('button', { name: /Editar evento/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Eliminar evento/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Ver proyecto' })).not.toBeInTheDocument();
-    // Sin acceso al equipo del proyecto: no se consulta y se muestra solo el conteo.
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    // Sin acceso al equipo del proyecto: nunca se consulta.
     expect(membersMock.useProjectMembers).toHaveBeenLastCalledWith(0);
-    expect(screen.getByText('1 invitado')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cerrar' })).toBeInTheDocument();
+  });
+
+  it('un evento compartido OCUPADO solo muestra el horario: sin título, tipo, modalidad ni proyecto', () => {
+    const compartido: EventoCompartidoDTO = {
+      idEvento: 9,
+      fechaInicio: new Date(2026, 9, 8, 9, 0).toISOString(),
+      fechaFin: new Date(2026, 9, 8, 10, 30).toISOString(),
+      visibilidad: 'OCUPADO',
+    };
+    const { container } = render(
+      <EventDetailDialog evento={compartido} open onOpenChange={vi.fn()} editable={false} onEditar={vi.fn()} compartidoPor={{ nombre: 'Luis Hernández' }} />,
+      { wrapper },
+    );
+
+    expect(screen.getByRole('heading', { name: 'Ocupado' })).toBeInTheDocument();
+    expect(screen.getByText(/09:00–10:30/)).toBeInTheDocument();
+    expect(screen.getByText('Calendario de Luis Hernández · solo lectura')).toBeInTheDocument();
+    expect(screen.queryByText('Taller de diseño')).not.toBeInTheDocument();
+    expect(screen.queryByText('App de tutorías')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tutoría')).not.toBeInTheDocument();
+    expect(screen.queryByText('Híbrida')).not.toBeInTheDocument();
+    expect(container.querySelector('.pill')).toBeNull();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Editar|Eliminar/ })).not.toBeInTheDocument();
   });
 });
