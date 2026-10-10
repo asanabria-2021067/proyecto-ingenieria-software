@@ -335,3 +335,46 @@ describe('CalendarSharesService — matriz de acceso (G01-C05)', () => {
     expect(JSON.stringify(tareas)).not.toContain('SECRETO');
   });
 });
+
+describe('CalendarSharesService.dejarDeRecibir — revocación por el destinatario (G01-C10, UI-31/B-05)', () => {
+  it('borra únicamente la fila (propietario, yo): el actor sale del token, nunca del cuerpo', async () => {
+    const { prisma, service } = makeDeps();
+    prisma.calendarioCompartido.deleteMany.mockResolvedValue({ count: 1 });
+
+    await expect(service.dejarDeRecibir(VIEWER_ID, OWNER_ID)).resolves.toEqual({ eliminado: true });
+    expect(prisma.calendarioCompartido.deleteMany).toHaveBeenCalledTimes(1);
+    expect(prisma.calendarioCompartido.deleteMany).toHaveBeenCalledWith({
+      where: { idPropietario: OWNER_ID, idInvitado: VIEWER_ID },
+    });
+  });
+
+  it('otro usuario no puede borrar la relación ajena: su llamada solo apunta a su propia fila (inexistente → eliminado: false)', async () => {
+    const { prisma, service } = makeDeps();
+    prisma.calendarioCompartido.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.dejarDeRecibir(42, OWNER_ID)).resolves.toEqual({ eliminado: false });
+    const where = prisma.calendarioCompartido.deleteMany.mock.calls[0][0].where;
+    expect(where).toEqual({ idPropietario: OWNER_ID, idInvitado: 42 });
+    expect(where).not.toHaveProperty('OR');
+  });
+
+  it('tras quitarse el calendario, la lectura posterior de la agenda es 403', async () => {
+    const { prisma, events, service } = makeDeps();
+    prisma.calendarioCompartido.deleteMany.mockResolvedValue({ count: 1 });
+    prisma.calendarioCompartido.findFirst.mockResolvedValue(null);
+
+    await service.dejarDeRecibir(VIEWER_ID, OWNER_ID);
+    await expect(
+      service.agendaCompartida(VIEWER_ID, OWNER_ID, '2026-10-01T06:00:00.000Z', '2026-10-08T06:00:00.000Z'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(events.findSharedInRange).not.toHaveBeenCalled();
+  });
+
+  it('la revocación del propietario sigue intacta y es independiente', async () => {
+    const { prisma, service } = makeDeps();
+    prisma.calendarioCompartido.deleteMany.mockResolvedValue({ count: 1 });
+
+    await service.dejarDeCompartir(OWNER_ID, VIEWER_ID);
+    expect(prisma.calendarioCompartido.deleteMany).toHaveBeenCalledWith({ where: { idPropietario: OWNER_ID, idInvitado: VIEWER_ID } });
+  });
+});

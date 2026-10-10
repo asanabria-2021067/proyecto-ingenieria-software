@@ -28,8 +28,9 @@ describe('CalendarSharesController', () => {
     expect(Reflect.getMetadata(PATH_METADATA, CalendarSharesController)).toBe('usuarios/me/calendario');
   });
 
-  it('expone exactamente listar, compartir, dejarDeCompartir y agenda', () => {
+  // G01-C10 (UI-31): se añade dejarDeRecibir (DELETE del lado del destinatario).
+  it('expone exactamente listar, compartir, dejarDeCompartir, dejarDeRecibir y agenda', () => {
     const propios = Object.getOwnPropertyNames(CalendarSharesController.prototype).filter((n) => n !== 'constructor');
-    expect(propios.sort()).toEqual(['agenda', 'compartir', 'dejarDeCompartir', 'listar']);
+    expect(propios.sort()).toEqual(['agenda', 'compartir', 'dejarDeCompartir', 'dejarDeRecibir', 'listar']);
   });
 });

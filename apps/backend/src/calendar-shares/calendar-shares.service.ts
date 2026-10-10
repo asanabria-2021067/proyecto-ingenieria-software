@@ -128,6 +128,19 @@ export class CalendarSharesService {
   }
 
   /**
+   * DELETE /usuarios/me/calendario/compartidos-conmigo/:idPropietario
+   * G01 (UI-31): quien recibe un calendario puede quitárselo. El actor sale
+   * del token y solo se borra SU fila con ese propietario: nunca toca
+   * comparticiones de terceros. Idempotente, como dejarDeCompartir.
+   */
+  async dejarDeRecibir(userId: number, idPropietario: number) {
+    const { count } = await this.prisma.calendarioCompartido.deleteMany({
+      where: { idPropietario, idInvitado: userId },
+    });
+    return { eliminado: count > 0 };
+  }
+
+  /**
    * GET /usuarios/me/calendario/compartidos-conmigo/:idPropietario/agenda?desde&hasta
    * Solo con una fila vigente (propietario, yo): revocar la compartición hace
    * que la siguiente petición reciba 403. Ambos ids salen del token y de la

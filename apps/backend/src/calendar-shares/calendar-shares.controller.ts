@@ -46,6 +46,15 @@ export class CalendarSharesController {
     return this.calendarShares.dejarDeCompartir(user.userId, idUsuario);
   }
 
+  /** G01 (UI-31): el destinatario se quita un calendario que le compartieron. */
+  @Delete('compartidos-conmigo/:idPropietario')
+  dejarDeRecibir(
+    @CurrentUser() user: { userId: number },
+    @Param('idPropietario', ParseIntPipe) idPropietario: number,
+  ) {
+    return this.calendarShares.dejarDeRecibir(user.userId, idPropietario);
+  }
+
   @Get('compartidos-conmigo/:idPropietario/agenda')
   agenda(
     @CurrentUser() user: { userId: number },
