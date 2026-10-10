@@ -1,28 +1,14 @@
 'use client';
 
-import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
-
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import {
-  ArrowLeft,
-  Calendar,
-  CheckCircle2,
-  Circle,
-  Clock,
-  History,
-  ListChecks,
-  Lock,
-  ShieldAlert,
-  ShieldCheck,
-  UserRound,
-} from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectMemberDetail } from '@/hooks/use-project-member-detail';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
 import {
   ESTADO_LABEL,
   ESTADO_TAREA_TONE,
@@ -38,9 +24,9 @@ import { useLeadershipCandidates } from '@/hooks/use-leadership';
 import { useHistoricalProject } from '@/hooks/use-historical-project';
 import { motivoInelegibilidadLabel, type LeadershipCandidateDto } from '@/lib/types/leadership';
 import type { HistoricalHorasUsuario } from '@/lib/services/historical';
-import type { EstadoSprint } from '@/lib/types/sprints';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
+import { ProjectBackLink, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -84,13 +70,30 @@ function ordenarSprintsDescendente(
   return [...sprints].sort((a, b) => b.numero - a.numero);
 }
 
+/** Fila que despliega su detalle (`<summary>`): sin marcador nativo y con foco visible por teclado. */
+const DISCLOSURE_SUMMARY =
+  'cursor-pointer list-none outline-none transition-colors hover:bg-surface-container-low focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden';
+
+/** Indicador de expansión: gira cuando el `<details class="group">` que lo contiene está abierto. */
+function DisclosureChevron() {
+  return (
+    <ChevronDown
+      aria-hidden="true"
+      className="size-4 shrink-0 text-text-secondary transition-transform group-open:rotate-180 motion-reduce:transition-none"
+    />
+  );
+}
+
 function DetalleSkeleton() {
   return (
-    <div className="space-y-6">
-      <Skeleton className="h-32 w-full rounded-2xl" />
-      <Skeleton className="h-16 w-full rounded-2xl" />
-      <Skeleton className="h-48 w-full rounded-2xl" />
-      <Skeleton className="h-48 w-full rounded-2xl" />
+    <div className="flex flex-col gap-section" aria-busy="true" aria-label="Cargando detalle del integrante">
+      <Skeleton className="h-14 w-72 max-w-full rounded-card" />
+      <div className="grid grid-cols-1 gap-grid @xl/project:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-24 w-full rounded-card" />
+        ))}
+      </div>
+      <Skeleton className="h-44 w-full rounded-card" />
     </div>
   );
 }
@@ -125,17 +128,9 @@ export default function DetalleIntegranteProyectoPage() {
   const horasHistoricas =
     historicoQuery.data?.totales.porUsuario.find((u) => u.idUsuario === idUsuarioNum) ?? null;
 
-  const volverHref = `/dashboard/proyectos/${id}/equipo`;
-
   return (
-    <div className="mx-auto max-w-[1100px] px-8 py-8">
-      <Link
-        href={volverHref}
-        className="inline-flex items-center gap-1.5 text-sm text-tertiary hover:text-primary mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Volver al equipo
-      </Link>
+    <ProjectPageShell>
+      <ProjectBackLink href={`/dashboard/proyectos/${id}/equipo`} label="Volver al equipo" className="mb-card" />
 
       {cargandoPermisos && <DetalleSkeleton />}
 
@@ -151,17 +146,17 @@ export default function DetalleIntegranteProyectoPage() {
           {cargandoDetalle && <DetalleSkeleton />}
 
           {!cargandoDetalle && isError && (
-            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-10 text-center">
-              <ShieldAlert className="w-10 h-10 text-error mx-auto mb-3" />
-              <p className="text-sm text-error">
-                {getApiErrorMessage(error, 'general', 'No se pudo cargar el detalle del integrante.')}
-              </p>
-            </div>
+            <Empty tone="danger" role="alert">
+              <EmptyHeader>
+                <EmptyTitle>
+                  {getApiErrorMessage(error, 'general', 'No se pudo cargar el detalle del integrante.')}
+                </EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           )}
 
           {!cargandoDetalle && detalle && (
             <DetalleIntegranteContent
-              idProyecto={idProyecto}
               detalle={detalle}
               candidato={candidato}
               horasHistoricas={horasHistoricas}
@@ -171,7 +166,7 @@ export default function DetalleIntegranteProyectoPage() {
           )}
         </>
       )}
-    </div>
+    </ProjectPageShell>
   );
 }
 
@@ -182,7 +177,6 @@ function DetalleIntegranteContent({
   proyectoCerrado,
   mostrarElegibilidad,
 }: {
-  idProyecto: number;
   detalle: NonNullable<ReturnType<typeof useProjectMemberDetail>['data']>;
   candidato: LeadershipCandidateDto | null;
   horasHistoricas: HistoricalHorasUsuario | null;
@@ -203,249 +197,237 @@ function DetalleIntegranteContent({
   const tareasDistintas = horasHistoricas?.tareasDistintas ?? candidato?.tareasDistintas ?? tareas.length;
 
   return (
-    <div className="space-y-6">
-      {/* Encabezado del integrante */}
-      <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
-        <div className="flex items-start gap-4">
-          <Avatar className="size-14 shrink-0">
-            {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
-            <AvatarFallback className="bg-primary/10 text-base font-bold text-primary">
-              {getInitials(usuario.nombre, usuario.apellido)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <UserRound className="w-5 h-5 text-primary shrink-0" aria-hidden="true" />
-              <h1 className="font-headline font-extrabold text-2xl text-on-surface truncate">
-                {usuario.nombre} {usuario.apellido}
-              </h1>
-            </div>
-            <p className="text-sm text-tertiary mb-3">{usuario.correo}</p>
-
-            <div className="flex flex-wrap gap-2">
-              {participaciones.map((participacion) => {
-                const estilo = ESTADO_PARTICIPACION_STYLE[participacion.estadoParticipacion];
-                return (
-                  <span
-                    key={participacion.idParticipacion}
-                    className={`pill ${estilo.className}`}
-                    title={
-                      participacion.fechaSalida
-                        ? `Desde ${formatearFechaLimite(participacion.fechaIngreso)} hasta ${formatearFechaLimite(participacion.fechaSalida)}`
-                        : `Desde ${formatearFechaLimite(participacion.fechaIngreso)}`
-                    }
-                  >
-                    {participacion.rolProyecto.nombreRol} · {estilo.label.toUpperCase()}
+    <div className="flex flex-col gap-section">
+      {/* Encabezado del integrante: directo sobre el fondo, sin tarjeta. */}
+      <header className="flex items-start gap-stack">
+        <Avatar className="size-12 shrink-0">
+          {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
+          <AvatarFallback className="bg-primary/10 text-sm font-bold text-primary">
+            {getInitials(usuario.nombre, usuario.apellido)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <h1 className="type-display break-words text-text-primary">
+            {usuario.nombre} {usuario.apellido}
+          </h1>
+          <p className="type-meta break-all">{usuario.correo}</p>
+          <ul aria-label="Roles en el proyecto" className="mt-tight flex flex-wrap gap-x-stack gap-y-tight">
+            {participaciones.map((participacion) => {
+              const estilo = ESTADO_PARTICIPACION_STYLE[participacion.estadoParticipacion];
+              return (
+                <li key={participacion.idParticipacion} className="flex flex-wrap items-center gap-tight">
+                  <span className="type-body font-semibold text-text-primary">
+                    {participacion.rolProyecto.nombreRol}
                   </span>
-                );
-              })}
-            </div>
-          </div>
+                  <span className={`pill pill-sm ${estilo.className}`}>{estilo.label}</span>
+                  <span className="type-meta tabular-nums">
+                    Desde {formatearFechaLimite(participacion.fechaIngreso)}
+                    {participacion.fechaSalida && ` hasta ${formatearFechaLimite(participacion.fechaSalida)}`}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         </div>
-      </div>
+      </header>
 
       {proyectoCerrado && (
         <p
           role="status"
-          className="flex items-center gap-2 rounded-xl border border-outline-variant/40 bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant"
+          className="type-body rounded-card border border-outline-variant/50 bg-surface-container-low px-card py-inline text-text-secondary"
         >
-          <Lock className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
           Proyecto cerrado: las horas acreditadas son definitivas y no existen acciones sobre el integrante.
         </p>
       )}
 
-      {/* Total de horas — justifica reconocimiento (contrato B14, se conserva) */}
-      <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 flex items-center gap-3">
-        <div className="flex items-center justify-center size-11 rounded-xl bg-primary/10 shrink-0">
-          <Clock className="w-5 h-5 text-primary" aria-hidden="true" />
-        </div>
-        <div>
-          <p className="text-xs font-bold text-tertiary uppercase tracking-wide">
-            Total de horas reales
-          </p>
-          <p className="text-2xl font-headline font-extrabold text-on-surface">
-            {totalHorasReales.toLocaleString('es-GT', { maximumFractionDigits: 2 })} h
-          </p>
-        </div>
-        <div className="ml-auto text-right">
-          <p className="text-xs font-bold text-tertiary uppercase tracking-wide">Tareas</p>
-          <p className="text-2xl font-headline font-extrabold text-on-surface">{tareas.length}</p>
-        </div>
-      </div>
+      {/* Indicadores principales. Las horas reales salen de `tareas` (contrato B14);
+          las registradas, del servidor por integrante. */}
+      <section aria-label="Resumen del integrante" className="grid grid-cols-1 gap-grid @xl/project:grid-cols-3">
+        <HoursKpiCard variante="en-linea" label="Horas reales" value={`${formatearHoras(totalHorasReales)} h`} />
+        <HoursKpiCard
+          variante="en-linea"
+          label="Horas registradas"
+          value={registradas != null ? `${formatearDecimal(registradas)} h` : '—'}
+        />
+        <HoursKpiCard variante="en-linea" label="Tareas realizadas" value={String(tareas.length)} />
+      </section>
 
-      {/* Horas por nivel (S7 V5 §4) — nunca se suman entre niveles */}
-      <section aria-labelledby="horas-niveles-title" className="space-y-2">
-        <h2 id="horas-niveles-title" className="sr-only">
-          Horas del integrante por nivel
+      {/* Niveles secundarios (S7 V5 §4): una sola superficie; nunca se suman entre niveles. */}
+      <section aria-labelledby="horas-niveles-title" className="card-base">
+        <h2 id="horas-niveles-title" className="type-section text-text-primary">
+          Desglose de horas
         </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <HoursKpiCard icon={Clock} label="Horas registradas" value={registradas != null ? `${formatearDecimal(registradas)} h` : '—'} />
-          <HoursKpiCard icon={History} label="Horas legacy" value={legacy != null ? `${formatearDecimal(legacy)} h` : '—'} />
-          <HoursKpiCard icon={Calendar} label="Horas propuestas" value={`${formatearDecimal(propuestas)} h`} />
-          <HoursKpiCard icon={CheckCircle2} label="Horas acreditadas" value={`${formatearDecimal(acreditadas)} h`} destacado />
-        </div>
-        <p className="text-xs text-tertiary">
+        <p className="type-meta mt-micro">
           Registradas y legacy provienen del servidor por integrante; propuestas y acreditadas se consolidan por Sprint. Los
           niveles no se suman entre sí.
         </p>
+        <div className="mt-stack grid grid-cols-1 gap-x-card gap-y-stack border-t border-outline-variant/50 pt-stack @md/project:grid-cols-3">
+          <HoursLevel label="Horas legacy" value={legacy != null ? `${formatearDecimal(legacy)} h` : '—'} />
+          <HoursLevel label="Horas propuestas" value={`${formatearDecimal(propuestas)} h`} />
+          <HoursLevel label="Horas acreditadas" value={`${formatearDecimal(acreditadas)} h`} />
+        </div>
       </section>
 
       {mostrarElegibilidad && candidato && (
-        <section
-          aria-labelledby="elegibilidad-title"
-          className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 id="elegibilidad-title" className="flex items-center gap-2 text-base font-bold text-on-surface">
-              <ShieldCheck className="size-5 text-primary" aria-hidden="true" />
-              Elegibilidad para liderazgo
-            </h2>
-            <span
-              className={`pill ${candidato.esElegible ? 'pill-green' : 'pill-neutral'}`}
-            >
-              {candidato.esElegible ? 'Elegible' : 'No elegible'}
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-tertiary">
-            Criterios objetivos del servidor; no existe ranking ni recomendación automática. Tareas distintas:{' '}
-            <span className="font-semibold text-on-surface">{tareasDistintas}</span>.
-          </p>
-          {candidato.motivos.length > 0 ? (
-            <ul className="mt-3 space-y-1 text-sm text-on-surface-variant" aria-label="Motivos de inelegibilidad">
-              {candidato.motivos.map((motivo) => (
-                <li key={motivo} className="flex items-start gap-2">
-                  <ShieldAlert className="mt-0.5 size-4 shrink-0 text-error" aria-hidden="true" />
-                  {motivoInelegibilidadLabel(motivo)}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-on-surface-variant">Cumple los criterios objetivos para recibir el liderazgo.</p>
-          )}
-        </section>
+        <LeadershipEligibilityCard candidato={candidato} tareasDistintas={tareasDistintas} />
       )}
 
       {/* Historial por Sprint — F15, agrupación entregada por B14, nunca reconstruida aquí */}
-      <div className="space-y-4">
-        <div className="flex items-start gap-2">
-          <ListChecks className="w-5 h-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
-          <div>
-            <h2 className="font-headline font-bold text-lg text-on-surface">
-              Historial por Sprint
-            </h2>
-            <p className="text-sm text-tertiary">
-              Actividad, tareas y horas reconocidas del integrante organizadas por Sprint.
-            </p>
-          </div>
+      <section aria-labelledby="historial-sprints-title" className="flex flex-col gap-stack">
+        <div>
+          <h2 id="historial-sprints-title" className="type-section text-text-primary">
+            Historial por Sprint
+          </h2>
+          <p className="type-meta mt-micro">
+            Actividad, tareas y horas reconocidas del integrante organizadas por Sprint.
+          </p>
         </div>
 
-        {sprintsOrdenados.length === 0 && (
-          <Empty role="status">
-            <EmptyMedia variant="icon">
-              <ListChecks aria-hidden="true" className="h-7 w-7" />
-            </EmptyMedia>
-            <EmptyHeader>
-              <EmptyTitle>Este integrante aún no tiene actividad registrada en Sprints.</EmptyTitle>
-            </EmptyHeader>
-          </Empty>
+        {sprintsOrdenados.length === 0 ? (
+          <div className="card-base">
+            <Empty tone="flush" role="status">
+              <EmptyHeader>
+                <EmptyTitle>Este integrante aún no tiene actividad registrada en Sprints.</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          </div>
+        ) : (
+          <div className="card-base divide-y divide-outline-variant/50 overflow-hidden p-0">
+            {sprintsOrdenados.map((sprint) => (
+              <MemberSprintHistoryRow key={sprint.idSprint} sprint={sprint} />
+            ))}
+          </div>
         )}
-
-        {sprintsOrdenados.map((sprint) => (
-          <MemberSprintHistoryCard key={sprint.idSprint} sprint={sprint} />
-        ))}
-      </div>
+      </section>
     </div>
   );
 }
 
-function MemberSprintHistoryCard({ sprint }: { sprint: HistorialSprintIntegranteDTO }) {
-  const estilo = ESTADO_SPRINT_STYLE[sprint.estado];
-  const headingId = `sprint-historial-${sprint.idSprint}`;
+/** Nivel de horas del desglose: rótulo pequeño y cifra, sin tarjeta ni icono (mismo lenguaje que las métricas de Sprints). */
+function HoursLevel({ label, value }: { label: string; value: string }) {
+  return (
+    <div role="group" aria-label={label} className="min-w-0">
+      <p className="type-meta">{label}</p>
+      <p className="mt-micro type-subtitle font-semibold tabular-nums text-text-primary">{value}</p>
+    </div>
+  );
+}
+
+/**
+ * Elegibilidad para liderazgo: una franja con el estado y su explicación; los
+ * criterios técnicos quedan en el desplegable (abierto de entrada cuando hay
+ * motivos de inelegibilidad, que es lo que el líder necesita leer).
+ */
+function LeadershipEligibilityCard({
+  candidato,
+  tareasDistintas,
+}: {
+  candidato: LeadershipCandidateDto;
+  tareasDistintas: number;
+}) {
+  const totalMotivos = candidato.motivos.length;
 
   return (
-    <section
-      aria-labelledby={headingId}
-      className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden"
-    >
-      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <Calendar className="w-5 h-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 id={headingId} className="text-base font-bold text-on-surface">
-                Sprint {sprint.numero}
-              </h3>
-              <span
-                className={`pill ${estilo.className}`}
-              >
-                {estilo.label.toUpperCase()}
-              </span>
-            </div>
-            <p className="text-xs text-tertiary mt-0.5">
-              {sprint.fechaCierre
-                ? `${formatearFechaHora(sprint.fechaInicio)} – ${formatearFechaHora(sprint.fechaCierre)}`
-                : formatearFechaHora(sprint.fechaInicio)}
+    <section aria-labelledby="elegibilidad-title" className="card-base overflow-hidden p-0">
+      <details className="group" open={totalMotivos > 0}>
+        <summary className={`flex flex-wrap items-center gap-x-stack gap-y-tight px-card py-inline ${DISCLOSURE_SUMMARY}`}>
+          <h2 id="elegibilidad-title" className="type-body font-semibold text-text-primary">
+            Elegibilidad para liderazgo
+          </h2>
+          <span className={`pill ${candidato.esElegible ? 'pill-success' : 'pill-neutral'}`}>
+            {candidato.esElegible ? 'Elegible' : 'No elegible'}
+          </span>
+          <p className="type-meta order-last min-w-0 basis-full @2xl/project:order-none @2xl/project:flex-1 @2xl/project:basis-0">
+            {totalMotivos === 0
+              ? 'Cumple los criterios objetivos para recibir el liderazgo.'
+              : totalMotivos === 1
+                ? 'No cumple 1 criterio objetivo.'
+                : `No cumple ${totalMotivos} criterios objetivos.`}
+          </p>
+          <span className="type-meta ml-auto flex items-center gap-micro">
+            Criterios
+            <DisclosureChevron />
+          </span>
+        </summary>
+        <div className="border-t border-outline-variant/50 px-card py-stack">
+          {totalMotivos > 0 && (
+            <ul aria-label="Motivos de inelegibilidad" className="type-body mb-stack list-disc space-y-micro pl-5 text-text-primary">
+              {candidato.motivos.map((motivo) => (
+                <li key={motivo}>{motivoInelegibilidadLabel(motivo)}</li>
+              ))}
+            </ul>
+          )}
+          <p className="type-meta">
+            Criterios objetivos del servidor; no existe ranking ni recomendación automática. Tareas distintas:{' '}
+            <span className="font-semibold text-text-primary">{tareasDistintas}</span>.
+          </p>
+        </div>
+      </details>
+    </section>
+  );
+}
+
+/**
+ * Sprint del historial: fila compacta que se despliega para mostrar las
+ * actividades individuales. Los Sprints en curso llegan abiertos; los cerrados,
+ * plegados.
+ */
+function MemberSprintHistoryRow({ sprint }: { sprint: HistorialSprintIntegranteDTO }) {
+  const estilo = ESTADO_SPRINT_STYLE[sprint.estado];
+  const headingId = `sprint-historial-${sprint.idSprint}`;
+  const totalTareas = sprint.tareas.length;
+
+  return (
+    <section aria-labelledby={headingId}>
+      <details className="group" open={sprint.estado !== 'CERRADO'}>
+        <summary
+          className={`flex flex-col gap-tight px-card py-inline @2xl/project:flex-row @2xl/project:items-center @2xl/project:justify-between ${DISCLOSURE_SUMMARY}`}
+        >
+          <div className="flex min-w-0 flex-wrap items-center gap-x-inline gap-y-micro">
+            <h3 id={headingId} className="type-body font-semibold text-text-primary">
+              Sprint {sprint.numero}
+            </h3>
+            <span className={`pill ${estilo.className}`}>{estilo.label}</span>
+            <p className="type-meta tabular-nums">
+              {formatearFechaHora(sprint.fechaInicio)}
+              {sprint.fechaCierre && ` → ${formatearFechaHora(sprint.fechaCierre)}`}
             </p>
           </div>
-        </div>
-
-        <div className="flex items-center gap-5 shrink-0">
-          <div className="flex items-center gap-2">
-            <ListChecks className="w-4 h-4 text-tertiary shrink-0" aria-hidden="true" />
-            <div>
-              <p className="text-base font-bold text-on-surface leading-tight">
-                {sprint.tareas.length}
-              </p>
-              <p className="text-[11px] text-tertiary whitespace-nowrap">
-                {sprint.tareas.length === 1 ? 'tarea realizada' : 'tareas realizadas'}
-              </p>
-            </div>
+          <div className="flex shrink-0 items-center justify-between gap-inline">
+            <p className="type-meta tabular-nums">
+              <span className="font-semibold text-text-primary">{totalTareas}</span>{' '}
+              {totalTareas === 1 ? 'tarea realizada' : 'tareas realizadas'}
+              {' · '}
+              <span className="font-semibold text-text-primary">{formatearHoras(sprint.horasAprobadas)} h</span>{' '}
+              reconocidas
+            </p>
+            <DisclosureChevron />
           </div>
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-tertiary shrink-0" aria-hidden="true" />
-            <div>
-              <p className="text-base font-bold text-on-surface leading-tight">
-                {formatearHoras(sprint.horasAprobadas)} h
-              </p>
-              <p className="text-[11px] text-tertiary whitespace-nowrap">horas reconocidas</p>
-            </div>
-          </div>
-        </div>
-      </div>
+        </summary>
 
-      {sprint.tareas.length === 0 ? (
-        <p className="border-t border-outline-variant/40 px-5 py-4 text-sm text-tertiary">
-          No hay tareas registradas para este Sprint.
-        </p>
-      ) : (
-        <ul className="divide-y divide-outline-variant/40 border-t border-outline-variant/40">
-          {sprint.tareas.map((tarea) => {
-            return (
-              <li key={tarea.idTarea} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                {tarea.estadoTarea === 'HECHO' ? (
-                  <CheckCircle2
-                    className="w-4 h-4 text-primary shrink-0"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Circle className="w-4 h-4 text-tertiary/40 shrink-0" aria-hidden="true" />
-                )}
-                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-on-surface">
-                  {tarea.tituloTarea}
-                </p>
-                <span
-                  className={`pill pill-sm shrink-0 pill-${ESTADO_TAREA_TONE[tarea.estadoTarea]}`}
-                >
+        {totalTareas === 0 ? (
+          <p className="type-meta border-t border-outline-variant/50 bg-surface-container-low/50 px-card py-inline">
+            No hay tareas registradas para este Sprint.
+          </p>
+        ) : (
+          <ul
+            aria-label={`Actividades del Sprint ${sprint.numero}`}
+            className="divide-y divide-outline-variant/40 border-t border-outline-variant/50 bg-surface-container-low/50"
+          >
+            {sprint.tareas.map((tarea) => (
+              <li key={tarea.idTarea} className="flex flex-wrap items-center gap-inline px-card py-tight">
+                <p className="type-body min-w-0 flex-1 truncate text-text-primary">{tarea.tituloTarea}</p>
+                <span className={`pill pill-sm shrink-0 pill-${ESTADO_TAREA_TONE[tarea.estadoTarea]}`}>
                   {ESTADO_LABEL[tarea.estadoTarea]}
                 </span>
-                <span className="shrink-0 text-sm font-bold text-on-surface">
+                <span className="type-body w-16 shrink-0 text-right font-semibold tabular-nums text-text-primary">
                   {tarea.horasReales !== null ? `${formatearHoras(tarea.horasReales)} h` : '— h'}
                 </span>
               </li>
-            );
-          })}
-        </ul>
-      )}
+            ))}
+          </ul>
+        )}
+      </details>
     </section>
   );
 }
