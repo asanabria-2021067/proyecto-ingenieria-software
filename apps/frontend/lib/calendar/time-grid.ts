@@ -7,8 +7,12 @@ export type EventoItem = Extract<AgendaItem, { kind: 'evento' }>;
 export const HORA_ALTO_PX = 48;
 /** Hora a la que la cuadrícula hace scroll al abrir (la jornada empieza ahí). */
 export const HORA_INICIAL_VISIBLE = 7;
-/** Un evento muy corto igual necesita espacio para leerse. */
-const MINUTOS_MINIMOS_VISIBLES = 30;
+/**
+ * Un evento muy corto igual necesita espacio para leerse y tocarse: 40 min
+ * son 32 px (G02, UI-04/UI-18), suficientes para una línea "hora · título".
+ * Solo cambia el alto del bloque, nunca la duración real del evento.
+ */
+export const MINUTOS_MINIMOS_VISIBLES = 40;
 
 export interface BloqueEvento {
   item: EventoItem;

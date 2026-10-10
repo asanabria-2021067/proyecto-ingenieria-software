@@ -243,9 +243,9 @@ export function TimeGridView({
                         // G02 (UI-05): un tramo que termina a las 00:00 lo hace ya en la fecha siguiente.
                         item.horaFin === '00:00' && item.fechaFin > item.fechaInicio ? ' del día siguiente' : ''
                       }${item.compartidoPor ? `, calendario de ${item.compartidoPor.nombre}` : ''}`}
-                      className={`absolute overflow-hidden rounded-control border-l-4 px-1.5 py-1 text-left shadow-card transition-[filter] hover:brightness-95 ${tono.bloque} ${tono.borde} ${
-                        item.compartidoPor ? 'border-dashed' : ''
-                      }`}
+                      className={`absolute overflow-hidden rounded-control border-l-4 px-1.5 text-left shadow-card transition-[filter] hover:brightness-95 ${
+                        compacto ? 'py-0.5' : 'py-1'
+                      } ${tono.bloque} ${tono.borde} ${item.compartidoPor ? 'border-dashed' : ''}`}
                       style={{
                         top: top + 1,
                         height: height - 2,
@@ -253,12 +253,19 @@ export function TimeGridView({
                         width: `calc(${100 / total}% - 4px)`,
                       }}
                     >
-                      <span className="block truncate text-[11px] font-semibold opacity-90">
-                        {item.horaInicio} – {item.horaFin}
-                      </span>
-                      <span className={`block text-xs font-bold leading-tight ${compacto ? 'truncate' : 'line-clamp-2'}`}>
-                        {item.titulo}
-                      </span>
+                      {compacto ? (
+                        // G02 (UI-04): en un bloque corto solo cabe una línea: la hora de inicio y el título.
+                        <span className="block truncate text-xs font-bold leading-tight">
+                          <span className="font-semibold opacity-90">{item.horaInicio}</span> · {item.titulo}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="block truncate text-[11px] font-semibold opacity-90">
+                            {item.horaInicio} – {item.horaFin}
+                          </span>
+                          <span className="block text-xs font-bold leading-tight line-clamp-2">{item.titulo}</span>
+                        </>
+                      )}
                       {!compacto && (
                         <span className="mt-0.5 flex items-center gap-1 truncate text-[11px] opacity-90">
                           {/* G01 (UI-01): un evento OCUPADO no tiene modalidad real que mostrar. */}

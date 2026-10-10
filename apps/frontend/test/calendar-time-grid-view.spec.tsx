@@ -345,3 +345,46 @@ describe('TimeGridView — ancho útil en Semana (G02-C11, UI-02)', () => {
     expect(screen.getByTestId('cuadricula-horas')).not.toHaveClass('min-w-[48rem]');
   });
 });
+
+describe('TimeGridView — eventos breves (G02-C12, UI-04/UI-18)', () => {
+  it.each([
+    ['15 min', '09:15'],
+    ['30 min', '09:30'],
+  ])('un evento de %s muestra su título en pantalla en una sola línea con la hora, y mide 32 px', (_caso, horaFin) => {
+    const key = '2026-10-08';
+    const corto = evento(21, key, {
+      titulo: 'Stand-up rápido',
+      horaFin,
+      fechaFin: new Date(`${key}T${horaFin}:00`),
+    });
+    render(
+      <TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={new Map([[key, [corto]]])} onSelectEvento={() => {}} ahora={AHORA} />,
+    );
+
+    const bloque = screen.getByRole('button', { name: `Stand-up rápido, 09:00 a ${horaFin}` });
+    expect(bloque).toHaveTextContent('09:00 · Stand-up rápido');
+    expect(bloque).not.toHaveTextContent(`09:00 – ${horaFin}`);
+    expect(bloque).toHaveStyle({ top: `${9 * 48 + 1}px`, height: `${32 - 2}px` });
+  });
+
+  it('un evento de una hora conserva las dos líneas (rango de horas y título) y el pie con la modalidad', () => {
+    const key = '2026-10-08';
+    render(
+      <TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={new Map([[key, [evento(22, key, { titulo: 'Reunión larga' })]]])} onSelectEvento={() => {}} ahora={AHORA} />,
+    );
+    const bloque = screen.getByRole('button', { name: 'Reunión larga, 09:00 a 10:30' });
+    expect(bloque).toHaveTextContent('09:00 – 10:30');
+    expect(bloque).toHaveTextContent('Reunión larga');
+    expect(bloque).toHaveTextContent('Proyecto Uno');
+  });
+
+  it('dos eventos breves solapados siguen repartiéndose la columna y ambos muestran su título', () => {
+    const key = '2026-10-08';
+    const a = evento(23, key, { titulo: 'A corto', horaFin: '09:15', fechaFin: new Date(`${key}T09:15:00`) });
+    const b = evento(24, key, { titulo: 'B corto', horaInicio: '09:10', horaFin: '09:25', fechaInicio: new Date(`${key}T09:10:00`), fechaFin: new Date(`${key}T09:25:00`) });
+    render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={new Map([[key, [a, b]]])} onSelectEvento={() => {}} ahora={AHORA} />);
+    expect(screen.getByRole('button', { name: /^A corto/ })).toHaveTextContent('A corto');
+    expect(screen.getByRole('button', { name: /^B corto/ })).toHaveTextContent('B corto');
+    expect(screen.getByRole('button', { name: /^A corto/ })).toHaveStyle({ width: 'calc(50% - 4px)' });
+  });
+});

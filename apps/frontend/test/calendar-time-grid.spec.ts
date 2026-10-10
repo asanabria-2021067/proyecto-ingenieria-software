@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HORA_ALTO_PX, layoutDia, posicionAhora, tonoDeEvento, type EventoItem } from '@/lib/calendar/time-grid';
+import { HORA_ALTO_PX, MINUTOS_MINIMOS_VISIBLES, layoutDia, posicionAhora, tonoDeEvento, type EventoItem } from '@/lib/calendar/time-grid';
 
 function evento(id: number, inicio: [number, number], fin: [number, number], overrides: Partial<EventoItem> = {}): EventoItem {
   const fechaInicio = new Date(2026, 9, 6, inicio[0], inicio[1]);
@@ -62,9 +62,15 @@ describe('calendar/time-grid layoutDia (HU-184 T-324)', () => {
     expect(porId[3]).not.toBe(porId[1]);
   });
 
-  it('un evento muy corto se dibuja con un mínimo legible', () => {
+  // G02-C12: el mínimo pasa de 30 a 40 min (32 px) para que quepa "hora · título" y sea tocable.
+  it('un evento muy corto se dibuja con un mínimo legible de 32 px sin cambiar su posición ni la de los demás', () => {
     const [bloque] = layoutDia([evento(1, [9, 0], [9, 10])]);
-    expect(bloque.height).toBe(0.5 * HORA_ALTO_PX);
+    expect(bloque.height).toBe((MINUTOS_MINIMOS_VISIBLES / 60) * HORA_ALTO_PX);
+    expect(bloque.height).toBe(32);
+    expect(bloque.top).toBe(9 * HORA_ALTO_PX);
+    // Uno de 30 min también se estira a 32 px; uno de 45 min conserva su alto real.
+    expect(layoutDia([evento(2, [9, 0], [9, 30])])[0].height).toBe(32);
+    expect(layoutDia([evento(3, [9, 0], [9, 45])])[0].height).toBe(36);
   });
 
   it('los eventos de varios días no van en la cuadrícula de horas', () => {
