@@ -588,6 +588,7 @@ export default function CalendarioPage() {
             compartidosEstado={isLoadingCompartidos ? 'cargando' : isErrorCompartidos ? 'error' : 'listo'}
             onReintentarCompartidos={() => void refetchCompartidos()}
             estadoAgendas={estadosCompartidos}
+            miniRedundanteEnMovil={vista === 'mes'}
           />
         </div>
 

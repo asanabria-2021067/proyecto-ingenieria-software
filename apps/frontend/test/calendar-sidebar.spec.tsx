@@ -200,3 +200,50 @@ describe('CalendarSidebar — carga, error y reintento de calendarios compartido
     expect(screen.queryByRole('button', { name: /Reintentar/ })).not.toBeInTheDocument();
   });
 });
+
+describe('CalendarSidebar — columna plegable en móvil y mini calendario (G04-C09, UI-41/UI-42)', () => {
+  const disparador = () => screen.getByRole('button', { name: 'Filtros y calendarios' });
+  const contenido = () => document.querySelector('[data-slot="collapsible-content"]') as HTMLElement;
+
+  it('empieza abierta: el control solo existe bajo lg y el contenido completo está disponible', () => {
+    renderSidebar();
+    expect(disparador()).toHaveAttribute('aria-expanded', 'true');
+    expect(disparador()).toHaveClass('lg:hidden');
+    expect(contenido()).toHaveAttribute('data-state', 'open');
+    expect(screen.getByRole('checkbox', { name: 'Ver el calendario de Ana García' })).toBeInTheDocument();
+  });
+
+  it('al plegar y volver a abrir, las casillas siguen ahí y operables; plegada, el contenido solo se oculta bajo lg', () => {
+    const { onToggleCompartido } = renderSidebar();
+    fireEvent.click(disparador());
+    expect(disparador()).toHaveAttribute('aria-expanded', 'false');
+    expect(contenido()).toHaveAttribute('data-state', 'closed');
+    // Oculta en móvil por clase; desde lg vuelve a mostrarse aunque el estado sea "cerrado".
+    expect(contenido()).toHaveClass('data-[state=closed]:hidden', 'lg:data-[state=closed]:block');
+    expect(contenido()).not.toHaveAttribute('hidden');
+
+    fireEvent.click(disparador());
+    expect(disparador()).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ver el calendario de Ana García' }));
+    expect(onToggleCompartido).toHaveBeenCalledWith(ANA.idUsuario);
+  });
+
+  it('el control anuncia qué despliega (aria-controls apunta al contenido)', () => {
+    renderSidebar();
+    expect(disparador().getAttribute('aria-controls')).toBe(contenido().id);
+  });
+
+  it('en la vista Mes el mini calendario se oculta bajo lg (la rejilla grande ya es el mes) y fuera de Mes se muestra siempre', () => {
+    renderSidebar({ miniRedundanteEnMovil: true });
+    const tarjetaMini = screen.getByRole('button', { name: 'Mes anterior' }).closest('.card-base') as HTMLElement;
+    expect(tarjetaMini).toHaveClass('hidden', 'lg:block');
+    cleanup();
+    renderSidebar();
+    expect(screen.getByRole('button', { name: 'Mes anterior' }).closest('.card-base')).not.toHaveClass('hidden');
+  });
+
+  it('en el calendario del estudiante "hoy" del mini usa el primario, como las vistas', () => {
+    renderSidebar();
+    expect(document.querySelector('aside [aria-current="date"]')).toHaveClass('bg-primary', 'text-on-primary');
+  });
+});

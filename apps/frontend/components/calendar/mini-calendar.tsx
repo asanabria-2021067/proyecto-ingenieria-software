@@ -19,6 +19,7 @@ export function MiniCalendar({
   selectedKey,
   onSelectDay,
   size = 'sm',
+  todayTone = 'accent',
 }: {
   year: number;
   month: number;
@@ -29,9 +30,17 @@ export function MiniCalendar({
   selectedKey?: string;
   onSelectDay?: (key: string) => void;
   size?: 'sm' | 'md';
+  /**
+   * G04 (UI-41): color del día de hoy. Por defecto `accent`, como siempre
+   * (tablero y widgets que comparten esta rejilla no cambian). El calendario
+   * del estudiante pide `primary` para que "hoy" se vea igual que en sus
+   * vistas Día/Semana/Mes.
+   */
+  todayTone?: 'accent' | 'primary';
 }) {
   const weeks = getMonthMatrix(year, month);
   const cellSize = size === 'sm' ? 'h-7 w-7 text-xs' : 'h-10 w-10 text-sm';
+  const hoyClase = todayTone === 'primary' ? 'bg-primary font-bold text-on-primary' : 'bg-accent font-bold text-on-accent';
 
   return (
     <div>
@@ -87,7 +96,7 @@ export function MiniCalendar({
                     !day.inCurrentMonth
                       ? 'text-text-disabled'
                       : 'text-text-primary'
-                  } ${isToday ? 'bg-accent font-bold text-on-accent' : ''} ${
+                  } ${isToday ? hoyClase : ''} ${
                     isSelected && !isToday ? 'bg-surface-container-high' : ''
                   } ${onSelectDay ? 'cursor-pointer hover:bg-surface-container' : 'cursor-default'}`}
                 >
