@@ -3,28 +3,8 @@
 import Link from 'next/link';
 import type { CalendarDay } from '@/lib/calendar/utils';
 import { agendaItemKey, type AgendaItem } from '@/lib/calendar/agenda';
-import { TIPO_EVENTO_ESTILO, TONO_CLASES } from '@/lib/calendar/paleta';
-import { tonoDeEvento, type EventoItem } from '@/lib/calendar/time-grid';
-
-const PRIORIDAD_DOT: Record<string, string> = {
-  ALTA: 'bg-status-error',
-  MEDIA: 'bg-status-warning',
-  BAJA: 'bg-outline-variant',
-};
-
-/** HU-184: ícono del evento con el color de su tipo (o de la persona, si es compartido) y su nombre para lectores. */
-function EventoIcono({ item }: { item: EventoItem }) {
-  const estilo = TIPO_EVENTO_ESTILO[item.tipo];
-  return (
-    <span
-      className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control ${TONO_CLASES[tonoDeEvento(item)].bloque}`}
-      title={estilo.label}
-    >
-      <estilo.icon className="h-2.5 w-2.5" aria-hidden="true" />
-      <span className="sr-only">{estilo.label}</span>
-    </span>
-  );
-}
+import { IconoTipoEvento, PRIORIDAD_DOT, TONO_CLASES } from '@/lib/calendar/paleta';
+import { tonoDeEvento } from '@/lib/calendar/time-grid';
 
 /**
  * HU-169 (T-264): vista semanal — 7 columnas (una fila apilada en móvil) con
@@ -126,7 +106,7 @@ export function WeekView({
                         aria-hidden="true"
                       />
                     ) : (
-                      <EventoIcono item={item} />
+                      <IconoTipoEvento tipo={item.tipo} tono={tonoDeEvento(item)} className="mt-0.5" />
                     )}
                     <span className="flex min-w-0 flex-col">
                       <span className="type-body truncate text-text-primary">{item.titulo}</span>

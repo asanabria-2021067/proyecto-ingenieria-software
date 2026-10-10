@@ -4,6 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MonthView } from '../components/calendar/month-view';
+import { IconoTipoEvento, PRIORIDAD_BORDE, PRIORIDAD_DOT } from '../lib/calendar/paleta';
 import type { AgendaItem } from '../lib/calendar/agenda';
 
 afterEach(() => {
@@ -273,5 +274,39 @@ describe('MonthView — fechas fuera del mes legibles (G04-C05, UI-14)', () => {
       expect(contraste(texto, token(tema, 'surface-container-lowest'))).toBeGreaterThanOrEqual(4.5);
       expect(contraste(texto, token(tema, 'surface-container-high'))).toBeGreaterThanOrEqual(4.5);
     }
+  });
+});
+
+describe('IconoTipoEvento y prioridades compartidas (G04-C12, UI-37)', () => {
+  it('dibuja el cuadro con el tono recibido, el ícono decorativo y el nombre del tipo para lectores', () => {
+    const { container } = render(<IconoTipoEvento tipo="ENTREGA" tono={4} />);
+    const cuadro = container.firstElementChild as HTMLElement;
+    expect(cuadro).toHaveClass('flex', 'h-3.5', 'w-3.5', 'shrink-0', 'rounded-control', 'bg-cal-4', 'text-on-cal-4');
+    expect(cuadro).toHaveAttribute('title', 'Entrega');
+    expect(cuadro.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(cuadro.querySelector('.sr-only')).toHaveTextContent('Entrega');
+  });
+
+  it('el tono es el que decide quien lo usa (p. ej. el de la persona en un evento compartido) y admite una clase extra', () => {
+    const { container } = render(<IconoTipoEvento tipo="TUTORIA" tono={2} className="mt-0.5" />);
+    const cuadro = container.firstElementChild as HTMLElement;
+    expect(cuadro).toHaveClass('bg-cal-2', 'mt-0.5');
+    expect(cuadro).not.toHaveClass('bg-cal-1');
+    expect(cuadro).toHaveAttribute('title', 'Tutoría');
+  });
+
+  it('las prioridades conservan sus colores y significado', () => {
+    expect(PRIORIDAD_DOT).toEqual({ ALTA: 'bg-status-error', MEDIA: 'bg-status-warning', BAJA: 'bg-outline-variant' });
+    expect(PRIORIDAD_BORDE).toEqual({ ALTA: 'border-l-status-error', MEDIA: 'border-l-status-warning', BAJA: 'border-l-outline-variant' });
+  });
+
+  it('Mes sigue mostrando el ícono del tipo en un evento propio y solo un punto en uno OCUPADO', () => {
+    const ocupado: AgendaItem = { ...(evento(3, '2026-10-06', 'Ocupado') as Extract<AgendaItem, { kind: 'evento' }>), ocupado: true, compartidoPor: { idUsuario: 9, nombre: 'Ana García', tono: 2 } };
+    const itemsByDay = new Map<string, AgendaItem[]>([['2026-10-06', [evento(1, '2026-10-06', 'Revisión de sprint', 'ENTREGA'), ocupado]]]);
+    render(<MonthView year={2026} month={9} todayKey="2026-10-09" selectedKey={null} itemsByDay={itemsByDay} onSelectDay={() => {}} />);
+    const celda = screen.getByRole('button', { name: 'martes, 6 de octubre, 2 actividades' });
+    expect(celda.querySelectorAll('[title="Entrega"]')).toHaveLength(1);
+    expect(celda.querySelector('[title="Entrega"]')).toHaveClass('bg-cal-4');
+    expect(celda.querySelector('[title="Otro"]')).toBeNull();
   });
 });

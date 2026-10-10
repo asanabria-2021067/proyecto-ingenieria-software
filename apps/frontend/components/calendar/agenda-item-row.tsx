@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { agendaItemKey, type AgendaItem } from '@/lib/calendar/agenda';
 import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
-import { TIPO_EVENTO_ESTILO, TONO_CLASES } from '@/lib/calendar/paleta';
+import { PRIORIDAD_BORDE, TIPO_EVENTO_ESTILO, TONO_CLASES } from '@/lib/calendar/paleta';
 import { tonoDeEvento } from '@/lib/calendar/time-grid';
 
 const ESTADO_TAREA_LABEL: Record<string, string> = {
@@ -22,13 +22,6 @@ const TAREA_ESTADO_PILL: Record<string, string> = {
 };
 
 const PRIORIDAD_LABEL: Record<string, string> = { ALTA: 'Alta', MEDIA: 'Media', BAJA: 'Baja' };
-
-/** Color por prioridad real de la tarea (dato del backend, no decorativo). */
-const PRIORIDAD_BORDE: Record<string, string> = {
-  ALTA: 'border-l-status-error',
-  MEDIA: 'border-l-status-warning',
-  BAJA: 'border-l-outline-variant',
-};
 
 /**
  * HU-169 (T-264): una fila de agenda, tarea o evento. Tareas y eventos se

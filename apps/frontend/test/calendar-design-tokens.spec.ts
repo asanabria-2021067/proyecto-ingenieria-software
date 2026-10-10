@@ -56,3 +56,36 @@ describe('calendario — tokens de tipografía y radios (G04-C10, UI-33)', () =>
     expect(leer(join('components', 'calendar', 'calendar-filter-menu.tsx'))).toMatch(/<Button type="button" variant="outline" className="h-9 gap-1\.5 rounded-pill /);
   });
 });
+
+describe('calendario — una sola definición de prioridades e ícono de tipo (G04-C12, UI-37)', () => {
+  const FUENTES = [
+    ...ARCHIVOS,
+    ...readdirSync(join(RAIZ, 'lib', 'calendar'))
+      .filter((f) => f.endsWith('.ts'))
+      .map((f) => join('lib', 'calendar', f)),
+  ];
+  const definiciones = (patron: RegExp) => FUENTES.filter((ruta) => patron.test(leer(ruta)));
+
+  it('PRIORIDAD_DOT, PRIORIDAD_BORDE e IconoTipoEvento se definen solo en lib/calendar/paleta.ts', () => {
+    const paleta = join('lib', 'calendar', 'paleta.ts');
+    expect(definiciones(/\bconst PRIORIDAD_DOT\b/)).toEqual([paleta]);
+    expect(definiciones(/\bconst PRIORIDAD_BORDE\b/)).toEqual([paleta]);
+    expect(definiciones(/\bfunction IconoTipoEvento\b/)).toEqual([paleta]);
+    // Los ayudantes locales duplicados desaparecieron.
+    expect(definiciones(/\bfunction (IconoEvento|EventoIcono)\b/)).toEqual([]);
+  });
+
+  it('las vistas que los usan los importan de paleta (Mes, Semana, Día/Semana por horas y la fila de agenda)', () => {
+    const importa = (ruta: string, nombre: string) => new RegExp(`import \\{[^}]*\\b${nombre}\\b[^}]*\\} from '@/lib/calendar/paleta'`).test(leer(ruta));
+    expect(importa(join('components', 'calendar', 'month-view.tsx'), 'IconoTipoEvento')).toBe(true);
+    expect(importa(join('components', 'calendar', 'week-view.tsx'), 'IconoTipoEvento')).toBe(true);
+    expect(importa(join('components', 'calendar', 'week-view.tsx'), 'PRIORIDAD_DOT')).toBe(true);
+    expect(importa(join('components', 'calendar', 'time-grid-view.tsx'), 'PRIORIDAD_DOT')).toBe(true);
+    expect(importa(join('components', 'calendar', 'agenda-item-row.tsx'), 'PRIORIDAD_BORDE')).toBe(true);
+  });
+
+  it('paleta.ts no importa time-grid (sin dependencia circular: time-grid ya importa paleta)', () => {
+    expect(leer(join('lib', 'calendar', 'paleta.ts'))).not.toMatch(/from '\.\/time-grid'|from '@\/lib\/calendar\/time-grid'/);
+    expect(leer(join('lib', 'calendar', 'time-grid.ts'))).toMatch(/from '\.\/paleta'/);
+  });
+});

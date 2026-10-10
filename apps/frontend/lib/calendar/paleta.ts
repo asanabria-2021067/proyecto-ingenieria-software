@@ -1,3 +1,4 @@
+import { createElement } from 'react';
 import {
   CalendarDays,
   ClipboardCheck,
@@ -70,3 +71,40 @@ export const TIPO_EVENTO_ESTILO: Record<TipoEvento, TipoEventoEstilo> = {
 };
 
 export const TIPOS_EVENTO_EN_ORDEN: TipoEvento[] = ['TUTORIA', 'REUNION', 'ENTREGA', 'REVISION', 'TALLER', 'OTRO'];
+
+/**
+ * G04 (UI-37): color por prioridad real de una tarea (dato del backend, no
+ * decorativo). Antes cada vista repetía su propio mapa; cambiar un color
+ * exigía tocar tres archivos. Clases literales, como todo en este módulo.
+ */
+export const PRIORIDAD_DOT: Record<string, string> = {
+  ALTA: 'bg-status-error',
+  MEDIA: 'bg-status-warning',
+  BAJA: 'bg-outline-variant',
+};
+
+/** Borde izquierdo de la fila de una tarea, con la misma escala que `PRIORIDAD_DOT`. */
+export const PRIORIDAD_BORDE: Record<string, string> = {
+  ALTA: 'border-l-status-error',
+  MEDIA: 'border-l-status-warning',
+  BAJA: 'border-l-outline-variant',
+};
+
+/**
+ * G04 (UI-37): cuadro del color del evento con el ícono de su tipo y su nombre
+ * para lectores de pantalla (nunca solo color). Recibe el tono ya resuelto
+ * (`tonoDeEvento`, que vive en `time-grid.ts`) para que este módulo no importe
+ * a quien lo importa. Sin JSX porque el archivo es `.ts`.
+ */
+export function IconoTipoEvento({ tipo, tono, className = '' }: { tipo: TipoEvento; tono: TonoCalendario; className?: string }) {
+  const estilo = TIPO_EVENTO_ESTILO[tipo];
+  return createElement(
+    'span',
+    {
+      className: `flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control ${TONO_CLASES[tono].bloque} ${className}`.trim(),
+      title: estilo.label,
+    },
+    createElement(estilo.icon, { className: 'h-2.5 w-2.5', 'aria-hidden': true }),
+    createElement('span', { className: 'sr-only' }, estilo.label),
+  );
+}

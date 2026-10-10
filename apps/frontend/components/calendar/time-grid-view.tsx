@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { CalendarDay } from '@/lib/calendar/utils';
 import { agendaItemKey, type AgendaItem } from '@/lib/calendar/agenda';
 import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
-import { TONO_CLASES } from '@/lib/calendar/paleta';
+import { PRIORIDAD_DOT, TONO_CLASES } from '@/lib/calendar/paleta';
 import {
   HORA_ALTO_PX,
   HORA_INICIAL_VISIBLE,
@@ -22,12 +22,6 @@ const MAX_TODO_EL_DIA = 3;
 function etiquetaHora(h: number): string {
   return `${String(h).padStart(2, '0')}:00`;
 }
-
-const PRIORIDAD_DOT: Record<string, string> = {
-  ALTA: 'bg-status-error',
-  MEDIA: 'bg-status-warning',
-  BAJA: 'bg-outline-variant',
-};
 
 /** Fecha límite de tarea o evento de varios días, en la franja "Todo el día". */
 function ChipTodoElDia({ item, onSelectEvento }: { item: AgendaItem; onSelectEvento: (item: EventoItem) => void }) {
