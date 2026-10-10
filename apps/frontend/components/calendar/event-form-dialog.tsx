@@ -370,7 +370,13 @@ export function EventFormDialog({
                         <FormControl>
                           <DatePicker
                             value={field.value}
-                            onChange={field.onChange}
+                            onChange={(date) => {
+                              field.onChange(date);
+                              // G02 (UI-06): mover el inicio de un evento de varios días nunca lo
+                              // colapsa a un día; la fecha de fin se conserva y, si queda antes
+                              // del nuevo inicio, el error se muestra de inmediato.
+                              if (form.getValues('terminaOtroDia')) void form.trigger('fechaFin');
+                            }}
                             disabledBefore={isEditing ? undefined : hoyInicioDelDia()}
                             disabled={isPending}
                             className="bg-surface-container-lowest"

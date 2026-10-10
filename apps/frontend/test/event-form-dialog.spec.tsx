@@ -496,3 +496,62 @@ describe('EventFormDialog — "Termina otro día" y fecha de fin (G02-C08, UI-06
     });
   });
 });
+
+describe('EventFormDialog — edición de eventos de varios días (G02-C09, UI-06)', () => {
+  const nocturno = () =>
+    evento({
+      fechaInicio: new Date(2026, 9, 8, 22, 0).toISOString(),
+      fechaFin: new Date(2026, 9, 10, 1, 0).toISOString(),
+      antelacionMinutos: 45,
+    });
+
+  function renderEditar(ev = nocturno()) {
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={ev} />, { wrapper });
+  }
+
+  it('al editar, "Termina otro día" viene marcado con la fecha de fin original y el recordatorio no estándar se conserva', () => {
+    renderEditar();
+    expect(screen.getByRole('checkbox', { name: 'Termina otro día' })).toBeChecked();
+    expect(screen.getByLabelText('Fecha de fin')).toHaveTextContent(/10 oct 2026/i);
+    expect(screen.getByLabelText('Hora de inicio')).toHaveValue('22:00');
+    expect(screen.getByLabelText('Hora de fin')).toHaveValue('01:00');
+    expect(screen.getByRole('combobox', { name: 'Cuándo enviar el recordatorio' })).toHaveTextContent('45 minutos antes');
+  });
+
+  it('cambiar solo el título conserva exactamente el inicio y el fin originales', async () => {
+    eventsMock.updateEvent.mockResolvedValueOnce(nocturno());
+    renderEditar();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Reunión renombrada' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(eventsMock.updateEvent).toHaveBeenCalled());
+    const payload = eventsMock.updateEvent.mock.calls[0][2];
+    expect(payload.fechaInicio).toBe(new Date(2026, 9, 8, 22, 0).toISOString());
+    expect(payload.fechaFin).toBe(new Date(2026, 9, 10, 1, 0).toISOString());
+    expect(payload.antelacionMinutos).toBe(45);
+  });
+
+  it('mover la fecha de inicio después de la de fin no colapsa el evento: muestra el error del campo y no guarda', async () => {
+    renderEditar();
+    fireEvent.click(screen.getByLabelText('Fecha'));
+    fireEvent.click(await screen.findByRole('button', { name: /, 20 de octubre/ }));
+    expect(await screen.findByText('La fecha de fin no puede ser anterior a la de inicio.')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Termina otro día' })).toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(mensajesMock.aviso.advertencia).toHaveBeenCalled());
+    expect(eventsMock.updateEvent).not.toHaveBeenCalled();
+  });
+
+  it('desmarcar "Termina otro día" al editar convierte el evento en uno de un día de forma explícita (no silenciosa)', async () => {
+    eventsMock.updateEvent.mockResolvedValueOnce(nocturno());
+    renderEditar();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
+    expect(screen.queryByLabelText('Fecha de fin')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Hora de fin'), { target: { value: '23:30' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(eventsMock.updateEvent).toHaveBeenCalled());
+    expect(eventsMock.updateEvent.mock.calls[0][2].fechaFin).toBe(new Date(2026, 9, 8, 23, 30).toISOString());
+  });
+});
