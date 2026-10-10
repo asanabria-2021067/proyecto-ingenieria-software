@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { EventsService } from '../src/events/events.service';
+import {
+  EVENT_SHARED_SELECT,
+  EventsService,
+  proyectarEventoCompartido,
+  type EventoCompartidoFila,
+} from '../src/events/events.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const LEADER_ID = 1;
@@ -405,6 +410,74 @@ describe('EventsService — visibilidad por invitados (HU-184)', () => {
 
     expect(prisma.eventoProyecto.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining(FILTRO_PARTICIPANTE) }),
+    );
+  });
+});
+
+describe('EventsService — proyección de evento compartido (G01-C01, UI-01)', () => {
+  // Una fila real puede traer columnas privadas; la proyección jamás las copia.
+  const fila = {
+    idEvento: EVENT_ID,
+    idProyecto: PROJECT_ID,
+    tituloEvento: 'Demo final',
+    fechaInicio: new Date('2030-10-01T14:00:00.000Z'),
+    fechaFin: new Date('2030-10-01T15:00:00.000Z'),
+    tipoEvento: 'REUNION',
+    modalidad: 'VIRTUAL',
+    proyecto: { idProyecto: PROJECT_ID, tituloProyecto: 'Proyecto X' },
+    descripcionEvento: 'SECRETO-descripcion',
+    linkSesion: 'https://meet.example/SECRETO-link',
+    ubicacionLat: 14.6,
+    ubicacionLng: -90.5,
+    ubicacionNombre: 'SECRETO-lugar',
+    invitados: [PARTICIPANT_ID],
+    rolesDestino: [3],
+    antelacionMinutos: 60,
+    idCreador: LEADER_ID,
+    recordatorioEnviadoEn: null,
+  } as unknown as EventoCompartidoFila;
+  const PRIVADOS = ['SECRETO', 'invitados', 'rolesDestino', 'antelacionMinutos', 'idCreador', 'recordatorioEnviadoEn', 'ubicacion', 'linkSesion', 'descripcionEvento'];
+
+  it('con detalle permitido devuelve exactamente las claves del contrato', () => {
+    const evento = proyectarEventoCompartido(fila, true);
+    expect(Object.keys(evento).sort()).toEqual(
+      ['fechaFin', 'fechaInicio', 'idEvento', 'modalidad', 'proyecto', 'tipoEvento', 'tituloEvento', 'visibilidad'].sort(),
+    );
+    expect(evento.visibilidad).toBe('DETALLE');
+    const json = JSON.stringify(evento);
+    for (const privado of PRIVADOS) expect(json).not.toContain(privado);
+    expect(json).toContain('Demo final');
+    expect(json).toContain('Proyecto X');
+  });
+
+  it('sin detalle (OCUPADO) solo devuelve id, horario y visibilidad: sin título, tipo ni proyecto', () => {
+    const evento = proyectarEventoCompartido(fila, false);
+    expect(Object.keys(evento).sort()).toEqual(['fechaFin', 'fechaInicio', 'idEvento', 'visibilidad']);
+    expect(evento.visibilidad).toBe('OCUPADO');
+    const json = JSON.stringify(evento);
+    expect(json).not.toContain('Demo final');
+    expect(json).not.toContain('Proyecto X');
+    for (const privado of PRIVADOS) expect(json).not.toContain(privado);
+  });
+
+  it('EVENT_SHARED_SELECT no pide ninguna columna privada', () => {
+    for (const columna of ['descripcionEvento', 'linkSesion', 'ubicacionLat', 'ubicacionLng', 'ubicacionNombre', 'invitados', 'rolesDestino', 'antelacionMinutos', 'idCreador', 'recordatorioEnviadoEn']) {
+      expect(EVENT_SHARED_SELECT).not.toHaveProperty(columna);
+    }
+  });
+
+  it('el calendario personal (findForUserInRange) sigue pidiendo el contrato completo', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValue([{ idProyecto: PROJECT_ID }]);
+    prisma.eventoProyecto.findMany.mockResolvedValue([]);
+    const service = new EventsService(prisma);
+
+    await service.findForUserInRange(LEADER_ID, '2026-10-01T00:00:00.000Z', '2026-10-31T23:59:59.000Z');
+
+    expect(prisma.eventoProyecto.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ descripcionEvento: true, linkSesion: true, invitados: true, ubicacionLat: true }),
+      }),
     );
   });
 });

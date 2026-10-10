@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EstadoProyecto, Prisma } from '@prisma/client';
+import { EstadoProyecto, Prisma, type ModalidadEvento, type TipoEvento } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -31,6 +31,62 @@ const EVENT_SELECT = {
   tipoEvento: true,
   invitados: true,
 } as const;
+
+/**
+ * G01 (UI-01): única `select` permitida para un evento visto desde un
+ * calendario compartido. Nunca pide descripción, enlace, ubicación,
+ * invitados, rolesDestino ni antelación: compartir la agenda no es permiso
+ * de lectura sobre el proyecto.
+ */
+export const EVENT_SHARED_SELECT = {
+  idEvento: true,
+  idProyecto: true,
+  tituloEvento: true,
+  fechaInicio: true,
+  fechaFin: true,
+  tipoEvento: true,
+  modalidad: true,
+  proyecto: { select: { idProyecto: true, tituloProyecto: true } },
+} as const satisfies Prisma.EventoProyectoSelect;
+
+export type EventoCompartidoFila = Prisma.EventoProyectoGetPayload<{ select: typeof EVENT_SHARED_SELECT }>;
+
+/**
+ * Contrato de un evento en la agenda compartida. `DETALLE` solo cuando quien
+ * recibe tiene acceso propio al proyecto; si no, `OCUPADO`: horario sin
+ * identidad (ni título, ni tipo, ni proyecto).
+ */
+export type EventoCompartido =
+  | {
+      idEvento: number;
+      fechaInicio: Date;
+      fechaFin: Date;
+      visibilidad: 'DETALLE';
+      tituloEvento: string;
+      tipoEvento: TipoEvento;
+      modalidad: ModalidadEvento;
+      proyecto: { idProyecto: number; tituloProyecto: string };
+    }
+  | { idEvento: number; fechaInicio: Date; fechaFin: Date; visibilidad: 'OCUPADO' };
+
+/**
+ * Construye el DTO compartido campo por campo (allowlist): aunque la fila
+ * traiga más columnas, nunca se copian por spread.
+ */
+export function proyectarEventoCompartido(fila: EventoCompartidoFila, puedeVerDetalle: boolean): EventoCompartido {
+  const base = { idEvento: fila.idEvento, fechaInicio: fila.fechaInicio, fechaFin: fila.fechaFin };
+  if (!puedeVerDetalle) {
+    return { ...base, visibilidad: 'OCUPADO' };
+  }
+  return {
+    ...base,
+    visibilidad: 'DETALLE',
+    tituloEvento: fila.tituloEvento,
+    tipoEvento: fila.tipoEvento,
+    modalidad: fila.modalidad,
+    proyecto: { idProyecto: fila.proyecto.idProyecto, tituloProyecto: fila.proyecto.tituloProyecto },
+  };
+}
 
 /**
  * HU-184: un evento con invitados solo lo ven ellos y el líder del proyecto;
