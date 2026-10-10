@@ -50,6 +50,7 @@ import {
   useCalendariosCompartidos,
   useDejarDeRecibirCalendario,
 } from '@/hooks/use-calendar-shares';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { aviso } from '@/lib/mensajes';
 import { getCalendariosCompartidos, type EventoCompartidoDTO } from '@/lib/services/calendar-shares';
@@ -72,21 +73,36 @@ const VISTAS: { value: VistaCalendario; label: string }[] = [
   { value: 'mes', label: 'Mes' },
 ];
 
-/** Preferencia por persona: qué calendarios compartidos tiene activados (solo comodidad local). */
+/**
+ * Qué calendarios compartidos tiene activados cada persona (solo comodidad
+ * local). G04 (UI-29): la clave lleva el id de la cuenta autenticada; antes
+ * era global y dos cuentas en el mismo navegador heredaban la selección de la
+ * otra. Solo se guardan ids numéricos, y nunca dan acceso por sí mismos: lo
+ * que se puede ver lo decide la API (lista de calendarios recibidos).
+ */
 const CLAVE_COMPARTIDOS_ACTIVOS = 'calendario:compartidos-activos';
 
-function leerCompartidosActivos(): number[] {
+function claveCompartidosActivos(idUsuario: number): string {
+  return `${CLAVE_COMPARTIDOS_ACTIVOS}:${idUsuario}`;
+}
+
+function leerCompartidosActivos(idUsuario: number): number[] {
   try {
-    const valor = JSON.parse(window.localStorage.getItem(CLAVE_COMPARTIDOS_ACTIVOS) ?? '[]');
-    return Array.isArray(valor) ? valor.filter((v): v is number => typeof v === 'number') : [];
+    // La clave global anterior no dice de quién era: no se migra a nadie y se elimina.
+    window.localStorage.removeItem(CLAVE_COMPARTIDOS_ACTIVOS);
+    const valor: unknown = JSON.parse(window.localStorage.getItem(claveCompartidosActivos(idUsuario)) ?? '[]');
+    if (!Array.isArray(valor)) return [];
+    return [...new Set(valor.filter((v): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0))];
   } catch {
     return [];
   }
 }
 
-function guardarCompartidosActivos(ids: number[]) {
+function guardarCompartidosActivos(idUsuario: number, ids: number[]) {
   try {
-    window.localStorage.setItem(CLAVE_COMPARTIDOS_ACTIVOS, JSON.stringify(ids));
+    const clave = claveCompartidosActivos(idUsuario);
+    const valor = JSON.stringify(ids);
+    if (window.localStorage.getItem(clave) !== valor) window.localStorage.setItem(clave, valor);
   } catch {
     // Sin almacenamiento (modo privado): la selección vive solo en esta visita.
   }
@@ -202,6 +218,8 @@ export default function CalendarioPage() {
   } = useCalendariosCompartidos();
   const queryClient = useQueryClient();
   const dejarDeRecibir = useDejarDeRecibirCalendario();
+  const { data: usuario } = useCurrentUser();
+  const idUsuarioActual = usuario?.idUsuario ?? null;
 
   // G03 (UI-28): la hora "ahora" y el día "hoy" avanzan mientras la página
   // sigue abierta (línea de ahora cada minuto; "Hoy" cambia a medianoche sin
@@ -221,7 +239,10 @@ export default function CalendarioPage() {
   const [mostrarTareas, setMostrarTareas] = useState(true);
   const [tiposOcultos, setTiposOcultos] = useState<Set<TipoEvento>>(new Set());
   const [proyectosOcultos, setProyectosOcultos] = useState<Set<number>>(new Set());
+  // G04 (UI-29): selección cruda + de qué cuenta se leyó. Mientras no coincida con la cuenta
+  // actual (primer render, hidratación, cambio de sesión) no se aplica ni se guarda nada.
   const [compartidosActivos, setCompartidosActivos] = useState<number[]>([]);
+  const [preferenciasDe, setPreferenciasDe] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventoProyectoDTO | null>(null);
@@ -233,9 +254,14 @@ export default function CalendarioPage() {
   // G03 (UI-10): clave (data-evento-key) del bloque o fila que abrió el detalle, para devolverle el foco al cerrar.
   const [claveDisparador, setClaveDisparador] = useState<string | null>(null);
 
-  // localStorage solo existe en el navegador: se lee después de montar.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => setCompartidosActivos(leerCompartidosActivos()), []);
+  // localStorage solo existe en el navegador y la clave depende de la cuenta:
+  // se lee después de montar, cuando ya se sabe quién ha iniciado sesión.
+  useEffect(() => {
+    if (idUsuarioActual === null) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCompartidosActivos(leerCompartidosActivos(idUsuarioActual));
+    setPreferenciasDe(idUsuarioActual);
+  }, [idUsuarioActual]);
 
   // G03 (UI-40): `?compartido=<ownerId>` llega desde la notificación. Se lee
   // una sola vez al montar, se retira de la URL en el acto (sin navegación ni
@@ -269,11 +295,7 @@ export default function CalendarioPage() {
           aviso.advertencia('Ese calendario ya no está compartido contigo', 'Quien lo compartió pudo retirarlo. Revisa la columna izquierda.');
           return;
         }
-        setCompartidosActivos((actuales) => {
-          const nuevos = actuales.includes(persona.idUsuario) ? actuales : [...actuales, persona.idUsuario];
-          guardarCompartidosActivos(nuevos);
-          return nuevos;
-        });
+        setCompartidosActivos((actuales) => (actuales.includes(persona.idUsuario) ? actuales : [...actuales, persona.idUsuario]));
         aviso.exito('Calendario activado', `Ya ves el calendario de ${persona.nombre} ${persona.apellido} junto al tuyo.`);
       })
       .catch(() => {
@@ -301,10 +323,19 @@ export default function CalendarioPage() {
     () => (compartidos?.compartidosConmigo ?? []).map((p, i) => ({ ...p, tono: tonoPorIndice(i) })),
     [compartidos],
   );
+  const preferenciasListas = idUsuarioActual !== null && preferenciasDe === idUsuarioActual;
   const idsActivos = useMemo(
-    () => personasCompartidas.filter((p) => compartidosActivos.includes(p.idUsuario)).map((p) => p.idUsuario),
-    [personasCompartidas, compartidosActivos],
+    () => (preferenciasListas ? personasCompartidas.filter((p) => compartidosActivos.includes(p.idUsuario)).map((p) => p.idUsuario) : []),
+    [personasCompartidas, compartidosActivos, preferenciasListas],
   );
+  // G04 (UI-29): único punto de escritura. Se guarda lo activo YA filtrado contra los
+  // calendarios que la API dice que recibo (uno revocado desaparece del almacenamiento),
+  // y solo cuando esa lista cargó bien: si falló, la preferencia no se toca.
+  const listaCompartidosCargada = compartidos !== undefined;
+  useEffect(() => {
+    if (!preferenciasListas || !listaCompartidosCargada || idUsuarioActual === null) return;
+    guardarCompartidosActivos(idUsuarioActual, idsActivos);
+  }, [preferenciasListas, listaCompartidosCargada, idUsuarioActual, idsActivos]);
   // G04 (UI-11): el Set que recibe la columna izquierda solo cambia si cambian los activos.
   const compartidosActivosSet = useMemo(() => new Set(idsActivos), [idsActivos]);
   const { agendas: agendasCompartidas, estados: estadosCompartidos } = useAgendasCompartidas(idsActivos, rango.desde, rango.hasta);
@@ -448,11 +479,7 @@ export default function CalendarioPage() {
   };
 
   const handleToggleCompartido = (idUsuario: number) => {
-    setCompartidosActivos((actuales) => {
-      const nuevos = actuales.includes(idUsuario) ? actuales.filter((id) => id !== idUsuario) : [...actuales, idUsuario];
-      guardarCompartidosActivos(nuevos);
-      return nuevos;
-    });
+    setCompartidosActivos((actuales) => (actuales.includes(idUsuario) ? actuales.filter((id) => id !== idUsuario) : [...actuales, idUsuario]));
   };
 
   // G01 (UI-31): quitarme un calendario recibido. Si falla, la persona sigue en la lista.
@@ -461,11 +488,7 @@ export default function CalendarioPage() {
     const nombre = persona ? `${persona.nombre} ${persona.apellido}` : 'esa persona';
     dejarDeRecibir.mutate(idUsuario, {
       onSuccess: () => {
-        setCompartidosActivos((actuales) => {
-          const nuevos = actuales.filter((id) => id !== idUsuario);
-          guardarCompartidosActivos(nuevos);
-          return nuevos;
-        });
+        setCompartidosActivos((actuales) => actuales.filter((id) => id !== idUsuario));
         aviso.exito('Calendario quitado', `Ya no verás el calendario de ${nombre}.`);
       },
       onError: (err) => aviso.error('No se pudo quitar el calendario', getApiErrorMessage(err, 'calendar')),

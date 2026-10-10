@@ -49,8 +49,10 @@ vi.mock('../lib/calendar/vista', async (importOriginal) => {
   return { ...real, filtrarItems: vi.fn(real.filtrarItems) };
 });
 
+// G04-C13: la cuenta autenticada se puede cambiar por prueba (dos usuarios en el mismo navegador).
+const sesionMock = vi.hoisted(() => ({ usuario: { idUsuario: 1, nombre: 'Carlos', apellido: 'Mendoza', fotoUrl: null, roles: [] as string[] } as { idUsuario: number; nombre: string; apellido: string; fotoUrl: null; roles: string[] } | undefined }));
 vi.mock('../hooks/use-current-user', () => ({
-  useCurrentUser: () => ({ data: { idUsuario: 1, nombre: 'Carlos', apellido: 'Mendoza', fotoUrl: null, roles: [] } }),
+  useCurrentUser: () => ({ data: sesionMock.usuario }),
 }));
 vi.mock('../hooks/use-project-members', () => ({ useProjectMembers: () => ({ members: [], isLoading: false }) }));
 // El mapa (leaflet) no se necesita en la página: el diálogo monta un hueco.
@@ -85,6 +87,7 @@ beforeEach(() => {
   eventsMock.getMisEventos.mockResolvedValue([]);
   sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [] });
   navigationMock.searchParams = new URLSearchParams('');
+  sesionMock.usuario = { idUsuario: 1, nombre: 'Carlos', apellido: 'Mendoza', fotoUrl: null, roles: [] };
   window.localStorage.clear();
 });
 
@@ -332,7 +335,7 @@ describe('CalendarioPage — estados de compartidos y de carga propia (G03-C09, 
       compartidosConmigo: [{ idUsuario: 9, nombre: 'Ana', apellido: 'García', fotoUrl: null }],
     });
     sharesMock.getAgendaCompartida.mockRejectedValue(Object.assign(new Error('x'), { statusCode: 500 }));
-    window.localStorage.setItem('calendario:compartidos-activos', '[9]');
+    window.localStorage.setItem('calendario:compartidos-activos:1', '[9]');
     await renderPage();
 
     const lateral = screen.getByRole('complementary', { name: 'Opciones del calendario' });
@@ -384,7 +387,7 @@ describe('CalendarioPage — abrir un calendario compartido desde la notificaci�
 
     expect(await screen.findByRole('checkbox', { name: 'Ver el calendario de Ana García' })).toBeChecked();
     await waitFor(() => expect(sharesMock.getAgendaCompartida).toHaveBeenCalledWith(9, expect.any(Date), expect.any(Date)));
-    expect(JSON.parse(window.localStorage.getItem('calendario:compartidos-activos') ?? '[]')).toEqual([9]);
+    expect(JSON.parse(window.localStorage.getItem('calendario:compartidos-activos:1') ?? '[]')).toEqual([9]);
     expect(window.location.search).toBe('');
     expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Calendario activado', expect.stringContaining('Ana García'));
   });
@@ -397,7 +400,9 @@ describe('CalendarioPage — abrir un calendario compartido desde la notificaci�
     await waitFor(() => expect(mensajesMock.aviso.advertencia).toHaveBeenCalledWith('Ese calendario ya no está compartido contigo', expect.any(String)));
     expect(screen.getByRole('checkbox', { name: 'Ver el calendario de Ana García' })).not.toBeChecked();
     expect(sharesMock.getAgendaCompartida).not.toHaveBeenCalled();
-    expect(window.localStorage.getItem('calendario:compartidos-activos')).toBeNull();
+    // G04-C13 (clase B): antes se exigía que la clave no existiera; ahora la preferencia se guarda
+    // por usuario y ya saneada, así que "nada activado" es una lista vacía.
+    expect(JSON.parse(window.localStorage.getItem('calendario:compartidos-activos:1') ?? '[]')).toEqual([]);
     expect(window.location.search).toBe('');
   });
 
@@ -578,7 +583,7 @@ describe('CalendarioPage — derivaciones memoizadas (G04-C02, UI-11)', () => {
           }
         : { eventos: [{ idEvento: 900, fechaInicio: new Date(2026, 9, 9, 14, 0).toISOString(), fechaFin: new Date(2026, 9, 9, 15, 0).toISOString(), visibilidad: 'OCUPADO' }], tareas: [] },
     );
-    window.localStorage.setItem('calendario:compartidos-activos', '[5]');
+    window.localStorage.setItem('calendario:compartidos-activos:1', '[5]');
     await renderPage();
     await bloque(/^Revisión con Luis, 11:00 a 12:00, calendario de Luis Hernández/);
     expect(screen.queryByRole('button', { name: /^Ocupado/ })).not.toBeInTheDocument();
@@ -771,5 +776,113 @@ describe('CalendarioPage — periodo corto en pantallas estrechas con nombre acc
     fireEvent.click(vista('Mes'));
     expect(etiquetaPeriodo().textContent).toBe('Octubre 2026');
     expect(corto()).toBeNull();
+  });
+});
+
+describe('CalendarioPage — calendarios activos guardados por usuario (G04-C13, UI-29)', () => {
+  const ANA = { idUsuario: 9, nombre: 'Ana', apellido: 'García', fotoUrl: null };
+  const LUIS = { idUsuario: 5, nombre: 'Luis', apellido: 'Hernández', fotoUrl: null };
+  const CLAVE_LEGADA = 'calendario:compartidos-activos';
+  const clave = (idUsuario: number) => `${CLAVE_LEGADA}:${idUsuario}`;
+  const guardado = (idUsuario: number) => window.localStorage.getItem(clave(idUsuario));
+  const casilla = (nombre: string) => screen.findByRole('checkbox', { name: `Ver el calendario de ${nombre}` });
+  const usuario = (idUsuario: number) => ({ idUsuario, nombre: 'Persona', apellido: String(idUsuario), fotoUrl: null, roles: [] });
+
+  beforeEach(() => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [ANA, LUIS] });
+    sharesMock.getAgendaCompartida.mockResolvedValue({ eventos: [], tareas: [] });
+  });
+
+  it('dos cuentas en el mismo navegador no heredan preferencias: cada una lee y escribe su propia clave', async () => {
+    window.localStorage.setItem(clave(1), '[9]');
+    const { unmount } = render(<CalendarioPage />, { wrapper });
+    expect(await casilla('Ana García')).toBeChecked();
+    expect(await casilla('Luis Hernández')).not.toBeChecked();
+    unmount();
+
+    // Otra persona inicia sesión en el mismo navegador.
+    sesionMock.usuario = usuario(2);
+    render(<CalendarioPage />, { wrapper });
+    expect(await casilla('Ana García')).not.toBeChecked();
+    fireEvent.click(await casilla('Luis Hernández'));
+    await waitFor(() => expect(guardado(2)).toBe('[5]'));
+    expect(guardado(1)).toBe('[9]');
+  });
+
+  it('si la cuenta cambia sin recargar la página, lo activado por la anterior deja de aplicarse y no se consulta su agenda', async () => {
+    window.localStorage.setItem(clave(1), '[9]');
+    const { rerender } = render(<CalendarioPage />, { wrapper });
+    expect(await casilla('Ana García')).toBeChecked();
+    await waitFor(() => expect(sharesMock.getAgendaCompartida).toHaveBeenCalledTimes(1));
+
+    sesionMock.usuario = usuario(2);
+    rerender(<CalendarioPage />);
+    await waitFor(async () => expect(await casilla('Ana García')).not.toBeChecked());
+    expect(guardado(1)).toBe('[9]');
+    expect(guardado(2)).toBe('[]');
+  });
+
+  it('la clave global anterior (sin usuario) no se aplica a nadie y se elimina', async () => {
+    window.localStorage.setItem(CLAVE_LEGADA, '[9]');
+    await renderPage();
+    expect(await casilla('Ana García')).not.toBeChecked();
+    await waitFor(() => expect(window.localStorage.getItem(CLAVE_LEGADA)).toBeNull());
+    expect(sharesMock.getAgendaCompartida).not.toHaveBeenCalled();
+  });
+
+  it('un calendario revocado desaparece de los activos y del almacenamiento, sin consultar su agenda', async () => {
+    window.localStorage.setItem(clave(1), '[9,77]');
+    await renderPage();
+    expect(await casilla('Ana García')).toBeChecked();
+    await waitFor(() => expect(guardado(1)).toBe('[9]'));
+    expect(sharesMock.getAgendaCompartida.mock.calls.every(([id]) => id === 9)).toBe(true);
+  });
+
+  it('si ya nadie me comparte su calendario, la preferencia guardada queda vacía', async () => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [] });
+    window.localStorage.setItem(clave(1), '[9]');
+    await renderPage();
+    await screen.findByText('Nadie te ha compartido su calendario todavía.');
+    await waitFor(() => expect(guardado(1)).toBe('[]'));
+    expect(sharesMock.getAgendaCompartida).not.toHaveBeenCalled();
+  });
+
+  it('si la lista de calendarios no se pudo cargar, la preferencia guardada no se toca', async () => {
+    sharesMock.getCalendariosCompartidos.mockRejectedValue(Object.assign(new Error('x'), { statusCode: 500 }));
+    window.localStorage.setItem(clave(1), '[9]');
+    await renderPage();
+    await screen.findByText('No se pudieron cargar los calendarios compartidos.', {}, { timeout: 4000 });
+    expect(guardado(1)).toBe('[9]');
+  });
+
+  it.each([
+    ['no es JSON', 'no-json'],
+    ['un objeto', '{"9":true}'],
+    ['ids no válidos mezclados', '["9", -1, 0, 1.5, null, 9, 9, 5]'],
+  ])('un valor guardado corrupto (%s) se ignora o se sanea: solo cuentan enteros positivos sin repetir', async (_caso, valor) => {
+    window.localStorage.setItem(clave(1), valor);
+    await renderPage();
+    await casilla('Ana García');
+    await waitFor(() => expect(guardado(1)).toMatch(/^\[(\d+(,\d+)*)?\]$/));
+    const ids = JSON.parse(guardado(1) as string) as number[];
+    expect(ids).toEqual(valor.includes('9, 9, 5') ? [9, 5] : []);
+  });
+
+  it('solo se guardan identificadores numéricos: ni nombres, ni correos, ni datos de proyecto', async () => {
+    await renderPage();
+    fireEvent.click(await casilla('Ana García'));
+    await waitFor(() => expect(guardado(1)).toBe('[9]'));
+    const todo = JSON.stringify({ ...window.localStorage });
+    expect(todo).not.toMatch(/Ana|García|uvg\.edu|Proyecto/);
+  });
+
+  it('sin sesión resuelta todavía (primer render, hidratación) no se lee ni se escribe nada', async () => {
+    sesionMock.usuario = undefined;
+    window.localStorage.setItem(clave(1), '[9]');
+    const escribir = vi.spyOn(Storage.prototype, 'setItem');
+    await renderPage();
+    expect(await casilla('Ana García')).not.toBeChecked();
+    expect(escribir).not.toHaveBeenCalled();
+    escribir.mockRestore();
   });
 });
