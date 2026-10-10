@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Loader2, Search, Share2, UserMinus } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Search, Share2, UserMinus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,9 @@ import { aviso } from '@/lib/mensajes';
 import { buscarUsuarios } from '@/lib/services/social';
 import type { UsuarioResumenDto } from '@/lib/types/social';
 import { iniciales } from './invitados-field';
+
+/** Mínimo de letras para consultar (`buscarUsuarios` ignora consultas más cortas). */
+export const MIN_BUSQUEDA = 2;
 
 function Persona({ persona, detalle }: { persona: UsuarioResumenDto; detalle?: string }) {
   return (
@@ -51,7 +54,7 @@ function Persona({ persona, detalle }: { persona: UsuarioResumenDto; detalle?: s
 export function ShareCalendarDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [texto, setTexto] = useState('');
   const [busqueda, setBusqueda] = useState('');
-  const { data: compartidos } = useCalendariosCompartidos();
+  const { data: compartidos, isLoading: cargandoLista, isError: errorLista, refetch: recargarLista } = useCalendariosCompartidos();
   const compartir = useCompartirCalendario();
   const dejar = useDejarDeCompartirCalendario();
 
@@ -68,10 +71,16 @@ export function ShareCalendarDialog({ open, onOpenChange }: { open: boolean; onO
     onOpenChange(next);
   };
 
+  // G03 (UI-40): cada estado del buscador se distingue: consulta corta (sin
+  // pedir nada), buscando, fallo HTTP (con reintento) y vacío legítimo. La
+  // consulta sigue con debounce de 300 ms y una clave por texto, así que una
+  // respuesta tardía de un texto anterior nunca pisa a la actual.
+  const consultaCorta = texto.trim().length > 0 && texto.trim().length < MIN_BUSQUEDA;
   const resultados = useQuery({
     queryKey: ['compartir-agenda-busqueda', busqueda],
     queryFn: () => buscarUsuarios({ q: busqueda }),
-    enabled: open && busqueda.length >= 2,
+    enabled: open && busqueda.length >= MIN_BUSQUEDA,
+    retry: false,
   });
 
   const yaCompartido = new Set((compartidos?.compartidoPorMi ?? []).map((u) => u.idUsuario));
@@ -119,16 +128,31 @@ export function ShareCalendarDialog({ open, onOpenChange }: { open: boolean; onO
                 id="buscar-persona-agenda"
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
-                placeholder="Nombre o apellido"
+                placeholder="Nombre o apellido (mínimo 2 letras)"
+                aria-describedby="buscar-persona-agenda-pista"
                 className="h-10 rounded-md border-outline-variant pl-9 text-sm"
               />
             </div>
+            <p id="buscar-persona-agenda-pista" className="type-meta" aria-live="polite">
+              {consultaCorta ? `Escribe al menos ${MIN_BUSQUEDA} letras para buscar.` : 'Busca por nombre o apellido.'}
+            </p>
 
-            {busqueda.length >= 2 && (
+            {busqueda.length >= MIN_BUSQUEDA && (
               <ul className="divide-y divide-outline-variant/30 rounded-card border border-outline-variant/50" aria-label="Resultados">
                 {resultados.isLoading && (
-                  <li className="type-meta flex items-center gap-tight px-stack py-tight">
+                  <li role="status" className="type-meta flex items-center gap-tight px-stack py-tight">
                     <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> Buscando...
+                  </li>
+                )}
+                {resultados.isError && (
+                  <li role="alert" className="flex flex-wrap items-center justify-between gap-tight px-stack py-tight">
+                    <span className="type-meta flex items-center gap-tight text-status-error">
+                      <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
+                      No se pudo buscar personas. {getApiErrorMessage(resultados.error, 'calendar')}
+                    </span>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void resultados.refetch()} className="shrink-0">
+                      Reintentar búsqueda
+                    </Button>
                   </li>
                 )}
                 {resultados.data?.items.length === 0 && (
@@ -160,9 +184,20 @@ export function ShareCalendarDialog({ open, onOpenChange }: { open: boolean; onO
 
           <div className="space-y-tight">
             <h3 className="text-sm font-medium text-on-surface">
-              Compartida con ({compartidos?.compartidoPorMi.length ?? 0})
+              Compartida con{compartidos ? ` (${compartidos.compartidoPorMi.length})` : ''}
             </h3>
-            {(compartidos?.compartidoPorMi.length ?? 0) === 0 ? (
+            {cargandoLista ? (
+              <p role="status" className="type-meta flex items-center gap-tight">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> Cargando...
+              </p>
+            ) : errorLista ? (
+              <div role="alert" className="flex flex-wrap items-center justify-between gap-tight">
+                <span className="type-meta text-status-error">No se pudo cargar con quién compartes tu agenda.</span>
+                <Button type="button" size="sm" variant="outline" onClick={() => void recargarLista()} className="shrink-0">
+                  Reintentar
+                </Button>
+              </div>
+            ) : (compartidos?.compartidoPorMi.length ?? 0) === 0 ? (
               <p className="type-meta">Todavía no compartes tu agenda con nadie.</p>
             ) : (
               <ul className="space-y-tight">

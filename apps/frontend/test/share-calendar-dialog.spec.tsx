@@ -93,3 +93,80 @@ describe('ShareCalendarDialog (HU-184)', () => {
     expect(mensajesMock.aviso.error.mock.calls[0][0]).toBe('No se pudo compartir tu agenda');
   });
 });
+
+describe('ShareCalendarDialog — estados del buscador (G03-C10, UI-40)', () => {
+  function errorHttp(statusCode: number) {
+    return Object.assign(new Error('x'), { statusCode });
+  }
+
+  it('con una sola letra no consulta y explica el mínimo de dos', async () => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [] });
+    render(<ShareCalendarDialog open onOpenChange={vi.fn()} />, { wrapper });
+    await screen.findByText('Todavía no compartes tu agenda con nadie.');
+
+    expect(screen.getByText('Busca por nombre o apellido.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Buscar persona'), { target: { value: 'A' } });
+    expect(await screen.findByText('Escribe al menos 2 letras para buscar.')).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 400));
+    expect(socialMock.buscarUsuarios).not.toHaveBeenCalled();
+    expect(screen.queryByRole('list', { name: 'Resultados' })).not.toBeInTheDocument();
+  });
+
+  it('con dos letras busca (tras el debounce), muestra "Buscando..." y luego un vacío legítimo', async () => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [] });
+    let resolver: (r: { items: never[]; hasMore: boolean }) => void = () => {};
+    socialMock.buscarUsuarios.mockImplementation(() => new Promise((resolve) => (resolver = resolve)));
+    render(<ShareCalendarDialog open onOpenChange={vi.fn()} />, { wrapper });
+
+    fireEvent.change(screen.getByLabelText('Buscar persona'), { target: { value: 'An' } });
+    expect((await screen.findByText('Buscando...', {}, { timeout: 2000 })).closest('[role="status"]')).not.toBeNull();
+    expect(socialMock.buscarUsuarios).toHaveBeenCalledWith({ q: 'An' });
+    resolver({ items: [], hasMore: false });
+    expect(await screen.findByText('No se encontraron personas.')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it.each([403, 500])('un HTTP %s no se presenta como "sin resultados": muestra el error y permite reintentar', async (status) => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [] });
+    socialMock.buscarUsuarios.mockRejectedValueOnce(errorHttp(status)).mockResolvedValueOnce({ items: [ANA], hasMore: false });
+    render(<ShareCalendarDialog open onOpenChange={vi.fn()} />, { wrapper });
+
+    fireEvent.change(screen.getByLabelText('Buscar persona'), { target: { value: 'Ana' } });
+    const alerta = await screen.findByRole('alert', {}, { timeout: 2000 });
+    expect(alerta).toHaveTextContent('No se pudo buscar personas.');
+    expect(screen.queryByText('No se encontraron personas.')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar búsqueda' }));
+    expect(await screen.findByRole('button', { name: 'Compartir con Ana García' })).toBeInTheDocument();
+    expect(socialMock.buscarUsuarios).toHaveBeenCalledTimes(2);
+  });
+
+  it('la lista "Compartida con" distingue cargando y error de un vacío real', async () => {
+    sharesMock.getCalendariosCompartidos.mockRejectedValueOnce(errorHttp(500)).mockResolvedValueOnce({ compartidoPorMi: [LUIS], compartidosConmigo: [] });
+    render(<ShareCalendarDialog open onOpenChange={vi.fn()} />, { wrapper });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Cargando...');
+    expect(screen.queryByText('Todavía no compartes tu agenda con nadie.')).not.toBeInTheDocument();
+    const alerta = await screen.findByRole('alert');
+    expect(alerta).toHaveTextContent('No se pudo cargar con quién compartes tu agenda.');
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByText('Luis Hernández')).toBeInTheDocument();
+    expect(screen.getByText('Compartida con (1)')).toBeInTheDocument();
+  });
+
+  it('mientras una compartición está en curso, los demás botones "Compartir" quedan deshabilitados (sin doble envío)', async () => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [] });
+    const LUIS_RESULTADO = { idUsuario: 5, nombre: 'Luis', apellido: 'Hernández', fotoUrl: null };
+    socialMock.buscarUsuarios.mockResolvedValue({ items: [ANA, LUIS_RESULTADO], hasMore: false });
+    sharesMock.compartirCalendario.mockImplementation(() => new Promise(() => {}));
+    render(<ShareCalendarDialog open onOpenChange={vi.fn()} />, { wrapper });
+
+    fireEvent.change(screen.getByLabelText('Buscar persona'), { target: { value: 'Ana' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Compartir con Ana García' }, { timeout: 2000 }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Compartir con Luis Hernández' })).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Compartir con Ana García' })).toBeDisabled();
+    expect(sharesMock.compartirCalendario).toHaveBeenCalledTimes(1);
+    // Los resultados de búsqueda no traen correo (solo nombre y carrera).
+    expect(screen.queryByText(/@uvg\.edu\.gt/)).not.toBeInTheDocument();
+  });
+});
