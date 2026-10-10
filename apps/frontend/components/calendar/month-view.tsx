@@ -118,7 +118,8 @@ export function MonthView({
                         key={agendaItemKey(item)}
                         className="flex items-center gap-1 truncate rounded-control bg-surface-container px-1 py-0.5 type-meta"
                       >
-                        {item.kind === 'evento' ? (
+                        {/* G01 (UI-01): un evento OCUPADO no tiene tipo real: punto, sin ícono ni nombre de tipo. */}
+                        {item.kind === 'evento' && !item.ocupado ? (
                           <IconoEvento item={item} />
                         ) : (
                           <span className={`h-1.5 w-1.5 shrink-0 rounded-pill ${puntoDe(item)}`} aria-hidden="true" />

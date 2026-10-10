@@ -123,6 +123,46 @@ describe('TimeGridView (HU-184 T-324)', () => {
     expect(bloque).toHaveClass('bg-cal-4', 'border-dashed');
   });
 
+  it('un evento compartido OCUPADO solo anuncia "Ocupado" y su horario: sin tipo, modalidad ni proyecto (G01-C09, UI-01)', () => {
+    const key = '2026-10-07';
+    const { container } = render(
+      <TimeGridView
+        days={semana()}
+        todayKey="2026-10-06"
+        itemsByDay={
+          new Map([
+            [
+              key,
+              [
+                evento(5, key, {
+                  titulo: 'Ocupado',
+                  projectId: 0,
+                  projectTitle: '',
+                  href: '',
+                  tipo: 'OTRO',
+                  modalidad: 'VIRTUAL',
+                  ocupado: true,
+                  compartidoPor: { idUsuario: 9, nombre: 'Ana García', tono: 4 },
+                }),
+                tarea(6, key, { titulo: 'Fecha límite', projectId: 0, projectTitle: '', href: '', ocupado: true, compartidoPor: { idUsuario: 9, nombre: 'Ana García', tono: 4 } }),
+              ],
+            ],
+          ])
+        }
+        onSelectEvento={() => {}}
+        ahora={AHORA}
+      />,
+    );
+
+    const bloque = screen.getByRole('button', { name: 'Ocupado, 09:00 a 10:30, calendario de Ana García' });
+    expect(bloque).toHaveClass('bg-cal-4', 'border-dashed');
+    expect(bloque.textContent).toContain('Ana García');
+    expect(bloque.querySelector('svg')).toBeNull(); // sin ícono de modalidad
+    expect(container.textContent).not.toMatch(/Otro|Virtual|Proyecto/);
+    expect(screen.getByText('Fecha límite')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
   it('una tarea compartida no es un enlace', () => {
     const key = '2026-10-08';
     render(

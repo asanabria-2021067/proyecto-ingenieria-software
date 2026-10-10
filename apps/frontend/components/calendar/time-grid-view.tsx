@@ -43,9 +43,11 @@ function ChipTodoElDia({ item, onSelectEvento }: { item: AgendaItem; onSelectEve
       </button>
     );
   }
+  // G01 (UI-01): una fecha límite OCUPADO no tiene prioridad real: punto del color de la persona.
+  const punto = item.ocupado && item.compartidoPor ? TONO_CLASES[item.compartidoPor.tono].punto : (PRIORIDAD_DOT[item.prioridad] ?? 'bg-outline-variant');
   const contenido = (
     <>
-      <span className={`size-1.5 shrink-0 rounded-pill ${PRIORIDAD_DOT[item.prioridad] ?? 'bg-outline-variant'}`} aria-hidden="true" />
+      <span className={`size-1.5 shrink-0 rounded-pill ${punto}`} aria-hidden="true" />
       <span className="truncate">{item.titulo}</span>
     </>
   );
@@ -236,7 +238,8 @@ export function TimeGridView({
                       </span>
                       {!compacto && (
                         <span className="mt-0.5 flex items-center gap-1 truncate text-[11px] opacity-90">
-                          <Modalidad className="size-3 shrink-0" aria-hidden="true" />
+                          {/* G01 (UI-01): un evento OCUPADO no tiene modalidad real que mostrar. */}
+                          {!item.ocupado && <Modalidad className="size-3 shrink-0" aria-hidden="true" />}
                           <span className="truncate">{item.compartidoPor ? item.compartidoPor.nombre : item.projectTitle}</span>
                         </span>
                       )}

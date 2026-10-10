@@ -120,7 +120,15 @@ export function WeekView({
                     onClick={() => onSelectEvento(item)}
                     className="flex items-start gap-1.5 rounded-control bg-surface-container-low px-1.5 py-1 text-left transition-colors hover:bg-surface-container"
                   >
-                    <EventoIcono item={item} />
+                    {/* G01 (UI-01): un evento OCUPADO no tiene tipo real que anunciar. */}
+                    {item.ocupado ? (
+                      <span
+                        className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-pill ${item.compartidoPor ? TONO_CLASES[item.compartidoPor.tono].punto : 'bg-outline-variant'}`}
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <EventoIcono item={item} />
+                    )}
                     <span className="flex min-w-0 flex-col">
                       <span className="type-body truncate text-text-primary">{item.titulo}</span>
                       <span className="type-meta truncate">

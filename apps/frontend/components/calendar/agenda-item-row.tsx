@@ -47,17 +47,23 @@ export function AgendaItemRow({
   onSelectEvento?: (item: Extract<AgendaItem, { kind: 'evento' }>) => void;
 }) {
   if (item.kind === 'tarea') {
-    const clase = `flex flex-wrap items-center gap-3 rounded-xl border-l-4 bg-surface-container-low px-4 py-3 ${PRIORIDAD_BORDE[item.prioridad]}`;
+    // G01 (UI-01): una fecha límite OCUPADO no tiene prioridad, estado ni proyecto reales.
+    const borde = item.ocupado && item.compartidoPor ? TONO_CLASES[item.compartidoPor.tono].borde : PRIORIDAD_BORDE[item.prioridad];
+    const clase = `flex flex-wrap items-center gap-3 rounded-xl border-l-4 bg-surface-container-low px-4 py-3 ${borde}`;
     const contenido = (
       <>
         <span className="min-w-[10rem] flex-1 truncate text-sm text-on-surface">{item.titulo}</span>
         <span className="shrink-0 text-xs text-tertiary">
-          {item.compartidoPor ? `${item.compartidoPor.nombre} · ${item.projectTitle}` : item.projectTitle}
+          {item.compartidoPor ? [item.compartidoPor.nombre, item.projectTitle].filter(Boolean).join(' · ') : item.projectTitle}
         </span>
-        <span className="pill pill-neutral shrink-0">{PRIORIDAD_LABEL[item.prioridad]}</span>
-        <span className={`pill shrink-0 ${TAREA_ESTADO_PILL[item.estado] ?? 'pill-neutral'}`}>
-          {ESTADO_TAREA_LABEL[item.estado] ?? item.estado}
-        </span>
+        {!item.ocupado && (
+          <>
+            <span className="pill pill-neutral shrink-0">{PRIORIDAD_LABEL[item.prioridad]}</span>
+            <span className={`pill shrink-0 ${TAREA_ESTADO_PILL[item.estado] ?? 'pill-neutral'}`}>
+              {ESTADO_TAREA_LABEL[item.estado] ?? item.estado}
+            </span>
+          </>
+        )}
       </>
     );
     if (!item.href) {
@@ -81,19 +87,22 @@ export function AgendaItemRow({
       className={`flex w-full flex-wrap items-center gap-3 rounded-xl border-l-4 bg-surface-container-low px-4 py-3 text-left transition-colors hover:bg-surface-container ${tono.borde}`}
     >
       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-control ${tono.bloque}`}>
-        <tipo.icon className="h-3.5 w-3.5" aria-hidden="true" />
+        {/* G01 (UI-01): un evento OCUPADO no tiene tipo real: sin ícono de tipo. */}
+        {!item.ocupado && <tipo.icon className="h-3.5 w-3.5" aria-hidden="true" />}
       </span>
       <span className="min-w-[10rem] flex-1 truncate text-sm text-on-surface">{item.titulo}</span>
       <span className="shrink-0 text-xs text-tertiary">
         {item.horaInicio}–{item.horaFin}
       </span>
       <span className="shrink-0 text-xs text-tertiary">
-        {item.compartidoPor ? `${item.compartidoPor.nombre} · ${item.projectTitle}` : item.projectTitle}
+        {item.compartidoPor ? [item.compartidoPor.nombre, item.projectTitle].filter(Boolean).join(' · ') : item.projectTitle}
       </span>
-      <span className="pill pill-neutral inline-flex shrink-0 items-center gap-1">
-        <modalidad.icon className="size-3" aria-hidden="true" />
-        {tipo.label} · {modalidad.label}
-      </span>
+      {!item.ocupado && (
+        <span className="pill pill-neutral inline-flex shrink-0 items-center gap-1">
+          <modalidad.icon className="size-3" aria-hidden="true" />
+          {tipo.label} · {modalidad.label}
+        </span>
+      )}
       <ChevronRight className="h-4 w-4 shrink-0 text-tertiary" aria-hidden="true" />
     </button>
   );

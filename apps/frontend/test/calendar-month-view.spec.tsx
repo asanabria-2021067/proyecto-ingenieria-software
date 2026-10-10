@@ -160,6 +160,22 @@ describe('MonthView (HU-169 T-264)', () => {
     expect(container.querySelector('span.bg-cal-4-strong.h-1\\.5')).not.toBeNull();
   });
 
+  it('un evento compartido OCUPADO se pinta como punto, sin ícono ni nombre de tipo (G01-C09, UI-01)', () => {
+    const itemsByDay = new Map<string, AgendaItem[]>([
+      [
+        '2026-09-10',
+        [{ ...evento(2, '2026-09-10', 'Ocupado'), ocupado: true, projectId: 0, projectTitle: '', href: '', compartidoPor: { idUsuario: 9, nombre: 'Ana', tono: 2 } }],
+      ],
+    ]);
+    const { container } = render(
+      <MonthView year={2026} month={8} todayKey="2026-09-27" selectedKey={null} itemsByDay={itemsByDay} onSelectDay={() => {}} />,
+    );
+
+    expect(screen.getByText('Ocupado')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('Otro');
+    expect(container.querySelector('svg')).toBeNull();
+  });
+
   it('el nombre accesible del día dice cuántas actividades tiene (los títulos no caben en móvil)', () => {
     const key = '2026-09-10';
     const itemsByDay = new Map<string, AgendaItem[]>([[key, [tarea(1, key, 'T1'), evento(2, key, 'E1')]]]);
