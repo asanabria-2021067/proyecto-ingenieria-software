@@ -242,6 +242,10 @@
   --text-meta--line-height: 1.125rem;
   --text-meta--font-weight: 400;
 
+  /* G04 (UI-33): 11 px para texto denso del calendario; ver `.type-micro`. */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.5;
+
   --spacing-micro: 0.25rem;
   --spacing-tight: 0.5rem;
   --spacing-inline: 0.75rem;
@@ -289,6 +293,19 @@
   --color-attention: oklch(66.6% 0.179 58.318);
   --color-attention-strong: oklch(55.5% 0.163 48.998);
   --color-on-attention: #ffffff;
+}
+
+/* G04 (UI-33): texto denso del calendario (horas dentro de un bloque, chips de
+   "Todo el día", iniciales de avatar, chip de duración). A diferencia del resto
+   de `type-*` no fija color ni peso: dentro de un bloque el color es el
+   `on-cal-N` del tono. Es una utilidad propia (`@utility`), así que gana a las
+   clases de componente (`pill`, `type-meta`) cuando conviven, y se llama
+   `type-micro` y no `text-micro` a propósito: `cn()` (tailwind-merge) toma un
+   `text-*` que no conoce por un color y lo descarta junto a otro color de texto. */
+@utility type-micro {
+  font-family: var(--font-family-body);
+  font-size: var(--text-micro);
+  line-height: var(--text-micro--line-height);
 }
 
 @layer components {

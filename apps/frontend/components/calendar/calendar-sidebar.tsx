@@ -196,7 +196,7 @@ export function CalendarSidebar({
                     <div className="flex items-center gap-tight">
                       <Avatar className={`size-7 ring-2 ring-offset-1 ring-offset-card ${TONO_CLASES[persona.tono].anillo}`}>
                         {persona.fotoUrl && <AvatarImage src={persona.fotoUrl} alt="" />}
-                        <AvatarFallback className={`text-[10px] font-bold ${TONO_CLASES[persona.tono].bloque}`}>
+                        <AvatarFallback className={`type-micro font-bold ${TONO_CLASES[persona.tono].bloque}`}>
                           {iniciales(persona.nombre, persona.apellido)}
                         </AvatarFallback>
                       </Avatar>

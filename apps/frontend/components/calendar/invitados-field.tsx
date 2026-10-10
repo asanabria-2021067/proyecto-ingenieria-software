@@ -22,7 +22,7 @@ function Chip({ persona, sufijo, onQuitar, disabled }: {
     <span className="inline-flex max-w-full items-center gap-1.5 rounded-pill border border-outline-variant bg-surface-container-lowest py-0.5 pl-0.5 pr-2 text-xs text-text-primary">
       <Avatar className="size-6">
         {persona.fotoUrl && <AvatarImage src={persona.fotoUrl} alt="" />}
-        <AvatarFallback className="bg-surface-container-high text-[10px] font-bold text-text-secondary">
+        <AvatarFallback className="bg-surface-container-high type-micro font-bold text-text-secondary">
           {iniciales(persona.nombre, persona.apellido)}
         </AvatarFallback>
       </Avatar>
@@ -132,7 +132,7 @@ export function InvitadosField({
                 >
                   <Avatar className="size-6">
                     {m.fotoUrl && <AvatarImage src={m.fotoUrl} alt="" />}
-                    <AvatarFallback className="text-[10px]">{iniciales(m.nombre, m.apellido)}</AvatarFallback>
+                    <AvatarFallback className="type-micro">{iniciales(m.nombre, m.apellido)}</AvatarFallback>
                   </Avatar>
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-sm">

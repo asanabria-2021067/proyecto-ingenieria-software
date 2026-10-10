@@ -257,7 +257,8 @@ export function EventFormDialog({
                 <CalendarCheck2 className="size-5" aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <DialogTitle className="text-lg font-bold text-on-surface sm:text-xl">
+                {/* G04 (UI-33): el título usa el `type-section` que ya trae DialogTitle. */}
+                <DialogTitle>
                   {isEditing ? 'Editar evento' : 'Nuevo evento o sesión'}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-on-surface-variant sm:text-sm">
@@ -452,7 +453,7 @@ export function EventFormDialog({
                           <FormLabel className="text-xs font-medium text-on-surface-variant">Hora de fin</FormLabel>
                           {duracion && (
                             // G04 (UI-32): sin aria-label en un span genérico (no es válido ni fiable): texto oculto + valor.
-                            <span className="pill pill-success px-1.5 py-0 text-[11px]">
+                            <span className="pill pill-success px-1.5 py-0 type-micro">
                               <span className="sr-only">Duración </span>
                               {duracion}
                             </span>
@@ -733,7 +734,7 @@ export function EventFormDialog({
                     variant="ghost"
                     disabled={isPending}
                     onClick={() => void confirmarEliminacion()}
-                    className="h-10 gap-1.5 rounded-md text-xs font-bold text-status-error hover:text-status-error"
+                    className="h-10 gap-1.5 rounded-pill text-xs font-bold text-status-error hover:text-status-error"
                   >
                     {isCancelling ? (
                       <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
@@ -748,7 +749,7 @@ export function EventFormDialog({
                   variant="ghost"
                   disabled={isPending}
                   onClick={() => onOpenChange(false)}
-                  className="h-10 rounded-md text-xs font-bold"
+                  className="h-10 rounded-pill text-xs font-bold"
                 >
                   Cancelar
                 </Button>

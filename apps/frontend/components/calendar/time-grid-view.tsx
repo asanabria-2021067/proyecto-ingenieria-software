@@ -39,7 +39,7 @@ function ChipTodoElDia({ item, onSelectEvento }: { item: AgendaItem; onSelectEve
         data-evento-key={agendaItemKey(item)}
         onClick={() => onSelectEvento(item)}
         // G04 (UI-18): min-h-6 = 24 px de objetivo táctil (antes 20.5 px).
-        className={`min-h-6 w-full truncate rounded-control border-l-4 px-1.5 py-0.5 text-left text-[11px] font-semibold ${tono.bloque} ${tono.borde}`}
+        className={`min-h-6 w-full truncate rounded-control border-l-4 px-1.5 py-0.5 text-left type-micro font-semibold ${tono.bloque} ${tono.borde}`}
       >
         {item.titulo}
       </button>
@@ -54,7 +54,7 @@ function ChipTodoElDia({ item, onSelectEvento }: { item: AgendaItem; onSelectEve
     </>
   );
   const clase =
-    'flex min-h-6 w-full items-center gap-1 rounded-control border border-outline-variant/60 bg-surface-container-lowest px-1.5 py-0.5 text-[11px] text-text-primary';
+    'flex min-h-6 w-full items-center gap-1 rounded-control border border-outline-variant/60 bg-surface-container-lowest px-1.5 py-0.5 type-micro text-text-primary';
   // Una tarea de un calendario compartido no es navegable (quien la ve puede no ser del proyecto).
   return item.href ? (
     <Link href={item.href} title={`Fecha límite: ${item.titulo}`} className={`${clase} hover:bg-surface-container`}>
@@ -213,7 +213,7 @@ export function TimeGridView({
             {HORAS.map((h) => (
               <span
                 key={h}
-                className="type-meta absolute right-1.5 -translate-y-1/2 text-[11px]"
+                className="type-meta absolute right-1.5 -translate-y-1/2 type-micro"
                 style={{ top: h * HORA_ALTO_PX }}
               >
                 {h > 0 ? etiquetaHora(h) : ''}
@@ -266,14 +266,14 @@ export function TimeGridView({
                         </span>
                       ) : (
                         <>
-                          <span className="block truncate text-[11px] font-semibold opacity-90">
+                          <span className="block truncate type-micro font-semibold opacity-90">
                             {item.horaInicio} – {item.horaFin}
                           </span>
                           <span className="block text-xs font-bold leading-tight line-clamp-2">{item.titulo}</span>
                         </>
                       )}
                       {!compacto && (
-                        <span className="mt-0.5 flex items-center gap-1 truncate text-[11px] opacity-90">
+                        <span className="mt-0.5 flex items-center gap-1 truncate type-micro opacity-90">
                           {/* G01 (UI-01): un evento OCUPADO no tiene modalidad real que mostrar. */}
                           {!item.ocupado && <Modalidad className="size-3 shrink-0" aria-hidden="true" />}
                           <span className="truncate">{item.compartidoPor ? item.compartidoPor.nombre : item.projectTitle}</span>

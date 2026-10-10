@@ -11,8 +11,11 @@ Los tokens viven en `apps/frontend/app/global.css` y reutilizan la paleta Materi
 | `type-subtitle` | Título de tarjeta o fila | 16 / 24 / 500 |
 | `type-body` | Texto y descripciones | 15 / 24 / 400 |
 | `type-meta` | Fechas, autores, contadores e identificadores | 13 / 18 / 400 |
+| `type-micro` | Texto denso del calendario: horas dentro de un bloque, chips de «Todo el día», iniciales de avatar | 11 / 16.5 / hereda |
 
 `type-meta` siempre usa texto secundario. Manrope se reserva para `display` y `section`; Inter cubre los demás niveles.
+
+`type-micro` es la única clase de la familia que no fija color ni peso: se usa dentro de bloques que ya traen su color (`on-cal-N`). No es un nivel de lectura: no debe usarse para párrafos ni fuera de componentes densos. Sustituye a los literales `text-[11px]` y `text-[10px]`. Está declarada con `@utility` (gana a `pill` y `type-meta` cuando conviven). Debe usarse `type-micro` y no la utilidad `text-micro`: `cn()` (tailwind-merge) confunde un `text-*` propio con un color y lo elimina al combinarlo con otro color de texto.
 
 ## Color
 

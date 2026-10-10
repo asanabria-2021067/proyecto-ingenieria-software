@@ -40,7 +40,7 @@ export function CalendarFilterMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" className="h-9 gap-1.5 rounded-md border-outline-variant text-xs font-bold">
+        <Button type="button" variant="outline" className="h-9 gap-1.5 rounded-pill border-outline-variant text-xs font-bold">
           <ListFilter className="size-4" aria-hidden="true" />
           {filtrando ? 'Eventos filtrados' : 'Todos los eventos'} ({total})
           <ChevronDown className="size-3.5" aria-hidden="true" />

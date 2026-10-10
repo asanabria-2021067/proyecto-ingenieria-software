@@ -516,7 +516,7 @@ export default function CalendarioPage() {
     <div className={dashboardPage('py-8')}>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-gap">
         <div>
-          <h1 className="mb-1 font-headline text-3xl font-extrabold text-on-surface">Calendario académico y proyectos</h1>
+          <h1 className="type-display mb-1">Calendario académico y proyectos</h1>
           <p className="text-sm text-tertiary">Organiza tus tutorías, reuniones, entregas y fechas límite de tus proyectos.</p>
         </div>
 
@@ -526,13 +526,13 @@ export default function CalendarioPage() {
               {compartidoPorMi.slice(0, 3).map((persona) => (
                 <Avatar key={persona.idUsuario} className="size-8 ring-2 ring-card" title={`${persona.nombre} ${persona.apellido}`}>
                   {persona.fotoUrl && <AvatarImage src={persona.fotoUrl} alt="" />}
-                  <AvatarFallback className="bg-surface-container-high text-[10px] font-bold">
+                  <AvatarFallback className="bg-surface-container-high type-micro font-bold">
                     {iniciales(persona.nombre, persona.apellido)}
                   </AvatarFallback>
                 </Avatar>
               ))}
               {compartidoPorMi.length > 3 && (
-                <span className="flex size-8 items-center justify-center rounded-pill bg-surface-container-high text-[10px] font-bold ring-2 ring-card">
+                <span className="flex size-8 items-center justify-center rounded-pill bg-surface-container-high type-micro font-bold ring-2 ring-card">
                   +{compartidoPorMi.length - 3}
                 </span>
               )}
@@ -640,7 +640,7 @@ export default function CalendarioPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="size-8 rounded-control p-0"
+                className="size-8 rounded-pill p-0"
                 aria-label="Anterior"
                 onClick={() => irA(navegar(vista, anchor, -1))}
               >
@@ -649,7 +649,7 @@ export default function CalendarioPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="size-8 rounded-control p-0"
+                className="size-8 rounded-pill p-0"
                 aria-label="Siguiente"
                 onClick={() => irA(navegar(vista, anchor, 1))}
               >
