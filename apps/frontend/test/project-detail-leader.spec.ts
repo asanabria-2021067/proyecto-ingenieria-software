@@ -265,7 +265,7 @@ describe('Tarjetas compartidas del detalle de proyecto', () => {
     expect(screen.getByText('Descripción corta.')).toBeInTheDocument();
     const resumen = screen.getByRole('region', { name: 'Resumen del proyecto' });
     expect(within(resumen).getByText('En progreso')).toHaveClass('pill');
-    expect(within(resumen).getByText('Horas Beca')).toHaveClass('rounded-[7px]');
+    expect(within(resumen).getByText('Horas Beca')).toHaveClass('pill', 'pill-sage');
     expect(within(resumen).getByText('Mixta')).toHaveClass('pill', 'pill-neutral');
     const etiquetas = screen.getByRole('list', { name: 'Etiquetas del proyecto' });
     expect(within(etiquetas).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Salud', 'Deporte']);

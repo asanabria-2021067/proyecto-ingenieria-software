@@ -270,9 +270,9 @@ describe('SprintAnalyticsPage — lectura semántica', () => {
   });
 
   it.each([
-    ['PENDIENTE', 'Pendiente', 'bg-outline', 'bg-surface-container-high'],
-    ['EN_PROGRESO', 'En progreso', 'bg-accent', 'bg-status-warning'],
-    ['COMPLETADO', 'Completado', 'bg-primary', 'bg-primary-container'],
+    ['PENDIENTE', 'Pendiente', 'bg-outline', 'pill-neutral'],
+    ['EN_PROGRESO', 'En progreso', 'bg-accent', 'pill-lime'],
+    ['COMPLETADO', 'Completado', 'bg-primary', 'pill-success'],
   ] as const)('hito %s: la barra y el badge comparten tono', (estadoHito, etiqueta, barraClase, badgeClase) => {
     mockAnalytics({
       analytics: analytics({ hitos: [{ idHito: 1, tituloHito: 'MVP', estadoHito, porcentaje: 40 }] }),

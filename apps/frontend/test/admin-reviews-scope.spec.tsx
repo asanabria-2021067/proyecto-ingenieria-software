@@ -165,12 +165,11 @@ describe('VIEW-05 — bandeja de solicitudes de publicación (F017)', () => {
 
     // Misma etiqueta de categoría que las vistas de estudiante (clase y texto).
     const beca = seccion('Pendientes de revisión').getByText('Horas Beca');
-    expect(beca).toHaveClass('rounded-[7px]');
-    expect(beca.className).toContain('bg-[#E4EFE4]');
+    expect(beca).toHaveClass('pill', 'pill-sage');
     expect(seccion('Pendientes de revisión').getByText(/Líder: Ana López · Envío #1 · Recibida el 1 ago 2026/)).toBeInTheDocument();
 
     const espera = seccion('En espera de correcciones');
-    expect(espera.getByText('Experiencia').className).toContain('bg-[#DFEBFF]');
+    expect(espera.getByText('Experiencia')).toHaveClass('pill', 'pill-blue');
     expect(espera.getByText(/Líder: Eva Ruiz · Envío #1 · Revisado el 3 ago 2026/)).toBeInTheDocument();
     expect(espera.queryByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
 

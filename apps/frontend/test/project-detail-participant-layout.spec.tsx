@@ -261,7 +261,7 @@ describe('Página del participante sobre el esqueleto compartido', () => {
     expect(within(full).getByRole('heading', { level: 2, name: 'Portal de voluntariado UVG' })).toBeInTheDocument();
     expect(within(full).getByRole('heading', { level: 1, name: 'Resumen' })).toBeInTheDocument();
     expect(within(full).getByRole('link', { name: 'Volver a Proyectos disponibles' })).toHaveAttribute('href', '/dashboard/proyectos');
-    expect(within(full).getByText('Extensión')).toHaveClass('rounded-[7px]');
+    expect(within(full).getByText('Extensión')).toHaveClass('pill', 'pill-violet');
   });
 
   it('principal: descripción y objetivos, banner de salida, aviso de postulaciones y roles, en ese orden', async () => {

@@ -1,83 +1,110 @@
 'use client';
 
-import { AlertCircle, AlertTriangle, ArrowDown, ArrowUp, CheckCircle, Clock, Minus, XCircle } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { ArrowDown, ArrowUp, Minus, Tag as TagIcon } from 'lucide-react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
+import { ATTENTION_TONE } from '@/components/admin/dashboard/attention-queue';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
+import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
 import {
   CLOSED_BADGE,
   GOLD_BADGE,
   GREEN_BADGE,
+  MODALIDAD_ICON,
   NEUTRAL_BADGE,
   SLATE_BADGE,
   estadoBadgeLabel,
   estadoBadgeStyle,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
+import { ENTIDAD_LABEL, ENTIDAD_TONE } from '@/components/projects/bitacora-entity.utils';
+import { ESTADO_REVISION_LABEL } from '@/components/projects/closure-review-status.utils';
 import { ExitRequestBadge } from '@/components/projects/member-exit-request-actions';
 import { ESTADO_PARTICIPACION_STYLE } from '@/components/projects/member-status.utils';
+import { ESTADO_HITO_STYLE, ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
+import {
+  ESTADO_LABEL as ESTADO_TAREA_LABEL,
+  ESTADO_TAREA_TONE,
+  PRIORIDAD_ICON,
+  PRIORIDAD_LABEL,
+  PRIORIDAD_TONE,
+  VENCIMIENTO_CONFIG,
+} from '@/components/projects/task-board.utils';
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 import { Badge } from '@/components/ui/badge';
+import { TAG_TONES, Tag, type TagSize } from '@/components/ui/tag';
+import { ESTADO_BADGE as ESTADO_APELACION_BADGE } from '@/app/dashboard/admin/apelaciones/appeals-inbox-client';
+import { SITUACION_CIERRE, SITUACION_PUBLICACION } from '@/lib/admin/request-status';
 import { SITUACION_SPRINT_LABEL, SITUACION_SPRINT_TONE } from '@/lib/admin/sprint-calendar';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
+import { MODALIDAD_LABEL } from '@/types';
+import type { ModalidadProyecto } from '@/types';
 
 /**
- * VISTA TEMPORAL — inventario de las etiquetas (pills, badges y chips) que usa
- * la aplicación, en vistas de estudiante y de administrador, para revisarlas
- * juntas. No forma parte del producto: se elimina al terminar la revisión.
+ * VISTA TEMPORAL — catálogo de las 27 familias de etiquetas (pills, badges y
+ * chips) de UVGenius, en vistas de estudiante y de administrador. No forma
+ * parte del producto: se elimina al terminar la revisión.
  *
- * «En vivo» = la etiqueta se pinta con el componente o la constante real, así
- * que refleja cualquier cambio. «Copia» = el mapa de estilos es privado de su
- * página (un `page.tsx` no puede exportarlo) y aquí se replican sus clases; si
- * la página cambia, esta copia no se entera.
+ * Todo lo que se pinta aquí sale de los componentes, mapas y tokens reales que
+ * usan las demás páginas (nada se copia a mano): si una vista cambia su tono,
+ * este catálogo lo refleja. Cada familia se muestra en claro y en oscuro
+ * (el panel oscuro envuelve el contenido en `.dark`, la misma clase que
+ * `next-themes` pone en <html>).
  */
 
-// Formas reales de etiqueta, tal como las escribe cada vista.
-const PILL = 'pill';
-const TARJETA = 'inline-flex h-6.25 items-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap';
-const REDONDA = 'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap';
-const REDONDA_GRANDE = 'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold';
-const REDONDA_11 = 'w-fit rounded-full px-2.5 py-0.5 text-[11px] font-semibold';
-const MODALIDAD = 'inline-flex h-6.5 items-center rounded-full px-3 text-[12px] font-semibold whitespace-nowrap';
-
 type Vista = 'Estudiante' | 'Admin' | 'Ambas';
-type Origen = 'En vivo' | 'Copia';
+/** Compartida = reutiliza un tono/mapa común del sistema; Particular = tiene su propio mapa de dominio. */
+type Origen = 'Compartida' | 'Particular';
 
-function Grupo({
+function Familia({
+  numero,
   titulo,
   vista,
   origen,
   fuente,
+  nota,
   children,
 }: {
+  numero: number;
   titulo: string;
   vista: Vista;
   origen: Origen;
   fuente: string;
-  children: React.ReactNode;
+  nota?: string;
+  children: ReactNode;
 }) {
   return (
-    <section className="card-base">
+    <section className="card-base flex flex-col gap-inline" aria-labelledby={`familia-${numero}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-inline gap-y-micro">
-        <h2 className="type-subtitle font-semibold">{titulo}</h2>
+        <h2 id={`familia-${numero}`} className="type-subtitle font-semibold">
+          {String(numero).padStart(2, '0')} · {titulo}
+        </h2>
         <p className="type-meta">
           {vista} · {origen}
         </p>
       </div>
-      <p className="type-meta mt-micro break-all font-mono">{fuente}</p>
-      <div className="mt-stack flex flex-wrap items-center gap-tight">{children}</div>
+      <p className="type-meta break-all font-mono">{fuente}</p>
+      {nota && <p className="type-meta">{nota}</p>}
+      <div className="grid grid-cols-1 gap-tight sm:grid-cols-2">
+        <div className="flex flex-wrap items-center gap-tight rounded-control bg-surface-container-low p-inline">{children}</div>
+        <div className="dark flex flex-wrap items-center gap-tight rounded-control bg-surface p-inline text-on-surface">{children}</div>
+      </div>
     </section>
   );
 }
 
-const chip = (forma: string, clase: string, texto: string) => (
-  <span key={`${texto}-${clase}`} className={`${forma} ${clase}`}>
-    {texto}
-  </span>
-);
-
-const TIPOS = ['ACADEMICO_HORAS_BECA', 'EXTRACURRICULAR_EXTENSION', 'ACADEMICO_EXPERIENCIA'];
 const ESTADOS_PROYECTO = ['BORRADOR', 'EN_REVISION', 'OBSERVADO', 'PUBLICADO', 'EN_PROGRESO', 'EN_SOLICITUD_CIERRE', 'CERRADO', 'CANCELADO'];
+const TIPOS_PROYECTO = ['ACADEMICO_HORAS_BECA', 'EXTRACURRICULAR_EXTENSION', 'ACADEMICO_EXPERIENCIA'];
+const TAMANOS: TagSize[] = ['sm', 'md', 'lg'];
+const HABILIDADES = ['React', 'Python', 'TypeScript', 'Java', 'NestJS', 'PostgreSQL', 'SQL', 'Estadística', 'Diseño UX', 'Figma', 'Docker', 'Liderazgo', 'Redacción'];
+const ETIQUETAS_LIBRES = [
+  ['Frontend', '#006735'],
+  ['Urgente', '#ba1a1a'],
+  ['Documentación', '#1659C7'],
+  ['Backend', '#6448AE'],
+  ['Diseño', '#0F6459'],
+  ['Nombre de etiqueta demasiado largo para una celda compacta', '#f5c400'],
+] as const;
 
 export default function AdminEtiquetasPage() {
   return (
@@ -86,197 +113,291 @@ export default function AdminEtiquetasPage() {
       <header className="mb-6">
         <h1 className="type-display text-balance">Etiquetas</h1>
         <p className="mt-tight max-w-3xl text-base text-tertiary">
-          Vista temporal de revisión: reúne las etiquetas de estado, categoría y prioridad que usa UVGenius en las
-          vistas de estudiante y de administrador. «En vivo» usa el componente real; «Copia» replica las clases de un
-          mapa privado de su página.
+          Catálogo temporal de las 27 familias de etiquetas de UVGenius. Cada familia importa el componente, el mapa o el
+          token real que usan las vistas de estudiante y de administrador, y se muestra en modo claro (izquierda) y oscuro
+          (derecha).
         </p>
       </header>
 
-      <div className="grid grid-cols-1 gap-grid lg:grid-cols-2">
-        <Grupo titulo="Clases base «pill»" vista="Ambas" origen="En vivo" fuente="app/global.css (.pill, .pill-*)">
-          {['pill-neutral', 'pill-accent', 'pill-success', 'pill-warning', 'pill-error'].map((c) => chip(PILL, c, c))}
-        </Grupo>
-
-        <Grupo titulo="Categoría del proyecto" vista="Ambas" origen="En vivo" fuente="components/projects/available-project-card.tsx · tipoBadgeStyle">
-          {TIPOS.map((t) => chip(TARJETA, tipoBadgeStyle(t), tipoBadgeLabel(t)))}
-        </Grupo>
-
-        <Grupo titulo="Estado del proyecto" vista="Ambas" origen="En vivo" fuente="components/projects/available-project-card.tsx · estadoBadgeStyle">
-          {ESTADOS_PROYECTO.map((e) => chip(TARJETA, estadoBadgeStyle(e), estadoBadgeLabel(e)))}
-          {chip(TARJETA, 'blink-gold-gray', 'En solicitud de cierre (Mis Proyectos)')}
-          <span className="inline-flex h-8 items-center rounded-md bg-[#0A4232] px-3 text-xs font-semibold text-white dark:bg-primary dark:text-on-primary">
-            Ver proyecto (cierre solicitado)
-          </span>
-          <span className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-semibold text-on-primary">
-            Ver proyecto (publicado / en progreso)
-          </span>
-          <span className="inline-flex h-8 items-center rounded-md bg-[#64756C] px-3 text-xs font-semibold text-white dark:bg-[#453405] dark:text-[#ffd873]">
-            Ver proyecto (cerrado)
-          </span>
-        </Grupo>
-
-        <Grupo titulo="Paleta compartida de etiquetas" vista="Ambas" origen="En vivo" fuente="components/projects/available-project-card.tsx · *_BADGE">
-          {chip(TARJETA, NEUTRAL_BADGE, 'Neutral')}
-          {chip(TARJETA, GREEN_BADGE, 'Verde')}
-          {chip(TARJETA, GOLD_BADGE, 'Cierre solicitado')}
-          {chip(TARJETA, CLOSED_BADGE, 'Cerrado')}
-          {chip(TARJETA, SLATE_BADGE, 'Pizarra')}
-          {chip(PILL, SLATE_BADGE, 'Líder')}
-          {chip(PILL, 'pill-neutral', 'Participación finalizada')}
-        </Grupo>
-
-        <Grupo titulo="Modalidad del proyecto" vista="Estudiante" origen="Copia" fuente="app/dashboard/proyectos/[id]/page.tsx · MODALIDAD_BADGE">
-          {['Presencial', 'Virtual', 'Mixta'].map((m) => chip(MODALIDAD, 'bg-surface-container-high text-on-surface-variant', m))}
-        </Grupo>
-
-        <Grupo titulo="Estado de tarea" vista="Estudiante" origen="Copia" fuente="mis-tareas/page.tsx · tareas-explorer-client.tsx · my-hours-project-list.tsx">
-          {chip(PILL, 'pill-neutral', 'Por hacer')}
-          {chip(PILL, 'pill-warning', 'En progreso')}
-          {chip(PILL, 'pill-neutral', 'En revisión')}
-          {chip(PILL, 'pill-success', 'Hecho')}
-          {chip(PILL, 'pill-neutral', 'Eliminada')}
-        </Grupo>
-
-        <Grupo titulo="Estado de tarea (calendario)" vista="Estudiante" origen="Copia" fuente="components/calendar/agenda-item-row.tsx · TAREA_ESTADO_PILL">
-          {chip(PILL, 'pill-neutral', 'Por hacer')}
-          {chip(PILL, 'pill-accent', 'En progreso')}
-          {chip(PILL, 'pill-warning', 'En revisión')}
-          {chip(PILL, 'pill-success', 'Hecho')}
-        </Grupo>
-
-        <Grupo titulo="Prioridad de tarea" vista="Estudiante" origen="Copia" fuente="mis-tareas/page.tsx · tareas-explorer-client.tsx · PRIORIDAD_TONE">
-          <span className="pill pill-neutral">
-            <ArrowDown className="size-3.5" aria-hidden="true" />
-            Baja
-          </span>
-          <span className="pill pill-warning">
-            <Minus className="size-3.5" aria-hidden="true" />
-            Media
-          </span>
-          <span className="pill pill-error">
-            <ArrowUp className="size-3.5" aria-hidden="true" />
-            Alta
-          </span>
-        </Grupo>
-
-        <Grupo titulo="Vencimiento de tarea" vista="Estudiante" origen="Copia" fuente="app/dashboard/mis-tareas/page.tsx · VENCIMIENTO_CONFIG">
-          <span className="pill pill-error">
-            <AlertCircle className="size-3.5" aria-hidden="true" />
-            Vencida
-          </span>
-          <span className="pill pill-warning">
-            <AlertTriangle className="size-3.5" aria-hidden="true" />
-            Vence pronto
-          </span>
-        </Grupo>
-
-        <Grupo titulo="Etiqueta de tarea (color libre)" vista="Estudiante" origen="En vivo" fuente="components/projects/task-label-chip.tsx · TaskLabelChip">
-          {[
-            ['Frontend', '#006735'],
-            ['Urgente', '#ba1a1a'],
-            ['Documentación', '#1659C7'],
-          ].map(([nombreEtiqueta, color], i) => (
-            <TaskLabelChip key={nombreEtiqueta} etiqueta={{ idEtiqueta: i + 1, nombreEtiqueta, color } as never} />
+      <section className="card-base mb-grid flex flex-col gap-inline" aria-labelledby="sistema">
+        <h2 id="sistema" className="type-subtitle font-semibold">
+          Sistema: tonos y tamaños
+        </h2>
+        <p className="type-meta break-all font-mono">
+          app/global.css (.pill, .pill-sm, .pill-lg, .pill-&lt;tono&gt;, --color-tag-* / --color-on-tag-*, --radius-tag) · components/ui/tag.tsx (Tag, tagClass)
+        </p>
+        <p className="type-meta">
+          Forma única: radio «tag» (7 px), 25 px de alto, 12 px semibold. Los 15 tonos cumplen AA (≥ 4,5:1) en ambos temas.
+          Nombres históricos: accent = lime, warning = amber, error = red.
+        </p>
+        <div className="grid grid-cols-1 gap-tight sm:grid-cols-2">
+          <div className="flex flex-wrap items-center gap-tight rounded-control bg-surface-container-low p-inline">
+            {TAG_TONES.map((tone) => (
+              <Tag key={tone} tone={tone}>
+                {tone}
+              </Tag>
+            ))}
+          </div>
+          <div className="dark flex flex-wrap items-center gap-tight rounded-control bg-surface p-inline text-on-surface">
+            {TAG_TONES.map((tone) => (
+              <Tag key={tone} tone={tone}>
+                {tone}
+              </Tag>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-tight">
+          {TAMANOS.map((size) => (
+            <Tag key={size} tone="green" size={size}>
+              Publicado · {size}
+            </Tag>
           ))}
-        </Grupo>
+          <Tag tone="green">
+            <TagIcon aria-hidden="true" />
+            Con icono
+          </Tag>
+          <span className="max-w-40">
+            <Tag tone="neutral" className="w-full">
+              <span className="truncate">Etiqueta larga que se trunca con `truncate` en celdas estrechas</span>
+            </Tag>
+          </span>
+        </div>
+      </section>
 
-        <Grupo titulo="Estado de Sprint" vista="Estudiante" origen="Copia" fuente="proyectos/[id]/sprints/** · equipo/[idUsuario] · ESTADO_SPRINT_STYLE">
-          {chip(REDONDA, 'bg-primary-container text-on-primary-container', 'Activo')}
-          {chip(REDONDA, 'bg-status-warning text-on-status-warning', 'En finalización')}
-          {chip(REDONDA, 'bg-surface-container-high text-tertiary', 'Cerrado')}
-          {chip(REDONDA, 'bg-primary-container text-on-primary-container', 'ACTIVO')}
-          {chip(REDONDA, 'bg-status-warning text-on-status-warning', 'EN FINALIZACIÓN')}
-          {chip(REDONDA, 'bg-surface-container-high text-tertiary', 'CERRADO')}
-        </Grupo>
+      <div className="grid grid-cols-1 gap-grid lg:grid-cols-2">
+        <Familia numero={1} titulo="Clases base «pill»" vista="Ambas" origen="Compartida" fuente="app/global.css · .pill-neutral/.pill-accent/.pill-success/.pill-warning/.pill-error">
+          {(['neutral', 'accent', 'success', 'warning', 'error'] as const).map((tone) => (
+            <Tag key={tone} tone={tone}>
+              {tone[0].toUpperCase() + tone.slice(1)}
+            </Tag>
+          ))}
+        </Familia>
 
-        <Grupo titulo="Estado de hito" vista="Estudiante" origen="Copia" fuente="proyectos/[id]/sprints/[sprintId]/** · ESTADO_HITO_STYLE">
-          {chip(REDONDA, 'bg-surface-container-high text-tertiary', 'Pendiente')}
-          {chip(REDONDA, 'bg-status-warning text-on-status-warning', 'En progreso')}
-          {chip(REDONDA, 'bg-primary-container text-on-primary-container', 'Completado')}
-        </Grupo>
+        <Familia numero={2} titulo="Categoría del proyecto" vista="Ambas" origen="Particular" fuente="components/projects/tipo-badge.tsx · TipoBadge → tipoBadgeStyle (available-project-card.tsx)">
+          {TIPOS_PROYECTO.map((t) => (
+            <TipoBadge key={t} tipo={t} />
+          ))}
+          <TipoBadge tipo="ACADEMICO_HORAS_BECA" size="sm" />
+        </Familia>
 
-        <Grupo titulo="Situación de Sprint (calendario admin)" vista="Admin" origen="En vivo" fuente="lib/admin/sprint-calendar.ts · SITUACION_SPRINT_TONE">
-          {(Object.keys(SITUACION_SPRINT_TONE) as Array<keyof typeof SITUACION_SPRINT_TONE>).map((s) =>
-            chip(PILL, SITUACION_SPRINT_TONE[s], SITUACION_SPRINT_LABEL[s]),
-          )}
-        </Grupo>
+        <Familia numero={3} titulo="Estado del proyecto" vista="Ambas" origen="Particular" fuente="components/projects/available-project-card.tsx · estadoBadgeStyle / estadoBadgeLabel" nota="Referencia visual principal del sistema (forma aprobada).">
+          {ESTADOS_PROYECTO.map((e) => (
+            <span key={e} className={`pill ${estadoBadgeStyle(e)}`}>
+              {estadoBadgeLabel(e)}
+            </span>
+          ))}
+        </Familia>
 
-        <Grupo titulo="Estado de participación" vista="Ambas" origen="En vivo" fuente="components/projects/member-status.utils.ts · ESTADO_PARTICIPACION_STYLE">
-          {Object.values(ESTADO_PARTICIPACION_STYLE).map((e) => chip(REDONDA, e.className, e.label))}
+        <Familia numero={4} titulo="Variantes en Mis Proyectos" vista="Estudiante" origen="Particular" fuente="available-project-card.tsx · context='mine' (pill-forest + blink-gold-gray) · estadoBadgeStyle" nota="Accionable (cierre solicitado, parpadea) vs. informativo (sutil); el acceso al proyecto cerrado queda en «closed».">
+          <span className="pill pill-forest blink-gold-gray">En solicitud de cierre</span>
+          <span className={`pill ${estadoBadgeStyle('EN_SOLICITUD_CIERRE')}`}>En solicitud de cierre</span>
+          <span className={`pill ${estadoBadgeStyle('CERRADO')}`}>Cerrado</span>
+          <span className={`pill ${estadoBadgeStyle('PUBLICADO')}`}>Publicado</span>
+          <span className={`pill ${estadoBadgeStyle('EN_PROGRESO')}`}>En progreso</span>
+        </Familia>
+
+        <Familia numero={5} titulo="Paleta compartida" vista="Ambas" origen="Compartida" fuente="available-project-card.tsx · NEUTRAL_BADGE, GREEN_BADGE, GOLD_BADGE, CLOSED_BADGE, SLATE_BADGE · my-hours-project-list.tsx (Líder, Participación finalizada)">
+          <span className={`pill ${NEUTRAL_BADGE}`}>Neutral</span>
+          <span className={`pill ${GREEN_BADGE}`}>Verde</span>
+          <span className={`pill ${GOLD_BADGE}`}>Cierre solicitado</span>
+          <span className={`pill ${CLOSED_BADGE}`}>Cerrado</span>
+          <span className={`pill ${SLATE_BADGE}`}>Pizarra</span>
+          <span className={`pill ${SLATE_BADGE}`}>Líder</span>
+          <span className="pill pill-neutral">Participación finalizada</span>
+        </Familia>
+
+        <Familia numero={6} titulo="Modalidad del proyecto" vista="Estudiante" origen="Compartida" fuente="proyectos/[id]/page.tsx · MODALIDAD_BADGE (pill-neutral) · project-header-card.tsx (pill-neutral + MODALIDAD_ICON)">
+          {(Object.keys(MODALIDAD_LABEL) as ModalidadProyecto[]).map((m) => {
+            const Icon = MODALIDAD_ICON[m];
+            return (
+              <Tag key={m} tone="neutral">
+                <Icon aria-hidden="true" />
+                {MODALIDAD_LABEL[m]}
+              </Tag>
+            );
+          })}
+        </Familia>
+
+        <Familia numero={7} titulo="Estado de tarea" vista="Estudiante" origen="Compartida" fuente="components/projects/task-board.utils.ts · ESTADO_TAREA_TONE (Mis Tareas, explorador, Mis Horas, detalle de tarea)">
+          {(Object.keys(ESTADO_TAREA_TONE) as Array<keyof typeof ESTADO_TAREA_TONE>).map((e) => (
+            <Tag key={e} tone={ESTADO_TAREA_TONE[e]}>
+              {ESTADO_TAREA_LABEL[e]}
+            </Tag>
+          ))}
+          <span className="pill pill-neutral">Eliminada</span>
+        </Familia>
+
+        <Familia numero={8} titulo="Estado de tarea (calendario)" vista="Estudiante" origen="Compartida" fuente="components/calendar/agenda-item-row.tsx · ESTADO_TAREA_TONE en tamaño sm" nota="Mismos tokens que la familia 07, en tamaño compacto.">
+          {(Object.keys(ESTADO_TAREA_TONE) as Array<keyof typeof ESTADO_TAREA_TONE>).map((e) => (
+            <Tag key={e} tone={ESTADO_TAREA_TONE[e]} size="sm">
+              {ESTADO_TAREA_LABEL[e]}
+            </Tag>
+          ))}
+          <Tag tone="neutral" size="sm">
+            Evento
+          </Tag>
+        </Familia>
+
+        <Familia numero={9} titulo="Prioridad de tarea" vista="Estudiante" origen="Compartida" fuente="task-board.utils.ts · PRIORIDAD_TONE + PRIORIDAD_ICON">
+          {(Object.keys(PRIORIDAD_TONE) as Array<keyof typeof PRIORIDAD_TONE>).map((p) => {
+            const Icon = PRIORIDAD_ICON[p] ?? { BAJA: ArrowDown, MEDIA: Minus, ALTA: ArrowUp }[p];
+            return (
+              <Tag key={p} tone={PRIORIDAD_TONE[p]}>
+                <Icon aria-hidden="true" />
+                {PRIORIDAD_LABEL[p]}
+              </Tag>
+            );
+          })}
+        </Familia>
+
+        <Familia numero={10} titulo="Vencimiento de tarea" vista="Estudiante" origen="Compartida" fuente="task-board.utils.ts · VENCIMIENTO_CONFIG (Mis Tareas)">
+          {(Object.keys(VENCIMIENTO_CONFIG) as Array<keyof typeof VENCIMIENTO_CONFIG>).map((v) => {
+            const { icon: Icon, label, tone } = VENCIMIENTO_CONFIG[v];
+            return (
+              <Tag key={v} tone={tone}>
+                <Icon aria-hidden="true" />
+                {label}
+              </Tag>
+            );
+          })}
+        </Familia>
+
+        <Familia numero={11} titulo="Etiquetas libres de tarea" vista="Estudiante" origen="Particular" fuente="components/projects/task-label-chip.tsx · TaskLabelChip (color almacenado → punto + tinte al 16 %)" nota="Ejemplos: el color lo define cada proyecto; el texto conserva el color del tema.">
+          {ETIQUETAS_LIBRES.map(([nombreEtiqueta, color], i) => (
+            <TaskLabelChip
+              key={nombreEtiqueta}
+              etiqueta={{ idEtiqueta: i + 1, nombreEtiqueta, nombreNormalizado: nombreEtiqueta.toLowerCase(), color }}
+            />
+          ))}
+        </Familia>
+
+        <Familia numero={12} titulo="Estado de Sprint" vista="Estudiante" origen="Compartida" fuente="components/projects/sprint-status.utils.ts · ESTADO_SPRINT_STYLE (lista, detalle, finalizar, analíticas, ficha de integrante)">
+          {Object.values(ESTADO_SPRINT_STYLE).map((e) => (
+            <span key={e.label} className={`pill ${e.className}`}>
+              {e.label}
+            </span>
+          ))}
+        </Familia>
+
+        <Familia numero={13} titulo="Estado de hito" vista="Estudiante" origen="Compartida" fuente="sprint-status.utils.ts · ESTADO_HITO_STYLE (detalle y analíticas del Sprint)">
+          {Object.values(ESTADO_HITO_STYLE).map((e) => (
+            <span key={e.label} className={`pill ${e.className}`}>
+              {e.label}
+            </span>
+          ))}
+        </Familia>
+
+        <Familia numero={14} titulo="Situación temporal de Sprint" vista="Admin" origen="Particular" fuente="lib/admin/sprint-calendar.ts · SITUACION_SPRINT_TONE / SITUACION_SPRINT_LABEL" nota="Solo se pinta la situación que calcula el backend; el sistema no define situaciones de finalización adicionales.">
+          {(Object.keys(SITUACION_SPRINT_TONE) as Array<keyof typeof SITUACION_SPRINT_TONE>).map((s) => (
+            <span key={s} className={`pill ${SITUACION_SPRINT_TONE[s]}`}>
+              {SITUACION_SPRINT_LABEL[s]}
+            </span>
+          ))}
+        </Familia>
+
+        <Familia numero={15} titulo="Estado de participación" vista="Ambas" origen="Compartida" fuente="components/projects/member-status.utils.ts · ESTADO_PARTICIPACION_STYLE · member-exit-request-actions.tsx · ExitRequestBadge">
+          {Object.values(ESTADO_PARTICIPACION_STYLE).map((e) => (
+            <span key={e.label} className={`pill ${e.className}`}>
+              {e.label}
+            </span>
+          ))}
           <ExitRequestBadge request={{} as never} />
-        </Grupo>
+        </Familia>
 
-        <Grupo titulo="Estado de postulación" vista="Estudiante" origen="Copia" fuente="mis-postulaciones/page.tsx · proyectos/[id]/postulaciones/page.tsx · ESTADO_CONFIG">
-          <span className={`${REDONDA_GRANDE} bg-surface-container text-tertiary`}>
-            <Clock className="size-3.5" aria-hidden="true" />
-            Pendiente
-          </span>
-          <span className={`${REDONDA_GRANDE} bg-secondary-container text-on-secondary-container`}>
-            <CheckCircle className="size-3.5" aria-hidden="true" />
-            Aceptada
-          </span>
-          <span className={`${REDONDA_GRANDE} bg-error-container text-error`}>
-            <XCircle className="size-3.5" aria-hidden="true" />
-            Rechazada
-          </span>
-        </Grupo>
+        <Familia numero={16} titulo="Estado de postulación" vista="Estudiante" origen="Compartida" fuente="components/projects/application-status.utils.ts · ESTADO_POSTULACION_STYLE (Mis Postulaciones, postulaciones del proyecto)">
+          {Object.values(ESTADO_POSTULACION_STYLE).map(({ label, icon: Icon, tone }) => (
+            <Tag key={label} tone={tone}>
+              <Icon aria-hidden="true" />
+              {label}
+            </Tag>
+          ))}
+        </Familia>
 
-        <Grupo titulo="Estado de postulación (dashboard)" vista="Estudiante" origen="Copia" fuente="app/dashboard/page.tsx · estadoColors">
-          {chip(PILL, 'pill-warning', 'Pendiente')}
-          {chip(PILL, 'pill-success', 'Aceptada')}
-          {chip(PILL, 'pill-error', 'Rechazada')}
-        </Grupo>
+        <Familia numero={17} titulo="Postulación (dashboard)" vista="Estudiante" origen="Compartida" fuente="app/dashboard/page.tsx · ESTADO_POSTULACION_STYLE[estado].tone (texto crudo del backend)" nota="Reutiliza los tonos de la familia 16.">
+          {(Object.keys(ESTADO_POSTULACION_STYLE) as Array<keyof typeof ESTADO_POSTULACION_STYLE>).map((e) => (
+            <Tag key={e} tone={ESTADO_POSTULACION_STYLE[e].tone}>
+              {e}
+            </Tag>
+          ))}
+        </Familia>
 
-        <Grupo titulo="Revisión de cierre" vista="Estudiante" origen="Copia" fuente="app/dashboard/proyectos/[id]/page.tsx · ESTADO_REVISION_LABEL">
-          {chip(REDONDA_11, 'bg-surface-container-high text-on-surface-variant', 'Borrador')}
-          {chip(REDONDA_11, 'bg-surface-container-high text-on-surface-variant', 'Enviada')}
-          {chip(REDONDA_11, 'bg-status-warning text-on-status-warning', 'Corrección documental')}
-          {chip(REDONDA_11, 'bg-error/10 text-error', 'Devuelta a ejecución')}
-          {chip(REDONDA_11, 'bg-primary/10 text-primary', 'Aprobado')}
-        </Grupo>
+        <Familia numero={18} titulo="Revisión de cierre" vista="Estudiante" origen="Particular" fuente="components/projects/closure-review-status.utils.ts · ESTADO_REVISION_LABEL (historial en proyectos/[id], tamaño sm)">
+          {Object.values(ESTADO_REVISION_LABEL).map((e) => (
+            <span key={e.label} className={`pill pill-sm ${e.className}`}>
+              {e.label}
+            </span>
+          ))}
+        </Familia>
 
-        <Grupo titulo="Entidad en la bitácora" vista="Estudiante" origen="Copia" fuente="app/dashboard/proyectos/[id]/bitacora/page.tsx · ENTIDAD_TONE">
-          {chip(PILL, 'pill-accent', 'Tarea')}
-          {chip(PILL, 'pill-success', 'Sprint')}
-          {chip(PILL, 'pill-warning', 'Proyecto')}
-          {chip(PILL, 'pill-error', 'Apelación de liderazgo')}
-          {chip(PILL, 'pill-neutral', 'Revisión de cierre')}
-          {chip(PILL, 'pill-neutral', 'Documento de cierre')}
-        </Grupo>
+        <Familia numero={19} titulo="Entidad en la bitácora" vista="Estudiante" origen="Particular" fuente="components/projects/bitacora-entity.utils.ts · ENTIDAD_TONE / ENTIDAD_LABEL">
+          {(Object.keys(ENTIDAD_TONE) as Array<keyof typeof ENTIDAD_TONE>).map((e) => (
+            <span key={e} className={`pill ${ENTIDAD_TONE[e]}`}>
+              {ENTIDAD_LABEL[e]} <span className="font-normal opacity-70">({e})</span>
+            </span>
+          ))}
+        </Familia>
 
-        <Grupo titulo="Semestre y habilidades (Comunidad)" vista="Estudiante" origen="En vivo" fuente="lib/social/badge-colors.ts">
-          {[1, 2, 3, 4].map((s) => chip(`${PILL} font-semibold`, getSemestreBadgeStyle(s), `Semestre ${s}`))}
-          {['React', 'Python', 'Diseño UX', 'SQL', 'Liderazgo', 'Docker', 'Figma', 'Estadística', 'Java', 'Redacción'].map((h) =>
-            chip(`${PILL} font-semibold`, getHabilidadBadgeStyle(h), h),
-          )}
-        </Grupo>
+        <Familia numero={20} titulo="Semestre académico" vista="Estudiante" origen="Particular" fuente="lib/social/badge-colors.ts · getSemestreBadgeStyle (cualquier semestre)">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
+            <span key={s} className={`pill ${getSemestreBadgeStyle(s)}`}>
+              Semestre {s}
+            </span>
+          ))}
+        </Familia>
 
-        <Grupo titulo="Estado de usuario" vista="Admin" origen="En vivo" fuente="components/admin/UserStatusBadge.tsx">
+        <Familia numero={21} titulo="Habilidades e intereses" vista="Estudiante" origen="Particular" fuente="lib/social/badge-colors.ts · getHabilidadBadgeStyle (hash estable sobre 6 tonos)">
+          {HABILIDADES.map((h) => (
+            <span key={h} className={`pill ${getHabilidadBadgeStyle(h)}`}>
+              {h}
+            </span>
+          ))}
+        </Familia>
+
+        <Familia numero={22} titulo="Estado de usuario" vista="Admin" origen="Compartida" fuente="components/admin/UserStatusBadge.tsx · Tag">
           <UserStatusBadge estado="ACTIVO" />
           <UserStatusBadge estado="INACTIVO" />
           <UserStatusBadge estado="BLOQUEADO" />
-        </Grupo>
+        </Familia>
 
-        <Grupo titulo="Estado de apelación" vista="Admin" origen="Copia" fuente="app/dashboard/admin/apelaciones/appeals-inbox-client.tsx · ESTADO_BADGE">
-          {chip('inline-flex items-center rounded-full px-3 py-1 text-xs font-bold', 'bg-amber-400/15 text-amber-800 dark:text-amber-200', 'Pendiente')}
-          {chip('inline-flex items-center rounded-full px-3 py-1 text-xs font-bold', 'bg-primary/10 text-primary', 'Aceptada')}
-          {chip('inline-flex items-center rounded-full px-3 py-1 text-xs font-bold', 'bg-error/10 text-error', 'Denegada')}
-          {chip('inline-flex items-center rounded-full px-3 py-1 text-xs font-bold', 'bg-surface-container-high text-on-surface-variant', 'Cancelada')}
-        </Grupo>
+        <Familia numero={23} titulo="Estado de apelación" vista="Admin" origen="Particular" fuente="app/dashboard/admin/apelaciones/appeals-inbox-client.tsx · ESTADO_BADGE">
+          {Object.values(ESTADO_APELACION_BADGE).map((e) => (
+            <span key={e.label} className={`pill ${e.className}`}>
+              {e.label}
+            </span>
+          ))}
+        </Familia>
 
-        <Grupo titulo="Panel admin: cola de atención y actividad" vista="Admin" origen="En vivo" fuente="components/admin/dashboard/attention-queue.tsx · app/dashboard/admin/page.tsx">
-          {chip(TARJETA, GREEN_BADGE, 'Pendiente')}
-          {chip(TARJETA, GOLD_BADGE, 'Acción requerida')}
-          {chip(TARJETA, 'bg-status-error text-on-status-error', 'Revisar')}
-          {chip(TARJETA, GOLD_BADGE, 'En solicitud de cierre')}
-        </Grupo>
+        <Familia numero={24} titulo="Cola de atención administrativa" vista="Admin" origen="Compartida" fuente="components/admin/dashboard/attention-queue.tsx · ATTENTION_TONE · app/dashboard/admin/page.tsx · actEstadoStyle (GOLD_BADGE)">
+          <span className={`pill ${ATTENTION_TONE.atencion.etiqueta}`}>Pendiente</span>
+          <span className={`pill ${ATTENTION_TONE.cierre.etiqueta}`}>Acción requerida</span>
+          <span className={`pill ${ATTENTION_TONE.bloqueo.etiqueta}`}>Revisar</span>
+          <span className={`pill ${GOLD_BADGE}`}>En solicitud de cierre</span>
+        </Familia>
 
-        <Grupo titulo="Componente Badge (shadcn)" vista="Ambas" origen="En vivo" fuente="components/ui/badge.tsx">
-          <Badge>default</Badge>
-          <Badge variant="secondary">secondary</Badge>
-          <Badge variant="destructive">destructive</Badge>
-          <Badge variant="outline">outline</Badge>
-        </Grupo>
+        <Familia numero={25} titulo="Solicitudes de publicación" vista="Admin" origen="Particular" fuente="lib/admin/request-status.ts · SITUACION_PUBLICACION (KPIs de projects/admin/reviews)" nota="Estados de la solicitud; los botones de acción no son etiquetas.">
+          {Object.values(SITUACION_PUBLICACION).map((s) => (
+            <Tag key={s.label} tone={s.tone}>
+              {s.label}
+            </Tag>
+          ))}
+          <Tag tone="success">Aprobada</Tag>
+        </Familia>
+
+        <Familia numero={26} titulo="Solicitudes de cierre" vista="Admin" origen="Particular" fuente="lib/admin/request-status.ts · SITUACION_CIERRE (KPIs de closure-requests-inbox)" nota="Semántica independiente de las solicitudes de publicación.">
+          {Object.values(SITUACION_CIERRE).map((s) => (
+            <Tag key={s.label} tone={s.tone}>
+              {s.label}
+            </Tag>
+          ))}
+          <Tag tone="success">Aprobada</Tag>
+        </Familia>
+
+        <Familia numero={27} titulo="Componente Badge (shadcn)" vista="Ambas" origen="Compartida" fuente="components/ui/badge.tsx · variantes sobre tokens tag-* (forma sm)">
+          <Badge>Default</Badge>
+          <Badge variant="secondary">Secondary</Badge>
+          <Badge variant="destructive">Destructive</Badge>
+          <Badge variant="outline">Outline</Badge>
+        </Familia>
       </div>
     </div>
   );

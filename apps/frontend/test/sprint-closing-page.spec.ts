@@ -364,7 +364,7 @@ describe('SprintClosingPage — alineada con el workspace del proyecto', () => {
     expect(encabezado).toHaveAttribute('data-slot', 'project-page-header');
     const titulo = within(encabezado).getByRole('heading', { level: 1, name: 'Cerrar Sprint 4' });
     expect(titulo.closest('.card-base, .rounded-xl')).toBeNull();
-    expect(within(encabezado).getByText('En finalización')).toHaveClass('rounded-full', 'bg-status-warning');
+    expect(within(encabezado).getByText('En finalización')).toHaveClass('pill', 'pill-lime');
     expect(screen.getByRole('link', { name: 'Volver a Sprints' })).toHaveAttribute('href', '/dashboard/proyectos/42/sprints');
     expect(screen.queryByRole('link', { name: /volver al proyecto/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: /breadcrumb/i })).not.toBeInTheDocument();
@@ -454,7 +454,7 @@ describe('SprintClosingPage — alineada con el workspace del proyecto', () => {
       expect(fila.firstElementChild).toHaveClass(rejilla!);
       expect(fila).not.toHaveTextContent(/Total reportadas|Total propuestas/);
     }
-    expect(screen.getByText('Logística')).toHaveClass('rounded-full', 'bg-secondary-container/30');
+    expect(screen.getByText('Logística')).toHaveClass('pill', 'pill-sm', 'pill-sage');
 
     fireEvent.click(filas[0]);
     expect(filas[0]).toHaveAttribute('aria-expanded', 'true');

@@ -81,7 +81,7 @@ describe('ClosedProjectsBoard — consulta histórica de proyectos cerrados', ()
     const fila = within(tabla.getAllByRole('row')[1]);
     expect(fila.getByText('Plataforma de tutorías entre estudiantes')).toBeInTheDocument();
     expect(fila.getByText('Cerrado')).toHaveClass('pill');
-    expect(fila.getByText('Horas Beca')).toHaveClass('rounded-[7px]');
+    expect(fila.getByText('Horas Beca')).toHaveClass('pill', 'pill-sage');
     expect(fila.getAllByText('Vernel Hernández').length).toBeGreaterThan(0);
     expect(fila.getByRole('link', { name: 'Ver histórico de Plataforma de tutorías entre estudiantes' })).toHaveAttribute(
       'href',

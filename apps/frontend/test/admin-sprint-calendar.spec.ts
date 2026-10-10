@@ -172,7 +172,7 @@ describe('formato', () => {
       expect(SITUACION_SPRINT_LABEL[situacion]).toBeTruthy();
       expect(SITUACION_SPRINT_TONE[situacion]).toBeTruthy();
     }
-    expect(SITUACION_SPRINT_TONE.PLAN_VENCIDO).toContain('attention');
+    expect(SITUACION_SPRINT_TONE.PLAN_VENCIDO).toContain('pill-orange');
     expect(SITUACION_SPRINT_TONE.PLAN_VENCIDO).not.toMatch(/error/);
   });
 });
