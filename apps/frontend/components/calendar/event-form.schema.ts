@@ -61,15 +61,18 @@ export interface EventFormValues {
   tituloEvento: string;
   descripcionEvento: string;
   tipoEvento: TipoEvento;
-  /** HU-184: una sola fecha; el evento empieza y termina ese día. */
+  /** Día de inicio; por defecto el evento también termina ese día. */
   fecha: Date | undefined;
   horaInicio: string;
   horaFin: string;
   /**
-   * Solo para eventos creados antes de HU-184 que duran varios días: el día
-   * en que terminan. Se conserva al guardar mientras no se cambie la fecha.
+   * G02 (UI-06, F262-07): "Termina otro día". Desmarcado (lo normal), el
+   * evento termina en `fecha`; marcado, termina en `fechaFin` (que puede ser
+   * el día siguiente para 22:00 → 01:00, o varios días después). Al editar un
+   * evento que ya duraba varios días viene marcado con su fin original.
    */
-  fechaFinOriginal: Date | null;
+  terminaOtroDia: boolean;
+  fechaFin: Date | undefined;
   modalidad: ModalidadEvento;
   ubicacionLat: number | null;
   ubicacionLng: number | null;
@@ -83,14 +86,19 @@ export interface EventFormValues {
   antelacionMinutos: number;
 }
 
-/** Lo mínimo para calcular el rango; `fecha` opcional porque así la entrega zod. */
-type RangoInput = { fecha?: Date; horaInicio: string; horaFin: string; fechaFinOriginal: Date | null };
+/** Lo mínimo para calcular el rango; fechas opcionales porque así las entrega zod. */
+type RangoInput = { fecha?: Date; horaInicio: string; horaFin: string; terminaOtroDia: boolean; fechaFin?: Date };
 
-/** Inicio y fin reales del formulario (con el día de fin original si el evento dura varios días). */
+/** Día en que termina el evento según el formulario: `fechaFin` solo si "Termina otro día" está marcado. */
+export function diaDeFin(values: Pick<RangoInput, 'fecha' | 'terminaOtroDia' | 'fechaFin'>): Date | undefined {
+  return values.terminaOtroDia ? values.fechaFin : values.fecha;
+}
+
+/** Inicio y fin reales del formulario, en hora local (fecha + hora, no solo HH:mm). */
 export function rangoDelFormulario(values: RangoInput) {
   return {
     inicio: combinarFechaHora(values.fecha, values.horaInicio),
-    fin: combinarFechaHora(values.fechaFinOriginal ?? values.fecha, values.horaFin),
+    fin: combinarFechaHora(diaDeFin(values), values.horaFin),
   };
 }
 
@@ -121,7 +129,8 @@ export function emptyEventForm(defaultProjectId?: number, initialDate?: Date, ah
     // Si la hora propuesta es las 23:00, una hora después ya es otro día:
     // con una sola fecha, el fin se recorta al final del mismo día.
     horaFin: mismoDia(base, fin) ? toHora(fin) : '23:59',
-    fechaFinOriginal: null,
+    terminaOtroDia: false,
+    fechaFin: undefined,
     modalidad: 'VIRTUAL',
     ubicacionLat: null,
     ubicacionLng: null,
@@ -145,7 +154,8 @@ export function eventFormFromEvento(evento: EventoProyectoDTO): EventFormValues 
     fecha: soloDia(inicio),
     horaInicio: toHora(inicio),
     horaFin: toHora(fin),
-    fechaFinOriginal: mismoDia(inicio, fin) ? null : soloDia(fin),
+    terminaOtroDia: !mismoDia(inicio, fin),
+    fechaFin: mismoDia(inicio, fin) ? undefined : soloDia(fin),
     modalidad: evento.modalidad,
     ubicacionLat: evento.ubicacionLat,
     ubicacionLng: evento.ubicacionLng,
@@ -184,7 +194,8 @@ export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora =
       fecha: z.date().optional(),
       horaInicio: z.string(),
       horaFin: z.string(),
-      fechaFinOriginal: z.date().nullable(),
+      terminaOtroDia: z.boolean(),
+      fechaFin: z.date().optional(),
       modalidad: z.enum(['PRESENCIAL', 'VIRTUAL', 'MIXTA']),
       ubicacionLat: z.number().nullable(),
       ubicacionLng: z.number().nullable(),
@@ -212,6 +223,18 @@ export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora =
       }
       if (!HORA_FORMAT.test(values.horaFin)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['horaFin'], message: 'Indica la hora de fin.' });
+      }
+
+      if (values.terminaOtroDia) {
+        if (!values.fechaFin) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fechaFin'], message: 'Selecciona la fecha de fin.' });
+        } else if (values.fecha && soloDia(values.fechaFin).getTime() < soloDia(values.fecha).getTime()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['fechaFin'],
+            message: 'La fecha de fin no puede ser anterior a la de inicio.',
+          });
+        }
       }
 
       const { inicio, fin } = rangoDelFormulario(values);

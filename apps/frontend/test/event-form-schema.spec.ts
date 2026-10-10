@@ -98,11 +98,13 @@ describe('buildEventFormSchema (HU-184 T-323)', () => {
     expect(errores.horaInicio).toBeUndefined();
   });
 
-  it('un evento de varios días conserva su día de fin: una hora de fin "menor" sigue siendo válida', () => {
+  // G02-C07: antes el día de fin solo existía como `fechaFinOriginal` oculto; ahora es "Termina otro día" + fechaFin.
+  it('con "Termina otro día" una hora de fin "menor" es válida porque el fin cae en la fecha siguiente', () => {
     const errores = mensajes(
-      valores({ fecha: new Date(2026, 9, 6), horaInicio: '22:00', horaFin: '01:00', fechaFinOriginal: new Date(2026, 9, 7) }),
+      valores({ fecha: new Date(2026, 9, 6), horaInicio: '22:00', horaFin: '01:00', terminaOtroDia: true, fechaFin: new Date(2026, 9, 7) }),
     );
     expect(errores.horaFin).toBeUndefined();
+    expect(errores.fechaFin).toBeUndefined();
   });
 
   it('virtual sin link o con link sin http(s) es inválido', () => {
@@ -150,10 +152,10 @@ describe('helpers del formulario de evento', () => {
 
   it('duracionTexto da el chip "1h 30m", "45m" o null si el rango no es válido', () => {
     const dia = new Date(2026, 9, 6);
-    expect(duracionTexto({ fecha: dia, horaInicio: '09:00', horaFin: '10:30', fechaFinOriginal: null })).toBe('1h 30m');
-    expect(duracionTexto({ fecha: dia, horaInicio: '09:00', horaFin: '09:45', fechaFinOriginal: null })).toBe('45m');
-    expect(duracionTexto({ fecha: dia, horaInicio: '09:00', horaFin: '11:00', fechaFinOriginal: null })).toBe('2h');
-    expect(duracionTexto({ fecha: dia, horaInicio: '10:00', horaFin: '09:00', fechaFinOriginal: null })).toBeNull();
+    expect(duracionTexto({ fecha: dia, horaInicio: '09:00', horaFin: '10:30', terminaOtroDia: false })).toBe('1h 30m');
+    expect(duracionTexto({ fecha: dia, horaInicio: '09:00', horaFin: '09:45', terminaOtroDia: false })).toBe('45m');
+    expect(duracionTexto({ fecha: dia, horaInicio: '09:00', horaFin: '11:00', terminaOtroDia: false })).toBe('2h');
+    expect(duracionTexto({ fecha: dia, horaInicio: '10:00', horaFin: '09:00', terminaOtroDia: false })).toBeNull();
   });
 
   it('eventFormFromEvento y buildEventPayload van y vuelven sin perder datos', () => {
@@ -176,7 +178,8 @@ describe('helpers del formulario de evento', () => {
       fechaFin: new Date(2026, 9, 12, 17, 0).toISOString(),
     });
     const form = eventFormFromEvento(original);
-    expect(form.fechaFinOriginal).toEqual(new Date(2026, 9, 12));
+    expect(form.terminaOtroDia).toBe(true);
+    expect(form.fechaFin).toEqual(new Date(2026, 9, 12));
     expect(buildEventPayload(form, { keepEmptyDescripcion: true }).fechaFin).toBe(original.fechaFin);
   });
 
@@ -246,5 +249,62 @@ describe('límites de ubicación: nombre y coordenadas (G02-C03, UI-03/UI-25)', 
     expect(payload.ubicacionNombre).toHaveLength(255);
     expect(payload.ubicacionLat).toBe(14.6);
     expect(payload.ubicacionLng).toBe(-90.5);
+  });
+});
+
+describe('fecha de fin opcional: eventos que cruzan medianoche o duran varios días (G02-C07, UI-06/F262-07)', () => {
+  const inicio = new Date(2026, 9, 6);
+
+  it('sin "Termina otro día" el evento es de un solo día: fin > inicio válido, fin ≤ inicio inválido', () => {
+    expect(mensajes(valores({ fecha: inicio, horaInicio: '09:00', horaFin: '10:00' }))).toEqual({});
+    expect(mensajes(valores({ fecha: inicio, horaInicio: '10:00', horaFin: '09:00' })).horaFin).toBe('El fin debe ser posterior al inicio.');
+    expect(mensajes(valores({ fecha: inicio, horaInicio: '22:00', horaFin: '01:00' })).horaFin).toBe('El fin debe ser posterior al inicio.');
+  });
+
+  it('22:00 del día 1 → 01:00 del día 2 es válido y se serializa con fecha y hora completas en hora local', () => {
+    const form = valores({ fecha: inicio, horaInicio: '22:00', horaFin: '01:00', terminaOtroDia: true, fechaFin: new Date(2026, 9, 7) });
+    expect(mensajes(form)).toEqual({});
+    const payload = buildEventPayload(form, { keepEmptyDescripcion: false });
+    expect(payload.fechaInicio).toBe(new Date(2026, 9, 6, 22, 0).toISOString());
+    expect(payload.fechaFin).toBe(new Date(2026, 9, 7, 1, 0).toISOString());
+  });
+
+  it('un evento de dos días o más es válido y conserva ambas fechas', () => {
+    const form = valores({ fecha: inicio, horaInicio: '09:00', horaFin: '17:00', terminaOtroDia: true, fechaFin: new Date(2026, 9, 8) });
+    expect(mensajes(form)).toEqual({});
+    const payload = buildEventPayload(form, { keepEmptyDescripcion: false });
+    expect(new Date(payload.fechaFin).getTime() - new Date(payload.fechaInicio).getTime()).toBe((48 + 8) * 60 * 60 * 1000);
+  });
+
+  it('con "Termina otro día" marcado hay que elegir la fecha de fin, y no puede ser anterior a la de inicio', () => {
+    expect(mensajes(valores({ fecha: inicio, terminaOtroDia: true, fechaFin: undefined })).fechaFin).toBe('Selecciona la fecha de fin.');
+    expect(mensajes(valores({ fecha: inicio, terminaOtroDia: true, fechaFin: new Date(2026, 9, 5) })).fechaFin).toBe(
+      'La fecha de fin no puede ser anterior a la de inicio.',
+    );
+  });
+
+  it('la misma fecha de fin que la de inicio se valida como un solo día (fin ≤ inicio inválido)', () => {
+    const errores = mensajes(valores({ fecha: inicio, horaInicio: '10:00', horaFin: '09:00', terminaOtroDia: true, fechaFin: inicio }));
+    expect(errores.fechaFin).toBeUndefined();
+    expect(errores.horaFin).toBe('El fin debe ser posterior al inicio.');
+  });
+
+  it('una fecha de fin que queda sin usar (desmarcado) no afecta: el fin vuelve al día de inicio', () => {
+    const form = valores({ fecha: inicio, horaInicio: '09:00', horaFin: '10:00', terminaOtroDia: false, fechaFin: new Date(2026, 9, 9) });
+    expect(mensajes(form)).toEqual({});
+    expect(buildEventPayload(form, { keepEmptyDescripcion: false }).fechaFin).toBe(new Date(2026, 9, 6, 10, 0).toISOString());
+  });
+
+  it('eventFormFromEvento marca "Termina otro día" solo cuando el evento no termina el mismo día local', () => {
+    const unDia = eventFormFromEvento(evento());
+    expect(unDia.terminaOtroDia).toBe(false);
+    expect(unDia.fechaFin).toBeUndefined();
+    const nocturno = eventFormFromEvento(
+      evento({ fechaInicio: new Date(2026, 9, 10, 22, 0).toISOString(), fechaFin: new Date(2026, 9, 11, 1, 0).toISOString() }),
+    );
+    expect(nocturno.terminaOtroDia).toBe(true);
+    expect(nocturno.fechaFin).toEqual(new Date(2026, 9, 11));
+    expect(nocturno.horaFin).toBe('01:00');
+    expect(duracionTexto(nocturno)).toBe('3h');
   });
 });
