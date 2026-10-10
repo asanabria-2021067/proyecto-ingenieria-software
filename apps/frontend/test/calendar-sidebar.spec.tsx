@@ -22,6 +22,7 @@ afterEach(() => {
 });
 
 const ANA = { idUsuario: 9, nombre: 'Ana', apellido: 'García', fotoUrl: null, tono: 2 as const };
+const LUIS = { idUsuario: 5, nombre: 'Luis', apellido: 'Hernández', fotoUrl: null, tono: 3 as const };
 
 function renderSidebar(overrides: Partial<Parameters<typeof CalendarSidebar>[0]> = {}) {
   const onToggleCompartido = vi.fn();
@@ -109,5 +110,93 @@ describe('useDejarDeRecibirCalendario (G01-C11, UI-31)', () => {
     });
 
     expect(client.getQueryData(['agenda-compartida', ANA.idUsuario, 'a', 'b'])).toEqual({ eventos: [], tareas: [] });
+  });
+});
+
+describe('CalendarSidebar — carga, error y reintento de calendarios compartidos (G03-C09, UI-12/UI-39)', () => {
+  it('un fallo al cargar la lista no se ve como "nadie te ha compartido": muestra el error y Reintentar', () => {
+    const onReintentarCompartidos = vi.fn();
+    renderSidebar({ compartidos: [], compartidosActivos: new Set(), compartidosEstado: 'error', onReintentarCompartidos });
+
+    const alerta = screen.getByRole('alert');
+    expect(alerta).toHaveTextContent('No se pudieron cargar los calendarios compartidos.');
+    expect(screen.queryByText('Nadie te ha compartido su calendario todavía.')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(onReintentarCompartidos).toHaveBeenCalledTimes(1);
+  });
+
+  it('mientras la lista carga se anuncia el estado y no se muestra el vacío', () => {
+    renderSidebar({ compartidos: [], compartidosActivos: new Set(), compartidosEstado: 'cargando' });
+    expect(screen.getByRole('status')).toHaveTextContent('Cargando calendarios compartidos...');
+    expect(screen.queryByText('Nadie te ha compartido su calendario todavía.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('con la lista vacía de verdad sigue el mensaje de siempre', () => {
+    renderSidebar({ compartidos: [], compartidosActivos: new Set(), compartidosEstado: 'listo' });
+    expect(screen.getByText('Nadie te ha compartido su calendario todavía.')).toBeInTheDocument();
+  });
+
+  it('una persona cuya agenda falla muestra su error con reintento propio y la otra sigue visible sin alertas', () => {
+    const refetch = vi.fn();
+    renderSidebar({
+      compartidos: [ANA, LUIS],
+      compartidosActivos: new Set([ANA.idUsuario, LUIS.idUsuario]),
+      estadoAgendas: new Map<number, { isLoading: boolean; isError: boolean; revocada: boolean; refetch: () => void }>([
+        [ANA.idUsuario, { isLoading: false, isError: true, revocada: false, refetch }],
+        [LUIS.idUsuario, { isLoading: false, isError: false, revocada: false, refetch: vi.fn() }],
+      ]),
+    });
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getByRole('alert')).toHaveTextContent('No se pudo cargar este calendario.');
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar el calendario de Ana García' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+    // Luis: su check sigue operable y sin mensajes.
+    expect(screen.getByRole('checkbox', { name: 'Ver el calendario de Luis Hernández' })).toBeChecked();
+    expect(screen.queryByRole('button', { name: 'Reintentar el calendario de Luis Hernández' })).not.toBeInTheDocument();
+  });
+
+  it('mientras la agenda de una persona activada carga, se indica junto a su check; desactivada no muestra nada', () => {
+    const estadoAgendas = new Map([[ANA.idUsuario, { isLoading: true, isError: false, revocada: false, refetch: vi.fn() }]]);
+    const { rerender } = render(
+      <CalendarSidebar
+        mini={{ year: 2026, month: 9, todayKey: '2026-10-09', markedDates: new Set(), onPrevMonth: () => {}, onNextMonth: () => {}, onSelectDay: () => {} }}
+        metaHoras={null}
+        proyectos={[]}
+        proyectosOcultos={new Set()}
+        onToggleProyecto={() => {}}
+        compartidos={[ANA]}
+        compartidosActivos={new Set([ANA.idUsuario])}
+        onToggleCompartido={() => {}}
+        onQuitarCompartido={() => {}}
+        estadoAgendas={estadoAgendas}
+      />,
+    );
+    expect(screen.getByRole('status', { name: 'Cargando el calendario de Ana García' })).toBeInTheDocument();
+
+    rerender(
+      <CalendarSidebar
+        mini={{ year: 2026, month: 9, todayKey: '2026-10-09', markedDates: new Set(), onPrevMonth: () => {}, onNextMonth: () => {}, onSelectDay: () => {} }}
+        metaHoras={null}
+        proyectos={[]}
+        proyectosOcultos={new Set()}
+        onToggleProyecto={() => {}}
+        compartidos={[ANA]}
+        compartidosActivos={new Set()}
+        onToggleCompartido={() => {}}
+        onQuitarCompartido={() => {}}
+        estadoAgendas={estadoAgendas}
+      />,
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('una revocación (403) se explica sin ofrecer reintento, porque ya no hay permiso', () => {
+    renderSidebar({
+      estadoAgendas: new Map([[ANA.idUsuario, { isLoading: false, isError: true, revocada: true, refetch: vi.fn() }]]),
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('Ana ya no comparte su calendario contigo.');
+    expect(screen.queryByRole('button', { name: /Reintentar/ })).not.toBeInTheDocument();
   });
 });

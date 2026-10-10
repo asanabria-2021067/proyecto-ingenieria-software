@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Plus, Share2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Share2 } from 'lucide-react';
 import {
   Empty,
   EmptyContent,
@@ -43,7 +43,12 @@ import {
   rangoVisible,
   type VistaCalendario,
 } from '@/lib/calendar/vista';
-import { useAgendasCompartidas, useCalendariosCompartidos, useDejarDeRecibirCalendario } from '@/hooks/use-calendar-shares';
+import {
+  calendariosCompartidosQueryKey,
+  useAgendasCompartidas,
+  useCalendariosCompartidos,
+  useDejarDeRecibirCalendario,
+} from '@/hooks/use-calendar-shares';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { aviso } from '@/lib/mensajes';
 import type { EventoCompartidoDTO } from '@/lib/services/calendar-shares';
@@ -125,7 +130,13 @@ export default function CalendarioPage() {
     queryFn: getMyProjects,
   });
 
-  const { data: compartidos } = useCalendariosCompartidos();
+  const {
+    data: compartidos,
+    isLoading: isLoadingCompartidos,
+    isError: isErrorCompartidos,
+    refetch: refetchCompartidos,
+  } = useCalendariosCompartidos();
+  const queryClient = useQueryClient();
   const dejarDeRecibir = useDejarDeRecibirCalendario();
 
   // G03 (UI-28): la hora "ahora" y el día "hoy" avanzan mientras la página
@@ -180,7 +191,33 @@ export default function CalendarioPage() {
     () => personasCompartidas.filter((p) => compartidosActivos.includes(p.idUsuario)).map((p) => p.idUsuario),
     [personasCompartidas, compartidosActivos],
   );
-  const { agendas: agendasCompartidas } = useAgendasCompartidas(idsActivos, rango.desde, rango.hasta);
+  const { agendas: agendasCompartidas, estados: estadosCompartidos } = useAgendasCompartidas(idsActivos, rango.desde, rango.hasta);
+
+  // G03 (UI-12): un fallo por persona se avisa una sola vez (al pasar a error),
+  // nunca en cada render; si fue revocación (403) se refresca la lista para que
+  // la persona desaparezca de "compartidos conmigo". El estado se resume en un
+  // texto estable ("id:revocada,…") para que el efecto solo corra al cambiar.
+  const fallosCompartidos = idsActivos
+    .filter((id) => estadosCompartidos.get(id)?.isError)
+    .map((id) => `${id}:${estadosCompartidos.get(id)?.revocada ? 1 : 0}`)
+    .join(',');
+  const avisadosRef = useRef(new Set<number>());
+  useEffect(() => {
+    const actuales = new Map(fallosCompartidos ? fallosCompartidos.split(',').map((f) => f.split(':')).map(([id, r]) => [Number(id), r === '1']) : []);
+    for (const [id, revocada] of actuales) {
+      if (avisadosRef.current.has(id)) continue;
+      avisadosRef.current.add(id);
+      const persona = personasCompartidas.find((p) => p.idUsuario === id);
+      const nombre = persona ? `${persona.nombre} ${persona.apellido}` : 'esa persona';
+      if (revocada) {
+        aviso.advertencia('Calendario ya no disponible', `${nombre} dejó de compartir su calendario contigo.`);
+        void queryClient.invalidateQueries({ queryKey: calendariosCompartidosQueryKey });
+      } else {
+        aviso.error('No se pudo cargar un calendario compartido', `El calendario de ${nombre} no respondió. Puedes reintentarlo desde la columna izquierda.`);
+      }
+    }
+    for (const id of avisadosRef.current) if (!actuales.has(id)) avisadosRef.current.delete(id);
+  }, [fallosCompartidos, personasCompartidas, queryClient]);
 
   const ledProjectIds = useMemo(() => new Set(misProyectos.map((p) => p.idProyecto)), [misProyectos]);
 
@@ -421,10 +458,13 @@ export default function CalendarioPage() {
             onToggleCompartido={handleToggleCompartido}
             onQuitarCompartido={handleQuitarCompartido}
             quitandoCompartido={dejarDeRecibir.isPending ? dejarDeRecibir.variables : null}
+            compartidosEstado={isLoadingCompartidos ? 'cargando' : isErrorCompartidos ? 'error' : 'listo'}
+            onReintentarCompartidos={() => void refetchCompartidos()}
+            estadoAgendas={estadosCompartidos}
           />
         </div>
 
-        <div className="order-1 min-w-0 space-y-section lg:order-2">
+        <div className="order-1 min-w-0 space-y-section lg:order-2" aria-busy={isLoading}>
           <div className="flex flex-wrap items-center justify-between gap-tight">
             <CalendarFilterMenu
               total={contarItems(itemsVisibles)}
@@ -486,6 +526,40 @@ export default function CalendarioPage() {
             </div>
           </div>
 
+          {/* T-264: un fetch fallido no puede verse igual que "sin actividad".
+              G03 (UI-39): el estado va ANTES de la rejilla (que mientras tanto
+              está vacía y marcada aria-busy), con el botón del sistema. */}
+          {isLoading && (
+            <div className="flex items-center justify-center gap-tight py-3 text-sm text-tertiary" role="status">
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              Cargando tu calendario...
+            </div>
+          )}
+
+          {isError && (
+            <Empty tone="danger" className="surface-enter" role="alert">
+              <EmptyMedia variant="icon">
+                <AlertCircle aria-hidden="true" className="h-7 w-7" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>No se pudo cargar tu calendario</EmptyTitle>
+                <EmptyDescription>Verifica que tu sesión siga activa o intenta actualizar.</EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    void refetchTareas();
+                    void refetchEventos();
+                  }}
+                  className="h-10 rounded-pill bg-primary px-5 text-sm font-bold text-on-primary hover:bg-primary/90"
+                >
+                  Reintentar
+                </Button>
+              </EmptyContent>
+            </Empty>
+          )}
+
           {vista === 'mes' && (
             <MonthView
               year={anchor.getFullYear()}
@@ -523,37 +597,6 @@ export default function CalendarioPage() {
                 <WeekView days={rango.days} todayKey={hoyKey} itemsByDay={itemsByDay} onSelectEvento={handleSelectEvento} />
               </div>
             </>
-          )}
-
-          {/* T-264: un fetch fallido no puede verse igual que "sin actividad". */}
-          {isLoading && (
-            <div className="py-6 text-center text-sm text-tertiary" role="status">
-              Cargando tu calendario...
-            </div>
-          )}
-
-          {isError && (
-            <Empty tone="danger" className="surface-enter" role="alert">
-              <EmptyMedia variant="icon">
-                <AlertCircle aria-hidden="true" className="h-7 w-7" />
-              </EmptyMedia>
-              <EmptyHeader>
-                <EmptyTitle>No se pudo cargar tu calendario</EmptyTitle>
-                <EmptyDescription>Verifica que tu sesión siga activa o intenta actualizar.</EmptyDescription>
-              </EmptyHeader>
-              <EmptyContent>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void refetchTareas();
-                    void refetchEventos();
-                  }}
-                  className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-                >
-                  Reintentar
-                </button>
-              </EmptyContent>
-            </Empty>
           )}
 
           {vista === 'mes' && !isLoading && !isError && (

@@ -312,3 +312,47 @@ describe('CalendarioPage — reloj vivo: línea "Ahora" y día "Hoy" (G03-C07, U
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+describe('CalendarioPage — estados de compartidos y de carga propia (G03-C09, UI-12/UI-39)', () => {
+  it('si la lista de compartidos falla, la columna izquierda lo dice y Reintentar vuelve a pedirla; el aviso de agenda fallida sale una sola vez', async () => {
+    sharesMock.getCalendariosCompartidos.mockRejectedValueOnce(Object.assign(new Error('x'), { statusCode: 500 })).mockResolvedValue({
+      compartidoPorMi: [],
+      compartidosConmigo: [{ idUsuario: 9, nombre: 'Ana', apellido: 'García', fotoUrl: null }],
+    });
+    sharesMock.getAgendaCompartida.mockRejectedValue(Object.assign(new Error('x'), { statusCode: 500 }));
+    window.localStorage.setItem('calendario:compartidos-activos', '[9]');
+    await renderPage();
+
+    const lateral = screen.getByRole('complementary', { name: 'Opciones del calendario' });
+    expect(await within(lateral).findByText('No se pudieron cargar los calendarios compartidos.')).toBeInTheDocument();
+    fireEvent.click(within(lateral).getByRole('button', { name: 'Reintentar' }));
+    await waitFor(() => expect(sharesMock.getCalendariosCompartidos).toHaveBeenCalledTimes(2));
+    expect(await within(lateral).findByRole('checkbox', { name: 'Ver el calendario de Ana García' })).toBeChecked();
+
+    // La agenda de Ana falla: alerta junto a ella y un solo toast aunque la página se vuelva a renderizar.
+    expect(await within(lateral).findByText('No se pudo cargar este calendario.')).toBeInTheDocument();
+    fireEvent.click(boton('Siguiente'));
+    fireEvent.click(boton('Anterior'));
+    await waitFor(() => expect(mensajesMock.aviso.error).toHaveBeenCalledTimes(1));
+    expect(mensajesMock.aviso.error.mock.calls[0][0]).toBe('No se pudo cargar un calendario compartido');
+  });
+
+  it('mientras carga el calendario propio, el estado se anuncia antes de la rejilla y la zona queda aria-busy', async () => {
+    // La semana y el mes del mini son dos consultas: se resuelven todas las pendientes.
+    const pendientes: ((e: MiEventoDTO[]) => void)[] = [];
+    eventsMock.getMisEventos.mockImplementation(() => new Promise<MiEventoDTO[]>((resolve) => pendientes.push(resolve)));
+    render(<CalendarioPage />, { wrapper });
+
+    const estado = screen.getByText('Cargando tu calendario...').closest('[role="status"]') as HTMLElement;
+    expect(estado).not.toBeNull();
+    const rejilla = screen.getByTestId('cuadricula-semana');
+    expect(estado.compareDocumentPosition(rejilla) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rejilla.closest('[aria-busy="true"]')).not.toBeNull();
+
+    await act(async () => {
+      for (const resolver of pendientes) resolver([]);
+    });
+    await waitFor(() => expect(screen.queryByText('Cargando tu calendario...')).not.toBeInTheDocument());
+    expect(rejilla.closest('[aria-busy="true"]')).toBeNull();
+  });
+});
