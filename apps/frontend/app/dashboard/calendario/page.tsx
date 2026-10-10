@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Share2 } from 'lucide-react';
@@ -103,6 +103,38 @@ function tieneFechaLimite(tarea: MiTareaDTO): tarea is MiTareaDTO & { fechaLimit
   return tarea.fechaLimite !== null;
 }
 
+/**
+ * G04 (UI-36): mismo corte que la utilidad `xl:` de Tailwind (80rem). Desde
+ * ahí la Semana cabe como cuadrícula por horas; por debajo es lista de días.
+ */
+const CONSULTA_SEMANA_EN_CUADRICULA = '(min-width: 80rem)';
+
+function suscribirAncho(alCambiar: () => void): () => void {
+  if (typeof window.matchMedia !== 'function') return () => {};
+  const consulta = window.matchMedia(CONSULTA_SEMANA_EN_CUADRICULA);
+  consulta.addEventListener('change', alCambiar);
+  return () => consulta.removeEventListener('change', alCambiar);
+}
+
+function leerAncho(): boolean | null {
+  return typeof window.matchMedia === 'function' ? window.matchMedia(CONSULTA_SEMANA_EN_CUADRICULA).matches : null;
+}
+
+function leerAnchoEnServidor(): null {
+  return null;
+}
+
+/**
+ * `true` cuadrícula, `false` lista, `null` todavía desconocido (servidor e
+ * hidratación, o un entorno sin `matchMedia`). Con `null` se dibujan ambas
+ * variantes bajo las clases `hidden xl:block` / `xl:hidden`, igual que antes:
+ * el HTML del servidor coincide con el primer render del cliente y no hay
+ * salto visual; en cuanto el navegador conoce su ancho queda montada una sola.
+ */
+function useSemanaEnCuadricula(): boolean | null {
+  return useSyncExternalStore(suscribirAncho, leerAncho, leerAnchoEnServidor);
+}
+
 function alternar<T>(conjunto: Set<T>, valor: T): Set<T> {
   const nuevo = new Set(conjunto);
   if (nuevo.has(valor)) nuevo.delete(valor);
@@ -158,6 +190,7 @@ export default function CalendarioPage() {
     return () => clearInterval(id);
   }, []);
   const hoyKey = toDateKey(ahora);
+  const semanaEnCuadricula = useSemanaEnCuadricula();
   const [vista, setVista] = useState<VistaCalendario>('semana');
   const [anchor, setAnchor] = useState(() => new Date());
   const [miniMes, setMiniMes] = useState(() => new Date(ahora.getFullYear(), ahora.getMonth(), 1));
@@ -652,24 +685,32 @@ export default function CalendarioPage() {
           {vista === 'semana' && (
             <>
               {/* G02 (UI-02): con las dos barras laterales, 7 columnas de horas solo son
-                  legibles desde xl (1280 px); por debajo, la semana se ve como lista de días. */}
-              <div className="hidden xl:block">
-                <TimeGridView
-                  days={rango.days}
-                  todayKey={hoyKey}
-                  itemsByDay={itemsByDay}
-                  onSelectEvento={handleSelectEvento}
-                  onVerDia={(key) => {
-                    const [y, m, d] = key.split('-').map(Number);
-                    irA(new Date(y, m - 1, d));
-                    setVista('dia');
-                  }}
-                  ahora={ahora}
-                />
-              </div>
-              <div className="xl:hidden">
-                <WeekView days={rango.days} todayKey={hoyKey} itemsByDay={itemsByDay} onSelectEvento={handleSelectEvento} />
-              </div>
+                  legibles desde xl (1280 px); por debajo, la semana se ve como lista de días.
+                  G04 (UI-36): solo se monta la variante que corresponde al ancho (antes
+                  vivían las dos y una quedaba oculta por CSS: ~200 nodos de más y la
+                  cuadrícula sin su scroll inicial al mostrarse). Al montarse, la
+                  cuadrícula hace scroll a las 07:00. */}
+              {semanaEnCuadricula !== false && (
+                <div className={semanaEnCuadricula === null ? 'hidden xl:block' : undefined}>
+                  <TimeGridView
+                    days={rango.days}
+                    todayKey={hoyKey}
+                    itemsByDay={itemsByDay}
+                    onSelectEvento={handleSelectEvento}
+                    onVerDia={(key) => {
+                      const [y, m, d] = key.split('-').map(Number);
+                      irA(new Date(y, m - 1, d));
+                      setVista('dia');
+                    }}
+                    ahora={ahora}
+                  />
+                </div>
+              )}
+              {semanaEnCuadricula !== true && (
+                <div className={semanaEnCuadricula === null ? 'xl:hidden' : undefined}>
+                  <WeekView days={rango.days} todayKey={hoyKey} itemsByDay={itemsByDay} onSelectEvento={handleSelectEvento} />
+                </div>
+              )}
             </>
           )}
 

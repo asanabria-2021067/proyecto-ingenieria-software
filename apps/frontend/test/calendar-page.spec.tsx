@@ -596,3 +596,101 @@ describe('CalendarioPage — derivaciones memoizadas (G04-C02, UI-11)', () => {
     expect(screen.getByRole('checkbox', { name: 'Ver el calendario de Luis Hernández' })).toBeChecked();
   });
 });
+
+describe('CalendarioPage — una sola representación de Semana montada (G04-C03, UI-36/UI-02)', () => {
+  /** Simula `matchMedia('(min-width: 80rem)')` (breakpoint xl) y permite cambiar el ancho. */
+  function simularAncho(amplio: boolean) {
+    let coincide = amplio;
+    const oyentes = new Set<() => void>();
+    const consultas: string[] = [];
+    window.matchMedia = ((consulta: string) => {
+      consultas.push(consulta);
+      return {
+        get matches() {
+          return coincide;
+        },
+        media: consulta,
+        addEventListener: (_tipo: string, oyente: () => void) => oyentes.add(oyente),
+        removeEventListener: (_tipo: string, oyente: () => void) => oyentes.delete(oyente),
+      };
+    }) as unknown as typeof window.matchMedia;
+    return {
+      consultas,
+      oyentes,
+      cambiar(valor: boolean) {
+        coincide = valor;
+        act(() => oyentes.forEach((oyente) => oyente()));
+      },
+    };
+  }
+
+  afterEach(() => {
+    delete (window as { matchMedia?: unknown }).matchMedia;
+  });
+
+  const cuadricula = () => screen.queryByTestId('cuadricula-semana');
+  const listaSemana = () => screen.queryByText(/· Hoy/);
+
+  it('en un ancho amplio solo existe la cuadrícula por horas: la lista de días no está en el DOM', async () => {
+    const ancho = simularAncho(true);
+    eventsMock.getMisEventos.mockResolvedValue([eventoDTO()]);
+    await renderPage();
+
+    expect(cuadricula()).toBeInTheDocument();
+    expect(listaSemana()).not.toBeInTheDocument();
+    expect(await screen.findAllByRole('button', { name: /^Reunión semanal, 09:00 a 10:00/ })).toHaveLength(1);
+    expect(ancho.consultas).toContain('(min-width: 80rem)');
+  });
+
+  it('en un ancho estrecho solo existe la lista de días: la cuadrícula (24 filas × 7 columnas) no se monta', async () => {
+    simularAncho(false);
+    eventsMock.getMisEventos.mockResolvedValue([eventoDTO()]);
+    await renderPage();
+
+    expect(cuadricula()).not.toBeInTheDocument();
+    expect(screen.queryByTestId('cuadricula-horas')).not.toBeInTheDocument();
+    expect(listaSemana()).toBeInTheDocument();
+    expect(await screen.findAllByRole('button', { name: /Reunión semanal/ })).toHaveLength(1);
+  });
+
+  it('al ensanchar (rotar o redimensionar) se monta la cuadrícula con el scroll en las 07:00 y al estrechar vuelve la lista', async () => {
+    const ancho = simularAncho(false);
+    await renderPage();
+    expect(cuadricula()).not.toBeInTheDocument();
+
+    ancho.cambiar(true);
+    const horas = await screen.findByTestId('cuadricula-horas');
+    expect(listaSemana()).not.toBeInTheDocument();
+    expect(horas.scrollTop).toBe(7 * 48 - 12);
+
+    ancho.cambiar(false);
+    expect(cuadricula()).not.toBeInTheDocument();
+    expect(listaSemana()).toBeInTheDocument();
+  });
+
+  it('cambiar de vista y navegar sigue funcionando con una sola variante, y la vista Día no depende del ancho', async () => {
+    simularAncho(false);
+    await renderPage();
+    fireEvent.click(vista('Día'));
+    expect(screen.getByTestId('cuadricula-horas')).toBeInTheDocument();
+    fireEvent.click(vista('Semana'));
+    expect(screen.queryByTestId('cuadricula-horas')).not.toBeInTheDocument();
+    fireEvent.click(boton('Siguiente'));
+    expect(etiquetaPeriodo()).toHaveTextContent('12 oct');
+    expect(cuadricula()).not.toBeInTheDocument();
+  });
+
+  it('al desmontar la página deja de escuchar el cambio de ancho', async () => {
+    const ancho = simularAncho(true);
+    const { unmount } = render(<CalendarioPage />, { wrapper });
+    await waitFor(() => expect(ancho.oyentes.size).toBeGreaterThan(0));
+    unmount();
+    expect(ancho.oyentes.size).toBe(0);
+  });
+
+  it('sin matchMedia (servidor e hidratación) se conserva el respaldo por CSS con ambas variantes y sus clases', async () => {
+    await renderPage();
+    expect(cuadricula()?.closest('.hidden.xl\\:block')).not.toBeNull();
+    expect(listaSemana()?.closest('.xl\\:hidden')).not.toBeNull();
+  });
+});
