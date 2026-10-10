@@ -43,7 +43,8 @@ export function DatePicker({
           variant="outline"
           disabled={disabled}
           className={cn(
-            'h-10 w-full justify-start gap-2 rounded-md border-outline-variant px-3 text-left text-sm font-normal',
+            // min-w-0: el botón puede encogerse hasta su contenedor y el texto se trunca (G04-R02).
+            'h-10 w-full min-w-0 justify-start gap-2 rounded-md border-outline-variant px-3 text-left text-sm font-normal',
             !value && 'text-on-surface-variant',
             className,
           )}

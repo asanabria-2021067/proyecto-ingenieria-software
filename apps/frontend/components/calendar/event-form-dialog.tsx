@@ -500,7 +500,8 @@ export function EventFormDialog({
                       control={form.control}
                       name="fechaFin"
                       render={({ field }) => (
-                        <FormItem className="min-w-0 flex-1 sm:max-w-[16rem]">
+                        // G04-R02: en móvil ocupa su propia fila; al lado de la casilla no cabía y se salía de la tarjeta.
+                        <FormItem className="min-w-0 flex-1 basis-full sm:max-w-[16rem] sm:basis-0">
                           <FormLabel className="sr-only">Fecha de fin</FormLabel>
                           <FormControl>
                             <DatePicker

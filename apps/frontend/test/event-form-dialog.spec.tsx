@@ -895,3 +895,29 @@ describe('EventFormDialog — ARIA válido en los disparadores de fecha (G04-C07
     await waitFor(() => expect(screen.getByLabelText('Fecha de fin')).toHaveFocus());
   });
 });
+
+describe('EventFormDialog — la fecha de fin cabe en el diálogo angosto (G04-R02, G03-OBS-02)', () => {
+  // jsdom no calcula cajas: aquí se fija el contrato de clases; la medición real (320/375/768 px,
+  // claro y oscuro) está en la evidencia del gate.
+  it('en móvil la fecha de fin ocupa su propia fila y puede encogerse; desde sm vuelve junto a la casilla', () => {
+    renderCrear();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
+    const boton = screen.getByLabelText('Fecha de fin');
+    const item = boton.closest('[data-slot="form-item"]') as HTMLElement;
+    for (const clase of ['min-w-0', 'basis-full', 'sm:basis-0', 'sm:max-w-[16rem]']) expect(item).toHaveClass(clase);
+    expect(item.parentElement).toHaveClass('flex', 'flex-wrap');
+    expect(boton).toHaveClass('w-full', 'min-w-0');
+    expect(boton.querySelector('span')).toHaveClass('truncate');
+  });
+
+  it('los dos selectores de fecha comparten la misma regla y conservan nombre, descripción y altura', () => {
+    renderCrear();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
+    for (const nombre of ['Fecha', 'Fecha de fin']) {
+      const boton = screen.getByLabelText(nombre);
+      expect(boton).toHaveClass('h-10', 'w-full', 'min-w-0');
+      expect(boton).toHaveAccessibleDescription('Campo obligatorio');
+    }
+    expect(screen.getByLabelText('Fecha de fin')).toHaveTextContent('Selecciona la fecha de fin');
+  });
+});
