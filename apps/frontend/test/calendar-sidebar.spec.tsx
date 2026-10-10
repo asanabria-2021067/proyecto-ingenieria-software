@@ -247,3 +247,27 @@ describe('CalendarSidebar — columna plegable en móvil y mini calendario (G04-
     expect(document.querySelector('aside [aria-current="date"]')).toHaveClass('bg-primary', 'text-on-primary');
   });
 });
+
+describe('CalendarSidebar — identidad de propietario distinta del tipo de evento (G04-C11, UI-34)', () => {
+  it('"Mis proyectos" ya no muestra un punto de color por proyecto: solo nombre y casilla', () => {
+    renderSidebar({ proyectos: [{ idProyecto: 1, tituloProyecto: 'Alfa' }, { idProyecto: 2, tituloProyecto: 'Beta' }] });
+    const lista = screen.getByRole('heading', { name: 'Mis proyectos' }).parentElement as HTMLElement;
+    expect(lista.querySelector('[class*="bg-cal-"]')).toBeNull();
+    expect(lista.querySelectorAll('li')).toHaveLength(2);
+    expect(screen.getByRole('checkbox', { name: 'Alfa' })).toBeChecked();
+  });
+
+  it('el avatar de quien comparte lleva contorno discontinuo con su tono (patrón, no solo color) y ya no un anillo sólido', () => {
+    renderSidebar();
+    const avatar = document.querySelector('aside li [data-slot="avatar"]') as HTMLElement;
+    expect(avatar).toHaveClass('border-2', 'border-dashed', 'border-cal-2-strong');
+    expect(avatar.className).not.toMatch(/\bring-/);
+  });
+
+  it('una leyenda en texto explica cómo reconocer lo compartido, y cada persona se nombra en su casilla', () => {
+    renderSidebar({ compartidos: [ANA, LUIS], compartidosActivos: new Set([ANA.idUsuario]) });
+    expect(screen.getByText(/Sus actividades llevan borde discontinuo y el nombre de la persona\./)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Ver el calendario de Ana García' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Ver el calendario de Luis Hernández' })).not.toBeChecked();
+  });
+});

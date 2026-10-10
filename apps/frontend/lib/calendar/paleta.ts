@@ -19,8 +19,13 @@ export interface ClasesTono {
   borde: string;
   /** Punto o marca sólida (leyendas, vista compacta). */
   punto: string;
-  /** Anillo alrededor del avatar de un calendario compartido. */
-  anillo: string;
+  /**
+   * Contorno del avatar de un calendario compartido. G04 (UI-34): se pinta
+   * discontinuo (`border-dashed`), igual que los bloques de esa persona, para
+   * que su identidad no dependa solo del color (los tonos son los mismos seis
+   * de los tipos de evento).
+   */
+  contorno: string;
 }
 
 /**
@@ -28,15 +33,22 @@ export interface ClasesTono {
  * escritas completas en el código, así que no se arman con plantillas.
  */
 export const TONO_CLASES: Record<TonoCalendario, ClasesTono> = {
-  1: { bloque: 'bg-cal-1 text-on-cal-1', borde: 'border-l-cal-1-strong', punto: 'bg-cal-1-strong', anillo: 'ring-cal-1-strong' },
-  2: { bloque: 'bg-cal-2 text-on-cal-2', borde: 'border-l-cal-2-strong', punto: 'bg-cal-2-strong', anillo: 'ring-cal-2-strong' },
-  3: { bloque: 'bg-cal-3 text-on-cal-3', borde: 'border-l-cal-3-strong', punto: 'bg-cal-3-strong', anillo: 'ring-cal-3-strong' },
-  4: { bloque: 'bg-cal-4 text-on-cal-4', borde: 'border-l-cal-4-strong', punto: 'bg-cal-4-strong', anillo: 'ring-cal-4-strong' },
-  5: { bloque: 'bg-cal-5 text-on-cal-5', borde: 'border-l-cal-5-strong', punto: 'bg-cal-5-strong', anillo: 'ring-cal-5-strong' },
-  6: { bloque: 'bg-cal-6 text-on-cal-6', borde: 'border-l-cal-6-strong', punto: 'bg-cal-6-strong', anillo: 'ring-cal-6-strong' },
+  1: { bloque: 'bg-cal-1 text-on-cal-1', borde: 'border-l-cal-1-strong', punto: 'bg-cal-1-strong', contorno: 'border-cal-1-strong' },
+  2: { bloque: 'bg-cal-2 text-on-cal-2', borde: 'border-l-cal-2-strong', punto: 'bg-cal-2-strong', contorno: 'border-cal-2-strong' },
+  3: { bloque: 'bg-cal-3 text-on-cal-3', borde: 'border-l-cal-3-strong', punto: 'bg-cal-3-strong', contorno: 'border-cal-3-strong' },
+  4: { bloque: 'bg-cal-4 text-on-cal-4', borde: 'border-l-cal-4-strong', punto: 'bg-cal-4-strong', contorno: 'border-cal-4-strong' },
+  5: { bloque: 'bg-cal-5 text-on-cal-5', borde: 'border-l-cal-5-strong', punto: 'bg-cal-5-strong', contorno: 'border-cal-5-strong' },
+  6: { bloque: 'bg-cal-6 text-on-cal-6', borde: 'border-l-cal-6-strong', punto: 'bg-cal-6-strong', contorno: 'border-cal-6-strong' },
 };
 
-/** Proyectos y calendarios compartidos reciben tono por orden de aparición, en ciclo. */
+/**
+ * Los calendarios compartidos reciben tono por orden de aparición, en ciclo.
+ * G04 (UI-34): son los mismos seis tonos de los tipos de evento y, con siete
+ * o más personas, se repiten. Por eso el tono nunca es la única pista de quién
+ * es una actividad: lo compartido lleva además borde discontinuo y el nombre
+ * de la persona (visible y en la etiqueta accesible). Los proyectos ya no
+ * reciben tono: en las vistas el color es del tipo de evento, no del proyecto.
+ */
 export function tonoPorIndice(indice: number): TonoCalendario {
   return ((((indice % 6) + 6) % 6) + 1) as TonoCalendario;
 }

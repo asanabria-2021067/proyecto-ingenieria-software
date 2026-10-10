@@ -1,6 +1,5 @@
 import type { TipoEvento } from '@/lib/services/events';
 import type { AgendaItem } from './agenda';
-import { tonoPorIndice, type TonoCalendario } from './paleta';
 import {
   addDays,
   formatMonthLabel,
@@ -81,26 +80,25 @@ export function contarItems(items: AgendaItem[]): number {
   return new Set(items.map((i) => `${i.kind}-${i.id}-${i.compartidoPor?.idUsuario ?? 'yo'}`)).size;
 }
 
-export interface ProyectoConTono {
+export interface ProyectoDelCalendario {
   idProyecto: number;
   tituloProyecto: string;
-  tono: TonoCalendario;
 }
 
 /**
  * "Mis proyectos" de la columna izquierda: los que lidero más los que aparecen
- * en mi calendario (eventos o tareas), ordenados por nombre. El tono sale del
- * orden alfabético para que un proyecto no cambie de color al navegar.
+ * en mi calendario (eventos o tareas), ordenados por nombre. G04 (UI-34): ya
+ * no llevan tono: en las vistas el color es del tipo de evento, y un punto de
+ * color por proyecto era una leyenda sin correspondencia.
  */
 export function proyectosDelCalendario(
   propios: AgendaItem[],
   liderados: { idProyecto: number; tituloProyecto: string }[],
-): ProyectoConTono[] {
+): ProyectoDelCalendario[] {
   const porId = new Map<number, string>();
   for (const p of liderados) porId.set(p.idProyecto, p.tituloProyecto);
   for (const item of propios) if (!item.compartidoPor) porId.set(item.projectId, item.projectTitle);
   return [...porId.entries()]
     .map(([idProyecto, tituloProyecto]) => ({ idProyecto, tituloProyecto }))
-    .sort((a, b) => a.tituloProyecto.localeCompare(b.tituloProyecto, 'es'))
-    .map((p, i) => ({ ...p, tono: tonoPorIndice(i) }));
+    .sort((a, b) => a.tituloProyecto.localeCompare(b.tituloProyecto, 'es'));
 }

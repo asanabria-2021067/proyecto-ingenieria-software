@@ -15,7 +15,6 @@ import { iniciales } from './invitados-field';
 export interface ProyectoFiltro {
   idProyecto: number;
   tituloProyecto: string;
-  tono: TonoCalendario;
 }
 
 export interface CalendarioCompartidoFiltro extends UsuarioCalendarioDTO {
@@ -146,7 +145,6 @@ export function CalendarSidebar({
                   const id = `filtro-proyecto-${p.idProyecto}`;
                   return (
                     <li key={p.idProyecto} className="flex items-center gap-tight">
-                      <span className={`size-2.5 shrink-0 rounded-pill ${TONO_CLASES[p.tono].punto}`} aria-hidden="true" />
                       <label htmlFor={id} className="type-body min-w-0 flex-1 truncate text-text-primary">
                         {p.tituloProyecto}
                       </label>
@@ -167,7 +165,10 @@ export function CalendarSidebar({
               <Users className="size-4 text-text-secondary" aria-hidden="true" />
               Calendarios compartidos conmigo
             </h3>
-            <p className="type-meta mb-stack">Actívalos para verlos junto al tuyo.</p>
+            {/* G04 (UI-34): la identidad de lo compartido es el borde discontinuo y el nombre, no solo el color. */}
+        <p className="type-meta mb-stack">
+          Actívalos para verlos junto al tuyo. Sus actividades llevan borde discontinuo y el nombre de la persona.
+        </p>
             {compartidosEstado === 'cargando' ? (
               <p role="status" className="type-meta flex items-center gap-tight">
                 <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
@@ -194,7 +195,7 @@ export function CalendarSidebar({
                   return (
                     <li key={persona.idUsuario}>
                     <div className="flex items-center gap-tight">
-                      <Avatar className={`size-7 ring-2 ring-offset-1 ring-offset-card ${TONO_CLASES[persona.tono].anillo}`}>
+                      <Avatar className={`size-7 border-2 border-dashed ${TONO_CLASES[persona.tono].contorno}`}>
                         {persona.fotoUrl && <AvatarImage src={persona.fotoUrl} alt="" />}
                         <AvatarFallback className={`type-micro font-bold ${TONO_CLASES[persona.tono].bloque}`}>
                           {iniciales(persona.nombre, persona.apellido)}

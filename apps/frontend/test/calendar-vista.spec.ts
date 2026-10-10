@@ -98,13 +98,19 @@ describe('calendar/vista filtros (HU-184 T-324)', () => {
 });
 
 describe('calendar/vista proyectosDelCalendario (HU-184 T-324)', () => {
-  it('une liderados y los que tienen actividad, en orden alfabético con tono estable', () => {
+  // G04-C11 (clase B): antes este caso exigía un `tono` por proyecto (Alfa 1, Beta 2, Zeta 3). Ese
+  // color no significaba nada en las vistas (allí el color es del tipo de evento) y chocaba con
+  // el de tipos y personas; la lista sigue igual, pero sin tono.
+  it('une liderados y los que tienen actividad, en orden alfabético y sin tono (el color es del tipo de evento, no del proyecto)', () => {
     const proyectos = proyectosDelCalendario([evento(1), tarea(2)], [{ idProyecto: 3, tituloProyecto: 'Beta' }]);
-    expect(proyectos.map((p) => [p.tituloProyecto, p.tono])).toEqual([
-      ['Alfa', 1],
-      ['Beta', 2],
-      ['Zeta', 3],
-    ]);
+    expect(proyectos.map((p) => p.tituloProyecto)).toEqual(['Alfa', 'Beta', 'Zeta']);
+    for (const proyecto of proyectos) expect(Object.keys(proyecto).sort()).toEqual(['idProyecto', 'tituloProyecto']);
+  });
+
+  it('el orden no depende del orden de llegada (estable al navegar entre periodos)', () => {
+    const a = proyectosDelCalendario([evento(1), tarea(2)], [{ idProyecto: 3, tituloProyecto: 'Beta' }]);
+    const b = proyectosDelCalendario([tarea(2), evento(1)], [{ idProyecto: 3, tituloProyecto: 'Beta' }]);
+    expect(b).toEqual(a);
   });
 
   it('no incluye proyectos que solo aparecen en calendarios compartidos', () => {

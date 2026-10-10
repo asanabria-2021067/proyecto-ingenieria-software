@@ -489,3 +489,33 @@ describe('TimeGridView — alto adaptable de la cuadrícula (G04-C08, UI-38)', (
     expect(horas).not.toHaveClass('h-[34rem]');
   });
 });
+
+describe('TimeGridView — lo compartido se distingue por patrón y nombre (G04-C11, UI-34)', () => {
+  it('un evento compartido de varios días en "Todo el día" lleva borde discontinuo y nombra a su dueño; uno propio no', () => {
+    const itemsByDay = new Map<string, AgendaItem[]>([
+      [
+        '2026-10-06',
+        [
+          evento(1, '2026-10-06', { titulo: 'Congreso propio', multiDia: true, tipo: 'TUTORIA' }),
+          evento(2, '2026-10-06', { titulo: 'Viaje de Ana', multiDia: true, tipo: 'TUTORIA', compartidoPor: { idUsuario: 9, nombre: 'Ana García', tono: 1 } }),
+        ],
+      ],
+    ]);
+    render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={itemsByDay} onSelectEvento={vi.fn()} ahora={AHORA} />);
+
+    const propio = screen.getByRole('button', { name: 'Congreso propio' });
+    const compartido = screen.getByRole('button', { name: 'Viaje de Ana, calendario de Ana García' });
+    // Mismo tono (Tutoría = tono 1 = primera persona): la diferencia es el patrón y el nombre.
+    expect(propio).toHaveClass('bg-cal-1');
+    expect(compartido).toHaveClass('bg-cal-1', 'border-dashed');
+    expect(propio).not.toHaveClass('border-dashed');
+  });
+
+  it('los bloques con hora de un calendario compartido conservan su borde discontinuo y el nombre en la etiqueta', () => {
+    const itemsByDay = new Map<string, AgendaItem[]>([
+      ['2026-10-06', [evento(3, '2026-10-06', { titulo: 'Ocupado', ocupado: true, compartidoPor: { idUsuario: 9, nombre: 'Ana García', tono: 1 } })]],
+    ]);
+    render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={itemsByDay} onSelectEvento={vi.fn()} ahora={AHORA} />);
+    expect(screen.getByRole('button', { name: 'Ocupado, 09:00 a 10:30, calendario de Ana García' })).toHaveClass('border-dashed');
+  });
+});

@@ -38,8 +38,12 @@ function ChipTodoElDia({ item, onSelectEvento }: { item: AgendaItem; onSelectEve
         type="button"
         data-evento-key={agendaItemKey(item)}
         onClick={() => onSelectEvento(item)}
+        // G04 (UI-34): lo compartido se distingue por patrón y nombre, igual que los bloques con hora.
+        aria-label={item.compartidoPor ? `${item.titulo}, calendario de ${item.compartidoPor.nombre}` : undefined}
         // G04 (UI-18): min-h-6 = 24 px de objetivo táctil (antes 20.5 px).
-        className={`min-h-6 w-full truncate rounded-control border-l-4 px-1.5 py-0.5 text-left type-micro font-semibold ${tono.bloque} ${tono.borde}`}
+        className={`min-h-6 w-full truncate rounded-control border-l-4 px-1.5 py-0.5 text-left type-micro font-semibold ${tono.bloque} ${tono.borde} ${
+          item.compartidoPor ? 'border-dashed' : ''
+        }`}
       >
         {item.titulo}
       </button>
