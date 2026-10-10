@@ -6,6 +6,7 @@ import {
   duracionTexto,
   emptyEventForm,
   eventFormFromEvento,
+  inicioPropuesto,
   type EventFormValues,
 } from '../components/calendar/event-form.schema';
 import type { EventoProyectoDTO } from '../lib/services/events';
@@ -411,5 +412,56 @@ describe('validación del inicio contra el reloj vivo (G03-C03, UI-26)', () => {
     // Mover el inicio dentro del pasado sí se rechaza, contra la hora actual.
     const movido = schema.safeParse({ ...form, horaInicio: '08:30' });
     expect(movido.success).toBe(false);
+  });
+});
+
+describe('hora propuesta coherente con la fecha elegida (G03-C04, UI-27)', () => {
+  const ahora = new Date(2026, 9, 5, 10, 20);
+
+  it('abrir desde una celda a las 09:00 de un día futuro propone exactamente 09:00–10:00 de ese día', () => {
+    const form = emptyEventForm(1, new Date(2026, 9, 8, 9, 0), ahora);
+    expect(form.fecha).toEqual(new Date(2026, 9, 8));
+    expect(form.horaInicio).toBe('09:00');
+    expect(form.horaFin).toBe('10:00');
+    expect(form.terminaOtroDia).toBe(false);
+  });
+
+  it('respeta una hora con minutos (vista Día a las 14:30) sin redondearla', () => {
+    const form = emptyEventForm(1, new Date(2026, 9, 8, 14, 30), ahora);
+    expect(form.horaInicio).toBe('14:30');
+    expect(form.horaFin).toBe('15:30');
+  });
+
+  it('sin fecha inicial propone la siguiente hora en punto a partir de ahora (nunca el pasado)', () => {
+    const form = emptyEventForm(1, undefined, ahora);
+    expect(form.fecha).toEqual(new Date(2026, 9, 5));
+    expect(form.horaInicio).toBe('11:00');
+    expect(form.horaFin).toBe('12:00');
+    expect(buildEventFormSchema({ mode: 'create', ahora }).safeParse({ ...form, tituloEvento: 'x', linkSesion: 'https://meet.google.com/x' }).success).toBe(true);
+  });
+
+  it('si la fecha elegida ya pasó (hoy a las 09:00 siendo las 10:20), cae en el siguiente hueco válido en vez de sugerir el pasado', () => {
+    const form = emptyEventForm(1, new Date(2026, 9, 5, 9, 0), ahora);
+    expect(form.fecha).toEqual(new Date(2026, 9, 5));
+    expect(form.horaInicio).toBe('11:00');
+    expect(form.horaFin).toBe('12:00');
+  });
+
+  it('una propuesta a las 23:30 recorta el fin a las 23:59 del mismo día', () => {
+    const form = emptyEventForm(1, new Date(2026, 9, 8, 23, 30), ahora);
+    expect(form.horaInicio).toBe('23:30');
+    expect(form.horaFin).toBe('23:59');
+  });
+
+  it('inicioPropuesto es el único punto de decisión: futuro se respeta, pasado o ausente va a la siguiente hora', () => {
+    expect(inicioPropuesto(new Date(2026, 9, 5, 10, 20), ahora)).toEqual(new Date(2026, 9, 5, 10, 20));
+    expect(inicioPropuesto(new Date(2026, 9, 5, 10, 19), ahora)).toEqual(new Date(2026, 9, 5, 11, 0));
+    expect(inicioPropuesto(undefined, ahora)).toEqual(new Date(2026, 9, 5, 11, 0));
+  });
+
+  it('al editar, las horas del evento se cargan tal cual y no se tocan por la propuesta', () => {
+    const form = eventFormFromEvento(evento({ fechaInicio: new Date(2026, 9, 1, 8, 0).toISOString(), fechaFin: new Date(2026, 9, 1, 9, 15).toISOString() }));
+    expect(form.horaInicio).toBe('08:00');
+    expect(form.horaFin).toBe('09:15');
   });
 });

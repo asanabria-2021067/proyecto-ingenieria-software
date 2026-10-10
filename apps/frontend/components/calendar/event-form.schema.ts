@@ -113,10 +113,26 @@ export function duracionTexto(values: RangoInput): string | null {
   return resto === 0 ? `${horas}h` : `${horas}h ${resto}m`;
 }
 
-export function emptyEventForm(defaultProjectId?: number, initialDate?: Date, ahora = new Date()): EventFormValues {
-  const base = initialDate ? new Date(initialDate) : new Date(ahora);
+/**
+ * Hora de inicio propuesta. G03 (UI-27): si el calendario entregó una fecha
+ * con hora (celda del mes o vista Día a las 09:00) se respeta tal cual, para
+ * que el formulario prometa lo mismo que la pantalla; si esa hora ya pasó o
+ * no hay fecha, se propone la siguiente hora en punto a partir de ahora.
+ */
+export function inicioPropuesto(initialDate: Date | undefined, ahora: Date): Date {
+  if (initialDate && initialDate.getTime() >= ahora.getTime()) {
+    const base = new Date(initialDate);
+    base.setSeconds(0, 0);
+    return base;
+  }
+  const base = new Date(ahora);
   base.setMinutes(0, 0, 0);
   base.setHours(base.getHours() + 1);
+  return base;
+}
+
+export function emptyEventForm(defaultProjectId?: number, initialDate?: Date, ahora = new Date()): EventFormValues {
+  const base = inicioPropuesto(initialDate, ahora);
   const fin = new Date(base);
   fin.setHours(fin.getHours() + 1);
   return {
