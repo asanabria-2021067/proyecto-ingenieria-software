@@ -93,9 +93,14 @@ export function MiniCalendar({
                   aria-current={isToday ? 'date' : undefined}
                   aria-pressed={onSelectDay ? isSelected : undefined}
                   className={`relative flex ${cellSize} items-center justify-center rounded-pill font-medium transition-colors ${
-                    !day.inCurrentMonth
-                      ? 'text-text-disabled'
-                      : 'text-text-primary'
+                    // Con el tono primario, hoy no lleva el color base: `text-text-primary` ganaba
+                    // a `text-on-primary` por orden de CSS y el número quedaba ilegible sobre el
+                    // verde (2.44:1). Con el acento por defecto la cadena de clases no cambia.
+                    isToday && todayTone === 'primary'
+                      ? ''
+                      : !day.inCurrentMonth
+                        ? 'text-text-disabled'
+                        : 'text-text-primary'
                   } ${isToday ? hoyClase : ''} ${
                     isSelected && !isToday ? 'bg-surface-container-high' : ''
                   } ${onSelectDay ? 'cursor-pointer hover:bg-surface-container' : 'cursor-default'}`}

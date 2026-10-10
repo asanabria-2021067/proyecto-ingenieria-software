@@ -65,3 +65,35 @@ describe('MiniCalendar — color de "hoy" opcional (G04-C09, UI-41)', () => {
     expect(hoy()).toHaveClass('bg-accent');
   });
 });
+
+describe('MiniCalendar — el número de "hoy" es legible con todayTone="primary" (corrección de G04-C09)', () => {
+  // En el navegador `text-text-primary` ganaba a `text-on-primary` por orden de CSS: el "9" quedaba
+  // oscuro sobre el verde primario (2.44:1 en claro, 1.5:1 en oscuro). Con el tono primario, hoy no
+  // debe llevar ninguna otra clase de color de texto.
+  const coloresDeTexto = (el: HTMLElement) => [...el.classList].filter((c) => /^text-(text-|on-)/.test(c));
+
+  it('con todayTone="primary" hoy solo lleva text-on-primary como color de texto', () => {
+    renderMini({ todayTone: 'primary' });
+    expect(coloresDeTexto(hoy())).toEqual(['text-on-primary']);
+  });
+
+  it('también cuando hoy cae fuera del mes mostrado (celda de un mes vecino)', () => {
+    // La rejilla de octubre empieza el lunes 28 de septiembre: el 29 es una celda de mes vecino.
+    renderMini({ todayTone: 'primary', month: 9, todayKey: '2026-09-29' });
+    expect(hoy()).toHaveTextContent('29');
+    expect(coloresDeTexto(hoy())).toEqual(['text-on-primary']);
+  });
+
+  it('sin la prop, la celda de hoy conserva exactamente sus clases de siempre (tablero y widgets sin cambios)', () => {
+    renderMini();
+    expect(hoy().className).toBe(
+      'relative flex h-7 w-7 text-xs items-center justify-center rounded-pill font-medium transition-colors text-text-primary bg-accent font-bold text-on-accent  cursor-pointer hover:bg-surface-container',
+    );
+  });
+
+  it('los días que no son hoy conservan su color de siempre con cualquiera de los dos tonos', () => {
+    renderMini({ todayTone: 'primary' });
+    expect(coloresDeTexto(screen.getByRole('button', { name: '20' }))).toEqual(['text-text-primary']);
+    expect(coloresDeTexto(screen.getAllByRole('button', { name: '28' }).find((b) => b.classList.contains('text-text-disabled')) as HTMLElement)).toEqual(['text-text-disabled']);
+  });
+});
