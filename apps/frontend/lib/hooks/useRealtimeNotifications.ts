@@ -19,6 +19,7 @@ import {
 } from '@/lib/query-keys/leadership';
 import { projectMembersQueryKey, projectTeamSummaryQueryKey } from '@/lib/query-keys/members';
 import { adminAppealsPrefix, adminProjectDetailQueryKey, adminProjectsPrefix } from '@/lib/query-keys/admin-projects';
+import { adminCuentasPendientesQueryKey } from '@/lib/query-keys/admin-accounts';
 import { projectTasksQueryKey, taskHoursQueryKey } from '@/lib/query-keys/tasks';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
@@ -112,6 +113,9 @@ export function useRealtimeNotifications(enabled: boolean) {
 
     const handleNotification = (data: Notification) => {
       setLatestNotification(data);
+      if (data?.tipoNotificacion === 'CUENTA_PENDIENTE_VERIFICACION') {
+        queryClient.invalidateQueries({ queryKey: adminCuentasPendientesQueryKey });
+      }
     };
 
     // F6 (A4/A9.1): el estado real de un Sprint sigue viviendo en la query
