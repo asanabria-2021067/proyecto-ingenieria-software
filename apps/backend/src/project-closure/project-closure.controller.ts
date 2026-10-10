@@ -12,6 +12,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
@@ -50,7 +52,8 @@ export class ProjectClosureController {
 
   @Post('aprobar-cierre')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ProjectWriteGuard)
+  @UseGuards(RolesGuard, ProjectWriteGuard)
+  @Roles('administrador')
   @ProjectWrite({ source: { kind: 'param', name: 'projectId' }, states: ['S'], sprint: 'NONE_OPERABLE', family: 'CIERRE_VEREDICTO' })
   approve(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }, @Body() dto: ApproveClosureDto) {
     return this.review.approveClosure(projectId, user.userId, dto);
@@ -58,7 +61,8 @@ export class ProjectClosureController {
 
   @Post('rechazar-cierre')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ProjectWriteGuard)
+  @UseGuards(RolesGuard, ProjectWriteGuard)
+  @Roles('administrador')
   @ProjectWrite({ source: { kind: 'param', name: 'projectId' }, states: ['S'], sprint: 'NONE_OPERABLE', family: 'CIERRE_VEREDICTO' })
   returnToExecution(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }, @Body() dto: ReturnExecutionDto) {
     return this.review.returnToExecution(projectId, user.userId, dto);
@@ -75,7 +79,8 @@ export class ProjectClosureController {
   /** E103: crea el borrador de cierre o devuelve el existente. */
   @Post('cierre/correccion-documental')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ProjectWriteGuard)
+  @UseGuards(RolesGuard, ProjectWriteGuard)
+  @Roles('administrador')
   @ProjectWrite({ source: { kind: 'param', name: 'projectId' }, states: ['S'], sprint: 'NONE_OPERABLE', family: 'CIERRE_VEREDICTO' })
   correction(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }, @Body() dto: CorrectionDto) {
     return this.review.requestDocumentaryCorrection(projectId, user.userId, dto);

@@ -1,5 +1,7 @@
 import { Controller, Get, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AdminProjectsQueryDto } from './dto/admin-projects-query.dto';
 import { HistoricalProjectReadService } from './historical-project-read.service';
@@ -11,7 +13,8 @@ import { HistoricalProjectReadService } from './historical-project-read.service'
  * un proyecto no convierte a nadie en su líder.
  */
 @Controller('admin/proyectos')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('administrador')
 export class AdminProjectsController {
   constructor(protected readonly historical: HistoricalProjectReadService) {}
 

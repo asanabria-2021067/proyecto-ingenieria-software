@@ -8,6 +8,7 @@ import { createProject, updateProject, getMyProjectById, submitProjectForReview 
 import { getCarreras, getHabilidades, type Carrera, type Habilidad } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
 import { getApiErrorMessage, getApiErrorStatus, traducirMensajeValidacion } from '@/components/projects/api-error';
+import { useRequireCan } from '@/hooks/use-can';
 import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
 import { Step1 } from './Step1';
 import { Step2 } from './Step2';
@@ -48,10 +49,16 @@ function NewProjectFormContent() {
   const { data: carreras = [] } = useQuery<Carrera[]>({ queryKey: ['carreras'], queryFn: getCarreras });
   const { data: habilidades = [] } = useQuery<Habilidad[]>({ queryKey: ['habilidades'], queryFn: getHabilidades });
 
-  const { data: proyectoExistente, isLoading: loadingExistente } = useQuery({
+  const { data: proyectoExistente, isLoading: loadingExistente, error: errorExistente } = useQuery({
     queryKey: ['proyecto-owner', editId],
     queryFn: () => getMyProjectById(editId!),
     enabled: editId !== null,
+  });
+
+  const { denegado } = useRequireCan('proyecto.editar', {
+    activo: editId !== null,
+    esLider: getApiErrorStatus(errorExistente) !== 403,
+    listo: !loadingExistente,
   });
 
   const esEdicionParcial =
@@ -288,6 +295,8 @@ function NewProjectFormContent() {
   const animClass = direction === 'forward'
     ? 'animate-in fade-in-0 slide-in-from-right-4 duration-200'
     : 'animate-in fade-in-0 slide-in-from-left-4 duration-200';
+
+  if (denegado) return null;
 
   if (loadingExistente) {
     return (

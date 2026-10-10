@@ -11,6 +11,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
@@ -37,7 +39,8 @@ const LEADERSHIP_ADMIN_WRITE: ProjectWriteMetadata = {
 };
 
 @Controller('admin')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('administrador')
 export class LeadershipAdminController {
   constructor(
     private readonly leadershipRead: LeadershipReadService,
