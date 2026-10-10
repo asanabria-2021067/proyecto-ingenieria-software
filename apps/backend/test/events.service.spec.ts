@@ -10,6 +10,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { UpdateEventDto } from '../src/events/dto/update-event.dto';
+import { GetEventsRangeQueryDto, MAX_DIAS_RANGO_EVENTOS } from '../src/events/dto/get-events-range-query.dto';
 
 const LEADER_ID = 1;
 const PARTICIPANT_ID = 2;
@@ -797,5 +798,55 @@ describe('UpdateEventDto — null explícito solo donde significa "limpiar" (G04
 
   it('la omisión sigue siendo válida: un PATCH de solo título no exige nada más', async () => {
     expect(await errores({ tituloEvento: 'Nuevo título' })).toEqual([]);
+  });
+});
+
+describe('GetEventsRangeQueryDto — rango acotado (G04-C15, UI-20/B-06)', () => {
+  const DESDE = '2026-10-01T06:00:00.000Z';
+  const mas = (dias: number, ms = 0) => new Date(Date.parse(DESDE) + dias * 86_400_000 + ms).toISOString();
+  const validar = async (query: Record<string, unknown>) => {
+    const errores = await validate(plainToInstance(GetEventsRangeQueryDto, query), { whitelist: true, forbidNonWhitelisted: true });
+    return errores.flatMap((e) => Object.values(e.constraints ?? {}).map((mensaje) => `${e.property}: ${mensaje}`));
+  };
+
+  it('el tope es de 62 días', () => {
+    expect(MAX_DIAS_RANGO_EVENTOS).toBe(62);
+  });
+
+  it.each([
+    ['un día (vista Día)', 1],
+    ['una semana (vista Semana)', 7],
+    ['6 semanas, lo que pide la vista Mes y el mini calendario', 42],
+    ['exactamente 62 días', 62],
+  ])('acepta %s', async (_caso, dias) => {
+    expect(await validar({ desde: DESDE, hasta: mas(dias) })).toEqual([]);
+  });
+
+  it('acepta un rango de longitud cero (hasta igual a desde)', async () => {
+    expect(await validar({ desde: DESDE, hasta: DESDE })).toEqual([]);
+  });
+
+  it.each([
+    ['62 días y un milisegundo', mas(62, 1)],
+    ['un año completo', mas(365)],
+    ['diez años', mas(3650)],
+  ])('rechaza %s con un mensaje que dice el tope', async (_caso, hasta) => {
+    expect(await validar({ desde: DESDE, hasta })).toEqual(['hasta: el rango entre desde y hasta no puede superar 62 días']);
+  });
+
+  it('rechaza un rango invertido con su propio mensaje', async () => {
+    expect(await validar({ desde: DESDE, hasta: mas(-1) })).toEqual(['hasta: hasta no puede ser anterior a desde']);
+  });
+
+  it('una fecha con formato inválido la sigue reportando solo @IsDateString (sin error duplicado ni excepción)', async () => {
+    expect(await validar({ desde: 'ayer', hasta: mas(1) })).toEqual(['desde: desde debe ser una fecha/hora válida (ISO 8601)']);
+    expect(await validar({ desde: DESDE, hasta: 'mañana' })).toEqual(['hasta: hasta debe ser una fecha/hora válida (ISO 8601)']);
+    expect(await validar({ desde: DESDE })).toEqual(['hasta: hasta debe ser una fecha/hora válida (ISO 8601)']);
+  });
+
+  it('el tope se mide en tiempo real, sin importar la zona con que venga escrita la fecha', async () => {
+    // 62 días exactos expresados con offset de Guatemala (-06:00) en vez de Z.
+    expect(await validar({ desde: '2026-10-01T00:00:00.000-06:00', hasta: '2026-12-02T00:00:00.000-06:00' })).toEqual([]);
+    expect(await validar({ desde: '2026-10-01T00:00:00.000-06:00', hasta: '2026-12-02T00:00:00.001-06:00' })).toHaveLength(1);
   });
 });

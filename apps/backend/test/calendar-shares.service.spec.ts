@@ -468,3 +468,49 @@ describe('CalendarSharesService — correo solo donde la UI lo muestra (G01-C13,
     expect(Object.keys(resultado)).not.toContain('correo');
   });
 });
+
+describe('CalendarSharesService.compartir — destinatarios admisibles (G04-C15, UI-20/B-11)', () => {
+  it('el destinatario se busca siempre con estado ACTIVO: un INACTIVO, un BLOQUEADO o un id inexistente dan el mismo 404 y no crean nada', async () => {
+    const { prisma, notifications, service } = makeDeps();
+    prisma.usuario.findFirst.mockResolvedValue(null);
+
+    for (const idInvitado of [50, 51, 999_999]) {
+      await expect(service.compartir(OWNER_ID, idInvitado)).rejects.toThrow(new NotFoundException('Usuario no encontrado'));
+      expect(prisma.usuario.findFirst).toHaveBeenLastCalledWith(expect.objectContaining({ where: { idUsuario: idInvitado, estado: 'ACTIVO' } }));
+    }
+    expect(prisma.calendarioCompartido.create).not.toHaveBeenCalled();
+    expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
+  });
+
+  it('la respuesta de un destinatario válido no trae estado, correo ni roles (solo el resumen público)', async () => {
+    const { prisma, service } = makeDeps();
+    prisma.usuario.findFirst.mockResolvedValue({ idUsuario: VIEWER_ID, nombre: 'Ana', apellido: 'García', fotoUrl: null });
+    prisma.calendarioCompartido.create.mockResolvedValue({});
+
+    expect(await service.compartir(OWNER_ID, VIEWER_ID)).toEqual({ idUsuario: VIEWER_ID, nombre: 'Ana', apellido: 'García', fotoUrl: null });
+    expect(prisma.usuario.findFirst.mock.calls[0][0].select).toEqual({ idUsuario: true, nombre: true, apellido: true, fotoUrl: true });
+  });
+
+  // Decisión de producto pendiente (Angel/PO): el buscador no ofrece administradores, pero el
+  // endpoint no los excluye. Este caso fija el contrato actual para que cambiarlo sea explícito.
+  it('no excluye por rol: el filtro del destinatario es solo id + estado ACTIVO (sin condición de administrador)', async () => {
+    const { prisma, service } = makeDeps();
+    prisma.usuario.findFirst.mockResolvedValue({ idUsuario: 7, nombre: 'Admin', apellido: 'Uno', fotoUrl: null });
+    prisma.calendarioCompartido.create.mockResolvedValue({});
+
+    await service.compartir(OWNER_ID, 7);
+    expect(prisma.usuario.findFirst.mock.calls[0][0].where).toEqual({ idUsuario: 7, estado: 'ACTIVO' });
+    expect(prisma.calendarioCompartido.create).toHaveBeenCalledWith({ data: { idPropietario: OWNER_ID, idInvitado: 7 } });
+  });
+
+  it('la agenda compartida solo se sirve si el propietario sigue ACTIVO', async () => {
+    const { prisma, events, service } = makeDeps();
+    prisma.calendarioCompartido.findFirst.mockResolvedValue(null);
+
+    await expect(service.agendaCompartida(VIEWER_ID, OWNER_ID, '2026-10-01T00:00:00.000Z', '2026-10-08T00:00:00.000Z')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.calendarioCompartido.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { idPropietario: OWNER_ID, idInvitado: VIEWER_ID, propietario: { estado: 'ACTIVO' } } }),
+    );
+    expect(events.findSharedInRange).not.toHaveBeenCalled();
+  });
+});

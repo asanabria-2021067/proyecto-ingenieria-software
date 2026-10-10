@@ -236,6 +236,52 @@ describeIntegration('G01-C14 — contrato HTTP de calendarios compartidos (Postg
     expect(eventos[0]).toHaveProperty('invitados');
   });
 
+  // G04-C15 (UI-20, B-06): el tope de 62 días protege las dos rutas que usan GetEventsRangeQueryDto.
+  it('G04-C15: un rango de más de 62 días o invertido responde 400 en mi calendario y en la agenda compartida; 62 días exactos pasan', async () => {
+    const q = (desde: string, hasta: string) => `desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`;
+    const EXACTO = q('2026-11-01T00:00:00.000Z', '2027-01-02T00:00:00.000Z'); // 62 días
+    const EXCEDIDO = q('2026-11-01T00:00:00.000Z', '2027-01-02T00:00:00.001Z');
+    const ANUAL = q('2020-01-01T00:00:00.000Z', '2030-01-01T00:00:00.000Z');
+    const INVERTIDO = q('2026-11-30T00:00:00.000Z', '2026-11-01T00:00:00.000Z');
+    const agenda = `/usuarios/me/calendario/compartidos-conmigo/${ids.owner}/agenda`;
+
+    for (const [ruta, token] of [['/usuarios/me/eventos', tokens.owner], [agenda, tokens.viewer]] as const) {
+      expect((await pedir(`${ruta}?${EXACTO}`, token)).status).toBe(200);
+      for (const rango of [EXCEDIDO, ANUAL]) {
+        const res = await pedir(`${ruta}?${rango}`, token);
+        expect(res.status).toBe(400);
+        const cuerpo = await res.text();
+        expect(cuerpo).toContain('no puede superar 62 días');
+        expect(cuerpo).not.toContain('SECRETO');
+      }
+      const invertido = await pedir(`${ruta}?${INVERTIDO}`, token);
+      expect(invertido.status).toBe(400);
+      expect(await invertido.text()).toContain('hasta no puede ser anterior a desde');
+    }
+  });
+
+  // G04-C15 (B-11): destinatarios admisibles contra la base real.
+  it('G04-C15: compartir con un usuario INACTIVO, BLOQUEADO o inexistente responde 404 y no crea fila ni notifica', async () => {
+    const inactivo = await createIntegrationUser(prisma, { nombre: 'Inactivo', apellido: 'G01' });
+    const bloqueado = await createIntegrationUser(prisma, { nombre: 'Bloqueado', apellido: 'G01' });
+    scope.userIds!.push(inactivo.idUsuario, bloqueado.idUsuario);
+    await prisma.usuario.update({ where: { idUsuario: inactivo.idUsuario }, data: { estado: 'INACTIVO' } });
+    await prisma.usuario.update({ where: { idUsuario: bloqueado.idUsuario }, data: { estado: 'BLOQUEADO' } });
+    notifyFromTemplate.mockClear();
+
+    for (const idUsuario of [inactivo.idUsuario, bloqueado.idUsuario, 2_000_000_000]) {
+      const res = await pedir('/usuarios/me/calendario/compartidos', tokens.owner, { method: 'POST', body: JSON.stringify({ idUsuario }) });
+      expect(res.status).toBe(404);
+      expect(((await res.json()) as { message: string }).message).toBe('Usuario no encontrado');
+    }
+    expect(await prisma.calendarioCompartido.count({ where: { idPropietario: ids.owner, idInvitado: { in: [inactivo.idUsuario, bloqueado.idUsuario] } } })).toBe(0);
+    expect(notifyFromTemplate).not.toHaveBeenCalled();
+    // Un id que no es entero positivo ni siquiera llega al servicio.
+    for (const idUsuario of [0, -3, 1.5, '7 OR 1=1']) {
+      expect((await pedir('/usuarios/me/calendario/compartidos', tokens.owner, { method: 'POST', body: JSON.stringify({ idUsuario }) })).status).toBe(400);
+    }
+  });
+
   it('un rango inválido es rechazado por el ValidationPipe con 400', async () => {
     const res = await pedir(`/usuarios/me/calendario/compartidos-conmigo/${ids.owner}/agenda?desde=ayer&hasta=${encodeURIComponent(HASTA)}`, tokens.viewer);
     expect(res.status).toBe(400);

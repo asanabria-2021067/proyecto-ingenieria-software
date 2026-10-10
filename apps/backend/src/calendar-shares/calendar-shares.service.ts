@@ -106,7 +106,16 @@ export class CalendarSharesService {
     };
   }
 
-  /** POST /usuarios/me/calendario/compartidos — idempotente: compartir dos veces no duplica ni vuelve a notificar. */
+  /**
+   * POST /usuarios/me/calendario/compartidos — idempotente: compartir dos veces no duplica ni vuelve a notificar.
+   *
+   * G04 (UI-20, B-11): política de destinatarios vigente: cualquier usuario
+   * con estado ACTIVO que no sea uno mismo (INACTIVO, BLOQUEADO o inexistente
+   * responden el mismo 404, sin revelar cuál es el caso). El buscador del
+   * diálogo no ofrece administradores, pero este endpoint no los excluye:
+   * hacerlo es una decisión de producto que no está aprobada (pendiente de
+   * Angel/PO), así que no se añade por inferencia.
+   */
   async compartir(userId: number, idInvitado: number) {
     if (idInvitado === userId) {
       throw new BadRequestException('No puedes compartir el calendario contigo mismo');
