@@ -780,9 +780,13 @@ describe('EventFormDialog — etiquetas, foco en campos no nativos y obligatorie
 
   it('los campos obligatorios se anuncian con aria-required según la modalidad; la descripción no', () => {
     renderCrear();
-    for (const etiqueta of ['Título del evento o actividad', 'Proyecto', 'Fecha', 'Hora de inicio', 'Hora de fin', 'Enlace de conexión virtual']) {
+    for (const etiqueta of ['Título del evento o actividad', 'Proyecto', 'Hora de inicio', 'Hora de fin', 'Enlace de conexión virtual']) {
       expect(screen.getByLabelText(etiqueta)).toHaveAttribute('aria-required', 'true');
     }
+    // G04-C07 (clase B): la fecha es un <button> y no admite aria-required (axe aria-allowed-attr);
+    // su obligatoriedad se anuncia como descripción accesible.
+    expect(screen.getByLabelText('Fecha')).not.toHaveAttribute('aria-required');
+    expect(screen.getByLabelText('Fecha')).toHaveAccessibleDescription('Campo obligatorio');
     fireEvent.click(screen.getByRole('button', { name: 'Agregar descripción' }));
     expect(screen.getByLabelText('Descripción (opcional)')).not.toHaveAttribute('aria-required');
 
@@ -846,5 +850,48 @@ describe('EventFormDialog — objetivos táctiles de los controles pequeños (G0
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     await waitFor(() => expect(eventsMock.updateEvent).toHaveBeenCalled());
     expect(eventsMock.updateEvent.mock.calls[0][2].invitados).toEqual([]);
+  });
+});
+
+describe('EventFormDialog — semántica de grupos y duración (G04-C07, UI-32)', () => {
+  it('"Participantes e invitados" es un grupo con nombre que contiene los chips y el botón de añadir', () => {
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={evento()} />, { wrapper });
+    const grupo = screen.getByRole('group', { name: 'Participantes e invitados' });
+    expect(within(grupo).getByRole('button', { name: 'Quitar a Ana García' })).toBeInTheDocument();
+    expect(within(grupo).getByRole('button', { name: 'Añadir integrante' })).toBeInTheDocument();
+    expect(within(grupo).getByText(/\(Tú · Líder\)/)).toBeInTheDocument();
+  });
+
+  it('la duración se anuncia como texto ("Duración 1h") y ningún span genérico lleva aria-label', () => {
+    renderCrear();
+    const chip = screen.getByText('1h');
+    expect(chip).toHaveTextContent('Duración 1h');
+    expect(chip.querySelector('.sr-only')).toHaveTextContent('Duración');
+    expect(chip).not.toHaveAttribute('aria-label');
+    const conEtiquetaInvalida = [...screen.getByRole('dialog').querySelectorAll('span[aria-label], div[aria-label]')].filter((n) => !n.hasAttribute('role'));
+    expect(conEtiquetaInvalida).toEqual([]);
+  });
+});
+
+describe('EventFormDialog — ARIA válido en los disparadores de fecha (G04-C07, UI-30)', () => {
+  it('ningún <button> del formulario lleva aria-required; los combobox e inputs sí pueden', () => {
+    renderCrear();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
+    const dialogo = screen.getByRole('dialog');
+    const invalidos = [...dialogo.querySelectorAll('button[aria-required]')].filter((b) => (b.getAttribute('role') ?? 'button') === 'button');
+    expect(invalidos).toEqual([]);
+    expect(screen.getByLabelText('Fecha de fin')).toHaveAccessibleDescription('Campo obligatorio');
+    expect(screen.getByRole('combobox', { name: 'Proyecto' })).toHaveAttribute('aria-required', 'true');
+  });
+
+  it('con error, la descripción de la fecha de fin incluye la obligatoriedad y el mensaje', async () => {
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    await screen.findByText('Selecciona la fecha de fin.');
+    expect(screen.getByLabelText('Fecha de fin')).toHaveAccessibleDescription('Campo obligatorio Selecciona la fecha de fin.');
+    await waitFor(() => expect(screen.getByLabelText('Fecha de fin')).toHaveFocus());
   });
 });

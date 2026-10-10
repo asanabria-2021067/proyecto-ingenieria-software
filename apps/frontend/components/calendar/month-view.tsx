@@ -1,6 +1,6 @@
 'use client';
 
-import { getMonthMatrix, WEEKDAY_LABELS_ES } from '@/lib/calendar/utils';
+import { getMonthMatrix, WEEKDAY_LABELS_ES, WEEKDAY_NAMES_ES } from '@/lib/calendar/utils';
 import { TIPO_EVENTO_ESTILO, TONO_CLASES } from '@/lib/calendar/paleta';
 import { tonoDeEvento } from '@/lib/calendar/time-grid';
 import { agendaItemKey, type AgendaItem } from '@/lib/calendar/agenda';
@@ -64,7 +64,9 @@ export function MonthView({
       <div className="mb-tight grid grid-cols-7 gap-1">
         {WEEKDAY_LABELS_ES.map((label, i) => (
           <div key={i} className="type-meta py-tight text-center uppercase">
-            {label}
+            {/* G04 (UI-32): la inicial es decorativa; el lector oye el nombre del día. */}
+            <span aria-hidden="true">{label}</span>
+            <span className="sr-only">{WEEKDAY_NAMES_ES[i]}</span>
           </div>
         ))}
       </div>

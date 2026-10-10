@@ -694,3 +694,49 @@ describe('CalendarioPage — una sola representación de Semana montada (G04-C03
     expect(listaSemana()?.closest('.xl\\:hidden')).not.toBeNull();
   });
 });
+
+describe('CalendarioPage — jerarquía de encabezados y grupos con nombre (G04-C07, UI-32)', () => {
+  it('los encabezados no saltan niveles: h1 de la página, h2 del periodo y de la columna, h3 de sus secciones', async () => {
+    usersMock.getDashboardStats.mockResolvedValue({ horasBeca: 10, horasBecaRequeridas: 40, horasExtension: 0, horasExtensionRequeridas: null });
+    await renderPage();
+    await screen.findByRole('heading', { name: 'Meta de horas' });
+    const niveles = screen.getAllByRole('heading').map((h) => Number(h.tagName.slice(1)));
+    expect(niveles[0]).toBe(1);
+    expect(niveles.filter((n) => n === 1)).toHaveLength(1);
+    // Regla de axe `heading-order`: nunca se baja más de un nivel de golpe.
+    niveles.forEach((nivel, i) => {
+      if (i > 0) expect(nivel - niveles[i - 1]).toBeLessThanOrEqual(1);
+    });
+    expect(screen.getByRole('heading', { level: 2, name: 'Opciones del calendario' })).toHaveClass('sr-only');
+    for (const seccion of ['Meta de horas', 'Mis proyectos', 'Calendarios compartidos conmigo']) {
+      expect(screen.getByRole('heading', { level: 3, name: seccion })).toBeInTheDocument();
+    }
+  });
+
+  it('el periodo visible es un h2 con aria-live que sigue a la navegación y a la vista', async () => {
+    await renderPage();
+    const periodo = screen.getByRole('heading', { level: 2, name: /5 oct/ });
+    expect(periodo).toBe(etiquetaPeriodo());
+    expect(periodo).toHaveAttribute('aria-live', 'polite');
+    fireEvent.click(vista('Mes'));
+    expect(screen.getByRole('heading', { level: 2, name: 'Octubre 2026' })).toBeInTheDocument();
+  });
+
+  it('las cabeceras del mes dicen el nombre completo del día (dos "M" distintas) sin cambiar lo que se ve', async () => {
+    await renderPage();
+    fireEvent.click(vista('Mes'));
+    const rejilla = celdaMes(20, 'octubre').closest('.card-base') as HTMLElement;
+    const cabeceras = [...(rejilla.firstElementChild as HTMLElement).children] as HTMLElement[];
+    expect(cabeceras.map((c) => c.querySelector('[aria-hidden="true"]')?.textContent)).toEqual(['L', 'M', 'M', 'J', 'V', 'S', 'D']);
+    expect(cabeceras.map((c) => c.querySelector('.sr-only')?.textContent)).toEqual(['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']);
+  });
+
+  it('los avatares de "compartida con" forman un grupo con nombre (aria-label ya no cuelga de un div sin rol)', async () => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({
+      compartidoPorMi: [{ idUsuario: 5, nombre: 'Luis', apellido: 'Hernández', fotoUrl: null, correo: 'luis@uvg.edu.gt' }],
+      compartidosConmigo: [],
+    });
+    await renderPage();
+    expect(await screen.findByRole('group', { name: 'Compartida con 1 personas' })).toBeInTheDocument();
+  });
+});

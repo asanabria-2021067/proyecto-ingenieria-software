@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { CheckCircle2, UserPlus, X } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -68,6 +68,7 @@ export function InvitadosField({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const tituloId = useId();
   const { members, isLoading } = useProjectMembers(idProyecto);
 
   // Una persona con dos roles aparece dos veces en el equipo: se deduplica.
@@ -81,9 +82,12 @@ export function InvitadosField({
   const disponibles = integrantes.filter((m) => !value.includes(m.idUsuario));
 
   return (
-    <div className="rounded-card border border-outline-variant/60 bg-surface-container-low p-stack">
+    // G04 (UI-32): grupo con nombre, para que el lector anuncie a qué pertenecen los chips y el botón.
+    <div role="group" aria-labelledby={tituloId} className="rounded-card border border-outline-variant/60 bg-surface-container-low p-stack">
       <div className="mb-tight flex items-center justify-between gap-tight">
-        <span className="text-sm font-medium text-on-surface">Participantes e invitados</span>
+        <span id={tituloId} className="text-sm font-medium text-on-surface">
+          Participantes e invitados
+        </span>
         <span className="type-meta">
           {value.length === 0 ? 'Todo el proyecto' : `${value.length} ${value.length === 1 ? 'invitado' : 'invitados'}`}
         </span>

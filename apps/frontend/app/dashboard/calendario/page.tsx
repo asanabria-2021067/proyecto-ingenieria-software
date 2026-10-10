@@ -497,7 +497,7 @@ export default function CalendarioPage() {
 
         <div className="flex flex-wrap items-center gap-tight">
           {compartidoPorMi.length > 0 && (
-            <div className="flex -space-x-2" aria-label={`Compartida con ${compartidoPorMi.length} personas`}>
+            <div role="group" className="flex -space-x-2" aria-label={`Compartida con ${compartidoPorMi.length} personas`}>
               {compartidoPorMi.slice(0, 3).map((persona) => (
                 <Avatar key={persona.idUsuario} className="size-8 ring-2 ring-card" title={`${persona.nombre} ${persona.apellido}`}>
                   {persona.fotoUrl && <AvatarImage src={persona.fotoUrl} alt="" />}
@@ -537,6 +537,8 @@ export default function CalendarioPage() {
 
       <div className="grid grid-cols-1 gap-grid lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="order-2 lg:order-1">
+          {/* G04 (UI-32): las secciones de la columna son h3; este h2 evita el salto h1 → h3. */}
+          <h2 className="sr-only">Opciones del calendario</h2>
           <CalendarSidebar
             mini={{
               year: miniMes.getFullYear(),
@@ -627,9 +629,10 @@ export default function CalendarioPage() {
               >
                 <ChevronRight className="size-4" aria-hidden="true" />
               </Button>
-              <span className="type-subtitle min-w-0 text-text-primary" aria-live="polite">
+              {/* G04 (UI-32): el periodo visible es el título de la zona del calendario. */}
+              <h2 className="type-subtitle min-w-0 text-text-primary" aria-live="polite">
                 {etiquetaRango(vista, anchor)}
-              </span>
+              </h2>
             </div>
           </div>
 

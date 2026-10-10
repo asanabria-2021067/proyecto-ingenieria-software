@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getApiErrorMessage } from '@/components/projects/api-error';
@@ -403,7 +403,6 @@ export function EventFormDialog({
                         <FormControl>
                           <DatePicker
                             ref={field.ref}
-                            aria-required
                             value={field.value}
                             onChange={(date) => {
                               field.onChange(date);
@@ -417,6 +416,9 @@ export function EventFormDialog({
                             className="bg-surface-container-lowest"
                           />
                         </FormControl>
+                        {/* G04 (UI-30): el disparador es un <button>, que no admite aria-required
+                            (axe: aria-allowed-attr); la obligatoriedad va como descripción accesible. */}
+                        <FormDescription className="sr-only">Campo obligatorio</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -449,7 +451,9 @@ export function EventFormDialog({
                         <div className="flex items-center justify-between gap-1">
                           <FormLabel className="text-xs font-medium text-on-surface-variant">Hora de fin</FormLabel>
                           {duracion && (
-                            <span className="pill pill-success px-1.5 py-0 text-[11px]" aria-label={`Duración ${duracion}`}>
+                            // G04 (UI-32): sin aria-label en un span genérico (no es válido ni fiable): texto oculto + valor.
+                            <span className="pill pill-success px-1.5 py-0 text-[11px]">
+                              <span className="sr-only">Duración </span>
                               {duracion}
                             </span>
                           )}
@@ -500,7 +504,6 @@ export function EventFormDialog({
                           <FormControl>
                             <DatePicker
                               ref={field.ref}
-                              aria-required
                               value={field.value}
                               onChange={field.onChange}
                               disabledBefore={fecha}
@@ -509,6 +512,7 @@ export function EventFormDialog({
                               className="bg-surface-container-lowest"
                             />
                           </FormControl>
+                          <FormDescription className="sr-only">Campo obligatorio</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
