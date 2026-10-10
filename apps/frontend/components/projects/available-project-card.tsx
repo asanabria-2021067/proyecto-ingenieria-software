@@ -26,26 +26,27 @@ export type ProyectoDisponibleResumen = Omit<ProyectoResumen, 'roles'> & {
   roles?: { cupos: number }[];
 };
 
-// Los badges se pintan por clase (no por `style` inline) precisamente para
-// poder declarar su variante `dark:` — un color de fondo/texto inline no
-// puede reaccionar al tema.
-export const NEUTRAL_BADGE = 'bg-surface-container-high text-on-surface-variant';
-const BLUE_BADGE = 'bg-[#DFEBFF] text-[#1659C7] dark:bg-[#13294d] dark:text-[#7fc4ff]';
-const PURPLE_BADGE = 'bg-[#EEE8FF] text-[#6448AE] dark:bg-[#2a1f4d] dark:text-[#c9a6ff]';
-const YELLOW_BADGE = 'bg-[#E4EFE4] text-[#326B43] dark:bg-[#453405] dark:text-[#ffd873]';
-export const GREEN_BADGE = 'bg-[#E2F1DD] text-[#286327] dark:bg-[#123a1a] dark:text-[#6fe08a]';
-// Observado / requiere corrección: verde salvia (antes naranja).
-const SAGE_BADGE = 'bg-[#E7EEDD] text-[#3F6B35] dark:bg-[#26331f] dark:text-[#b9cf9f]';
+// Los badges se pintan por clase, nunca por `style` inline: cada tono
+// `pill-*` toma su par fondo/texto de `--color-tag-*` (app/global.css), que
+// `.dark` redefine. La forma (radio, alto, tipografía) la da `.pill`.
+export const NEUTRAL_BADGE = 'pill-neutral';
+const BLUE_BADGE = 'pill-blue';
+const PURPLE_BADGE = 'pill-violet';
+/** Horas Beca: verde salvia claro. */
+const YELLOW_BADGE = 'pill-sage';
+export const GREEN_BADGE = 'pill-green';
+// Observado / requiere corrección: verde salvia.
+const SAGE_BADGE = 'pill-sage';
 /**
- * Cierre solicitado: verde esmeralda (en modo oscuro conserva el dorado). El
- * nombre es histórico —fue dorado— y se mantiene para no tocar a quien lo importa.
+ * Cierre solicitado: verde bosque sólido (acción). El nombre es histórico —fue
+ * dorado— y se mantiene para no tocar a quien lo importa.
  */
-export const GOLD_BADGE = 'bg-[#2B5830] text-white dark:bg-[#453405] dark:text-[#ffd873]';
+export const GOLD_BADGE = 'pill-forest';
 /** Cerrado: verde grisáceo apagado, que resta protagonismo a lo ya concluido. */
-export const CLOSED_BADGE = 'bg-[#4A6B5D] text-white dark:bg-[#453405] dark:text-[#ffd873]';
-/** Tono de texto de `GOLD_BADGE`, para iconos dorados sin fondo. */
-export const GOLD_ICON = 'text-[#775700] dark:text-[#ffd873]';
-export const SLATE_BADGE = 'bg-[#E2E9F7] text-[#486386] dark:bg-[#182740] dark:text-[#9dc1ea]';
+export const CLOSED_BADGE = 'pill-closed';
+/** Tono de texto de `GOLD_BADGE`, para iconos sin fondo. */
+export const GOLD_ICON = 'text-tag-forest dark:text-on-tag-forest';
+export const SLATE_BADGE = 'pill-slate';
 
 const TIPO_BADGE_STYLE: Partial<Record<TipoProyecto, string>> = {
   ACADEMICO_EXPERIENCIA: BLUE_BADGE,
@@ -67,9 +68,12 @@ const ESTADO_BADGE_STYLE: Record<string, string> = {
   PUBLICADO: GREEN_BADGE,
   EN_PROGRESO: GREEN_BADGE,
   BORRADOR: NEUTRAL_BADGE,
-  EN_REVISION: SLATE_BADGE,
+  EN_REVISION: NEUTRAL_BADGE,
   OBSERVADO: SAGE_BADGE,
+  // Estado informativo (fuera de «Mis Proyectos»): gris sutil, sin parpadeo.
+  EN_SOLICITUD_CIERRE: 'pill-subtle',
   CERRADO: CLOSED_BADGE,
+  CANCELADO: NEUTRAL_BADGE,
 };
 const ESTADO_LABEL: Record<string, string> = {
   BORRADOR: 'Borrador',
@@ -300,7 +304,7 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
 
   // «En solicitud de cierre» parpadea solo en «Mis Proyectos»; en el resto es la etiqueta neutral fija.
   const estadoStyle =
-    props.context === 'mine' && estadoProyecto === 'EN_SOLICITUD_CIERRE' ? 'blink-gold-gray' : estadoBadgeStyle(estadoProyecto);
+    props.context === 'mine' && estadoProyecto === 'EN_SOLICITUD_CIERRE' ? 'pill-forest blink-gold-gray' : estadoBadgeStyle(estadoProyecto);
   let estadoLabelText: string;
   let metadataExtra: React.ReactNode = null;
   let footerLeft: React.ReactNode = null;
@@ -463,12 +467,12 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
               viewport (sm:), que nunca se activaba dentro del grid. */}
           <div className="flex flex-col items-end gap-1 @sm:flex-row @sm:items-center @sm:gap-2">
             <span
-              className={`inline-flex h-6.25 items-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap ${tipoStyle}`}
+              className={`pill ${tipoStyle}`}
             >
               {tipoBadgeLabel(tipoProyecto)}
             </span>
             <span
-              className={`inline-flex h-6.25 items-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap ${estadoStyle}`}
+              className={`pill ${estadoStyle}`}
             >
               {estadoLabelText}
             </span>
@@ -513,8 +517,8 @@ export function AvailableProjectCardSkeleton() {
       <div className="flex items-start justify-between gap-2">
         <Skeleton className="h-[22px] w-3/5" />
         <div className="flex shrink-0 gap-2">
-          <Skeleton className="h-6.25 w-16 rounded-[7px]" />
-          <Skeleton className="h-6.25 w-16 rounded-[7px]" />
+          <Skeleton className="h-6.25 w-16 rounded-tag" />
+          <Skeleton className="h-6.25 w-16 rounded-tag" />
         </div>
       </div>
       <div className="mt-inline space-y-1.5">

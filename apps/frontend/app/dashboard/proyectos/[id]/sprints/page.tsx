@@ -1,5 +1,7 @@
 'use client';
 
+import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
+
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -54,22 +56,6 @@ function mensajeErrorFinalizarSprint(error: unknown): string {
   }
   return mensaje || 'No fue posible finalizar el Sprint. Intenta nuevamente.';
 }
-
-/**
- * Estados de Sprint centralizados (mismo criterio `statusConfig` manual que
- * `ESTADO_SPRINT_STYLE` en `sprints/[sprintId]/page.tsx`, F4 — no exportado
- * allí, así que se repite localmente en vez de importar entre páginas
- * congeladas). Exhaustivo por diseño: un `EstadoSprint` nuevo rompe la
- * compilación en vez de caer silenciosamente en un estado incorrecto.
- */
-const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
-  ACTIVO: { label: 'ACTIVO', className: 'bg-primary-container text-on-primary-container' },
-  EN_FINALIZACION: {
-    label: 'EN FINALIZACIÓN',
-    className: 'bg-status-warning text-on-status-warning',
-  },
-  CERRADO: { label: 'CERRADO', className: 'bg-surface-container-high text-tertiary' },
-};
 
 /** Mini-tarjeta interna de una métrica del Sprint (fecha, tareas, hitos, horas). */
 function SprintMetric({
@@ -191,9 +177,9 @@ function EstadoSprintBadge({ estado }: { estado: EstadoSprint }) {
   const estilo = ESTADO_SPRINT_STYLE[estado];
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
+      className={`pill ${estilo.className}`}
     >
-      {estilo.label}
+      {estilo.label.toUpperCase()}
     </span>
   );
 }

@@ -285,10 +285,10 @@ function ClosurePreparationView({ proyecto }: { proyecto: ProyectoDetalleDTO }) 
           </p>
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
             <TipoBadge tipo={proyecto.tipoProyecto} />
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
+            <span className={`pill pill-sm ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
               {estadoBadgeLabel(proyecto.estadoProyecto)}
             </span>
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+            <span className="pill pill-sm pill-slate">
               Líder
             </span>
           </div>

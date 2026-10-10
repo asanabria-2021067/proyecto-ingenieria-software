@@ -10,7 +10,7 @@ import {
   estadoBadgeLabel,
   estadoBadgeStyle,
 } from '@/components/projects/available-project-card';
-import { ESTADO_LABEL } from '@/components/projects/task-board.utils';
+import { ESTADO_LABEL, ESTADO_TAREA_TONE } from '@/components/projects/task-board.utils';
 import { formatearHoras } from '@/lib/hours/format';
 import type { MisHorasProyecto, MisHorasTarea } from '@/lib/services/users';
 import type { EstadoTarea, TipoProyecto } from '@/types';
@@ -22,13 +22,6 @@ const ICONO_TIPO: Record<TipoProyecto, LucideIcon> = {
   ACADEMICO_EXPERIENCIA: Briefcase,
 };
 
-/** Mismos tonos que Mis Tareas y el explorador de tareas (el mapa no se extrae aquí). */
-const ESTADO_TAREA_TONE: Record<EstadoTarea, string> = {
-  POR_HACER: 'pill-neutral',
-  EN_PROGRESO: 'pill-warning',
-  EN_REVISION: 'pill-neutral',
-  HECHO: 'pill-success',
-};
 
 /** Icono del tipo de proyecto: neutro y sin fondo, al par del título. */
 export function IconoTipo({ tipo }: { tipo: TipoProyecto }) {
@@ -98,7 +91,7 @@ function TablaTareas({ proyecto }: { proyecto: MisHorasProyecto }) {
               {tarea.sprint ? `Sprint ${tarea.sprint.numero}` : <span className="text-text-secondary">Sin sprint</span>}
             </TableCell>
             <TableCell className="hidden sm:table-cell">
-              <span className={`pill ${ESTADO_TAREA_TONE[tarea.estadoTarea]}`}>{ESTADO_LABEL[tarea.estadoTarea]}</span>
+              <span className={`pill pill-${ESTADO_TAREA_TONE[tarea.estadoTarea]}`}>{ESTADO_LABEL[tarea.estadoTarea]}</span>
             </TableCell>
             <TableCell className="text-right tabular-nums">{formatearHoras(tarea.registradas)}</TableCell>
             <TableCell className="hidden text-right tabular-nums sm:table-cell">{formatearHoras(tarea.legacy)}</TableCell>

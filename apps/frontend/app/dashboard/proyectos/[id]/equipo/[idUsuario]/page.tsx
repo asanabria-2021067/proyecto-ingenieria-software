@@ -1,5 +1,7 @@
 'use client';
 
+import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
+
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -22,8 +24,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
-  ESTADO_COLUMNA_STYLE,
   ESTADO_LABEL,
+  ESTADO_TAREA_TONE,
   formatearFechaLimite,
 } from '@/components/projects/task-board.utils';
 import type {
@@ -39,21 +41,6 @@ import type { HistoricalHorasUsuario } from '@/lib/services/historical';
 import type { EstadoSprint } from '@/lib/types/sprints';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
-
-/**
- * Estilos de estado de Sprint (mismo criterio `statusConfig` manual que
- * `ESTADO_SPRINT_STYLE` en `sprints/page.tsx` y `sprints/[sprintId]/page.tsx`,
- * F4 — no exportado en ninguna de las dos, así que se repite localmente en
- * vez de importar entre páginas congeladas).
- */
-const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
-  ACTIVO: { label: 'ACTIVO', className: 'bg-primary-container text-on-primary-container' },
-  EN_FINALIZACION: {
-    label: 'EN FINALIZACIÓN',
-    className: 'bg-status-warning text-on-status-warning',
-  },
-  CERRADO: { label: 'CERRADO', className: 'bg-surface-container-high text-tertiary' },
-};
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -241,14 +228,14 @@ function DetalleIntegranteContent({
                 return (
                   <span
                     key={participacion.idParticipacion}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${estilo.className}`}
+                    className={`pill ${estilo.className}`}
                     title={
                       participacion.fechaSalida
                         ? `Desde ${formatearFechaLimite(participacion.fechaIngreso)} hasta ${formatearFechaLimite(participacion.fechaSalida)}`
                         : `Desde ${formatearFechaLimite(participacion.fechaIngreso)}`
                     }
                   >
-                    {participacion.rolProyecto.nombreRol} · {estilo.label}
+                    {participacion.rolProyecto.nombreRol} · {estilo.label.toUpperCase()}
                   </span>
                 );
               })}
@@ -314,9 +301,7 @@ function DetalleIntegranteContent({
               Elegibilidad para liderazgo
             </h2>
             <span
-              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
-                candidato.esElegible ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-on-surface-variant'
-              }`}
+              className={`pill ${candidato.esElegible ? 'pill-green' : 'pill-neutral'}`}
             >
               {candidato.esElegible ? 'Elegible' : 'No elegible'}
             </span>
@@ -391,9 +376,9 @@ function MemberSprintHistoryCard({ sprint }: { sprint: HistorialSprintIntegrante
                 Sprint {sprint.numero}
               </h3>
               <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
+                className={`pill ${estilo.className}`}
               >
-                {estilo.label}
+                {estilo.label.toUpperCase()}
               </span>
             </div>
             <p className="text-xs text-tertiary mt-0.5">
@@ -435,7 +420,6 @@ function MemberSprintHistoryCard({ sprint }: { sprint: HistorialSprintIntegrante
       ) : (
         <ul className="divide-y divide-outline-variant/40 border-t border-outline-variant/40">
           {sprint.tareas.map((tarea) => {
-            const estiloTarea = ESTADO_COLUMNA_STYLE[tarea.estadoTarea];
             return (
               <li key={tarea.idTarea} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 {tarea.estadoTarea === 'HECHO' ? (
@@ -450,7 +434,7 @@ function MemberSprintHistoryCard({ sprint }: { sprint: HistorialSprintIntegrante
                   {tarea.tituloTarea}
                 </p>
                 <span
-                  className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${estiloTarea.headerBg} ${estiloTarea.headerText}`}
+                  className={`pill pill-sm shrink-0 pill-${ESTADO_TAREA_TONE[tarea.estadoTarea]}`}
                 >
                   {ESTADO_LABEL[tarea.estadoTarea]}
                 </span>

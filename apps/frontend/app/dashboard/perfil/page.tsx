@@ -1,5 +1,7 @@
 'use client';
 
+import { getHabilidadBadgeStyle } from '@/lib/social/badge-colors';
+
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -257,11 +259,7 @@ export default function PerfilPage() {
                         Estado
                       </p>
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
-                          user?.estado === 'ACTIVO'
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-error/10 text-error'
-                        }`}
+                        className={`pill ${user?.estado === 'ACTIVO' ? 'pill-success' : 'pill-red'}`}
                       >
                         {user?.estado === 'ACTIVO' ? (
                           <CheckCircle2 className="h-3.5 w-3.5" />
@@ -495,7 +493,7 @@ export default function PerfilPage() {
                         user.intereses.map((item) => (
                           <span
                             key={item.idUsuarioInteres}
-                            className="rounded-full bg-secondary-container px-3 py-1 text-xs font-bold text-on-secondary-container"
+                            className={`pill ${getHabilidadBadgeStyle(item.interes.nombreInteres)}`}
                           >
                             {item.interes.nombreInteres}
                           </span>
@@ -514,7 +512,7 @@ export default function PerfilPage() {
                         user.cualidades.map((item) => (
                           <span
                             key={item.idUsuarioCualidad}
-                            className="rounded-full bg-surface-container-high px-3 py-1 text-xs font-bold text-on-surface"
+                            className="pill pill-neutral"
                           >
                             {item.cualidad.nombreCualidad}
                           </span>

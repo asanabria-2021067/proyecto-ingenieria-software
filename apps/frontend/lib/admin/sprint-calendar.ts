@@ -18,16 +18,16 @@ export const SITUACION_SPRINT_LABEL: Record<AdminSprintSituacion, string> = {
 };
 
 /**
- * Tono de la píldora por situación, con los roles de color del sistema de
- * diseño. El plan vencido usa el naranja de atención, no el rojo: el rojo se
- * reserva para bloqueos.
+ * Tono `pill-*` de la etiqueta por situación (app/global.css). El plan
+ * vencido usa el naranja de atención, no el rojo: el rojo se reserva para
+ * bloqueos. Esta tabla solo pinta la situación que calcula el backend.
  */
 export const SITUACION_SPRINT_TONE: Record<AdminSprintSituacion, string> = {
   EN_CURSO: 'pill-success',
-  VENCE_HOY: 'pill-accent',
-  PLAN_VENCIDO: 'bg-attention/15 text-attention-strong dark:text-attention',
+  VENCE_HOY: 'pill-lime',
+  PLAN_VENCIDO: 'pill-orange',
   EN_FINALIZACION: 'pill-neutral',
-  SIN_FECHA: 'pill-neutral',
+  SIN_FECHA: 'pill-subtle',
 };
 
 /**

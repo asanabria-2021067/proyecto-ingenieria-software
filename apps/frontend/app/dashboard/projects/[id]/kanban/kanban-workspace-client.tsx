@@ -287,24 +287,24 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             <h2 className="type-section line-clamp-2 text-text-primary">{proyecto.tituloProyecto}</h2>
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${estadoBadgeStyle(proyecto.estadoProyecto)}`}
+                className={`pill pill-sm ${estadoBadgeStyle(proyecto.estadoProyecto)}`}
               >
                 {estadoBadgeLabel(proyecto.estadoProyecto)}
               </span>
               <TipoBadge tipo={proyecto.tipoProyecto} />
-              <span className="inline-flex items-center rounded-full border border-outline-variant/30 px-2.5 py-0.5 text-[11px] font-medium text-on-surface-variant">
+              <span className="pill pill-sm pill-neutral">
                 {MODALIDAD_LABEL[proyecto.modalidadProyecto as keyof typeof MODALIDAD_LABEL] ??
                   proyecto.modalidadProyecto}
               </span>
               {isLeader && (
-                <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                <span className="pill pill-sm pill-slate">
                   Líder
                 </span>
               )}
               {misRoles.map((rol) => (
                 <span
                   key={rol.idRolProyecto}
-                  className="inline-flex items-center rounded-full border border-outline-variant/30 px-2.5 py-0.5 text-[11px] font-medium text-on-surface-variant"
+                  className="pill pill-sm pill-neutral"
                 >
                   {rol.nombreRol}
                 </span>
@@ -344,7 +344,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               <h2 className="text-xl font-bold text-on-surface md:text-[22px]">
                 {activeTab === 'hitos' ? 'Hitos' : 'Tablero de tareas'}
               </h2>
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+              <span className="pill pill-sm pill-green">
                 {tasks.length} {tasks.length === 1 ? 'tarea' : 'tareas'}
               </span>
               {isFetchingTasks && (

@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowDown, ArrowUp, Minus } from 'lucide-react';
+import type { TagTone } from '@/components/ui/tag';
 import type { EstadoTarea, Prioridad, TareaPublicaDTO } from '@/lib/types/tasks';
 
 export interface ColumnaConfig {
@@ -75,6 +76,34 @@ export const ESTADO_COLUMNA_STYLE: Record<EstadoTarea, EstadoColumnaStyle> = {
     dot: 'bg-status-success',
     columnDot: 'bg-primary',
   },
+};
+
+/**
+ * Tono de la etiqueta de estado de tarea (Mis Tareas, explorador, Mis Horas,
+ * calendario, detalle de tarea): el color vive únicamente aquí. Las columnas
+ * del Kanban siguen usando `ESTADO_COLUMNA_STYLE` (es un encabezado, no una
+ * etiqueta).
+ */
+export const ESTADO_TAREA_TONE: Record<EstadoTarea, TagTone> = {
+  POR_HACER: 'neutral',
+  EN_PROGRESO: 'lime',
+  EN_REVISION: 'neutral',
+  HECHO: 'success',
+};
+
+/** Tono de la etiqueta de prioridad; el icono direccional (`PRIORIDAD_ICON`) la acompaña siempre. */
+export const PRIORIDAD_TONE: Record<Prioridad, TagTone> = {
+  BAJA: 'neutral',
+  MEDIA: 'lime',
+  ALTA: 'red',
+};
+
+/** Vencimiento de una tarea (Mis Tareas): icono + texto, nunca solo color. */
+export type VencimientoTarea = 'VENCIDA' | 'PROXIMA';
+
+export const VENCIMIENTO_CONFIG: Record<VencimientoTarea, { label: string; icon: typeof AlertCircle; tone: TagTone }> = {
+  VENCIDA: { label: 'Vencida', icon: AlertCircle, tone: 'red' },
+  PROXIMA: { label: 'Vence pronto', icon: AlertTriangle, tone: 'lime' },
 };
 
 export const PRIORIDAD_LABEL: Record<Prioridad, string> = {

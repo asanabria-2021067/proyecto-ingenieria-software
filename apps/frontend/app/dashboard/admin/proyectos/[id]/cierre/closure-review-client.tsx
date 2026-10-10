@@ -423,7 +423,7 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
               </div>
             </dl>
           </div>
-          <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${estadoBadgeStyle(cabecera.estado)}`}>
+          <span className={`pill shrink-0 ${estadoBadgeStyle(cabecera.estado)}`}>
             {estadoBadgeLabel(cabecera.estado)}
           </span>
         </div>
@@ -565,7 +565,7 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
                           </span>
                         </TableCell>
                         <TableCell className="px-5 py-3">
-                          <Badge className="border-transparent bg-primary/10 text-[11px] font-semibold text-primary">{m.rol}</Badge>
+                          <Badge variant="secondary">{m.rol}</Badge>
                         </TableCell>
                         <TableCell className="px-5 py-3 text-sm text-on-surface-variant">
                           {ESTADO_PARTICIPACION_LABEL[m.participacion] ?? m.participacion}

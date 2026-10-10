@@ -185,7 +185,7 @@ function MiembroRow({
           {miembro.roles.map((rol) => (
             <span
               key={rol.idRolProyecto}
-              className="inline-flex items-center rounded-full bg-secondary-container/30 px-2 py-0.5 text-xs font-bold text-secondary"
+              className="pill pill-sm pill-sage"
             >
               {rol.nombreRol}
             </span>
@@ -193,9 +193,7 @@ function MiembroRow({
         </div>
       </TableCell>
       <TableCell className="px-4 py-3">
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
-        >
+        <span className={`pill ${estilo.className}`}>
           {estilo.label}
         </span>
       </TableCell>

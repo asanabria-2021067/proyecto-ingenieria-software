@@ -1,5 +1,7 @@
 'use client';
 
+import { ENTIDAD_LABEL, ENTIDAD_TONE } from '@/components/projects/bitacora-entity.utils';
+
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
@@ -122,32 +124,6 @@ const EVENTO_STYLE: Record<TipoEventoBitacoraValor, EstiloEvento> = {
   // ---- T-295/T-296 (HU-177): actividades y asistencia del líder. ----
   ACTIVITY_CREATED: { label: 'Actividad creada', icon: CalendarPlus },
   ATTENDANCE_MARKED: { label: 'Asistencia marcada', icon: UserCheck },
-};
-
-/**
- * T-223/T-224 (HU-156): la pastilla de color agrupa por `tipoEntidad` —el
- * campo que el backend ya asigna a cada evento (bitacora-eventos.service.ts)—
- * en vez de mapear cada uno de los ~34 `tipoEvento` a mano. Con solo 5 tonos
- * disponibles (HU-163) y 6 entidades, REVISION_CIERRE y DOCUMENTO_CIERRE
- * comparten tono: siguen siendo distinguibles por su ícono propio, que es la
- * distinción que no depende del color (daltonismo/impresión).
- */
-const ENTIDAD_TONE: Record<string, string> = {
-  TAREA: 'pill-accent',
-  SPRINT: 'pill-success',
-  PROYECTO: 'pill-warning',
-  APELACION_LIDERAZGO: 'pill-error',
-  REVISION_CIERRE: 'pill-neutral',
-  DOCUMENTO_CIERRE: 'pill-neutral',
-};
-
-const ENTIDAD_LABEL: Record<string, string> = {
-  TAREA: 'Tarea',
-  SPRINT: 'Sprint',
-  PROYECTO: 'Proyecto',
-  APELACION_LIDERAZGO: 'Liderazgo',
-  REVISION_CIERRE: 'Cierre',
-  DOCUMENTO_CIERRE: 'Cierre',
 };
 
 /**

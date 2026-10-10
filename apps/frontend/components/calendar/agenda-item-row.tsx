@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
+import { ESTADO_TAREA_TONE } from '@/components/projects/task-board.utils';
+import type { EstadoTarea } from '@/lib/types/tasks';
 import { agendaItemKey, type AgendaItem } from '@/lib/calendar/agenda';
 import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
 import { PRIORIDAD_BORDE, TIPO_EVENTO_ESTILO, TONO_CLASES } from '@/lib/calendar/paleta';
@@ -12,13 +14,6 @@ const ESTADO_TAREA_LABEL: Record<string, string> = {
   EN_PROGRESO: 'En progreso',
   EN_REVISION: 'En revisión',
   HECHO: 'Hecho',
-};
-
-const TAREA_ESTADO_PILL: Record<string, string> = {
-  POR_HACER: 'pill-neutral',
-  EN_PROGRESO: 'pill-accent',
-  EN_REVISION: 'pill-warning',
-  HECHO: 'pill-success',
 };
 
 const PRIORIDAD_LABEL: Record<string, string> = { ALTA: 'Alta', MEDIA: 'Media', BAJA: 'Baja' };
@@ -52,8 +47,8 @@ export function AgendaItemRow({
         </span>
         {!item.ocupado && (
           <>
-            <span className="pill pill-neutral shrink-0">{PRIORIDAD_LABEL[item.prioridad]}</span>
-            <span className={`pill shrink-0 ${TAREA_ESTADO_PILL[item.estado] ?? 'pill-neutral'}`}>
+            <span className="pill pill-sm pill-neutral shrink-0">{PRIORIDAD_LABEL[item.prioridad]}</span>
+            <span className={`pill pill-sm shrink-0 pill-${ESTADO_TAREA_TONE[item.estado as EstadoTarea] ?? 'neutral'}`}>
               {ESTADO_TAREA_LABEL[item.estado] ?? item.estado}
             </span>
           </>
@@ -94,7 +89,7 @@ export function AgendaItemRow({
         {item.compartidoPor ? [item.compartidoPor.nombre, item.projectTitle].filter(Boolean).join(' · ') : item.projectTitle}
       </span>
       {!item.ocupado && (
-        <span className="pill pill-neutral inline-flex shrink-0 items-center gap-1">
+        <span className="pill pill-sm pill-neutral inline-flex shrink-0 items-center gap-1">
           <modalidad.icon className="size-3" aria-hidden="true" />
           {tipo.label} · {modalidad.label}
         </span>

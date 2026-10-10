@@ -258,7 +258,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${estadoBadgeStyle(vista.estado)}`}>
+              <span className={`pill ${estadoBadgeStyle(vista.estado)}`}>
                 {estadoBadgeLabel(vista.estado)}
               </span>
               <TipoBadge tipo={vista.tipo} />
@@ -425,8 +425,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
                           </span>
                         </TableCell>
                         <TableCell className="px-5 py-3">
-                          {/* Verde muy claro + texto verde institucional, igual en claro y oscuro. */}
-                          <Badge className="border-transparent bg-[#E2EFE8] text-[11px] font-semibold text-[#006735]">{m.rol}</Badge>
+                          <Badge variant="secondary">{m.rol}</Badge>
                         </TableCell>
                         <TableCell className="px-5 py-3 text-sm text-on-surface-variant">
                           <span className="inline-flex items-center gap-1.5">

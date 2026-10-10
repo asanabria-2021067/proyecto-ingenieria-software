@@ -1,5 +1,7 @@
 'use client';
 
+import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
+
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AlertCircle, Repeat } from 'lucide-react';
@@ -31,15 +33,6 @@ function sprintMasReciente(sprints: SprintComparativeAnalyticsItemDto[]): Sprint
   return cerrados[0] ?? null;
 }
 
-/** Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE` en `sprints/page.tsx`/`sprints/[sprintId]/page.tsx`. */
-const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
-  ACTIVO: { label: 'Activo', className: 'bg-primary-container text-on-primary-container' },
-  EN_FINALIZACION: {
-    label: 'En finalización',
-    className: 'bg-status-warning text-on-status-warning',
-  },
-  CERRADO: { label: 'Cerrado', className: 'bg-surface-container-high text-tertiary' },
-};
 
 /**
  * Barra horizontal proporcional al máximo de `tareasCompletadas` entre los
@@ -140,7 +133,7 @@ function ComparativeContent({ idProyecto, sprints }: { idProyecto: number; sprin
                   <td className="px-4 py-3 font-semibold text-on-surface">Sprint {sprint.numero}</td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
+                      className={`pill ${estilo.className}`}
                     >
                       {estilo.label}
                     </span>

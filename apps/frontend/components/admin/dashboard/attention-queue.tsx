@@ -1,21 +1,21 @@
 import { useId } from 'react';
 import Link from 'next/link';
-import { GOLD_BADGE, GOLD_ICON, GREEN_BADGE } from '@/components/projects/available-project-card';
+import { GOLD_BADGE, GOLD_ICON, NEUTRAL_BADGE } from '@/components/projects/available-project-card';
 import { AlertTriangle, ChevronRight, ClipboardList, Clock, type LucideIcon } from 'lucide-react';
 
-type AttentionTone = 'atencion' | 'cierre' | 'bloqueo';
+export type AttentionTone = 'atencion' | 'cierre' | 'bloqueo';
 
-// Etiqueta de estado: misma forma (radio, alto, tipografía) y la misma paleta
-// que las etiquetas de las tarjetas de proyecto.
-const ETIQUETA = 'mx-auto flex h-6.25 w-36 items-center justify-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap';
+// Etiqueta de estado: la forma `.pill` estándar (misma que las tarjetas de
+// proyecto), centrada y de ancho fijo para alinear la columna.
+const ETIQUETA = 'pill mx-auto w-36 justify-center';
 
-const TONO: Record<AttentionTone, { icono: string; etiqueta: string }> = {
-  // Acento del sistema (lima) para lo que espera una decisión.
-  atencion: { icono: 'text-secondary-fixed-dim dark:text-secondary-fixed', etiqueta: GREEN_BADGE },
-  // Mismo dorado que la etiqueta de proyecto en solicitud de cierre.
+export const ATTENTION_TONE: Record<AttentionTone, { icono: string; etiqueta: string }> = {
+  // Pendiente de decisión: neutral; el número de la fila ya llama la atención.
+  atencion: { icono: 'text-text-secondary', etiqueta: NEUTRAL_BADGE },
+  // Mismo verde bosque que la etiqueta de proyecto en solicitud de cierre.
   cierre: { icono: GOLD_ICON, etiqueta: GOLD_BADGE },
-  // El rojo queda solo para accesos restringidos.
-  bloqueo: { icono: 'text-error', etiqueta: 'bg-status-error text-on-status-error' },
+  // Cuentas bloqueadas: ámbar de atención (el rojo se reserva para errores).
+  bloqueo: { icono: 'text-on-tag-amber', etiqueta: 'pill-amber' },
 };
 
 // Anchos compartidos por el encabezado de columnas y las filas, y los mismos
@@ -114,7 +114,7 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
       <ul className="divide-y divide-outline-variant/50">
         {filas.map((fila) => {
           const Icono = fila.icono;
-          const tono = TONO[fila.tono];
+          const tono = ATTENTION_TONE[fila.tono];
           return (
             <li
               key={fila.clave}

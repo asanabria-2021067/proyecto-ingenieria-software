@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, AlertTriangle, ClipboardList, SearchX } from 'lucide-react';
+import { AlertCircle, ClipboardList, SearchX } from 'lucide-react';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { Button } from '@/components/ui/button';
@@ -25,9 +25,14 @@ import {
 } from '@/components/ui/empty';
 import {
   ESTADO_LABEL,
+  ESTADO_TAREA_TONE,
   PRIORIDAD_ICON,
   PRIORIDAD_LABEL,
+  PRIORIDAD_TONE,
+  VENCIMIENTO_CONFIG,
+  type VencimientoTarea,
 } from '@/components/projects/task-board.utils';
+import { Tag } from '@/components/ui/tag';
 import { getMisTareas, type MiTareaDTO } from '@/lib/services/users';
 import {
   filterTasksByPriority,
@@ -56,7 +61,7 @@ const FILTRO_TODOS = 'TODOS';
 // una tarea "próxima a vencer" si le quedan 3 días o menos
 const DIAS_PROXIMA_A_VENCER = 3;
 
-type Vencimiento = 'VENCIDA' | 'PROXIMA' | null;
+type Vencimiento = VencimientoTarea | null;
 
 function getVencimiento(tarea: MiTareaDTO): Vencimiento {
   if (!tarea.fechaLimite || tarea.estadoTarea === 'HECHO') return null;
@@ -75,26 +80,6 @@ function getVencimiento(tarea: MiTareaDTO): Vencimiento {
   return null;
 }
 
-// icono + texto en cada pastilla: el vencimiento nunca depende solo del color
-const VENCIMIENTO_CONFIG: Record<
-  Exclude<Vencimiento, null>,
-  { label: string; icon: typeof AlertCircle; tone: string }
-> = {
-  VENCIDA: { label: 'Vencida', icon: AlertCircle, tone: 'pill-error' },
-  PROXIMA: { label: 'Vence pronto', icon: AlertTriangle, tone: 'pill-warning' },
-};
-
-const ESTADO_TONE: Record<EstadoTarea, string> = {
-  POR_HACER: 'pill-neutral',
-  EN_PROGRESO: 'pill-warning',
-  EN_REVISION: 'pill-neutral',
-  HECHO: 'pill-success',
-};
-const PRIORIDAD_TONE: Record<Prioridad, string> = {
-  BAJA: 'pill-neutral',
-  MEDIA: 'pill-warning',
-  ALTA: 'pill-error',
-};
 
 const OPCIONES_ORDEN: { value: string; label: string; campo: CriterioOrdenTarea; direccion: DireccionOrden }[] = [
   { value: 'fechaLimite:asc', label: 'Fecha límite: más próxima primero', campo: 'fechaLimite', direccion: 'asc' },
@@ -113,16 +98,16 @@ function formatFecha(fecha: string): string {
 }
 
 function EstadoBadge({ estado }: { estado: EstadoTarea }) {
-  return <span className={`pill ${ESTADO_TONE[estado]}`}>{ESTADO_LABEL[estado]}</span>;
+  return <Tag tone={ESTADO_TAREA_TONE[estado]}>{ESTADO_LABEL[estado]}</Tag>;
 }
 
 function PrioridadBadge({ prioridad }: { prioridad: Prioridad }) {
   const Icono = PRIORIDAD_ICON[prioridad];
   return (
-    <span className={`pill ${PRIORIDAD_TONE[prioridad]}`}>
-      <Icono className="size-3.5" aria-hidden="true" />
+    <Tag tone={PRIORIDAD_TONE[prioridad]}>
+      <Icono aria-hidden="true" />
       {PRIORIDAD_LABEL[prioridad]}
-    </span>
+    </Tag>
   );
 }
 
@@ -205,10 +190,10 @@ function FilaTarea({ tarea }: { tarea: MiTareaDTO }) {
           <span className="type-meta tabular-nums text-text-secondary">{formatFecha(tarea.fechaLimite)}</span>
         )}
         {config && VencimientoIcon && (
-          <span className={`pill ${config.tone}`}>
-            <VencimientoIcon className="size-3.5" aria-hidden="true" />
+          <Tag tone={config.tone}>
+            <VencimientoIcon aria-hidden="true" />
             {config.label}
-          </span>
+          </Tag>
         )}
       </div>
       <div className={CELDA_CORTA}>

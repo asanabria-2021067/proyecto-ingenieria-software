@@ -1,5 +1,7 @@
 ﻿'use client';
 
+import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
+
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -49,12 +51,6 @@ import type {
   EstadoSprint,
 } from '@/lib/types/sprints';
 
-/** Mismo pill de estado que el detalle y la lista de Sprints. */
-const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
-  ACTIVO: { label: 'Activo', className: 'bg-primary-container text-on-primary-container' },
-  EN_FINALIZACION: { label: 'En finalización', className: 'bg-status-warning text-on-status-warning' },
-  CERRADO: { label: 'Cerrado', className: 'bg-surface-container-high text-tertiary' },
-};
 
 /**
  * Columnas de la revisión por integrante: el encabezado y cada fila usan la
@@ -168,7 +164,7 @@ function MemberItem({
             {participante.roles.map((rol) => (
               <span
                 key={rol.idRolProyecto}
-                className="inline-flex items-center rounded-full bg-secondary-container/30 px-2 py-0.5 text-xs font-bold text-secondary"
+                className="pill pill-sm pill-sage"
               >
                 {rol.nombreRol}
               </span>
@@ -413,7 +409,7 @@ export default function SprintClosingPage() {
         actions={
           estiloEstado && (
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estiloEstado.className}`}
+              className={`pill ${estiloEstado.className}`}
             >
               {estiloEstado.label}
             </span>

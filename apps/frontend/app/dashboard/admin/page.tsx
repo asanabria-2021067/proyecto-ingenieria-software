@@ -205,8 +205,8 @@ function AdminStatsSkeleton() {
 // panel usan 11rem y 7rem centradas para sus dos últimas columnas.
 const ACT_COL_ESTADO = 'flex shrink-0 sm:w-44 sm:justify-center';
 const ACT_COL_ACCION = 'shrink-0 text-center sm:w-28';
-/** Misma etiqueta de estado que las tarjetas de «Proyectos»; el cierre solicitado va en dorado fijo. */
-const ACT_ETIQUETA = 'inline-flex h-6.25 items-center rounded-[7px] px-3 text-[12px] font-semibold whitespace-nowrap';
+/** Misma etiqueta de estado que las tarjetas de «Proyectos»; el cierre solicitado va en verde bosque fijo. */
+const ACT_ETIQUETA = 'pill';
 const actEstadoStyle = (estado: string) => (estado === 'EN_SOLICITUD_CIERRE' ? GOLD_BADGE : estadoBadgeStyle(estado));
 
 function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] }) {

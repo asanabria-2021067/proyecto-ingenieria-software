@@ -9,7 +9,6 @@ import { acceptAppeal } from '@/lib/services/leadership';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { LeadershipChangeDialog } from '@/components/leadership/leadership-change-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -51,11 +50,12 @@ const FILTROS = [
 ] as const;
 type Filtro = (typeof FILTROS)[number]['value'];
 
-const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
-  PENDIENTE: { label: 'Pendiente', className: 'bg-amber-400/15 text-amber-800 dark:text-amber-200' },
-  ACEPTADA: { label: 'Aceptada', className: 'bg-primary/10 text-primary' },
-  DENEGADA: { label: 'Denegada', className: 'bg-error/10 text-error' },
-  CANCELADA: { label: 'Cancelada', className: 'bg-surface-container-high text-on-surface-variant' },
+/** Etiqueta de estado de apelación: tono `pill-*` (app/global.css); la forma la pone `.pill`. */
+export const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
+  PENDIENTE: { label: 'Pendiente', className: 'pill-amber' },
+  ACEPTADA: { label: 'Aceptada', className: 'pill-success' },
+  DENEGADA: { label: 'Denegada', className: 'pill-red' },
+  CANCELADA: { label: 'Cancelada', className: 'pill-neutral' },
 };
 
 function getInitials(nombre: string, apellido: string): string {
@@ -99,7 +99,7 @@ function AppealPanel({
   const pendiente = apelacion.estadoApelacion === 'PENDIENTE';
   const candidatos = useLeadershipCandidates(apelacion.idProyecto, pendiente);
   const candidato = candidatos.data?.candidatos.find((c) => c.idUsuario === apelacion.candidatoPropuesto.idUsuario) ?? null;
-  const estado = ESTADO_BADGE[apelacion.estadoApelacion] ?? { label: apelacion.estadoApelacion, className: 'bg-surface-container-high text-on-surface-variant' };
+  const estado = ESTADO_BADGE[apelacion.estadoApelacion] ?? { label: apelacion.estadoApelacion, className: 'pill-neutral' };
 
   return (
     <section aria-label={`Apelación #${apelacion.idApelacion}`} className={`${CARD} space-y-4`}>
@@ -115,7 +115,7 @@ function AppealPanel({
             · enviada el {formatearFecha(apelacion.creadaEn)}
           </p>
         </div>
-        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${estado.className}`}>{estado.label}</span>
+        <span className={`pill ${estado.className}`}>{estado.label}</span>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -415,7 +415,7 @@ export default function AppealsInboxClient() {
               </TableHeader>
               <TableBody>
                 {items.map((a) => {
-                  const badge = ESTADO_BADGE[a.estadoApelacion] ?? { label: a.estadoApelacion, className: 'bg-surface-container-high text-on-surface-variant' };
+                  const badge = ESTADO_BADGE[a.estadoApelacion] ?? { label: a.estadoApelacion, className: 'pill-neutral' };
                   const activa = a.idApelacion === seleccionadaId;
                   return (
                     <TableRow key={a.idApelacion} className={`border-outline-variant/40 ${activa ? 'bg-primary/5' : 'hover:bg-surface-container-low'}`}>
@@ -442,7 +442,7 @@ export default function AppealsInboxClient() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap px-4 py-3 text-sm text-on-surface-variant">{formatearFecha(a.creadaEn)}</TableCell>
                       <TableCell className="px-4 py-3">
-                        <Badge className={`border-transparent text-[11px] font-semibold ${badge.className}`}>{badge.label}</Badge>
+                        <span className={`pill pill-sm ${badge.className}`}>{badge.label}</span>
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right">
                         <Button

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AlertTriangle } from 'lucide-react';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
+import { SITUACION_CIERRE } from '@/lib/admin/request-status';
 import { IconoTipo } from '@/components/hours/my-hours-project-list';
 import {
   RequestInboxCard,
@@ -130,10 +131,10 @@ export function ClosureRequestsInbox({ data }: { data: AdminProjectsPage }) {
   return (
     <div className="space-y-10">
       <RequestInboxKpis columns={4}>
-        <ResumenKpi label="Pendientes de evaluación" valor={conteo('PENDIENTE_DE_EVALUACION', pendientes.length)} punto="bg-outline" />
-        <ResumenKpi label="Reenviadas para revisión" valor={conteo('REENVIADA_PARA_REVISION', reenviadas.length)} punto="bg-status-warning" />
-        <ResumenKpi label="En espera de correcciones" valor={conteo('EN_ESPERA_DE_CORRECCIONES', enEspera.length)} punto="bg-attention" />
-        <ResumenKpi label="Sin entrega formal" valor={conteo('SIN_ENTREGA_FORMAL', sinEntrega.length)} punto="bg-outline-variant" />
+        <ResumenKpi label="Pendientes de evaluación" valor={conteo('PENDIENTE_DE_EVALUACION', pendientes.length)} punto={SITUACION_CIERRE.PENDIENTE_DE_EVALUACION.punto} />
+        <ResumenKpi label="Reenviadas para revisión" valor={conteo('REENVIADA_PARA_REVISION', reenviadas.length)} punto={SITUACION_CIERRE.REENVIADA_PARA_REVISION.punto} />
+        <ResumenKpi label="En espera de correcciones" valor={conteo('EN_ESPERA_DE_CORRECCIONES', enEspera.length)} punto={SITUACION_CIERRE.EN_ESPERA_DE_CORRECCIONES.punto} />
+        <ResumenKpi label="Sin entrega formal" valor={conteo('SIN_ENTREGA_FORMAL', sinEntrega.length)} punto={SITUACION_CIERRE.SIN_ENTREGA_FORMAL.punto} />
       </RequestInboxKpis>
 
       {sinClasificar.length > 0 && (

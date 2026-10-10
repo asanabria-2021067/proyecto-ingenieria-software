@@ -42,13 +42,14 @@ import {
 } from '@/lib/services/users';
 import { searchProjects } from '@/lib/services/projects';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
-import type { ProyectoResumen, TipoProyecto } from '@/types';
+import type { EstadoPostulacion, ProyectoResumen, TipoProyecto } from '@/types';
 import { apiFetch } from '@/lib/api/client';
 import {
   estadoBadgeLabel,
   tipoBadgeLabel,
   tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
+import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
 import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import { useFeedSocial } from '@/hooks/use-social';
@@ -240,12 +241,6 @@ function CalendarioWidget() {
     </div>
   );
 }
-
-const estadoColors: Record<string, string> = {
-  PENDIENTE: 'pill-warning',
-  ACEPTADA: 'pill-success',
-  RECHAZADA: 'pill-error',
-};
 
 /**
  * T-252: el motivo del orden ponderado se arma acá a partir de los datos
@@ -748,7 +743,7 @@ export default function DashboardPage() {
                             </p>
                           </div>
                           <span
-                            className={`pill shrink-0 ${estadoColors[a.estadoPostulacion] ?? 'pill-neutral'}`}
+                            className={`pill shrink-0 pill-${ESTADO_POSTULACION_STYLE[a.estadoPostulacion as EstadoPostulacion]?.tone ?? 'neutral'}`}
                           >
                             {a.estadoPostulacion}
                           </span>

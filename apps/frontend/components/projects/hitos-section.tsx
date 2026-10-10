@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CreateMilestoneDialog } from '@/components/projects/create-milestone-dialog';
 import { AssignMilestoneDialog } from '@/components/projects/assign-milestone-dialog';
+import { ESTADO_HITO_STYLE } from '@/components/projects/sprint-status.utils';
 import {
   ESTADO_COLUMNA_STYLE,
   ESTADO_LABEL,
@@ -105,29 +106,9 @@ function calcularStats(tareas: TareaPublicaDTO[]): HitoStats {
   };
 }
 
+/** Misma etiqueta (texto y tono) que el detalle y las analíticas del Sprint; el icono la acompaña. */
 function estadoHitoConfig(estado: HitoStats['estado']) {
-  if (estado === 'COMPLETADO') {
-    return {
-      label: 'Completado',
-      className: 'bg-[#E2F1DD] text-[#286327] dark:bg-green-500/10 dark:text-green-300',
-      icon: CheckCircle2,
-      dot: 'bg-[#3E9B3A]',
-    };
-  }
-  if (estado === 'EN_PROGRESO') {
-    return {
-      label: 'En progreso',
-      className: 'bg-[#FFF1CC] text-[#8A6300] dark:bg-amber-500/10 dark:text-amber-300',
-      icon: Circle,
-      dot: 'bg-[#D9A400]',
-    };
-  }
-  return {
-    label: 'Pendiente',
-    className: 'bg-[#E9EDF1] text-[#59616C] dark:bg-white/5 dark:text-slate-300',
-    icon: Circle,
-    dot: 'bg-[#8A93A0]',
-  };
+  return { ...ESTADO_HITO_STYLE[estado], icon: estado === 'COMPLETADO' ? CheckCircle2 : Circle };
 }
 
 function fechaHitoClass(hito: Hito, stats: HitoStats): string {
@@ -337,10 +318,9 @@ function MilestoneCard({
         </h3>
         <span
           aria-label={`Estado del hito: ${estado.label}`}
-          className={`inline-flex min-h-6 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-semibold ${estado.className}`}
+          className={`pill pill-sm ${estado.className}`}
         >
-          <span className={`inline-block size-1.5 rounded-full ${estado.dot}`} aria-hidden="true" />
-          <EstadoIcon className="size-3" aria-hidden="true" />
+          <EstadoIcon aria-hidden="true" />
           {estado.label}
         </span>
         <p className={`flex items-center gap-1.5 text-[11px] ${fechaHitoClass(hito, stats)}`}>
@@ -448,9 +428,7 @@ function UnassignedMilestoneTasksSection({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-bold text-on-surface">Tareas sin hito</h3>
-          <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] font-semibold text-tertiary">
-            {tareas.length}
-          </span>
+          <span className="pill pill-sm pill-neutral">{tareas.length}</span>
         </div>
         <div className="flex items-center gap-2">
           {seleccionHabilitada && algunaSeleccionada && (

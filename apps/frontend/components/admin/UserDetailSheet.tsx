@@ -343,7 +343,7 @@ function LiderContent({ user }: { user: AdminUserDetail }) {
               Postulaciones pendientes
             </span>
             {(act?.postulacionesPendientes ?? 0) > 0 && (
-              <span className="pill mt-micro bg-attention/15 text-attention-strong dark:text-attention">
+              <span className="pill pill-amber mt-micro">
                 Requiere atención
               </span>
             )}

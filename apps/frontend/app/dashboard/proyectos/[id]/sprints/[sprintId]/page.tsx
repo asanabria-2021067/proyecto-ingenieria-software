@@ -1,5 +1,7 @@
 'use client';
 
+import { ESTADO_HITO_STYLE, ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
+
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -65,30 +67,6 @@ function formatearFechaHora(iso: string): string {
 function formatearHoras(horas: number): string {
   return horas.toLocaleString('es-GT', { maximumFractionDigits: 2 });
 }
-
-/**
- * Estilos de estado de Sprint centralizados (mismo criterio que
- * `ESTADO_PARTICIPACION_STYLE`): un `span` con mapa de clases, no
- * `ui/badge`. Exhaustivo por diseño — un `EstadoSprint` nuevo rompe la
- * compilación en vez de caer silenciosamente en un estado incorrecto.
- */
-const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
-  ACTIVO: { label: 'Activo', className: 'bg-primary-container text-on-primary-container' },
-  EN_FINALIZACION: {
-    label: 'En finalización',
-    className: 'bg-status-warning text-on-status-warning',
-  },
-  CERRADO: { label: 'Cerrado', className: 'bg-surface-container-high text-tertiary' },
-};
-
-const ESTADO_HITO_STYLE: Record<EstadoHito, { label: string; className: string }> = {
-  PENDIENTE: { label: 'Pendiente', className: 'bg-surface-container-high text-tertiary' },
-  EN_PROGRESO: {
-    label: 'En progreso',
-    className: 'bg-status-warning text-on-status-warning',
-  },
-  COMPLETADO: { label: 'Completado', className: 'bg-primary-container text-on-primary-container' },
-};
 
 interface ParticipanteContribucion {
   usuario: SprintHistoryUsuarioDto;
@@ -253,7 +231,7 @@ function HitoRow({ hito }: { hito: { idHito: number; tituloHito: string; estadoH
         <span className="truncate text-sm font-medium text-on-surface">{hito.tituloHito}</span>
       </div>
       <span
-        className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
+        className={`pill w-fit ${estilo.className}`}
       >
         {estilo.label}
       </span>
@@ -377,7 +355,7 @@ function SprintDetailContent({
       >
         <div className="mt-tight flex flex-wrap items-center gap-x-inline gap-y-micro">
           <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estiloEstado.className}`}
+            className={`pill ${estiloEstado.className}`}
           >
             {estiloEstado.label}
           </span>

@@ -5,6 +5,7 @@ import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCheck } from 'lucide-react';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
+import { SITUACION_PUBLICACION } from '@/lib/admin/request-status';
 import { IconoTipo } from '@/components/hours/my-hours-project-list';
 import { formatInstanteGuatemala } from '@/lib/admin/sprint-calendar';
 import type { TipoProyecto } from '@/types';
@@ -165,9 +166,9 @@ export default function AdminReviewsInboxPage() {
           <div className="space-y-10">
             {/* Resumen: solo publicación. */}
             <RequestInboxKpis columns={3}>
-              <ResumenKpi label="Pendientes de revisión" valor={primerEnvio.length} punto="bg-outline" />
-              <ResumenKpi label="Reenviadas para revisión" valor={reenviadas.length} punto="bg-status-warning" />
-              <ResumenKpi label="En espera de correcciones" valor={enEsperaDeCorrecciones.length} punto="bg-review-soft" />
+              <ResumenKpi label="Pendientes de revisión" valor={primerEnvio.length} punto={SITUACION_PUBLICACION.PENDIENTE_DE_REVISION.punto} />
+              <ResumenKpi label="Reenviadas para revisión" valor={reenviadas.length} punto={SITUACION_PUBLICACION.REENVIADA_PARA_REVISION.punto} />
+              <ResumenKpi label="En espera de correcciones" valor={enEsperaDeCorrecciones.length} punto={SITUACION_PUBLICACION.EN_ESPERA_DE_CORRECCIONES.punto} />
             </RequestInboxKpis>
 
             {/* Primer envío: nadie lo ha revisado todavía. */}
