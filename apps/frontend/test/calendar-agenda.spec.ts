@@ -4,6 +4,7 @@ import {
   eventoToAgendaItem,
   eventoToAgendaItems,
   groupAgendaItemsByDay,
+  ocupaDiasCompletos,
   tareaCompartidaToAgendaItem,
   tareaToAgendaItem,
 } from '@/lib/calendar/agenda';
@@ -244,5 +245,59 @@ describe('calendar/agenda — mapeo de la agenda compartida reducida (G01-C07, U
     expect(item.descripcion).toBe('Notas');
     expect(item.href).toBe('/dashboard/projects/10');
     expect(item.ocupado).toBeUndefined();
+  });
+});
+
+describe('calendar/agenda — eventos nocturnos partidos por fecha real (G02-C04, UI-05)', () => {
+  const RANGO: [Date, Date] = [new Date(2026, 9, 1), new Date(2026, 10, 1)];
+  const local = (d: number, h: number, m = 0) => new Date(2026, 9, d, h, m).toISOString();
+  const soloEventos = (items: ReturnType<typeof eventoToAgendaItems>) =>
+    items.map((i) => (i.kind === 'evento' ? { key: i.key, horaInicio: i.horaInicio, horaFin: i.horaFin, multiDia: i.multiDia } : null));
+
+  it('un evento 22:00 → 00:00 (fin exactamente a medianoche) es un único tramo del primer día, sin fantasma al siguiente', () => {
+    const items = eventoToAgendaItems(evento({ fechaInicio: local(8, 22), fechaFin: local(9, 0) }), ...RANGO);
+    expect(soloEventos(items)).toEqual([{ key: '2026-10-08', horaInicio: '22:00', horaFin: '00:00', multiDia: false }]);
+    const [tramo] = items;
+    if (tramo.kind !== 'evento') throw new Error('unreachable');
+    expect(tramo.fechaFin).toEqual(new Date(2026, 9, 9, 0, 0));
+  });
+
+  it('un evento 23:00 → 01:00 produce dos tramos con horas reales y ninguno es de todo el día', () => {
+    const items = eventoToAgendaItems(evento({ fechaInicio: local(8, 23), fechaFin: local(9, 1) }), ...RANGO);
+    expect(soloEventos(items)).toEqual([
+      { key: '2026-10-08', horaInicio: '23:00', horaFin: '00:00', multiDia: false },
+      { key: '2026-10-09', horaInicio: '00:00', horaFin: '01:00', multiDia: false },
+    ]);
+    expect(new Set(items.map(agendaItemKey)).size).toBe(2);
+    expect(items.every((i) => i.id === 1)).toBe(true);
+    expect(items.map((i) => i.sortKey)).toEqual(['23:00', '00:00']);
+  });
+
+  it('un evento de 24 h o más sigue siendo de días completos: mismo ítem en cada día, sin recortar horas', () => {
+    const items = eventoToAgendaItems(evento({ fechaInicio: local(8, 9), fechaFin: local(10, 17) }), ...RANGO);
+    expect(items.map((i) => i.key)).toEqual(['2026-10-08', '2026-10-09', '2026-10-10']);
+    expect(items.every((i) => i.kind === 'evento' && i.multiDia && i.horaInicio === '09:00' && i.horaFin === '17:00')).toBe(true);
+    expect(ocupaDiasCompletos(new Date(local(8, 9)), new Date(local(9, 9)))).toBe(true);
+    expect(ocupaDiasCompletos(new Date(local(8, 23)), new Date(local(9, 1)))).toBe(false);
+  });
+
+  it('un tramo nocturno fuera del rango visible se recorta igual que cualquier día', () => {
+    const items = eventoToAgendaItems(evento({ fechaInicio: local(31, 23), fechaFin: new Date(2026, 10, 1, 1).toISOString() }), ...RANGO);
+    expect(soloEventos(items)).toEqual([{ key: '2026-10-31', horaInicio: '23:00', horaFin: '00:00', multiDia: false }]);
+  });
+
+  it('eventoToAgendaItem (un solo ítem) también deja de marcar como varios días un evento con horas que cruza medianoche', () => {
+    const item = eventoToAgendaItem(evento({ fechaInicio: local(8, 23), fechaFin: local(9, 1) }));
+    if (item.kind !== 'evento') throw new Error('unreachable');
+    expect(item.multiDia).toBe(false);
+    expect(item.horaFin).toBe('01:00');
+  });
+
+  it('los tramos de un evento compartido conservan el contrato de G01 (OCUPADO sin título ni proyecto)', () => {
+    const origen = { idUsuario: 7, nombre: 'Ana García', tono: 3 as const };
+    const items = eventoToAgendaItems({ idEvento: 50, fechaInicio: local(8, 23), fechaFin: local(9, 1), visibilidad: 'OCUPADO' }, ...RANGO, origen);
+    expect(items).toHaveLength(2);
+    expect(items.every((i) => i.kind === 'evento' && i.ocupado && i.titulo === 'Ocupado' && i.projectId === 0 && i.compartidoPor === origen)).toBe(true);
+    expect(JSON.stringify(items)).not.toContain('Proyecto');
   });
 });

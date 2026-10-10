@@ -99,6 +99,22 @@ export function tareaCompartidaToAgendaItem(tarea: TareaCompartidaDTO, origen: O
   };
 }
 
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
+
+/**
+ * G02 (UI-05): "varios días" significa que el evento ocupa días completos
+ * (dura 24 h o más) y va en la franja "Todo el día". Un evento con horas
+ * que cruza medianoche (22:00 → 01:00) NO es de todo el día: se parte en
+ * tramos por fecha real (`eventoToAgendaItems`).
+ */
+export function ocupaDiasCompletos(fechaInicio: Date, fechaFin: Date): boolean {
+  return fechaFin.getTime() - fechaInicio.getTime() >= MS_POR_DIA;
+}
+
+function inicioDelDia(fecha: Date): Date {
+  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+}
+
 /**
  * G01 (UI-01): un evento de una agenda compartida llega ya reducido por el
  * backend. Se copia campo por campo (sin spread del DTO) y, cuando viene
@@ -114,7 +130,7 @@ function eventoCompartidoToAgendaItem(evento: EventoCompartidoDTO, origen: Orige
     sortKey: horaInicio,
     id: evento.idEvento,
     descripcion: null,
-    multiDia: toDateKey(fechaInicio) !== toDateKey(fechaFin),
+    multiDia: ocupaDiasCompletos(fechaInicio, fechaFin),
     href: '',
     horaInicio,
     horaFin: formatTime(fechaFin),
@@ -153,7 +169,7 @@ export function eventoToAgendaItem(evento: MiEventoDTO | EventoCompartidoDTO, or
     descripcion: evento.descripcionEvento,
     modalidad: evento.modalidad,
     tipo: evento.tipoEvento,
-    multiDia: toDateKey(fechaInicio) !== toDateKey(fechaFin),
+    multiDia: ocupaDiasCompletos(fechaInicio, fechaFin),
     projectTitle: evento.proyecto.tituloProyecto,
     href: `/dashboard/projects/${evento.proyecto.idProyecto}`,
     horaInicio,
@@ -171,6 +187,12 @@ export function eventoToAgendaItem(evento: MiEventoDTO | EventoCompartidoDTO, or
  * es por solapamiento, así que un evento que abarca varios días — o que
  * arranca antes del rango visible y lo solapa — debe aparecer en cada día
  * que toca, no solo en el de fechaInicio.
+ *
+ * G02 (UI-05): un evento de días completos (≥ 24 h) repite el mismo ítem
+ * (`multiDia`) en cada día. Un evento con horas que cruza medianoche se
+ * parte en tramos por fecha real, cada uno con su propio horario
+ * (23:00–00:00 el primer día, 00:00–01:00 el siguiente); si termina
+ * exactamente a las 00:00 solo existe el tramo del primer día.
  */
 export function eventoToAgendaItems(
   evento: MiEventoDTO | EventoCompartidoDTO,
@@ -185,13 +207,31 @@ export function eventoToAgendaItems(
   // obtener el último día real que sigue dentro del rango visible.
   const finRangoInclusivo = new Date(rangoHasta.getTime() - 1);
   const primerDia = fechaInicioEvento < rangoDesde ? rangoDesde : fechaInicioEvento;
-  const ultimoDia = fechaFinEvento < finRangoInclusivo ? fechaFinEvento : finRangoInclusivo;
+  // Un fin exactamente a medianoche pertenece al día anterior (no crea tramo fantasma).
+  const finEfectivo = base.kind === 'evento' && !base.multiDia ? new Date(fechaFinEvento.getTime() - 1) : fechaFinEvento;
+  const ultimoDia = finEfectivo < finRangoInclusivo ? finEfectivo : finRangoInclusivo;
 
   const items: AgendaItem[] = [];
-  let cursor = new Date(primerDia.getFullYear(), primerDia.getMonth(), primerDia.getDate());
-  const limite = new Date(ultimoDia.getFullYear(), ultimoDia.getMonth(), ultimoDia.getDate());
+  let cursor = inicioDelDia(primerDia);
+  const limite = inicioDelDia(ultimoDia);
   while (cursor <= limite) {
-    items.push({ ...base, key: toDateKey(cursor) });
+    if (base.kind === 'evento' && !base.multiDia) {
+      const siguiente = addDays(cursor, 1);
+      const tramoInicio = fechaInicioEvento > cursor ? fechaInicioEvento : cursor;
+      const tramoFin = fechaFinEvento < siguiente ? fechaFinEvento : siguiente;
+      const horaInicio = formatTime(tramoInicio);
+      items.push({
+        ...base,
+        key: toDateKey(cursor),
+        sortKey: horaInicio,
+        horaInicio,
+        horaFin: formatTime(tramoFin),
+        fechaInicio: tramoInicio,
+        fechaFin: tramoFin,
+      });
+    } else {
+      items.push({ ...base, key: toDateKey(cursor) });
+    }
     cursor = addDays(cursor, 1);
   }
   return items;
