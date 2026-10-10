@@ -24,6 +24,40 @@ export const RECORDATORIO_OPTIONS: { value: number; label: string }[] = [
 
 export const RECORDATORIO_DEFAULT = 60;
 
+/** Autoridad tal como se escribió: `https://[usuario@]host[:puerto]…` (el host entre corchetes si es IPv6). */
+const AUTORIDAD_DEL_ENLACE = /^https?:\/\/(?:[^/?#@]+@)?(\[[^\]]+\]|[^/?#:]+)/i;
+const ETIQUETA_DE_DOMINIO = /^[a-z\u00a1-\uffff0-9-]+$/i;
+const TLD = /^([a-z\u00a1-\uffff]{2,}|xn[a-z0-9-]{2,})$/i;
+const OCTETO = /^(0|[1-9]\d{0,2})$/;
+
+function esDominioConTld(host: string): boolean {
+  const etiquetas = host.split('.');
+  if (etiquetas.length < 2 || !TLD.test(etiquetas[etiquetas.length - 1])) return false;
+  return etiquetas.every((e) => e.length > 0 && e.length <= 63 && ETIQUETA_DE_DOMINIO.test(e) && !e.startsWith('-') && !e.endsWith('-'));
+}
+
+/**
+ * G04 (UI-24): política única del enlace de una sesión, la misma que aplica
+ * el backend (`esEnlaceDeSesion` en create-event.dto.ts). Antes el formulario
+ * solo exigía http(s) y el backend, además, un dominio real: un enlace como
+ * `http://localhost:3000` o `https://intranet/sala` pasaba aquí y volvía como
+ * 400 al guardar.
+ *  1. URL absoluta http/https con host, sin espacios, caracteres de control ni
+ *     invisibles (`safeExternalHref`, contrato OWASP G07).
+ *  2. Sin `<` ni `>`.
+ *  3. Host real: dominio con TLD (sin guion bajo), una IPv4 o una IPv6 entre
+ *     corchetes. No hay excepción de desarrollo para `localhost`.
+ */
+export function esEnlaceDeSesionValido(valor: string): boolean {
+  if (!safeExternalHref(valor) || /[<>]/.test(valor)) return false;
+  const host = AUTORIDAD_DEL_ENLACE.exec(valor)?.[1];
+  if (!host) return false;
+  if (host.startsWith('[')) return true; // IPv6 literal: ya lo validó el analizador de URL.
+  const partes = host.split('.');
+  if (partes.every((p) => /^\d+$/.test(p))) return partes.length === 4 && partes.every((p) => OCTETO.test(p) && Number(p) <= 255);
+  return esDominioConTld(host);
+}
+
 export function requiereUbicacion(modalidad: ModalidadEvento): boolean {
   return modalidad === 'PRESENCIAL' || modalidad === 'MIXTA';
 }
@@ -294,12 +328,18 @@ export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora =
         const link = values.linkSesion.trim();
         if (link.length === 0) {
           ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['linkSesion'], message: 'Ingresa el link de la sesión.' });
-        } else if (!safeExternalHref(link)) {
-          // Mismo criterio que decide si el link es clicable en el detalle del evento.
+        } else if (!/^https?:\/\//i.test(link)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['linkSesion'],
             message: 'El link debe empezar con http:// o https://.',
+          });
+        } else if (!esEnlaceDeSesionValido(link)) {
+          // G04 (UI-24): mismo criterio que el backend, para que el error salga aquí y no como 400 al guardar.
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['linkSesion'],
+            message: 'El link no parece válido. Revisa el dominio, por ejemplo https://meet.google.com/abc-defg-hij.',
           });
         }
       }

@@ -7,7 +7,6 @@ import {
   IsInt,
   IsNumber,
   IsString,
-  IsUrl,
   Max,
   MaxLength,
   Min,
@@ -15,6 +14,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { ModalidadEvento, TipoEvento } from '@prisma/client';
+import { IsEnlaceDeSesion } from './create-event.dto';
 
 /**
  * HU-169 (T-263): edición parcial. Mismo patrón que UpdateLabelDto/UpdateTaskDto:
@@ -82,7 +82,7 @@ export class UpdateEventDto {
   // Requerido cuando modalidad es VIRTUAL o MIXTA.
   @ValidateIf((o: UpdateEventDto) => o.modalidad === ModalidadEvento.VIRTUAL || o.modalidad === ModalidadEvento.MIXTA)
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @IsUrl({ protocols: ['http', 'https'], require_protocol: true }, { message: 'linkSesion debe ser una URL http/https válida' })
+  @IsEnlaceDeSesion()
   @MaxLength(500)
   linkSesion?: string | null;
 

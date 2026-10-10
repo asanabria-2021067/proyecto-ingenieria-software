@@ -196,6 +196,40 @@ describeIntegration('G04 — contrato HTTP de eventos de proyecto (PostgreSQL re
     });
   });
 
+  describe('G04-C17 (UI-24): el enlace de la sesión se valida igual que en el formulario', () => {
+    it.each([
+      'http://localhost:3000/sala',
+      'https://intranet/sala',
+      'https://exa_mple.com/x',
+      'https://ejemplo.com/<script>',
+      'https://ejemplo.com/\u200bx',
+      'javascript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+    ])('rechaza con 400 y no crea nada: %j', async (linkSesion) => {
+      const antes = await prisma.eventoProyecto.count({ where: { idProyecto: ids.proyecto } });
+      const { res, json } = await crear({ modalidad: 'VIRTUAL', linkSesion });
+      expect(res.status).toBe(400);
+      expect(JSON.stringify(json.message)).toContain('linkSesion debe ser una URL http/https válida');
+      expect(await prisma.eventoProyecto.count({ where: { idProyecto: ids.proyecto } })).toBe(antes);
+    });
+
+    it('acepta un enlace real (con puerto, ruta y consulta) y lo guarda tal como llegó', async () => {
+      const linkSesion = 'https://teams.microsoft.com:443/l/meetup-join/19%3ameeting?context=%7b%7d';
+      const { res, json } = await crear({ modalidad: 'VIRTUAL', linkSesion });
+      expect(res.status).toBe(201);
+      expect((await fila(json.idEvento as number)).linkSesion).toBe(linkSesion);
+    });
+
+    it('la misma política aplica al editar', async () => {
+      const { json } = await crear({ modalidad: 'VIRTUAL', linkSesion: 'https://meet.google.com/abc-defg-hij' });
+      const idEvento = json.idEvento as number;
+      expect((await editar(idEvento, { modalidad: 'VIRTUAL', linkSesion: 'https://intranet/sala' })).res.status).toBe(400);
+      expect((await fila(idEvento)).linkSesion).toBe('https://meet.google.com/abc-defg-hij');
+      expect((await editar(idEvento, { modalidad: 'VIRTUAL', linkSesion: 'https://zoom.us/j/123' })).res.status).toBe(200);
+      expect((await fila(idEvento)).linkSesion).toBe('https://zoom.us/j/123');
+    });
+  });
+
   /**
    * G04-C16 (UI-22): recordatorios reales. EventsReminderService y
    * NotificationsService son los de producción (sin gateway de sockets: las

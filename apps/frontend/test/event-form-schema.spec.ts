@@ -5,6 +5,7 @@ import {
   combinarFechaHora,
   duracionTexto,
   emptyEventForm,
+  esEnlaceDeSesionValido,
   eventFormFromEvento,
   inicioPropuesto,
   type EventFormValues,
@@ -510,5 +511,83 @@ describe('metadatos de modalidad obsoletos al editar (G04-C14, UI-35)', () => {
     const limpio = evento({ modalidad: 'VIRTUAL', ubicacionLat: null, ubicacionLng: null, ubicacionNombre: null, fechaInicio: new Date(2030, 9, 6, 9, 0).toISOString(), fechaFin: new Date(2030, 9, 6, 10, 0).toISOString() });
     const payload = buildEventPayload(eventFormFromEvento(limpio), { keepEmptyDescripcion: true });
     expect(payload).toMatchObject({ modalidad: 'VIRTUAL', ubicacionLat: null, ubicacionLng: null, ubicacionNombre: null, linkSesion: limpio.linkSesion });
+  });
+});
+
+// Matriz compartida de G04-C17: es la MISMA lista en apps/backend/test/events.service.spec.ts y en
+// apps/frontend/test/event-form-schema.spec.ts. Si cambia aquí, debe cambiar allá: lo que prueba es que
+// formulario y backend aceptan y rechazan exactamente los mismos enlaces.
+const ENLACES_ACEPTADOS = [
+  "https://meet.google.com/abc-defg-hij",
+  "http://zoom.us/j/123?pwd=x#frag",
+  "HTTPS://Meet.Google.com/ABC",
+  "https://teams.microsoft.com/l/meetup-join/19%3ameeting",
+  "https://sub.dominio.edu.gt:8443/sala",
+  "https://192.168.1.10/sala",
+  "https://[2001:db8::1]/sala",
+  "http://[::1]/x",
+  "https://usuario:clave@ejemplo.com/x",
+  "https://xn--espaa-rta.es/aula",
+  "https://ejemplo.espa\u00f1a/aula",
+  "https://ejemplo.com",
+  "https://ejemplo.com/",
+  "https://ejemplo.com?x=1",
+  "https://ejemplo.com#f",
+  "https://a.io/x",
+  "https://ejemplo.co.uk/x",
+  "https://ejemplo.museum/x",
+  "https://255.255.255.255/x",
+  "https://0.0.0.0/x",
+  "https://ejemplo.com:8443/x",
+  "https://ejemplo.com:/x",
+  "https://ejemplo.COM/X",
+  "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/x",
+  "https://ejemplo.com/ruta/muy/larga?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+];
+
+const ENLACES_RECHAZADOS: Record<string, string[]> = {
+  "sin dominio real (el 400 tard\u00edo de UI-24)": ["http://localhost:3000/sala", "http://localhost", "https://intranet/sala", "https://meet", "https://ejemplo.c/x", "https://ejemplo.123/x", "https://.com/x"],
+  "host mal formado": ["https://ejemplo..com/x", "https://-ejemplo.com/x", "https://ejemplo-.com/x", "https://exa_mple.com/x", "https://ejemplo.com./x", "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/x", "https://@ejemplo.com/x"],
+  "IP inv\u00e1lida": ["https://1.1/x", "https://1.2.3/x", "https://1.2.3.4.5/x", "https://999.1.1.1/x", "https://256.1.1.1/x", "https://01.2.3.4/x"],
+  "puerto inv\u00e1lido": ["https://ejemplo.com:99999/x", "https://ejemplo.com:80a/x"],
+  "sin esquema http(s)": ["meet.google.com/x", "//meet.google.com/x", "ftp://ejemplo.com/x", "file:///etc/passwd", "https-app://ejemplo.com", "http://", "https://", "https:///ruta"],
+  "esquemas peligrosos": ["javascript:alert(1)", "JaVaScRiPt:alert(1)", "java\tscript:alert(1)", "data:text/html,<script>alert(1)</script>", "vbscript:msgbox(1)"],
+  "espacios, controles, invisibles o < >": ["https://ejemplo.com/a b", " https://ejemplo.com", "https://ejemplo.com\n", "https://ejemplo.com/\u200bx", "https://exam\u200bple.com/x", "https://ejemplo.com/<script>", "https://ejemplo.com/a>b"],
+};
+
+describe('enlace de la sesión — política única con el backend (G04-C17, UI-24)', () => {
+  const errorDeEnlace = (linkSesion: string) => mensajes(valores({ linkSesion })).linkSesion;
+
+  it.each(ENLACES_ACEPTADOS)('acepta %s', (enlace) => {
+    expect(esEnlaceDeSesionValido(enlace)).toBe(true);
+    expect(errorDeEnlace(enlace)).toBeUndefined();
+  });
+
+  for (const [motivo, enlaces] of Object.entries(ENLACES_RECHAZADOS)) {
+    it.each(enlaces)(`rechaza por "${motivo}": %j`, (enlace) => {
+      expect(esEnlaceDeSesionValido(enlace)).toBe(false);
+      // El formulario recorta los extremos antes de validar, igual que el DTO del backend.
+      const recortado = enlace.trim();
+      if (esEnlaceDeSesionValido(recortado)) expect(errorDeEnlace(enlace)).toBeUndefined();
+      else expect(errorDeEnlace(enlace)).toBeDefined();
+    });
+  }
+
+  it('lo que antes pasaba aquí y volvía como 400 del servidor ahora se explica junto al campo', () => {
+    for (const enlace of ['http://localhost:3000/sala', 'https://intranet/sala', 'https://exa_mple.com/x', 'https://ejemplo.com/<script>']) {
+      expect(errorDeEnlace(enlace)).toBe('El link no parece válido. Revisa el dominio, por ejemplo https://meet.google.com/abc-defg-hij.');
+    }
+  });
+
+  it('sin http(s) conserva su mensaje de siempre; vacío sigue pidiendo el enlace', () => {
+    for (const enlace of ['meet.google.com/x', 'javascript:alert(1)', 'data:text/html,x', 'ftp://ejemplo.com/x']) {
+      expect(errorDeEnlace(enlace)).toBe('El link debe empezar con http:// o https://.');
+    }
+    expect(errorDeEnlace('   ')).toBe('Ingresa el link de la sesión.');
+  });
+
+  it('un evento presencial no valida el enlace (la modalidad no lo usa)', () => {
+    const errores = mensajes(valores({ modalidad: 'PRESENCIAL', ubicacionLat: 14.6, ubicacionLng: -90.5, linkSesion: 'no es un enlace' }));
+    expect(errores.linkSesion).toBeUndefined();
   });
 });

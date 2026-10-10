@@ -10,6 +10,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { UpdateEventDto } from '../src/events/dto/update-event.dto';
+import { CreateEventDto, esEnlaceDeSesion } from '../src/events/dto/create-event.dto';
 import { GetEventsRangeQueryDto, MAX_DIAS_RANGO_EVENTOS } from '../src/events/dto/get-events-range-query.dto';
 
 const LEADER_ID = 1;
@@ -918,5 +919,126 @@ describe('EventsService — reabrir el recordatorio cuando crece la audiencia (G
     const { prisma, service } = preparar([ANA]);
     await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, comoElDialogo([ANA, LUIS]));
     expect(Object.keys(prisma.eventoProyecto.update.mock.calls[0][0].select)).not.toContain('recordatorioEnviadoEn');
+  });
+});
+
+// Matriz compartida de G04-C17: es la MISMA lista en apps/backend/test/events.service.spec.ts y en
+// apps/frontend/test/event-form-schema.spec.ts. Si cambia aquí, debe cambiar allá: lo que prueba es que
+// formulario y backend aceptan y rechazan exactamente los mismos enlaces.
+const ENLACES_ACEPTADOS = [
+  "https://meet.google.com/abc-defg-hij",
+  "http://zoom.us/j/123?pwd=x#frag",
+  "HTTPS://Meet.Google.com/ABC",
+  "https://teams.microsoft.com/l/meetup-join/19%3ameeting",
+  "https://sub.dominio.edu.gt:8443/sala",
+  "https://192.168.1.10/sala",
+  "https://[2001:db8::1]/sala",
+  "http://[::1]/x",
+  "https://usuario:clave@ejemplo.com/x",
+  "https://xn--espaa-rta.es/aula",
+  "https://ejemplo.espa\u00f1a/aula",
+  "https://ejemplo.com",
+  "https://ejemplo.com/",
+  "https://ejemplo.com?x=1",
+  "https://ejemplo.com#f",
+  "https://a.io/x",
+  "https://ejemplo.co.uk/x",
+  "https://ejemplo.museum/x",
+  "https://255.255.255.255/x",
+  "https://0.0.0.0/x",
+  "https://ejemplo.com:8443/x",
+  "https://ejemplo.com:/x",
+  "https://ejemplo.COM/X",
+  "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/x",
+  "https://ejemplo.com/ruta/muy/larga?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+];
+
+const ENLACES_RECHAZADOS: Record<string, string[]> = {
+  "sin dominio real (el 400 tard\u00edo de UI-24)": ["http://localhost:3000/sala", "http://localhost", "https://intranet/sala", "https://meet", "https://ejemplo.c/x", "https://ejemplo.123/x", "https://.com/x"],
+  "host mal formado": ["https://ejemplo..com/x", "https://-ejemplo.com/x", "https://ejemplo-.com/x", "https://exa_mple.com/x", "https://ejemplo.com./x", "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/x", "https://@ejemplo.com/x"],
+  "IP inv\u00e1lida": ["https://1.1/x", "https://1.2.3/x", "https://1.2.3.4.5/x", "https://999.1.1.1/x", "https://256.1.1.1/x", "https://01.2.3.4/x"],
+  "puerto inv\u00e1lido": ["https://ejemplo.com:99999/x", "https://ejemplo.com:80a/x"],
+  "sin esquema http(s)": ["meet.google.com/x", "//meet.google.com/x", "ftp://ejemplo.com/x", "file:///etc/passwd", "https-app://ejemplo.com", "http://", "https://", "https:///ruta"],
+  "esquemas peligrosos": ["javascript:alert(1)", "JaVaScRiPt:alert(1)", "java\tscript:alert(1)", "data:text/html,<script>alert(1)</script>", "vbscript:msgbox(1)"],
+  "espacios, controles, invisibles o < >": ["https://ejemplo.com/a b", " https://ejemplo.com", "https://ejemplo.com\n", "https://ejemplo.com/\u200bx", "https://exam\u200bple.com/x", "https://ejemplo.com/<script>", "https://ejemplo.com/a>b"],
+};
+
+describe('enlace de la sesión — política única con el formulario (G04-C17, UI-24)', () => {
+  const erroresDe = async (Dto: typeof CreateEventDto | typeof UpdateEventDto, linkSesion: unknown) => {
+    const plano = { tituloEvento: 'Reunión', fechaInicio: '2030-10-01T14:00:00.000Z', fechaFin: '2030-10-01T15:00:00.000Z', modalidad: 'VIRTUAL', linkSesion };
+    return (await validate(plainToInstance(Dto, plano), { whitelist: true, forbidNonWhitelisted: true })).map((e) => e.property);
+  };
+
+  it.each(ENLACES_ACEPTADOS)('acepta %s (función y DTO de creación y edición)', async (enlace) => {
+    expect(esEnlaceDeSesion(enlace)).toBe(true);
+    expect(await erroresDe(CreateEventDto, enlace)).toEqual([]);
+    expect(await erroresDe(UpdateEventDto, enlace)).toEqual([]);
+  });
+
+  for (const [motivo, enlaces] of Object.entries(ENLACES_RECHAZADOS)) {
+    it.each(enlaces)(`rechaza por "${motivo}": %j`, async (enlace) => {
+      expect(esEnlaceDeSesion(enlace)).toBe(false);
+      // El DTO recorta espacios de los extremos antes de validar (como el formulario): un enlace
+      // que solo falla por eso se vuelve válido; el resto debe dar error en linkSesion.
+      const recortado = enlace.trim();
+      const esperado = esEnlaceDeSesion(recortado) ? [] : ['linkSesion'];
+      expect(await erroresDe(CreateEventDto, enlace)).toEqual(esperado);
+      expect(await erroresDe(UpdateEventDto, enlace)).toEqual(esperado);
+    });
+  }
+
+  it('no acepta nada que no sea texto, ni la cadena vacía (un evento virtual necesita su enlace)', async () => {
+    for (const valor of ['', '   ', 0, 42, true, {}, [], undefined]) expect(esEnlaceDeSesion(valor)).toBe(false);
+    expect(await erroresDe(CreateEventDto, '')).toEqual(['linkSesion']);
+    expect(await erroresDe(CreateEventDto, undefined)).toEqual(['linkSesion']);
+  });
+
+  it('el tope de 500 caracteres se mantiene aunque el enlace sea válido', async () => {
+    const largo = `https://ejemplo.com/${'a'.repeat(490)}`;
+    expect(largo.length).toBeGreaterThan(500);
+    expect(await erroresDe(CreateEventDto, largo)).toEqual(['linkSesion']);
+  });
+
+  it('un evento presencial no exige enlace: la política solo se aplica cuando la modalidad lo usa', async () => {
+    const plano = { tituloEvento: 'Taller', fechaInicio: '2030-10-01T14:00:00.000Z', fechaFin: '2030-10-01T15:00:00.000Z', modalidad: 'PRESENCIAL', ubicacionLat: 14.6, ubicacionLng: -90.5 };
+    expect(await validate(plainToInstance(CreateEventDto, plano), { whitelist: true, forbidNonWhitelisted: true })).toEqual([]);
+  });
+});
+
+describe('rolesDestino — deuda contractual registrada, sin cambio de comportamiento (G04-C17, UI-23)', () => {
+  it('sigue siendo un dato que se recibe y se guarda tal cual al crear y al editar', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.eventoProyecto.create.mockResolvedValue({ idEvento: EVENT_ID });
+    prisma.eventoProyecto.findFirst.mockResolvedValue({ idEvento: EVENT_ID, fechaInicio: new Date('2030-10-01T14:00:00.000Z'), fechaFin: new Date('2030-10-01T15:00:00.000Z'), modalidad: 'VIRTUAL', invitados: [] });
+    prisma.eventoProyecto.update.mockResolvedValue({ idEvento: EVENT_ID });
+    const service = new EventsService(prisma);
+
+    await service.create(PROJECT_ID, LEADER_ID, dto({ rolesDestino: [3, 4] }));
+    expect(prisma.eventoProyecto.create.mock.calls[0][0].data.rolesDestino).toEqual([3, 4]);
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { rolesDestino: [5] });
+    expect(prisma.eventoProyecto.update.mock.calls[0][0].data.rolesDestino).toEqual([5]);
+  });
+
+  it('ninguna lectura filtra por rolesDestino: la visibilidad depende de invitados y de la pertenencia al proyecto', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.proyecto.findMany.mockResolvedValue([{ idProyecto: PROJECT_ID }]);
+    prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+    prisma.eventoProyecto.findMany.mockResolvedValue([]);
+    const service = new EventsService(prisma);
+
+    await service.findAllForProject(PROJECT_ID, PARTICIPANT_ID);
+    await service.findForUserInRange(PARTICIPANT_ID, '2030-10-01T00:00:00.000Z', '2030-10-08T00:00:00.000Z');
+    await service.findSharedInRange(LEADER_ID, PARTICIPANT_ID, '2030-10-01T00:00:00.000Z', '2030-10-08T00:00:00.000Z');
+    for (const [{ where }] of prisma.eventoProyecto.findMany.mock.calls) {
+      expect(JSON.stringify(where)).not.toContain('rolesDestino');
+    }
+  });
+
+  it('la agenda compartida sigue sin pedir ni devolver rolesDestino (regresión de G01)', () => {
+    expect(Object.keys(EVENT_SHARED_SELECT)).not.toContain('rolesDestino');
+    const fila = { idEvento: 1, idProyecto: 5, tituloEvento: 'x', fechaInicio: new Date(), fechaFin: new Date(), tipoEvento: 'OTRO', modalidad: 'VIRTUAL', proyecto: { idProyecto: 5, tituloProyecto: 'P' }, rolesDestino: [1, 2] } as unknown as EventoCompartidoFila;
+    for (const detalle of [true, false]) expect(JSON.stringify(proyectarEventoCompartido(fila, detalle))).not.toContain('rolesDestino');
   });
 });
