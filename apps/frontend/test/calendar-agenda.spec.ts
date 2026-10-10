@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   agendaItemKey,
   eventoToAgendaItem,
@@ -9,6 +9,7 @@ import {
 } from '@/lib/calendar/agenda';
 import type { MiTareaDTO } from '@/lib/services/users';
 import type { MiEventoDTO } from '@/lib/services/events';
+import type { AgendaCompartidaDTO, EventoCompartidoDTO, TareaCompartidaDTO } from '@/lib/services/calendar-shares';
 
 function tarea(overrides: Partial<MiTareaDTO> & { fechaLimite: string }): MiTareaDTO & { fechaLimite: string } {
   return {
@@ -151,6 +152,7 @@ describe('calendar/agenda — calendarios compartidos y tipo (HU-184)', () => {
     const item = tareaCompartidaToAgendaItem(
       {
         idTarea: 3,
+        visibilidad: 'DETALLE',
         tituloTarea: 'Informe',
         estadoTarea: 'EN_PROGRESO',
         prioridad: 'ALTA',
@@ -168,5 +170,28 @@ describe('calendar/agenda — calendarios compartidos y tipo (HU-184)', () => {
     const mio = eventoToAgendaItem(evento());
     const compartido = eventoToAgendaItem(evento(), origen);
     expect(agendaItemKey(mio)).not.toBe(agendaItemKey(compartido));
+  });
+});
+
+describe('calendar-shares — contrato mínimo de la agenda compartida (G01-C06, UI-01)', () => {
+  it('EventoCompartidoDTO no admite campos privados ni en DETALLE ni en OCUPADO', () => {
+    expectTypeOf<EventoCompartidoDTO>().not.toHaveProperty('linkSesion');
+    expectTypeOf<EventoCompartidoDTO>().not.toHaveProperty('descripcionEvento');
+    expectTypeOf<EventoCompartidoDTO>().not.toHaveProperty('ubicacionLat');
+    expectTypeOf<EventoCompartidoDTO>().not.toHaveProperty('invitados');
+    expectTypeOf<EventoCompartidoDTO>().not.toHaveProperty('rolesDestino');
+    expectTypeOf<EventoCompartidoDTO>().not.toHaveProperty('antelacionMinutos');
+    // OCUPADO: ni título ni proyecto; DETALLE: solo lo necesario para pintarlo.
+    expectTypeOf<Extract<EventoCompartidoDTO, { visibilidad: 'OCUPADO' }>>().not.toHaveProperty('tituloEvento');
+    expectTypeOf<Extract<EventoCompartidoDTO, { visibilidad: 'OCUPADO' }>>().not.toHaveProperty('proyecto');
+    expectTypeOf<Extract<EventoCompartidoDTO, { visibilidad: 'DETALLE' }>>().toHaveProperty('tituloEvento');
+    expectTypeOf<Extract<TareaCompartidaDTO, { visibilidad: 'OCUPADO' }>>().not.toHaveProperty('tituloTarea');
+    expectTypeOf<AgendaCompartidaDTO['eventos'][number]>().toEqualTypeOf<EventoCompartidoDTO>();
+  });
+
+  it('el DTO personal (MiEventoDTO) no es asignable al compartido: no se puede colar por accidente', () => {
+    expectTypeOf<MiEventoDTO>().not.toMatchTypeOf<EventoCompartidoDTO>();
+    // Y un evento compartido nunca pasa por donde se espera el DTO completo.
+    expectTypeOf<EventoCompartidoDTO>().not.toMatchTypeOf<MiEventoDTO>();
   });
 });

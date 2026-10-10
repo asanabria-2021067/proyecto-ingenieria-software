@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/api/client';
-import type { MiEventoDTO } from '@/lib/services/events';
+import type { ModalidadEvento, TipoEvento } from '@/lib/services/events';
 import type { MiTareaDTO } from '@/lib/services/users';
 
 /** HU-184: persona en la lista de calendarios compartidos. */
@@ -18,18 +18,46 @@ export interface CalendariosCompartidosDTO {
   compartidosConmigo: UsuarioCalendarioDTO[];
 }
 
-/** Fecha límite de una tarea de otra persona: solo lo necesario para pintarla. */
-export interface TareaCompartidaDTO {
+/**
+ * G01 (UI-01): contrato mínimo de una agenda compartida. `DETALLE` solo cuando
+ * tengo acceso propio al proyecto; si no, `OCUPADO`: horario sin identidad.
+ * Nunca trae descripción, enlace, ubicación, invitados ni recordatorio: el
+ * backend no los envía y estos tipos no los admiten.
+ */
+export type VisibilidadCompartida = 'DETALLE' | 'OCUPADO';
+
+export type EventoCompartidoDTO = {
+  idEvento: number;
+  fechaInicio: string;
+  fechaFin: string;
+} & (
+  | {
+      visibilidad: 'DETALLE';
+      tituloEvento: string;
+      tipoEvento: TipoEvento;
+      modalidad: ModalidadEvento;
+      proyecto: { idProyecto: number; tituloProyecto: string };
+    }
+  | { visibilidad: 'OCUPADO' }
+);
+
+/** Fecha límite de una tarea de otra persona, con la misma política que los eventos. */
+export type TareaCompartidaDTO = {
   idTarea: number;
-  tituloTarea: string;
-  estadoTarea: MiTareaDTO['estadoTarea'];
-  prioridad: MiTareaDTO['prioridad'];
   fechaLimite: string;
-  proyecto: { idProyecto: number; tituloProyecto: string };
-}
+} & (
+  | {
+      visibilidad: 'DETALLE';
+      tituloTarea: string;
+      estadoTarea: MiTareaDTO['estadoTarea'];
+      prioridad: MiTareaDTO['prioridad'];
+      proyecto: { idProyecto: number; tituloProyecto: string };
+    }
+  | { visibilidad: 'OCUPADO' }
+);
 
 export interface AgendaCompartidaDTO {
-  eventos: MiEventoDTO[];
+  eventos: EventoCompartidoDTO[];
   tareas: TareaCompartidaDTO[];
 }
 
