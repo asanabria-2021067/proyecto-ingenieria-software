@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { CalendarSharesService } from '../src/calendar-shares/calendar-shares.service';
+import { CalendarSharesService, proyectarTareaCompartida } from '../src/calendar-shares/calendar-shares.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { EventsService } from '../src/events/events.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
@@ -17,7 +17,7 @@ function makeDeps() {
     calendarioCompartido: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
     tarea: { findMany: vi.fn() },
   };
-  const events = { findForUserInRange: vi.fn() };
+  const events = { findForUserInRange: vi.fn(), projectIdsForUser: vi.fn().mockResolvedValue([]) };
   const notifications = { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) };
   const service = new CalendarSharesService(
     prisma as unknown as PrismaService,
@@ -121,11 +121,14 @@ describe('CalendarSharesService.agendaCompartida (HU-184)', () => {
     expect(prisma.tarea.findMany).not.toHaveBeenCalled();
   });
 
-  it('con calendario compartido devuelve los eventos que ve el propietario y sus tareas pendientes del rango', async () => {
+  it('con calendario compartido devuelve los eventos y las fechas límite del rango', async () => {
     const { prisma, events, service } = makeDeps();
     prisma.calendarioCompartido.findFirst.mockResolvedValue({ idCalendarioCompartido: 1 });
     events.findForUserInRange.mockResolvedValue([{ idEvento: 5 }]);
-    prisma.tarea.findMany.mockResolvedValue([{ idTarea: 8 }]);
+    events.projectIdsForUser.mockResolvedValueOnce([10]).mockResolvedValueOnce([10]);
+    prisma.tarea.findMany.mockResolvedValue([
+      { idTarea: 8, tituloTarea: 'Informe', estadoTarea: 'EN_PROGRESO', prioridad: 'ALTA', fechaLimite: new Date('2026-10-03'), proyecto: { idProyecto: 10, tituloProyecto: 'Común' } },
+    ]);
 
     const resultado = await service.agendaCompartida(
       VIEWER_ID,
@@ -134,12 +137,18 @@ describe('CalendarSharesService.agendaCompartida (HU-184)', () => {
       '2026-10-08T06:00:00.000Z',
     );
 
-    expect(resultado).toEqual({ eventos: [{ idEvento: 5 }], tareas: [{ idTarea: 8 }] });
-    expect(events.findForUserInRange).toHaveBeenCalledWith(
-      OWNER_ID,
-      '2026-10-01T06:00:00.000Z',
-      '2026-10-08T06:00:00.000Z',
-    );
+    expect(resultado.eventos).toEqual([{ idEvento: 5 }]);
+    expect(resultado.tareas).toEqual([
+      {
+        idTarea: 8,
+        fechaLimite: new Date('2026-10-03'),
+        visibilidad: 'DETALLE',
+        tituloTarea: 'Informe',
+        estadoTarea: 'EN_PROGRESO',
+        prioridad: 'ALTA',
+        proyecto: { idProyecto: 10, tituloProyecto: 'Común' },
+      },
+    ]);
     expect(prisma.tarea.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -149,5 +158,68 @@ describe('CalendarSharesService.agendaCompartida (HU-184)', () => {
         }),
       }),
     );
+  });
+});
+
+describe('CalendarSharesService — tareas compartidas por participación vigente (G01-C03, UI-01/B-02)', () => {
+  const RANGO = ['2026-10-01T06:00:00.000Z', '2026-10-08T06:00:00.000Z'] as const;
+  const tarea = (overrides: Record<string, unknown> = {}) => ({
+    idTarea: 8,
+    tituloTarea: 'SECRETO-tarea',
+    estadoTarea: 'POR_HACER',
+    prioridad: 'MEDIA',
+    fechaLimite: new Date('2026-10-03'),
+    proyecto: { idProyecto: 10, tituloProyecto: 'SECRETO-proyecto' },
+    ...overrides,
+  });
+
+  it('solo consulta tareas de proyectos donde el propietario es líder o participante ACTIVO hoy', async () => {
+    const { prisma, events, service } = makeDeps();
+    prisma.calendarioCompartido.findFirst.mockResolvedValue({ idCalendarioCompartido: 1 });
+    events.findForUserInRange.mockResolvedValue([]);
+    events.projectIdsForUser.mockResolvedValueOnce([10, 11]).mockResolvedValueOnce([10]);
+    prisma.tarea.findMany.mockResolvedValue([]);
+
+    await service.agendaCompartida(VIEWER_ID, OWNER_ID, ...RANGO);
+
+    expect(events.projectIdsForUser).toHaveBeenNthCalledWith(1, OWNER_ID);
+    expect(events.projectIdsForUser).toHaveBeenNthCalledWith(2, VIEWER_ID);
+    const where = prisma.tarea.findMany.mock.calls[0][0].where;
+    expect(where.proyecto).toEqual({ eliminadoEn: null, idProyecto: { in: [10, 11] } });
+    expect(where.asignaciones).toEqual({ some: { idUsuario: OWNER_ID } });
+    expect(where.eliminadoEn).toBeNull();
+  });
+
+  it('propietario retirado de todos sus proyectos: sin tareas y sin consultar la tabla', async () => {
+    const { prisma, events, service } = makeDeps();
+    prisma.calendarioCompartido.findFirst.mockResolvedValue({ idCalendarioCompartido: 1 });
+    events.findForUserInRange.mockResolvedValue([]);
+    events.projectIdsForUser.mockResolvedValueOnce([]).mockResolvedValueOnce([10]);
+
+    const resultado = await service.agendaCompartida(VIEWER_ID, OWNER_ID, ...RANGO);
+
+    expect(resultado.tareas).toEqual([]);
+    expect(prisma.tarea.findMany).not.toHaveBeenCalled();
+  });
+
+  it('a un destinatario ajeno al proyecto no se le envía título, estado ni proyecto de la tarea', async () => {
+    const { prisma, events, service } = makeDeps();
+    prisma.calendarioCompartido.findFirst.mockResolvedValue({ idCalendarioCompartido: 1 });
+    events.findForUserInRange.mockResolvedValue([]);
+    events.projectIdsForUser.mockResolvedValueOnce([10]).mockResolvedValueOnce([99]);
+    prisma.tarea.findMany.mockResolvedValue([tarea()]);
+
+    const resultado = await service.agendaCompartida(VIEWER_ID, OWNER_ID, ...RANGO);
+
+    expect(resultado.tareas).toEqual([{ idTarea: 8, fechaLimite: new Date('2026-10-03'), visibilidad: 'OCUPADO' }]);
+    expect(JSON.stringify(resultado.tareas)).not.toContain('SECRETO');
+  });
+
+  it('proyectarTareaCompartida copia campo por campo y nunca columnas ajenas al contrato', () => {
+    const fila = { ...tarea(), descripcionTarea: 'SECRETO-descripcion', idSprint: 4, idHito: 2 } as unknown as Parameters<typeof proyectarTareaCompartida>[0];
+    const conDetalle = proyectarTareaCompartida(fila, true);
+    expect(Object.keys(conDetalle).sort()).toEqual(['estadoTarea', 'fechaLimite', 'idTarea', 'prioridad', 'proyecto', 'tituloTarea', 'visibilidad']);
+    expect(JSON.stringify(conDetalle)).not.toContain('SECRETO-descripcion');
+    expect(Object.keys(proyectarTareaCompartida(fila, false)).sort()).toEqual(['fechaLimite', 'idTarea', 'visibilidad']);
   });
 });

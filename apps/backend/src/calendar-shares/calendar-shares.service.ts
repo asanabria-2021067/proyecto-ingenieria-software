@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type EstadoTarea, type Prioridad } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventsService } from '../events/events.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -12,6 +12,48 @@ const USUARIO_RESUMEN = {
   correo: true,
   fotoUrl: true,
 } as const;
+
+/** G01 (UI-01): única `select` de una tarea vista desde un calendario compartido. */
+const TAREA_SHARED_SELECT = {
+  idTarea: true,
+  tituloTarea: true,
+  estadoTarea: true,
+  prioridad: true,
+  fechaLimite: true,
+  proyecto: { select: { idProyecto: true, tituloProyecto: true } },
+} as const satisfies Prisma.TareaSelect;
+
+type TareaCompartidaFila = Prisma.TareaGetPayload<{ select: typeof TAREA_SHARED_SELECT }>;
+
+/** Contrato de una fecha límite en la agenda compartida (misma política que EventoCompartido). */
+export type TareaCompartida =
+  | {
+      idTarea: number;
+      fechaLimite: Date;
+      visibilidad: 'DETALLE';
+      tituloTarea: string;
+      estadoTarea: EstadoTarea;
+      prioridad: Prioridad;
+      proyecto: { idProyecto: number; tituloProyecto: string };
+    }
+  | { idTarea: number; fechaLimite: Date; visibilidad: 'OCUPADO' };
+
+/** Allowlist campo por campo: nunca se copia la fila por spread. */
+export function proyectarTareaCompartida(fila: TareaCompartidaFila, puedeVerDetalle: boolean): TareaCompartida {
+  // fechaLimite es obligatoria en la consulta (filtro gte/lte): nunca llega null.
+  const base = { idTarea: fila.idTarea, fechaLimite: fila.fechaLimite as Date };
+  if (!puedeVerDetalle) {
+    return { ...base, visibilidad: 'OCUPADO' };
+  }
+  return {
+    ...base,
+    visibilidad: 'DETALLE',
+    tituloTarea: fila.tituloTarea,
+    estadoTarea: fila.estadoTarea,
+    prioridad: fila.prioridad,
+    proyecto: { idProyecto: fila.proyecto.idProyecto, tituloProyecto: fila.proyecto.tituloProyecto },
+  };
+}
 
 /**
  * HU-184: compartir el calendario propio (eventos de mis proyectos y fechas
@@ -96,27 +138,43 @@ export class CalendarSharesService {
 
     const [eventos, tareas] = await Promise.all([
       this.events.findForUserInRange(idPropietario, desde, hasta),
-      this.prisma.tarea.findMany({
-        where: {
-          eliminadoEn: null,
-          estadoTarea: { not: 'HECHO' },
-          // fechaLimite es @db.Date (medianoche UTC): se compara por día, no por instante.
-          fechaLimite: { gte: new Date(desde.slice(0, 10)), lte: new Date(hasta.slice(0, 10)) },
-          asignaciones: { some: { idUsuario: idPropietario } },
-          proyecto: { eliminadoEn: null },
-        },
-        select: {
-          idTarea: true,
-          tituloTarea: true,
-          estadoTarea: true,
-          prioridad: true,
-          fechaLimite: true,
-          proyecto: { select: { idProyecto: true, tituloProyecto: true } },
-        },
-        orderBy: { fechaLimite: 'asc' },
-      }),
+      this.tareasCompartidas(idPropietario, userId, desde, hasta),
     ]);
     return { eventos, tareas };
+  }
+
+  /**
+   * G01 (UI-01, B-02): fechas límite del propietario solo en proyectos donde
+   * hoy es líder o participante ACTIVO (una asignación vieja no da acceso), y
+   * con la misma política que los eventos: detalle solo si quien mira tiene
+   * acceso propio al proyecto; si no, OCUPADO sin título ni proyecto.
+   */
+  private async tareasCompartidas(
+    idPropietario: number,
+    idReceptor: number,
+    desde: string,
+    hasta: string,
+  ): Promise<TareaCompartida[]> {
+    const [idsPropietario, idsReceptor] = await Promise.all([
+      this.events.projectIdsForUser(idPropietario),
+      this.events.projectIdsForUser(idReceptor),
+    ]);
+    if (idsPropietario.length === 0) return [];
+
+    const filas = await this.prisma.tarea.findMany({
+      where: {
+        eliminadoEn: null,
+        estadoTarea: { not: 'HECHO' },
+        // fechaLimite es @db.Date (medianoche UTC): se compara por día, no por instante.
+        fechaLimite: { gte: new Date(desde.slice(0, 10)), lte: new Date(hasta.slice(0, 10)) },
+        asignaciones: { some: { idUsuario: idPropietario } },
+        proyecto: { eliminadoEn: null, idProyecto: { in: idsPropietario } },
+      },
+      select: TAREA_SHARED_SELECT,
+      orderBy: { fechaLimite: 'asc' },
+    });
+    const comunes = new Set(idsReceptor);
+    return filas.map((fila) => proyectarTareaCompartida(fila, comunes.has(fila.proyecto.idProyecto)));
   }
 
   /** La notificación es un efecto secundario: si falla, compartir ya quedó hecho. */
