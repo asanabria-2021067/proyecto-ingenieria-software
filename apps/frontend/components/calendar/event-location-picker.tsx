@@ -81,6 +81,8 @@ export interface EventLocationPickerProps {
   id?: string;
   'aria-describedby'?: string;
   'aria-invalid'?: boolean | 'true' | 'false';
+  /** G03 (UI-30): el lugar es obligatorio en presencial/híbrida; se anuncia en el input. */
+  'aria-required'?: boolean;
   /** Para enfocar el input cuando la ubicación es el único campo inválido. */
   inputRef?: Ref<HTMLInputElement>;
 }
@@ -100,6 +102,7 @@ export default function EventLocationPicker({
   id,
   'aria-describedby': ariaDescribedBy,
   'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
   inputRef,
 }: EventLocationPickerProps) {
   const [results, setResults] = useState<NominatimResult[]>([]);
@@ -142,6 +145,7 @@ export default function EventLocationPicker({
           id={id}
           aria-describedby={ariaDescribedBy}
           aria-invalid={ariaInvalid}
+          aria-required={ariaRequired}
           value={nombre}
           disabled={disabled}
           maxLength={MAX_NOMBRE_LUGAR}

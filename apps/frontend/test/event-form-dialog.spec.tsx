@@ -746,3 +746,82 @@ describe('EventFormDialog — modalidad accesible por teclado (G03-C12, UI-08)',
     await waitFor(() => expect(radio('Presencial')).toBeDisabled());
   });
 });
+
+describe('EventFormDialog — etiquetas, foco en campos no nativos y obligatoriedad (G03-C14, UI-08/UI-09/UI-30)', () => {
+  it('sin proyecto elegido, el foco va al selector de proyecto (trigger de Radix) y su mensaje queda asociado', async () => {
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} />, { wrapper });
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    const mensaje = await screen.findByText('Selecciona un proyecto.');
+    const trigger = screen.getByRole('combobox', { name: 'Proyecto' });
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(trigger).toHaveAttribute('aria-invalid', 'true');
+    expect(trigger.getAttribute('aria-describedby')).toContain(mensaje.id);
+    expect(eventsMock.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('con una fecha inválida, el foco va al trigger del DatePicker (no a "Agendar") y su error queda asociado', async () => {
+    // Un Controller de react-hook-form no admite `undefined`, así que la fecha no
+    // puede vaciarse desde el picker; una fecha corrupta en el evento sí la invalida.
+    eventsMock.updateEvent.mockResolvedValueOnce(evento());
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={evento({ fechaInicio: 'fecha-rota' })} />, { wrapper });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    const trigger = screen.getByLabelText('Fecha');
+    await waitFor(() => expect(trigger).toHaveAttribute('aria-invalid', 'true'));
+    await waitFor(() => expect(trigger).toHaveFocus());
+    const mensaje = document.getElementById(trigger.getAttribute('aria-describedby')!.split(' ').pop()!);
+    expect(mensaje).not.toBeNull();
+    expect(mensaje).toHaveTextContent(/./);
+    expect(eventsMock.updateEvent).not.toHaveBeenCalled();
+  });
+
+  it('los campos obligatorios se anuncian con aria-required según la modalidad; la descripción no', () => {
+    renderCrear();
+    for (const etiqueta of ['Título del evento o actividad', 'Proyecto', 'Fecha', 'Hora de inicio', 'Hora de fin', 'Enlace de conexión virtual']) {
+      expect(screen.getByLabelText(etiqueta)).toHaveAttribute('aria-required', 'true');
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar descripción' }));
+    expect(screen.getByLabelText('Descripción (opcional)')).not.toHaveAttribute('aria-required');
+
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).getByRole('radio', { name: 'Presencial' }));
+    expect(screen.getByLabelText('Ubicación presencial')).toHaveAttribute('aria-required', 'true');
+    expect(screen.queryByLabelText('Enlace de conexión virtual')).not.toBeInTheDocument();
+  });
+
+  it('no quedan etiquetas huérfanas: cada FormLabel con htmlFor apunta a un control existente y la modalidad se nombra por aria-labelledby', () => {
+    renderCrear();
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).getByRole('radio', { name: 'Híbrida' }));
+    const labels = Array.from(screen.getByRole('dialog').querySelectorAll('label[for]'));
+    expect(labels.length).toBeGreaterThan(5);
+    for (const label of labels) {
+      expect(document.getElementById(label.getAttribute('for')!)).not.toBeNull();
+    }
+    expect(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).toHaveAttribute('aria-labelledby');
+  });
+
+  it('un enlace inválido se anuncia junto al campo (aria-invalid y aria-describedby) y recibe el foco', async () => {
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    const mensaje = await screen.findByText('El link debe empezar con http:// o https://.');
+    const input = screen.getByLabelText('Enlace de conexión virtual');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input.getAttribute('aria-describedby')).toContain(mensaje.id);
+    await waitFor(() => expect(input).toHaveFocus());
+  });
+
+  it('si fallan proyecto y ubicación a la vez, el foco va al proyecto (primer campo), no a la ubicación', async () => {
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} />, { wrapper });
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).getByRole('radio', { name: 'Presencial' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    await screen.findByText('Marca la ubicación de la sesión en el mapa.');
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Proyecto' })).toHaveFocus());
+  });
+});

@@ -211,17 +211,14 @@ export function EventFormDialog({
 
   // Con el formulario largo (sobre todo en móvil) el campo con error puede
   // quedar fuera de vista: el aviso dice que hay algo que corregir.
-  // G02 (UI-09): react-hook-form enfoca solo campos nativos; si lo único
-  // inválido es la ubicación (sin ref registrada), se enfoca su input a mano.
+  // G02/G03 (UI-09): react-hook-form enfoca el primer campo inválido con ref
+  // registrada (inputs nativos y, desde G03-C14, los triggers de Select y
+  // DatePicker). La ubicación no tiene ref de formulario: si es lo único
+  // inválido, se enfoca su input a mano.
   const onInvalid = (errores: FieldErrors<EventFormValues>) => {
     aviso.advertencia('Revisa los campos marcados', 'Hay datos del evento que faltan o no son válidos.');
-    const soloUbicacion =
-      (errores.ubicacionLat || errores.ubicacionNombre) &&
-      !errores.tituloEvento &&
-      !errores.descripcionEvento &&
-      !errores.horaInicio &&
-      !errores.horaFin &&
-      !errores.linkSesion;
+    const claves = Object.keys(errores).filter((k) => k !== 'root');
+    const soloUbicacion = claves.length > 0 && claves.every((k) => k === 'ubicacionLat' || k === 'ubicacionNombre');
     if (soloUbicacion) ubicacionInputRef.current?.focus();
   };
 
@@ -272,6 +269,7 @@ export function EventFormDialog({
                       <Input
                         {...field}
                         maxLength={200}
+                        aria-required
                         disabled={isPending}
                         placeholder="Ej. Tutoría de Algoritmos y Estructura de Datos"
                         className="h-10 rounded-md border-outline-variant bg-surface-container-low text-sm"
@@ -323,7 +321,8 @@ export function EventFormDialog({
                       <FormLabel className={LABEL_CLASS}>Tipo de actividad</FormLabel>
                       <Select value={field.value} onValueChange={(v) => field.onChange(v as TipoEvento)} disabled={isPending}>
                         <FormControl>
-                          <SelectTrigger className="h-10 w-full border-outline-variant bg-surface-container-low">
+                          {/* G03 (UI-09): con la ref del campo, react-hook-form puede enfocar el trigger si queda inválido. */}
+                          <SelectTrigger ref={field.ref} aria-required className="h-10 w-full border-outline-variant bg-surface-container-low">
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
@@ -364,7 +363,7 @@ export function EventFormDialog({
                         disabled={isPending || isEditing}
                       >
                         <FormControl>
-                          <SelectTrigger className="h-10 w-full border-outline-variant bg-surface-container-low">
+                          <SelectTrigger ref={field.ref} aria-required className="h-10 w-full border-outline-variant bg-surface-container-low">
                             <SelectValue placeholder="Selecciona un proyecto que lideras" />
                           </SelectTrigger>
                         </FormControl>
@@ -392,6 +391,8 @@ export function EventFormDialog({
                         <FormLabel className="text-xs font-medium text-on-surface-variant">Fecha</FormLabel>
                         <FormControl>
                           <DatePicker
+                            ref={field.ref}
+                            aria-required
                             value={field.value}
                             onChange={(date) => {
                               field.onChange(date);
@@ -420,6 +421,7 @@ export function EventFormDialog({
                             {...field}
                             type="time"
                             step={300}
+                            aria-required
                             disabled={isPending}
                             className="h-10 rounded-md border-outline-variant bg-surface-container-lowest text-sm"
                           />
@@ -446,6 +448,7 @@ export function EventFormDialog({
                             {...field}
                             type="time"
                             step={300}
+                            aria-required
                             disabled={isPending}
                             className="h-10 rounded-md border-outline-variant bg-surface-container-lowest text-sm"
                           />
@@ -485,6 +488,8 @@ export function EventFormDialog({
                           <FormLabel className="sr-only">Fecha de fin</FormLabel>
                           <FormControl>
                             <DatePicker
+                              ref={field.ref}
+                              aria-required
                               value={field.value}
                               onChange={field.onChange}
                               disabledBefore={fecha}
@@ -575,6 +580,7 @@ export function EventFormDialog({
                                 type="url"
                                 inputMode="url"
                                 maxLength={500}
+                                aria-required
                                 disabled={isPending}
                                 placeholder="https://meet.google.com/..."
                                 className="h-10 rounded-md border-outline-variant bg-surface-container-lowest pl-9 text-sm"
@@ -606,6 +612,7 @@ export function EventFormDialog({
                           <FormControl>
                             <EventLocationPicker
                               inputRef={ubicacionInputRef}
+                              aria-required
                               lat={form.watch('ubicacionLat')}
                               lng={form.watch('ubicacionLng')}
                               nombre={form.watch('ubicacionNombre')}
