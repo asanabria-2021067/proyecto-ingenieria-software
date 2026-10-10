@@ -36,6 +36,7 @@ function ChipTodoElDia({ item, onSelectEvento }: { item: AgendaItem; onSelectEve
     return (
       <button
         type="button"
+        data-evento-key={agendaItemKey(item)}
         onClick={() => onSelectEvento(item)}
         className={`w-full truncate rounded-control border-l-4 px-1.5 py-0.5 text-left text-[11px] font-semibold ${tono.bloque} ${tono.borde}`}
       >
@@ -238,6 +239,8 @@ export function TimeGridView({
                     <button
                       key={agendaItemKey(item)}
                       type="button"
+                      // G03 (UI-10): clave estable para devolver el foco al cerrar el detalle.
+                      data-evento-key={agendaItemKey(item)}
                       onClick={() => onSelectEvento(item)}
                       aria-label={`${item.titulo}, ${item.horaInicio} a ${item.horaFin}${
                         // G02 (UI-05): un tramo que termina a las 00:00 lo hace ya en la fecha siguiente.

@@ -39,6 +39,20 @@ function textoRecordatorio(minutos: number): string {
   return RECORDATORIO_OPTIONS.find((opt) => opt.value === minutos)?.label ?? `${minutos} minutos antes`;
 }
 
+/**
+ * G03 (UI-10): el elemento que abrió el detalle se identifica por su
+ * `data-evento-key` (clave estable de la agenda, nunca el título) y se busca
+ * al cerrar, así que sobrevive a los re-renders de la cuadrícula. Si ya no
+ * existe (cambió el rango), Radix sigue su comportamiento por defecto.
+ */
+export function enfocarDisparador(claveEvento: string | null | undefined): boolean {
+  if (!claveEvento || !/^[\w-]+$/.test(claveEvento)) return false;
+  const el = document.querySelector<HTMLElement>(`[data-evento-key="${claveEvento}"]`);
+  if (!el) return false;
+  el.focus();
+  return document.activeElement === el;
+}
+
 function Fila({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-3">
@@ -64,11 +78,13 @@ function DetalleCompartido({
   open,
   onOpenChange,
   compartidoPor,
+  restaurarFocoA,
 }: {
   evento: EventoCompartidoDTO;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   compartidoPor: { nombre: string } | null;
+  restaurarFocoA?: string | null;
 }) {
   const detalle = evento.visibilidad === 'DETALLE' ? evento : null;
   const tipo = detalle ? TIPO_EVENTO_ESTILO[detalle.tipoEvento] : null;
@@ -78,7 +94,10 @@ function DetalleCompartido({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[520px]">
+      <DialogContent
+        onCloseAutoFocus={(e) => enfocarDisparador(restaurarFocoA) && e.preventDefault()}
+        className="flex max-h-[90dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[520px]"
+      >
         <DialogHeader className="shrink-0 gap-2 border-b border-outline-variant/35 px-4 pb-4 pt-5 pr-12 text-left sm:px-6">
           {tipo && estilo && (
             <div className="flex flex-wrap gap-tight">
@@ -143,6 +162,7 @@ export function EventDetailDialog({
   editable,
   onEditar,
   compartidoPor = null,
+  restaurarFocoA = null,
 }: {
   evento: MiEventoDTO | EventoCompartidoDTO | null;
   open: boolean;
@@ -152,6 +172,8 @@ export function EventDetailDialog({
   onEditar: (evento: MiEventoDTO) => void;
   /** HU-184: el evento viene del calendario que esta persona me compartió. */
   compartidoPor?: { nombre: string } | null;
+  /** G03 (UI-10): `data-evento-key` del bloque o fila que abrió el detalle; recibe el foco al cerrar. */
+  restaurarFocoA?: string | null;
 }) {
   const { cancelarEvento, isPending } = useCancelEvent();
   const compartido = eventoProp && 'visibilidad' in eventoProp ? eventoProp : null;
@@ -161,7 +183,7 @@ export function EventDetailDialog({
   const { members } = useProjectMembers(idProyectoEquipo);
 
   if (compartido) {
-    return <DetalleCompartido evento={compartido} open={open} onOpenChange={onOpenChange} compartidoPor={compartidoPor} />;
+    return <DetalleCompartido evento={compartido} open={open} onOpenChange={onOpenChange} compartidoPor={compartidoPor} restaurarFocoA={restaurarFocoA} />;
   }
   if (!propio) return null;
   const evento = propio;
@@ -185,7 +207,10 @@ export function EventDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
-      <DialogContent className="flex max-h-[90dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[520px]">
+      <DialogContent
+        onCloseAutoFocus={(e) => enfocarDisparador(restaurarFocoA) && e.preventDefault()}
+        className="flex max-h-[90dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[520px]"
+      >
         <DialogHeader className="shrink-0 gap-2 border-b border-outline-variant/35 px-4 pb-4 pt-5 pr-12 text-left sm:px-6">
           <div className="flex flex-wrap gap-tight">
             <span className={`pill inline-flex w-fit items-center gap-1 ${TONO_CLASES[tipo.tono].bloque}`}>

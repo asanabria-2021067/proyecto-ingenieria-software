@@ -447,3 +447,28 @@ describe('CalendarioPage — selector Día/Semana/Mes accesible (G03-C13, UI-08)
     expect(celdaMes(20, 'octubre')).toHaveAttribute('aria-pressed', 'false');
   });
 });
+
+describe('CalendarioPage — foco tras Detalle → Editar → Cancelar (G03-C15, UI-10/D-17)', () => {
+  it('tras cerrar el detalle con Escape, y tras Detalle → Editar → Cancelar, el foco vuelve al bloque del evento', async () => {
+    projectsMock.getMyProjects.mockResolvedValue([{ idProyecto: 1, tituloProyecto: 'Proyecto Uno', tipoProyecto: 'BECA', estadoProyecto: 'ACTIVO' }]);
+    eventsMock.getMisEventos.mockResolvedValue([eventoDTO()]);
+    await renderPage();
+    const bloque = (await screen.findAllByRole('button', { name: /^Reunión semanal, 09:00 a 10:00/ }))[0];
+
+    fireEvent.click(bloque);
+    let detalle = await screen.findByRole('dialog', { name: 'Reunión semanal' });
+    fireEvent.keyDown(detalle, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(bloque).toHaveFocus();
+
+    fireEvent.click(bloque);
+    detalle = await screen.findByRole('dialog', { name: 'Reunión semanal' });
+    fireEvent.click(within(detalle).getByRole('button', { name: /Editar evento/ }));
+    const formulario = await screen.findByRole('dialog', { name: 'Editar evento' });
+    await waitFor(() => expect(formulario.contains(document.activeElement)).toBe(true));
+    fireEvent.click(within(formulario).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(document.activeElement).not.toBe(document.body);
+    expect(bloque).toHaveFocus();
+  });
+});

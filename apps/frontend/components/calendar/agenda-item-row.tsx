@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
-import type { AgendaItem } from '@/lib/calendar/agenda';
+import { agendaItemKey, type AgendaItem } from '@/lib/calendar/agenda';
 import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
 import { TIPO_EVENTO_ESTILO, TONO_CLASES } from '@/lib/calendar/paleta';
 import { tonoDeEvento } from '@/lib/calendar/time-grid';
@@ -83,6 +83,8 @@ export function AgendaItemRow({
   return (
     <button
       type="button"
+      // G03 (UI-10): clave estable para devolver el foco al cerrar el detalle.
+      data-evento-key={agendaItemKey(item)}
       onClick={() => onSelectEvento?.(item)}
       className={`flex w-full flex-wrap items-center gap-3 rounded-xl border-l-4 bg-surface-container-low px-4 py-3 text-left transition-colors hover:bg-surface-container ${tono.borde}`}
     >

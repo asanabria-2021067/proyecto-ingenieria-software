@@ -167,6 +167,8 @@ export default function CalendarioPage() {
     { evento: MiEventoDTO; compartidoPor: null } | { evento: EventoCompartidoDTO; compartidoPor: OrigenCompartido } | null
   >(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  // G03 (UI-10): clave (data-evento-key) del bloque o fila que abrió el detalle, para devolverle el foco al cerrar.
+  const [claveDisparador, setClaveDisparador] = useState<string | null>(null);
 
   // localStorage solo existe en el navegador: se lee después de montar.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -343,6 +345,7 @@ export default function CalendarioPage() {
   const isError = isErrorTareas || isErrorEventos;
 
   const handleSelectEvento = (item: EventoItem) => {
+    setClaveDisparador(agendaItemKey(item));
     if (item.compartidoPor) {
       const compartido = eventosCompartidos.get(`${item.compartidoPor.idUsuario}-${item.id}`);
       if (!compartido) return;
@@ -362,6 +365,8 @@ export default function CalendarioPage() {
   };
 
   const handleNuevoEvento = () => {
+    // Abierto desde "Agendar actividad": el foco vuelve a ese botón (comportamiento de Radix), no a un bloque.
+    setClaveDisparador(null);
     setEditingEvent(null);
     setDialogOpen(true);
   };
@@ -686,6 +691,7 @@ export default function CalendarioPage() {
         editable={detalle !== null && detalle.compartidoPor === null && ledProjectIds.has(detalle.evento.idProyecto)}
         compartidoPor={detalle?.compartidoPor ?? null}
         onEditar={handleEditarDesdeDetalle}
+        restaurarFocoA={claveDisparador}
       />
 
       <EventFormDialog
@@ -699,6 +705,7 @@ export default function CalendarioPage() {
         editingEvent={editingEvent}
         defaultProjectId={misProyectos[0]?.idProyecto}
         initialDate={initialDateParaNuevoEvento}
+        restaurarFocoA={claveDisparador}
       />
 
       <ShareCalendarDialog open={shareOpen} onOpenChange={setShareOpen} />

@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mensajesMock = vi.hoisted(() => ({
@@ -16,7 +16,7 @@ vi.mock('../lib/services/events', () => eventsMock);
 const membersMock = vi.hoisted(() => ({ useProjectMembers: vi.fn() }));
 vi.mock('../hooks/use-project-members', () => membersMock);
 
-import { EventDetailDialog, formatRangoEvento } from '../components/calendar/event-detail-dialog';
+import { EventDetailDialog, enfocarDisparador, formatRangoEvento } from '../components/calendar/event-detail-dialog';
 import type { MiEventoDTO } from '../lib/services/events';
 import type { EventoCompartidoDTO } from '../lib/services/calendar-shares';
 
@@ -226,5 +226,77 @@ describe('EventDetailDialog (HU-184 T-324)', () => {
     expect(container.querySelector('.pill')).toBeNull();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Editar|Eliminar/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('EventDetailDialog — el foco vuelve a quien abrió el detalle (G03-C15, UI-10/D-17)', () => {
+  const CLAVE = 'evento-7-2026-10-08-yo';
+
+  function Escenario({ compartido = false }: { compartido?: boolean }) {
+    const [open, setOpen] = useState(false);
+    const [clave, setClave] = useState<string | null>(null);
+    const dto: MiEventoDTO | EventoCompartidoDTO = compartido
+      ? { idEvento: 7, fechaInicio: evento().fechaInicio, fechaFin: evento().fechaFin, visibilidad: 'OCUPADO' }
+      : evento();
+    return (
+      <>
+        <button
+          type="button"
+          data-evento-key={CLAVE}
+          onClick={() => {
+            setClave(CLAVE);
+            setOpen(true);
+          }}
+        >
+          Bloque del evento
+        </button>
+        <EventDetailDialog
+          evento={dto}
+          open={open}
+          onOpenChange={setOpen}
+          editable={false}
+          onEditar={vi.fn()}
+          compartidoPor={compartido ? { nombre: 'Luis Hernández' } : null}
+          restaurarFocoA={clave}
+        />
+      </>
+    );
+  }
+
+  it.each([
+    ['Escape', (dialogo: HTMLElement) => fireEvent.keyDown(dialogo, { key: 'Escape' })],
+    ['la X', (dialogo: HTMLElement) => fireEvent.click(within(dialogo).getByRole('button', { name: 'Close' }))],
+  ])('al cerrar con %s el foco regresa al bloque que lo abrió (no a <body>)', async (_nombre, cerrar) => {
+    render(<Escenario />, { wrapper });
+    const bloque = screen.getByRole('button', { name: 'Bloque del evento' });
+    bloque.focus();
+    fireEvent.click(bloque);
+    const dialogo = await screen.findByRole('dialog');
+    await waitFor(() => expect(dialogo.contains(document.activeElement)).toBe(true));
+
+    cerrar(dialogo);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(bloque).toHaveFocus();
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it('un detalle compartido (OCUPADO) también devuelve el foco al bloque', async () => {
+    render(<Escenario compartido />, { wrapper });
+    const bloque = screen.getByRole('button', { name: 'Bloque del evento' });
+    fireEvent.click(bloque);
+    const dialogo = await screen.findByRole('dialog', { name: 'Ocupado' });
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Cerrar' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(bloque).toHaveFocus();
+  });
+
+  it('enfocarDisparador busca por clave estable, nunca por título, y rechaza claves con caracteres de selector', () => {
+    const { unmount } = render(<button type="button" data-evento-key="evento-9-2026-10-09-yo">Taller</button>);
+    expect(enfocarDisparador('evento-9-2026-10-09-yo')).toBe(true);
+    expect(document.activeElement).toHaveTextContent('Taller');
+    expect(enfocarDisparador('evento-99-2026-10-09-yo')).toBe(false);
+    expect(enfocarDisparador('"] [data-x="')).toBe(false);
+    expect(enfocarDisparador(null)).toBe(false);
+    unmount();
   });
 });

@@ -115,6 +115,7 @@ export function WeekView({
                   <button
                     key={agendaItemKey(item)}
                     type="button"
+                    data-evento-key={agendaItemKey(item)}
                     onClick={() => onSelectEvento(item)}
                     className="flex items-start gap-1.5 rounded-control bg-surface-container-low px-1.5 py-1 text-left transition-colors hover:bg-surface-container"
                   >
