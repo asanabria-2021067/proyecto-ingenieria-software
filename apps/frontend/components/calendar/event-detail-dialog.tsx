@@ -53,6 +53,18 @@ export function enfocarDisparador(claveEvento: string | null | undefined): boole
   return document.activeElement === el;
 }
 
+/**
+ * G04-R01 (G03-OBS-01): los diálogos de la barra ("Agendar actividad",
+ * "Compartir agenda") se abren por estado, sin `DialogTrigger`, así que Radix
+ * no sabe a quién devolver el foco y lo dejaba en <body>. El botón que los
+ * abrió llega por ref; si ya no está en el documento, no se hace nada.
+ */
+export function enfocarElemento(el: HTMLElement | null | undefined): boolean {
+  if (!el?.isConnected) return false;
+  el.focus();
+  return document.activeElement === el;
+}
+
 function Fila({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-3">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, Check, Loader2, Search, Share2, UserMinus } from 'lucide-react';
 import {
@@ -23,6 +23,7 @@ import { aviso } from '@/lib/mensajes';
 import { buscarUsuarios } from '@/lib/services/social';
 import type { UsuarioResumenDto } from '@/lib/types/social';
 import { iniciales } from './invitados-field';
+import { enfocarElemento } from './event-detail-dialog';
 
 /** Mínimo de letras para consultar (`buscarUsuarios` ignora consultas más cortas). */
 export const MIN_BUSQUEDA = 2;
@@ -51,7 +52,16 @@ function Persona({ persona, detalle }: { persona: UsuarioResumenDto; detalle?: s
  * calendario. Dejar de compartir es reversible, así que no pide confirmación
  * (regla de docs/architecture/sprint8-mensajes.md); solo avisa el resultado.
  */
-export function ShareCalendarDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function ShareCalendarDialog({
+  open,
+  onOpenChange,
+  restaurarFocoEn,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** G04-R01: botón que abrió el diálogo; recupera el foco al cerrar. */
+  restaurarFocoEn?: RefObject<HTMLElement | null>;
+}) {
   const [texto, setTexto] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const { data: compartidos, isLoading: cargandoLista, isError: errorLista, refetch: recargarLista } = useCalendariosCompartidos();
@@ -101,7 +111,10 @@ export function ShareCalendarDialog({ open, onOpenChange }: { open: boolean; onO
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="flex max-h-[90dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[480px]">
+      <DialogContent
+        onCloseAutoFocus={(e) => enfocarElemento(restaurarFocoEn?.current) && e.preventDefault()}
+        className="flex max-h-[90dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[480px]"
+      >
         <DialogHeader className="shrink-0 flex-row items-start gap-3 space-y-0 border-b border-outline-variant/35 px-4 pb-4 pt-5 pr-12 text-left sm:px-6">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary text-on-primary">
             <Share2 className="size-5" aria-hidden="true" />

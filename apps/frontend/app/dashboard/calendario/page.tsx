@@ -253,6 +253,9 @@ export default function CalendarioPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   // G03 (UI-10): clave (data-evento-key) del bloque o fila que abrió el detalle, para devolverle el foco al cerrar.
   const [claveDisparador, setClaveDisparador] = useState<string | null>(null);
+  // G04-R01: botones de la barra que abren un diálogo; recuperan el foco cuando se cierra.
+  const botonAgendarRef = useRef<HTMLButtonElement>(null);
+  const botonCompartirRef = useRef<HTMLButtonElement>(null);
 
   // localStorage solo existe en el navegador y la clave depende de la cuenta:
   // se lee después de montar, cuando ya se sabe quién ha iniciado sesión.
@@ -472,7 +475,7 @@ export default function CalendarioPage() {
   };
 
   const handleNuevoEvento = () => {
-    // Abierto desde "Agendar actividad": el foco vuelve a ese botón (comportamiento de Radix), no a un bloque.
+    // Abierto desde "Agendar actividad": el foco vuelve a ese botón (botonAgendarRef), no a un bloque.
     setClaveDisparador(null);
     setEditingEvent(null);
     setDialogOpen(true);
@@ -562,6 +565,7 @@ export default function CalendarioPage() {
             </div>
           )}
           <Button
+            ref={botonCompartirRef}
             type="button"
             variant="outline"
             onClick={() => setShareOpen(true)}
@@ -572,6 +576,7 @@ export default function CalendarioPage() {
           </Button>
           {misProyectos.length > 0 && (
             <Button
+              ref={botonAgendarRef}
               type="button"
               onClick={handleNuevoEvento}
               className="h-9 gap-1.5 rounded-pill bg-primary px-4 text-xs font-bold text-on-primary hover:bg-primary/90"
@@ -825,9 +830,10 @@ export default function CalendarioPage() {
         defaultProjectId={misProyectos[0]?.idProyecto}
         initialDate={initialDateParaNuevoEvento}
         restaurarFocoA={claveDisparador}
+        restaurarFocoEn={editingEvent ? undefined : botonAgendarRef}
       />
 
-      <ShareCalendarDialog open={shareOpen} onOpenChange={setShareOpen} />
+      <ShareCalendarDialog open={shareOpen} onOpenChange={setShareOpen} restaurarFocoEn={botonCompartirRef} />
     </div>
   );
 }

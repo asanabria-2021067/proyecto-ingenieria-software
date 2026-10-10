@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import dynamic from 'next/dynamic';
 import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,7 +29,7 @@ import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
 import { TIPO_EVENTO_ESTILO, TIPOS_EVENTO_EN_ORDEN, TONO_CLASES } from '@/lib/calendar/paleta';
 import { createEvent, updateEvent, type EventoProyectoDTO, type ModalidadEvento, type TipoEvento } from '@/lib/services/events';
 import { DatePicker } from './date-picker';
-import { enfocarDisparador } from './event-detail-dialog';
+import { enfocarDisparador, enfocarElemento } from './event-detail-dialog';
 import { InvitadosField } from './invitados-field';
 import {
   MODALIDAD_OPTIONS,
@@ -103,6 +103,7 @@ export function EventFormDialog({
   defaultProjectId,
   initialDate,
   restaurarFocoA = null,
+  restaurarFocoEn,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -117,6 +118,8 @@ export function EventFormDialog({
    * del bloque original, al cancelar o guardar el foco vuelve a él.
    */
   restaurarFocoA?: string | null;
+  /** G04-R01: control que abrió el diálogo cuando no fue un bloque del calendario (botón de la barra). */
+  restaurarFocoEn?: RefObject<HTMLElement | null>;
 }) {
   const isEditing = Boolean(editingEvent);
   const [mostrarDescripcion, setMostrarDescripcion] = useState(false);
@@ -241,7 +244,7 @@ export function EventFormDialog({
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
       <DialogContent
-        onCloseAutoFocus={(e) => enfocarDisparador(restaurarFocoA) && e.preventDefault()}
+        onCloseAutoFocus={(e) => (enfocarDisparador(restaurarFocoA) || enfocarElemento(restaurarFocoEn?.current)) && e.preventDefault()}
         className="flex max-h-[92dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[600px]"
       >
         <Form {...form}>

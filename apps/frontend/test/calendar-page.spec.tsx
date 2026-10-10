@@ -508,6 +508,80 @@ describe('CalendarioPage — foco tras Detalle → Editar → Cancelar (G03-C15,
   });
 });
 
+describe('CalendarioPage — foco tras cerrar los diálogos de la barra (G04-R01, G03-OBS-01)', () => {
+  const PROYECTO = { idProyecto: 1, tituloProyecto: 'Proyecto Uno', tipoProyecto: 'BECA', estadoProyecto: 'ACTIVO' };
+  const sinDialogo = () => waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  const CASOS = [
+    { nombreBoton: 'Agendar actividad', titulo: 'Nuevo evento o sesión' },
+    { nombreBoton: 'Compartir agenda', titulo: 'Compartir mi agenda' },
+  ];
+
+  beforeEach(() => {
+    projectsMock.getMyProjects.mockResolvedValue([PROYECTO]);
+    eventsMock.getMisEventos.mockResolvedValue([eventoDTO()]);
+  });
+
+  it.each(CASOS)('$nombreBoton: Escape y el botón de cerrar devuelven el foco al botón, también al reabrir', async ({ nombreBoton, titulo }) => {
+    await renderPage();
+    const disparador = boton(nombreBoton);
+
+    fireEvent.click(disparador);
+    let dialogo = await screen.findByRole('dialog', { name: titulo });
+    await waitFor(() => expect(dialogo.contains(document.activeElement)).toBe(true));
+    fireEvent.keyDown(dialogo, { key: 'Escape' });
+    await sinDialogo();
+    expect(disparador).toHaveFocus();
+
+    fireEvent.click(disparador);
+    dialogo = await screen.findByRole('dialog', { name: titulo });
+    fireEvent.click(within(dialogo).getByRole('button', { name: /^(Close|Cerrar)$/ }));
+    await sinDialogo();
+    expect(disparador).toHaveFocus();
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it('"Agendar actividad": Cancelar devuelve el foco al botón', async () => {
+    await renderPage();
+    fireEvent.click(boton('Agendar actividad'));
+    const dialogo = await screen.findByRole('dialog', { name: 'Nuevo evento o sesión' });
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Cancelar' }));
+    await sinDialogo();
+    expect(boton('Agendar actividad')).toHaveFocus();
+  });
+
+  it.each(CASOS)('$nombreBoton: en StrictMode (montaje doble de efectos) el foco también vuelve', async ({ nombreBoton, titulo }) => {
+    render(
+      <StrictMode>
+        <CalendarioPage />
+      </StrictMode>,
+      { wrapper },
+    );
+    await waitFor(() => expect(screen.queryByText('Cargando tu calendario...')).not.toBeInTheDocument());
+    fireEvent.click(boton(nombreBoton));
+    fireEvent.keyDown(await screen.findByRole('dialog', { name: titulo }), { key: 'Escape' });
+    await sinDialogo();
+    expect(boton(nombreBoton)).toHaveFocus();
+  });
+
+  it('no roba el foco de un bloque: Detalle → Editar → Cancelar vuelve al evento aunque antes se haya usado la barra', async () => {
+    await renderPage();
+    fireEvent.click(boton('Agendar actividad'));
+    fireEvent.keyDown(await screen.findByRole('dialog', { name: 'Nuevo evento o sesión' }), { key: 'Escape' });
+    await sinDialogo();
+    expect(boton('Agendar actividad')).toHaveFocus();
+
+    const bloque = (await screen.findAllByRole('button', { name: /^Reunión semanal, 09:00 a 10:00/ }))[0];
+    fireEvent.click(bloque);
+    const detalle = await screen.findByRole('dialog', { name: 'Reunión semanal' });
+    fireEvent.click(within(detalle).getByRole('button', { name: /Editar evento/ }));
+    const formulario = await screen.findByRole('dialog', { name: 'Editar evento' });
+    fireEvent.click(within(formulario).getByRole('button', { name: 'Cancelar' }));
+    await sinDialogo();
+    expect(bloque).toHaveFocus();
+    expect(boton('Agendar actividad')).not.toHaveFocus();
+  });
+});
+
 describe('CalendarioPage — derivaciones memoizadas (G04-C02, UI-11)', () => {
   const recalculos = () => ({
     porDia: vi.mocked(groupAgendaItemsByDay).mock.calls.length,
