@@ -307,7 +307,7 @@ describe('ProjectSidebar — navegación agrupada y colapsable', () => {
       within(screen.getByRole('group', { name: 'Seguimiento' }))
         .getAllByRole('link')
         .map((l) => l.textContent),
-    ).toEqual(['Bitácora', 'Analítica', 'Reportes', 'Cierre']);
+    ).toEqual(['Bitácora', 'Asistencia', 'Analítica', 'Reportes', 'Cierre']);
   });
 
   it('el participante no recibe el grupo Equipo', () => {

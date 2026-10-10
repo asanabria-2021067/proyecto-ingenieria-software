@@ -58,6 +58,7 @@ describe('buildProjectNavGroups', () => {
         label: 'Seguimiento',
         items: [
           ['Bitácora', '/dashboard/proyectos/42/bitacora'],
+          ['Asistencia', '/dashboard/proyectos/42/asistencia'],
           ['Analítica', '/dashboard/proyectos/42/sprints/analytics'],
           ['Reportes', '/dashboard/proyectos/42/reportes'],
           ['Cierre', '/dashboard/projects/42/cierre'],
@@ -95,6 +96,7 @@ describe('buildProjectNavGroups', () => {
         label: 'Seguimiento',
         items: [
           ['Bitácora', '/dashboard/proyectos/42/bitacora'],
+          ['Asistencia', '/dashboard/proyectos/42/asistencia'],
           ['Analítica', '/dashboard/proyectos/42/sprints/analytics'],
         ],
       },
@@ -218,6 +220,7 @@ describe('flattenNavItems', () => {
       'Tablero',
       'Lista de tareas',
       'Bitácora',
+      'Asistencia',
       'Analítica',
     ]);
   });

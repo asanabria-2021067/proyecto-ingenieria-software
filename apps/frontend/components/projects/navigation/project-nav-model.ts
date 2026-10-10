@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  CalendarCheck,
   ClipboardCheck,
   Crown,
   FolderOutput,
@@ -135,6 +136,14 @@ export function buildProjectNavGroups(ctx: ProjectNavContext): ProjectNavGroup[]
   if (esMiembro) {
     seguimiento.push(
       { id: 'bitacora', href: `/dashboard/proyectos/${idProyecto}/bitacora`, label: 'Bitácora', icon: ScrollText },
+      // HU-177/T-298: el integrante consulta su asistencia; solo el líder la
+      // modifica (ACTIVIDAD_ASISTENCIA en el backend).
+      {
+        id: 'asistencia',
+        href: `/dashboard/proyectos/${idProyecto}/asistencia`,
+        label: 'Asistencia',
+        icon: CalendarCheck,
+      },
       // HU-143: la analítica es «líder o integrante», el mismo criterio que
       // aplica el backend (assertCanListSprintAnalytics).
       {
