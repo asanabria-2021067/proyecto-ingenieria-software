@@ -54,6 +54,8 @@ export function getNotificationLink(n: {
     // conteos) y se muestra como texto; datosJson nunca se renderiza.
     case 'ALERTA_SEGURIDAD':
       return '/dashboard/admin/usuarios';
+    case 'CUENTA_PENDIENTE_VERIFICACION':
+      return '/dashboard/admin/cuentas-pendientes';
     default:
       return null;
   }

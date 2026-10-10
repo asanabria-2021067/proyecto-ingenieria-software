@@ -496,7 +496,7 @@ export default function RegistroPage() {
                 {isPending && <Spinner />}
                 <AlertDescription>
                   {registroOk
-                    ? 'Cuenta creada. Redirigiendo…'
+                    ? 'Cuenta creada. Administración debe verificarla antes de que puedas iniciar sesión.'
                     : isError
                       ? mensajeError(error as (Error & { statusCode?: number }) | null)
                       : 'Creando tu cuenta…'}

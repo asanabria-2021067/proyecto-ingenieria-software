@@ -149,17 +149,46 @@ async function registerUser(ctx, label) {
   const suffix = randomBytes(4).toString('hex');
   const carne = String(randomBytes(4).readUInt32BE(0));
   const correo = `pru${carne}@uvg.edu.gt`;
+  const contrasena = `T14-sintetica-${suffix}`;
   const response = await request(ctx, 'POST', '/api/auth/register', {
-    body: { correo, contrasena: `T14-sintetica-${suffix}`, nombre: 'Sintetico', apellido: 'Prueba', carne, idCarrera: Number(ctx.carreraId), semestre: 1 },
+    body: { correo, contrasena, nombre: 'Sintetico', apellido: 'Prueba', carne, idCarrera: Number(ctx.carreraId), semestre: 1 },
   });
   if (response.status !== 201) {
     throw new Error(`registro ${label}: status ${response.status}`);
   }
-  const jar = cookiesFrom(response);
-  return { label, correo, carne, access: jar.access_token, refresh: jar.refresh_token, id: jwtSubject(jar.access_token) };
+  return { label, correo, carne, contrasena };
 }
 
 const cookieOf = (user) => `access_token=${encodeURIComponent(user.access)}`;
+
+const LOGIN_WINDOW_MS = 61_000;
+
+async function loginUser(ctx, user) {
+  const attempt = () => request(ctx, 'POST', '/api/auth/login', { body: { correo: user.correo, contrasena: user.contrasena } });
+  let response = await attempt();
+  if (response.status === 429) {
+    await new Promise((resolve) => setTimeout(resolve, LOGIN_WINDOW_MS));
+    response = await attempt();
+  }
+  if (response.status !== 201) {
+    throw new Error(`login ${user.label}: status ${response.status}`);
+  }
+  const jar = cookiesFrom(response);
+  return { ...user, access: jar.access_token, refresh: jar.refresh_token, id: jwtSubject(jar.access_token) };
+}
+
+async function approveUser(ctx, admin, user) {
+  const pending = json(await request(ctx, 'GET', '/api/admin/cuentas-pendientes', { cookie: cookieOf(admin) }));
+  const cuenta = (pending?.cuentas ?? []).find((c) => c?.correo === user.correo);
+  if (!cuenta) {
+    throw new Error(`aprobacion ${user.label}: la cuenta no aparece como pendiente`);
+  }
+  const response = await request(ctx, 'PATCH', `/api/admin/cuentas-pendientes/${cuenta.idUsuario}/aprobar`, { cookie: cookieOf(admin) });
+  if (response.status !== 200) {
+    throw new Error(`aprobacion ${user.label}: status ${response.status}`);
+  }
+  return loginUser(ctx, user);
+}
 
 // ─── Socket.IO sobre WebSocket ───────────────────────────────────────────────
 
@@ -280,15 +309,20 @@ export async function realtimeChecks(ctx) {
   check('T14-01', 'bundle same-origin sin :3001 ni IP de la API', [bundle.scanned || 'no se encontro el bundle realtime', ...bundleFindings(bundle.found)]);
 
   // Cuatro registros sinteticos: el limite de /auth/register es 5/min y T18 ya uso uno.
-  const owner = await registerUser(ctx, 'owner');
-  const member = await registerUser(ctx, 'member');
-  const outsider = await registerUser(ctx, 'outsider');
-  const admin = await registerUser(ctx, 'admin');
+  const ownerPendiente = await registerUser(ctx, 'owner');
+  const memberPendiente = await registerUser(ctx, 'member');
+  const outsiderPendiente = await registerUser(ctx, 'outsider');
+  const adminPendiente = await registerUser(ctx, 'admin');
   sql(
     ctx,
     `INSERT INTO rol_acceso (nombre_perfil) VALUES ('administrador') ON CONFLICT (nombre_perfil) DO NOTHING;` +
-      `INSERT INTO usuario_rol_acceso (id_usuario, id_rol_acceso) SELECT ${Number(admin.id)}, id_rol_acceso FROM rol_acceso WHERE nombre_perfil = 'administrador';`,
+      `INSERT INTO usuario_rol_acceso (id_usuario, id_rol_acceso) SELECT u.id_usuario, r.id_rol_acceso FROM usuario u, rol_acceso r WHERE u.correo = '${adminPendiente.correo}' AND r.nombre_perfil = 'administrador';` +
+      `UPDATE usuario SET estado = 'ACTIVO' WHERE correo = '${adminPendiente.correo}';`,
   );
+  const admin = await loginUser(ctx, adminPendiente);
+  const owner = await approveUser(ctx, admin, ownerPendiente);
+  const member = await approveUser(ctx, admin, memberPendiente);
+  const outsider = await approveUser(ctx, admin, outsiderPendiente);
   const idProyecto = Number(
     sql(
       ctx,

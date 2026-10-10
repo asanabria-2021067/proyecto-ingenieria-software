@@ -3,8 +3,10 @@ import { readRepoFile } from './helpers/workflow-yaml';
 // Las mismas funciones que ejecuta run-harness.sh contra nginx con TLS.
 import {
   EXPECTED_FRONTEND_HEADERS,
+  PENDING_ACCOUNT_MESSAGE,
   characterizeTls,
   verifyAuthCookies,
+  verifyPendingAccount,
   verifyFrontendHeaders,
   verifyHsts,
 } from '../../../infra/staging/characterize.mjs';
@@ -34,6 +36,30 @@ describe('G06-C08: T17/T18/T21 en el arnés TLS', () => {
 
   it('T18: cookies con Secure, HttpOnly, SameSite=Lax y Path=/ pasan', () => {
     expect(verifyAuthCookies(goodCookies)).toEqual([]);
+  });
+
+  it('T18: registro 201 sin cookies de sesión y login 403 con el mensaje de cuenta pendiente pasan', () => {
+    expect(
+      verifyPendingAccount({
+        registro: { status: 201 },
+        login: { status: 403, message: PENDING_ACCOUNT_MESSAGE },
+      }),
+    ).toEqual([]);
+  });
+
+  it('T18: un registro que emite cookies de sesión o un login que no responde 403 fallan', () => {
+    expect(
+      verifyPendingAccount({
+        registro: { status: 201, setCookies: goodCookies },
+        login: { status: 403, message: PENDING_ACCOUNT_MESSAGE },
+      }),
+    ).toEqual(['el registro emitio cookies de sesion: access_token,refresh_token']);
+    expect(
+      verifyPendingAccount({
+        registro: { status: 201 },
+        login: { status: 401, message: 'Credenciales invalidas' },
+      }),
+    ).toEqual(['login status 401 != 403', 'el login no devolvio el mensaje de cuenta pendiente']);
   });
 
   describe('fixtures negativos', () => {

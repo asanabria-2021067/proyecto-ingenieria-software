@@ -200,7 +200,7 @@ describe('AuthService — contenido del payload emitido', () => {
     }
   });
 
-  it('el payload firmado en register no lleva la contraseña ni su hash', async () => {
+  it('register no firma ningún token: la cuenta queda pendiente de verificación', async () => {
     const tx = {
       usuario: {
         create: vi.fn().mockResolvedValue({ idUsuario: 7, correo: 'n@uvg.edu.gt' }),
@@ -231,9 +231,6 @@ describe('AuthService — contenido del payload emitido', () => {
       semestre: 4,
     });
 
-    for (const call of sign.mock.calls) {
-      const payload = call[0] as Record<string, unknown>;
-      expect(payload).not.toHaveProperty('contrasena');
-    }
+    expect(sign).not.toHaveBeenCalled();
   });
 });

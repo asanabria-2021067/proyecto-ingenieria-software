@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -43,6 +44,8 @@ export const UNKNOWN_USER_PASSWORD_HASH = "$2b$10$aIZFrVp.yjl7jr05RXCHVeqgnl4MBv
 export function accountAttemptKey(correo: string): string {
   return correo.trim().toLowerCase();
 }
+
+export const MENSAJE_CUENTA_PENDIENTE = "Tu cuenta está pendiente de verificación por administración";
 
 interface ResetTokenPayload {
   tipo: string;
@@ -120,6 +123,8 @@ export class AuthService {
 
     // G04 (OWASP25-C023): una cuenta BLOQUEADO o INACTIVO no recibe tokens
     // aunque la contraseña sea correcta; la respuesta es la misma genérica.
+    const pendiente = usuario?.estado === EstadoUsuario.PENDIENTE_VERIFICACION;
+
     if (bloqueada || !usuario || !contrasenaValida || usuario.estado !== EstadoUsuario.ACTIVO) {
       // Cuenta inexistente o contraseña incorrecta suman al contador por igual.
       const bloqueoNuevo = !bloqueada && (!usuario || !contrasenaValida) && this.attempts.recordFailure(cuenta);
@@ -136,7 +141,9 @@ export class AuthService {
             ? "BLOQUEO_TEMPORAL"
             : !usuario || !contrasenaValida
               ? "CREDENCIALES"
-              : "CUENTA_NO_ACTIVA",
+              : pendiente
+                ? "CUENTA_PENDIENTE_VERIFICACION"
+                : "CUENTA_NO_ACTIVA",
           cuentaConocida: Boolean(usuario),
           ...cuentaRef,
         },
@@ -150,6 +157,9 @@ export class AuthService {
           idUsuarioAfectado: usuario?.idUsuario ?? null,
           detalle: { cuentaConocida: Boolean(usuario), ...cuentaRef },
         });
+      }
+      if (!bloqueada && pendiente) {
+        throw new ForbiddenException(MENSAJE_CUENTA_PENDIENTE);
       }
       throw new UnauthorizedException("Credenciales invalidas");
     }
@@ -199,6 +209,7 @@ export class AuthService {
           contrasena: contrasenaHash,
           nombre: registerDto.nombre,
           apellido: registerDto.apellido,
+          estado: EstadoUsuario.PENDIENTE_VERIFICACION,
         },
       });
 
@@ -214,7 +225,13 @@ export class AuthService {
       return user;
     });
 
-    return this.issueTokens(usuario);
+    await this.notificationsService.notifyAdminsFromTemplate("CUENTA_PENDIENTE_VERIFICACION", {
+      userName: `${registerDto.nombre} ${registerDto.apellido}`,
+      carne: registerDto.carne,
+      userId: usuario.idUsuario,
+    });
+
+    return { idUsuario: usuario.idUsuario, estado: EstadoUsuario.PENDIENTE_VERIFICACION };
   }
 
   async forgotPassword(carne: string, correo: string) {
