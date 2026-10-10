@@ -4,6 +4,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import {
   compartirCalendario,
   dejarDeCompartirCalendario,
+  dejarDeRecibirCalendario,
   getAgendaCompartida,
   getCalendariosCompartidos,
   type AgendaCompartidaDTO,
@@ -35,6 +36,21 @@ export function useDejarDeCompartirCalendario() {
   return useMutation({
     mutationFn: (idUsuario: number) => dejarDeCompartirCalendario(idUsuario),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: calendariosCompartidosQueryKey });
+    },
+  });
+}
+
+/**
+ * G01 (UI-31): quitarme un calendario recibido. Además de refrescar la lista,
+ * descarta la agenda cacheada de esa persona: ya no tengo permiso para verla.
+ */
+export function useDejarDeRecibirCalendario() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (idPropietario: number) => dejarDeRecibirCalendario(idPropietario),
+    onSuccess: (_resultado, idPropietario) => {
+      queryClient.removeQueries({ queryKey: ['agenda-compartida', idPropietario] });
       void queryClient.invalidateQueries({ queryKey: calendariosCompartidosQueryKey });
     },
   });

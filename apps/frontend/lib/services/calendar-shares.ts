@@ -79,6 +79,13 @@ export function dejarDeCompartirCalendario(idUsuario: number): Promise<{ elimina
   return apiFetch<{ eliminado: boolean }>(`/usuarios/me/calendario/compartidos/${idUsuario}`, { method: 'DELETE' });
 }
 
+/** DELETE /usuarios/me/calendario/compartidos-conmigo/:idPropietario — G01 (UI-31): me quito un calendario que me compartieron. */
+export function dejarDeRecibirCalendario(idPropietario: number): Promise<{ eliminado: boolean }> {
+  return apiFetch<{ eliminado: boolean }>(`/usuarios/me/calendario/compartidos-conmigo/${idPropietario}`, {
+    method: 'DELETE',
+  });
+}
+
 /** GET /usuarios/me/calendario/compartidos-conmigo/:idPropietario/agenda?desde&hasta */
 export function getAgendaCompartida(idPropietario: number, desde: Date, hasta: Date): Promise<AgendaCompartidaDTO> {
   const params = new URLSearchParams({ desde: desde.toISOString(), hasta: hasta.toISOString() });

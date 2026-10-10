@@ -43,7 +43,9 @@ import {
   rangoVisible,
   type VistaCalendario,
 } from '@/lib/calendar/vista';
-import { useAgendasCompartidas, useCalendariosCompartidos } from '@/hooks/use-calendar-shares';
+import { useAgendasCompartidas, useCalendariosCompartidos, useDejarDeRecibirCalendario } from '@/hooks/use-calendar-shares';
+import { getApiErrorMessage } from '@/components/projects/api-error';
+import { aviso } from '@/lib/mensajes';
 import type { EventoCompartidoDTO } from '@/lib/services/calendar-shares';
 import { MonthView } from '@/components/calendar/month-view';
 import { WeekView } from '@/components/calendar/week-view';
@@ -124,6 +126,7 @@ export default function CalendarioPage() {
   });
 
   const { data: compartidos } = useCalendariosCompartidos();
+  const dejarDeRecibir = useDejarDeRecibirCalendario();
 
   const ahora = useMemo(() => new Date(), []);
   const hoyKey = toDateKey(ahora);
@@ -261,6 +264,23 @@ export default function CalendarioPage() {
     });
   };
 
+  // G01 (UI-31): quitarme un calendario recibido. Si falla, la persona sigue en la lista.
+  const handleQuitarCompartido = (idUsuario: number) => {
+    const persona = personasCompartidas.find((p) => p.idUsuario === idUsuario);
+    const nombre = persona ? `${persona.nombre} ${persona.apellido}` : 'esa persona';
+    dejarDeRecibir.mutate(idUsuario, {
+      onSuccess: () => {
+        setCompartidosActivos((actuales) => {
+          const nuevos = actuales.filter((id) => id !== idUsuario);
+          guardarCompartidosActivos(nuevos);
+          return nuevos;
+        });
+        aviso.exito('Calendario quitado', `Ya no verás el calendario de ${nombre}.`);
+      },
+      onError: (err) => aviso.error('No se pudo quitar el calendario', getApiErrorMessage(err, 'calendar')),
+    });
+  };
+
   const irA = (fecha: Date) => {
     setAnchor(fecha);
     setMiniMes(new Date(fecha.getFullYear(), fecha.getMonth(), 1));
@@ -363,6 +383,8 @@ export default function CalendarioPage() {
             compartidos={personasCompartidas}
             compartidosActivos={new Set(idsActivos)}
             onToggleCompartido={handleToggleCompartido}
+            onQuitarCompartido={handleQuitarCompartido}
+            quitandoCompartido={dejarDeRecibir.isPending ? dejarDeRecibir.variables : null}
           />
         </div>
 

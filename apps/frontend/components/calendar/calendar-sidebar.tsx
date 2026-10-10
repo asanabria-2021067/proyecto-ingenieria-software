@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { ClipboardList, Target, Users } from 'lucide-react';
+import { ClipboardList, Loader2, Target, UserMinus, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MiniCalendar } from '@/components/calendar/mini-calendar';
 import { TONO_CLASES, type TonoCalendario } from '@/lib/calendar/paleta';
@@ -40,6 +41,8 @@ export function CalendarSidebar({
   compartidos,
   compartidosActivos,
   onToggleCompartido,
+  onQuitarCompartido,
+  quitandoCompartido = null,
 }: {
   mini: {
     year: number;
@@ -58,6 +61,10 @@ export function CalendarSidebar({
   compartidos: CalendarioCompartidoFiltro[];
   compartidosActivos: Set<number>;
   onToggleCompartido: (idUsuario: number) => void;
+  /** G01 (UI-31): quitarme definitivamente el calendario de esa persona (distinto del check, que solo lo oculta). */
+  onQuitarCompartido: (idUsuario: number) => void;
+  /** idUsuario cuya revocación está en curso (deshabilita su botón). */
+  quitandoCompartido?: number | null;
 }) {
   const progreso = metaHoras ? Math.min(100, Math.round((metaHoras.actual / metaHoras.requeridas) * 100)) : 0;
 
@@ -153,6 +160,21 @@ export function CalendarSidebar({
                     checked={compartidosActivos.has(persona.idUsuario)}
                     onCheckedChange={() => onToggleCompartido(persona.idUsuario)}
                   />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Quitar el calendario de ${nombre}`}
+                    disabled={quitandoCompartido === persona.idUsuario}
+                    onClick={() => onQuitarCompartido(persona.idUsuario)}
+                    className="size-7 shrink-0 text-text-secondary hover:text-status-error"
+                  >
+                    {quitandoCompartido === persona.idUsuario ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <UserMinus className="size-3.5" aria-hidden="true" />
+                    )}
+                  </Button>
                 </li>
               );
             })}
