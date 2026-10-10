@@ -301,3 +301,54 @@ describe('calendar/agenda — eventos nocturnos partidos por fecha real (G02-C04
     expect(JSON.stringify(items)).not.toContain('Proyecto');
   });
 });
+
+/**
+ * G02-C13: fixtures canónicas de regresión del calendario (las mismas que usan
+ * los specs de vistas): 15 min, 30 min, 23:00→01:00, fin 00:00, 2 días,
+ * 3 solapados y 4 tareas el mismo día. Aquí se fija el mapeo; en
+ * calendar-time-grid-view/calendar-week-view su representación.
+ */
+describe('calendar/agenda — regresión temporal consolidada (G02-C13)', () => {
+  const RANGO: [Date, Date] = [new Date(2026, 9, 5), new Date(2026, 9, 12)];
+  const local = (d: number, h: number, m = 0) => new Date(2026, 9, d, h, m).toISOString();
+  const CASOS = {
+    quince: evento({ idEvento: 101, tituloEvento: 'Stand-up', fechaInicio: local(8, 9), fechaFin: local(8, 9, 15) }),
+    treinta: evento({ idEvento: 102, tituloEvento: 'Daily', fechaInicio: local(8, 10), fechaFin: local(8, 10, 30) }),
+    nocturno: evento({ idEvento: 103, tituloEvento: 'Hackathon', fechaInicio: local(8, 23), fechaFin: local(9, 1) }),
+    medianoche: evento({ idEvento: 104, tituloEvento: 'Cierre', fechaInicio: local(8, 22), fechaFin: local(9, 0) }),
+    dosDias: evento({ idEvento: 105, tituloEvento: 'Congreso', fechaInicio: local(9, 9), fechaFin: local(10, 17) }),
+    solapados: [1, 2, 3].map((n) => evento({ idEvento: 110 + n, tituloEvento: `Solapado ${n}`, fechaInicio: local(7, 10, (n - 1) * 15), fechaFin: local(7, 11) })),
+  };
+
+  it('cada caso produce exactamente los ítems esperados por día, con horas reales y sin fantasmas', () => {
+    const items = [
+      CASOS.quince,
+      CASOS.treinta,
+      CASOS.nocturno,
+      CASOS.medianoche,
+      CASOS.dosDias,
+      ...CASOS.solapados,
+    ].flatMap((e) => eventoToAgendaItems(e, ...RANGO));
+    const porDia = groupAgendaItemsByDay(items);
+    const resumen = (key: string) =>
+      (porDia.get(key) ?? []).map((i) => (i.kind === 'evento' ? `${i.id}:${i.horaInicio}-${i.horaFin}${i.multiDia ? ':todoElDia' : ''}` : 'tarea'));
+
+    expect(resumen('2026-10-07')).toEqual(['111:10:00-11:00', '112:10:15-11:00', '113:10:30-11:00']);
+    expect(resumen('2026-10-08')).toEqual(['101:09:00-09:15', '102:10:00-10:30', '104:22:00-00:00', '103:23:00-00:00']);
+    expect(resumen('2026-10-09')).toEqual(['103:00:00-01:00', '105:09:00-17:00:todoElDia']);
+    expect(resumen('2026-10-10')).toEqual(['105:09:00-17:00:todoElDia']);
+    expect(porDia.has('2026-10-11')).toBe(false);
+    // Claves React únicas aunque un mismo evento aparezca en dos días.
+    expect(new Set(items.map(agendaItemKey)).size).toBe(items.length);
+  });
+
+  it('los ítems compartidos OCUPADO de esas mismas fixtures no revelan título ni proyecto (G01 intacto)', () => {
+    const origen = { idUsuario: 7, nombre: 'Ana García', tono: 3 as const };
+    const compartidos = [CASOS.nocturno, CASOS.dosDias].flatMap((e) =>
+      eventoToAgendaItems({ idEvento: e.idEvento, fechaInicio: e.fechaInicio, fechaFin: e.fechaFin, visibilidad: 'OCUPADO' }, ...RANGO, origen),
+    );
+    expect(compartidos).toHaveLength(4);
+    expect(compartidos.every((i) => i.kind === 'evento' && i.ocupado && i.titulo === 'Ocupado' && i.projectTitle === '')).toBe(true);
+    expect(JSON.stringify(compartidos)).not.toMatch(/Hackathon|Congreso|Proyecto X/);
+  });
+});

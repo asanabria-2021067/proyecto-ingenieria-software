@@ -388,3 +388,66 @@ describe('TimeGridView — eventos breves (G02-C12, UI-04/UI-18)', () => {
     expect(screen.getByRole('button', { name: /^A corto/ })).toHaveStyle({ width: 'calc(50% - 4px)' });
   });
 });
+
+describe('TimeGridView — regresión consolidada de la semana cargada (G02-C13)', () => {
+  const d = (day: number, h: number, m = 0) => new Date(2026, 9, day, h, m);
+  const hora = (h: number, m = 0) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  const bloque = (id: number, titulo: string, day: number, ini: [number, number], fin: [number, number], extra: Partial<Extract<AgendaItem, { kind: 'evento' }>> = {}) =>
+    evento(id, `2026-10-${String(day).padStart(2, '0')}`, {
+      titulo,
+      horaInicio: hora(...ini),
+      horaFin: hora(...fin),
+      fechaInicio: d(day, ...ini),
+      fechaFin: d(day, ...fin),
+      ...extra,
+    });
+  const semanaCargada = () =>
+    new Map<string, AgendaItem[]>([
+      ['2026-10-07', [bloque(111, 'Solapado 1', 7, [10, 0], [11, 0]), bloque(112, 'Solapado 2', 7, [10, 15], [11, 0]), bloque(113, 'Solapado 3', 7, [10, 30], [11, 0])]],
+      [
+        '2026-10-08',
+        [
+          bloque(101, 'Stand-up', 8, [9, 0], [9, 15]),
+          bloque(102, 'Daily', 8, [10, 0], [10, 30]),
+          bloque(104, 'Cierre', 8, [22, 0], [0, 0], { fechaFin: d(9, 0, 0) }),
+          bloque(103, 'Hackathon', 8, [23, 0], [0, 0], { fechaFin: d(9, 0, 0) }),
+          ...[1, 2, 3, 4].map((n) => tarea(200 + n, '2026-10-08')),
+        ],
+      ],
+      ['2026-10-09', [bloque(103, 'Hackathon', 9, [0, 0], [1, 0]), bloque(105, 'Congreso', 9, [9, 0], [17, 0], { multiDia: true, fechaFin: d(10, 17, 0) })]],
+      ['2026-10-10', [bloque(105, 'Congreso', 10, [9, 0], [17, 0], { multiDia: true, fechaInicio: d(9, 9, 0) })]],
+    ]);
+
+  it('Semana: eventos breves con título, tramos nocturnos en sus horas, +N de solapes y +N más de la franja, sin fantasmas', () => {
+    const onVerDia = vi.fn();
+    render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={semanaCargada()} onSelectEvento={() => {}} onVerDia={onVerDia} ahora={AHORA} />);
+
+    expect(screen.getByRole('button', { name: 'Stand-up, 09:00 a 09:15' })).toHaveTextContent('09:00 · Stand-up');
+    expect(screen.getByRole('button', { name: 'Daily, 10:00 a 10:30' })).toHaveTextContent('10:00 · Daily');
+    expect(screen.getByRole('button', { name: 'Cierre, 22:00 a 00:00 del día siguiente' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hackathon, 23:00 a 00:00 del día siguiente' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hackathon, 00:00 a 01:00' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Cierre/ })).toHaveLength(1);
+    // Todo el día: 2 chips del congreso (uno por día) y 3 tareas + "+1 más" como botón.
+    expect(screen.getAllByRole('button', { name: 'Congreso' })).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: /^Tarea 20\d/ })).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: '1 actividad más de todo el día, ver el día' }));
+    expect(onVerDia).toHaveBeenCalledWith('2026-10-08');
+    // 3 solapados en Semana: solo el primero a media columna y un "+2" que abre el día.
+    expect(screen.getByRole('button', { name: /^Solapado 1/ })).toHaveStyle({ width: 'calc(50% - 4px)' });
+    expect(screen.queryByRole('button', { name: /^Solapado 2/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '2 eventos más a esta hora, ver el día' }));
+    expect(onVerDia).toHaveBeenLastCalledWith('2026-10-07');
+  });
+
+  it('Día (08): los mismos ítems con todas las tareas alcanzables y los tramos nocturnos en la cuadrícula', () => {
+    const dia = [{ date: new Date(2026, 9, 8), key: '2026-10-08', inCurrentMonth: true }];
+    render(<TimeGridView days={dia} todayKey="2026-10-06" itemsByDay={semanaCargada()} onSelectEvento={() => {}} ahora={AHORA} />);
+
+    expect(screen.getAllByRole('link', { name: /^Tarea 20\d/ })).toHaveLength(4);
+    expect(screen.queryByText(/más$/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hackathon, 23:00 a 00:00 del día siguiente' })).toHaveStyle({ top: `${23 * 48 + 1}px` });
+    expect(screen.getByRole('button', { name: 'Stand-up, 09:00 a 09:15' })).toHaveStyle({ height: '30px' });
+    expect(screen.getByTestId('cuadricula-semana')).not.toHaveClass('overflow-x-auto');
+  });
+});

@@ -157,3 +157,33 @@ describe('WeekView — una sola columna en todo ancho (G02-C11, UI-02)', () => {
     expect(visibles.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe('WeekView (lista) — regresión consolidada (G02-C13)', () => {
+  it('los tramos nocturnos y los eventos breves se listan en su día con su hora de inicio; OCUPADO no revela nada', () => {
+    const d = (day: number, h: number, m = 0) => new Date(2026, 8, day, h, m);
+    // El helper `evento(id, key)` no admite overrides: se extiende por spread (tipado a la variante evento).
+    const base = (id: number, key: string) => evento(id, key) as Extract<AgendaItem, { kind: 'evento' }>;
+    const items = new Map<string, AgendaItem[]>([
+      ['2026-09-09', [{ ...base(103, '2026-09-09'), titulo: 'Hackathon', sortKey: '23:00', horaInicio: '23:00', horaFin: '00:00', fechaInicio: d(9, 23), fechaFin: d(10, 0) }]],
+      [
+        '2026-09-10',
+        [
+          { ...base(103, '2026-09-10'), titulo: 'Hackathon', sortKey: '00:00', horaInicio: '00:00', horaFin: '01:00', fechaInicio: d(10, 0), fechaFin: d(10, 1) },
+          { ...base(101, '2026-09-10'), titulo: 'Stand-up', horaFin: '09:15', fechaFin: d(10, 9, 15) },
+          { ...base(50, '2026-09-10'), titulo: 'Ocupado', ocupado: true, projectId: 0, projectTitle: '', href: '', compartidoPor: { idUsuario: 9, nombre: 'Ana', tono: 2 } },
+        ],
+      ],
+    ]);
+    const { container } = render(<WeekView days={days()} todayKey="2026-09-09" itemsByDay={items} onSelectEvento={() => {}} />);
+
+    expect(screen.getAllByRole('button', { name: /Hackathon/ })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /Hackathon\s*23:00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Hackathon\s*00:00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Stand-up\s*09:00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ocupado\s*09:00 · Ana/ })).toBeInTheDocument();
+    // El bloque OCUPADO no anuncia tipo ni modalidad (los demás eventos del fixture sí llevan su "Otro").
+    expect(screen.getByRole('button', { name: /Ocupado\s*09:00 · Ana/ }).textContent).not.toMatch(/Otro|Virtual|Proyecto/);
+    // Días vacíos ocultos (6 de 7 tienen algo o son hoy: 09 y 10 → 5 ocultos).
+    expect(container.querySelectorAll('.hidden')).toHaveLength(5);
+  });
+});
