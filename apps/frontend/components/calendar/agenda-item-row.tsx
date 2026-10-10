@@ -53,7 +53,8 @@ export function AgendaItemRow({
     const contenido = (
       <>
         <span className="min-w-[10rem] flex-1 truncate text-sm text-on-surface">{item.titulo}</span>
-        <span className="shrink-0 text-xs text-tertiary">
+        {/* G04 (UI-38): puede encoger y truncar; con shrink-0 un nombre largo se salía de la fila en 320 px. */}
+        <span className="min-w-0 max-w-full truncate text-xs text-tertiary">
           {item.compartidoPor ? [item.compartidoPor.nombre, item.projectTitle].filter(Boolean).join(' · ') : item.projectTitle}
         </span>
         {!item.ocupado && (
@@ -96,7 +97,7 @@ export function AgendaItemRow({
       <span className="shrink-0 text-xs text-tertiary">
         {item.horaInicio}–{item.horaFin}
       </span>
-      <span className="shrink-0 text-xs text-tertiary">
+      <span className="min-w-0 max-w-full truncate text-xs text-tertiary">
         {item.compartidoPor ? [item.compartidoPor.nombre, item.projectTitle].filter(Boolean).join(' · ') : item.projectTitle}
       </span>
       {!item.ocupado && (

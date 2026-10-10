@@ -480,3 +480,12 @@ describe('TimeGridView — objetivos táctiles de la franja "Todo el día" (G04-
     expect(screen.queryByRole('link', { name: 'Fecha límite' })).not.toBeInTheDocument();
   });
 });
+
+describe('TimeGridView — alto adaptable de la cuadrícula (G04-C08, UI-38)', () => {
+  it('la zona con scroll se limita a 70dvh (sin superar 34rem) y conserva su scroll interno propio', () => {
+    render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={new Map()} onSelectEvento={vi.fn()} ahora={AHORA} />);
+    const horas = screen.getByTestId('cuadricula-horas');
+    expect(horas).toHaveClass('h-[min(34rem,70dvh)]', 'overflow-y-auto', 'overscroll-contain');
+    expect(horas).not.toHaveClass('h-[34rem]');
+  });
+});

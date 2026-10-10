@@ -740,3 +740,36 @@ describe('CalendarioPage — jerarquía de encabezados y grupos con nombre (G04-
     expect(await screen.findByRole('group', { name: 'Compartida con 1 personas' })).toBeInTheDocument();
   });
 });
+
+describe('CalendarioPage — periodo corto en pantallas estrechas con nombre accesible completo (G04-C08, UI-38)', () => {
+  const corto = () => etiquetaPeriodo().querySelector('[aria-hidden="true"]');
+
+  it('en Semana se muestra "5 – 11 oct 2026" bajo sm y el encabezado sigue llamándose con el rango completo', async () => {
+    await renderPage();
+    expect(corto()).toHaveTextContent(/^5 – 11 oct 2026$/);
+    expect(corto()).toHaveClass('sm:hidden');
+    expect(screen.getByRole('heading', { level: 2, name: '5 oct – 11 oct 2026' })).toBe(etiquetaPeriodo());
+    expect(etiquetaPeriodo().querySelector('.sr-only')).toHaveClass('sm:not-sr-only');
+  });
+
+  it('una semana que cruza de mes se abrevia con ambos meses', async () => {
+    await renderPage();
+    fireEvent.click(boton('Anterior'));
+    expect(corto()).toHaveTextContent(/^28 sept – 4 oct$/);
+    expect(screen.getByRole('heading', { level: 2, name: '28 sept – 4 oct 2026' })).toBeInTheDocument();
+  });
+
+  it('en Día se muestra "Vie, 9 oct 2026" y el nombre accesible conserva la fecha larga', async () => {
+    await renderPage();
+    fireEvent.click(vista('Día'));
+    expect(corto()).toHaveTextContent(/^Vie, 9 oct 2026$/);
+    expect(screen.getByRole('heading', { level: 2, name: 'Viernes, 9 de octubre de 2026' })).toBeInTheDocument();
+  });
+
+  it('en Mes el nombre ya es corto: un solo texto, sin duplicado oculto', async () => {
+    await renderPage();
+    fireEvent.click(vista('Mes'));
+    expect(etiquetaPeriodo().textContent).toBe('Octubre 2026');
+    expect(corto()).toBeNull();
+  });
+});

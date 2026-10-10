@@ -135,6 +135,29 @@ function useSemanaEnCuadricula(): boolean | null {
   return useSyncExternalStore(suscribirAncho, leerAncho, leerAnchoEnServidor);
 }
 
+/**
+ * G04 (UI-38): el periodo en formato corto para pantallas estrechas (a 320 px
+ * el largo ocupaba 2–3 líneas): "Vie, 9 oct 2026", "5 – 11 oct 2026" o, si la
+ * semana cruza de mes, "28 sept – 4 oct". El largo sigue siendo el nombre
+ * accesible del encabezado.
+ */
+function etiquetaRangoCorta(vista: VistaCalendario, anchor: Date): string {
+  if (vista === 'dia') {
+    const texto = anchor.toLocaleDateString('es-GT', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+  if (vista === 'semana') {
+    const { days } = rangoVisible('semana', anchor);
+    const inicio = days[0].date;
+    const fin = days[6].date;
+    const corto = (fecha: Date) => fecha.toLocaleDateString('es-GT', { day: 'numeric', month: 'short' });
+    return inicio.getMonth() === fin.getMonth()
+      ? `${inicio.getDate()} – ${fin.toLocaleDateString('es-GT', { day: 'numeric', month: 'short', year: 'numeric' })}`
+      : `${corto(inicio)} – ${corto(fin)}`;
+  }
+  return etiquetaRango(vista, anchor);
+}
+
 function alternar<T>(conjunto: Set<T>, valor: T): Set<T> {
   const nuevo = new Set(conjunto);
   if (nuevo.has(valor)) nuevo.delete(valor);
@@ -486,6 +509,8 @@ export default function CalendarioPage() {
         : undefined;
 
   const compartidoPorMi = compartidos?.compartidoPorMi ?? [];
+  const periodo = etiquetaRango(vista, anchor);
+  const periodoCorto = etiquetaRangoCorta(vista, anchor);
 
   return (
     <div className={dashboardPage('py-8')}>
@@ -631,7 +656,17 @@ export default function CalendarioPage() {
               </Button>
               {/* G04 (UI-32): el periodo visible es el título de la zona del calendario. */}
               <h2 className="type-subtitle min-w-0 text-text-primary" aria-live="polite">
-                {etiquetaRango(vista, anchor)}
+                {periodoCorto === periodo ? (
+                  periodo
+                ) : (
+                  <>
+                    {/* G04 (UI-38): bajo `sm` se ve el corto; el largo sigue en el árbol accesible. */}
+                    <span className="sm:hidden" aria-hidden="true">
+                      {periodoCorto}
+                    </span>
+                    <span className="sr-only sm:not-sr-only">{periodo}</span>
+                  </>
+                )}
               </h2>
             </div>
           </div>

@@ -205,7 +205,9 @@ export function TimeGridView({
         </div>
       )}
 
-      <div ref={scrollRef} className={`relative h-[34rem] overflow-y-auto overscroll-contain ${anchoMinimo}`} data-testid="cuadricula-horas">
+      {/* G04 (UI-38): tope de 70dvh para que en pantallas bajas (568 px) la cuadrícula no
+          ocupe todo el alto y deje un scroll anidado sin salida; en pantallas normales sigue en 34rem. */}
+      <div ref={scrollRef} className={`relative h-[min(34rem,70dvh)] overflow-y-auto overscroll-contain ${anchoMinimo}`} data-testid="cuadricula-horas">
         <div className="grid" style={{ ...plantilla, height: 24 * HORA_ALTO_PX }}>
           <div className="relative">
             {HORAS.map((h) => (
