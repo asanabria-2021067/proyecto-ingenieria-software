@@ -215,6 +215,38 @@
   --color-on-cal-6: #c6efef;
   --color-cal-6-strong: #57c3c3;
 
+  /* Etiquetas: pares fondo/texto propios del modo oscuro (AA verificado). */
+  --color-tag-neutral: #2a3036;
+  --color-on-tag-neutral: #d5dae0;
+  --color-tag-subtle: #23292e;
+  --color-on-tag-subtle: #aeb5bd;
+  --color-tag-sage: #2a4530;
+  --color-on-tag-sage: #b9d6b4;
+  --color-tag-green: #214a2c;
+  --color-on-tag-green: #a9e3a6;
+  --color-tag-success: #72dc93;
+  --color-on-tag-success: #003918;
+  --color-tag-lime: #3e5a14;
+  --color-on-tag-lime: #d4f59a;
+  --color-tag-forest: #3b7048;
+  --color-on-tag-forest: #e4f5e6;
+  --color-tag-closed: #4a7362;
+  --color-on-tag-closed: #e6f2ec;
+  --color-tag-blue: #1c3a66;
+  --color-on-tag-blue: #a9c8ff;
+  --color-tag-violet: #3b2a6b;
+  --color-on-tag-violet: #cdb8ff;
+  --color-tag-turquoise: #154a44;
+  --color-on-tag-turquoise: #9fe3d6;
+  --color-tag-amber: #5c3d10;
+  --color-on-tag-amber: #ffd9a3;
+  --color-tag-orange: #5e2e12;
+  --color-on-tag-orange: #ffc49b;
+  --color-tag-red: #5e2323;
+  --color-on-tag-red: #ffb4ab;
+  --color-tag-slate: #27395a;
+  --color-on-tag-slate: #b4c9ee;
+
   --gradient-color: #224a33;
   --sparkles-color: #72dc93;
 }
@@ -289,6 +321,46 @@
   --color-on-status-warning: var(--color-on-secondary-fixed);
   --color-status-error: var(--color-error-container);
   --color-on-status-error: var(--color-error);
+
+  /*
+   * Etiquetas (pills, badges, chips): un solo juego de tonos semánticos para
+   * estudiante y administrador. Cada tono es un par fondo (`tag-*`) / texto
+   * (`on-tag-*`) verificado en AA (≥ 4.5:1) en claro y en oscuro; `.dark`
+   * redefine los pares abajo, nunca reutiliza los fondos claros. La forma
+   * (radio, alto, tipografía) vive en `.pill` y sus tamaños.
+   */
+  --radius-tag: 0.4375rem;
+
+  --color-tag-neutral: #e5e7eb;
+  --color-on-tag-neutral: #374151;
+  --color-tag-subtle: #edf0f3;
+  --color-on-tag-subtle: #5d6470;
+  --color-tag-sage: #e2ece1;
+  --color-on-tag-sage: #295a3a;
+  --color-tag-green: #dff0da;
+  --color-on-tag-green: #276039;
+  --color-tag-success: #006837;
+  --color-on-tag-success: #ffffff;
+  --color-tag-lime: #b7f567;
+  --color-on-tag-lime: #183300;
+  --color-tag-forest: #315d3c;
+  --color-on-tag-forest: #ffffff;
+  --color-tag-closed: #496b5d;
+  --color-on-tag-closed: #ffffff;
+  --color-tag-blue: #dbeafe;
+  --color-on-tag-blue: #1d4ed8;
+  --color-tag-violet: #ede9fe;
+  --color-on-tag-violet: #6d28d9;
+  --color-tag-turquoise: #d5f5ef;
+  --color-on-tag-turquoise: #0f6459;
+  --color-tag-amber: #fff0d4;
+  --color-on-tag-amber: #8b4b0a;
+  --color-tag-orange: #ffedd5;
+  --color-on-tag-orange: #9a3412;
+  --color-tag-red: #fee2e2;
+  --color-on-tag-red: #991b1b;
+  --color-tag-slate: #e4ebf6;
+  --color-on-tag-slate: #3d5686;
 
   /* Atención / corrección requerida (proyecto observado): el mismo naranja
      que `amber-600` / `amber-700` del botón «Editar» en Mis Proyectos. */
@@ -379,40 +451,130 @@
     padding: var(--spacing-card);
   }
 
+  /*
+   * Etiqueta estándar (familia «pill»): la forma aprobada de «Estado del
+   * proyecto» —radio `tag`, 25 px de alto, 12 px semibold— para TODAS las
+   * etiquetas de estado, categoría y prioridad. Tamaños: `pill-sm` (tablas
+   * compactas, calendarios, listas) y `pill-lg` (solo cabeceras que lo
+   * justifiquen). Los tonos `pill-<tono>` toman su par de `--color-tag-*`.
+   * Las utilidades Tailwind siguen ganando a esta capa para ajustes puntuales.
+   */
   .pill {
     align-items: center;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-tag);
     display: inline-flex;
-    font-size: var(--text-meta);
-    font-weight: 500;
+    font-size: 0.75rem;
+    font-weight: 600;
     gap: var(--spacing-micro);
-    line-height: var(--text-meta--line-height);
-    padding: var(--spacing-micro) var(--spacing-tight);
+    height: 1.5625rem;
+    line-height: 1;
+    max-width: 100%;
+    padding-inline: var(--spacing-inline);
+    white-space: nowrap;
   }
 
-  .pill-accent {
-    background: var(--color-accent);
-    color: var(--color-on-accent);
+  .pill > svg {
+    flex-shrink: 0;
+    height: 0.875rem;
+    width: 0.875rem;
+  }
+
+  .pill-sm {
+    font-size: 0.6875rem;
+    height: 1.25rem;
+    padding-inline: var(--spacing-tight);
+  }
+
+  .pill-sm > svg {
+    height: 0.75rem;
+    width: 0.75rem;
+  }
+
+  .pill-lg {
+    font-size: 0.8125rem;
+    height: 1.75rem;
+    padding-inline: 0.875rem;
   }
 
   .pill-neutral {
-    background: var(--color-surface-container-high);
-    color: var(--color-text-secondary);
+    background: var(--color-tag-neutral);
+    color: var(--color-on-tag-neutral);
+  }
+
+  .pill-subtle {
+    background: var(--color-tag-subtle);
+    color: var(--color-on-tag-subtle);
+  }
+
+  .pill-sage {
+    background: var(--color-tag-sage);
+    color: var(--color-on-tag-sage);
+  }
+
+  .pill-green {
+    background: var(--color-tag-green);
+    color: var(--color-on-tag-green);
   }
 
   .pill-success {
-    background: var(--color-status-success);
-    color: var(--color-on-status-success);
+    background: var(--color-tag-success);
+    color: var(--color-on-tag-success);
   }
 
+  /* `accent` conserva su nombre histórico: es el lima del sistema. */
+  .pill-lime,
+  .pill-accent {
+    background: var(--color-tag-lime);
+    color: var(--color-on-tag-lime);
+  }
+
+  .pill-forest {
+    background: var(--color-tag-forest);
+    color: var(--color-on-tag-forest);
+  }
+
+  .pill-closed {
+    background: var(--color-tag-closed);
+    color: var(--color-on-tag-closed);
+  }
+
+  .pill-blue {
+    background: var(--color-tag-blue);
+    color: var(--color-on-tag-blue);
+  }
+
+  .pill-violet {
+    background: var(--color-tag-violet);
+    color: var(--color-on-tag-violet);
+  }
+
+  .pill-turquoise {
+    background: var(--color-tag-turquoise);
+    color: var(--color-on-tag-turquoise);
+  }
+
+  /* `warning` conserva su nombre histórico: es el ámbar de atención. */
+  .pill-amber,
   .pill-warning {
-    background: var(--color-status-warning);
-    color: var(--color-on-status-warning);
+    background: var(--color-tag-amber);
+    color: var(--color-on-tag-amber);
   }
 
+  .pill-orange {
+    background: var(--color-tag-orange);
+    color: var(--color-on-tag-orange);
+  }
+
+  /* `error` conserva su nombre histórico: es el rojo. */
+  .pill-red,
   .pill-error {
-    background: var(--color-status-error);
-    color: var(--color-on-status-error);
+    background: var(--color-tag-red);
+    color: var(--color-on-tag-red);
+  }
+
+  .pill-slate {
+    background: var(--color-tag-slate);
+    color: var(--color-on-tag-slate);
   }
 
   .layout-grid {
@@ -464,17 +626,12 @@ html {
 }
 
 :root {
-  --blink-gray-bg: #e9edf1;
-  --blink-gray-text: #59616c;
-  --blink-gold-bg: #2b5830;
-  --blink-gold-text: #ffffff;
-}
-
-.dark {
-  --blink-gray-bg: #262b30;
-  --blink-gray-text: #c3c7cc;
-  --blink-gold-bg: #453405;
-  --blink-gold-text: #ffd873;
+  /* Parpadeo de «En solicitud de cierre»: entre el tono sutil y el bosque
+     de las etiquetas, así sigue al tema sin valores propios. */
+  --blink-gray-bg: var(--color-tag-subtle);
+  --blink-gray-text: var(--color-on-tag-subtle);
+  --blink-gold-bg: var(--color-tag-forest);
+  --blink-gold-text: var(--color-on-tag-forest);
 }
 
 @keyframes blink-gold-gray {
