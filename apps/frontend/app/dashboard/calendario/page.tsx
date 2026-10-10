@@ -128,7 +128,15 @@ export default function CalendarioPage() {
   const { data: compartidos } = useCalendariosCompartidos();
   const dejarDeRecibir = useDejarDeRecibirCalendario();
 
-  const ahora = useMemo(() => new Date(), []);
+  // G03 (UI-28): la hora "ahora" y el día "hoy" avanzan mientras la página
+  // sigue abierta (línea de ahora cada minuto; "Hoy" cambia a medianoche sin
+  // recargar). Solo mueve estos indicadores: las consultas dependen del rango
+  // (ancla), no de este reloj, así que un tick no vuelve a pedir la agenda.
+  const [ahora, setAhora] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setAhora(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   const hoyKey = toDateKey(ahora);
   const [vista, setVista] = useState<VistaCalendario>('semana');
   const [anchor, setAnchor] = useState(() => new Date());

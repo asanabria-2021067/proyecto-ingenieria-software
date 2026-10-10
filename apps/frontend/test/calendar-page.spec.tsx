@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import type { ReactNode } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mensajesMock = vi.hoisted(() => ({
@@ -247,5 +247,68 @@ describe('CalendarioPage — mini calendario sincronizado (G03-C06, UI-17)', () 
     fireEvent.click(diaMini(21));
     expect(etiquetaPeriodo()).toHaveTextContent('19 oct');
     expect(diaMini(21)).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+describe('CalendarioPage — reloj vivo: línea "Ahora" y día "Hoy" (G03-C07, UI-28)', () => {
+  beforeEach(() => {
+    // Aquí también se fingen los intervalos (los timeouts siguen reales para
+    // waitFor). Hay que salir de los timers falsos del beforeEach general:
+    // una segunda llamada a useFakeTimers no cambia qué se finge.
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.setSystemTime(HOY);
+  });
+
+  const lineaAhora = () => screen.getByTestId('cuadricula-horas').querySelector<HTMLElement>('.z-10');
+  const cabeceraHoy = () => within(screen.getByTestId('cuadricula-semana')).getAllByText('Hoy')[0].parentElement as HTMLElement;
+
+  it('cada minuto la línea de "ahora" baja sin volver a pedir la agenda', async () => {
+    await renderPage();
+    fireEvent.click(vista('Día'));
+    await waitFor(() => expect(lineaAhora()).not.toBeNull());
+    const topInicial = Number.parseFloat(lineaAhora()!.style.top);
+    const llamadas = eventsMock.getMisEventos.mock.calls.length;
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(Number.parseFloat(lineaAhora()!.style.top)).toBeGreaterThan(topInicial);
+    act(() => {
+      vi.advanceTimersByTime(10 * 60_000);
+    });
+    expect(Number.parseFloat(lineaAhora()!.style.top)).toBeCloseTo(topInicial + (11 / 60) * 48, 3);
+    expect(eventsMock.getMisEventos.mock.calls.length).toBe(llamadas);
+    expect(usersMock.getMisTareas).toHaveBeenCalledTimes(1);
+  });
+
+  it('a medianoche (America/Guatemala) "Hoy" pasa al día siguiente sin recargar y la semana que se estaba viendo no cambia', async () => {
+    vi.setSystemTime(new Date(2026, 9, 9, 23, 59, 30));
+    await renderPage();
+    expect(cabeceraHoy()).toHaveAttribute('aria-current', 'date');
+    expect(cabeceraHoy()).toHaveTextContent('9');
+
+    // El usuario navega a la semana siguiente antes de medianoche.
+    fireEvent.click(boton('Siguiente'));
+    expect(etiquetaPeriodo()).toHaveTextContent('12 oct');
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    // Sigue viendo la semana del 12: hoy (10 oct) no está en ella y el ancla no se movió.
+    expect(etiquetaPeriodo()).toHaveTextContent('12 oct');
+    expect(within(screen.getByTestId('cuadricula-semana')).queryByText('Hoy')).not.toBeInTheDocument();
+
+    fireEvent.click(boton('Hoy'));
+    expect(etiquetaPeriodo()).toHaveTextContent('5 oct');
+    expect(cabeceraHoy()).toHaveTextContent('10');
+    expect(screen.getByRole('complementary', { name: 'Opciones del calendario' }).querySelector('[aria-current="date"]')).toHaveTextContent('10');
+  });
+
+  it('al desmontar la página el intervalo se limpia', async () => {
+    const { unmount } = render(<CalendarioPage />, { wrapper });
+    await waitFor(() => expect(screen.queryByText('Cargando tu calendario...')).not.toBeInTheDocument());
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
