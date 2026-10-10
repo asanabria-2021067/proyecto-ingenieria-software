@@ -369,6 +369,9 @@ describe('EventsService — tipo e invitados (HU-184)', () => {
       idEvento: EVENT_ID,
       fechaInicio: new Date('2030-10-01T14:00:00.000Z'),
       fechaFin: new Date('2030-10-01T15:00:00.000Z'),
+      // G04-C16 (clase B): la fila real siempre trae `invitados` (Int[] con default []); el
+      // fixture lo omitía y ahora el servicio lo compara para saber si la audiencia crece.
+      invitados: [],
     });
     prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: PARTICIPANT_ID }]);
     prisma.eventoProyecto.update.mockResolvedValue({ idEvento: EVENT_ID });
@@ -848,5 +851,72 @@ describe('GetEventsRangeQueryDto — rango acotado (G04-C15, UI-20/B-06)', () =>
     // 62 días exactos expresados con offset de Guatemala (-06:00) en vez de Z.
     expect(await validar({ desde: '2026-10-01T00:00:00.000-06:00', hasta: '2026-12-02T00:00:00.000-06:00' })).toEqual([]);
     expect(await validar({ desde: '2026-10-01T00:00:00.000-06:00', hasta: '2026-12-02T00:00:00.001-06:00' })).toHaveLength(1);
+  });
+});
+
+describe('EventsService — reabrir el recordatorio cuando crece la audiencia (G04-C16, UI-22)', () => {
+  const ANA = 4;
+  const LUIS = 6;
+  function preparar(invitadosActuales: number[]) {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.eventoProyecto.findFirst.mockResolvedValue({
+      idEvento: EVENT_ID,
+      idProyecto: PROJECT_ID,
+      tituloEvento: 'Kickoff',
+      fechaInicio: new Date('2030-10-01T14:00:00.000Z'),
+      fechaFin: new Date('2030-10-01T15:00:00.000Z'),
+      modalidad: 'VIRTUAL',
+      linkSesion: 'https://meet.google.com/abc',
+      invitados: invitadosActuales,
+    });
+    prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: ANA }, { idUsuario: LUIS }]);
+    prisma.eventoProyecto.update.mockResolvedValue({ idEvento: EVENT_ID });
+    return { prisma, service: new EventsService(prisma) };
+  }
+  const datos = (prisma: ReturnType<typeof makePrisma>) => prisma.eventoProyecto.update.mock.calls[0][0].data as Record<string, unknown>;
+  /** Lo que el diálogo real envía en cada edición: título, la misma fecha de inicio y la lista de invitados. */
+  const comoElDialogo = (invitados: number[], extra: Record<string, unknown> = {}) => ({ tituloEvento: 'Kickoff', fechaInicio: '2030-10-01T14:00:00.000Z', invitados, ...extra });
+
+  it('añadir un invitado nuevo reabre el recordatorio (recordatorioEnviadoEn = null)', async () => {
+    const { prisma, service } = preparar([ANA]);
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, comoElDialogo([ANA, LUIS]));
+    expect(datos(prisma)).toMatchObject({ invitados: [ANA, LUIS], recordatorioEnviadoEn: null });
+  });
+
+  it('vaciar la lista (el evento vuelve a ser de todo el proyecto) también amplía la audiencia y lo reabre', async () => {
+    const { prisma, service } = preparar([ANA]);
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, comoElDialogo([]));
+    expect(datos(prisma)).toMatchObject({ invitados: [], recordatorioEnviadoEn: null });
+  });
+
+  it.each([
+    ['guardar con los mismos invitados (editar solo el título, como hace el diálogo)', [ANA, LUIS], [ANA, LUIS], { tituloEvento: 'Kickoff (aula nueva)' }],
+    ['los mismos invitados en otro orden o repetidos', [ANA, LUIS], [LUIS, ANA, ANA], {}],
+    ['quitar a un invitado', [ANA, LUIS], [ANA], {}],
+    ['restringir un evento de todo el proyecto a unos invitados (nadie nuevo entra)', [], [ANA], {}],
+  ])('%s NO reabre el recordatorio', async (_caso, antes, ahora, extra) => {
+    const { prisma, service } = preparar(antes);
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, comoElDialogo(ahora, extra));
+    expect(datos(prisma)).not.toHaveProperty('recordatorioEnviadoEn');
+  });
+
+  it('un PATCH que no menciona los invitados (solo título) no reabre nada', async () => {
+    const { prisma, service } = preparar([ANA]);
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { tituloEvento: 'Otro título' });
+    expect(datos(prisma)).not.toHaveProperty('recordatorioEnviadoEn');
+    expect(datos(prisma)).not.toHaveProperty('invitados');
+  });
+
+  it('si el invitado nuevo no es integrante activo, es un 400 y no se reabre ni se guarda nada', async () => {
+    const { prisma, service } = preparar([ANA]);
+    await expect(service.update(PROJECT_ID, EVENT_ID, LEADER_ID, comoElDialogo([ANA, 777]))).rejects.toThrow(BadRequestException);
+    expect(prisma.eventoProyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('la respuesta sigue sin exponer recordatorioEnviadoEn (contrato público de T-263)', async () => {
+    const { prisma, service } = preparar([ANA]);
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, comoElDialogo([ANA, LUIS]));
+    expect(Object.keys(prisma.eventoProyecto.update.mock.calls[0][0].select)).not.toContain('recordatorioEnviadoEn');
   });
 });

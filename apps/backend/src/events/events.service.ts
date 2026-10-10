@@ -242,7 +242,19 @@ export class EventsService {
     if (dto.rolesDestino !== undefined) data.rolesDestino = dto.rolesDestino;
     if (dto.tipoEvento !== undefined) data.tipoEvento = dto.tipoEvento;
     if (dto.invitados !== undefined) {
-      data.invitados = await this.normalizarInvitados(projectId, proyecto.creadoPor, dto.invitados);
+      const invitados = await this.normalizarInvitados(projectId, proyecto.creadoPor, dto.invitados);
+      data.invitados = invitados;
+      // G04 (UI-22): si la audiencia CRECE (alguien nuevo en la lista, o la
+      // lista se vacía y el evento vuelve a ser de todo el proyecto), quien
+      // entra tarde se quedaba sin recordatorio cuando este ya se había
+      // enviado. Se reabre el recordatorio; EventsReminderService solo avisa a
+      // quien todavía no tiene aviso de este evento para esta hora de inicio,
+      // así que los ya notificados no reciben un duplicado. El diálogo manda
+      // `invitados` en cada edición: por eso se compara contra el valor real
+      // (cambiar solo el título, o quitar a alguien, no reabre nada).
+      if (this.audienciaCrece(actual.invitados, invitados)) {
+        data.recordatorioEnviadoEn = null;
+      }
     }
     // T-265: mover fechaInicio invalida el recordatorio ya agendado/enviado
     // contra la fecha vieja — se resetea para que EventsReminderService lo
@@ -297,6 +309,17 @@ export class EventsService {
       throw new BadRequestException('Solo puedes invitar a integrantes activos del proyecto');
     }
     return unicos;
+  }
+
+  /**
+   * ¿Hay alguien que antes no recibía el evento y ahora sí? `[]` significa
+   * "todo el proyecto": pasar de una lista a `[]` amplía; pasar de `[]` a una
+   * lista restringe (los invitados son siempre integrantes, ya estaban dentro).
+   */
+  private audienciaCrece(antes: number[], ahora: number[]): boolean {
+    if (antes.length === 0) return false;
+    if (ahora.length === 0) return true;
+    return ahora.some((id) => !antes.includes(id));
   }
 
   private assertFechaFinPosterior(fechaInicio: string, fechaFin: string): void {

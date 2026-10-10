@@ -12,6 +12,9 @@ import { createIntegrationUser, createIntegrationProject, createIntegrationProje
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { EventsController } from '../../src/events/events.controller';
 import { EventsService } from '../../src/events/events.service';
+import { EventsReminderService } from '../../src/events/events-reminder.service';
+import { NotificationsService } from '../../src/notifications/notifications.service';
+import type { NotificationsGateway } from '../../src/notifications/notifications.gateway';
 import { JwtStrategy } from '../../src/auth/jwt.strategy';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { getJwtSecret } from '../../src/config/jwt-secret';
@@ -53,7 +56,7 @@ describeIntegration('G04 — contrato HTTP de eventos de proyecto (PostgreSQL re
   let app: INestApplication;
   let url: string;
   const scope: IntegrationCleanupScope = { userIds: [], projectIds: [], roleIds: [], participationIds: [], sprintIds: [], taskIds: [], assignmentIds: [] };
-  const ids = { lider: 0, integrante: 0, proyecto: 0 };
+  const ids = { lider: 0, integrante: 0, tardio: 0, tercero: 0, proyecto: 0 };
   const tokens = { lider: '', integrante: '' };
 
   const pedir = (ruta: string, token: string, init: RequestInit = {}) =>
@@ -106,6 +109,14 @@ describeIntegration('G04 — contrato HTTP de eventos de proyecto (PostgreSQL re
     scope.roleIds!.push(rol.idRolProyecto);
     const participacion = await createIntegrationParticipation(prisma, integrante.idUsuario, rol.idRolProyecto);
     scope.participationIds!.push(participacion.idParticipacion);
+    // G04-C16: dos integrantes activos más (uno se invita tarde; el otro nunca se invita).
+    for (const clave of ['tardio', 'tercero'] as const) {
+      const persona = await createIntegrationUser(prisma, { nombre: clave, apellido: 'G04' });
+      scope.userIds!.push(persona.idUsuario);
+      ids[clave] = persona.idUsuario;
+      const p = await createIntegrationParticipation(prisma, persona.idUsuario, rol.idRolProyecto);
+      scope.participationIds!.push(p.idParticipacion);
+    }
 
     const jwt = new JwtService({ secret: getJwtSecret() });
     const firmar = (u: { idUsuario: number; correo: string }) => jwt.sign({ sub: u.idUsuario, correo: u.correo, tipo: 'access' });
@@ -182,6 +193,123 @@ describeIntegration('G04 — contrato HTTP de eventos de proyecto (PostgreSQL re
       const res = await pedir(`/proyectos/${ids.proyecto}/eventos/${json.idEvento}`, tokens.integrante, { method: 'PATCH', body: JSON.stringify({ modalidad: 'VIRTUAL', linkSesion: 'https://meet.google.com/abc-defg-hij', ubicacionLat: null, ubicacionLng: null, ubicacionNombre: null }) });
       expect(res.status).toBe(403);
       expect(await fila(json.idEvento as number)).toMatchObject({ modalidad: 'PRESENCIAL', ubicacionLat: 14.6048 });
+    });
+  });
+
+  /**
+   * G04-C16 (UI-22): recordatorios reales. EventsReminderService y
+   * NotificationsService son los de producción (sin gateway de sockets: las
+   * notificaciones se persisten igual); la consulta de "a quién ya avisé" usa
+   * los filtros JSON de PostgreSQL de verdad.
+   */
+  describe('G04-C16 (UI-22): recordatorio al añadir invitados, sin duplicados', () => {
+    let reminder: EventsReminderService;
+    let idEvento = 0;
+    const LINK = 'https://meet.google.com/abc-defg-hij';
+    // Empieza en 30 minutos con 60 de antelación: el recordatorio ya debe salir.
+    const enMinutos = (m: number) => new Date(Math.ceil(Date.now() / 60_000) * 60_000 + m * 60_000).toISOString();
+    let inicio = '';
+    /** Recordatorios de este evento por persona. */
+    const avisos = async () => {
+      const filas = await prisma.notificacion.findMany({
+        where: { tipoNotificacion: 'RECORDATORIO_EVENTO', datosJson: { path: ['eventId'], equals: idEvento } },
+        select: { idUsuario: true },
+      });
+      const porUsuario = new Map<number, number>();
+      for (const f of filas) porUsuario.set(f.idUsuario, (porUsuario.get(f.idUsuario) ?? 0) + 1);
+      return { total: filas.length, de: (idUsuario: number) => porUsuario.get(idUsuario) ?? 0 };
+    };
+    /** Lo que el diálogo real envía en cada edición. */
+    const guardar = (invitados: number[], extra: Record<string, unknown> = {}) => editar(idEvento, { tituloEvento: 'Kickoff G04', fechaInicio: inicio, invitados, ...extra });
+
+    beforeAll(() => {
+      const notifications = new NotificationsService(prisma as unknown as PrismaService, {} as NotificationsGateway);
+      reminder = new EventsReminderService(prisma as unknown as PrismaService, notifications);
+    });
+
+    it('primer envío: reciben el aviso el líder y la persona invitada, una vez cada uno, y el evento queda marcado', async () => {
+      inicio = enMinutos(30);
+      const { res, json } = await crear({ tituloEvento: 'Kickoff G04', fechaInicio: inicio, fechaFin: enMinutos(90), antelacionMinutos: 60, modalidad: 'VIRTUAL', linkSesion: LINK, invitados: [ids.integrante] });
+      expect(res.status).toBe(201);
+      idEvento = json.idEvento as number;
+
+      await reminder.enviarRecordatoriosPendientes();
+
+      const a = await avisos();
+      expect([a.total, a.de(ids.lider), a.de(ids.integrante), a.de(ids.tardio), a.de(ids.tercero)]).toEqual([2, 1, 1, 0, 0]);
+      expect((await fila(idEvento)).recordatorioEnviadoEn).not.toBeNull();
+    });
+
+    it('volver a correr el cron no reenvía nada', async () => {
+      await reminder.enviarRecordatoriosPendientes();
+      await reminder.enviarRecordatoriosPendientes();
+      expect((await avisos()).total).toBe(2);
+    });
+
+    it('añadir un invitado después del envío: solo esa persona recibe el aviso; los ya notificados no se duplican', async () => {
+      expect((await guardar([ids.integrante, ids.tardio])).res.status).toBe(200);
+      expect((await fila(idEvento)).recordatorioEnviadoEn).toBeNull();
+
+      await reminder.enviarRecordatoriosPendientes();
+
+      const a = await avisos();
+      expect([a.total, a.de(ids.lider), a.de(ids.integrante), a.de(ids.tardio), a.de(ids.tercero)]).toEqual([3, 1, 1, 1, 0]);
+      expect((await fila(idEvento)).recordatorioEnviadoEn).not.toBeNull();
+    });
+
+    it('editar solo el título (con los mismos invitados) o quitar a un invitado no reabre el recordatorio ni envía nada', async () => {
+      expect((await guardar([ids.integrante, ids.tardio], { tituloEvento: 'Kickoff G04 (aula nueva)' })).res.status).toBe(200);
+      expect((await fila(idEvento)).recordatorioEnviadoEn).not.toBeNull();
+      expect((await guardar([ids.integrante])).res.status).toBe(200);
+      expect((await fila(idEvento)).recordatorioEnviadoEn).not.toBeNull();
+
+      await reminder.enviarRecordatoriosPendientes();
+      expect((await avisos()).total).toBe(3);
+    });
+
+    it('abrir el evento a todo el proyecto: recibe aviso únicamente quien nunca lo tuvo', async () => {
+      expect((await guardar([])).res.status).toBe(200);
+      expect((await fila(idEvento)).recordatorioEnviadoEn).toBeNull();
+
+      await reminder.enviarRecordatoriosPendientes();
+
+      const a = await avisos();
+      expect([a.total, a.de(ids.lider), a.de(ids.integrante), a.de(ids.tardio), a.de(ids.tercero)]).toEqual([4, 1, 1, 1, 1]);
+    });
+
+    it('mover la hora de inicio sí avisa a todos de la fecha nueva (T-265 intacto), una sola vez', async () => {
+      inicio = enMinutos(40);
+      expect((await guardar([], { fechaFin: enMinutos(100) })).res.status).toBe(200);
+      expect((await fila(idEvento)).recordatorioEnviadoEn).toBeNull();
+
+      await reminder.enviarRecordatoriosPendientes();
+      await reminder.enviarRecordatoriosPendientes();
+
+      const a = await avisos();
+      expect([a.total, a.de(ids.lider), a.de(ids.integrante), a.de(ids.tardio), a.de(ids.tercero)]).toEqual([8, 2, 2, 2, 2]);
+      const nuevos = await prisma.notificacion.count({
+        where: { tipoNotificacion: 'RECORDATORIO_EVENTO', AND: [{ datosJson: { path: ['eventId'], equals: idEvento } }, { datosJson: { path: ['fechaInicioIso'], equals: inicio } }] },
+      });
+      expect(nuevos).toBe(4);
+    });
+
+    it('un aviso anterior a G04 (sin fechaInicioIso) también se reconoce por su texto y no se duplica', async () => {
+      // Se simula el dato histórico: se quita la clave nueva de los avisos de la hora vigente.
+      const vigentes = await prisma.notificacion.findMany({
+        where: { tipoNotificacion: 'RECORDATORIO_EVENTO', AND: [{ datosJson: { path: ['eventId'], equals: idEvento } }, { datosJson: { path: ['fechaInicioIso'], equals: inicio } }] },
+        select: { idNotificacion: true, datosJson: true },
+      });
+      for (const n of vigentes) {
+        const { fechaInicioIso: _omitida, ...legado } = n.datosJson as Record<string, unknown>;
+        await prisma.notificacion.update({ where: { idNotificacion: n.idNotificacion }, data: { datosJson: legado as object } });
+      }
+      // Se reabre a mano la marca, como si se hubiera añadido alguien.
+      await prisma.eventoProyecto.update({ where: { idEvento }, data: { recordatorioEnviadoEn: null } });
+
+      await reminder.enviarRecordatoriosPendientes();
+
+      expect((await avisos()).total).toBe(8);
+      expect((await fila(idEvento)).recordatorioEnviadoEn).not.toBeNull();
     });
   });
 });

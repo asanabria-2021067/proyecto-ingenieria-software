@@ -233,6 +233,13 @@ export interface NotificationTemplateData {
     eventId: number;
     /** Fecha/hora de inicio ya formateada por el emisor (es-GT), lista para mostrar. */
     fechaInicioTexto: string;
+    /**
+     * G04 (UI-22): el mismo inicio como instante ISO. No se muestra: es la
+     * clave con la que EventsReminderService reconoce a quién ya avisó de este
+     * evento para esta hora de inicio. Opcional porque los avisos anteriores
+     * a G04 no lo traen (para esos se compara `fechaInicioTexto`).
+     */
+    fechaInicioIso?: string;
   };
 
   // HU-184: un usuario compartió su calendario (solo lectura) con el destinatario.
