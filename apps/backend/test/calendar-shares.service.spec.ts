@@ -439,3 +439,32 @@ describe('CalendarSharesService — límite de notificaciones al compartir (G01-
     expect(deps.notifications.notifyFromTemplate).not.toHaveBeenCalled();
   });
 });
+
+describe('CalendarSharesService — correo solo donde la UI lo muestra (G01-C13, UI-19/F262-10)', () => {
+  it('"compartidosConmigo" (propietarios) se consulta sin correo; "compartidoPorMi" (invitados) sí lo trae', async () => {
+    const { prisma, service } = makeDeps();
+    prisma.calendarioCompartido.findMany
+      .mockResolvedValueOnce([{ invitado: ANA }])
+      .mockResolvedValueOnce([{ propietario: { idUsuario: 3, nombre: 'Luis', apellido: 'Pérez', fotoUrl: null } }]);
+
+    const resultado = await service.listar(OWNER_ID);
+
+    const [porMi, conmigo] = prisma.calendarioCompartido.findMany.mock.calls.map((c) => c[0].select);
+    expect(porMi.invitado.select).toEqual({ idUsuario: true, nombre: true, apellido: true, fotoUrl: true, correo: true });
+    expect(conmigo.propietario.select).toEqual({ idUsuario: true, nombre: true, apellido: true, fotoUrl: true });
+    expect(Object.keys(resultado.compartidosConmigo[0])).not.toContain('correo');
+    expect(resultado.compartidoPorMi[0].correo).toBe('ana@uvg.edu.gt');
+  });
+
+  it('la respuesta de compartir no pide el correo del destinatario', async () => {
+    const { prisma, service } = makeDeps();
+    prisma.usuario.findFirst.mockResolvedValue({ idUsuario: VIEWER_ID, nombre: 'Ana', apellido: 'García', fotoUrl: null });
+    prisma.usuario.findUnique.mockResolvedValue({ nombre: 'Carlos', apellido: 'Mendoza' });
+    prisma.calendarioCompartido.create.mockResolvedValue({});
+
+    const resultado = await service.compartir(OWNER_ID, VIEWER_ID);
+
+    expect(prisma.usuario.findFirst.mock.calls[0][0].select).toEqual({ idUsuario: true, nombre: true, apellido: true, fotoUrl: true });
+    expect(Object.keys(resultado)).not.toContain('correo');
+  });
+});

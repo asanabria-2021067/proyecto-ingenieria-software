@@ -21,7 +21,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const ANA = { idUsuario: 9, nombre: 'Ana', apellido: 'García', correo: 'ana@uvg.edu.gt', fotoUrl: null, tono: 2 as const };
+const ANA = { idUsuario: 9, nombre: 'Ana', apellido: 'García', fotoUrl: null, tono: 2 as const };
 
 function renderSidebar(overrides: Partial<Parameters<typeof CalendarSidebar>[0]> = {}) {
   const onToggleCompartido = vi.fn();

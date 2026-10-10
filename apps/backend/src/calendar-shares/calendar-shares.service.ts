@@ -11,14 +11,20 @@ import { NotificationsService } from '../notifications/notifications.service';
  */
 const VENTANA_RENOTIFICACION_MS = 24 * 60 * 60 * 1000;
 
-/** Datos públicos de una persona en la lista de calendarios compartidos. */
+/** Datos públicos de una persona en la lista de calendarios compartidos (sin correo). */
 const USUARIO_RESUMEN = {
   idUsuario: true,
   nombre: true,
   apellido: true,
-  correo: true,
   fotoUrl: true,
 } as const;
+
+/**
+ * G01 (UI-19): el correo solo se devuelve en "con quién compartí" (la
+ * persona que yo elegí y que la UI muestra bajo su nombre); nunca el del
+ * propietario que me compartió ni en la respuesta de compartir.
+ */
+const INVITADO_RESUMEN = { ...USUARIO_RESUMEN, correo: true } as const;
 
 /** G01 (UI-01): única `select` de una tarea vista desde un calendario compartido. */
 const TAREA_SHARED_SELECT = {
@@ -85,7 +91,7 @@ export class CalendarSharesService {
     const [porMi, conmigo] = await Promise.all([
       this.prisma.calendarioCompartido.findMany({
         where: { idPropietario: userId, invitado: { estado: 'ACTIVO' } },
-        select: { invitado: { select: USUARIO_RESUMEN } },
+        select: { invitado: { select: INVITADO_RESUMEN } },
         orderBy: { creadoEn: 'asc' },
       }),
       this.prisma.calendarioCompartido.findMany({

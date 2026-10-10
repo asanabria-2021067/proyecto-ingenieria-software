@@ -2,18 +2,17 @@ import { apiFetch } from '@/lib/api/client';
 import type { ModalidadEvento, TipoEvento } from '@/lib/services/events';
 import type { MiTareaDTO } from '@/lib/services/users';
 
-/** HU-184: persona en la lista de calendarios compartidos. */
+/** HU-184: persona en la lista de calendarios compartidos (sin correo: G01, UI-19). */
 export interface UsuarioCalendarioDTO {
   idUsuario: number;
   nombre: string;
   apellido: string;
-  correo: string;
   fotoUrl: string | null;
 }
 
 export interface CalendariosCompartidosDTO {
-  /** Personas con las que yo compartí mi calendario. */
-  compartidoPorMi: UsuarioCalendarioDTO[];
+  /** Personas con las que yo compartí mi calendario (con correo: las elegí yo y se muestra bajo su nombre). */
+  compartidoPorMi: (UsuarioCalendarioDTO & { correo: string })[];
   /** Personas que me compartieron su calendario (estilo Teams: se superponen al mío). */
   compartidosConmigo: UsuarioCalendarioDTO[];
 }
