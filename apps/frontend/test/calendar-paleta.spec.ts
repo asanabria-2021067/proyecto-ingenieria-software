@@ -54,3 +54,60 @@ describe('calendar/paleta (HU-184)', () => {
     }
   });
 });
+
+/** Valor hexadecimal de `--color-<token>` dentro de un bloque del CSS. */
+function token(css: string, nombre: string): string {
+  const m = css.match(new RegExp(`--color-${nombre}:\\s*(#[0-9a-fA-F]{6})\\b`));
+  if (!m) throw new Error(`sin token --color-${nombre}`);
+  return m[1];
+}
+
+/** Luminancia relativa y razón de contraste de WCAG 2.x. */
+function luminancia(hex: string): number {
+  const canal = (i: number) => {
+    const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * canal(1) + 0.7152 * canal(3) + 0.0722 * canal(5);
+}
+
+function contraste(a: string, b: string): number {
+  const [claro, oscuro] = [luminancia(a), luminancia(b)].sort((x, y) => y - x);
+  return (claro + 0.05) / (oscuro + 0.05);
+}
+
+describe('calendar/paleta — contraste de los indicadores (G04-C04, UI-14)', () => {
+  const TEMAS = [
+    ['claro', bloque('@theme {')],
+    ['oscuro', bloque('.dark {')],
+  ] as const;
+  const TONOS = [1, 2, 3, 4, 5, 6] as const;
+
+  it('la fórmula de contraste es la de WCAG (negro sobre blanco = 21:1)', () => {
+    expect(contraste('#000000', '#ffffff')).toBeCloseTo(21, 5);
+    expect(contraste('#ffffff', '#ffffff')).toBe(1);
+  });
+
+  // 1.4.11 (contraste no textual): bordes, puntos y anillos de cada tono deben
+  // distinguirse (≥ 3:1) de la tarjeta, de su propio fondo suave y de la fila gris.
+  for (const [tema, css] of TEMAS) {
+    it.each(TONOS)(`${tema}: cal-%i-strong alcanza 3:1 sobre la tarjeta, su fondo cal-N y la fila`, (n) => {
+      const fuerte = token(css, `cal-${n}-strong`);
+      expect(contraste(fuerte, token(css, 'surface-container-lowest'))).toBeGreaterThanOrEqual(3);
+      expect(contraste(fuerte, token(css, `cal-${n}`))).toBeGreaterThanOrEqual(3);
+      expect(contraste(fuerte, token(css, 'surface-container-low'))).toBeGreaterThanOrEqual(3);
+    });
+
+    it.each(TONOS)(`${tema}: el texto on-cal-%i sobre su fondo conserva 4.5:1`, (n) => {
+      expect(contraste(token(css, `on-cal-${n}`), token(css, `cal-${n}`))).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+
+  it('el ajuste es solo del tema claro: los tonos fuertes del oscuro y el resto de la paleta clara no cambian', () => {
+    const oscuro = bloque('.dark {');
+    expect(TONOS.map((n) => token(oscuro, `cal-${n}-strong`))).toEqual(['#a98bf0', '#5cc982', '#6fa4ec', '#e6bd3a', '#ee7fac', '#57c3c3']);
+    const claro = bloque('@theme {');
+    expect([1, 2, 3, 5].map((n) => token(claro, `cal-${n}-strong`))).toEqual(['#7c4dcc', '#2f9e5a', '#3b7dd8', '#d94b86']);
+    expect(TONOS.map((n) => token(claro, `cal-${n}`))).toEqual(['#efe7fb', '#e3f6e8', '#e2eefc', '#fdf3d6', '#fce4ee', '#dcf3f3']);
+  });
+});

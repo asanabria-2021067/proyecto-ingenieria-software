@@ -125,13 +125,15 @@
   --color-cal-3-strong: #3b7dd8;
   --color-cal-4: #fdf3d6;
   --color-on-cal-4: #6b4a00;
-  --color-cal-4-strong: #c99700;
+  /* G04 (UI-14): #c99700 daba 2.65:1 sobre blanco y 2.40:1 sobre cal-4; #9c7400 da 4.28 y 3.86. */
+  --color-cal-4-strong: #9c7400;
   --color-cal-5: #fce4ee;
   --color-on-cal-5: #7a1f45;
   --color-cal-5-strong: #d94b86;
   --color-cal-6: #dcf3f3;
   --color-on-cal-6: #0f4c4c;
-  --color-cal-6-strong: #2a9d9d;
+  /* G04 (UI-14): #2a9d9d daba 3.28:1 sobre blanco y 2.83:1 sobre cal-6; #1f8585 da 4.42 y 3.82. */
+  --color-cal-6-strong: #1f8585;
 
   --font-family-headline: var(--font-manrope, 'Manrope'), sans-serif;
   --font-family-body: var(--font-inter, 'Inter'), sans-serif;
