@@ -92,6 +92,13 @@ function guardarCompartidosActivos(ids: number[]) {
   }
 }
 
+// G04 (UI-11): mientras una consulta no tiene datos, el valor por defecto debe
+// ser SIEMPRE el mismo array: un `[]` literal en la desestructuración sería una
+// referencia nueva por render y rompería toda la cadena de `useMemo`.
+const SIN_TAREAS: MiTareaDTO[] = [];
+const SIN_EVENTOS: MiEventoDTO[] = [];
+const SIN_PROYECTOS: MiProyectoListItemDTO[] = [];
+
 function tieneFechaLimite(tarea: MiTareaDTO): tarea is MiTareaDTO & { fechaLimite: string } {
   return tarea.fechaLimite !== null;
 }
@@ -113,7 +120,7 @@ function alternar<T>(conjunto: Set<T>, valor: T): Set<T> {
  */
 export default function CalendarioPage() {
   const {
-    data: tareas = [],
+    data: tareas = SIN_TAREAS,
     isLoading: isLoadingTareas,
     isError: isErrorTareas,
     refetch: refetchTareas,
@@ -127,7 +134,7 @@ export default function CalendarioPage() {
     queryFn: getDashboardStats,
   });
 
-  const { data: misProyectos = [] } = useQuery<MiProyectoListItemDTO[]>({
+  const { data: misProyectos = SIN_PROYECTOS } = useQuery<MiProyectoListItemDTO[]>({
     queryKey: ['dashboard-mis-proyectos'],
     queryFn: getMyProjects,
   });
@@ -224,7 +231,7 @@ export default function CalendarioPage() {
   const rango = useMemo(() => rangoVisible(vista, anchor), [vista, anchor]);
 
   const {
-    data: eventos = [],
+    data: eventos = SIN_EVENTOS,
     isLoading: isLoadingEventos,
     isError: isErrorEventos,
     refetch: refetchEventos,
@@ -242,8 +249,9 @@ export default function CalendarioPage() {
     () => personasCompartidas.filter((p) => compartidosActivos.includes(p.idUsuario)).map((p) => p.idUsuario),
     [personasCompartidas, compartidosActivos],
   );
+  // G04 (UI-11): el Set que recibe la columna izquierda solo cambia si cambian los activos.
+  const compartidosActivosSet = useMemo(() => new Set(idsActivos), [idsActivos]);
   const { agendas: agendasCompartidas, estados: estadosCompartidos } = useAgendasCompartidas(idsActivos, rango.desde, rango.hasta);
-
 
   // G03 (UI-12): un fallo por persona se avisa una sola vez (al pasar a error),
   // nunca en cada render; si fue revocación (403) se refresca la lista para que
@@ -272,6 +280,10 @@ export default function CalendarioPage() {
   }, [fallosCompartidos, personasCompartidas, queryClient]);
 
   const ledProjectIds = useMemo(() => new Set(misProyectos.map((p) => p.idProyecto)), [misProyectos]);
+  const proyectosLiderados = useMemo(
+    () => misProyectos.map((p) => ({ idProyecto: p.idProyecto, tituloProyecto: p.tituloProyecto, tipoProyecto: p.tipoProyecto })),
+    [misProyectos],
+  );
 
   const itemsPropios = useMemo<AgendaItem[]>(
     () => [
@@ -509,7 +521,7 @@ export default function CalendarioPage() {
             proyectosOcultos={proyectosOcultos}
             onToggleProyecto={(id) => setProyectosOcultos((s) => alternar(s, id))}
             compartidos={personasCompartidas}
-            compartidosActivos={new Set(idsActivos)}
+            compartidosActivos={compartidosActivosSet}
             onToggleCompartido={handleToggleCompartido}
             onQuitarCompartido={handleQuitarCompartido}
             quitandoCompartido={dejarDeRecibir.isPending ? dejarDeRecibir.variables : null}
@@ -705,11 +717,7 @@ export default function CalendarioPage() {
       <EventFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        ledProjects={misProyectos.map((p) => ({
-          idProyecto: p.idProyecto,
-          tituloProyecto: p.tituloProyecto,
-          tipoProyecto: p.tipoProyecto,
-        }))}
+        ledProjects={proyectosLiderados}
         editingEvent={editingEvent}
         defaultProjectId={misProyectos[0]?.idProyecto}
         initialDate={initialDateParaNuevoEvento}

@@ -39,6 +39,16 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => navigationMock.searchParams,
 }));
 
+// G04-C02: contadores de recálculo sobre las derivaciones reales (misma implementación, espiada).
+vi.mock('../lib/calendar/agenda', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../lib/calendar/agenda')>();
+  return { ...real, groupAgendaItemsByDay: vi.fn(real.groupAgendaItemsByDay), eventoToAgendaItems: vi.fn(real.eventoToAgendaItems) };
+});
+vi.mock('../lib/calendar/vista', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../lib/calendar/vista')>();
+  return { ...real, filtrarItems: vi.fn(real.filtrarItems) };
+});
+
 vi.mock('../hooks/use-current-user', () => ({
   useCurrentUser: () => ({ data: { idUsuario: 1, nombre: 'Carlos', apellido: 'Mendoza', fotoUrl: null, roles: [] } }),
 }));
@@ -47,6 +57,8 @@ vi.mock('../hooks/use-project-members', () => ({ useProjectMembers: () => ({ mem
 vi.mock('next/dynamic', () => ({ default: () => () => null }));
 
 import CalendarioPage from '../app/dashboard/calendario/page';
+import { eventoToAgendaItems, groupAgendaItemsByDay } from '../lib/calendar/agenda';
+import { filtrarItems } from '../lib/calendar/vista';
 import type { MiEventoDTO } from '../lib/services/events';
 
 beforeAll(() => {
@@ -488,5 +500,99 @@ describe('CalendarioPage — foco tras Detalle → Editar → Cancelar (G03-C15,
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(document.activeElement).not.toBe(document.body);
     expect(bloque).toHaveFocus();
+  });
+});
+
+describe('CalendarioPage — derivaciones memoizadas (G04-C02, UI-11)', () => {
+  const recalculos = () => ({
+    porDia: vi.mocked(groupAgendaItemsByDay).mock.calls.length,
+    filtro: vi.mocked(filtrarItems).mock.calls.length,
+    mapeo: vi.mocked(eventoToAgendaItems).mock.calls.length,
+  });
+  const ANA = { idUsuario: 9, nombre: 'Ana', apellido: 'García', fotoUrl: null };
+  const LUIS = { idUsuario: 5, nombre: 'Luis', apellido: 'Hernández', fotoUrl: null };
+  const bloque = (nombre: RegExp) => screen.findAllByRole('button', { name: nombre });
+
+  it('abrir y cerrar el detalle de un evento no vuelve a agrupar, filtrar ni mapear la agenda', async () => {
+    eventsMock.getMisEventos.mockResolvedValue([eventoDTO()]);
+    await renderPage();
+    const [evento] = await bloque(/^Reunión semanal, 09:00 a 10:00/);
+    const antes = recalculos();
+
+    fireEvent.click(evento);
+    const detalle = await screen.findByRole('dialog', { name: 'Reunión semanal' });
+    fireEvent.keyDown(detalle, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    expect(recalculos()).toEqual(antes);
+  });
+
+  it('mientras los eventos siguen cargando, un render ajeno (abrir "Compartir agenda") no recalcula con un vacío nuevo cada vez', async () => {
+    eventsMock.getMisEventos.mockImplementation(() => new Promise<MiEventoDTO[]>(() => {}));
+    render(<CalendarioPage />, { wrapper });
+    await waitFor(() => expect(usersMock.getMisTareas).toHaveBeenCalled());
+    await screen.findByText('Nadie te ha compartido su calendario todavía.');
+    const antes = recalculos();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Compartir agenda' }));
+    const compartir = await screen.findByRole('dialog', { name: 'Compartir mi agenda' });
+    fireEvent.keyDown(compartir, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    expect(recalculos()).toEqual(antes);
+  });
+
+  it('el tick del reloj mueve la línea de "ahora" sin recalcular la agenda', async () => {
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.setSystemTime(HOY);
+    eventsMock.getMisEventos.mockResolvedValue([eventoDTO()]);
+    await renderPage();
+    await bloque(/^Reunión semanal, 09:00 a 10:00/);
+    const antes = recalculos();
+
+    act(() => {
+      vi.advanceTimersByTime(5 * 60_000);
+    });
+    expect(recalculos()).toEqual(antes);
+  });
+
+  it('activar otra agenda sí actualiza el contenido y hace su propia petición, sin volver a pedir la que ya estaba', async () => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [ANA, LUIS] });
+    sharesMock.getAgendaCompartida.mockImplementation(async (id: number) =>
+      id === LUIS.idUsuario
+        ? {
+            eventos: [
+              {
+                idEvento: 901,
+                fechaInicio: new Date(2026, 9, 9, 11, 0).toISOString(),
+                fechaFin: new Date(2026, 9, 9, 12, 0).toISOString(),
+                visibilidad: 'DETALLE',
+                tituloEvento: 'Revisión con Luis',
+                tipoEvento: 'REVISION',
+                modalidad: 'VIRTUAL',
+                proyecto: { idProyecto: 1, tituloProyecto: 'Proyecto Uno' },
+              },
+            ],
+            tareas: [],
+          }
+        : { eventos: [{ idEvento: 900, fechaInicio: new Date(2026, 9, 9, 14, 0).toISOString(), fechaFin: new Date(2026, 9, 9, 15, 0).toISOString(), visibilidad: 'OCUPADO' }], tareas: [] },
+    );
+    window.localStorage.setItem('calendario:compartidos-activos', '[5]');
+    await renderPage();
+    await bloque(/^Revisión con Luis, 11:00 a 12:00, calendario de Luis Hernández/);
+    expect(screen.queryByRole('button', { name: /^Ocupado/ })).not.toBeInTheDocument();
+    const antes = recalculos();
+    const pedidas = (id: number) => sharesMock.getAgendaCompartida.mock.calls.filter(([propietario]) => propietario === id).length;
+    expect(pedidas(LUIS.idUsuario)).toBe(1);
+    expect(pedidas(ANA.idUsuario)).toBe(0);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ver el calendario de Ana García' }));
+    await bloque(/^Ocupado, 14:00 a 15:00, calendario de Ana García/);
+
+    expect(pedidas(ANA.idUsuario)).toBe(1);
+    expect(pedidas(LUIS.idUsuario)).toBe(1);
+    expect(recalculos().porDia).toBeGreaterThan(antes.porDia);
+    expect(screen.getByRole('checkbox', { name: 'Ver el calendario de Luis Hernández' })).toBeChecked();
   });
 });
