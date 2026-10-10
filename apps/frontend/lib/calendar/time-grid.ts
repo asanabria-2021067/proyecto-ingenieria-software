@@ -26,6 +26,20 @@ function minutosDelDia(fecha: Date): number {
   return fecha.getHours() * 60 + fecha.getMinutes();
 }
 
+function mismoDia(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/**
+ * G02 (UI-05): minuto del día en que termina el bloque. Un fin en otra
+ * fecha (medianoche exacta o un tramo que sigue al día siguiente) se
+ * representa hasta las 24:00 de este día; nunca como una hora "anterior"
+ * al inicio.
+ */
+function minutoFinEnElDia(inicio: Date, fin: Date): number {
+  return mismoDia(inicio, fin) ? minutosDelDia(fin) : 24 * 60;
+}
+
 /**
  * HU-184 (T-324): posiciona los eventos con hora de un día en la cuadrícula.
  * Los que se solapan se reparten en columnas (como Teams/Outlook): cada grupo
@@ -37,7 +51,7 @@ export function layoutDia(eventos: EventoItem[]): BloqueEvento[] {
     .filter((e) => !e.multiDia)
     .map((item) => {
       const inicio = minutosDelDia(item.fechaInicio);
-      const finReal = minutosDelDia(item.fechaFin) || 24 * 60; // termina a medianoche
+      const finReal = minutoFinEnElDia(item.fechaInicio, item.fechaFin);
       const fin = Math.max(finReal, inicio + MINUTOS_MINIMOS_VISIBLES);
       return { item, inicio, fin: Math.min(fin, 24 * 60) };
     })

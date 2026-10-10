@@ -218,8 +218,9 @@ export function TimeGridView({
                       type="button"
                       onClick={() => onSelectEvento(item)}
                       aria-label={`${item.titulo}, ${item.horaInicio} a ${item.horaFin}${
-                        item.compartidoPor ? `, calendario de ${item.compartidoPor.nombre}` : ''
-                      }`}
+                        // G02 (UI-05): un tramo que termina a las 00:00 lo hace ya en la fecha siguiente.
+                        item.horaFin === '00:00' && item.fechaFin > item.fechaInicio ? ' del día siguiente' : ''
+                      }${item.compartidoPor ? `, calendario de ${item.compartidoPor.nombre}` : ''}`}
                       className={`absolute overflow-hidden rounded-control border-l-4 px-1.5 py-1 text-left shadow-card transition-[filter] hover:brightness-95 ${tono.bloque} ${tono.borde} ${
                         item.compartidoPor ? 'border-dashed' : ''
                       }`}

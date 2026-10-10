@@ -163,6 +163,69 @@ describe('TimeGridView (HU-184 T-324)', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
+  it('un evento 23:00 → 01:00 llega como dos tramos con hora y se dibuja en la cuadrícula, no en "Todo el día" (G02-C05, UI-05)', () => {
+    const tramoA = evento(9, '2026-10-08', {
+      titulo: 'Hackathon',
+      horaInicio: '23:00',
+      horaFin: '00:00',
+      fechaInicio: new Date(2026, 9, 8, 23, 0),
+      fechaFin: new Date(2026, 9, 9, 0, 0),
+    });
+    const tramoB = evento(9, '2026-10-09', {
+      titulo: 'Hackathon',
+      horaInicio: '00:00',
+      horaFin: '01:00',
+      fechaInicio: new Date(2026, 9, 9, 0, 0),
+      fechaFin: new Date(2026, 9, 9, 1, 0),
+    });
+    render(
+      <TimeGridView
+        days={semana()}
+        todayKey="2026-10-06"
+        itemsByDay={new Map([['2026-10-08', [tramoA]], ['2026-10-09', [tramoB]]])}
+        onSelectEvento={() => {}}
+        ahora={AHORA}
+      />,
+    );
+
+    expect(screen.queryByText('Todo el día')).not.toBeInTheDocument();
+    const bloqueA = screen.getByRole('button', { name: 'Hackathon, 23:00 a 00:00 del día siguiente' });
+    expect(bloqueA).toHaveStyle({ top: `${23 * 48 + 1}px`, height: `${48 - 2}px` });
+    const bloqueB = screen.getByRole('button', { name: 'Hackathon, 00:00 a 01:00' });
+    expect(bloqueB).toHaveStyle({ top: '1px', height: `${48 - 2}px` });
+  });
+
+  it('un evento que termina exactamente a las 00:00 ocupa hasta el final de su día y no aparece al siguiente', () => {
+    const unico = evento(10, '2026-10-08', {
+      titulo: 'Cierre',
+      horaInicio: '22:00',
+      horaFin: '00:00',
+      fechaInicio: new Date(2026, 9, 8, 22, 0),
+      fechaFin: new Date(2026, 9, 9, 0, 0),
+    });
+    render(
+      <TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={new Map([['2026-10-08', [unico]]])} onSelectEvento={() => {}} ahora={AHORA} />,
+    );
+
+    expect(screen.queryByText('Todo el día')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Cierre/ })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Cierre, 22:00 a 00:00 del día siguiente' })).toHaveStyle({ height: `${2 * 48 - 2}px` });
+  });
+
+  it('un ítem sin partir cuyo fin cae en otra fecha se recorta a las 24:00 del día, nunca "antes" del inicio', () => {
+    const sinPartir = evento(11, '2026-10-08', {
+      titulo: 'Guardia',
+      horaInicio: '23:00',
+      horaFin: '01:00',
+      fechaInicio: new Date(2026, 9, 8, 23, 0),
+      fechaFin: new Date(2026, 9, 9, 1, 0),
+    });
+    render(
+      <TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={new Map([['2026-10-08', [sinPartir]]])} onSelectEvento={() => {}} ahora={AHORA} />,
+    );
+    expect(screen.getByRole('button', { name: /^Guardia/ })).toHaveStyle({ top: `${23 * 48 + 1}px`, height: `${48 - 2}px` });
+  });
+
   it('una tarea compartida no es un enlace', () => {
     const key = '2026-10-08';
     render(
