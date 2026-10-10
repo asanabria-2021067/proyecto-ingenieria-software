@@ -55,7 +55,7 @@ export function getNotificationLink(n: {
     case 'ALERTA_SEGURIDAD':
       return '/dashboard/admin/usuarios';
     case 'CUENTA_PENDIENTE_VERIFICACION':
-      return '/dashboard/admin/usuarios';
+      return '/dashboard/admin/cuentas-pendientes';
     default:
       return null;
   }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Archive,
@@ -15,15 +15,19 @@ import {
   LayoutDashboard,
   Settings2,
   ShieldCheck,
+  UserCheck,
   Users,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
+import { useCuentasPendientes } from '@/hooks/use-cuentas-pendientes';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import { SidebarNav, type NavEntry, type NavLeaf } from '@/components/dashboard/SidebarNav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import logo from '@/public/logo.png';
+
+export const ADMIN_CUENTAS_PENDIENTES_HREF = '/dashboard/admin/cuentas-pendientes';
 
 /**
  * S7 (VIEW-12, F011). Los cuatro grupos de «Proyectos» son EXACTAMENTE los del
@@ -59,6 +63,7 @@ export const adminNavEntries: NavEntry[] = [
     icon: Settings2,
     items: [
       { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
+      { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
       { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
     ],
   },
@@ -78,9 +83,23 @@ export const adminNavItemsMobile: NavLeaf[] = [
 ];
 
 /** `useSearchParams` exige un límite de Suspense en el prerender: se aísla aquí. */
-function AdminSidebarNav() {
+function AdminSidebarNav({ entries }: { entries: NavEntry[] }) {
   const searchParams = useSearchParams();
-  return <SidebarNav entries={adminNavEntries} theme="admin" search={searchParams?.toString() ?? ''} />;
+  return <SidebarNav entries={entries} theme="admin" search={searchParams?.toString() ?? ''} />;
+}
+
+function withCuentasPendientes(entries: NavEntry[], total: number): NavEntry[] {
+  if (total <= 0) return entries;
+  return entries.map((entry) =>
+    entry.type === 'group'
+      ? {
+          ...entry,
+          items: entry.items.map((item) =>
+            item.href === ADMIN_CUENTAS_PENDIENTES_HREF ? { ...item, badge: total } : item,
+          ),
+        }
+      : entry,
+  );
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -90,6 +109,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleLogout = useLogout();
 
   const esAdmin = isAdminUser(user);
+  const { data: cuentasPendientes } = useCuentasPendientes(esAdmin);
+  const totalPendientes = cuentasPendientes?.total ?? 0;
+  const navEntries = useMemo(
+    () => withCuentasPendientes(adminNavEntries, totalPendientes),
+    [totalPendientes],
+  );
 
   useEffect(() => {
     if (isLoading) return;
@@ -127,8 +152,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </span>
         </div>
 
-        <Suspense fallback={<SidebarNav entries={adminNavEntries} theme="admin" />}>
-          <AdminSidebarNav />
+        <Suspense fallback={<SidebarNav entries={navEntries} theme="admin" />}>
+          <AdminSidebarNav entries={navEntries} />
         </Suspense>
 
         <div className="px-3 py-4" style={{ borderTop: '1px solid var(--admin-border)' }}>
