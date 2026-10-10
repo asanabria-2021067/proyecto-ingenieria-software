@@ -147,6 +147,13 @@ interface MineEstadoConfig {
   secondaryIconClassName?: string;
 }
 
+/**
+ * «Ver proyecto» de un proyecto cerrado: verde grisáceo desaturado. Lo comparte
+ * «Revisar cierre» de la bandeja de solicitudes de cierre del administrador.
+ */
+export const BOTON_CERRADO =
+  'bg-[#64756C] text-white hover:bg-[#57675F] dark:bg-[#453405] dark:text-[#ffd873] dark:hover:bg-[#5a4408]';
+
 /** «Ver proyecto» de un proyecto con cierre solicitado: verde oscuro de marca. */
 const BOTON_CIERRE_SOLICITADO = 'bg-[#0A4232] text-white hover:bg-[#08352A] dark:bg-primary dark:text-on-primary dark:hover:bg-primary/90';
 
@@ -218,7 +225,7 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         estadoLabel: 'Cerrado',
         buttonLabel: 'Ver proyecto',
         buttonHref: `/dashboard/proyectos/${idProyecto}`,
-        buttonClassName: 'bg-[#64756C] text-white hover:bg-[#57675F] dark:bg-[#453405] dark:text-[#ffd873] dark:hover:bg-[#5a4408]',
+        buttonClassName: BOTON_CERRADO,
         buttonAnimated: false,
         showDelete: false,
         secondaryIcon: Lock,

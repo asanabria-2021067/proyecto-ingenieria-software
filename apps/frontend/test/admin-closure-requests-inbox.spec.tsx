@@ -172,7 +172,7 @@ describe('Solicitudes de cierre — bandeja por etapas', () => {
     // …y la categoría real con la etiqueta de las vistas de estudiante.
     const categorias = screen.getAllByText('Extensión');
     expect(categorias).toHaveLength(4);
-    for (const etiqueta of categorias) expect(etiqueta).toHaveClass('rounded-[7px]');
+    for (const etiqueta of categorias) expect(etiqueta).toHaveClass('pill', 'pill-violet');
     // Las acciones son el botón compacto del panel, sin icono.
     for (const accion of screen.getAllByRole('link', { name: /^(Revisar cierre|Ver solicitud|Ver proyecto): / })) {
       expect(accion).toHaveAttribute('data-slot', 'button');
@@ -225,7 +225,7 @@ describe('Solicitudes de cierre — bandeja por etapas', () => {
     expect(verProyecto).not.toHaveClass('bg-primary');
     expect(verProyecto).not.toHaveClass('bg-consult');
     expect(screen.getByRole('link', { name: 'Ver solicitud: Feria de Ciencias' })).toHaveClass('bg-consult');
-    expect(screen.getByRole('link', { name: 'Revisar cierre: Portal de Voluntariado' })).toHaveClass('bg-primary');
+    expect(screen.getByRole('link', { name: 'Revisar cierre: Portal de Voluntariado' })).toHaveClass('bg-[#64756C]');
 
     expect(seccion('En espera de correcciones').queryByRole('link', { name: /Revisar cierre/ })).not.toBeInTheDocument();
     expect(seccion('Sin entrega formal').queryByRole('link', { name: /Revisar cierre|Ver solicitud/ })).not.toBeInTheDocument();

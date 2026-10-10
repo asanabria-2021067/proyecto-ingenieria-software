@@ -11,9 +11,9 @@ import {
 import {
   REQUEST_INBOX_BUTTON,
   REQUEST_INBOX_BUTTON_CONSULT,
-  REQUEST_INBOX_BUTTON_GREEN,
   RequestInboxDetails,
 } from '@/components/admin/request-inbox-details';
+import { BOTON_CERRADO } from '@/components/projects/available-project-card';
 import { Button } from '@/components/ui/button';
 import { formatInstanteGuatemala } from '@/lib/admin/sprint-calendar';
 import type { AdminProjectListItem, AdminProjectsPage, ClosureRequestSituation } from '@/lib/types/admin-projects';
@@ -32,7 +32,7 @@ const hrefProyecto = (idProyecto: number) => `/dashboard/admin/proyectos/${idPro
 
 /**
  * Enlace al detalle con forma de botón compacto; nunca resuelve nada desde la
- * bandeja. `decision`: verde, abre una entrega por resolver. `neutro`: el botón
+ * bandeja. `decision`: el verde grisáceo de «Cerrado» de Mis Proyectos, abre una entrega por resolver. `neutro`: el botón
  * oscuro por defecto, el mismo «Ver proyecto» de Actividad reciente del panel,
  * para lo que solo lleva al detalle del proyecto. El resto: verde de consulta.
  */
@@ -49,7 +49,7 @@ function Accion({
   texto: string;
   proyecto: string;
 }) {
-  const tono = decision ? REQUEST_INBOX_BUTTON_GREEN : neutro ? '' : REQUEST_INBOX_BUTTON_CONSULT;
+  const tono = decision ? BOTON_CERRADO : neutro ? '' : REQUEST_INBOX_BUTTON_CONSULT;
   return (
     <Button asChild size="sm" className={`${REQUEST_INBOX_BUTTON} ${tono}`}>
       <Link href={href} aria-label={`${texto}: ${proyecto}`}>
