@@ -33,8 +33,8 @@ function EventoIcono({ item }: { item: EventoItem }) {
  * HU-184 (T-324): un clic en un evento abre su detalle (`onSelectEvento`),
  * sea o no del proyecto que lidera el usuario. En móvil (días apilados) se
  * ocultan los días sin actividad, salvo hoy, para no hacer scroll por
- * tarjetas vacías. HU-184: en escritorio la semana se ve como cuadrícula por
- * horas (TimeGridView); esta lista queda para móvil.
+ * tarjetas vacías. HU-184: desde xl la semana se ve como cuadrícula por
+ * horas (TimeGridView); esta lista queda para móvil, tablet y portátil.
  */
 export function WeekView({
   days,
@@ -50,21 +50,19 @@ export function WeekView({
   const semanaVacia = days.every((day) => (itemsByDay.get(day.key) ?? []).length === 0);
 
   return (
-    <div className="grid grid-cols-1 gap-tight md:grid-cols-7 md:gap-gap">
-      {semanaVacia && (
-        <p className="type-meta card-base py-3 text-center md:hidden">Sin actividad esta semana</p>
-      )}
+    // G02 (UI-02): esta lista solo se muestra donde la cuadrícula no cabe (<xl):
+    // siempre una columna de días, sin la rejilla de 7 que la hacía ilegible.
+    <div className="grid grid-cols-1 gap-tight">
+      {semanaVacia && <p className="type-meta card-base py-3 text-center">Sin actividad esta semana</p>}
       {days.map((day) => {
         const items = itemsByDay.get(day.key) ?? [];
         const isToday = day.key === todayKey;
-        const ocultarEnMovil = items.length === 0 && !isToday;
+        const ocultar = items.length === 0 && !isToday;
         return (
           <div
             key={day.key}
             aria-current={isToday ? 'date' : undefined}
-            className={`card-base flex flex-col gap-tight max-md:p-stack ${isToday ? 'border-primary' : ''} ${
-              ocultarEnMovil ? 'max-md:hidden' : ''
-            }`}
+            className={`card-base flex flex-col gap-tight p-stack ${isToday ? 'border-primary' : ''} ${ocultar ? 'hidden' : ''}`}
           >
             <div
               className={`type-meta flex items-center justify-between rounded-control px-tight py-1 ${

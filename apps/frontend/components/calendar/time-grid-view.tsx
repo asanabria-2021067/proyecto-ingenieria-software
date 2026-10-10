@@ -134,10 +134,14 @@ export function TimeGridView({
 
   const hayTodoElDia = columnas.some((c) => c.todoElDia.length > 0);
   const plantilla = { gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))` };
+  // G02 (UI-02): en Semana cada día necesita ≥ 96 px; si el contenedor es más
+  // angosto, la cuadrícula hace scroll horizontal interno (nunca la página).
+  const anchoMinimo = days.length > 1 ? 'min-w-[48rem]' : '';
 
   return (
     <div className="card-base overflow-hidden p-0">
-      <div className="grid border-b border-outline-variant/40" style={plantilla}>
+      <div className={days.length > 1 ? 'overflow-x-auto' : ''} data-testid="cuadricula-semana">
+      <div className={`grid border-b border-outline-variant/40 ${anchoMinimo}`} style={plantilla}>
         <div />
         {days.map((day) => {
           const isToday = day.key === todayKey;
@@ -166,7 +170,7 @@ export function TimeGridView({
       </div>
 
       {hayTodoElDia && (
-        <div className="grid border-b border-outline-variant/40" style={plantilla}>
+        <div className={`grid border-b border-outline-variant/40 ${anchoMinimo}`} style={plantilla}>
           <div className="type-meta flex items-start justify-end px-1 py-1 text-right leading-tight">Todo el día</div>
           {columnas.map(({ day, todoElDia }) => {
             // G02 (UI-13): en Día hay sitio para todas (con scroll acotado); en
@@ -199,7 +203,7 @@ export function TimeGridView({
         </div>
       )}
 
-      <div ref={scrollRef} className="relative h-[34rem] overflow-y-auto overscroll-contain" data-testid="cuadricula-horas">
+      <div ref={scrollRef} className={`relative h-[34rem] overflow-y-auto overscroll-contain ${anchoMinimo}`} data-testid="cuadricula-horas">
         <div className="grid" style={{ ...plantilla, height: 24 * HORA_ALTO_PX }}>
           <div className="relative">
             {HORAS.map((h) => (
@@ -294,6 +298,7 @@ export function TimeGridView({
             );
           })}
         </div>
+      </div>
       </div>
     </div>
   );

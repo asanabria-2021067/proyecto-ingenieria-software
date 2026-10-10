@@ -118,8 +118,9 @@ describe('WeekView (HU-169 T-264)', () => {
       />,
     );
 
-    // 7 días: 1 con actividad + hoy visibles, los otros 5 ocultos en móvil.
-    expect(container.querySelectorAll('.max-md\\:hidden')).toHaveLength(5);
+    // G02-C11: la lista se usa en todo ancho < xl; los días vacíos (salvo hoy) se ocultan siempre.
+    // 7 días: 1 con actividad + hoy visibles, los otros 5 ocultos.
+    expect(container.querySelectorAll('.hidden')).toHaveLength(5);
     expect(screen.queryByText('Sin actividad esta semana')).not.toBeInTheDocument();
 
     rerender(<WeekView days={days()} todayKey="2026-09-09" itemsByDay={new Map()} onSelectEvento={() => {}} />);
@@ -142,3 +143,17 @@ describe('WeekView (HU-169 T-264)', () => {
   });
 });
 
+
+describe('WeekView — una sola columna en todo ancho (G02-C11, UI-02)', () => {
+  it('la lista ya no se convierte en rejilla de 7 columnas en tablet: una columna y días vacíos ocultos', () => {
+    const key = '2026-09-10';
+    const { container } = render(
+      <WeekView days={days()} todayKey="2026-09-09" itemsByDay={new Map([[key, [tarea(1, key)]]])} onSelectEvento={() => {}} />,
+    );
+    const lista = container.firstElementChild as HTMLElement;
+    expect(lista.className).toContain('grid-cols-1');
+    expect(lista.className).not.toMatch(/md:grid-cols-7|lg:grid-cols-7/);
+    const visibles = [...container.querySelectorAll('[aria-current], .card-base')].filter((n) => !n.classList.contains('hidden'));
+    expect(visibles.length).toBeGreaterThanOrEqual(2);
+  });
+});

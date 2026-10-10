@@ -321,3 +321,27 @@ describe('TimeGridView (HU-184 T-324)', () => {
     expect(screen.queryByRole('button', { name: /eventos más/ })).not.toBeInTheDocument();
   });
 });
+
+describe('TimeGridView — ancho útil en Semana (G02-C11, UI-02)', () => {
+  it('en Semana la cuadrícula tiene un ancho mínimo y scroll horizontal interno; en Día no', () => {
+    const key = '2026-10-08';
+    const { unmount } = render(
+      <TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={new Map([[key, [evento(1, key)]]])} onSelectEvento={() => {}} ahora={AHORA} />,
+    );
+    expect(screen.getByTestId('cuadricula-semana')).toHaveClass('overflow-x-auto');
+    expect(screen.getByTestId('cuadricula-horas')).toHaveClass('min-w-[48rem]');
+    unmount();
+
+    render(
+      <TimeGridView
+        days={[{ date: new Date(2026, 9, 8), key, inCurrentMonth: true }]}
+        todayKey="2026-10-06"
+        itemsByDay={new Map([[key, [evento(1, key)]]])}
+        onSelectEvento={() => {}}
+        ahora={AHORA}
+      />,
+    );
+    expect(screen.getByTestId('cuadricula-semana')).not.toHaveClass('overflow-x-auto');
+    expect(screen.getByTestId('cuadricula-horas')).not.toHaveClass('min-w-[48rem]');
+  });
+});

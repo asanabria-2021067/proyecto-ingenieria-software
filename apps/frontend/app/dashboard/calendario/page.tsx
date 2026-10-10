@@ -467,8 +467,9 @@ export default function CalendarioPage() {
 
           {vista === 'semana' && (
             <>
-              {/* En móvil 7 columnas de horas no caben: la semana se ve como lista de días. */}
-              <div className="hidden md:block">
+              {/* G02 (UI-02): con las dos barras laterales, 7 columnas de horas solo son
+                  legibles desde xl (1280 px); por debajo, la semana se ve como lista de días. */}
+              <div className="hidden xl:block">
                 <TimeGridView
                   days={rango.days}
                   todayKey={hoyKey}
@@ -482,7 +483,7 @@ export default function CalendarioPage() {
                   ahora={ahora}
                 />
               </div>
-              <div className="md:hidden">
+              <div className="xl:hidden">
                 <WeekView days={rango.days} todayKey={hoyKey} itemsByDay={itemsByDay} onSelectEvento={handleSelectEvento} />
               </div>
             </>
