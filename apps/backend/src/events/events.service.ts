@@ -140,6 +140,37 @@ export class EventsService {
     });
   }
 
+  /**
+   * G01 (UI-01): agenda del propietario vista por quien recibe su calendario
+   * compartido. Los proyectos son los del propietario, pero la visibilidad se
+   * evalúa contra quien mira: un evento con invitados solo aparece si quien
+   * mira está invitado (sin heredar el bypass de líder del propietario), y el
+   * detalle (título, tipo, modalidad, proyecto) solo si quien mira tiene
+   * acceso propio a ese proyecto; si no, se devuelve como OCUPADO.
+   */
+  async findSharedInRange(ownerId: number, viewerId: number, desde: string, hasta: string): Promise<EventoCompartido[]> {
+    const [idsPropietario, idsReceptor] = await Promise.all([
+      this.projectIdsForUser(ownerId),
+      this.projectIdsForUser(viewerId),
+    ]);
+    if (idsPropietario.length === 0) return [];
+
+    const filas = await this.prisma.eventoProyecto.findMany({
+      where: {
+        idProyecto: { in: idsPropietario },
+        eliminadoEn: null,
+        fechaInicio: { lte: new Date(hasta) },
+        fechaFin: { gte: new Date(desde) },
+        // Restricción por invitados contra quien mira, nunca contra el propietario.
+        OR: [{ invitados: { isEmpty: true } }, { invitados: { has: viewerId } }],
+      },
+      select: EVENT_SHARED_SELECT,
+      orderBy: { fechaInicio: 'asc' },
+    });
+    const comunes = new Set(idsReceptor);
+    return filas.map((fila) => proyectarEventoCompartido(fila, comunes.has(fila.idProyecto)));
+  }
+
   async create(projectId: number, userId: number, dto: CreateEventDto) {
     const proyecto = await this.getProjectOrThrow(projectId);
     this.assertLeader(proyecto, userId);
@@ -266,7 +297,8 @@ export class EventsService {
     }
   }
 
-  private async projectIdsForUser(userId: number): Promise<number[]> {
+  /** Proyectos donde el usuario es líder o participante ACTIVO (público: lo reutiliza la agenda compartida). */
+  async projectIdsForUser(userId: number): Promise<number[]> {
     const proyectos = await this.prisma.proyecto.findMany({
       where: {
         eliminadoEn: null,

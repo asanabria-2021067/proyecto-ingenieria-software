@@ -481,3 +481,92 @@ describe('EventsService — proyección de evento compartido (G01-C01, UI-01)', 
     );
   });
 });
+
+describe('EventsService — agenda compartida con permisos del receptor (G01-C02, UI-01)', () => {
+  const OWNER_ID = LEADER_ID;
+  const VIEWER_ID = PARTICIPANT_ID;
+  const PROYECTO_COMUN = PROJECT_ID;
+  const PROYECTO_AJENO = 77;
+  const RANGO = ['2026-10-01T00:00:00.000Z', '2026-10-31T23:59:59.000Z'] as const;
+
+  function fila(overrides: Record<string, unknown> = {}) {
+    return {
+      idEvento: 1,
+      idProyecto: PROYECTO_COMUN,
+      tituloEvento: 'Reunión',
+      fechaInicio: new Date('2026-10-05T14:00:00.000Z'),
+      fechaFin: new Date('2026-10-05T15:00:00.000Z'),
+      tipoEvento: 'REUNION',
+      modalidad: 'VIRTUAL',
+      proyecto: { idProyecto: PROYECTO_COMUN, tituloProyecto: 'Común' },
+      ...overrides,
+    };
+  }
+
+  it('filtra por los proyectos del propietario, pero la restricción de invitados se evalúa contra quien mira y sin bypass de líder', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany
+      .mockResolvedValueOnce([{ idProyecto: PROYECTO_COMUN }, { idProyecto: PROYECTO_AJENO }]) // propietario
+      .mockResolvedValueOnce([{ idProyecto: PROYECTO_COMUN }]); // receptor
+    prisma.eventoProyecto.findMany.mockResolvedValue([]);
+    const service = new EventsService(prisma);
+
+    await service.findSharedInRange(OWNER_ID, VIEWER_ID, ...RANGO);
+
+    const llamada = prisma.eventoProyecto.findMany.mock.calls[0][0];
+    expect(llamada.where.idProyecto).toEqual({ in: [PROYECTO_COMUN, PROYECTO_AJENO] });
+    expect(llamada.where.eliminadoEn).toBeNull();
+    // Exactamente estas dos ramas: un evento restringido a otros invitados no aparece aunque el propietario lidere el proyecto.
+    expect(llamada.where.OR).toEqual([{ invitados: { isEmpty: true } }, { invitados: { has: VIEWER_ID } }]);
+    expect(JSON.stringify(llamada.where)).not.toContain('creadoPor');
+    expect(llamada.select).toEqual(EVENT_SHARED_SELECT);
+  });
+
+  it('evento de un proyecto común devuelve detalle; evento público de un proyecto ajeno solo disponibilidad sin identidad', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany
+      .mockResolvedValueOnce([{ idProyecto: PROYECTO_COMUN }, { idProyecto: PROYECTO_AJENO }])
+      .mockResolvedValueOnce([{ idProyecto: PROYECTO_COMUN }]);
+    prisma.eventoProyecto.findMany.mockResolvedValue([
+      fila(),
+      fila({ idEvento: 2, idProyecto: PROYECTO_AJENO, tituloEvento: 'SECRETO ajeno', proyecto: { idProyecto: PROYECTO_AJENO, tituloProyecto: 'SECRETO proyecto' } }),
+    ]);
+    const service = new EventsService(prisma);
+
+    const resultado = await service.findSharedInRange(OWNER_ID, VIEWER_ID, ...RANGO);
+
+    expect(resultado).toHaveLength(2);
+    expect(resultado[0]).toMatchObject({ idEvento: 1, visibilidad: 'DETALLE', tituloEvento: 'Reunión', proyecto: { idProyecto: PROYECTO_COMUN } });
+    expect(resultado[1]).toEqual({
+      idEvento: 2,
+      fechaInicio: new Date('2026-10-05T14:00:00.000Z'),
+      fechaFin: new Date('2026-10-05T15:00:00.000Z'),
+      visibilidad: 'OCUPADO',
+    });
+    expect(JSON.stringify(resultado)).not.toContain('SECRETO');
+  });
+
+  it('propietario sin proyectos: lista vacía sin consultar eventos', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ idProyecto: PROYECTO_COMUN }]);
+    const service = new EventsService(prisma);
+
+    await expect(service.findSharedInRange(OWNER_ID, VIEWER_ID, ...RANGO)).resolves.toEqual([]);
+    expect(prisma.eventoProyecto.findMany).not.toHaveBeenCalled();
+  });
+
+  it('el calendario personal conserva su propio filtro (con bypass de líder) y no cambia', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValue([{ idProyecto: PROYECTO_COMUN }]);
+    prisma.eventoProyecto.findMany.mockResolvedValue([]);
+    const service = new EventsService(prisma);
+
+    await service.findForUserInRange(OWNER_ID, ...RANGO);
+
+    expect(prisma.eventoProyecto.findMany.mock.calls[0][0].where.OR).toEqual([
+      { invitados: { isEmpty: true } },
+      { invitados: { has: OWNER_ID } },
+      { proyecto: { creadoPor: OWNER_ID } },
+    ]);
+  });
+});
