@@ -124,4 +124,100 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     await expect(edicion).toBeHidden();
     await expect(bloqueEvento(page, tituloEditado)).toHaveCount(0, { timeout: 15_000 });
   });
+
+  // G02-C14 (UI-06, UI-05, T-325): fecha de fin opcional, medianoche y evento nocturno.
+  test('crea un evento 22:00 → 01:00 con "Termina otro día": se ve en ambos días como bloques con hora, no como todo el día', async ({ page }) => {
+    const titulo = `E2E nocturno ${Date.now()}`;
+    const dialogo = await abrirNuevoEvento(page);
+    await dialogo.getByLabel('Título del evento o actividad').fill(titulo);
+    await dialogo.getByLabel('Enlace de conexión virtual').fill(LINK);
+    await dialogo.getByLabel('Hora de inicio').fill('22:00');
+    await dialogo.getByLabel('Hora de fin').fill('01:00');
+    // Sin fecha de fin el fin cae "antes" del inicio.
+    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await expect(dialogo.getByText('El fin debe ser posterior al inicio.')).toBeVisible();
+
+    await dialogo.getByRole('checkbox', { name: 'Termina otro día' }).click();
+    await dialogo.getByLabel('Fecha de fin').click();
+    const manana = new Date();
+    manana.setDate(manana.getDate() + 2); // el reloj fijo es "mañana": el día siguiente a la fecha propuesta
+    await page.getByRole('button', { name: new RegExp(`, ${manana.getDate()} de `) }).first().click();
+    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await expect(page.getByText('Evento agendado')).toBeVisible();
+
+    try {
+      await verDia(page);
+      await expect(page.getByRole('button', { name: new RegExp(`^${titulo}, 22:00 a 00:00 del día siguiente`) })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('Todo el día')).toHaveCount(0);
+      await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
+      await expect(page.getByRole('button', { name: new RegExp(`^${titulo}, 00:00 a 01:00`) })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('Todo el día')).toHaveCount(0);
+      // El detalle muestra inicio y fin completos (cambia de día).
+      await page.getByRole('button', { name: new RegExp(`^${titulo}, 00:00 a 01:00`) }).click();
+      await expect(page.getByRole('dialog', { name: titulo }).getByText(/22:00 – .*01:00/)).toBeVisible();
+      await page.keyboard.press('Escape');
+    } finally {
+      await page.getByRole('button', { name: 'Anterior', exact: true }).click();
+      await page.getByRole('button', { name: new RegExp(`^${titulo}, 22:00 a 00:00`) }).click();
+      await page.getByRole('dialog', { name: titulo }).getByRole('button', { name: 'Eliminar evento' }).click();
+      await page.getByRole('alertdialog').getByRole('button', { name: 'Eliminar evento' }).click();
+      await expect(page.getByText('Evento eliminado')).toBeVisible();
+    }
+  });
+
+  test('un evento que termina exactamente a las 00:00 ocupa hasta el final de su día y no aparece al siguiente', async ({ page }) => {
+    const titulo = `E2E medianoche ${Date.now()}`;
+    const dialogo = await abrirNuevoEvento(page);
+    await dialogo.getByLabel('Título del evento o actividad').fill(titulo);
+    await dialogo.getByLabel('Enlace de conexión virtual').fill(LINK);
+    await dialogo.getByLabel('Hora de inicio').fill('23:00');
+    await dialogo.getByLabel('Hora de fin').fill('00:00');
+    await dialogo.getByRole('checkbox', { name: 'Termina otro día' }).click();
+    await dialogo.getByLabel('Fecha de fin').click();
+    const manana = new Date();
+    manana.setDate(manana.getDate() + 2);
+    await page.getByRole('button', { name: new RegExp(`, ${manana.getDate()} de `) }).first().click();
+    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await expect(page.getByText('Evento agendado')).toBeVisible();
+
+    try {
+      await verDia(page);
+      await expect(page.getByRole('button', { name: new RegExp(`^${titulo}, 23:00 a 00:00 del día siguiente`) })).toBeVisible({ timeout: 15_000 });
+      await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
+      await expect(page.getByRole('button', { name: new RegExp(`^${titulo}`) })).toHaveCount(0);
+      await page.getByRole('button', { name: 'Anterior', exact: true }).click();
+    } finally {
+      await page.getByRole('button', { name: new RegExp(`^${titulo}, 23:00 a 00:00`) }).click();
+      await page.getByRole('dialog', { name: titulo }).getByRole('button', { name: 'Eliminar evento' }).click();
+      await page.getByRole('alertdialog').getByRole('button', { name: 'Eliminar evento' }).click();
+      await expect(page.getByText('Evento eliminado')).toBeVisible();
+    }
+  });
+
+  // G02-C14 (UI-03): la búsqueda de lugar se simula (sin Nominatim real) con un nombre de 300 caracteres.
+  test('un evento presencial muestra el error de ubicación junto al campo y recorta un nombre de lugar demasiado largo', async ({ page }) => {
+    const nombreLargo = 'Edificio ' + 'x'.repeat(300);
+    await page.route('**/nominatim.openstreetmap.org/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ place_id: 1, display_name: nombreLargo, lat: '14.6', lon: '-90.5' }]) }),
+    );
+    const dialogo = await abrirNuevoEvento(page);
+    await dialogo.getByLabel('Título del evento o actividad').fill('Visita presencial que no se crea');
+    await dialogo.getByRole('radio', { name: 'Presencial' }).click();
+    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    const error = dialogo.getByText('Marca la ubicación de la sesión en el mapa.');
+    await expect(error).toBeVisible();
+    const input = dialogo.getByLabel('Ubicación presencial');
+    await expect(input).toHaveAttribute('aria-invalid', 'true');
+    await expect(input).toBeFocused();
+
+    await input.fill('Edificio');
+    await dialogo.getByRole('button', { name: 'Buscar ubicación' }).click();
+    await page.getByRole('button', { name: new RegExp(`^${nombreLargo.slice(0, 20)}`) }).click();
+    await expect(input).toHaveValue(nombreLargo.slice(0, 255));
+    await expect(error).toHaveCount(0);
+    await expect(input).toHaveAttribute('aria-invalid', 'false');
+
+    await dialogo.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(dialogo).toBeHidden();
+  });
 });
