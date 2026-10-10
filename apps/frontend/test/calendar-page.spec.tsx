@@ -356,3 +356,48 @@ describe('CalendarioPage — estados de compartidos y de carga propia (G03-C09, 
     expect(rejilla.closest('[aria-busy="true"]')).toBeNull();
   });
 });
+
+describe('CalendarioPage — abrir un calendario compartido desde la notificación (G03-C11, UI-40)', () => {
+  const ANA = { idUsuario: 9, nombre: 'Ana', apellido: 'García', fotoUrl: null };
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/dashboard/calendario');
+  });
+
+  it('?compartido=<id> activa el calendario si la API lo lista, lo guarda y limpia la URL', async () => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [ANA] });
+    sharesMock.getAgendaCompartida.mockResolvedValue({ eventos: [], tareas: [] });
+    window.history.replaceState(null, '', '/dashboard/calendario?compartido=9');
+    await renderPage();
+
+    expect(await screen.findByRole('checkbox', { name: 'Ver el calendario de Ana García' })).toBeChecked();
+    await waitFor(() => expect(sharesMock.getAgendaCompartida).toHaveBeenCalledWith(9, expect.any(Date), expect.any(Date)));
+    expect(JSON.parse(window.localStorage.getItem('calendario:compartidos-activos') ?? '[]')).toEqual([9]);
+    expect(window.location.search).toBe('');
+    expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Calendario activado', expect.stringContaining('Ana García'));
+  });
+
+  it('un id que la API no lista (revocado o ajeno) avisa, no activa nada y no consulta ninguna agenda', async () => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [ANA] });
+    window.history.replaceState(null, '', '/dashboard/calendario?compartido=77');
+    await renderPage();
+
+    await waitFor(() => expect(mensajesMock.aviso.advertencia).toHaveBeenCalledWith('Ese calendario ya no está compartido contigo', expect.any(String)));
+    expect(screen.getByRole('checkbox', { name: 'Ver el calendario de Ana García' })).not.toBeChecked();
+    expect(sharesMock.getAgendaCompartida).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem('calendario:compartidos-activos')).toBeNull();
+    expect(window.location.search).toBe('');
+  });
+
+  it('un id inválido se ignora en silencio y la URL queda limpia conservando otros parámetros', async () => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [ANA] });
+    window.history.replaceState(null, '', '/dashboard/calendario?compartido=abc&otro=1');
+    await renderPage();
+    await screen.findByRole('checkbox', { name: 'Ver el calendario de Ana García' });
+
+    expect(window.location.search).toBe('?otro=1');
+    expect(mensajesMock.aviso.advertencia).not.toHaveBeenCalled();
+    expect(mensajesMock.aviso.exito).not.toHaveBeenCalled();
+    expect(sharesMock.getAgendaCompartida).not.toHaveBeenCalled();
+  });
+});

@@ -51,7 +51,7 @@ import {
 } from '@/hooks/use-calendar-shares';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { aviso } from '@/lib/mensajes';
-import type { EventoCompartidoDTO } from '@/lib/services/calendar-shares';
+import { getCalendariosCompartidos, type EventoCompartidoDTO } from '@/lib/services/calendar-shares';
 import { MonthView } from '@/components/calendar/month-view';
 import { WeekView } from '@/components/calendar/week-view';
 import { TimeGridView } from '@/components/calendar/time-grid-view';
@@ -63,6 +63,7 @@ import { CalendarSidebar, type MetaHoras } from '@/components/calendar/calendar-
 import { CalendarFilterMenu } from '@/components/calendar/calendar-filter-menu';
 import { iniciales } from '@/components/calendar/invitados-field';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { idUsuarioSeguro } from '@/lib/services/notifications';
 
 const VISTAS: { value: VistaCalendario; label: string }[] = [
   { value: 'dia', label: 'Día' },
@@ -170,6 +171,45 @@ export default function CalendarioPage() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setCompartidosActivos(leerCompartidosActivos()), []);
 
+  // G03 (UI-40): `?compartido=<ownerId>` llega desde la notificación. Se lee
+  // una sola vez al montar, se retira de la URL en el acto (sin navegación ni
+  // bucles) y se activa SOLO si la API lo lista entre los calendarios
+  // recibidos (misma consulta que la columna izquierda: no hay petición
+  // extra). Si no está (revocado o id ajeno) se avisa y no se consulta ninguna
+  // agenda; un id inválido se ignora en silencio.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('compartido')) return;
+    const idSolicitado = idUsuarioSeguro(params.get('compartido'));
+    params.delete('compartido');
+    const resto = params.toString();
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${resto ? `?${resto}` : ''}`);
+    if (idSolicitado === null) return;
+    let vigente = true;
+    queryClient
+      .fetchQuery({ queryKey: calendariosCompartidosQueryKey, queryFn: getCalendariosCompartidos })
+      .then((lista) => {
+        if (!vigente) return;
+        const persona = lista.compartidosConmigo.find((p) => p.idUsuario === idSolicitado);
+        if (!persona) {
+          aviso.advertencia('Ese calendario ya no está compartido contigo', 'Quien lo compartió pudo retirarlo. Revisa la columna izquierda.');
+          return;
+        }
+        setCompartidosActivos((actuales) => {
+          const nuevos = actuales.includes(persona.idUsuario) ? actuales : [...actuales, persona.idUsuario];
+          guardarCompartidosActivos(nuevos);
+          return nuevos;
+        });
+        aviso.exito('Calendario activado', `Ya ves el calendario de ${persona.nombre} ${persona.apellido} junto al tuyo.`);
+      })
+      .catch(() => {
+        // La lista falló: la columna izquierda ya lo muestra con "Reintentar".
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [queryClient]);
+
   const rango = useMemo(() => rangoVisible(vista, anchor), [vista, anchor]);
 
   const {
@@ -192,6 +232,7 @@ export default function CalendarioPage() {
     [personasCompartidas, compartidosActivos],
   );
   const { agendas: agendasCompartidas, estados: estadosCompartidos } = useAgendasCompartidas(idsActivos, rango.desde, rango.hasta);
+
 
   // G03 (UI-12): un fallo por persona se avisa una sola vez (al pasar a error),
   // nunca en cada render; si fue revocación (403) se refresca la lista para que
