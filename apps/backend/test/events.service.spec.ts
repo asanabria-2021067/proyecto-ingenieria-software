@@ -570,3 +570,111 @@ describe('EventsService — agenda compartida con permisos del receptor (G01-C02
     ]);
   });
 });
+
+/**
+ * G01-C05 (UI-01, UI-15): matriz de roles sobre la agenda compartida. El
+ * mock de Prisma aplica de verdad los dos filtros que importan (proyectos
+ * del propietario e invitados contra quien mira), así la matriz prueba la
+ * política y no solo la forma de la consulta. Antes de G01 el spec afirmaba
+ * que el receptor veía "lo mismo que el propietario" (incluido el bypass de
+ * líder): esa expectativa era insegura y se sustituyó en C02–C04.
+ */
+describe('EventsService — matriz de roles de la agenda compartida (G01-C05)', () => {
+  const OWNER = 1; // líder de COMUN y de SOLO_OWNER
+  const VIEWER = 2;
+  const OTRO_INVITADO = 3;
+  const EXTERNO = 4; // nunca invitado, sin proyectos en común
+  const COMUN = 10;
+  const SOLO_OWNER = 20;
+  const CERRADO = 30;
+  const RANGO = ['2026-10-01T00:00:00.000Z', '2026-10-31T23:59:59.000Z'] as const;
+
+  const EVENTOS = [
+    { idEvento: 1, idProyecto: COMUN, tituloEvento: 'Público común', invitados: [] },
+    { idEvento: 2, idProyecto: COMUN, tituloEvento: 'Restringido con viewer', invitados: [OWNER, VIEWER] },
+    { idEvento: 3, idProyecto: COMUN, tituloEvento: 'Restringido sin viewer', invitados: [OWNER, OTRO_INVITADO] },
+    { idEvento: 4, idProyecto: SOLO_OWNER, tituloEvento: 'Público ajeno', invitados: [] },
+    { idEvento: 5, idProyecto: SOLO_OWNER, tituloEvento: 'Restringido ajeno', invitados: [OTRO_INVITADO] },
+    { idEvento: 6, idProyecto: CERRADO, tituloEvento: 'Público cerrado', invitados: [] },
+  ].map((e) => ({
+    ...e,
+    fechaInicio: new Date('2026-10-05T14:00:00.000Z'),
+    fechaFin: new Date('2026-10-05T15:00:00.000Z'),
+    tipoEvento: 'REUNION',
+    modalidad: 'VIRTUAL',
+    proyecto: { idProyecto: e.idProyecto, tituloProyecto: `Proyecto ${e.idProyecto}` },
+    linkSesion: 'https://SECRETO',
+  }));
+
+  /** Prisma falso: respeta `idProyecto.in` y la rama OR de invitados tal como las escribe el servicio. */
+  function makePrismaConFiltro(proyectosPorUsuario: Record<number, number[]>) {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockImplementation(async (args: { where: { OR: [{ creadoPor: number }, unknown] } }) => {
+      const userId = args.where.OR[0].creadoPor;
+      return (proyectosPorUsuario[userId] ?? []).map((idProyecto) => ({ idProyecto }));
+    });
+    prisma.eventoProyecto.findMany.mockImplementation(
+      async (args: { where: { idProyecto: { in: number[] }; OR: { invitados: { isEmpty?: boolean; has?: number } }[] } }) => {
+        const { idProyecto, OR } = args.where;
+        return EVENTOS.filter(
+          (e) =>
+            idProyecto.in.includes(e.idProyecto) &&
+            OR.some((rama) => (rama.invitados.isEmpty ? e.invitados.length === 0 : e.invitados.includes(rama.invitados.has!))),
+        );
+      },
+    );
+    return prisma;
+  }
+
+  const porId = (lista: Awaited<ReturnType<EventsService['findSharedInRange']>>) =>
+    Object.fromEntries(lista.map((e) => [e.idEvento, e.visibilidad]));
+
+  it('integrante del proyecto común: detalle de lo público y de lo que lo invita; nunca lo restringido a otros, aunque el propietario sea líder', async () => {
+    const prisma = makePrismaConFiltro({ [OWNER]: [COMUN, SOLO_OWNER, CERRADO], [VIEWER]: [COMUN] });
+    const service = new EventsService(prisma);
+
+    const resultado = await service.findSharedInRange(OWNER, VIEWER, ...RANGO);
+
+    expect(porId(resultado)).toEqual({ 1: 'DETALLE', 2: 'DETALLE', 4: 'OCUPADO', 6: 'OCUPADO' });
+    expect(JSON.stringify(resultado)).not.toContain('SECRETO');
+    expect(JSON.stringify(resultado)).not.toContain('ajeno');
+  });
+
+  it('externo sin proyectos en común: solo disponibilidad de lo público, sin títulos ni proyectos', async () => {
+    const prisma = makePrismaConFiltro({ [OWNER]: [COMUN, SOLO_OWNER], [EXTERNO]: [] });
+    const service = new EventsService(prisma);
+
+    const resultado = await service.findSharedInRange(OWNER, EXTERNO, ...RANGO);
+
+    expect(porId(resultado)).toEqual({ 1: 'OCUPADO', 4: 'OCUPADO' });
+    expect(JSON.stringify(resultado)).not.toContain('tituloEvento');
+  });
+
+  it('receptor retirado del proyecto (ya no ACTIVO) baja a OCUPADO aunque siga en la lista de invitados', async () => {
+    const prisma = makePrismaConFiltro({ [OWNER]: [COMUN], [VIEWER]: [] });
+    const service = new EventsService(prisma);
+
+    const resultado = await service.findSharedInRange(OWNER, VIEWER, ...RANGO);
+
+    expect(porId(resultado)).toEqual({ 1: 'OCUPADO', 2: 'OCUPADO' });
+  });
+
+  it('propietario retirado de un proyecto: sus eventos de ese proyecto desaparecen de la agenda compartida', async () => {
+    const prisma = makePrismaConFiltro({ [OWNER]: [SOLO_OWNER], [VIEWER]: [COMUN] });
+    const service = new EventsService(prisma);
+
+    const resultado = await service.findSharedInRange(OWNER, VIEWER, ...RANGO);
+
+    expect(porId(resultado)).toEqual({ 4: 'OCUPADO' });
+  });
+
+  it('el propietario, en su propio calendario, sí ve lo restringido que lidera (el bypass es suyo, no del receptor)', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValue([{ idProyecto: COMUN }]);
+    prisma.eventoProyecto.findMany.mockResolvedValue([]);
+    const service = new EventsService(prisma);
+
+    await service.findForUserInRange(OWNER, ...RANGO);
+    expect(prisma.eventoProyecto.findMany.mock.calls[0][0].where.OR).toContainEqual({ proyecto: { creadoPor: OWNER } });
+  });
+});

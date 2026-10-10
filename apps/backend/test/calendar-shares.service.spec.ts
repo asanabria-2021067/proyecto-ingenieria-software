@@ -280,3 +280,58 @@ describe('CalendarSharesService — respuesta segura del endpoint compartido (G0
     expect(events.projectIdsForUser).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * G01-C05 (UI-01, UI-15): matriz de acceso a la agenda compartida a nivel de
+ * servicio. Sustituye la expectativa previa (clase B) de que el receptor
+ * recibiera `findForUserInRange(propietario)`, es decir, todo lo que el
+ * propietario ve: esa afirmación codificaba la fuga F262-01.
+ */
+describe('CalendarSharesService — matriz de acceso (G01-C05)', () => {
+  const RANGO = ['2026-10-01T06:00:00.000Z', '2026-10-08T06:00:00.000Z'] as const;
+  const EXTERNO_ID = 42;
+
+  it.each([
+    ['receptor con compartición vigente', VIEWER_ID, { idCalendarioCompartido: 1 }, true],
+    ['tercero sin compartición', EXTERNO_ID, null, false],
+    ['receptor tras revocación', VIEWER_ID, null, false],
+  ])('%s → %s', async (_caso, quienMira, fila, permitido) => {
+    const { prisma, events, service } = makeDeps();
+    prisma.calendarioCompartido.findFirst.mockResolvedValue(fila);
+    events.projectIdsForUser.mockResolvedValue([]);
+
+    const peticion = service.agendaCompartida(quienMira, OWNER_ID, ...RANGO);
+    if (permitido) {
+      await expect(peticion).resolves.toEqual({ eventos: [], tareas: [] });
+      expect(events.findSharedInRange).toHaveBeenCalledWith(OWNER_ID, quienMira, ...RANGO);
+    } else {
+      await expect(peticion).rejects.toBeInstanceOf(ForbiddenException);
+      expect(events.findSharedInRange).not.toHaveBeenCalled();
+    }
+  });
+
+  it('propietario inactivo (estado ≠ ACTIVO) se trata como no compartido', async () => {
+    const { prisma, service } = makeDeps();
+    prisma.calendarioCompartido.findFirst.mockResolvedValue(null);
+
+    await expect(service.agendaCompartida(VIEWER_ID, OWNER_ID, ...RANGO)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.calendarioCompartido.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ propietario: { estado: 'ACTIVO' } }) }),
+    );
+  });
+
+  it('las tareas de un proyecto común llevan detalle y las de un proyecto ajeno solo fecha, en la misma respuesta', async () => {
+    const { prisma, events, service } = makeDeps();
+    prisma.calendarioCompartido.findFirst.mockResolvedValue({ idCalendarioCompartido: 1 });
+    events.projectIdsForUser.mockResolvedValueOnce([10, 11]).mockResolvedValueOnce([10]);
+    prisma.tarea.findMany.mockResolvedValue([
+      { idTarea: 1, tituloTarea: 'Común', estadoTarea: 'POR_HACER', prioridad: 'ALTA', fechaLimite: new Date('2026-10-02'), proyecto: { idProyecto: 10, tituloProyecto: 'P10' } },
+      { idTarea: 2, tituloTarea: 'SECRETO', estadoTarea: 'POR_HACER', prioridad: 'ALTA', fechaLimite: new Date('2026-10-03'), proyecto: { idProyecto: 11, tituloProyecto: 'SECRETO' } },
+    ]);
+
+    const { tareas } = await service.agendaCompartida(VIEWER_ID, OWNER_ID, ...RANGO);
+
+    expect(tareas.map((t) => t.visibilidad)).toEqual(['DETALLE', 'OCUPADO']);
+    expect(JSON.stringify(tareas)).not.toContain('SECRETO');
+  });
+});
