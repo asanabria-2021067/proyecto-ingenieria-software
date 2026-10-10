@@ -33,4 +33,13 @@ describe('CalendarSharesController', () => {
     const propios = Object.getOwnPropertyNames(CalendarSharesController.prototype).filter((n) => n !== 'constructor');
     expect(propios.sort()).toEqual(['agenda', 'compartir', 'dejarDeCompartir', 'dejarDeRecibir', 'listar']);
   });
+
+  // G01-C12 (UI-16): mismo perfil `short` que auth.controller; la política global no se toca.
+  it('POST compartidos lleva @Throttle short 5/min', () => {
+    // Claves tal como las escribe @Throttle (throttler.constants: THROTTLER_LIMIT/TTL + nombre del perfil).
+    const handler = CalendarSharesController.prototype.compartir;
+    expect(Reflect.getMetadata('THROTTLER:LIMITshort', handler)).toBe(5);
+    expect(Reflect.getMetadata('THROTTLER:TTLshort', handler)).toBe(60000);
+    expect(Reflect.getMetadata('THROTTLER:LIMITshort', CalendarSharesController.prototype.listar)).toBeUndefined();
+  });
 });

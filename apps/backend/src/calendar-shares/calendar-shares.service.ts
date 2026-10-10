@@ -4,6 +4,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EventsService, type EventoCompartido } from '../events/events.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
+/**
+ * G01 (UI-16, B-04): tras DELETE+POST no se vuelve a avisar a la misma persona
+ * del mismo propietario dentro de esta ventana. La evidencia es la propia
+ * tabla de notificaciones (persistida), no memoria del proceso.
+ */
+const VENTANA_RENOTIFICACION_MS = 24 * 60 * 60 * 1000;
+
 /** Datos públicos de una persona en la lista de calendarios compartidos. */
 const USUARIO_RESUMEN = {
   idUsuario: true,
@@ -204,6 +211,16 @@ export class CalendarSharesService {
   /** La notificación es un efecto secundario: si falla, compartir ya quedó hecho. */
   private async notificarCompartido(userId: number, idInvitado: number): Promise<void> {
     try {
+      const reciente = await this.prisma.notificacion.findFirst({
+        where: {
+          idUsuario: idInvitado,
+          tipoNotificacion: 'CALENDARIO_COMPARTIDO',
+          creadaEn: { gte: new Date(Date.now() - VENTANA_RENOTIFICACION_MS) },
+          datosJson: { path: ['ownerId'], equals: userId },
+        },
+        select: { idNotificacion: true },
+      });
+      if (reciente) return; // ya avisado hace menos de 24 h: compartir sigue siendo válido, solo no se repite el aviso
       const propietario = await this.prisma.usuario.findUnique({
         where: { idUsuario: userId },
         select: { nombre: true, apellido: true },

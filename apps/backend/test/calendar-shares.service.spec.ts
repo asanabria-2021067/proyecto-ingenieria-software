@@ -16,6 +16,7 @@ function makeDeps() {
     usuario: { findFirst: vi.fn(), findUnique: vi.fn() },
     calendarioCompartido: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
     tarea: { findMany: vi.fn() },
+    notificacion: { findFirst: vi.fn().mockResolvedValue(null) },
   };
   const events = { findForUserInRange: vi.fn(), findSharedInRange: vi.fn().mockResolvedValue([]), projectIdsForUser: vi.fn().mockResolvedValue([]) };
   const notifications = { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) };
@@ -376,5 +377,65 @@ describe('CalendarSharesService.dejarDeRecibir — revocación por el destinatar
 
     await service.dejarDeCompartir(OWNER_ID, VIEWER_ID);
     expect(prisma.calendarioCompartido.deleteMany).toHaveBeenCalledWith({ where: { idPropietario: OWNER_ID, idInvitado: VIEWER_ID } });
+  });
+});
+
+describe('CalendarSharesService — límite de notificaciones al compartir (G01-C12, UI-16/B-04)', () => {
+  function compartirOk(deps: ReturnType<typeof makeDeps>) {
+    deps.prisma.usuario.findFirst.mockResolvedValue(ANA);
+    deps.prisma.usuario.findUnique.mockResolvedValue({ nombre: 'Carlos', apellido: 'Mendoza' });
+    deps.prisma.calendarioCompartido.create.mockResolvedValue({});
+  }
+
+  it('DELETE+POST dentro de la ventana: la fila se crea de nuevo pero NO se vuelve a notificar', async () => {
+    const deps = makeDeps();
+    compartirOk(deps);
+    deps.prisma.notificacion.findFirst.mockResolvedValue({ idNotificacion: 77 });
+
+    await expect(deps.service.compartir(OWNER_ID, VIEWER_ID)).resolves.toEqual(ANA);
+
+    expect(deps.prisma.calendarioCompartido.create).toHaveBeenCalledTimes(1);
+    expect(deps.notifications.notifyFromTemplate).not.toHaveBeenCalled();
+    const where = deps.prisma.notificacion.findFirst.mock.calls[0][0].where;
+    expect(where).toMatchObject({
+      idUsuario: VIEWER_ID,
+      tipoNotificacion: 'CALENDARIO_COMPARTIDO',
+      datosJson: { path: ['ownerId'], equals: OWNER_ID },
+    });
+    expect(where.creadaEn.gte.getTime()).toBeGreaterThan(Date.now() - 24 * 60 * 60 * 1000 - 5000);
+  });
+
+  it('pasada la ventana (sin aviso reciente) sí notifica', async () => {
+    const deps = makeDeps();
+    compartirOk(deps);
+    deps.prisma.notificacion.findFirst.mockResolvedValue(null);
+
+    await deps.service.compartir(OWNER_ID, VIEWER_ID);
+
+    expect(deps.notifications.notifyFromTemplate).toHaveBeenCalledWith([VIEWER_ID], 'CALENDARIO_COMPARTIDO', {
+      ownerId: OWNER_ID,
+      ownerName: 'Carlos Mendoza',
+    });
+  });
+
+  it('la ventana es por par (propietario, invitado): otro destinatario se evalúa aparte', async () => {
+    const deps = makeDeps();
+    compartirOk(deps);
+    deps.prisma.usuario.findFirst.mockResolvedValue({ ...ANA, idUsuario: 3 });
+    deps.prisma.notificacion.findFirst.mockResolvedValue(null);
+
+    await deps.service.compartir(OWNER_ID, 3);
+
+    expect(deps.prisma.notificacion.findFirst.mock.calls[0][0].where.idUsuario).toBe(3);
+    expect(deps.notifications.notifyFromTemplate).toHaveBeenCalledWith([3], 'CALENDARIO_COMPARTIDO', expect.anything());
+  });
+
+  it('si la comprobación falla, compartir ya quedó hecho (la notificación es best-effort)', async () => {
+    const deps = makeDeps();
+    compartirOk(deps);
+    deps.prisma.notificacion.findFirst.mockRejectedValue(new Error('db'));
+
+    await expect(deps.service.compartir(OWNER_ID, VIEWER_ID)).resolves.toEqual(ANA);
+    expect(deps.notifications.notifyFromTemplate).not.toHaveBeenCalled();
   });
 });

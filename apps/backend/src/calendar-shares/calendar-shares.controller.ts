@@ -11,6 +11,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { GetEventsRangeQueryDto } from '../events/dto/get-events-range-query.dto';
@@ -32,8 +33,10 @@ export class CalendarSharesController {
     return this.calendarShares.listar(user.userId);
   }
 
+  /** G01 (UI-16): mismo perfil `short` que auth; evita ráfagas de compartir/quitar para notificar en bucle. */
   @Post('compartidos')
   @HttpCode(HttpStatus.CREATED)
+  @Throttle({ short: { limit: 5, ttl: 60000 } })
   compartir(@CurrentUser() user: { userId: number }, @Body() dto: ShareCalendarDto) {
     return this.calendarShares.compartir(user.userId, dto.idUsuario);
   }
