@@ -308,3 +308,47 @@ describe('fecha de fin opcional: eventos que cruzan medianoche o duran varios d�
     expect(duracionTexto(nocturno)).toBe('3h');
   });
 });
+
+describe('matriz de creación y edición de varios días (G02-C10, UI-06/T-325)', () => {
+  const dia6 = new Date(2026, 9, 6);
+  const dia7 = new Date(2026, 9, 7);
+
+  it.each([
+    ['día siguiente con hora menor (22:00 → 01:00)', { horaInicio: '22:00', horaFin: '01:00', terminaOtroDia: true, fechaFin: dia7 }, true],
+    ['día siguiente, misma hora (24 h exactas)', { horaInicio: '09:00', horaFin: '09:00', terminaOtroDia: true, fechaFin: dia7 }, true],
+    ['dos días completos', { horaInicio: '09:00', horaFin: '17:00', terminaOtroDia: true, fechaFin: new Date(2026, 9, 8) }, true],
+    ['marcado sin fecha de fin', { horaInicio: '09:00', horaFin: '10:00', terminaOtroDia: true, fechaFin: undefined }, false],
+    ['misma fecha de fin y misma hora (duración cero)', { horaInicio: '09:00', horaFin: '09:00', terminaOtroDia: true, fechaFin: dia6 }, false],
+    ['fecha de fin anterior', { horaInicio: '09:00', horaFin: '10:00', terminaOtroDia: true, fechaFin: new Date(2026, 9, 5) }, false],
+    ['un día normal', { horaInicio: '09:00', horaFin: '10:00', terminaOtroDia: false, fechaFin: undefined }, true],
+  ] as const)('%s → válido: %s', (_caso, campos, valido) => {
+    const errores = mensajes(valores({ fecha: dia6, ...campos }));
+    expect(Object.keys(errores).length === 0).toBe(valido);
+  });
+
+  it('al activar la opción no se pierden los demás mensajes (título vacío y fecha de fin ausente a la vez)', () => {
+    const errores = mensajes(valores({ fecha: dia6, tituloEvento: '', terminaOtroDia: true, fechaFin: undefined }));
+    expect(errores.tituloEvento).toBe('El título no puede estar vacío.');
+    expect(errores.fechaFin).toBe('Selecciona la fecha de fin.');
+  });
+
+  it('en edición, un evento histórico de varios días con inicio en el pasado sigue siendo válido mientras no se mueva el inicio', () => {
+    const original = evento({
+      fechaInicio: new Date(2026, 9, 1, 22, 0).toISOString(),
+      fechaFin: new Date(2026, 9, 3, 1, 0).toISOString(),
+    });
+    const form = eventFormFromEvento(original);
+    const errores = mensajes({ ...form, tituloEvento: 'Renombrado' }, { mode: 'edit', fechaInicioOriginal: original.fechaInicio, ahora: AHORA });
+    expect(errores).toEqual({});
+    const payload = buildEventPayload({ ...form, tituloEvento: 'Renombrado' }, { keepEmptyDescripcion: true });
+    expect(payload.fechaInicio).toBe(original.fechaInicio);
+    expect(payload.fechaFin).toBe(original.fechaFin);
+  });
+
+  it('la serialización ISO es la misma que al volver a cargar el evento (ida y vuelta sin corrimiento, hora local)', () => {
+    const form = valores({ fecha: dia6, horaInicio: '23:30', horaFin: '00:30', terminaOtroDia: true, fechaFin: dia7 });
+    const payload = buildEventPayload(form, { keepEmptyDescripcion: false });
+    const recargado = eventFormFromEvento(evento({ fechaInicio: payload.fechaInicio, fechaFin: payload.fechaFin }));
+    expect(recargado).toMatchObject({ fecha: dia6, horaInicio: '23:30', horaFin: '00:30', terminaOtroDia: true, fechaFin: dia7 });
+  });
+});

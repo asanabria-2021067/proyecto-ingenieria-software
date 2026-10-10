@@ -555,3 +555,56 @@ describe('EventFormDialog — edición de eventos de varios días (G02-C09, UI-0
     expect(eventsMock.updateEvent.mock.calls[0][2].fechaFin).toBe(new Date(2026, 9, 8, 23, 30).toISOString());
   });
 });
+
+describe('EventFormDialog — comportamiento del formulario con dos fechas (G02-C10)', () => {
+  it('la fecha de fin elegida se conserva al desmarcar y volver a marcar "Termina otro día"', async () => {
+    renderCrear();
+    const check = screen.getByRole('checkbox', { name: 'Termina otro día' });
+    fireEvent.click(check);
+    fireEvent.click(screen.getByLabelText('Fecha de fin'));
+    fireEvent.click(await screen.findByRole('button', { name: /, 7 de octubre/ }));
+    await waitFor(() => expect(screen.getByLabelText('Fecha de fin')).toHaveTextContent(/7 oct 2026/i));
+
+    fireEvent.click(check);
+    expect(screen.queryByLabelText('Fecha de fin')).not.toBeInTheDocument();
+    fireEvent.click(check);
+    expect(screen.getByLabelText('Fecha de fin')).toHaveTextContent(/7 oct 2026/i);
+  });
+
+  it('fin igual al inicio el mismo día sigue siendo inválido aunque la opción esté marcada con la misma fecha', async () => {
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.change(screen.getByLabelText('Hora de inicio'), { target: { value: '09:00' } });
+    fireEvent.change(screen.getByLabelText('Hora de fin'), { target: { value: '09:00' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
+    fireEvent.click(screen.getByLabelText('Fecha de fin'));
+    fireEvent.click(await screen.findByRole('button', { name: /, 5 de octubre/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    expect(await screen.findByText('El fin debe ser posterior al inicio.')).toBeInTheDocument();
+    expect(screen.queryByText('La fecha de fin no puede ser anterior a la de inicio.')).not.toBeInTheDocument();
+    expect(eventsMock.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('con varios errores a la vez (título vacío y fecha de fin ausente) todos se muestran y el foco va al título', async () => {
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    expect(await screen.findByText('El título no puede estar vacío.')).toBeInTheDocument();
+    expect(screen.getByText('Selecciona la fecha de fin.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('Título del evento o actividad')).toHaveFocus());
+  });
+
+  it('el chip de duración refleja el rango real de dos fechas', async () => {
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Hora de inicio'), { target: { value: '09:00' } });
+    fireEvent.change(screen.getByLabelText('Hora de fin'), { target: { value: '17:00' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
+    fireEvent.click(screen.getByLabelText('Fecha de fin'));
+    fireEvent.click(await screen.findByRole('button', { name: /, 7 de octubre/ }));
+    await waitFor(() => expect(screen.getByText('56h')).toBeInTheDocument());
+  });
+});
