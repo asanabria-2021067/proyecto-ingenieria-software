@@ -451,3 +451,32 @@ describe('TimeGridView — regresión consolidada de la semana cargada (G02-C13)
     expect(screen.getByTestId('cuadricula-semana')).not.toHaveClass('overflow-x-auto');
   });
 });
+
+describe('TimeGridView — objetivos táctiles de la franja "Todo el día" (G04-C06, UI-18)', () => {
+  it('los chips de todo el día (evento, fecha límite) y "+N más" son controles con nombre y al menos 24 px de alto (min-h-6)', () => {
+    const itemsByDay = new Map<string, AgendaItem[]>([
+      [
+        '2026-10-06',
+        [
+          evento(1, '2026-10-06', { titulo: 'Congreso', multiDia: true }),
+          tarea(2, '2026-10-06', { titulo: 'Entregar avance' }),
+          tarea(3, '2026-10-06', { titulo: 'Revisar PR' }),
+          tarea(4, '2026-10-06', { titulo: 'Subir informe' }),
+        ],
+      ],
+    ]);
+    render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={itemsByDay} onSelectEvento={vi.fn()} onVerDia={vi.fn()} ahora={AHORA} />);
+
+    const chipEvento = screen.getByRole('button', { name: 'Congreso' });
+    const chipTarea = screen.getByRole('link', { name: 'Entregar avance' });
+    const mas = screen.getByRole('button', { name: '1 actividad más de todo el día, ver el día' });
+    for (const control of [chipEvento, chipTarea, mas]) expect(control).toHaveClass('min-h-6');
+  });
+
+  it('una fecha límite compartida (no navegable) conserva la misma altura para no desalinear la franja', () => {
+    const compartida = tarea(9, '2026-10-06', { titulo: 'Fecha límite', href: undefined, ocupado: true, compartidoPor: { idUsuario: 9, nombre: 'Ana García', tono: 2 } });
+    render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={new Map([['2026-10-06', [compartida]]])} onSelectEvento={vi.fn()} ahora={AHORA} />);
+    expect(screen.getByText('Fecha límite').parentElement).toHaveClass('min-h-6');
+    expect(screen.queryByRole('link', { name: 'Fecha límite' })).not.toBeInTheDocument();
+  });
+});

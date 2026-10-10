@@ -316,7 +316,7 @@ export function EventFormDialog({
                 <button
                   type="button"
                   onClick={() => setMostrarDescripcion(true)}
-                  className="-mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  className="-mt-2 inline-flex min-h-6 items-center gap-1 text-xs font-medium text-primary hover:underline"
                 >
                   <Plus className="size-3.5" aria-hidden="true" />
                   Agregar descripción

@@ -233,7 +233,7 @@ export function CalendarSidebar({
 
       <Link
         href="/dashboard/mis-tareas"
-        className="inline-flex items-center gap-tight text-sm font-medium text-primary hover:underline"
+        className="inline-flex min-h-6 items-center gap-tight text-sm font-medium text-primary hover:underline"
       >
         <ClipboardList className="size-4" aria-hidden="true" />
         Ver todas mis tareas

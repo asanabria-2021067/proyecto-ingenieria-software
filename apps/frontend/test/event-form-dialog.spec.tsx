@@ -825,3 +825,26 @@ describe('EventFormDialog — etiquetas, foco en campos no nativos y obligatorie
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Proyecto' })).toHaveFocus());
   });
 });
+
+describe('EventFormDialog — objetivos táctiles de los controles pequeños (G04-C06, UI-18)', () => {
+  it('"Quitar a …", "Añadir integrante" y "Agregar descripción" tienen nombre accesible y un área de al menos 24 px', () => {
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={evento()} />, { wrapper });
+
+    const quitar = screen.getByRole('button', { name: 'Quitar a Ana García' });
+    expect(quitar).toHaveClass('size-6');
+    expect(quitar.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('button', { name: 'Añadir integrante' })).toHaveClass('min-h-6');
+    expect(screen.getByRole('button', { name: 'Agregar descripción' })).toHaveClass('min-h-6');
+  });
+
+  it('quitar un invitado sigue funcionando con el botón agrandado', async () => {
+    eventsMock.updateEvent.mockResolvedValueOnce(evento());
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={evento()} />, { wrapper });
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar a Ana García' }));
+    expect(screen.queryByRole('button', { name: 'Quitar a Ana García' })).not.toBeInTheDocument();
+    expect(screen.getByText('Todo el proyecto')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(eventsMock.updateEvent).toHaveBeenCalled());
+    expect(eventsMock.updateEvent.mock.calls[0][2].invitados).toEqual([]);
+  });
+});

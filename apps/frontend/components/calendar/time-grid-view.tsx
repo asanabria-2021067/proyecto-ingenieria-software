@@ -38,7 +38,8 @@ function ChipTodoElDia({ item, onSelectEvento }: { item: AgendaItem; onSelectEve
         type="button"
         data-evento-key={agendaItemKey(item)}
         onClick={() => onSelectEvento(item)}
-        className={`w-full truncate rounded-control border-l-4 px-1.5 py-0.5 text-left text-[11px] font-semibold ${tono.bloque} ${tono.borde}`}
+        // G04 (UI-18): min-h-6 = 24 px de objetivo táctil (antes 20.5 px).
+        className={`min-h-6 w-full truncate rounded-control border-l-4 px-1.5 py-0.5 text-left text-[11px] font-semibold ${tono.bloque} ${tono.borde}`}
       >
         {item.titulo}
       </button>
@@ -53,7 +54,7 @@ function ChipTodoElDia({ item, onSelectEvento }: { item: AgendaItem; onSelectEve
     </>
   );
   const clase =
-    'flex w-full items-center gap-1 rounded-control border border-outline-variant/60 bg-surface-container-lowest px-1.5 py-0.5 text-[11px] text-text-primary';
+    'flex min-h-6 w-full items-center gap-1 rounded-control border border-outline-variant/60 bg-surface-container-lowest px-1.5 py-0.5 text-[11px] text-text-primary';
   // Una tarea de un calendario compartido no es navegable (quien la ve puede no ser del proyecto).
   return item.href ? (
     <Link href={item.href} title={`Fecha límite: ${item.titulo}`} className={`${clase} hover:bg-surface-container`}>
@@ -193,7 +194,7 @@ export function TimeGridView({
                     type="button"
                     onClick={() => onVerDia?.(day.key)}
                     aria-label={`${ocultos} ${ocultos === 1 ? 'actividad más' : 'actividades más'} de todo el día, ver el día`}
-                    className="type-meta w-full rounded-control px-1 text-left hover:bg-surface-container"
+                    className="type-meta min-h-6 w-full rounded-control px-1 text-left hover:bg-surface-container"
                   >
                     +{ocultos} más
                   </button>

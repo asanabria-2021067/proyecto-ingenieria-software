@@ -36,7 +36,8 @@ function Chip({ persona, sufijo, onQuitar, disabled }: {
           onClick={onQuitar}
           disabled={disabled}
           aria-label={`Quitar a ${persona.nombre} ${persona.apellido}`}
-          className="rounded-pill p-0.5 text-text-secondary transition-colors hover:bg-surface-container hover:text-text-primary"
+          // G04 (UI-18): área táctil de 24×24 px alrededor del ícono de 12 px (antes 16×16).
+          className="-mr-1.5 inline-flex size-6 shrink-0 items-center justify-center rounded-pill text-text-secondary transition-colors hover:bg-surface-container hover:text-text-primary"
         >
           <X className="size-3" aria-hidden="true" />
         </button>
@@ -105,7 +106,7 @@ export function InvitadosField({
           <button
             type="button"
             disabled={disabled || idProyecto <= 0}
-            className="mt-tight inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50"
+            className="mt-tight inline-flex min-h-6 items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50"
           >
             <UserPlus className="size-4" aria-hidden="true" />
             Añadir integrante
