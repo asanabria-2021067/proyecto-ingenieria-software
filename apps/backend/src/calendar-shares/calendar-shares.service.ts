@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, type EstadoTarea, type Prioridad } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { EventsService } from '../events/events.service';
+import { EventsService, type EventoCompartido } from '../events/events.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 /** Datos públicos de una persona en la lista de calendarios compartidos. */
@@ -58,9 +58,10 @@ export function proyectarTareaCompartida(fila: TareaCompartidaFila, puedeVerDeta
 /**
  * HU-184: compartir el calendario propio (eventos de mis proyectos y fechas
  * límite de mis tareas) en solo lectura. No requiere aceptación: existir la
- * fila es estar compartido. Quien recibe ve exactamente lo que el
- * propietario ve en su calendario (mismo filtro de EventsService) y nunca
- * puede editar.
+ * fila es estar compartido. G01 (UI-01): quien recibe NO ve lo mismo que el
+ * propietario: la agenda se calcula con sus propios permisos
+ * (`EventsService.findSharedInRange`, `tareasCompartidas`) y con una
+ * proyección mínima; nunca puede editar.
  */
 @Injectable()
 export class CalendarSharesService {
@@ -126,8 +127,18 @@ export class CalendarSharesService {
     return { eliminado: count > 0 };
   }
 
-  /** GET /usuarios/me/calendario/compartidos-conmigo/:idPropietario/agenda?desde&hasta */
-  async agendaCompartida(userId: number, idPropietario: number, desde: string, hasta: string) {
+  /**
+   * GET /usuarios/me/calendario/compartidos-conmigo/:idPropietario/agenda?desde&hasta
+   * Solo con una fila vigente (propietario, yo): revocar la compartición hace
+   * que la siguiente petición reciba 403. Ambos ids salen del token y de la
+   * ruta; la respuesta son los contratos discriminados (DETALLE | OCUPADO).
+   */
+  async agendaCompartida(
+    userId: number,
+    idPropietario: number,
+    desde: string,
+    hasta: string,
+  ): Promise<{ eventos: EventoCompartido[]; tareas: TareaCompartida[] }> {
     const compartido = await this.prisma.calendarioCompartido.findFirst({
       where: { idPropietario, idInvitado: userId, propietario: { estado: 'ACTIVO' } },
       select: { idCalendarioCompartido: true },
@@ -137,7 +148,7 @@ export class CalendarSharesService {
     }
 
     const [eventos, tareas] = await Promise.all([
-      this.events.findForUserInRange(idPropietario, desde, hasta),
+      this.events.findSharedInRange(idPropietario, userId, desde, hasta),
       this.tareasCompartidas(idPropietario, userId, desde, hasta),
     ]);
     return { eventos, tareas };
