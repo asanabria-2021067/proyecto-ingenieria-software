@@ -195,3 +195,54 @@ describe('calendar-shares — contrato mínimo de la agenda compartida (G01-C06,
     expectTypeOf<EventoCompartidoDTO>().not.toMatchTypeOf<MiEventoDTO>();
   });
 });
+
+describe('calendar/agenda — mapeo de la agenda compartida reducida (G01-C07, UI-01)', () => {
+  const origen = { idUsuario: 7, nombre: 'Ana García', tono: 3 as const };
+  const base = { idEvento: 50, fechaInicio: '2026-09-23T15:00:00.000Z', fechaFin: '2026-09-23T16:00:00.000Z' };
+
+  it('un evento compartido con DETALLE conserva título, tipo, modalidad y proyecto, sin descripción ni enlace al proyecto', () => {
+    const evento: EventoCompartidoDTO = {
+      ...base,
+      visibilidad: 'DETALLE',
+      tituloEvento: 'Demo',
+      tipoEvento: 'TALLER',
+      modalidad: 'MIXTA',
+      proyecto: { idProyecto: 10, tituloProyecto: 'Proyecto X' },
+    };
+    const item = eventoToAgendaItem(evento, origen);
+    if (item.kind !== 'evento') throw new Error('unreachable');
+    expect(item).toMatchObject({ id: 50, titulo: 'Demo', tipo: 'TALLER', modalidad: 'MIXTA', projectId: 10, projectTitle: 'Proyecto X', descripcion: null, href: '', compartidoPor: origen });
+    expect(item.ocupado).toBeUndefined();
+  });
+
+  it('un evento compartido OCUPADO no lleva título, proyecto ni tipo reales: solo horario y la marca', () => {
+    const item = eventoToAgendaItem({ ...base, visibilidad: 'OCUPADO' }, origen);
+    if (item.kind !== 'evento') throw new Error('unreachable');
+    expect(item).toMatchObject({ id: 50, titulo: 'Ocupado', projectId: 0, projectTitle: '', descripcion: null, href: '', ocupado: true, compartidoPor: origen });
+    expect(item.horaInicio).toMatch(/^\d{2}:\d{2}$/);
+    expect(JSON.stringify(item)).not.toContain('Proyecto');
+  });
+
+  it('eventoToAgendaItems también acepta el DTO compartido y lo expande por día', () => {
+    const items = eventoToAgendaItems({ ...base, fechaFin: '2026-09-24T16:00:00.000Z', visibilidad: 'OCUPADO' }, new Date(2026, 8, 1), new Date(2026, 9, 1), origen);
+    expect(items.map((i) => i.key)).toEqual(['2026-09-23', '2026-09-24']);
+    expect(items.every((i) => i.kind === 'evento' && i.ocupado)).toBe(true);
+  });
+
+  it('un evento compartido sin origen es un error de programación, no un ítem propio', () => {
+    expect(() => eventoToAgendaItem({ ...base, visibilidad: 'OCUPADO' })).toThrow();
+  });
+
+  it('una tarea compartida OCUPADO solo conserva el día, sin título ni proyecto', () => {
+    const item = tareaCompartidaToAgendaItem({ idTarea: 3, fechaLimite: '2026-09-23T00:00:00.000Z', visibilidad: 'OCUPADO' }, origen);
+    expect(item).toMatchObject({ kind: 'tarea', key: '2026-09-23', id: 3, titulo: 'Fecha límite', projectId: 0, projectTitle: '', href: '', ocupado: true, compartidoPor: origen });
+  });
+
+  it('el mapeo del evento propio no cambia (sigue llevando descripción y enlace al proyecto)', () => {
+    const item = eventoToAgendaItem(evento({ descripcionEvento: 'Notas' }));
+    if (item.kind !== 'evento') throw new Error('unreachable');
+    expect(item.descripcion).toBe('Notas');
+    expect(item.href).toBe('/dashboard/projects/10');
+    expect(item.ocupado).toBeUndefined();
+  });
+});

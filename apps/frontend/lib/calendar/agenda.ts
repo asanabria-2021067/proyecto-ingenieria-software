@@ -1,6 +1,6 @@
 import type { MiTareaDTO } from '@/lib/services/users';
 import type { MiEventoDTO, ModalidadEvento, TipoEvento } from '@/lib/services/events';
-import type { TareaCompartidaDTO } from '@/lib/services/calendar-shares';
+import type { EventoCompartidoDTO, TareaCompartidaDTO } from '@/lib/services/calendar-shares';
 import type { TonoCalendario } from './paleta';
 import { addDays, formatTime, parseFechaSolo, toDateKey } from './utils';
 
@@ -29,6 +29,8 @@ export type AgendaItem =
       prioridad: MiTareaDTO['prioridad'];
       estado: MiTareaDTO['estadoTarea'];
       compartidoPor?: OrigenCompartido;
+      /** G01 (UI-01): fecha límite de un calendario compartido sin acceso al proyecto: solo el día. */
+      ocupado?: true;
     }
   | {
       kind: 'evento';
@@ -45,6 +47,13 @@ export type AgendaItem =
       /** El evento abarca más de un día: va en la franja "todo el día", no en la cuadrícula de horas. */
       multiDia: boolean;
       compartidoPor?: OrigenCompartido;
+      /**
+       * G01 (UI-01): evento de un calendario compartido sin acceso al
+       * proyecto: solo horario. `titulo`, `tipo` y `modalidad` son
+       * marcadores neutros ("Ocupado"); las vistas no deben pintar tipo ni
+       * modalidad cuando está activo.
+       */
+      ocupado?: true;
       projectTitle: string;
       href: string;
       horaInicio: string;
@@ -76,22 +85,61 @@ export function tareaToAgendaItem(tarea: MiTareaDTO & { fechaLimite: string }): 
  */
 export function tareaCompartidaToAgendaItem(tarea: TareaCompartidaDTO, origen: OrigenCompartido): AgendaItem {
   const fecha = parseFechaSolo(tarea.fechaLimite);
+  const base = { kind: 'tarea' as const, key: toDateKey(fecha), sortKey: '24:00', id: tarea.idTarea, href: '', compartidoPor: origen };
+  if (tarea.visibilidad === 'OCUPADO') {
+    return { ...base, titulo: 'Fecha límite', projectId: 0, projectTitle: '', prioridad: 'MEDIA', estado: 'POR_HACER', ocupado: true };
+  }
   return {
-    kind: 'tarea',
-    key: toDateKey(fecha),
-    sortKey: '24:00',
-    id: tarea.idTarea,
+    ...base,
     titulo: tarea.tituloTarea,
     projectId: tarea.proyecto.idProyecto,
     projectTitle: tarea.proyecto.tituloProyecto,
-    href: '',
     prioridad: tarea.prioridad,
     estado: tarea.estadoTarea,
-    compartidoPor: origen,
   };
 }
 
-export function eventoToAgendaItem(evento: MiEventoDTO, origen?: OrigenCompartido): AgendaItem {
+/**
+ * G01 (UI-01): un evento de una agenda compartida llega ya reducido por el
+ * backend. Se copia campo por campo (sin spread del DTO) y, cuando viene
+ * OCUPADO, sin título, tipo, modalidad ni proyecto reales.
+ */
+function eventoCompartidoToAgendaItem(evento: EventoCompartidoDTO, origen: OrigenCompartido): AgendaItem {
+  const fechaInicio = new Date(evento.fechaInicio);
+  const fechaFin = new Date(evento.fechaFin);
+  const horaInicio = formatTime(fechaInicio);
+  const base = {
+    kind: 'evento' as const,
+    key: toDateKey(fechaInicio),
+    sortKey: horaInicio,
+    id: evento.idEvento,
+    descripcion: null,
+    multiDia: toDateKey(fechaInicio) !== toDateKey(fechaFin),
+    href: '',
+    horaInicio,
+    horaFin: formatTime(fechaFin),
+    fechaInicio,
+    fechaFin,
+    compartidoPor: origen,
+  };
+  if (evento.visibilidad === 'OCUPADO') {
+    return { ...base, titulo: 'Ocupado', projectId: 0, projectTitle: '', modalidad: 'VIRTUAL', tipo: 'OTRO', ocupado: true };
+  }
+  return {
+    ...base,
+    titulo: evento.tituloEvento,
+    projectId: evento.proyecto.idProyecto,
+    projectTitle: evento.proyecto.tituloProyecto,
+    modalidad: evento.modalidad,
+    tipo: evento.tipoEvento,
+  };
+}
+
+export function eventoToAgendaItem(evento: MiEventoDTO | EventoCompartidoDTO, origen?: OrigenCompartido): AgendaItem {
+  if ('visibilidad' in evento) {
+    if (!origen) throw new Error('Un evento compartido necesita su origen');
+    return eventoCompartidoToAgendaItem(evento, origen);
+  }
   const fechaInicio = new Date(evento.fechaInicio);
   const fechaFin = new Date(evento.fechaFin);
   const horaInicio = formatTime(fechaInicio);
@@ -125,7 +173,7 @@ export function eventoToAgendaItem(evento: MiEventoDTO, origen?: OrigenCompartid
  * que toca, no solo en el de fechaInicio.
  */
 export function eventoToAgendaItems(
-  evento: MiEventoDTO,
+  evento: MiEventoDTO | EventoCompartidoDTO,
   rangoDesde: Date,
   rangoHasta: Date,
   origen?: OrigenCompartido,
