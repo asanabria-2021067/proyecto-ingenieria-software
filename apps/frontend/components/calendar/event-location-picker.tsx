@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Ref } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -77,6 +77,12 @@ export interface EventLocationPickerProps {
   onNombreChange: (value: string) => void;
   onPositionChange: (lat: number, lng: number) => void;
   disabled?: boolean;
+  /** G02 (UI-03/UI-09): los pone `FormControl` del diálogo; van al input del nombre para label, error y lector. */
+  id?: string;
+  'aria-describedby'?: string;
+  'aria-invalid'?: boolean | 'true' | 'false';
+  /** Para enfocar el input cuando la ubicación es el único campo inválido. */
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 /**
@@ -91,6 +97,10 @@ export default function EventLocationPicker({
   onNombreChange,
   onPositionChange,
   disabled,
+  id,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
+  inputRef,
 }: EventLocationPickerProps) {
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -128,6 +138,10 @@ export default function EventLocationPicker({
     <div className="space-y-tight">
       <div className="flex gap-tight">
         <Input
+          ref={inputRef}
+          id={id}
+          aria-describedby={ariaDescribedBy}
+          aria-invalid={ariaInvalid}
           value={nombre}
           disabled={disabled}
           maxLength={MAX_NOMBRE_LUGAR}

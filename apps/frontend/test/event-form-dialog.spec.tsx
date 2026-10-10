@@ -31,10 +31,12 @@ vi.mock('../hooks/use-project-members', () => ({
   useProjectMembers: () => ({ members: MIEMBROS, isLoading: false }),
 }));
 
-// El mapa (leaflet) no corre en jsdom y no es parte de lo que se prueba aquí.
-vi.mock('next/dynamic', () => ({
-  default: () => () => <div data-testid="mapa" />,
-}));
+// G02-C02: el diálogo monta el picker REAL (react-leaflet simulado abajo) para
+// poder verificar label, aria-invalid, mensajes y foco de la ubicación.
+vi.mock('next/dynamic', async () => {
+  const mod = await import('../components/calendar/event-location-picker');
+  return { default: () => mod.default };
+});
 
 // G02-C01: el picker se prueba directo con react-leaflet simulado (jsdom no tiene canvas ni window de Leaflet).
 const leafletMock = vi.hoisted(() => ({ handlers: {} as Record<string, (e: unknown) => void> }));
@@ -152,11 +154,11 @@ describe('EventFormDialog (HU-184 T-323, rediseño)', () => {
     renderCrear();
     const grupo = screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' });
     expect(within(grupo).getByRole('radio', { name: 'Virtual' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.queryByTestId('mapa')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mapa-real')).not.toBeInTheDocument();
 
     fireEvent.click(within(grupo).getByRole('radio', { name: 'Híbrida' }));
     expect(screen.getByLabelText('Enlace de conexión virtual')).toBeInTheDocument();
-    expect(screen.getByTestId('mapa')).toBeInTheDocument();
+    expect(screen.getByTestId('mapa-real')).toBeInTheDocument();
     expect(screen.getByText('Híbrida: requiere enlace virtual y lugar físico')).toBeInTheDocument();
   });
 
@@ -325,5 +327,66 @@ describe('EventLocationPicker — nombres largos y coordenadas (G02-C01, UI-03/U
     expect(normalizarCoordenadas(0, -180)).toEqual({ lat: 0, lng: -180 });
     expect(recortarNombreLugar('x'.repeat(255))).toHaveLength(255);
     expect(recortarNombreLugar('Edificio T-1')).toBe('Edificio T-1');
+  });
+});
+
+describe('EventFormDialog — validación visible de la ubicación (G02-C02, UI-03/UI-09)', () => {
+  function renderPresencial() {
+    const resultado = renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Visita' } });
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).getByRole('radio', { name: 'Presencial' }));
+    return resultado;
+  }
+
+  it('el input del lugar queda asociado a la etiqueta "Ubicación presencial"', () => {
+    renderPresencial();
+    const input = screen.getByLabelText('Ubicación presencial');
+    expect(input).toHaveAttribute('placeholder', expect.stringContaining('Busca un lugar'));
+    expect(input).toHaveAttribute('aria-invalid', 'false');
+  });
+
+  it('presencial sin punto en el mapa: el error aparece junto al campo, el input queda inválido y recibe el foco', async () => {
+    renderPresencial();
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    const mensaje = await screen.findByText('Marca la ubicación de la sesión en el mapa.');
+    const input = screen.getByLabelText('Ubicación presencial');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input.getAttribute('aria-describedby')).toContain(mensaje.id);
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(eventsMock.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('un nombre de lugar de más de 255 caracteres muestra su mensaje junto al campo (no solo el aviso genérico)', async () => {
+    renderPresencial();
+    fireEvent.change(screen.getByLabelText('Ubicación presencial'), { target: { value: 'x'.repeat(300) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    expect(await screen.findByText('El nombre del lugar no puede exceder 255 caracteres.')).toHaveAttribute('role', 'alert');
+    expect(eventsMock.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('al marcar el punto el error desaparece y el evento se agenda con sus coordenadas', async () => {
+    eventsMock.createEvent.mockResolvedValueOnce(evento());
+    renderPresencial();
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    await screen.findByText('Marca la ubicación de la sesión en el mapa.');
+
+    leafletMock.handlers.click({ latlng: { lat: 14.6, lng: -90.5 } });
+    await waitFor(() => expect(screen.queryByText('Marca la ubicación de la sesión en el mapa.')).not.toBeInTheDocument());
+    expect(screen.getByLabelText('Ubicación presencial')).toHaveAttribute('aria-invalid', 'false');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
+    expect(eventsMock.createEvent.mock.calls[0][1]).toMatchObject({ modalidad: 'PRESENCIAL', ubicacionLat: 14.6, ubicacionLng: -90.5 });
+  });
+
+  it('si además falta el título, el foco va al título (campo nativo) y no a la ubicación', async () => {
+    renderPresencial();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    await screen.findByText('El título no puede estar vacío.');
+    await waitFor(() => expect(screen.getByLabelText('Título del evento o actividad')).toHaveFocus());
   });
 });

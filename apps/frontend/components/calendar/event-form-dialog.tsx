@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CalendarCheck2, Link2, Loader2, MapPin, Plus, SlidersHorizontal, Trash2, Type, Video } from 'lucide-react';
@@ -111,6 +111,7 @@ export function EventFormDialog({
 }) {
   const isEditing = Boolean(editingEvent);
   const [mostrarDescripcion, setMostrarDescripcion] = useState(false);
+  const ubicacionInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { data: usuario } = useCurrentUser();
 
@@ -191,8 +192,18 @@ export function EventFormDialog({
 
   // Con el formulario largo (sobre todo en móvil) el campo con error puede
   // quedar fuera de vista: el aviso dice que hay algo que corregir.
-  const onInvalid = () => {
+  // G02 (UI-09): react-hook-form enfoca solo campos nativos; si lo único
+  // inválido es la ubicación (sin ref registrada), se enfoca su input a mano.
+  const onInvalid = (errores: FieldErrors<EventFormValues>) => {
     aviso.advertencia('Revisa los campos marcados', 'Hay datos del evento que faltan o no son válidos.');
+    const soloUbicacion =
+      (errores.ubicacionLat || errores.ubicacionNombre) &&
+      !errores.tituloEvento &&
+      !errores.descripcionEvento &&
+      !errores.horaInicio &&
+      !errores.horaFin &&
+      !errores.linkSesion;
+    if (soloUbicacion) ubicacionInputRef.current?.focus();
   };
 
   const onSubmit = (values: EventFormValues) => {
@@ -524,17 +535,26 @@ export function EventFormDialog({
                             )}
                           </div>
                           {/* Nombre del lugar arriba y el mapa debajo, como pidió el equipo. */}
-                          <EventLocationPicker
-                            lat={form.watch('ubicacionLat')}
-                            lng={form.watch('ubicacionLng')}
-                            nombre={form.watch('ubicacionNombre')}
-                            onNombreChange={(v) => form.setValue('ubicacionNombre', v)}
-                            onPositionChange={(lat, lng) => {
-                              form.setValue('ubicacionLng', lng);
-                              form.setValue('ubicacionLat', lat, { shouldValidate: form.formState.isSubmitted });
-                            }}
-                            disabled={isPending}
-                          />
+                          <FormControl>
+                            <EventLocationPicker
+                              inputRef={ubicacionInputRef}
+                              lat={form.watch('ubicacionLat')}
+                              lng={form.watch('ubicacionLng')}
+                              nombre={form.watch('ubicacionNombre')}
+                              onNombreChange={(v) => form.setValue('ubicacionNombre', v, { shouldValidate: form.formState.isSubmitted })}
+                              onPositionChange={(lat, lng) => {
+                                form.setValue('ubicacionLng', lng);
+                                form.setValue('ubicacionLat', lat, { shouldValidate: form.formState.isSubmitted });
+                              }}
+                              disabled={isPending}
+                            />
+                          </FormControl>
+                          {/* G02 (UI-03): el tope de 255 del nombre también se muestra junto al campo. */}
+                          {form.formState.errors.ubicacionNombre?.message && (
+                            <p role="alert" className="text-sm text-destructive">
+                              {form.formState.errors.ubicacionNombre.message}
+                            </p>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
