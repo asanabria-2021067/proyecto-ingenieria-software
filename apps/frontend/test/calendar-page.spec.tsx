@@ -401,3 +401,49 @@ describe('CalendarioPage — abrir un calendario compartido desde la notificaci�
     expect(sharesMock.getAgendaCompartida).not.toHaveBeenCalled();
   });
 });
+
+describe('CalendarioPage — selector Día/Semana/Mes accesible (G03-C13, UI-08)', () => {
+  const grupo = () => screen.getByRole('radiogroup', { name: 'Vista del calendario' });
+
+  it('ArrowRight pasa de Semana a Mes y ArrowLeft vuelve; la vista y su navegación siguen el cambio', async () => {
+    await renderPage();
+    expect(vista('Semana')).toHaveAttribute('aria-checked', 'true');
+    vista('Semana').focus();
+
+    fireEvent.keyDown(vista('Semana'), { key: 'ArrowRight' });
+    await waitFor(() => expect(vista('Mes')).toHaveAttribute('aria-checked', 'true'));
+    expect(vista('Mes')).toHaveFocus();
+    expect(etiquetaPeriodo()).toHaveTextContent('Octubre 2026');
+    expect(screen.queryByTestId('cuadricula-semana')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(vista('Mes'), { key: 'ArrowLeft' });
+    await waitFor(() => expect(vista('Semana')).toHaveAttribute('aria-checked', 'true'));
+    expect(screen.getByTestId('cuadricula-semana')).toBeInTheDocument();
+    expect(etiquetaPeriodo()).toHaveTextContent('5 oct');
+  });
+
+  it('el grupo es una sola parada de tabulación: entrar enfoca la vista activa y Tab sale al siguiente control', async () => {
+    await renderPage();
+    const opcionesTabulables = () => within(grupo()).getAllByRole('radio').filter((el) => el.getAttribute('tabindex') === '0');
+    expect(opcionesTabulables()).toHaveLength(0);
+    expect(grupo()).toHaveAttribute('tabindex', '0');
+
+    grupo().focus();
+    await waitFor(() => expect(vista('Semana')).toHaveFocus());
+    expect(opcionesTabulables()).toEqual([vista('Semana')]);
+    expect(vista('Día')).toHaveAttribute('tabindex', '-1');
+    expect(vista('Mes')).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('el clic sigue funcionando y cambiar de vista limpia el día elegido en Mes', async () => {
+    await renderPage();
+    fireEvent.click(vista('Mes'));
+    fireEvent.click(celdaMes(20, 'octubre'));
+    expect(celdaMes(20, 'octubre')).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(vista('Día'));
+    expect(vista('Día')).toHaveAttribute('aria-checked', 'true');
+    expect(etiquetaPeriodo()).toHaveTextContent('9 de octubre');
+    fireEvent.click(vista('Mes'));
+    expect(celdaMes(20, 'octubre')).toHaveAttribute('aria-pressed', 'false');
+  });
+});

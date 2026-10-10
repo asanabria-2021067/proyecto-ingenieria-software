@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Share2 } from 'lucide-react';
 import {
   Empty,
@@ -519,25 +520,32 @@ export default function CalendarioPage() {
               }}
             />
 
-            <div role="radiogroup" aria-label="Vista del calendario" className="flex rounded-pill bg-surface-container p-1">
+            {/* G03 (UI-08): mismo primitivo accesible que la modalidad del diálogo (G03-C12):
+                un solo tab stop, ←/→ cambian la vista y aria-checked es real. Los E2E
+                siguen usando getByRole('radio', { name: 'Día' | 'Semana' | 'Mes' }). */}
+            <RadioGroupPrimitive.Root
+              value={vista}
+              onValueChange={(v) => {
+                setVista(v as VistaCalendario);
+                setSelectedKey(null);
+              }}
+              aria-label="Vista del calendario"
+              orientation="horizontal"
+              loop
+              className="flex rounded-pill bg-surface-container p-1"
+            >
               {VISTAS.map((opcion) => (
-                <button
+                <RadioGroupPrimitive.Item
                   key={opcion.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={vista === opcion.value}
-                  onClick={() => {
-                    setVista(opcion.value);
-                    setSelectedKey(null);
-                  }}
-                  className={`rounded-pill px-3 py-1 text-xs font-bold transition-colors ${
+                  value={opcion.value}
+                  className={`rounded-pill px-3 py-1 text-xs font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
                     vista === opcion.value ? 'bg-surface-container-lowest text-on-surface shadow-card' : 'text-on-surface-variant'
                   }`}
                 >
                   {opcion.label}
-                </button>
+                </RadioGroupPrimitive.Item>
               ))}
-            </div>
+            </RadioGroupPrimitive.Root>
 
             <div className="flex items-center gap-tight">
               <Button type="button" variant="outline" className="h-8 rounded-pill px-3 text-xs font-bold" onClick={() => irA(new Date())}>
