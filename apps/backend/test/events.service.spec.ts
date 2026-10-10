@@ -7,6 +7,9 @@ import {
   type EventoCompartidoFila,
 } from '../src/events/events.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { UpdateEventDto } from '../src/events/dto/update-event.dto';
 
 const LEADER_ID = 1;
 const PARTICIPANT_ID = 2;
@@ -676,5 +679,123 @@ describe('EventsService — matriz de roles de la agenda compartida (G01-C05)', 
 
     await service.findForUserInRange(OWNER, ...RANGO);
     expect(prisma.eventoProyecto.findMany.mock.calls[0][0].where.OR).toContainEqual({ proyecto: { creadoPor: OWNER } });
+  });
+});
+
+describe('EventsService — metadatos de modalidad al editar (G04-C14, UI-35)', () => {
+  function presencial(overrides: Record<string, unknown> = {}) {
+    return {
+      idEvento: EVENT_ID,
+      idProyecto: PROJECT_ID,
+      tituloEvento: 'Taller',
+      fechaInicio: new Date('2030-10-01T14:00:00.000Z'),
+      fechaFin: new Date('2030-10-01T15:00:00.000Z'),
+      modalidad: 'PRESENCIAL',
+      ubicacionLat: 14.6,
+      ubicacionLng: -90.5,
+      ubicacionNombre: 'Edificio CIT',
+      linkSesion: null,
+      invitados: [],
+      ...overrides,
+    };
+  }
+  function preparar(actual: Record<string, unknown>) {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.eventoProyecto.findFirst.mockResolvedValue(actual);
+    prisma.eventoProyecto.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ ...actual, ...data }));
+    return { prisma, service: new EventsService(prisma) };
+  }
+  const datos = (prisma: ReturnType<typeof makePrisma>) => prisma.eventoProyecto.update.mock.calls[0][0].data as Record<string, unknown>;
+
+  it('PRESENCIAL → VIRTUAL con null explícito limpia latitud, longitud y nombre del lugar', async () => {
+    const { prisma, service } = preparar(presencial());
+    const resultado = await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, {
+      modalidad: 'VIRTUAL',
+      linkSesion: 'https://meet.google.com/abc',
+      ubicacionLat: null,
+      ubicacionLng: null,
+      ubicacionNombre: null,
+    });
+
+    expect(datos(prisma)).toMatchObject({ modalidad: 'VIRTUAL', ubicacionLat: null, ubicacionLng: null, ubicacionNombre: null, linkSesion: 'https://meet.google.com/abc' });
+    // Lo que devuelve el servicio (y verá el detalle) ya no trae un lugar huérfano.
+    expect(resultado).toMatchObject({ ubicacionLat: null, ubicacionLng: null, ubicacionNombre: null });
+  });
+
+  it('un PATCH parcial de un cliente antiguo (solo modalidad, sin campos de ubicación) no borra nada por omisión', async () => {
+    const { prisma, service } = preparar(presencial());
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { modalidad: 'VIRTUAL', linkSesion: 'https://meet.google.com/abc' });
+
+    const data = datos(prisma);
+    expect(data).not.toHaveProperty('ubicacionLat');
+    expect(data).not.toHaveProperty('ubicacionLng');
+    expect(data).not.toHaveProperty('ubicacionNombre');
+  });
+
+  it('MIXTA conserva lugar y enlace tal como llegan', async () => {
+    const { prisma, service } = preparar(presencial());
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, {
+      modalidad: 'MIXTA',
+      ubicacionLat: 14.6,
+      ubicacionLng: -90.5,
+      ubicacionNombre: 'Edificio CIT',
+      linkSesion: 'https://meet.google.com/abc',
+    });
+    expect(datos(prisma)).toMatchObject({ modalidad: 'MIXTA', ubicacionLat: 14.6, ubicacionLng: -90.5, ubicacionNombre: 'Edificio CIT', linkSesion: 'https://meet.google.com/abc' });
+  });
+
+  it('VIRTUAL → PRESENCIAL con linkSesion null limpia el enlace y guarda el lugar', async () => {
+    const { prisma, service } = preparar(presencial({ modalidad: 'VIRTUAL', ubicacionLat: null, ubicacionLng: null, ubicacionNombre: null, linkSesion: 'https://meet.google.com/abc' }));
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { modalidad: 'PRESENCIAL', ubicacionLat: 14.6, ubicacionLng: -90.5, linkSesion: null });
+    expect(datos(prisma)).toMatchObject({ modalidad: 'PRESENCIAL', ubicacionLat: 14.6, ubicacionLng: -90.5, linkSesion: null });
+  });
+
+  it.each([
+    ['sin cambiar la modalidad de un presencial', { ubicacionLat: null, ubicacionLng: null }],
+    ['pasando a híbrida', { modalidad: 'MIXTA' as const, ubicacionLat: null, ubicacionLng: null, linkSesion: 'https://meet.google.com/abc' }],
+  ])('borrar la ubicación %s produce 400 y no toca la base', async (_caso, cambio) => {
+    const { prisma, service } = preparar(presencial());
+    await expect(service.update(PROJECT_ID, EVENT_ID, LEADER_ID, cambio)).rejects.toThrow(BadRequestException);
+    expect(prisma.eventoProyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('borrar el enlace de un evento que sigue siendo virtual produce 400 y no toca la base', async () => {
+    const { prisma, service } = preparar(presencial({ modalidad: 'VIRTUAL', linkSesion: 'https://meet.google.com/abc' }));
+    await expect(service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { linkSesion: null })).rejects.toThrow('necesita el enlace');
+    expect(prisma.eventoProyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('borrar solo el nombre del lugar de un presencial está permitido (es opcional)', async () => {
+    const { prisma, service } = preparar(presencial());
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { ubicacionNombre: null });
+    expect(datos(prisma)).toMatchObject({ ubicacionNombre: null });
+    expect(datos(prisma)).not.toHaveProperty('ubicacionLat');
+  });
+});
+
+describe('UpdateEventDto — null explícito solo donde significa "limpiar" (G04-C14, UI-35)', () => {
+  const errores = async (plano: Record<string, unknown>) => (await validate(plainToInstance(UpdateEventDto, plano), { whitelist: true, forbidNonWhitelisted: true })).map((e) => e.property);
+
+  it('acepta null en ubicación al pasar a VIRTUAL y en el enlace al pasar a PRESENCIAL', async () => {
+    expect(await errores({ modalidad: 'VIRTUAL', linkSesion: 'https://meet.google.com/abc', ubicacionLat: null, ubicacionLng: null, ubicacionNombre: null })).toEqual([]);
+    expect(await errores({ modalidad: 'PRESENCIAL', ubicacionLat: 14.6, ubicacionLng: -90.5, linkSesion: null })).toEqual([]);
+  });
+
+  it('rechaza null en la ubicación de un PRESENCIAL/MIXTA y en el enlace de un VIRTUAL/MIXTA', async () => {
+    expect(await errores({ modalidad: 'PRESENCIAL', ubicacionLat: null, ubicacionLng: null })).toEqual(['ubicacionLat', 'ubicacionLng']);
+    expect(await errores({ modalidad: 'MIXTA', ubicacionLat: 14.6, ubicacionLng: -90.5, linkSesion: null })).toEqual(['linkSesion']);
+    expect(await errores({ modalidad: 'VIRTUAL', linkSesion: null })).toEqual(['linkSesion']);
+  });
+
+  it('el resto de campos sigue rechazando null (solo se acepta la omisión real)', async () => {
+    expect(await errores({ tituloEvento: null })).toEqual(['tituloEvento']);
+    expect(await errores({ fechaInicio: null })).toEqual(['fechaInicio']);
+    expect(await errores({ antelacionMinutos: null })).toEqual(['antelacionMinutos']);
+    expect(await errores({ invitados: null })).toEqual(['invitados']);
+  });
+
+  it('la omisión sigue siendo válida: un PATCH de solo título no exige nada más', async () => {
+    expect(await errores({ tituloEvento: 'Nuevo título' })).toEqual([]);
   });
 });

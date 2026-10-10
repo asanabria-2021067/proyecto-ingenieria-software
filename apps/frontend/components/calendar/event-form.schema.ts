@@ -306,6 +306,13 @@ export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora =
     });
 }
 
+/**
+ * `keepEmptyDescripcion` distingue edición (PATCH, `true`) de creación
+ * (`false`). G04 (UI-35): al editar, lo que la modalidad elegida ya no usa
+ * (el lugar en un evento virtual, el enlace en uno presencial) se envía como
+ * `null` explícito para que el backend lo borre; antes se omitía y el evento
+ * conservaba coordenadas o enlace huérfanos. Al crear se sigue omitiendo.
+ */
 export function buildEventPayload(
   values: EventFormValues,
   { keepEmptyDescripcion }: { keepEmptyDescripcion: boolean },
@@ -313,6 +320,7 @@ export function buildEventPayload(
   const descripcion = values.descripcionEvento.trim();
   const mostrarUbicacion = requiereUbicacion(values.modalidad);
   const mostrarLink = requiereLink(values.modalidad);
+  const sinValor = keepEmptyDescripcion ? null : undefined;
   // El schema ya garantizó fechas válidas antes de llegar aquí.
   const { inicio, fin } = rangoDelFormulario(values);
   return {
@@ -323,10 +331,11 @@ export function buildEventPayload(
     fechaFin: fin!.toISOString(),
     antelacionMinutos: values.recordatorioActivo ? values.antelacionMinutos : 0,
     modalidad: values.modalidad,
-    ubicacionLat: mostrarUbicacion && values.ubicacionLat !== null ? values.ubicacionLat : undefined,
-    ubicacionLng: mostrarUbicacion && values.ubicacionLng !== null ? values.ubicacionLng : undefined,
-    ubicacionNombre: mostrarUbicacion ? values.ubicacionNombre.trim() || undefined : undefined,
-    linkSesion: mostrarLink ? values.linkSesion.trim() || undefined : undefined,
+    ubicacionLat: mostrarUbicacion ? (values.ubicacionLat ?? undefined) : sinValor,
+    ubicacionLng: mostrarUbicacion ? (values.ubicacionLng ?? undefined) : sinValor,
+    // El nombre del lugar es opcional: vaciarlo al editar también lo borra.
+    ubicacionNombre: mostrarUbicacion ? values.ubicacionNombre.trim() || sinValor : sinValor,
+    linkSesion: mostrarLink ? values.linkSesion.trim() || undefined : sinValor,
     rolesDestino: values.rolesDestino,
     invitados: values.invitados,
   };

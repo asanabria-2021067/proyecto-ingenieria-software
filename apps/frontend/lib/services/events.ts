@@ -40,10 +40,11 @@ export interface EventPayload {
   fechaFin: string;
   antelacionMinutos?: number;
   modalidad?: ModalidadEvento;
-  ubicacionLat?: number;
-  ubicacionLng?: number;
-  ubicacionNombre?: string;
-  linkSesion?: string;
+  // G04 (UI-35): al editar, `null` = "bórralo" (la modalidad ya no lo usa); omitido = "no lo toques".
+  ubicacionLat?: number | null;
+  ubicacionLng?: number | null;
+  ubicacionNombre?: string | null;
+  linkSesion?: string | null;
   rolesDestino?: number[];
   tipoEvento?: TipoEvento;
   invitados?: number[];

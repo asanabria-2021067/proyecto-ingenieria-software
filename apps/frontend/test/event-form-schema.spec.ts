@@ -169,7 +169,9 @@ describe('helpers del formulario de evento', () => {
     expect(payload.invitados).toEqual([4, 5]);
     expect(payload.rolesDestino).toEqual([2]);
     expect(payload.linkSesion).toBe('https://meet.google.com/x');
-    expect(payload.ubicacionLat).toBeUndefined();
+    // G04-C14 (clase B): antes se exigía `undefined` (omitir). Al editar un evento virtual, el lugar
+    // que la modalidad no usa viaja como null explícito para que el backend limpie datos huérfanos.
+    expect(payload.ubicacionLat).toBeNull();
     expect(payload.descripcionEvento).toBe('');
   });
 
@@ -463,5 +465,50 @@ describe('hora propuesta coherente con la fecha elegida (G03-C04, UI-27)', () =>
     const form = eventFormFromEvento(evento({ fechaInicio: new Date(2026, 9, 1, 8, 0).toISOString(), fechaFin: new Date(2026, 9, 1, 9, 15).toISOString() }));
     expect(form.horaInicio).toBe('08:00');
     expect(form.horaFin).toBe('09:15');
+  });
+});
+
+describe('metadatos de modalidad obsoletos al editar (G04-C14, UI-35)', () => {
+  const dia = new Date(2030, 9, 6);
+  const base = { fecha: dia, horaInicio: '09:00', horaFin: '10:00' };
+  const conLugarYEnlace = { ubicacionLat: 14.6, ubicacionLng: -90.5, ubicacionNombre: 'Edificio CIT', linkSesion: 'https://meet.google.com/abc' };
+
+  it('PRESENCIAL → VIRTUAL al editar: lat, lng y nombre viajan como null explícito y el enlace se conserva', () => {
+    const payload = buildEventPayload(valores({ ...base, ...conLugarYEnlace, modalidad: 'VIRTUAL' }), { keepEmptyDescripcion: true });
+    expect(payload).toMatchObject({ modalidad: 'VIRTUAL', ubicacionLat: null, ubicacionLng: null, ubicacionNombre: null, linkSesion: 'https://meet.google.com/abc' });
+    // null sobrevive a JSON (undefined se perdería y el backend no limpiaría nada).
+    expect(JSON.parse(JSON.stringify(payload))).toMatchObject({ ubicacionLat: null, ubicacionLng: null, ubicacionNombre: null });
+  });
+
+  it('VIRTUAL → PRESENCIAL al editar: el enlace viaja como null y el lugar con sus coordenadas', () => {
+    const payload = buildEventPayload(valores({ ...base, ...conLugarYEnlace, modalidad: 'PRESENCIAL' }), { keepEmptyDescripcion: true });
+    expect(payload).toMatchObject({ modalidad: 'PRESENCIAL', linkSesion: null, ubicacionLat: 14.6, ubicacionLng: -90.5, ubicacionNombre: 'Edificio CIT' });
+  });
+
+  it('MIXTA conserva lugar y enlace: nada se limpia', () => {
+    const payload = buildEventPayload(valores({ ...base, ...conLugarYEnlace, modalidad: 'MIXTA' }), { keepEmptyDescripcion: true });
+    expect(payload).toMatchObject({ modalidad: 'MIXTA', ...conLugarYEnlace });
+    expect(Object.values(payload)).not.toContain(null);
+  });
+
+  it('vaciar el nombre del lugar al editar un presencial lo borra (null) sin tocar las coordenadas', () => {
+    const payload = buildEventPayload(valores({ ...base, ...conLugarYEnlace, modalidad: 'PRESENCIAL', ubicacionNombre: '   ' }), { keepEmptyDescripcion: true });
+    expect(payload).toMatchObject({ ubicacionNombre: null, ubicacionLat: 14.6, ubicacionLng: -90.5 });
+  });
+
+  it('al crear no se envía ningún null: lo que no aplica se omite, como antes', () => {
+    for (const modalidad of ['VIRTUAL', 'PRESENCIAL', 'MIXTA'] as const) {
+      const payload = buildEventPayload(valores({ ...base, ...conLugarYEnlace, modalidad }), { keepEmptyDescripcion: false });
+      expect(Object.values(payload)).not.toContain(null);
+    }
+    const virtual = JSON.parse(JSON.stringify(buildEventPayload(valores({ ...base, ...conLugarYEnlace, modalidad: 'VIRTUAL' }), { keepEmptyDescripcion: false })));
+    expect(virtual).not.toHaveProperty('ubicacionLat');
+    expect(virtual).not.toHaveProperty('ubicacionNombre');
+  });
+
+  it('ida y vuelta: un evento que el backend devuelve ya limpio (virtual, sin lugar) vuelve a producir el mismo payload', () => {
+    const limpio = evento({ modalidad: 'VIRTUAL', ubicacionLat: null, ubicacionLng: null, ubicacionNombre: null, fechaInicio: new Date(2030, 9, 6, 9, 0).toISOString(), fechaFin: new Date(2030, 9, 6, 10, 0).toISOString() });
+    const payload = buildEventPayload(eventFormFromEvento(limpio), { keepEmptyDescripcion: true });
+    expect(payload).toMatchObject({ modalidad: 'VIRTUAL', ubicacionLat: null, ubicacionLng: null, ubicacionNombre: null, linkSesion: limpio.linkSesion });
   });
 });

@@ -215,6 +215,20 @@ export class EventsService {
       );
     }
 
+    // G04 (UI-35): en los metadatos de modalidad, `null` explícito limpia el
+    // dato y la omisión lo conserva (un cliente antiguo que no los envía no
+    // borra nada). Lo que no se permite es dejar sin ubicación o sin enlace un
+    // evento cuya modalidad resultante sí los necesita.
+    const modalidadFinal = dto.modalidad ?? actual.modalidad;
+    const requiereUbicacion = modalidadFinal === 'PRESENCIAL' || modalidadFinal === 'MIXTA';
+    const requiereLink = modalidadFinal === 'VIRTUAL' || modalidadFinal === 'MIXTA';
+    if (requiereUbicacion && (dto.ubicacionLat === null || dto.ubicacionLng === null)) {
+      throw new BadRequestException('Un evento presencial o híbrido necesita su ubicación en el mapa');
+    }
+    if (requiereLink && dto.linkSesion === null) {
+      throw new BadRequestException('Un evento virtual o híbrido necesita el enlace de la sesión');
+    }
+
     const data: Prisma.EventoProyectoUpdateInput = { actualizadoEn: new Date() };
     if (dto.tituloEvento !== undefined) data.tituloEvento = dto.tituloEvento;
     if (dto.descripcionEvento !== undefined) data.descripcionEvento = dto.descripcionEvento;
