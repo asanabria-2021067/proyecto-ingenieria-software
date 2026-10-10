@@ -121,3 +121,94 @@ describe('useAgendasCompartidas — estado por persona (G03-C08, UI-12)', () => 
     expect(sharesMock.getAgendaCompartida).not.toHaveBeenCalled();
   });
 });
+
+describe('useAgendasCompartidas — referencias estables (G04-C01, UI-11/UI-12)', () => {
+  function renderConProps(ids: number[]) {
+    return renderHook(({ ids: actuales, desde, hasta }) => useAgendasCompartidas(actuales, desde, hasta), {
+      wrapper,
+      initialProps: { ids, desde: DESDE, hasta: HASTA },
+    });
+  }
+
+  it('volver a renderizar sin datos nuevos devuelve las mismas referencias de `agendas` y `estados` (aunque lleguen arrays y fechas nuevos con el mismo contenido) y no repite peticiones', async () => {
+    sharesMock.getAgendaCompartida.mockImplementation((id: number) => Promise.resolve(id === LUIS ? AGENDA_LUIS : { eventos: [], tareas: [] }));
+    const { result, rerender } = renderConProps([ANA, LUIS]);
+    await waitFor(() => expect(result.current.agendas.size).toBe(2));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const antes = result.current;
+    const llamadas = sharesMock.getAgendaCompartida.mock.calls.length;
+
+    for (let i = 0; i < 5; i++) rerender({ ids: [ANA, LUIS], desde: new Date(DESDE), hasta: new Date(HASTA) });
+
+    expect(result.current.agendas).toBe(antes.agendas);
+    expect(result.current.estados).toBe(antes.estados);
+    expect(result.current.erroresPorPropietario).toBe(antes.erroresPorPropietario);
+    expect(sharesMock.getAgendaCompartida.mock.calls.length).toBe(llamadas);
+  });
+
+  it('un cambio real en la agenda de una persona renueva la colección pero conserva la entrada y el estado de la otra', async () => {
+    sharesMock.getAgendaCompartida.mockImplementation((id: number) => Promise.resolve(id === LUIS ? AGENDA_LUIS : { eventos: [], tareas: [] }));
+    const { result } = renderConProps([ANA, LUIS]);
+    await waitFor(() => expect(result.current.agendas.size).toBe(2));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const antes = result.current;
+
+    const nuevaDeAna: AgendaCompartidaDTO = {
+      eventos: [{ idEvento: 77, fechaInicio: DESDE.toISOString(), fechaFin: DESDE.toISOString(), visibilidad: 'OCUPADO' }],
+      tareas: [],
+    };
+    sharesMock.getAgendaCompartida.mockImplementation((id: number) => Promise.resolve(id === LUIS ? AGENDA_LUIS : nuevaDeAna));
+    act(() => {
+      result.current.estados.get(ANA)?.refetch();
+    });
+    await waitFor(() => expect(result.current.agendas.get(ANA)).toEqual(nuevaDeAna));
+
+    expect(result.current.agendas).not.toBe(antes.agendas);
+    expect(result.current.agendas.get(LUIS)).toBe(antes.agendas.get(LUIS));
+    expect(result.current.estados.get(LUIS)).toBe(antes.estados.get(LUIS));
+  });
+
+  it('un refetch que devuelve exactamente lo mismo no cambia ninguna referencia', async () => {
+    sharesMock.getAgendaCompartida.mockImplementation(() => Promise.resolve({ eventos: [...AGENDA_LUIS.eventos], tareas: [] }));
+    const { result } = renderConProps([LUIS]);
+    await waitFor(() => expect(result.current.agendas.size).toBe(1));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const antes = result.current;
+
+    await act(async () => {
+      result.current.estados.get(LUIS)?.refetch();
+    });
+    await waitFor(() => expect(sharesMock.getAgendaCompartida).toHaveBeenCalledTimes(2));
+    expect(result.current.agendas).toBe(antes.agendas);
+    expect(result.current.estados).toBe(antes.estados);
+  });
+
+  it('un fallo parcial sigue representado por persona (estado y `erroresPorPropietario`) y también es estable entre renders', async () => {
+    const fallo = errorHttp(500);
+    sharesMock.getAgendaCompartida.mockImplementation((id: number) => (id === ANA ? Promise.reject(fallo) : Promise.resolve(AGENDA_LUIS)));
+    const { result, rerender } = renderConProps([ANA, LUIS]);
+    await waitFor(() => expect(result.current.estados.get(ANA)?.isError).toBe(true), { timeout: 4000 });
+    await waitFor(() => expect(result.current.agendas.get(LUIS)).toEqual(AGENDA_LUIS));
+
+    expect(result.current.isError).toBe(true);
+    expect(result.current.agendas.has(ANA)).toBe(false);
+    expect(result.current.erroresPorPropietario.get(ANA)).toBe(fallo);
+    expect(result.current.erroresPorPropietario.has(LUIS)).toBe(false);
+    const antes = result.current;
+    rerender({ ids: [ANA, LUIS], desde: DESDE, hasta: HASTA });
+    expect(result.current.estados).toBe(antes.estados);
+    expect(result.current.erroresPorPropietario).toBe(antes.erroresPorPropietario);
+  });
+
+  it('activar a otra persona cambia la colección (dependencia real) sin volver a pedir a quien ya estaba', async () => {
+    sharesMock.getAgendaCompartida.mockImplementation((id: number) => Promise.resolve(id === LUIS ? AGENDA_LUIS : { eventos: [], tareas: [] }));
+    const { result, rerender } = renderConProps([LUIS]);
+    await waitFor(() => expect(result.current.agendas.size).toBe(1));
+    const deLuis = result.current.agendas.get(LUIS);
+
+    rerender({ ids: [LUIS, ANA], desde: DESDE, hasta: HASTA });
+    await waitFor(() => expect(result.current.agendas.size).toBe(2));
+    expect(result.current.agendas.get(LUIS)).toBe(deLuis);
+    expect(sharesMock.getAgendaCompartida.mock.calls.filter(([id]) => id === LUIS)).toHaveLength(1);
+  });
+});
