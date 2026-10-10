@@ -390,3 +390,43 @@ describe('EventFormDialog — validación visible de la ubicación (G02-C02, UI-
     await waitFor(() => expect(screen.getByLabelText('Título del evento o actividad')).toHaveFocus());
   });
 });
+
+describe('EventFormDialog — límites de ubicación de extremo a extremo (G02-C03)', () => {
+  it('un resultado de Nominatim de 300 caracteres se recorta y el evento presencial se agenda con 255', async () => {
+    const nombreLargo = 'Edificio ' + 'x'.repeat(300);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => [{ place_id: 1, display_name: nombreLargo, lat: '14.6', lon: '-90.5' }] }),
+    );
+    eventsMock.createEvent.mockResolvedValueOnce(evento());
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Visita' } });
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).getByRole('radio', { name: 'Presencial' }));
+    fireEvent.change(screen.getByLabelText('Ubicación presencial'), { target: { value: 'Edificio' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar ubicación' }));
+    fireEvent.click(await screen.findByRole('button', { name: nombreLargo }));
+
+    expect((screen.getByLabelText('Ubicación presencial') as HTMLInputElement).value).toHaveLength(255);
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
+    expect(eventsMock.createEvent.mock.calls[0][1].ubicacionNombre).toHaveLength(255);
+    expect(screen.queryByText('El nombre del lugar no puede exceder 255 caracteres.')).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it('el mensaje de ubicación queda referenciado por aria-describedby y desaparece al corregir', async () => {
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Visita' } });
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).getByRole('radio', { name: 'Híbrida' }));
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    const mensaje = await screen.findByText('Marca la ubicación de la sesión en el mapa.');
+    const input = screen.getByLabelText('Ubicación presencial');
+    expect(input.getAttribute('aria-describedby')?.split(' ')).toContain(mensaje.id);
+
+    leafletMock.handlers.click({ latlng: { lat: 14.6, lng: -90.5 } });
+    await waitFor(() => expect(input).toHaveAttribute('aria-invalid', 'false'));
+    expect(input.getAttribute('aria-describedby')?.split(' ')).not.toContain(mensaje.id);
+  });
+});

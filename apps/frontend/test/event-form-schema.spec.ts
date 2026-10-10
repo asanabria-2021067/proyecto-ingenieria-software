@@ -187,3 +187,64 @@ describe('helpers del formulario de evento', () => {
     expect(form.antelacionMinutos).toBe(60);
   });
 });
+
+describe('límites de ubicación: nombre y coordenadas (G02-C03, UI-03/UI-25)', () => {
+  const presencialConPunto = (overrides: Partial<EventFormValues> = {}) =>
+    valores({ modalidad: 'PRESENCIAL', linkSesion: '', ubicacionLat: 14.6, ubicacionLng: -90.5, ...overrides });
+
+  it.each([
+    [0, true],
+    [254, true],
+    [255, true],
+    [256, false],
+    [300, false],
+  ])('nombre del lugar de %i caracteres → válido: %s', (largo, valido) => {
+    const errores = mensajes(presencialConPunto({ ubicacionNombre: 'x'.repeat(largo) }));
+    if (valido) {
+      expect(errores.ubicacionNombre).toBeUndefined();
+    } else {
+      expect(errores.ubicacionNombre).toBe('El nombre del lugar no puede exceder 255 caracteres.');
+    }
+    // El error de nombre nunca se confunde con el de título ni con el del punto.
+    expect(errores.tituloEvento).toBeUndefined();
+    expect(errores.ubicacionLat).toBeUndefined();
+  });
+
+  it('el nombre largo y el punto ausente se reportan a la vez, cada uno en su campo', () => {
+    const errores = mensajes(valores({ modalidad: 'PRESENCIAL', linkSesion: '', ubicacionNombre: 'x'.repeat(300) }));
+    expect(errores.ubicacionNombre).toBe('El nombre del lugar no puede exceder 255 caracteres.');
+    expect(errores.ubicacionLat).toBe('Marca la ubicación de la sesión en el mapa.');
+  });
+
+  it.each([
+    ['PRESENCIAL', true],
+    ['MIXTA', true],
+    ['VIRTUAL', false],
+  ] as const)('%s exige punto en el mapa: %s', (modalidad, exige) => {
+    const sinPunto = mensajes(valores({ modalidad, linkSesion: 'https://meet.google.com/x', ubicacionLat: null, ubicacionLng: null }));
+    expect(sinPunto.ubicacionLat === undefined).toBe(!exige);
+    const conPunto = mensajes(valores({ modalidad, linkSesion: 'https://meet.google.com/x', ubicacionLat: 14.6, ubicacionLng: -90.5 }));
+    expect(conPunto.ubicacionLat).toBeUndefined();
+  });
+
+  it('solo una de las dos coordenadas no basta', () => {
+    expect(mensajes(presencialConPunto({ ubicacionLng: null })).ubicacionLat).toBeDefined();
+    expect(mensajes(presencialConPunto({ ubicacionLat: null })).ubicacionLat).toBeDefined();
+  });
+
+  it('en VIRTUAL el nombre del lugar no se valida ni se envía', () => {
+    const virtual = valores({ ubicacionNombre: 'x'.repeat(300) });
+    expect(mensajes(virtual).ubicacionNombre).toBe('El nombre del lugar no puede exceder 255 caracteres.');
+    // La longitud se valida siempre (dato del formulario), pero el payload virtual no lleva ubicación.
+    const payload = buildEventPayload(valores({ ubicacionNombre: 'Salón' }), { keepEmptyDescripcion: false });
+    expect(payload.ubicacionNombre).toBeUndefined();
+    expect(payload.ubicacionLat).toBeUndefined();
+  });
+
+  it('el payload presencial envía nombre recortado por el formulario y coordenadas tal cual', () => {
+    const payload = buildEventPayload(presencialConPunto({ ubicacionNombre: `  ${'y'.repeat(255)}  ` }), { keepEmptyDescripcion: false });
+    expect(payload.ubicacionNombre).toHaveLength(255);
+    expect(payload.ubicacionLat).toBe(14.6);
+    expect(payload.ubicacionLng).toBe(-90.5);
+  });
+});
