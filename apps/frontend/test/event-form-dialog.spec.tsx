@@ -430,3 +430,69 @@ describe('EventFormDialog — límites de ubicación de extremo a extremo (G02-C
     expect(input.getAttribute('aria-describedby')?.split(' ')).not.toContain(mensaje.id);
   });
 });
+
+describe('EventFormDialog — "Termina otro día" y fecha de fin (G02-C08, UI-06/T-323)', () => {
+  function rellenarVirtual(titulo = 'Hackathon') {
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: titulo } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+  }
+
+  it('por defecto está desmarcado y no muestra la fecha de fin; al marcarlo aparece el selector con su etiqueta', () => {
+    renderCrear();
+    const check = screen.getByRole('checkbox', { name: 'Termina otro día' });
+    expect(check).not.toBeChecked();
+    expect(screen.queryByLabelText('Fecha de fin')).not.toBeInTheDocument();
+
+    fireEvent.click(check);
+    expect(screen.getByLabelText('Fecha de fin')).toHaveTextContent('Selecciona la fecha de fin');
+
+    fireEvent.click(check);
+    expect(screen.queryByLabelText('Fecha de fin')).not.toBeInTheDocument();
+  });
+
+  it('marcar y desmarcar el control no borra el título ni los invitados ya escritos', async () => {
+    renderCrear();
+    rellenarVirtual('Demo que no se pierde');
+    fireEvent.click(screen.getByRole('button', { name: /Añadir integrante/ }));
+    fireEvent.click(await screen.findByText('Luis Hernández'));
+    expect(await screen.findByText('1 invitado')).toBeInTheDocument();
+
+    const check = screen.getByRole('checkbox', { name: 'Termina otro día' });
+    fireEvent.click(check);
+    fireEvent.click(check);
+    expect(screen.getByLabelText('Título del evento o actividad')).toHaveValue('Demo que no se pierde');
+    expect(screen.getByText('1 invitado')).toBeInTheDocument();
+  });
+
+  it('con el control marcado y sin fecha de fin, el envío se detiene con el error junto al campo', async () => {
+    renderCrear();
+    rellenarVirtual();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    expect(await screen.findByText('Selecciona la fecha de fin.')).toBeInTheDocument();
+    expect(eventsMock.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('crea un evento 22:00 → 01:00 del día siguiente eligiendo la fecha de fin en el calendario', async () => {
+    eventsMock.createEvent.mockResolvedValueOnce(evento());
+    renderCrear();
+    rellenarVirtual();
+    fireEvent.change(screen.getByLabelText('Hora de inicio'), { target: { value: '22:00' } });
+    fireEvent.change(screen.getByLabelText('Hora de fin'), { target: { value: '01:00' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
+
+    // El popover abre el calendario del mes de la fecha de inicio (octubre 2026): se elige el 6.
+    fireEvent.click(screen.getByLabelText('Fecha de fin'));
+    fireEvent.click(await screen.findByRole('button', { name: /, 6 de octubre/ }));
+    await waitFor(() => expect(screen.getByLabelText('Fecha de fin')).toHaveTextContent(/6 oct 2026/i));
+    expect(screen.getByText('3h')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
+    expect(eventsMock.createEvent.mock.calls[0][1]).toMatchObject({
+      fechaInicio: new Date(2026, 9, 5, 22, 0).toISOString(),
+      fechaFin: new Date(2026, 9, 6, 1, 0).toISOString(),
+    });
+  });
+});

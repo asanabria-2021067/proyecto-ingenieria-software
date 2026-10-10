@@ -144,12 +144,14 @@ export function EventFormDialog({
   const idProyectoForm = form.watch('idProyecto');
   const linkSesion = form.watch('linkSesion');
   const recordatorioActivo = form.watch('recordatorioActivo');
-  const fechaFinOriginal = form.watch('fechaFinOriginal');
+  const terminaOtroDia = form.watch('terminaOtroDia');
+  const fecha = form.watch('fecha');
   const duracion = duracionTexto({
-    fecha: form.watch('fecha'),
+    fecha,
     horaInicio: form.watch('horaInicio'),
     horaFin: form.watch('horaFin'),
-    fechaFinOriginal,
+    terminaOtroDia,
+    fechaFin: form.watch('fechaFin'),
   });
 
   const idProyectoActivo = isEditing ? (editingEvent?.idProyecto ?? 0) : Number(idProyectoForm) || 0;
@@ -368,11 +370,7 @@ export function EventFormDialog({
                         <FormControl>
                           <DatePicker
                             value={field.value}
-                            onChange={(date) => {
-                              field.onChange(date);
-                              // Cambiar la fecha convierte un evento viejo de varios días en uno de un día.
-                              form.setValue('fechaFinOriginal', null);
-                            }}
+                            onChange={field.onChange}
                             disabledBefore={isEditing ? undefined : hoyInicioDelDia()}
                             disabled={isPending}
                             className="bg-surface-container-lowest"
@@ -428,13 +426,50 @@ export function EventFormDialog({
                     )}
                   />
                 </div>
-                {fechaFinOriginal && (
-                  <p className="type-meta mt-tight" role="note">
-                    Este evento termina el{' '}
-                    {fechaFinOriginal.toLocaleDateString('es-GT', { day: 'numeric', month: 'long' })}. Se conserva ese día
-                    de fin mientras no cambies la fecha.
-                  </p>
-                )}
+                {/* G02 (UI-06): "Termina otro día" es opcional; desmarcado, el evento termina en la misma fecha. */}
+                <div className="mt-tight flex flex-wrap items-start gap-x-4 gap-y-2">
+                  <FormField
+                    control={form.control}
+                    name="terminaOtroDia"
+                    render={({ field }) => (
+                      <FormItem className="flex h-10 items-center gap-2 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            disabled={isPending}
+                            onCheckedChange={(checked) => {
+                              field.onChange(checked === true);
+                              if (checked !== true) form.clearErrors('fechaFin');
+                            }}
+                          />
+                        </FormControl>
+                        <FormLabel className="text-xs font-normal text-on-surface">Termina otro día</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  {terminaOtroDia && (
+                    <FormField
+                      control={form.control}
+                      name="fechaFin"
+                      render={({ field }) => (
+                        <FormItem className="min-w-0 flex-1 sm:max-w-[16rem]">
+                          <FormLabel className="sr-only">Fecha de fin</FormLabel>
+                          <FormControl>
+                            <DatePicker
+                              value={field.value}
+                              onChange={field.onChange}
+                              disabledBefore={fecha}
+                              disabled={isPending}
+                              placeholder="Selecciona la fecha de fin"
+                              className="bg-surface-container-lowest"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
               </div>
 
               <FormField
