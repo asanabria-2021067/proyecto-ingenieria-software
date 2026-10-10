@@ -250,12 +250,12 @@ enum TipoNotificacion {
   CIERRE_DEVUELTO_A_EJECUCION
   HORAS_CONSOLIDADAS
   HORAS_ACREDITADAS
-  // G05-C11 (OWASP25-C038): alerta de seguridad a administradores (emitida solo con SECURITY_ALERTS_ENABLED=true).
-  ALERTA_SEGURIDAD
   // HU-169 (T-265): recordatorio de un EventoProyecto próximo a iniciar.
   RECORDATORIO_EVENTO
   CUENTA_PENDIENTE_VERIFICACION
   CUENTA_VERIFICADA
+  // G05-C11 (OWASP25-C038): alerta de seguridad a administradores (emitida solo con SECURITY_ALERTS_ENABLED=true).
+  ALERTA_SEGURIDAD
 }
 
 enum EstadoAmistad {
