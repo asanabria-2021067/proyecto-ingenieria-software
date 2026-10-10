@@ -168,16 +168,34 @@ export function TimeGridView({
       {hayTodoElDia && (
         <div className="grid border-b border-outline-variant/40" style={plantilla}>
           <div className="type-meta flex items-start justify-end px-1 py-1 text-right leading-tight">Todo el día</div>
-          {columnas.map(({ day, todoElDia }) => (
-            <div key={day.key} className="flex min-w-0 flex-col gap-0.5 border-l border-outline-variant/30 p-0.5">
-              {todoElDia.slice(0, MAX_TODO_EL_DIA).map((item) => (
-                <ChipTodoElDia key={agendaItemKey(item)} item={item} onSelectEvento={onSelectEvento} />
-              ))}
-              {todoElDia.length > MAX_TODO_EL_DIA && (
-                <span className="type-meta px-1">+{todoElDia.length - MAX_TODO_EL_DIA} más</span>
-              )}
-            </div>
-          ))}
+          {columnas.map(({ day, todoElDia }) => {
+            // G02 (UI-13): en Día hay sitio para todas (con scroll acotado); en
+            // Semana, lo que no cabe se abre desde "+N más", que lleva a ese día.
+            const limite = days.length === 1 ? todoElDia.length : MAX_TODO_EL_DIA;
+            const ocultos = todoElDia.length - limite;
+            return (
+              <div
+                key={day.key}
+                className={`flex min-w-0 flex-col gap-0.5 border-l border-outline-variant/30 p-0.5 ${
+                  days.length === 1 ? 'max-h-40 overflow-y-auto overscroll-contain' : ''
+                }`}
+              >
+                {todoElDia.slice(0, limite).map((item) => (
+                  <ChipTodoElDia key={agendaItemKey(item)} item={item} onSelectEvento={onSelectEvento} />
+                ))}
+                {ocultos > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onVerDia?.(day.key)}
+                    aria-label={`${ocultos} ${ocultos === 1 ? 'actividad más' : 'actividades más'} de todo el día, ver el día`}
+                    className="type-meta w-full rounded-control px-1 text-left hover:bg-surface-container"
+                  >
+                    +{ocultos} más
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

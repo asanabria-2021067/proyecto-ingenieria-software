@@ -226,6 +226,29 @@ describe('TimeGridView (HU-184 T-324)', () => {
     expect(screen.getByRole('button', { name: /^Guardia/ })).toHaveStyle({ top: `${23 * 48 + 1}px`, height: `${48 - 2}px` });
   });
 
+  it('en Día todas las fechas límite de la franja son alcanzables; en Semana "+N más" es un botón que abre ese día (G02-C06, UI-13)', () => {
+    const key = '2026-10-08';
+    const cuatro = [1, 2, 3, 4].map((n) => tarea(n, key));
+    const dia = { date: new Date(2026, 9, 8), key, inCurrentMonth: true };
+
+    const { unmount } = render(
+      <TimeGridView days={[dia]} todayKey="2026-10-06" itemsByDay={new Map([[key, cuatro]])} onSelectEvento={() => {}} ahora={AHORA} />,
+    );
+    expect(screen.getAllByRole('link', { name: /^Tarea \d/ })).toHaveLength(4);
+    expect(screen.queryByText(/más$/)).not.toBeInTheDocument();
+    unmount();
+
+    const onVerDia = vi.fn();
+    render(
+      <TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={new Map([[key, cuatro]])} onSelectEvento={() => {}} onVerDia={onVerDia} ahora={AHORA} />,
+    );
+    expect(screen.getAllByRole('link', { name: /^Tarea \d/ })).toHaveLength(3);
+    const mas = screen.getByRole('button', { name: '1 actividad más de todo el día, ver el día' });
+    expect(mas).toHaveTextContent('+1 más');
+    fireEvent.click(mas);
+    expect(onVerDia).toHaveBeenCalledWith(key);
+  });
+
   it('una tarea compartida no es un enlace', () => {
     const key = '2026-10-08';
     render(
