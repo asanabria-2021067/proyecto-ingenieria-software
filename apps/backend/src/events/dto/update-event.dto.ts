@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsDateString,
   IsEnum,
@@ -13,7 +14,7 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
-import { ModalidadEvento } from '@prisma/client';
+import { ModalidadEvento, TipoEvento } from '@prisma/client';
 
 /**
  * HU-169 (T-263): edición parcial. Mismo patrón que UpdateLabelDto/UpdateTaskDto:
@@ -82,4 +83,17 @@ export class UpdateEventDto {
   @IsArray()
   @IsInt({ each: true })
   rolesDestino?: number[];
+
+  // HU-184: categoría del evento (color en el calendario). Omitido = OTRO al crear.
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsEnum(TipoEvento)
+  tipoEvento?: TipoEvento;
+
+  // HU-184: idUsuario invitados; deben ser integrantes del proyecto (lo valida
+  // EventsService). Vacío/omitido = todo el proyecto.
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsInt({ each: true })
+  invitados?: number[];
 }

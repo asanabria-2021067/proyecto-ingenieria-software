@@ -101,6 +101,17 @@ enum ModalidadEvento {
   MIXTA
 }
 
+/// HU-184: categoría de un EventoProyecto (color en el calendario). Los
+/// eventos anteriores a esta columna quedan como OTRO.
+enum TipoEvento {
+  TUTORIA
+  REUNION
+  ENTREGA
+  REVISION
+  TALLER
+  OTRO
+}
+
 enum RolOrganizacionProyecto {
   PRINCIPAL
   COLABORADORA
@@ -253,6 +264,8 @@ enum TipoNotificacion {
   ALERTA_SEGURIDAD
   // HU-169 (T-265): recordatorio de un EventoProyecto próximo a iniciar.
   RECORDATORIO_EVENTO
+  // HU-184: alguien compartió su calendario (solo lectura) con el usuario.
+  CALENDARIO_COMPARTIDO
 }
 
 enum EstadoAmistad {
@@ -359,6 +372,8 @@ model Usuario {
   actividadesCreadas               ActividadProyecto[]
   asistencias                      AsistenciaActividad[]      @relation("AsistenciaUsuario")
   asistenciasConfirmadas           AsistenciaActividad[]      @relation("AsistenciaConfirmador")
+  calendariosCompartidosPorMi      CalendarioCompartido[]     @relation("CalendarioPropietario")
+  calendariosCompartidosConmigo    CalendarioCompartido[]     @relation("CalendarioInvitado")
 
   @@map("usuario")
 }
@@ -644,28 +659,34 @@ model ProyectoGuardado {
 /// recordatorio se recalcule contra la fecha nueva, y un `eliminadoEn` (=
 /// evento cancelado) excluye el evento de cualquier envío pendiente.
 model EventoProyecto {
-  idEvento              Int       @id @default(autoincrement()) @map("id_evento")
-  idProyecto            Int       @map("id_proyecto")
-  idCreador             Int       @map("id_creador")
-  tituloEvento          String    @map("titulo_evento") @db.VarChar(200)
-  descripcionEvento     String?   @map("descripcion_evento") @db.Text
-  fechaInicio           DateTime  @map("fecha_inicio")
-  fechaFin              DateTime  @map("fecha_fin")
+  idEvento              Int             @id @default(autoincrement()) @map("id_evento")
+  idProyecto            Int             @map("id_proyecto")
+  idCreador             Int             @map("id_creador")
+  tituloEvento          String          @map("titulo_evento") @db.VarChar(200)
+  descripcionEvento     String?         @map("descripcion_evento") @db.Text
+  fechaInicio           DateTime        @map("fecha_inicio")
+  fechaFin              DateTime        @map("fecha_fin")
   /// Minutos de antelación respecto a fechaInicio para disparar el
   /// recordatorio. Default documentado en T-265: 60 minutos (1 hora antes).
-  antelacionMinutos     Int       @default(60) @map("antelacion_minutos")
-  recordatorioEnviadoEn DateTime? @map("recordatorio_enviado_en")
-  creadoEn              DateTime  @default(now()) @map("creado_en")
-  actualizadoEn         DateTime? @map("actualizado_en")
-  eliminadoEn           DateTime? @map("eliminado_en")
+  antelacionMinutos     Int             @default(60) @map("antelacion_minutos")
+  recordatorioEnviadoEn DateTime?       @map("recordatorio_enviado_en")
+  creadoEn              DateTime        @default(now()) @map("creado_en")
+  actualizadoEn         DateTime?       @map("actualizado_en")
+  eliminadoEn           DateTime?       @map("eliminado_en")
   /// Modalidad de la sesión (mapa/link condicionan en el frontend según este valor).
   modalidad             ModalidadEvento @default(VIRTUAL) @map("modalidad")
-  ubicacionLat          Float?    @map("ubicacion_lat")
-  ubicacionLng          Float?    @map("ubicacion_lng")
-  ubicacionNombre       String?   @map("ubicacion_nombre") @db.VarChar(255)
-  linkSesion            String?   @map("link_sesion") @db.VarChar(500)
+  ubicacionLat          Float?          @map("ubicacion_lat")
+  ubicacionLng          Float?          @map("ubicacion_lng")
+  ubicacionNombre       String?         @map("ubicacion_nombre") @db.VarChar(255)
+  linkSesion            String?         @map("link_sesion") @db.VarChar(500)
   /// idRolProyecto destinatarios; [] = visible para todos los participantes del proyecto.
-  rolesDestino          Int[]     @default([]) @map("roles_destino")
+  rolesDestino          Int[]           @default([]) @map("roles_destino")
+  /// HU-184: categoría del evento (color en el calendario).
+  tipoEvento            TipoEvento      @default(OTRO) @map("tipo_evento")
+  /// HU-184: idUsuario invitados (integrantes del proyecto). [] = todo el
+  /// proyecto. Si tiene valores, solo ellos y el líder ven el evento y
+  /// reciben el recordatorio.
+  invitados             Int[]           @default([]) @map("invitados")
 
   proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto])
   creador  Usuario  @relation(fields: [idCreador], references: [idUsuario])
@@ -674,6 +695,22 @@ model EventoProyecto {
   @@index([fechaInicio])
   @@index([eliminadoEn, recordatorioEnviadoEn, fechaInicio])
   @@map("evento_proyecto")
+}
+
+/// HU-184: un usuario comparte su calendario (eventos y fechas límite de
+/// tareas, solo lectura) con otro. Sin aceptación: existe la fila = compartido.
+model CalendarioCompartido {
+  idCalendarioCompartido Int      @id @default(autoincrement()) @map("id_calendario_compartido")
+  idPropietario          Int      @map("id_propietario")
+  idInvitado             Int      @map("id_invitado")
+  creadoEn               DateTime @default(now()) @map("creado_en")
+
+  propietario Usuario @relation("CalendarioPropietario", fields: [idPropietario], references: [idUsuario])
+  invitado    Usuario @relation("CalendarioInvitado", fields: [idInvitado], references: [idUsuario])
+
+  @@unique([idPropietario, idInvitado])
+  @@index([idInvitado])
+  @@map("calendario_compartido")
 }
 
 model RevisionProyecto {

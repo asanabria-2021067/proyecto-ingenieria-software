@@ -15,6 +15,7 @@ function tarea(id: number, key: string, titulo: string): AgendaItem {
     sortKey: '24:00',
     id,
     titulo,
+    projectId: 1,
     projectTitle: 'Proyecto',
     href: `/dashboard/projects/1/kanban/tasks/${id}`,
     prioridad: 'MEDIA',
@@ -22,7 +23,7 @@ function tarea(id: number, key: string, titulo: string): AgendaItem {
   };
 }
 
-function evento(id: number, key: string, titulo: string): AgendaItem {
+function evento(id: number, key: string, titulo: string, tipo: 'TUTORIA' | 'REUNION' | 'ENTREGA' | 'OTRO' = 'OTRO'): AgendaItem {
   return {
     kind: 'evento',
     key,
@@ -31,6 +32,9 @@ function evento(id: number, key: string, titulo: string): AgendaItem {
     projectId: 1,
     titulo,
     descripcion: null,
+    modalidad: 'VIRTUAL',
+    tipo,
+    multiDia: false,
     projectTitle: 'Proyecto',
     href: '/dashboard/projects/1',
     horaInicio: '09:00',
@@ -117,5 +121,53 @@ describe('MonthView (HU-169 T-264)', () => {
     );
 
     expect(screen.queryByText(/más$/)).not.toBeInTheDocument();
+  });
+
+  it('marca hoy con aria-current y el texto "Hoy" (HU-184 T-324)', () => {
+    render(
+      <MonthView
+        year={2026}
+        month={8}
+        todayKey="2026-09-27"
+        selectedKey={null}
+        itemsByDay={new Map()}
+        onSelectDay={() => {}}
+      />,
+    );
+
+    const hoy = screen.getByRole('button', { name: /^Hoy, domingo, 27 de septiembre/ });
+    expect(hoy).toHaveAttribute('aria-current', 'date');
+    expect(hoy).toHaveTextContent('Hoy');
+    expect(screen.getAllByText('Hoy')).toHaveLength(1);
+  });
+
+  it('cada evento lleva el color e ícono de su tipo, con su nombre en texto (HU-184)', () => {
+    const key = '2026-09-10';
+    const itemsByDay = new Map<string, AgendaItem[]>([
+      [key, [evento(1, key, 'Clase', 'TUTORIA'), evento(2, key, 'Llamada', 'REUNION'), evento(3, key, 'Informe', 'ENTREGA')]],
+    ]);
+
+    const { container } = render(
+      <MonthView year={2026} month={8} todayKey="2026-09-27" selectedKey={null} itemsByDay={itemsByDay} onSelectDay={() => {}} />,
+    );
+
+    expect(screen.getByText('Tutoría')).toBeInTheDocument();
+    expect(screen.getByText('Reunión')).toBeInTheDocument();
+    expect(screen.getByText('Entrega')).toBeInTheDocument();
+    // Puntos de la vista compacta (móvil): uno por ítem con el color de su tipo.
+    expect(container.querySelector('span.bg-cal-1-strong.h-1\\.5')).not.toBeNull();
+    expect(container.querySelector('span.bg-cal-3-strong.h-1\\.5')).not.toBeNull();
+    expect(container.querySelector('span.bg-cal-4-strong.h-1\\.5')).not.toBeNull();
+  });
+
+  it('el nombre accesible del día dice cuántas actividades tiene (los títulos no caben en móvil)', () => {
+    const key = '2026-09-10';
+    const itemsByDay = new Map<string, AgendaItem[]>([[key, [tarea(1, key, 'T1'), evento(2, key, 'E1')]]]);
+
+    render(
+      <MonthView year={2026} month={8} todayKey="2026-09-27" selectedKey={null} itemsByDay={itemsByDay} onSelectDay={() => {}} />,
+    );
+
+    expect(screen.getByRole('button', { name: /10 de septiembre, 2 actividades$/ })).toBeInTheDocument();
   });
 });

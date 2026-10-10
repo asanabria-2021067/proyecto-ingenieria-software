@@ -1,10 +1,37 @@
 'use client';
 
-import { Clock } from 'lucide-react';
 import { getMonthMatrix, WEEKDAY_LABELS_ES } from '@/lib/calendar/utils';
-import type { AgendaItem } from '@/lib/calendar/agenda';
+import { TIPO_EVENTO_ESTILO, TONO_CLASES } from '@/lib/calendar/paleta';
+import { tonoDeEvento } from '@/lib/calendar/time-grid';
+import { agendaItemKey, type AgendaItem } from '@/lib/calendar/agenda';
 
 const MAX_VISIBLE_POR_DIA = 3;
+
+/** HU-184: evento con el color de su tipo (o de la persona, si es compartido); tarea propia en primario. */
+function puntoDe(item: AgendaItem): string {
+  if (item.kind === 'evento') return TONO_CLASES[tonoDeEvento(item)].punto;
+  return item.compartidoPor ? TONO_CLASES[item.compartidoPor.tono].punto : 'bg-primary';
+}
+
+function etiquetaDia(date: Date, total: number, isToday: boolean): string {
+  const fecha = date.toLocaleDateString('es-GT', { weekday: 'long', day: 'numeric', month: 'long' });
+  const actividad = total === 0 ? 'sin actividad' : total === 1 ? '1 actividad' : `${total} actividades`;
+  return `${isToday ? 'Hoy, ' : ''}${fecha}, ${actividad}`;
+}
+
+/** Cuadro del color del evento con el ícono y el nombre (para lectores) de su tipo. */
+function IconoEvento({ item }: { item: Extract<AgendaItem, { kind: 'evento' }> }) {
+  const estilo = TIPO_EVENTO_ESTILO[item.tipo];
+  return (
+    <span
+      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control ${TONO_CLASES[tonoDeEvento(item)].bloque}`}
+      title={estilo.label}
+    >
+      <estilo.icon className="h-2.5 w-2.5" aria-hidden="true" />
+      <span className="sr-only">{estilo.label}</span>
+    </span>
+  );
+}
 
 /**
  * HU-169 (T-264): vista mensual, extendida a partir de la rejilla existente
@@ -12,6 +39,8 @@ const MAX_VISIBLE_POR_DIA = 3;
  * rehace. Un día con más de MAX_VISIBLE_POR_DIA ítems se agrupa con un
  * indicador "+N más" en vez de desbordar la celda; seleccionar el día
  * (mismo patrón que antes) muestra el detalle completo debajo.
+ * HU-184 (T-324): en móvil la celda no alcanza para títulos; muestra solo
+ * puntos con el color de cada ítem y el detalle queda en la lista de abajo.
  */
 export function MonthView({
   year,
@@ -31,7 +60,7 @@ export function MonthView({
   const weeks = getMonthMatrix(year, month);
 
   return (
-    <div className="card-base">
+    <div className="card-base max-sm:p-tight">
       <div className="mb-tight grid grid-cols-7 gap-1">
         {WEEKDAY_LABELS_ES.map((label, i) => (
           <div key={i} className="type-meta py-tight text-center uppercase">
@@ -56,31 +85,43 @@ export function MonthView({
                   onClick={() => onSelectDay(day.key)}
                   aria-current={isToday ? 'date' : undefined}
                   aria-pressed={isSelected}
-                  className={`flex min-h-[92px] flex-col items-stretch gap-1 rounded-control border p-1 text-left transition-colors ${
-                    day.inCurrentMonth ? 'border-outline-variant/40' : 'border-transparent opacity-50'
+                  aria-label={etiquetaDia(day.date, items.length, isToday)}
+                  className={`flex min-h-[52px] min-w-0 flex-col items-stretch gap-1 rounded-control border p-0.5 text-left transition-colors sm:min-h-[92px] sm:p-1 ${
+                    isToday
+                      ? 'border-primary'
+                      : day.inCurrentMonth
+                        ? 'border-outline-variant/40'
+                        : 'border-transparent opacity-50'
                   } ${isSelected ? 'bg-surface-container-high' : 'bg-surface-container-lowest hover:bg-surface-container'}`}
                 >
-                  <span
-                    className={`type-meta self-end rounded-pill px-1.5 ${
-                      // El acento queda reservado para el ícono de evento (una sola cosa
-                      // destacada por bloque): "hoy" se marca con borde, no relleno.
-                      isToday ? 'border border-outline-variant font-bold text-on-surface' : ''
-                    }`}
-                  >
-                    {day.date.getDate()}
+                  <span className="flex items-center justify-center gap-1 sm:justify-end">
+                    {isToday && <span className="type-meta hidden font-bold text-text-primary sm:inline">Hoy</span>}
+                    <span
+                      className={`type-meta flex h-6 min-w-6 items-center justify-center rounded-pill px-1 ${
+                        // HU-184 (T-324): "hoy" con relleno primario (no acento: el
+                        // acento es de los eventos virtuales) + borde de la celda.
+                        isToday ? 'bg-primary font-bold text-on-primary' : ''
+                      }`}
+                    >
+                      {day.date.getDate()}
+                    </span>
                   </span>
-                  <div className="flex flex-1 flex-col gap-0.5 overflow-hidden">
+                  <div className="flex flex-wrap items-center justify-center gap-0.5 sm:hidden" aria-hidden="true">
+                    {visibles.map((item) => (
+                      <span key={agendaItemKey(item)} className={`h-1.5 w-1.5 rounded-pill ${puntoDe(item)}`} />
+                    ))}
+                    {restantes > 0 && <span className="type-meta leading-none">+{restantes}</span>}
+                  </div>
+                  <div className="hidden flex-1 flex-col gap-0.5 overflow-hidden sm:flex">
                     {visibles.map((item) => (
                       <span
-                        key={`${item.kind}-${item.id}`}
+                        key={agendaItemKey(item)}
                         className="flex items-center gap-1 truncate rounded-control bg-surface-container px-1 py-0.5 type-meta"
                       >
                         {item.kind === 'evento' ? (
-                          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control bg-accent text-on-accent">
-                            <Clock className="h-2.5 w-2.5" aria-hidden="true" />
-                          </span>
+                          <IconoEvento item={item} />
                         ) : (
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-pill bg-primary" aria-hidden="true" />
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-pill ${puntoDe(item)}`} aria-hidden="true" />
                         )}
                         <span className="truncate">{item.titulo}</span>
                       </span>

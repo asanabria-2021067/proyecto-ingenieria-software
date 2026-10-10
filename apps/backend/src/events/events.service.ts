@@ -28,7 +28,19 @@ const EVENT_SELECT = {
   ubicacionNombre: true,
   linkSesion: true,
   rolesDestino: true,
+  tipoEvento: true,
+  invitados: true,
 } as const;
+
+/**
+ * HU-184: un evento con invitados solo lo ven ellos y el líder del proyecto;
+ * sin invitados lo ve todo el proyecto (comportamiento previo).
+ */
+export function filtroVisibilidadEvento(userId: number): Prisma.EventoProyectoWhereInput {
+  return {
+    OR: [{ invitados: { isEmpty: true } }, { invitados: { has: userId } }, { proyecto: { creadoPor: userId } }],
+  };
+}
 
 /**
  * HU-169 (T-263): CRUD de EventoProyecto. Mismo patrón de permisos que
@@ -43,7 +55,7 @@ export class EventsService {
   async findAllForProject(projectId: number, userId: number) {
     await this.assertCanRead(projectId, userId);
     return this.prisma.eventoProyecto.findMany({
-      where: { idProyecto: projectId, eliminadoEn: null },
+      where: { idProyecto: projectId, eliminadoEn: null, ...filtroVisibilidadEvento(userId) },
       select: EVENT_SELECT,
       orderBy: { fechaInicio: 'asc' },
     });
@@ -62,6 +74,7 @@ export class EventsService {
         // termine el rango y termina después de que empiece.
         fechaInicio: { lte: new Date(hasta) },
         fechaFin: { gte: new Date(desde) },
+        ...filtroVisibilidadEvento(userId),
       },
       select: {
         ...EVENT_SELECT,
@@ -79,6 +92,7 @@ export class EventsService {
     }
     this.assertFechaFinPosterior(dto.fechaInicio, dto.fechaFin);
     this.assertFechaInicioNoPasada(dto.fechaInicio);
+    const invitados = await this.normalizarInvitados(projectId, proyecto.creadoPor, dto.invitados);
 
     return this.prisma.eventoProyecto.create({
       data: {
@@ -95,6 +109,8 @@ export class EventsService {
         ubicacionNombre: dto.ubicacionNombre,
         linkSesion: dto.linkSesion,
         rolesDestino: dto.rolesDestino ?? [],
+        tipoEvento: dto.tipoEvento ?? 'OTRO',
+        invitados,
       },
       select: EVENT_SELECT,
     });
@@ -123,6 +139,10 @@ export class EventsService {
     if (dto.ubicacionNombre !== undefined) data.ubicacionNombre = dto.ubicacionNombre;
     if (dto.linkSesion !== undefined) data.linkSesion = dto.linkSesion;
     if (dto.rolesDestino !== undefined) data.rolesDestino = dto.rolesDestino;
+    if (dto.tipoEvento !== undefined) data.tipoEvento = dto.tipoEvento;
+    if (dto.invitados !== undefined) {
+      data.invitados = await this.normalizarInvitados(projectId, proyecto.creadoPor, dto.invitados);
+    }
     // T-265: mover fechaInicio invalida el recordatorio ya agendado/enviado
     // contra la fecha vieja — se resetea para que EventsReminderService lo
     // recalcule contra la fecha nueva, nunca reenvía el viejo. El diálogo del
@@ -156,6 +176,26 @@ export class EventsService {
       where: { idEvento: eventId },
       data: { eliminadoEn: new Date() },
     });
+  }
+
+  /**
+   * HU-184: invitados sin duplicados y solo integrantes del proyecto (líder o
+   * participante ACTIVO). Un id ajeno es un 400, no se descarta en silencio:
+   * el líder debe enterarse de que esa persona no recibirá el evento.
+   */
+  private async normalizarInvitados(projectId: number, leaderId: number, invitados?: number[]): Promise<number[]> {
+    const unicos = [...new Set(invitados ?? [])];
+    if (unicos.length === 0) return [];
+
+    const participaciones = await this.prisma.participacionProyecto.findMany({
+      where: { idUsuario: { in: unicos }, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: projectId } },
+      select: { idUsuario: true },
+    });
+    const integrantes = new Set([leaderId, ...participaciones.map((p) => p.idUsuario)]);
+    if (unicos.some((id) => !integrantes.has(id))) {
+      throw new BadRequestException('Solo puedes invitar a integrantes activos del proyecto');
+    }
+    return unicos;
   }
 
   private assertFechaFinPosterior(fechaInicio: string, fechaFin: string): void {

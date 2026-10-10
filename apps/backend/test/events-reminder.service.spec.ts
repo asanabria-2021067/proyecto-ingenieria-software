@@ -31,6 +31,7 @@ function evento(overrides: Record<string, unknown> = {}) {
     tituloEvento: 'Kickoff',
     fechaInicio: new Date('2026-10-01T15:00:00.000Z'),
     antelacionMinutos: 60,
+    invitados: [],
     proyecto: { tituloProyecto: 'Proyecto X', creadoPor: LEADER_ID },
     ...overrides,
   };
@@ -162,5 +163,19 @@ describe('EventsReminderService.enviarRecordatoriosPendientes', () => {
     expect(notifications.notifyFromTemplate).toHaveBeenCalledTimes(2);
     // El evento fallido no se marca como enviado: puede reintentarse en la próxima corrida.
     expect(prisma.eventoProyecto.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('con invitados, solo los invitados que siguen en el proyecto y el líder reciben el recordatorio (HU-184)', async () => {
+    const OTRO_ID = 3;
+    const prisma = makePrisma();
+    prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: MEMBER_ID }, { idUsuario: OTRO_ID }]);
+    // 77 ya no es integrante: no recibe nada aunque siga en la lista.
+    prisma.eventoProyecto.findMany.mockResolvedValue([evento({ invitados: [OTRO_ID, 77] })]);
+    const notifications = makeNotifications();
+    const service = new EventsReminderService(prisma, notifications);
+
+    await service.enviarRecordatoriosPendientes();
+
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([LEADER_ID, OTRO_ID], 'RECORDATORIO_EVENTO', expect.any(Object));
   });
 });

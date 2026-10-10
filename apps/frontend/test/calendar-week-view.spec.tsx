@@ -24,6 +24,7 @@ function tarea(id: number, key: string): AgendaItem {
     sortKey: '24:00',
     id,
     titulo: 'Entregar avance',
+    projectId: 1,
     projectTitle: 'Proyecto',
     href: `/dashboard/projects/1/kanban/tasks/${id}`,
     prioridad: 'ALTA',
@@ -40,6 +41,9 @@ function evento(id: number, key: string): AgendaItem {
     projectId: 1,
     titulo: 'Reunión de equipo',
     descripcion: null,
+    modalidad: 'VIRTUAL',
+    tipo: 'OTRO',
+    multiDia: false,
     projectTitle: 'Proyecto',
     href: '/dashboard/projects/1',
     horaInicio: '09:00',
@@ -59,8 +63,7 @@ describe('WeekView (HU-169 T-264)', () => {
         days={days()}
         todayKey="2026-09-27"
         itemsByDay={itemsByDay}
-        isEventEditable={() => false}
-        onEditEvento={() => {}}
+        onSelectEvento={() => {}}
       />,
     );
 
@@ -75,30 +78,67 @@ describe('WeekView (HU-169 T-264)', () => {
         days={days()}
         todayKey="2026-09-27"
         itemsByDay={new Map()}
-        isEventEditable={() => false}
-        onEditEvento={() => {}}
+        onSelectEvento={() => {}}
       />,
     );
 
     expect(screen.getAllByText('Sin actividad')).toHaveLength(7);
   });
 
-  it('evento editable (proyecto liderado) se abre para editar, no navega', () => {
+  it('clic en un evento abre su detalle (HU-184 T-324), no navega', () => {
     const key = '2026-09-10';
     const itemsByDay = new Map<string, AgendaItem[]>([[key, [evento(1, key)]]]);
-    const onEditEvento = vi.fn();
+    const onSelectEvento = vi.fn();
 
-    render(
+    render(<WeekView days={days()} todayKey="2026-09-27" itemsByDay={itemsByDay} onSelectEvento={onSelectEvento} />);
+
+    screen.getByText('Reunión de equipo').closest('button')!.click();
+    expect(onSelectEvento).toHaveBeenCalledWith(expect.objectContaining({ kind: 'evento', id: 1 }));
+  });
+
+  it('resalta el día de hoy (HU-184 T-324)', () => {
+    const { container } = render(
+      <WeekView days={days()} todayKey="2026-09-09" itemsByDay={new Map()} onSelectEvento={() => {}} />,
+    );
+
+    const hoy = container.querySelector('[aria-current="date"]');
+    expect(hoy).not.toBeNull();
+    expect(hoy).toHaveTextContent('Hoy');
+    expect(container.querySelectorAll('[aria-current="date"]')).toHaveLength(1);
+  });
+
+  it('en móvil oculta los días vacíos salvo hoy, y avisa si la semana entera está vacía', () => {
+    const key = '2026-09-10';
+    const { container, rerender } = render(
       <WeekView
         days={days()}
-        todayKey="2026-09-27"
-        itemsByDay={itemsByDay}
-        isEventEditable={() => true}
-        onEditEvento={onEditEvento}
+        todayKey="2026-09-09"
+        itemsByDay={new Map([[key, [tarea(1, key)]]])}
+        onSelectEvento={() => {}}
       />,
     );
 
-    screen.getByText('Reunión de equipo').closest('button')!.click();
-    expect(onEditEvento).toHaveBeenCalled();
+    // 7 días: 1 con actividad + hoy visibles, los otros 5 ocultos en móvil.
+    expect(container.querySelectorAll('.max-md\\:hidden')).toHaveLength(5);
+    expect(screen.queryByText('Sin actividad esta semana')).not.toBeInTheDocument();
+
+    rerender(<WeekView days={days()} todayKey="2026-09-09" itemsByDay={new Map()} onSelectEvento={() => {}} />);
+    expect(screen.getByText('Sin actividad esta semana')).toBeInTheDocument();
+  });
+
+  it('una tarea de un calendario compartido no es un enlace y dice de quién es (HU-184)', () => {
+    const key = '2026-09-10';
+    const compartida: AgendaItem = {
+      ...tarea(3, key),
+      href: '',
+      compartidoPor: { idUsuario: 9, nombre: 'Ana García', tono: 2 },
+    };
+    render(
+      <WeekView days={days()} todayKey="2026-09-27" itemsByDay={new Map([[key, [compartida]]])} onSelectEvento={() => {}} />,
+    );
+
+    expect(screen.getByText('Ana García')).toBeInTheDocument();
+    expect(screen.getByText('Entregar avance').closest('a')).toBeNull();
   });
 });
+

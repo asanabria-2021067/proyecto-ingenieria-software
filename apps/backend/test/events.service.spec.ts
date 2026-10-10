@@ -150,7 +150,7 @@ describe('EventsService — listado (GET)', () => {
 
     expect(prisma.eventoProyecto.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { idProyecto: PROJECT_ID, eliminadoEn: null },
+        where: expect.objectContaining({ idProyecto: PROJECT_ID, eliminadoEn: null }),
         orderBy: { fechaInicio: 'asc' },
       }),
     );
@@ -316,6 +316,95 @@ describe('EventsService — rango global (GET /usuarios/me/eventos, T-264)', () 
           eliminadoEn: null,
         }),
       }),
+    );
+  });
+});
+
+describe('EventsService — tipo e invitados (HU-184)', () => {
+  it('al crear guarda el tipo (OTRO por defecto) e invitados sin duplicados', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: PARTICIPANT_ID }]);
+    prisma.eventoProyecto.create.mockResolvedValue({ idEvento: EVENT_ID });
+    const service = new EventsService(prisma);
+
+    await service.create(PROJECT_ID, LEADER_ID, dto({ tipoEvento: 'TUTORIA', invitados: [PARTICIPANT_ID, PARTICIPANT_ID, LEADER_ID] }));
+    expect(prisma.eventoProyecto.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tipoEvento: 'TUTORIA', invitados: [PARTICIPANT_ID, LEADER_ID] }),
+      }),
+    );
+
+    await service.create(PROJECT_ID, LEADER_ID, dto());
+    expect(prisma.eventoProyecto.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tipoEvento: 'OTRO', invitados: [] }) }),
+    );
+  });
+
+  it('invitar a alguien que no es integrante activo produce 400, sin crear', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: PARTICIPANT_ID }]);
+    const service = new EventsService(prisma);
+
+    await expect(
+      service.create(PROJECT_ID, LEADER_ID, dto({ invitados: [PARTICIPANT_ID, EXTERNO_ID] })),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.eventoProyecto.create).not.toHaveBeenCalled();
+  });
+
+  it('al editar valida y reemplaza los invitados, y cambia el tipo', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.eventoProyecto.findFirst.mockResolvedValue({
+      idEvento: EVENT_ID,
+      fechaInicio: new Date('2030-10-01T14:00:00.000Z'),
+      fechaFin: new Date('2030-10-01T15:00:00.000Z'),
+    });
+    prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: PARTICIPANT_ID }]);
+    prisma.eventoProyecto.update.mockResolvedValue({ idEvento: EVENT_ID });
+    const service = new EventsService(prisma);
+
+    await service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { tipoEvento: 'REVISION', invitados: [PARTICIPANT_ID] });
+    expect(prisma.eventoProyecto.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tipoEvento: 'REVISION', invitados: [PARTICIPANT_ID] }) }),
+    );
+
+    await expect(
+      service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { invitados: [EXTERNO_ID] }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('EventsService — visibilidad por invitados (HU-184)', () => {
+  const FILTRO_PARTICIPANTE = {
+    OR: [{ invitados: { isEmpty: true } }, { invitados: { has: PARTICIPANT_ID } }, { proyecto: { creadoPor: PARTICIPANT_ID } }],
+  };
+
+  it('GET /usuarios/me/eventos solo trae eventos sin invitados, donde está invitado o que lidera', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValue([{ idProyecto: PROJECT_ID }]);
+    prisma.eventoProyecto.findMany.mockResolvedValue([]);
+    const service = new EventsService(prisma);
+
+    await service.findForUserInRange(PARTICIPANT_ID, '2026-10-01T00:00:00.000Z', '2026-10-31T23:59:59.000Z');
+
+    expect(prisma.eventoProyecto.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining(FILTRO_PARTICIPANTE) }),
+    );
+  });
+
+  it('GET /proyectos/:id/eventos aplica el mismo filtro', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+    prisma.eventoProyecto.findMany.mockResolvedValue([]);
+    const service = new EventsService(prisma);
+
+    await service.findAllForProject(PROJECT_ID, PARTICIPANT_ID);
+
+    expect(prisma.eventoProyecto.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining(FILTRO_PARTICIPANTE) }),
     );
   });
 });
