@@ -54,6 +54,7 @@ vi.mock('leaflet', () => ({ default: { icon: () => ({}) } }));
 vi.mock('leaflet/dist/leaflet.css', () => ({}));
 
 import { EventFormDialog } from '../components/calendar/event-form-dialog';
+import { getApiErrorMessage } from '../components/projects/api-error';
 import EventLocationPicker, {
   MAX_NOMBRE_LUGAR,
   normalizarCoordenadas,
@@ -606,5 +607,81 @@ describe('EventFormDialog — comportamiento del formulario con dos fechas (G02-
     fireEvent.click(screen.getByLabelText('Fecha de fin'));
     fireEvent.click(await screen.findByRole('button', { name: /, 7 de octubre/ }));
     await waitFor(() => expect(screen.getByText('56h')).toBeInTheDocument());
+  });
+});
+
+describe('EventFormDialog — errores del servidor dentro del diálogo (G03-C01, UI-07)', () => {
+  function errorHttp(statusCode: number, message?: string) {
+    return Object.assign(new Error(message ?? 'detalle interno'), { statusCode });
+  }
+
+  function alertaDelDialogo() {
+    return within(screen.getByRole('dialog')).queryAllByRole('alert').find((n) => n.getAttribute('aria-live') === 'assertive');
+  }
+
+  async function enviarEventoValido() {
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+  }
+
+  it.each([
+    [400, 'El inicio debe ser anterior al fin.'],
+    [403, undefined],
+    [404, undefined],
+    [409, 'Ya existe un evento en ese horario.'],
+    [500, 'Error interno'],
+  ])('al crear, un HTTP %s se muestra como alerta dentro del diálogo (además del toast) y el diálogo sigue abierto', async (status, message) => {
+    const err = errorHttp(status, message);
+    eventsMock.createEvent.mockRejectedValueOnce(err);
+    const { onOpenChange } = renderCrear();
+    await enviarEventoValido();
+
+    const esperado = getApiErrorMessage(err, 'calendar');
+    await waitFor(() => expect(alertaDelDialogo()).toHaveTextContent(esperado));
+    expect(mensajesMock.aviso.error).toHaveBeenCalledWith('No se pudo agendar el evento', esperado);
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    // Nunca se muestra texto técnico ni el código HTTP.
+    expect(alertaDelDialogo()).not.toHaveTextContent(/detalle interno|Error interno|\b50\d\b/);
+  });
+
+  it('al editar, un HTTP 409 deja la alerta dentro del diálogo con su mensaje y conserva lo escrito', async () => {
+    const err = errorHttp(409, 'El evento cambió mientras lo editabas.');
+    eventsMock.updateEvent.mockRejectedValueOnce(err);
+    const onOpenChange = vi.fn();
+    render(<EventFormDialog open onOpenChange={onOpenChange} ledProjects={LED} editingEvent={evento()} />, { wrapper });
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Reunión editada' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(alertaDelDialogo()).toHaveTextContent('El evento cambió mientras lo editabas.'));
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(screen.getByLabelText('Título del evento o actividad')).toHaveValue('Reunión editada');
+  });
+
+  it('corregir un campo retira la alerta del servidor sin borrar los errores por campo', async () => {
+    eventsMock.createEvent.mockRejectedValueOnce(errorHttp(409, 'Conflicto de horario.'));
+    renderCrear();
+    await enviarEventoValido();
+    await waitFor(() => expect(alertaDelDialogo()).toHaveTextContent('Conflicto de horario.'));
+
+    // Un error de campo posterior convive con la alerta hasta que el usuario edita algo.
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo 2' } });
+    await waitFor(() => expect(alertaDelDialogo()).toBeUndefined());
+
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    expect(await screen.findByText('El título no puede estar vacío.')).toBeInTheDocument();
+    expect(alertaDelDialogo()).toBeUndefined();
+  });
+
+  it('un segundo envío que sí funciona cierra el diálogo aunque antes hubiera fallado', async () => {
+    eventsMock.createEvent.mockRejectedValueOnce(errorHttp(500)).mockResolvedValueOnce(evento());
+    const { onOpenChange } = renderCrear();
+    await enviarEventoValido();
+    await waitFor(() => expect(alertaDelDialogo()).toBeDefined());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Evento agendado');
   });
 });

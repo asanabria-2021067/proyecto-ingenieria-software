@@ -112,6 +112,7 @@ export function EventFormDialog({
   const isEditing = Boolean(editingEvent);
   const [mostrarDescripcion, setMostrarDescripcion] = useState(false);
   const ubicacionInputRef = useRef<HTMLInputElement>(null);
+  const errorServidorRef = useRef<HTMLParagraphElement>(null);
   const queryClient = useQueryClient();
   const { data: usuario } = useCurrentUser();
 
@@ -161,6 +162,15 @@ export function EventFormDialog({
     void queryClient.invalidateQueries({ queryKey: ['mis-eventos'] });
   };
 
+  // G03 (UI-07): el toast vive fuera del árbol del modal (Radix lo marca
+  // aria-hidden y en 375 px tapa la cabecera), así que la causa del rechazo
+  // también se escribe dentro del diálogo como error `root` del formulario.
+  const mostrarErrorServidor = (titulo: string, err: unknown) => {
+    const mensaje = getApiErrorMessage(err, 'calendar');
+    form.setError('root', { message: mensaje });
+    aviso.error(titulo, mensaje);
+  };
+
   const crear = useMutation({
     mutationFn: (values: EventFormValues) =>
       createEvent(Number(values.idProyecto), buildEventPayload(values, { keepEmptyDescripcion: false })),
@@ -169,7 +179,7 @@ export function EventFormDialog({
       aviso.exito('Evento agendado');
       onOpenChange(false);
     },
-    onError: (err) => aviso.error('No se pudo agendar el evento', getApiErrorMessage(err, 'calendar')),
+    onError: (err) => mostrarErrorServidor('No se pudo agendar el evento', err),
   });
 
   const editar = useMutation({
@@ -180,10 +190,16 @@ export function EventFormDialog({
       aviso.exito('Evento actualizado');
       onOpenChange(false);
     },
-    onError: (err) => aviso.error('No se pudo guardar el evento', getApiErrorMessage(err, 'calendar')),
+    onError: (err) => mostrarErrorServidor('No se pudo guardar el evento', err),
   });
 
   const { cancelarEvento, isPending: isCancelling } = useCancelEvent();
+
+  const errorServidor = form.formState.errors.root?.message;
+  useEffect(() => {
+    // Con el formulario largo el aviso queda al final del área con scroll: se trae a la vista.
+    if (errorServidor) errorServidorRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [errorServidor]);
 
   const isPending = crear.isPending || editar.isPending || isCancelling;
 
@@ -220,7 +236,13 @@ export function EventFormDialog({
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
       <DialogContent className="flex max-h-[92dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[600px]">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} noValidate className="flex max-h-[92dvh] min-h-0 flex-col">
+          <form
+            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+            // Corregir cualquier campo retira el error del servidor (los errores por campo siguen).
+            onChange={() => errorServidor && form.clearErrors('root')}
+            noValidate
+            className="flex max-h-[92dvh] min-h-0 flex-col"
+          >
             <DialogHeader className="shrink-0 flex-row items-start gap-3 space-y-0 px-4 pb-3 pt-5 pr-12 text-left sm:px-6">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary text-on-primary">
                 <CalendarCheck2 className="size-5" aria-hidden="true" />
@@ -620,6 +642,17 @@ export function EventFormDialog({
                   </FormItem>
                 )}
               />
+
+              {errorServidor && (
+                <p
+                  ref={errorServidorRef}
+                  role="alert"
+                  aria-live="assertive"
+                  className="rounded-control border border-status-error/40 bg-status-error/10 px-3 py-2 text-sm text-status-error"
+                >
+                  {errorServidor}
+                </p>
+              )}
             </div>
 
             <DialogFooter className="shrink-0 flex-col gap-3 border-t border-outline-variant/35 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
