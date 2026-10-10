@@ -36,7 +36,27 @@ vi.mock('next/dynamic', () => ({
   default: () => () => <div data-testid="mapa" />,
 }));
 
+// G02-C01: el picker se prueba directo con react-leaflet simulado (jsdom no tiene canvas ni window de Leaflet).
+const leafletMock = vi.hoisted(() => ({ handlers: {} as Record<string, (e: unknown) => void> }));
+vi.mock('react-leaflet', () => ({
+  MapContainer: ({ children }: { children?: ReactNode }) => <div data-testid="mapa-real">{children}</div>,
+  TileLayer: () => null,
+  Marker: () => null,
+  useMap: () => ({ setView: vi.fn(), getZoom: () => 12 }),
+  useMapEvents: (handlers: Record<string, (e: unknown) => void>) => {
+    Object.assign(leafletMock.handlers, handlers);
+    return null;
+  },
+}));
+vi.mock('leaflet', () => ({ default: { icon: () => ({}) } }));
+vi.mock('leaflet/dist/leaflet.css', () => ({}));
+
 import { EventFormDialog } from '../components/calendar/event-form-dialog';
+import EventLocationPicker, {
+  MAX_NOMBRE_LUGAR,
+  normalizarCoordenadas,
+  recortarNombreLugar,
+} from '../components/calendar/event-location-picker';
 import type { EventoProyectoDTO } from '../lib/services/events';
 
 beforeAll(() => {
@@ -250,5 +270,60 @@ describe('EventFormDialog (HU-184 T-323, rediseño)', () => {
     await waitFor(() => expect(eventsMock.deleteEvent).toHaveBeenCalledWith(1, 7));
     await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Evento eliminado'));
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('EventLocationPicker — nombres largos y coordenadas (G02-C01, UI-03/UI-25)', () => {
+  const NOMBRE_LARGO = 'Edificio ' + 'x'.repeat(300);
+
+  function renderPicker(overrides: Partial<Parameters<typeof EventLocationPicker>[0]> = {}) {
+    const onNombreChange = vi.fn();
+    const onPositionChange = vi.fn();
+    render(
+      <EventLocationPicker lat={null} lng={null} nombre="UVG" onNombreChange={onNombreChange} onPositionChange={onPositionChange} {...overrides} />,
+    );
+    return { onNombreChange, onPositionChange };
+  }
+
+  it('un resultado de Nominatim con 300 caracteres entra al formulario recortado a exactamente 255', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [{ place_id: 1, display_name: NOMBRE_LARGO, lat: '14.6', lon: '-90.5' }],
+      }),
+    );
+    const { onNombreChange, onPositionChange } = renderPicker();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar ubicación' }));
+    fireEvent.click(await screen.findByRole('button', { name: NOMBRE_LARGO }));
+
+    expect(onNombreChange).toHaveBeenCalledWith(NOMBRE_LARGO.slice(0, 255));
+    expect(onNombreChange.mock.calls[0][0]).toHaveLength(255);
+    expect(onPositionChange).toHaveBeenCalledWith(14.6, -90.5);
+    vi.unstubAllGlobals();
+  });
+
+  it('el input del lugar tiene maxLength 255 (mismo tope que el backend)', () => {
+    renderPicker();
+    expect(screen.getByPlaceholderText(/Busca un lugar/)).toHaveAttribute('maxlength', String(MAX_NOMBRE_LUGAR));
+  });
+
+  it('un clic fuera de ±180 de longitud (copia del mundo) llega normalizado y con la latitud acotada', () => {
+    const { onPositionChange } = renderPicker();
+
+    leafletMock.handlers.click({ latlng: { lat: 14.6, lng: 200 } });
+    expect(onPositionChange).toHaveBeenLastCalledWith(14.6, -160);
+
+    leafletMock.handlers.click({ latlng: { lat: 95, lng: -540.5 } });
+    expect(onPositionChange).toHaveBeenLastCalledWith(90, 179.5);
+  });
+
+  it('normalizarCoordenadas y recortarNombreLugar son idempotentes para valores ya válidos', () => {
+    expect(normalizarCoordenadas(14.5906, -90.551)).toEqual({ lat: 14.5906, lng: -90.551 });
+    expect(normalizarCoordenadas(0, 180)).toEqual({ lat: 0, lng: 180 });
+    expect(normalizarCoordenadas(0, -180)).toEqual({ lat: 0, lng: -180 });
+    expect(recortarNombreLugar('x'.repeat(255))).toHaveLength(255);
+    expect(recortarNombreLugar('Edificio T-1')).toBe('Edificio T-1');
   });
 });

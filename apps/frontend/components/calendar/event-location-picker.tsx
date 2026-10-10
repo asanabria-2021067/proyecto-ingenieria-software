@@ -30,10 +30,31 @@ interface NominatimResult {
   lon: string;
 }
 
+/** Mismo tope que `ubicacionNombre` en el backend (VarChar(255)) y en el schema del diálogo. */
+export const MAX_NOMBRE_LUGAR = 255;
+
+/** G02 (UI-03): un nombre de Nominatim puede superar el tope; se recorta antes de entrar al formulario. */
+export function recortarNombreLugar(nombre: string): string {
+  return nombre.length > MAX_NOMBRE_LUGAR ? nombre.slice(0, MAX_NOMBRE_LUGAR) : nombre;
+}
+
+/**
+ * G02 (UI-25): Leaflet permite hacer clic en copias del mundo (lng fuera de
+ * ±180) y el backend las rechaza con 400. Se normaliza como `LatLng.wrap()`:
+ * lng al rango [-180, 180] y lat acotada a [-90, 90].
+ */
+export function normalizarCoordenadas(lat: number, lng: number): { lat: number; lng: number } {
+  const latAcotada = Math.min(90, Math.max(-90, lat));
+  // Un valor ya válido se devuelve tal cual (sin pasar por el módulo, que introduce error de coma flotante).
+  if (lng >= -180 && lng <= 180) return { lat: latAcotada, lng };
+  return { lat: latAcotada, lng: ((((lng + 180) % 360) + 360) % 360) - 180 };
+}
+
 function ClickHandler({ onPick }: { onPick: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(e) {
-      onPick(e.latlng.lat, e.latlng.lng);
+      const { lat, lng } = normalizarCoordenadas(e.latlng.lat, e.latlng.lng);
+      onPick(lat, lng);
     },
   });
   return null;
@@ -95,8 +116,9 @@ export default function EventLocationPicker({
   };
 
   const elegirResultado = (result: NominatimResult) => {
-    onNombreChange(result.display_name);
-    onPositionChange(Number.parseFloat(result.lat), Number.parseFloat(result.lon));
+    onNombreChange(recortarNombreLugar(result.display_name));
+    const { lat: latLugar, lng: lngLugar } = normalizarCoordenadas(Number.parseFloat(result.lat), Number.parseFloat(result.lon));
+    onPositionChange(latLugar, lngLugar);
     setResults([]);
   };
 
@@ -108,6 +130,7 @@ export default function EventLocationPicker({
         <Input
           value={nombre}
           disabled={disabled}
+          maxLength={MAX_NOMBRE_LUGAR}
           onChange={(e) => onNombreChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
