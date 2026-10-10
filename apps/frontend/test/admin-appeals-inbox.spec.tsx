@@ -100,11 +100,32 @@ afterEach(() => {
 });
 
 describe('VIEW-18 — bandeja de apelaciones (F015)', () => {
-  it('el filtro por defecto pide las pendientes', async () => {
+  it('sin estado elegido muestra todas: no envía estado y el filtro queda en «Todos los estados»', async () => {
+    renderInbox();
+    await waitFor(() => expect(getAdminAppeals).toHaveBeenCalledWith({ estado: undefined, page: 1 }));
+    expect(screen.getByRole('combobox', { name: 'Filtrar por estado de la apelación' })).toHaveTextContent('Todos los estados');
+    expect(screen.queryByRole('navigation', { name: 'Filtrar por estado' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Cambio de liderazgo por carga académica')).toBeInTheDocument();
+  });
+
+  it('el estado de la URL se pide al backend y se refleja en el filtro', async () => {
+    searchParamsMock.mockReturnValue(new URLSearchParams('estado=PENDIENTE'));
     renderInbox();
     await waitFor(() => expect(getAdminAppeals).toHaveBeenCalledWith({ estado: 'PENDIENTE', page: 1 }));
-    expect(screen.getByRole('link', { name: 'Pendientes' })).toHaveAttribute('aria-current', 'page');
-    expect(await screen.findByText('Cambio de liderazgo por carga académica')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Filtrar por estado de la apelación' })).toHaveTextContent('Pendientes');
+  });
+
+  it('el buscador filtra la página cargada por proyecto, asunto, líder o candidato', async () => {
+    renderInbox();
+    await screen.findByText('Cambio de liderazgo por carga académica');
+    const buscador = screen.getByRole('textbox', { name: /Buscar apelaciones/ });
+
+    fireEvent.change(buscador, { target: { value: 'ramírez' } });
+    expect(screen.getByText('Cambio de liderazgo por carga académica')).toBeInTheDocument();
+
+    fireEvent.change(buscador, { target: { value: 'no existe' } });
+    expect(screen.queryByText('Cambio de liderazgo por carga académica')).not.toBeInTheDocument();
+    expect(screen.getByText(/No encontramos apelaciones que coincidan/)).toBeInTheDocument();
   });
 
   it('Aceptar abre LeadershipChangeDialog precargado con el candidato propuesto y envía expectedLeaderId por el endpoint de aceptación', async () => {
@@ -194,7 +215,7 @@ describe('VIEW-18 — bandeja de apelaciones (F015)', () => {
     expect(getLeadershipCandidates).not.toHaveBeenCalled();
   });
 
-  it('el filtro «Todas» no envía estado', async () => {
+  it('un estado desconocido en la URL equivale a no filtrar', async () => {
     searchParamsMock.mockReturnValue(new URLSearchParams('estado=TODAS'));
     renderInbox();
     await waitFor(() => expect(getAdminAppeals).toHaveBeenCalledWith({ estado: undefined, page: 1 }));

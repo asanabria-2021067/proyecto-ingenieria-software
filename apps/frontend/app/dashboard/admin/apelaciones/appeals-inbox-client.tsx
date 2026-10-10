@@ -10,7 +10,7 @@ import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api
 import { LeadershipChangeDialog } from '@/components/leadership/leadership-change-dialog';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { REQUEST_INBOX_BUTTON, REQUEST_INBOX_BUTTON_GREEN } from '@/components/admin/request-inbox-details';
-import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
+import { DASHBOARD_FILTER_TRIGGER_CLASS, DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import {
   DATA_TABLE_CARD,
   DATA_TABLE_HEAD_ROW,
@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
@@ -42,14 +43,19 @@ import {
   type TransferLeadershipInput,
 } from '@/lib/types/leadership';
 
+/** Estados por los que se puede filtrar. Sin ninguno elegido se muestran todas. */
 const FILTROS = [
   { value: 'PENDIENTE', label: 'Pendientes' },
   { value: 'ACEPTADA', label: 'Aceptadas' },
   { value: 'DENEGADA', label: 'Denegadas' },
   { value: 'CANCELADA', label: 'Canceladas' },
-  { value: 'TODAS', label: 'Todas' },
 ] as const;
-type Filtro = (typeof FILTROS)[number]['value'];
+const FILTRO_TODAS = 'TODAS';
+type Filtro = (typeof FILTROS)[number]['value'] | typeof FILTRO_TODAS;
+
+// Misma barra que Proyectos Activos y Cerrados: buscador ancho y el select al lado.
+const BARRA_FILTROS = 'grid grid-cols-1 gap-stack @xl/bandeja:flex @xl/bandeja:items-center';
+const FILTRO_TRIGGER = `w-full ${DASHBOARD_FILTER_TRIGGER_CLASS}`;
 
 /** Etiqueta de estado de apelación: tono `pill-*` (app/global.css); la forma la pone `.pill`. */
 export const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
@@ -91,15 +97,17 @@ function formatearDecimal(value: string): string {
   return dec.length > 0 ? `${entera}.${dec}` : entera;
 }
 
+/** Sin `?estado=` (o con uno desconocido) no hay filtro: se muestran todas. */
 export function parseFiltro(value: string | null): Filtro {
-  return (FILTROS.some((f) => f.value === value) ? value : 'PENDIENTE') as Filtro;
+  return (FILTROS.some((f) => f.value === value) ? value : FILTRO_TODAS) as Filtro;
 }
 
 function hrefFiltro(filtro: Filtro, page = 1): string {
   const params = new URLSearchParams();
-  params.set('estado', filtro);
+  if (filtro !== FILTRO_TODAS) params.set('estado', filtro);
   if (page > 1) params.set('page', String(page));
-  return `/dashboard/admin/apelaciones?${params.toString()}`;
+  const query = params.toString();
+  return query ? `/dashboard/admin/apelaciones?${query}` : '/dashboard/admin/apelaciones';
 }
 
 /** Búsqueda local sobre la página cargada: proyecto, asunto, líder o candidato. */
@@ -346,15 +354,16 @@ function TablaSkeleton() {
  *
  * Misma tabla, buscador y paginador que las bandejas de Proyectos. La
  * apelación seleccionada se despliega bajo su propia fila, no en una tarjeta
- * aparte. La búsqueda es local a la página cargada (el endpoint pagina por
- * estado); la paginación sigue en la URL (`?page=`).
+ * aparte. El estado y la página viven en la URL (`?estado=&page=`); sin estado
+ * elegido se piden todas. La búsqueda es local a la página cargada (el
+ * endpoint pagina por estado).
  */
 export default function AppealsInboxClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filtro = parseFiltro(searchParams.get('estado'));
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
-  const estado = filtro === 'TODAS' ? undefined : filtro;
+  const estado = filtro === FILTRO_TODAS ? undefined : filtro;
 
   const { data, isPending, isError, error, refetch } = useAdminAppeals(estado, page);
   const [busqueda, setBusqueda] = useState('');
@@ -368,6 +377,12 @@ export default function AppealsInboxClient() {
   const limit = data?.limit ?? 20;
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const hayBusqueda = busqueda.trim() !== '';
+  const hayFiltros = hayBusqueda || filtro !== FILTRO_TODAS;
+
+  function limpiarFiltros() {
+    setBusqueda('');
+    if (filtro !== FILTRO_TODAS) router.push(hrefFiltro(FILTRO_TODAS));
+  }
 
   const submitAceptar = (apelacion: ApelacionItemDto) => (input: TransferLeadershipInput) =>
     acceptAppeal(apelacion.idProyecto, apelacion.idApelacion, input);
@@ -376,36 +391,19 @@ export default function AppealsInboxClient() {
     <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
       <AdminBreadcrumb seccion="Gobernanza" seccionHref="/dashboard/admin" pagina="Apelaciones" />
 
-      <section className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <section className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="type-display text-balance">Apelaciones de liderazgo</h1>
           <p className="mt-tight max-w-2xl text-base text-tertiary">
             Solicitudes de los líderes para transferir su liderazgo. La apelación es una solicitud, no una designación.
           </p>
         </div>
-        <nav aria-label="Filtrar por estado" className="overflow-x-auto">
-          <ul className="flex min-w-max items-center gap-1 rounded-control border border-outline-variant/40 bg-surface-container-low p-1">
-            {FILTROS.map((f) => (
-              <li key={f.value}>
-                <Link
-                  href={hrefFiltro(f.value)}
-                  aria-current={f.value === filtro ? 'page' : undefined}
-                  className={`inline-flex items-center rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    f.value === filtro ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-high'
-                  }`}
-                >
-                  {f.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
       </section>
 
       <div className="@container/bandeja flex flex-col gap-stack">
-        <section aria-label="Buscar apelaciones" className="flex flex-col gap-inline @xl/bandeja:flex-row @xl/bandeja:items-center @xl/bandeja:justify-between">
+        <section aria-label="Filtros de apelaciones" className={BARRA_FILTROS}>
           <DashboardSearchField
-            containerClassName="w-full @xl/bandeja:max-w-sm"
+            containerClassName="@xl/bandeja:flex-1"
             name="busqueda"
             autoComplete="off"
             spellCheck={false}
@@ -414,7 +412,24 @@ export default function AppealsInboxClient() {
             placeholder="Buscar por proyecto, asunto, líder o candidato…"
             aria-label="Buscar apelaciones por proyecto, asunto, líder o candidato"
           />
-          {!isPending && !isError && (
+
+          <Select value={filtro} onValueChange={(v) => router.push(hrefFiltro(v as Filtro))}>
+            <SelectTrigger aria-label="Filtrar por estado de la apelación" className={`${FILTRO_TRIGGER} @xl/bandeja:w-52`}>
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={FILTRO_TODAS}>Todos los estados</SelectItem>
+              {FILTROS.map((f) => (
+                <SelectItem key={f.value} value={f.value}>
+                  {f.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </section>
+
+        {!isPending && !isError && (
+          <div className="flex min-h-8 flex-wrap items-center justify-between gap-inline">
             <p className="type-body text-text-secondary" role="status" aria-live="polite">
               Total de apelaciones:{' '}
               {hayBusqueda && (
@@ -425,8 +440,13 @@ export default function AppealsInboxClient() {
               <span className="font-semibold tabular-nums text-text-primary">{total}</span>
               {totalPages > 1 && <> · página {page} de {totalPages}</>}
             </p>
-          )}
-        </section>
+            {hayFiltros && (
+              <Button type="button" variant="ghost" size="sm" onClick={limpiarFiltros} className="font-medium text-primary">
+                Limpiar filtros
+              </Button>
+            )}
+          </div>
+        )}
 
         {isError ? (
           <Empty tone="danger" role="alert">
@@ -450,7 +470,13 @@ export default function AppealsInboxClient() {
               <Gavel aria-hidden="true" className="size-7" />
             </EmptyMedia>
             <EmptyHeader>
-              <EmptyTitle>{filtro === 'PENDIENTE' ? 'No hay apelaciones pendientes.' : 'No hay apelaciones con este estado.'}</EmptyTitle>
+              <EmptyTitle>
+                {filtro === FILTRO_TODAS
+                  ? 'No hay apelaciones.'
+                  : filtro === 'PENDIENTE'
+                    ? 'No hay apelaciones pendientes.'
+                    : 'No hay apelaciones con este estado.'}
+              </EmptyTitle>
               <EmptyDescription>Cuando un líder apele su liderazgo, aparecerá aquí.</EmptyDescription>
             </EmptyHeader>
           </Empty>
