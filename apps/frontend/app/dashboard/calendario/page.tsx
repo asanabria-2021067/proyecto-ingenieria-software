@@ -284,6 +284,10 @@ export default function CalendarioPage() {
   const irA = (fecha: Date) => {
     setAnchor(fecha);
     setMiniMes(new Date(fecha.getFullYear(), fecha.getMonth(), 1));
+    // G03 (UI-17): un día elegido que ya no se ve dejaría la lista del mes
+    // filtrada por una fecha fuera del periodo (vacío falso). Si sigue
+    // visible (p. ej. "Hoy" dentro del mismo mes) se conserva.
+    setSelectedKey((actual) => (actual && rangoVisible(vista, fecha).days.some((d) => d.key === actual) ? actual : null));
   };
 
   const handleMiniSelect = (key: string) => {
