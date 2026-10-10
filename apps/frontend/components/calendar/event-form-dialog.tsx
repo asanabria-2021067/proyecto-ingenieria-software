@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { useCancelEvent } from '@/hooks/use-cancel-event';
@@ -506,29 +507,33 @@ export function EventFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <div className="flex flex-wrap items-center justify-between gap-x-tight gap-y-1">
-                      <FormLabel className={LABEL_CLASS}>
+                      {/* G03 (UI-08): el nombre del grupo lo da este span por aria-labelledby, no un FormLabel con htmlFor colgante. */}
+                      <span id="modalidad-sesion-label" className={LABEL_CLASS}>
                         <SlidersHorizontal className="size-3.5 text-primary" aria-hidden="true" />
                         Modalidad de la sesión
-                      </FormLabel>
+                      </span>
                       <span className="type-meta">{MODALIDAD_AYUDA[field.value]}</span>
                     </div>
-                    <div
-                      role="radiogroup"
-                      aria-label="Modalidad de la sesión"
+                    {/* G03 (UI-08): RadioGroup de Radix (misma dependencia que components/ui/radio-group,
+                        sin su indicador circular para conservar los botones segmentados de la maqueta):
+                        un solo tab stop, ←/→ cambian la opción, aria-checked real. */}
+                    <RadioGroupPrimitive.Root
+                      value={field.value}
+                      onValueChange={(v) => field.onChange(v as ModalidadEvento)}
+                      disabled={isPending}
+                      aria-labelledby="modalidad-sesion-label"
+                      orientation="horizontal"
+                      loop
                       className="grid grid-cols-3 gap-1 rounded-control bg-surface-container-low p-1"
                     >
                       {MODALIDAD_OPTIONS.map((opt) => {
                         const Icono = MODALIDAD_ESTILO[opt.value].icon;
                         const activo = field.value === opt.value;
                         return (
-                          <button
+                          <RadioGroupPrimitive.Item
                             key={opt.value}
-                            type="button"
-                            role="radio"
-                            aria-checked={activo}
-                            disabled={isPending}
-                            onClick={() => field.onChange(opt.value)}
-                            className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-control px-2 text-xs font-medium transition-colors sm:text-sm ${
+                            value={opt.value}
+                            className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-control px-2 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 sm:text-sm ${
                               activo
                                 ? 'border border-primary/60 bg-surface-container-lowest text-on-surface shadow-card'
                                 : 'text-on-surface-variant hover:text-on-surface'
@@ -536,10 +541,10 @@ export function EventFormDialog({
                           >
                             <Icono className="size-4 shrink-0" aria-hidden="true" />
                             <span className="truncate">{opt.label}</span>
-                          </button>
+                          </RadioGroupPrimitive.Item>
                         );
                       })}
-                    </div>
+                    </RadioGroupPrimitive.Root>
                   </FormItem>
                 )}
               />

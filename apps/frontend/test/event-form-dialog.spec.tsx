@@ -685,3 +685,64 @@ describe('EventFormDialog — errores del servidor dentro del diálogo (G03-C01,
     expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Evento agendado');
   });
 });
+
+describe('EventFormDialog — modalidad accesible por teclado (G03-C12, UI-08)', () => {
+  const grupo = () => screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' });
+  const radio = (nombre: string) => within(grupo()).getByRole('radio', { name: nombre });
+
+  it('el grupo tiene nombre accesible por aria-labelledby y un único tab stop: al entrar con Tab el foco cae en la opción activa', async () => {
+    renderCrear();
+    expect(grupo()).toHaveAttribute('aria-labelledby');
+    expect(document.getElementById(grupo().getAttribute('aria-labelledby')!)).toHaveTextContent('Modalidad de la sesión');
+    // Antes (3 <button role=radio> sueltos) había tres paradas de tabulación [0,0,0].
+    // Con roving focus, al principio solo el contenedor es tabulable y delega en la opción activa.
+    const opcionesTabulables = () => within(grupo()).getAllByRole('radio').filter((el) => el.getAttribute('tabindex') === '0');
+    expect(opcionesTabulables()).toHaveLength(0);
+    expect(grupo()).toHaveAttribute('tabindex', '0');
+
+    grupo().focus();
+    await waitFor(() => expect(radio('Virtual')).toHaveFocus());
+    expect(radio('Virtual')).toHaveAttribute('aria-checked', 'true');
+    expect(opcionesTabulables()).toEqual([radio('Virtual')]);
+  });
+
+  it('con las flechas se cambia la opción (→ desde Virtual selecciona Híbrida; ← vuelve) y el formulario lo refleja', async () => {
+    renderCrear();
+    radio('Virtual').focus();
+    fireEvent.keyDown(radio('Virtual'), { key: 'ArrowRight' });
+    await waitFor(() => expect(radio('Híbrida')).toHaveAttribute('aria-checked', 'true'));
+    expect(radio('Híbrida')).toHaveFocus();
+    expect(screen.getByText('Híbrida: requiere enlace virtual y lugar físico')).toBeInTheDocument();
+    expect(screen.getByTestId('mapa-real')).toBeInTheDocument();
+
+    fireEvent.keyDown(radio('Híbrida'), { key: 'ArrowLeft' });
+    await waitFor(() => expect(radio('Virtual')).toHaveAttribute('aria-checked', 'true'));
+    expect(screen.queryByTestId('mapa-real')).not.toBeInTheDocument();
+  });
+
+  it('cambiar de modalidad no borra los invitados ni la ubicación ya marcada, y el payload lleva la modalidad elegida', async () => {
+    eventsMock.createEvent.mockResolvedValueOnce(evento());
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Visita' } });
+    fireEvent.click(radio('Presencial'));
+    leafletMock.handlers.click({ latlng: { lat: 14.6, lng: -90.5 } });
+    expect(await screen.findByText('Punto marcado')).toBeInTheDocument();
+
+    fireEvent.click(radio('Híbrida'));
+    expect(screen.getByText('Punto marcado')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+
+    await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
+    expect(eventsMock.createEvent.mock.calls[0][1]).toMatchObject({ modalidad: 'MIXTA', ubicacionLat: 14.6, ubicacionLng: -90.5, linkSesion: 'https://meet.google.com/x' });
+  });
+
+  it('mientras se guarda, las opciones quedan deshabilitadas', async () => {
+    eventsMock.createEvent.mockImplementationOnce(() => new Promise(() => {}));
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    await waitFor(() => expect(radio('Presencial')).toBeDisabled());
+  });
+});
