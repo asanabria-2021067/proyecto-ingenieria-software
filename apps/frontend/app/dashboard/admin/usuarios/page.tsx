@@ -4,14 +4,18 @@ import { useState, useCallback } from 'react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
-import {
-  X,
-  AlertCircle,
-  Eye,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
+import { X, AlertCircle, Eye, SearchX, Users } from 'lucide-react';
 import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+  DataTablePager,
+} from '@/components/dashboard/data-table';
+import { Button } from '@/components/ui/button';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { UserDetailSheet } from '@/components/admin/UserDetailSheet';
@@ -79,6 +83,16 @@ function isAdmin(user: AdminUserRow): boolean {
 
 const LIMIT = 10;
 
+// Misma tabla que las bandejas de Proyectos Activos y Cerrados (`data-table`).
+const TH = `h-auto whitespace-normal px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
+const TD = 'whitespace-normal px-stack py-inline align-middle';
+// Columnas que solo caben desde cierto ancho de la tarjeta; antes van como metadata bajo el nombre.
+const COL_CORREO = '@3xl/bandeja:table-cell';
+const META_CORREO = '@3xl/bandeja:hidden';
+const COL_ROL = '@xl/bandeja:table-cell';
+const META_ROL = '@xl/bandeja:hidden';
+const COL_FECHA = '@5xl/bandeja:table-cell';
+
 // ─── Confirm action state ─────────────────────────────────────────────────────
 
 interface PendingAction {
@@ -91,37 +105,28 @@ interface PendingAction {
   variant: 'destructive' | 'warning' | 'default';
 }
 
-// ─── Skeleton rows ────────────────────────────────────────────────────────────
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 
-function SkeletonRows() {
+function TablaSkeleton() {
   return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i} className="border-outline-variant/40">
-          <TableCell className="px-4 py-3">
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-8 w-8 rounded-full bg-surface-container-high" />
-              <Skeleton className="h-4 w-32 rounded bg-surface-container-high" />
+    <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando usuarios">
+      <div className={`${DATA_TABLE_HEAD_ROW} px-stack py-tight`}>
+        <Skeleton className="h-4 w-40" />
+      </div>
+      <div className="divide-y divide-outline-variant/50">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex items-center gap-stack px-stack py-inline">
+            <Skeleton className="size-8 shrink-0 rounded-full" />
+            <div className="min-w-0 flex-1 space-y-tight">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-3 w-1/2" />
             </div>
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-44 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-24 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-5 w-16 rounded-full bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-28 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-8 w-20 rounded-lg bg-surface-container-high" />
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
+            <Skeleton className="h-5 w-16 rounded-tag" />
+            <Skeleton className="h-8 w-24 rounded-tag" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -135,14 +140,16 @@ function UserActions({
   onViewProfile: (id: number) => void;
 }) {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center justify-end gap-1">
       <button
+        type="button"
         onClick={() => onViewProfile(user.idUsuario)}
-        className="flex items-center gap-1.5 rounded-tag bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
-        title="Ver perfil"
+        className="flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-tag bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+        aria-label={`Ver perfil de ${user.nombre} ${user.apellido}`}
       >
-        <Eye className="h-3.5 w-3.5" />
-        Ver perfil
+        <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+        {/* En tarjetas estrechas queda solo el icono: el nombre accesible ya lo dice. */}
+        <span className="hidden @xl/bandeja:inline">Ver perfil</span>
       </button>
     </div>
   );
@@ -184,6 +191,7 @@ export default function AdminUsuariosPage() {
     data,
     isLoading,
     isError,
+    refetch,
   } = useQuery({
     queryKey: ['adminUsers', queryParams],
     queryFn: () => listAdminUsers(queryParams),
@@ -234,14 +242,10 @@ export default function AdminUsuariosPage() {
     setPage(1);
   };
 
+  const usuarios = data?.data ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
-  const inicio = total === 0 ? 0 : (page - 1) * LIMIT + 1;
-  const fin = Math.min(page * LIMIT, total);
-
-  const visiblePages = Array.from({ length: totalPages }, (_, i) => i + 1).filter(
-    (p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1,
-  );
+  const hayFiltros = Boolean(search || rol || estado || year);
 
   return (
     <>
@@ -331,191 +335,153 @@ export default function AdminUsuariosPage() {
           )}
         </div>
 
-        {/* Table card */}
-        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
-          <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Usuario
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Correo institucional
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Rol
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Estado
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Fecha de registro
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Acciones
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading && <SkeletonRows />}
-
-              {isError && (
-                <TableRow className="border-0 hover:bg-transparent">
-                  <TableCell colSpan={6} className="px-4 py-10 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <AlertCircle className="h-6 w-6 text-error" />
-                      <p className="text-sm font-medium text-on-surface">
-                        No se pudieron cargar los usuarios.
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {!isLoading && !isError && data?.data.length === 0 && (
-                <TableRow className="border-0 hover:bg-transparent">
-                  <TableCell colSpan={6} className="px-4 py-10 text-center">
-                    <p className="text-sm text-tertiary">
-                      No se encontraron usuarios con los filtros seleccionados.
-                    </p>
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {!isLoading &&
-                !isError &&
-                data?.data.map((user) => {
-                  const rolPrincipal = user.roles[0] ?? '';
-                  const extras = user.roles.length > 1 ? user.roles.length - 1 : 0;
-
-                  return (
-                    <TableRow
-                      key={user.idUsuario}
-                      className="border-outline-variant/40 hover:bg-surface-container-low transition-colors"
-                    >
-                      {/* Usuario */}
-                      <TableCell className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-outline-variant/30">
-                            {user.fotoUrl ? (
-                              <Image
-                                src={user.fotoUrl}
-                                alt=""
-                                width={32}
-                                height={32}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-primary-container text-xs font-bold text-on-primary-container">
-                                {getInitials(user.nombre, user.apellido)}
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-sm font-medium text-on-surface">
-                            {user.nombre} {user.apellido}
-                          </span>
-                        </div>
-                      </TableCell>
-
-                      {/* Correo */}
-                      <TableCell className="px-4 py-3">
-                        <span className="text-sm text-tertiary">{user.correo}</span>
-                      </TableCell>
-
-                      {/* Rol */}
-                      <TableCell className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm text-on-surface">
-                            {formatRol(rolPrincipal)}
-                          </span>
-                          {extras > 0 && (
-                            <span className="rounded-full bg-surface-container-high px-1.5 py-0.5 text-[10px] font-black text-tertiary">
-                              +{extras}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* Estado */}
-                      <TableCell className="px-4 py-3">
-                        <UserStatusBadge estado={user.estado} />
-                      </TableCell>
-
-                      {/* Fecha */}
-                      <TableCell className="px-4 py-3">
-                        <span className="text-sm text-tertiary">
-                          {formatFecha(user.fechaCreacion)}
-                        </span>
-                      </TableCell>
-
-                      {/* Acciones */}
-                      <TableCell className="px-4 py-3">
-                        <UserActions
-                          user={user}
-                          onViewProfile={handleViewProfile}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-            </TableBody>
-          </Table>
-          </div>
-        </div>
-
-        {/* Pagination */}
-        {!isLoading && !isError && (
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-tertiary">
-              Mostrando{' '}
-              <span className="font-bold text-on-surface">{inicio}–{fin}</span>{' '}
-              de{' '}
-              <span className="font-bold text-on-surface">{total}</span>{' '}
-              usuarios
+        <div className="@container/bandeja flex flex-col gap-stack">
+          {!isLoading && !isError && (
+            <p className="type-body text-text-secondary" role="status" aria-live="polite">
+              {hayFiltros ? 'Usuarios encontrados: ' : 'Total de usuarios: '}
+              <span className="font-semibold tabular-nums text-text-primary">{total}</span>
+              {totalPages > 1 && <> · página {page} de {totalPages}</>}
             </p>
+          )}
 
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage((p) => p - 1)}
-                disabled={page <= 1}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-outline-variant text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
+          {isError ? (
+            <Empty tone="danger" role="alert">
+              <EmptyMedia variant="icon">
+                <AlertCircle aria-hidden="true" className="size-7" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>No se pudieron cargar los usuarios.</EmptyTitle>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+                  Reintentar
+                </Button>
+              </EmptyContent>
+            </Empty>
+          ) : isLoading ? (
+            <TablaSkeleton />
+          ) : usuarios.length === 0 ? (
+            <Empty tone={hayFiltros ? undefined : 'muted'} role="status">
+              <EmptyMedia variant="icon">
+                {hayFiltros ? <SearchX aria-hidden="true" className="size-7" /> : <Users aria-hidden="true" className="size-7" />}
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>
+                  {hayFiltros ? 'No se encontraron usuarios con los filtros seleccionados.' : 'No hay usuarios registrados.'}
+                </EmptyTitle>
+                {hayFiltros && <EmptyDescription>Prueba con otro texto o quita algún filtro.</EmptyDescription>}
+              </EmptyHeader>
+              {hayFiltros && (
+                <EmptyContent>
+                  <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
+                    Limpiar filtros
+                  </Button>
+                </EmptyContent>
+              )}
+            </Empty>
+          ) : (
+            <>
+              <div className={DATA_TABLE_CARD}>
+                <Table>
+                  <TableHeader>
+                    <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
+                      <TableHead scope="col" className={TH}>
+                        Usuario
+                      </TableHead>
+                      <TableHead scope="col" className={`${TH} hidden ${COL_CORREO}`}>
+                        Correo institucional
+                      </TableHead>
+                      <TableHead scope="col" className={`${TH} hidden ${COL_ROL}`}>
+                        Rol
+                      </TableHead>
+                      <TableHead scope="col" className={TH}>
+                        Estado
+                      </TableHead>
+                      <TableHead scope="col" className={`${TH} hidden ${COL_FECHA}`}>
+                        Fecha de registro
+                      </TableHead>
+                      <TableHead scope="col" className={`${TH} text-right`}>
+                        <span className="sr-only">Acciones</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {usuarios.map((user) => {
+                      const rolPrincipal = user.roles[0] ?? '';
+                      const extras = user.roles.length > 1 ? user.roles.length - 1 : 0;
 
-              {visiblePages.map((p, idx) => {
-                const prev = visiblePages[idx - 1];
-                const showEllipsis = prev !== undefined && p - prev > 1;
-                return (
-                  <span key={p} className="flex items-center gap-1">
-                    {showEllipsis && (
-                      <span className="px-1 text-xs text-tertiary">…</span>
-                    )}
-                    <button
-                      onClick={() => setPage(p)}
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-medium transition-colors ${
-                        p === page
-                          ? 'bg-primary text-on-primary'
-                          : 'border border-outline-variant text-on-surface hover:bg-surface-container-high'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  </span>
-                );
-              })}
+                      return (
+                        <TableRow key={user.idUsuario} className={`${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER}`}>
+                          {/* Usuario */}
+                          <TableCell className={`${TD} min-w-0`}>
+                            <div className="flex min-w-0 items-center gap-tight">
+                              <div className="size-8 shrink-0 overflow-hidden rounded-full border border-outline-variant/30">
+                                {user.fotoUrl ? (
+                                  <Image
+                                    src={user.fotoUrl}
+                                    alt=""
+                                    width={32}
+                                    height={32}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center bg-primary/10 text-[10px] font-bold text-primary">
+                                    {getInitials(user.nombre, user.apellido)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="type-body break-words font-semibold text-text-primary">
+                                  {user.nombre} {user.apellido}
+                                </p>
+                                <p className={`type-meta break-all ${META_CORREO}`}>{user.correo}</p>
+                                <p className={`type-meta ${META_ROL}`}>
+                                  {formatRol(rolPrincipal)}
+                                  {extras > 0 && <> +{extras}</>}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
 
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                disabled={page >= totalPages}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-outline-variant text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
+                          {/* Correo */}
+                          <TableCell className={`${TD} hidden ${COL_CORREO}`}>
+                            <span className="type-body break-all text-text-secondary">{user.correo}</span>
+                          </TableCell>
+
+                          {/* Rol */}
+                          <TableCell className={`${TD} hidden ${COL_ROL}`}>
+                            <div className="flex items-center gap-tight">
+                              <span className="type-body text-text-primary">{formatRol(rolPrincipal)}</span>
+                              {extras > 0 && <span className="pill pill-sm pill-neutral tabular-nums">+{extras}</span>}
+                            </div>
+                          </TableCell>
+
+                          {/* Estado */}
+                          <TableCell className={TD}>
+                            <UserStatusBadge estado={user.estado} />
+                          </TableCell>
+
+                          {/* Fecha */}
+                          <TableCell className={`${TD} hidden ${COL_FECHA}`}>
+                            <span className="type-body whitespace-nowrap text-text-secondary">{formatFecha(user.fechaCreacion)}</span>
+                          </TableCell>
+
+                          {/* Acciones */}
+                          <TableCell className={`${TD} text-right`}>
+                            <UserActions user={user} onViewProfile={handleViewProfile} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <DataTablePager label="Paginación de usuarios" pagina={page} totalPaginas={totalPages} onPagina={setPage} />
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Confirm dialog */}
