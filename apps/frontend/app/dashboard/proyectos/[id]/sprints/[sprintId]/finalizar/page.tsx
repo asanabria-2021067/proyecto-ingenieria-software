@@ -498,7 +498,7 @@ export default function SprintClosingPage() {
               </p>
 
               {summary.participantes.length === 0 ? (
-                <Empty tone="muted" role="status">
+                <Empty role="status">
                   <EmptyMedia variant="icon">
                     <Flag aria-hidden="true" className="h-7 w-7" />
                   </EmptyMedia>

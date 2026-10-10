@@ -340,7 +340,7 @@ function DetalleIntegranteContent({
         </div>
 
         {sprintsOrdenados.length === 0 && (
-          <Empty tone="muted" role="status">
+          <Empty role="status">
             <EmptyMedia variant="icon">
               <ListChecks aria-hidden="true" className="h-7 w-7" />
             </EmptyMedia>

@@ -6,6 +6,12 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+} from '@/components/dashboard/data-table';
 import type { LeadershipContextDto, LeadershipHistoryItemDto } from '@/lib/types/leadership';
 
 export interface LeadershipCardProps {
@@ -53,11 +59,11 @@ function formatearFecha(iso: string | null | undefined): string | null {
 
 const CARD = 'card-base';
 
-/** Formato de tabla de Mis Tareas: franja guía gris verdosa, divisores tenues, hover suave. */
-const FILA_GUIA = 'border-outline-variant/50 bg-surface-container-low hover:bg-surface-container-low';
-const CELDA_GUIA = 'h-auto whitespace-nowrap py-tight text-xs font-semibold text-text-secondary first:pl-card last:pr-card';
-const FILA = 'border-outline-variant/50 hover:bg-surface-container-low';
-const CELDA = 'first:pl-card last:pr-card';
+/** Misma tabla que las bandejas administrativas (`data-table`): franja guía tenue, divisores discretos, hover suave. */
+const FILA_GUIA = `${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`;
+const CELDA_GUIA = `h-auto whitespace-nowrap px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
+const FILA = `${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER}`;
+const CELDA = 'px-stack py-inline';
 
 /**
  * Historial de liderazgo (más reciente primero): Fecha · Líder anterior ·
@@ -69,11 +75,11 @@ export function LeadershipHistoryTable({ items }: { items: LeadershipHistoryItem
     <Table aria-label="Historial de liderazgo">
       <TableHeader>
         <TableRow className={FILA_GUIA}>
-          <TableHead className={CELDA_GUIA}>Fecha</TableHead>
-          <TableHead className={CELDA_GUIA}>Líder anterior</TableHead>
-          <TableHead className={CELDA_GUIA}>Nuevo líder</TableHead>
-          <TableHead className={CELDA_GUIA}>Origen</TableHead>
-          <TableHead className={CELDA_GUIA}>Motivo</TableHead>
+          <TableHead scope="col" className={CELDA_GUIA}>Fecha</TableHead>
+          <TableHead scope="col" className={CELDA_GUIA}>Líder anterior</TableHead>
+          <TableHead scope="col" className={CELDA_GUIA}>Nuevo líder</TableHead>
+          <TableHead scope="col" className={CELDA_GUIA}>Origen</TableHead>
+          <TableHead scope="col" className={CELDA_GUIA}>Motivo</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -82,14 +88,14 @@ export function LeadershipHistoryTable({ items }: { items: LeadershipHistoryItem
             <TableCell className={`type-meta whitespace-nowrap tabular-nums text-text-secondary ${CELDA}`}>
               {formatearFecha(item.registradoEn) ?? '—'}
             </TableCell>
-            <TableCell className={`whitespace-nowrap text-sm text-text-primary ${CELDA}`}>
+            <TableCell className={`type-body whitespace-nowrap text-text-primary ${CELDA}`}>
               {item.liderAnterior.nombre} {item.liderAnterior.apellido}
             </TableCell>
-            <TableCell className={`whitespace-nowrap text-sm font-semibold text-text-primary ${CELDA}`}>
+            <TableCell className={`type-body whitespace-nowrap font-semibold text-text-primary ${CELDA}`}>
               {item.liderNuevo.nombre} {item.liderNuevo.apellido}
             </TableCell>
             <TableCell className={CELDA}>
-              <span className="pill pill-neutral">{origenLabel(item.origen)}</span>
+              <span className="pill pill-sm pill-neutral">{origenLabel(item.origen)}</span>
             </TableCell>
             <TableCell className={`type-meta min-w-50 whitespace-normal text-text-secondary ${CELDA}`}>{item.motivo}</TableCell>
           </TableRow>
