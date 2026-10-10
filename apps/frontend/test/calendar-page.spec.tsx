@@ -175,3 +175,77 @@ describe('CalendarioPage — selección obsoleta al navegar (G03-C05, UI-17)', (
     expect(celdaMes(20, 'octubre')).toHaveAttribute('aria-pressed', 'true');
   });
 });
+
+describe('CalendarioPage — mini calendario sincronizado (G03-C06, UI-17)', () => {
+  const mini = () => screen.getByRole('complementary', { name: 'Opciones del calendario' });
+  /** Celda del mini: por defecto la del mes mostrado (las de meses vecinos llevan `text-text-disabled`). */
+  const diaMini = (dia: number, fueraDeMes = false) => {
+    const celda = within(mini())
+      .getAllByRole('button', { name: String(dia) })
+      .find((b) => b.classList.contains('text-text-disabled') === fueraDeMes);
+    if (!celda) throw new Error(`sin celda ${dia} (fueraDeMes=${fueraDeMes})`);
+    return celda;
+  };
+  const tieneMarca = (dia: number, fueraDeMes = false) => diaMini(dia, fueraDeMes).querySelector('.bg-primary') !== null;
+
+  it('en Semana el mini marca los días con actividad de todo el mes, no solo de la semana cargada', async () => {
+    eventsMock.getMisEventos.mockImplementation(async (desde: Date, hasta: Date) =>
+      [eventoDTO({ idEvento: 21, tituloEvento: 'Taller del 28', fechaInicio: new Date(2026, 9, 28, 9, 0).toISOString(), fechaFin: new Date(2026, 9, 28, 10, 0).toISOString() })].filter(
+        (e) => new Date(e.fechaInicio) >= desde && new Date(e.fechaInicio) < hasta,
+      ),
+    );
+    await renderPage();
+    expect(screen.getByRole('radio', { name: 'Semana' })).toHaveAttribute('aria-checked', 'true');
+    await waitFor(() => expect(tieneMarca(28)).toBe(true));
+    // La semana visible (5–11 oct) no contiene el 28: la marca viene del mes del mini.
+    expect(screen.queryByRole('button', { name: /Taller del 28/ })).not.toBeInTheDocument();
+  });
+
+  it('"Mes siguiente" en el mini consulta el rango de noviembre y, hasta que llega, no enseña marcas del mes anterior', async () => {
+    let resolverNoviembre: (eventos: MiEventoDTO[]) => void = () => {};
+    eventsMock.getMisEventos.mockImplementation((desde: Date, hasta: Date) => {
+      if (hasta.getTime() > new Date(2026, 10, 20).getTime()) return new Promise<MiEventoDTO[]>((resolve) => (resolverNoviembre = resolve));
+      return Promise.resolve([eventoDTO({ idEvento: 21, fechaInicio: new Date(2026, 9, 28, 9, 0).toISOString(), fechaFin: new Date(2026, 9, 28, 10, 0).toISOString() })]);
+    });
+    await renderPage();
+    await waitFor(() => expect(tieneMarca(28)).toBe(true));
+
+    fireEvent.click(within(mini()).getByRole('button', { name: 'Mes siguiente' }));
+    expect(within(mini()).getByText('Noviembre 2026')).toBeInTheDocument();
+    const llamadas = eventsMock.getMisEventos.mock.calls as [Date, Date][];
+    const deNoviembre = llamadas.find(([desde, hasta]) => desde <= new Date(2026, 10, 1) && hasta >= new Date(2026, 11, 1));
+    expect(deNoviembre).toBeDefined();
+    // El 28 de octubre también está en la cuadrícula de noviembre (fuera de mes): sin datos nuevos, sin marca.
+    expect(tieneMarca(28, true)).toBe(false);
+
+    resolverNoviembre([eventoDTO({ idEvento: 22, fechaInicio: new Date(2026, 10, 12, 9, 0).toISOString(), fechaFin: new Date(2026, 10, 12, 10, 0).toISOString() })]);
+    await waitFor(() => expect(tieneMarca(12)).toBe(true));
+    // La vista principal no se movió: sigue la semana de hoy.
+    expect(etiquetaPeriodo()).toHaveTextContent('5 oct');
+  });
+
+  it('en Día y Semana el mini señala la fecha ancla y la sigue al navegar; en Mes señala el día elegido', async () => {
+    await renderPage();
+    expect(diaMini(9)).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(boton('Siguiente'));
+    expect(diaMini(16)).toHaveAttribute('aria-pressed', 'true');
+    expect(diaMini(9)).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(vista('Día'));
+    fireEvent.click(boton('Hoy'));
+    expect(diaMini(9)).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(vista('Mes'));
+    expect(diaMini(9)).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(celdaMes(20, 'octubre'));
+    expect(diaMini(20)).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('elegir un día del mini navega a esa fecha en la vista actual', async () => {
+    await renderPage();
+    fireEvent.click(diaMini(21));
+    expect(etiquetaPeriodo()).toHaveTextContent('19 oct');
+    expect(diaMini(21)).toHaveAttribute('aria-pressed', 'true');
+  });
+});

@@ -224,6 +224,29 @@ export default function CalendarioPage() {
   const itemsByDay = useMemo(() => groupAgendaItemsByDay(itemsVisibles), [itemsVisibles]);
   const diasConActividad = useMemo(() => new Set(itemsByDay.keys()), [itemsByDay]);
 
+  // G03 (UI-17): el mini calendario muestra un mes completo, pero en Día/Semana
+  // el rango cargado es un día o una semana: sus marcas se calculan con una
+  // consulta del mes del mini (en Mes es la misma clave y TanStack la comparte).
+  // Mientras ese mes carga no hay marcas: nunca se enseñan las del mes anterior.
+  const rangoMini = useMemo(() => rangoVisible('mes', miniMes), [miniMes]);
+  const { data: eventosMini } = useQuery<MiEventoDTO[]>({
+    queryKey: ['mis-eventos', rangoMini.desde.toISOString(), rangoMini.hasta.toISOString()],
+    queryFn: () => getMisEventos(rangoMini.desde, rangoMini.hasta),
+  });
+  const miniMuestraElMesVisible =
+    vista === 'mes' && miniMes.getFullYear() === anchor.getFullYear() && miniMes.getMonth() === anchor.getMonth();
+  const marcasMini = useMemo(() => {
+    if (miniMuestraElMesVisible) return diasConActividad;
+    const items = filtrarItems(
+      [
+        ...tareas.filter(tieneFechaLimite).filter((t) => t.estadoTarea !== 'HECHO').map(tareaToAgendaItem),
+        ...(eventosMini ?? []).flatMap((e) => eventoToAgendaItems(e, rangoMini.desde, rangoMini.hasta)),
+      ],
+      { mostrarTareas, tiposOcultos, proyectosOcultos },
+    );
+    return new Set(items.map((i) => i.key));
+  }, [miniMuestraElMesVisible, diasConActividad, tareas, eventosMini, rangoMini, mostrarTareas, tiposOcultos, proyectosOcultos]);
+
   const agendaSeleccionada = useMemo(() => {
     const base = selectedKey ? (itemsByDay.get(selectedKey) ?? []) : itemsVisibles;
     return [...base].sort((a, b) => (a.key + a.sortKey).localeCompare(b.key + b.sortKey));
@@ -374,8 +397,9 @@ export default function CalendarioPage() {
               year: miniMes.getFullYear(),
               month: miniMes.getMonth(),
               todayKey: hoyKey,
-              selectedKey: selectedKey ?? undefined,
-              markedDates: diasConActividad,
+              // En Mes el mini refleja el día elegido; en Día/Semana, la fecha ancla que se está viendo.
+              selectedKey: vista === 'mes' ? (selectedKey ?? undefined) : toDateKey(anchor),
+              markedDates: marcasMini,
               onPrevMonth: () => setMiniMes((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1)),
               onNextMonth: () => setMiniMes((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1)),
               onSelectDay: handleMiniSelect,
