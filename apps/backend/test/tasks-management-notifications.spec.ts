@@ -35,6 +35,8 @@ function makeTx() {
     tarea: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     asignacionTarea: { create: vi.fn(), updateMany: vi.fn() },
     tareaEtiqueta: { createMany: vi.fn(), deleteMany: vi.fn() },
+    // HU-186: update() borra los avisos de vencimiento al cambiar la fecha límite.
+    recordatorioTarea: { deleteMany: vi.fn() },
     // Por defecto el proyecto tiene un Sprint ACTIVO (FND-03.B): irrelevante
     // para estos tests de notificaciones, que no ejercitan ese rechazo.
     sprint: { findFirst: vi.fn().mockResolvedValue({ idSprint: 1 }) },
@@ -320,6 +322,57 @@ describe('TasksService — notificaciones de edición (Tarea 34)', () => {
     const resultado = await service.update(PROJECT_ID, 42, ACTOR_ID, { tituloTarea: 'x' });
 
     expect(resultado.idTarea).toBe(42);
+  });
+
+  describe('HU-186 — avisos de vencimiento al reprogramar', () => {
+    const FECHA_ACTUAL = new Date('2026-10-12T00:00:00.000Z');
+
+    it('fecha límite distinta: borra los avisos registrados de la tarea, dentro de la transacción', async () => {
+      const { tx, service } = makeUpdateSetup({ fechaLimite: FECHA_ACTUAL });
+
+      await service.update(PROJECT_ID, 42, ACTOR_ID, { fechaLimite: '2026-10-20' });
+
+      expect(tx.recordatorioTarea.deleteMany).toHaveBeenCalledTimes(1);
+      expect(tx.recordatorioTarea.deleteMany).toHaveBeenCalledWith({ where: { idTarea: 42 } });
+    });
+
+    it('misma fecha límite: no borra nada', async () => {
+      const { tx, service } = makeUpdateSetup({ fechaLimite: FECHA_ACTUAL });
+
+      await service.update(PROJECT_ID, 42, ACTOR_ID, { fechaLimite: '2026-10-12', tituloTarea: 'x' });
+
+      expect(tx.recordatorioTarea.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('otros campos sin fecha límite: no borra nada', async () => {
+      const { tx, service } = makeUpdateSetup({ fechaLimite: FECHA_ACTUAL });
+
+      await service.update(PROJECT_ID, 42, ACTOR_ID, { tituloTarea: 'x', prioridad: 'ALTA' });
+
+      expect(tx.recordatorioTarea.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('si falla la escritura de la tarea no se borra ningún aviso', async () => {
+      const { tx, service } = makeUpdateSetup({ fechaLimite: FECHA_ACTUAL });
+      tx.tarea.update.mockRejectedValue(new Error('fallo de escritura'));
+
+      await expect(service.update(PROJECT_ID, 42, ACTOR_ID, { fechaLimite: '2026-10-20' })).rejects.toThrow(
+        'fallo de escritura',
+      );
+
+      expect(tx.recordatorioTarea.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('si falla el borrado de avisos la edición falla entera y no notifica (la transacción se revierte)', async () => {
+      const { tx, notifications, service } = makeUpdateSetup({ fechaLimite: FECHA_ACTUAL, idRolProyecto: ROLE_ID });
+      tx.recordatorioTarea.deleteMany.mockRejectedValue(new Error('conexión perdida'));
+
+      await expect(service.update(PROJECT_ID, 42, ACTOR_ID, { fechaLimite: '2026-10-20' })).rejects.toThrow(
+        'conexión perdida',
+      );
+
+      expect(notifications.notifyRoleMembers).not.toHaveBeenCalled();
+    });
   });
 });
 
