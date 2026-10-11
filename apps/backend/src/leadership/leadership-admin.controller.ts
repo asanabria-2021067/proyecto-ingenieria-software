@@ -53,6 +53,21 @@ export class LeadershipAdminController {
     return this.leadershipRead.adminInbox(undefined, { actorId: user.userId, query });
   }
 
+  /**
+   * Contadores por estado para las pestañas de la bandeja. Se declara antes de
+   * `:appealId` para que «resumen» no se interprete como un id.
+   */
+  @Get('liderazgo/apelaciones/resumen')
+  inboxSummary(@CurrentUser() user: { userId: number }) {
+    return this.leadershipRead.adminInboxSummary(undefined, { actorId: user.userId });
+  }
+
+  /** Una apelación por id, para la vista administrativa de revisión y resolución. */
+  @Get('liderazgo/apelaciones/:appealId')
+  appeal(@CurrentUser() user: { userId: number }, @Param('appealId', ParseIntPipe) appealId: number) {
+    return this.leadershipRead.adminAppeal(undefined, { actorId: user.userId, appealId });
+  }
+
   /** E100: aceptar la apelación por el MISMO motor que el cambio directo. */
   @Post('proyectos/:projectId/liderazgo/apelaciones/:appealId/aceptar')
   @HttpCode(HttpStatus.OK)
