@@ -412,7 +412,7 @@ describeIntegration('G01-C14 — contrato HTTP de calendarios compartidos (Postg
     }
   });
 
-  it('G05-C02: el detalle de una tarea del proyecto común trae exactamente sus campos permitidos y las listas solo nombre, apellido y foto', async () => {
+  it('G05-C02: el detalle de una tarea del proyecto común y las dos listas traen exactamente sus campos permitidos', async () => {
     const agenda = (await (await pedir(AGENDA(), tokens.viewer)).json()) as { tareas: Record<string, unknown>[] };
     const comun = agenda.tareas.find((t) => t.idTarea === ids.tareaComun) as Record<string, unknown>;
     expect(Object.keys(comun).sort()).toEqual(['estadoTarea', 'fechaLimite', 'idTarea', 'prioridad', 'proyecto', 'tituloTarea', 'visibilidad']);
@@ -421,9 +421,9 @@ describeIntegration('G01-C14 — contrato HTTP de calendarios compartidos (Postg
     for (const token of [tokens.owner, tokens.viewer]) {
       const lista = (await (await pedir('/usuarios/me/calendario/compartidos', token)).json()) as Record<string, Record<string, unknown>[]>;
       expect(Object.keys(lista).sort()).toEqual(['compartidoPorMi', 'compartidosConmigo']);
-      for (const persona of [...lista.compartidoPorMi, ...lista.compartidosConmigo]) {
-        expect(Object.keys(persona).sort()).toEqual(['apellido', 'fotoUrl', 'idUsuario', 'nombre']);
-      }
+      // G01-C13: el correo solo viaja donde la interfaz lo muestra (a quién le compartí yo), nunca el de quien me comparte.
+      for (const persona of lista.compartidoPorMi) expect(Object.keys(persona).sort()).toEqual(['apellido', 'correo', 'fotoUrl', 'idUsuario', 'nombre']);
+      for (const persona of lista.compartidosConmigo) expect(Object.keys(persona).sort()).toEqual(['apellido', 'fotoUrl', 'idUsuario', 'nombre']);
     }
   });
 
