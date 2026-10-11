@@ -96,21 +96,33 @@ export class TasksDueReminderService {
     const responsable = tarea.asignaciones[0]?.idUsuario;
     if (responsable === undefined || tarea.fechaLimite === null) return;
 
-    const reserva = await this.prisma.recordatorioTarea.createMany({
-      data: [{ idTarea: tarea.idTarea, ventanaHoras: ventana }],
-      skipDuplicates: true,
-    });
-    if (reserva.count === 0) return; // otra corrida ya lo envió
-
+    let reservado = false;
     try {
+      const reserva = await this.prisma.recordatorioTarea.createMany({
+        data: [{ idTarea: tarea.idTarea, ventanaHoras: ventana }],
+        skipDuplicates: true,
+      });
+      if (reserva.count === 0) return; // otra corrida ya lo envió
+      reservado = true;
+
       await this.emitirRecordatorio(tarea, ventana, responsable);
     } catch (error) {
       this.logger.warn(
         `Fallo al enviar el recordatorio de ${ventana} h de la tarea ${tarea.idTarea}: ${(error as Error)?.message ?? error}`,
       );
-      await this.prisma.recordatorioTarea
-        .deleteMany({ where: { idTarea: tarea.idTarea, ventanaHoras: ventana } })
-        .catch(() => undefined);
+      // Solo se libera la reserva propia: si falló el INSERT, la fila (si
+      // existe) es de otra corrida y borrarla permitiría un duplicado.
+      if (reservado) await this.liberarReserva(tarea.idTarea, ventana);
+    }
+  }
+
+  private async liberarReserva(idTarea: number, ventana: VentanaRecordatorio): Promise<void> {
+    try {
+      await this.prisma.recordatorioTarea.deleteMany({ where: { idTarea, ventanaHoras: ventana } });
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo liberar el recordatorio de ${ventana} h de la tarea ${idTarea}; no se reintentará: ${(error as Error)?.message ?? error}`,
+      );
     }
   }
 

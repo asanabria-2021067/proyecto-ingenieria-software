@@ -251,6 +251,19 @@ describe('TasksDueReminderService.enviarRecordatoriosDeVencimiento (T-329)', () 
     expect(service.emitir).toHaveBeenLastCalledWith(otra, 24, RESPONSABLE_ID + 1);
   });
 
+  it('si falla el registro de una tarea, sigue con las demás y no borra reservas ajenas', async () => {
+    const otra = tarea({ idTarea: TASK_ID + 1, asignaciones: [{ idUsuario: RESPONSABLE_ID + 1 }] });
+    const { prisma } = makePrisma(new Map([[MANANA.getTime(), [tarea(), otra]]]));
+    prisma.recordatorioTarea.createMany.mockRejectedValueOnce(new Error('conexión perdida'));
+    const service = new ServicioObservado(prisma, sinNotificaciones);
+
+    await service.enviarRecordatoriosDeVencimiento();
+
+    expect(prisma.recordatorioTarea.deleteMany).not.toHaveBeenCalled();
+    expect(service.emitir).toHaveBeenCalledTimes(1);
+    expect(service.emitir).toHaveBeenCalledWith(otra, 24, RESPONSABLE_ID + 1);
+  });
+
 });
 
 /**
