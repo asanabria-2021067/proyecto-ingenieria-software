@@ -57,6 +57,13 @@ export function formatSecurityEventDate(iso: string): string {
   return Number.isNaN(fecha.getTime()) ? 'Fecha desconocida' : FORMATO_FECHA.format(fecha);
 }
 
+/** La misma fecha en dos partes (día y hora), para apilarlas donde no caben en una línea. */
+export function formatSecurityEventDateParts(iso: string): { dia: string; hora: string | null } {
+  const completa = formatSecurityEventDate(iso);
+  const corte = completa.lastIndexOf(', ');
+  return corte === -1 ? { dia: completa, hora: null } : { dia: completa.slice(0, corte), hora: completa.slice(corte + 2) };
+}
+
 /** D-FG02-01: nombre e ID de la cuenta; nunca su correo. */
 export function accountLabel(account: SecurityEventAccount | null, ausente: string): string {
   if (!account) return ausente;

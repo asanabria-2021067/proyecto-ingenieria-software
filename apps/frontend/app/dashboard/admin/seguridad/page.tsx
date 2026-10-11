@@ -29,12 +29,12 @@ function TablaSkeleton() {
       <div className="divide-y divide-outline-variant/50">
         {[0, 1, 2, 3, 4].map((i) => (
           <div key={i} className="flex items-center gap-stack px-stack py-inline">
-            <Skeleton className="h-4 w-28 shrink-0" />
+            <Skeleton className="hidden h-4 w-28 shrink-0 @lg/bandeja:block" />
             <div className="min-w-0 flex-1 space-y-tight">
               <Skeleton className="h-5 w-40 rounded-tag" />
               <Skeleton className="h-3 w-1/2" />
             </div>
-            <Skeleton className="h-8 w-10 rounded-control @md/bandeja:w-28" />
+            <Skeleton className="h-8 w-10 rounded-control @3xl/bandeja:w-28" />
           </div>
         ))}
       </div>

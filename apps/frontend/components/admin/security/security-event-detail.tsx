@@ -17,7 +17,7 @@ import type { SecurityEvent } from '@/lib/types/admin-security';
 
 function Fila({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
   return (
-    <div className="grid gap-tight border-b border-outline-variant/50 py-inline last:border-b-0 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:gap-stack">
+    <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-inline border-b border-outline-variant/50 py-tight last:border-b-0 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:gap-stack sm:py-inline">
       <dt className="type-meta font-semibold">{etiqueta}</dt>
       <dd className="type-body min-w-0 break-words text-text-primary">{children}</dd>
     </div>
