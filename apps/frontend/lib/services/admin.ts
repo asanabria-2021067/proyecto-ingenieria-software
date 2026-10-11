@@ -2,7 +2,7 @@ import { apiFetch } from '@/lib/api/client';
 
 // ─── Base types ───────────────────────────────────────────────────────────────
 
-export type AdminUserStatus = 'ACTIVO' | 'INACTIVO' | 'BLOQUEADO';
+export type AdminUserStatus = 'ACTIVO' | 'INACTIVO' | 'BLOQUEADO' | 'PENDIENTE_VERIFICACION';
 
 export type AdminRole =
   | 'estudiante'
@@ -257,6 +257,51 @@ export async function updateAdminUserStatus(
     method: 'PATCH',
     body: JSON.stringify({ estado }),
   });
+}
+
+export interface AdminCuentaPendiente {
+  idUsuario: number;
+  nombre: string;
+  apellido: string;
+  correo: string;
+  carne: string | null;
+  carrera: { idCarrera: number; nombreCarrera: string } | null;
+  fechaRegistro: string;
+}
+
+export interface AdminCuentasPendientesResponse {
+  total: number;
+  cuentas: AdminCuentaPendiente[];
+}
+
+export interface ResolverCuentaPendienteResponse {
+  idUsuario: number;
+  nombre: string;
+  apellido: string;
+  correo: string;
+  estado: AdminUserStatus;
+}
+
+export async function getCuentasPendientes(): Promise<AdminCuentasPendientesResponse> {
+  return apiFetch<AdminCuentasPendientesResponse>('/admin/cuentas-pendientes');
+}
+
+export async function aprobarCuentaPendiente(
+  idUsuario: number,
+): Promise<ResolverCuentaPendienteResponse> {
+  return apiFetch<ResolverCuentaPendienteResponse>(
+    `/admin/cuentas-pendientes/${idUsuario}/aprobar`,
+    { method: 'PATCH' },
+  );
+}
+
+export async function rechazarCuentaPendiente(
+  idUsuario: number,
+): Promise<ResolverCuentaPendienteResponse> {
+  return apiFetch<ResolverCuentaPendienteResponse>(
+    `/admin/cuentas-pendientes/${idUsuario}/rechazar`,
+    { method: 'PATCH' },
+  );
 }
 
 // ─── GET /admin/password-reset-requests ──────────────────────────────────────

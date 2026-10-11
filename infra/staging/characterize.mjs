@@ -178,10 +178,11 @@ export async function characterizeSocket({ host = '127.0.0.1', httpsPort }) {
  */
 export const SPOOF_LOGIN_LIMIT = 5;
 
-export function verifySpoofResistance(statuses) {
+export function verifySpoofResistance(statuses, loginsPrevios = 0) {
   const index = statuses.indexOf(429);
+  const esperado = SPOOF_LOGIN_LIMIT - loginsPrevios;
   return [
-    index === SPOOF_LOGIN_LIMIT || `429 esperado en el intento ${SPOOF_LOGIN_LIMIT + 1}, obtenido ${index === -1 ? 'nunca' : `en el ${index + 1}`}`,
+    index === esperado || `429 esperado en el intento ${esperado + 1}, obtenido ${index === -1 ? 'nunca' : `en el ${index + 1}`}`,
   ].filter((outcome) => outcome !== true);
 }
 
@@ -216,12 +217,18 @@ function postLogin({ host, port, index }) {
   });
 }
 
-export async function characterizeSpoofing({ host = '127.0.0.1', httpsPort }) {
+export async function characterizeSpoofing({ host = '127.0.0.1', httpsPort, loginsPrevios = 0 }) {
   const statuses = [];
   for (let index = 0; index <= SPOOF_LOGIN_LIMIT; index += 1) {
     statuses.push(await postLogin({ host, port: httpsPort, index }));
   }
-  return [{ id: 'T16-01', title: `XFF falso rotativo no evade el limite de login (${statuses.join(',')})`, failures: verifySpoofResistance(statuses) }];
+  return [
+    {
+      id: 'T16-01',
+      title: `XFF falso rotativo no evade el limite de login (${statuses.join(',')})`,
+      failures: verifySpoofResistance(statuses, loginsPrevios),
+    },
+  ];
 }
 
 /**
@@ -288,12 +295,37 @@ export function verifyAuthCookies(setCookies) {
   return failures;
 }
 
+export const PENDING_ACCOUNT_MESSAGE = 'Tu cuenta está pendiente de verificación por administración';
+export const PENDING_ACCOUNT_LOGINS = 1;
+const SESSION_COOKIES = ['access_token', 'refresh_token'];
+
+export function verifyPendingAccount({ registro, login }) {
+  const cookiesDeSesion = (registro.setCookies ?? []).map((cookie) => cookie.split('=')[0]).filter((name) => SESSION_COOKIES.includes(name));
+  return [
+    registro.status === 201 || `registro status ${registro.status} != 201`,
+    cookiesDeSesion.length === 0 || `el registro emitio cookies de sesion: ${cookiesDeSesion.join(',')}`,
+    login.status === 403 || `login status ${login.status} != 403`,
+    login.message === PENDING_ACCOUNT_MESSAGE || 'el login no devolvio el mensaje de cuenta pendiente',
+    (login.setCookies ?? []).length === 0 || 'el login de la cuenta pendiente emitio cookies',
+  ].filter((outcome) => outcome !== true);
+}
+
+function messageOf(text) {
+  try {
+    return JSON.parse(text).message;
+  } catch {
+    return undefined;
+  }
+}
+
 function send({ host, port, path, method = 'GET', headers = {}, body }) {
   assertLocalHost(host);
   return new Promise((resolve, reject) => {
     const req = https.request({ host, port, path, method, headers, rejectUnauthorized: false, timeout: 15000 }, (res) => {
-      res.resume();
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers }));
+      let text = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => (text += chunk));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, text }));
     });
     req.on('timeout', () => req.destroy(new Error(`timeout ${path}`)));
     req.on('error', reject);
@@ -313,9 +345,11 @@ export async function characterizeTls({ host = '127.0.0.1', httpsPort, carreraId
   }
   const suffix = randomBytes(4).toString('hex');
   const carne = String(randomBytes(4).readUInt32BE(0));
+  const correo = `pru${carne}@uvg.edu.gt`;
+  const contrasena = `T18-sintetica-${suffix}`;
   const body = JSON.stringify({
-    correo: `pru${carne}@uvg.edu.gt`,
-    contrasena: `T18-sintetica-${suffix}`,
+    correo,
+    contrasena,
     nombre: 'Sintetico',
     apellido: 'Prueba',
     carne,
@@ -330,12 +364,22 @@ export async function characterizeTls({ host = '127.0.0.1', httpsPort, carreraId
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
     body,
   });
+  const credenciales = JSON.stringify({ correo, contrasena });
+  const login = await send({
+    host,
+    port: httpsPort,
+    path: '/api/auth/login',
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(credenciales) },
+    body: credenciales,
+  });
   results.push({
     id: 'T18',
-    title: `cookies de sesion con Secure/HttpOnly/SameSite=Lax (registro ${registro.status})`,
-    failures: [registro.status === 201 || `status ${registro.status} != 201`, ...verifyAuthCookies(registro.headers['set-cookie'] ?? [])].filter(
-      (outcome) => outcome !== true,
-    ),
+    title: `registro sin cookies de sesion y login de cuenta pendiente rechazado (registro ${registro.status}, login ${login.status})`,
+    failures: verifyPendingAccount({
+      registro: { status: registro.status, setCookies: registro.headers['set-cookie'] },
+      login: { status: login.status, message: messageOf(login.text), setCookies: login.headers['set-cookie'] },
+    }),
   });
   return results;
 }
@@ -365,7 +409,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const socket = [
     ...(await characterizeSocket(target)),
     ...(await characterizeTls({ ...target, carreraId: process.env.HARNESS_T18_CARRERA_ID })),
-    ...(await characterizeSpoofing(target)),
+    ...(await characterizeSpoofing({ ...target, loginsPrevios: PENDING_ACCOUNT_LOGINS })),
   ];
   for (const result of socket) {
     console.log(`${result.failures.length === 0 ? 'PASS' : 'FAIL'} ${result.id} ${result.title}`);

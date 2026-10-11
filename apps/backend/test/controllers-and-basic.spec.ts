@@ -40,7 +40,7 @@ describe('Controllers and basic services', () => {
     // G05-C09: login recibe la petición para el origen del evento de seguridad (req.ip).
     const req = { ip: '127.0.0.1', app: { get: () => false } } as unknown as Parameters<AuthController['login']>[1];
     await auth.login({ correo: 'a', contrasena: 'b' }, req, res);
-    await auth.register({} as Parameters<AuthController['register']>[0], res);
+    await auth.register({} as Parameters<AuthController['register']>[0]);
 
     const usersSvc = {
       getMe: vi.fn(),

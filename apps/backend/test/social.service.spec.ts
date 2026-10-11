@@ -227,6 +227,22 @@ describe('SocialService — buscarUsuarios', () => {
     );
   });
 
+  it('excluye del directorio las cuentas pendientes de verificación', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, {});
+
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: expect.arrayContaining([{ estado: { not: 'PENDIENTE_VERIFICACION' } }]),
+        },
+      }),
+    );
+  });
+
   it('excluye a los administradores del directorio', async () => {
     const prisma = makePrisma();
     prisma.usuario.findMany.mockResolvedValue([]);

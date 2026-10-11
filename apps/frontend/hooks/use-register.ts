@@ -22,12 +22,12 @@ export function useRegister() {
       uvgSwal.fire({
         icon: 'success',
         title: 'Cuenta creada',
-        text: 'Bienvenido a UVGenius. Redirigiendo…',
-        timer: 1500,
+        text: 'Administración debe verificar tu cuenta antes de que puedas iniciar sesión.',
+        timer: 4000,
         timerProgressBar: true,
         showConfirmButton: false,
       });
-      setTimeout(() => router.push('/dashboard'), 1500);
+      setTimeout(() => router.push('/login'), 4000);
     },
     onError: (error) => {
       uvgSwal.fire({

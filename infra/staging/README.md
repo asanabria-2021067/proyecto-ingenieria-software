@@ -46,7 +46,7 @@ Sobre HTTPS local (certificado autofirmado efímero):
 
 - **T17**: `/` y `/login` llevan exactamente las cabeceras base del frontend (nosniff, `X-Frame-Options: DENY`, Referrer-Policy, Permissions-Policy, CSP `frame-ancestors 'none'`), la CSP Report-Only con sus directivas clave, sin `X-Powered-By` y sin HSTS.
 - **T21**: `/api` y `/api/proyectos` devuelven exactamente `max-age=31536000; includeSubDomains`, nunca `preload`.
-- **T18**: el backend del arnés corre con `COOKIE_SECURE=true`. `run-harness.sh` inserta **una** carrera sintética en la base efímera y un registro vía nginx debe devolver `access_token` y `refresh_token` con `Secure`, `HttpOnly`, `SameSite=Lax` y `Path=/`. Solo se reportan atributos, nunca valores.
+- **T18**: `run-harness.sh` inserta **una** carrera sintética en la base efímera. Un registro vía nginx debe responder 201 **sin** cookies de sesión (la cuenta queda pendiente de verificación) y el login de esa cuenta debe responder 403 con el mensaje de cuenta pendiente, también sin cookies. Ese login cuenta para el límite de 5/min, así que T16 espera su 429 un intento antes. Los atributos `Secure`, `HttpOnly`, `SameSite=Lax` y `Path=/` de las cookies ya no se comprueban en el arnés: requieren una sesión de una cuenta aprobada. Solo se reportan estados y nombres, nunca valores.
 
 ## T14 (G07-C12)
 

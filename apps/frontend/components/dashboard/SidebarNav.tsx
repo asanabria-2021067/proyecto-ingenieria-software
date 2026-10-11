@@ -15,6 +15,7 @@ export interface NavLeaf {
   label: string;
   icon: LucideIcon;
   exact?: boolean;
+  badge?: number;
 }
 
 export interface NavGroup {
@@ -50,6 +51,16 @@ function isLeafActive(pathname: string, leaf: NavLeaf, search?: string | null): 
 
 function slug(label: string): string {
   return label.toLowerCase().replace(/\s+/g, '-');
+}
+
+function NavBadge({ count }: { count?: number }) {
+  if (!count || count <= 0) return null;
+  return (
+    <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-black text-destructive-foreground">
+      <span aria-hidden="true">{count > 99 ? '99+' : count}</span>
+      <span className="sr-only">{count} por atender</span>
+    </span>
+  );
 }
 
 const LEAF_ACTIVE_CLASS = 'bg-action text-on-action shadow-card';
@@ -129,6 +140,7 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
             >
               <Icon className="w-5 h-5 shrink-0" />
               {entry.label}
+              {isAdmin && <NavBadge count={entry.badge} />}
             </Link>
           );
         }
@@ -172,6 +184,7 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
         const groupActiveByRoute = entry.items.some((item) => isLeafActive(pathname, item, search));
         const expanded = expandedOverrides[entry.label] ?? groupActiveByRoute;
         const groupId = `nav-group-${slug(entry.label)}`;
+        const groupBadge = entry.items.reduce((total, item) => total + (item.badge ?? 0), 0);
 
         return (
           <div key={entry.label} className="space-y-1">
@@ -187,6 +200,7 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
             >
               <GroupIcon className="w-5 h-5 shrink-0" />
               <span className="flex-1 text-left">{entry.label}</span>
+              {!expanded && <NavBadge count={groupBadge} />}
               <ChevronDown
                 className={`size-4 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
                 aria-hidden="true"
@@ -212,6 +226,7 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
                     >
                       <ItemIcon className="w-4 h-4 shrink-0" />
                       {item.label}
+                      <NavBadge count={item.badge} />
                     </Link>
                   );
                 })}

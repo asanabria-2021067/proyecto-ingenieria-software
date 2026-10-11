@@ -16,6 +16,10 @@ const statusConfig: Record<
     label: 'Bloqueado',
     classes: 'bg-error-container text-error',
   },
+  PENDIENTE_VERIFICACION: {
+    label: 'Pendiente',
+    classes: 'bg-surface-container-high text-on-surface',
+  },
 };
 
 export function UserStatusBadge({ estado }: { estado: AdminUserStatus }) {

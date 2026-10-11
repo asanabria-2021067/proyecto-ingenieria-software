@@ -30,6 +30,7 @@ vi.mock('../hooks/use-current-user', () => ({
   isAdminUser: (u?: { roles?: string[] } | null) => (u?.roles ?? []).some((r) => r.toLowerCase() === 'administrador'),
 }));
 vi.mock('../hooks/use-logout', () => ({ useLogout: () => vi.fn() }));
+vi.mock('../hooks/use-cuentas-pendientes', () => ({ useCuentasPendientes: () => ({ data: undefined }) }));
 vi.mock('../components/layout/notifications-bell', () => ({ NotificationsBell: () => null }));
 vi.mock('../components/theme-toggle', () => ({ ThemeToggle: () => null }));
 vi.mock('../components/dashboard/UserMenu', () => ({ UserMenu: () => null }));

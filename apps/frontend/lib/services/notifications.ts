@@ -86,6 +86,8 @@ export function getNotificationLink(n: {
     // conteos) y se muestra como texto; datosJson nunca se renderiza.
     case 'ALERTA_SEGURIDAD':
       return '/dashboard/admin/usuarios';
+    case 'CUENTA_PENDIENTE_VERIFICACION':
+      return '/dashboard/admin/cuentas-pendientes';
     // HU-184: alguien compartió su calendario. G03 (UI-40): el enlace lleva el
     // `ownerId` validado y la página lo activa solo si la API lo lista entre
     // los calendarios recibidos; notificaciones antiguas sin id abren el calendario.

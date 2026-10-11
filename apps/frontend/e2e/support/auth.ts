@@ -16,12 +16,15 @@ function cacheFile(correo: string): string {
   return path.join(CACHE_DIR, `${correo}.json`);
 }
 
-export async function login(page: Page, correo: string): Promise<void> {
+// `destino` es la pantalla a la que el login lleva a esa cuenta (use-login.ts):
+// `/dashboard` para estudiantes y `/dashboard/admin` para administración. Se
+// espera la ruta exacta, así que una cuenta que aterriza en otra pantalla falla.
+export async function login(page: Page, correo: string, destino = '/dashboard'): Promise<void> {
   const file = cacheFile(correo);
   if (fs.existsSync(file)) {
     const cookies = JSON.parse(fs.readFileSync(file, 'utf-8'));
     await page.context().addCookies(cookies);
-    await page.goto('/dashboard');
+    await page.goto(destino);
     return;
   }
 
@@ -29,7 +32,7 @@ export async function login(page: Page, correo: string): Promise<void> {
   await page.getByPlaceholder('usuario@uvg.edu.gt').fill(correo);
   await page.getByPlaceholder('Minimo 8 caracteres').fill(PASSWORD);
   await page.getByRole('button', { name: 'Iniciar Sesion' }).click();
-  await page.waitForURL('**/dashboard', { timeout: 45_000 });
+  await page.waitForURL(`**${destino}`, { timeout: 45_000 });
 
   const cookies = await page.context().cookies();
   fs.mkdirSync(CACHE_DIR, { recursive: true });
