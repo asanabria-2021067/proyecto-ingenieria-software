@@ -1,0 +1,171 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { REPO_ROOT, loadWorkflow, parseWorkflow, readRepoFile, type WorkflowJob, type WorkflowStep } from './helpers/workflow-yaml';
+
+/**
+ * FG11-C03 (T-318). La comprobación de accesibilidad con axe forma parte de la
+ * suite E2E que CI ejecuta, corre en un paso propio y es bloqueante.
+ *
+ * Esto verifica el workflow y su cableado. Que GitHub Actions lo ejecutó de
+ * verdad solo se puede comprobar en una corrida real del pipeline.
+ */
+
+const PASO_A11Y = 'Accesibilidad con axe (cinco pantallas, claro y oscuro)';
+const PASO_SUITE = 'Ejecutar suite de humo E2E';
+
+type PasoCompleto = WorkflowStep & { if?: string; 'continue-on-error'?: boolean | string; 'working-directory'?: string };
+
+/** Razones por las que el job NO impone la comprobación de accesibilidad. Vacío = la impone. */
+export function a11yGateFindings(job: WorkflowJob): string[] {
+  const pasos = (job.steps ?? []) as PasoCompleto[];
+  const nombres = pasos.map((paso) => paso.name ?? '');
+  const hallazgos: string[] = [];
+  const a11y = pasos.find((paso) => paso.name === PASO_A11Y);
+  if (!a11y) return ['sin-paso-de-accesibilidad'];
+  if (!/^npm run test:e2e:a11y$/.test((a11y.run ?? '').trim())) hallazgos.push('el-paso-no-ejecuta-la-suite-a11y');
+  if (/\|\|\s*true|;\s*true\s*$|set \+e/.test(a11y.run ?? '')) hallazgos.push('fallo-ignorado-en-el-comando');
+  if (a11y['continue-on-error']) hallazgos.push('continue-on-error');
+  if (a11y.if) hallazgos.push('paso-condicional');
+  if (a11y['working-directory'] !== 'apps/frontend') hallazgos.push('directorio-incorrecto');
+  const indice = nombres.indexOf(PASO_A11Y);
+  for (const previo of ['Build de produccion del frontend para E2E', 'Esperar a que el backend responda', 'Preparar base de datos (migraciones + seed)']) {
+    const i = nombres.indexOf(previo);
+    if (i < 0 || i > indice) hallazgos.push(`corre-antes-de:${previo}`);
+  }
+  if (!nombres.slice(0, indice).some((nombre) => /Playwright/.test(nombre))) hallazgos.push('sin-navegador-instalado-antes');
+  const suite = nombres.indexOf(PASO_SUITE);
+  if (suite < 0) hallazgos.push('se-quito-la-suite-completa');
+  else if (suite < indice) hallazgos.push('la-suite-completa-corre-antes');
+  return hallazgos;
+}
+
+describe('FG11-C03: el job e2e de CI impone la accesibilidad', () => {
+  const ci = loadWorkflow('ci.yml');
+  const e2e = ci.jobs.e2e;
+  const pasos = (e2e.steps ?? []) as PasoCompleto[];
+
+  it('el workflow sigue siendo YAML válido y conserva sus jobs', () => {
+    expect(Object.keys(ci.jobs)).toEqual(expect.arrayContaining(['backend', 'frontend', 'e2e', 'dependency-audit']));
+  });
+
+  it('hay un paso propio de accesibilidad, bloqueante y en el orden correcto', () => {
+    expect(a11yGateFindings(e2e)).toEqual([]);
+  });
+
+  it('las condiciones del job no cambiaron: PR hacia main, ejecución manual o llamado desde el despliegue', () => {
+    expect((e2e.if ?? '').replace(/\s+/g, ' ').trim()).toBe(
+      "inputs.e2e == 'run' || (!inputs.e2e && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main')))",
+    );
+  });
+
+  it('la suite completa sigue ejecutándose igual: no se sustituyó ni se filtró', () => {
+    const suite = pasos.find((paso) => paso.name === PASO_SUITE);
+    expect(suite?.run?.trim()).toBe('npm run test:e2e');
+    expect(suite?.['continue-on-error']).toBeUndefined();
+  });
+
+  it('el paso corre contra el build de producción y los servicios efímeros del job', () => {
+    expect(e2e.env?.E2E_PRODUCTION_SERVER).toBe('1');
+    expect(e2e.env?.DATABASE_URL).toMatch(/@localhost:5432\/uvg_collab_e2e/);
+    const a11y = pasos.find((paso) => paso.name === PASO_A11Y);
+    expect(JSON.stringify(a11y?.env ?? {})).not.toMatch(/secrets\.|TOKEN|PASSWORD/);
+  });
+
+  it('la evidencia de axe se publica pase o falle, en un artefacto propio y sin secretos', () => {
+    const subida = pasos.find((paso) => paso.name === 'Subir evidencia de accesibilidad (axe)');
+    expect(subida?.uses).toMatch(/^actions\/upload-artifact@/);
+    expect(subida?.if).toBe("always() && steps.a11y.outcome != 'skipped'");
+    expect(subida?.with).toMatchObject({ name: 'a11y-axe-report', path: 'apps/frontend/playwright-report-a11y/' });
+    const a11y = pasos.find((paso) => paso.name === PASO_A11Y);
+    expect(a11y?.id).toBe('a11y');
+    expect(a11y?.env).toEqual({ PLAYWRIGHT_HTML_OUTPUT_DIR: 'playwright-report-a11y' });
+    expect(readRepoFile('.gitignore')).toContain('playwright-report-a11y/');
+  });
+
+  it('ningún otro job ni paso de seguridad se debilitó', () => {
+    for (const nombre of ['dependency-audit', 'backend', 'frontend']) {
+      const job = ci.jobs[nombre];
+      expect(job, nombre).toBeDefined();
+      for (const paso of (job.steps ?? []) as PasoCompleto[]) expect(paso['continue-on-error'], `${nombre}: ${paso.name}`).toBeUndefined();
+    }
+  });
+});
+
+describe('FG11-C03: el script y los specs que ejecuta ese paso', () => {
+  const pkg = JSON.parse(readRepoFile('apps/frontend/package.json')) as { scripts: Record<string, string> };
+
+  it('`test:e2e:a11y` ejecuta specs que existen', () => {
+    const script = pkg.scripts['test:e2e:a11y'];
+    expect(script).toMatch(/^playwright test /);
+    const specs = script.split(' ').slice(2);
+    expect(specs).toContain('e2e/accesibilidad.spec.ts');
+    for (const spec of specs) expect(existsSync(join(REPO_ROOT, 'apps/frontend', spec)), spec).toBe(true);
+  });
+
+  it('esos specs también entran en la suite completa: están en el directorio que recorre Playwright', () => {
+    const config = readRepoFile('apps/frontend/playwright.config.ts');
+    expect(config).toContain("testDir: './e2e'");
+    expect(config).not.toMatch(/testIgnore|grepInvert|grep:/);
+    expect(pkg.scripts['test:e2e']).toBe('playwright test');
+  });
+
+  it('el spec de accesibilidad no se salta, no se aplaza y no se limita a un solo test', () => {
+    const spec = readRepoFile('apps/frontend/e2e/accesibilidad.spec.ts');
+    expect(spec).not.toMatch(/test\.(skip|fixme|only)\b|describe\.(skip|fixme|only)\b|\.skip\(/);
+    expect(spec).toContain('expect(describirViolaciones(bloqueantes)');
+    // Cinco pantallas por dos temas.
+    expect(spec.match(/\{ id: '[a-z-]+', ruta: '/g)).toHaveLength(5);
+    expect(spec).toContain('for (const oscuro of [false, true])');
+  });
+
+  it('el helper de axe no admite exclusiones', () => {
+    const helper = readRepoFile('apps/frontend/e2e/support/a11y.ts');
+    expect(helper).not.toMatch(/\.disableRules\(|\.exclude\(|rules:/);
+    expect(helper).toContain("export const IMPACTOS_BLOQUEANTES = ['serious', 'critical'] as const;");
+  });
+});
+
+describe('FG11-C03: fixtures negativos del contrato', () => {
+  const base = (pasoA11y: string) =>
+    parseWorkflow(
+      [
+        'on: push',
+        'jobs:',
+        '  e2e:',
+        '    runs-on: ubuntu-latest',
+        '    steps:',
+        '      - name: Preparar base de datos (migraciones + seed)',
+        '        run: npx prisma migrate deploy',
+        '      - name: Esperar a que el backend responda',
+        '        run: curl -sf http://localhost:3001/api',
+        '      - name: Build de produccion del frontend para E2E',
+        '        run: npm run build',
+        '      - name: Instalar navegador y dependencias de Playwright',
+        '        run: npx playwright install --with-deps chromium',
+        pasoA11y,
+        `      - name: ${PASO_SUITE}`,
+        '        run: npm run test:e2e',
+      ].join('\n'),
+    ).jobs.e2e;
+  const paso = (extra: string[], run = 'npm run test:e2e:a11y') =>
+    [`      - name: ${PASO_A11Y}`, '        working-directory: apps/frontend', ...extra, `        run: ${run}`].join('\n');
+
+  it('el paso correcto no produce hallazgos', () => {
+    expect(a11yGateFindings(base(paso([])))).toEqual([]);
+  });
+
+  it.each([
+    ['continue-on-error', paso(['        continue-on-error: true']), 'continue-on-error'],
+    ['un fallo ignorado con `|| true`', paso([], 'npm run test:e2e:a11y || true'), 'fallo-ignorado-en-el-comando'],
+    ['un paso condicional', paso(["        if: github.base_ref == 'main'"]), 'paso-condicional'],
+    ['otro comando', paso([], 'npm run lint'), 'el-paso-no-ejecuta-la-suite-a11y'],
+  ])('detecta %s', (_nombre, yamlDelPaso, hallazgo) => {
+    expect(a11yGateFindings(base(yamlDelPaso))).toContain(hallazgo);
+  });
+
+  it('detecta que el paso no existe', () => {
+    const sinPaso = parseWorkflow(['on: push', 'jobs:', '  e2e:', '    steps:', `      - name: ${PASO_SUITE}`, '        run: npm run test:e2e'].join('\n'));
+    expect(a11yGateFindings(sinPaso.jobs.e2e)).toEqual(['sin-paso-de-accesibilidad']);
+  });
+});
