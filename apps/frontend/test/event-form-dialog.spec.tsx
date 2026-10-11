@@ -1107,12 +1107,26 @@ describe('EventFormDialog — fecha inicial y fechas pasadas (G05-C09, T-323/T-3
   });
 
   it('al crear, el calendario no deja elegir días anteriores a hoy; hoy y los siguientes sí', async () => {
+    // El reloj de la prueba está fijo en el lunes 5 de octubre de 2026 (beforeEach del archivo).
     renderCrear();
     fireEvent.click(screen.getByLabelText('Fecha'));
     await waitFor(() => expect(diasDelSelector().length).toBeGreaterThan(27));
-    const estado = (dia: number) => diasDelSelector().find((b) => b.getAttribute('data-day')?.startsWith(`${dia}/10/2026`))?.disabled;
-    expect([1, 2, 3, 4].map(estado)).toEqual([true, true, true, true]);
-    expect([5, 6, 20, 31].map(estado)).toEqual([false, false, false, false]);
+    const selector = document.querySelector('[data-slot="popover-content"]') as HTMLElement;
+    // Antes de buscar días concretos: el selector muestra octubre de 2026.
+    expect(within(selector).getByText(/^octubre 2026$/i)).toBeInTheDocument();
+    // Cada día se busca por su nombre accesible en español ("lunes, 5 de octubre de 2026"; hoy lleva
+    // delante "Hoy, "). El atributo `data-day` no sirve: se genera con toLocaleDateString() y cambia con
+    // el idioma del sistema ("5/10/2026" en español, "10/5/2026" en inglés, que es el de CI).
+    const dia = (numero: number) => within(selector).getByRole('button', { name: new RegExp(`(^|[ ,])${numero} de octubre de 2026`) });
+    for (const pasado of [1, 2, 3, 4]) expect(dia(pasado), `día ${pasado}`).toBeDisabled();
+    for (const elegible of [5, 6, 20, 31]) expect(dia(elegible), `día ${elegible}`).toBeEnabled();
+    // Ningún otro día de octubre queda bloqueado por error: exactamente los cuatro anteriores a hoy.
+    const octubre = within(selector).getAllByRole('button', { name: / de octubre de 2026/ });
+    expect(octubre).toHaveLength(31);
+    expect(octubre.filter((b) => (b as HTMLButtonElement).disabled)).toHaveLength(4);
+    // Y un día bloqueado no cambia la fecha del formulario al pulsarlo.
+    fireEvent.click(dia(3));
+    expect(screen.getByLabelText('Fecha')).toHaveTextContent(/5 oct 2026/i);
   });
 
   it('al editar, los días pasados no se bloquean: un evento ya ocurrido se puede abrir sin perder su fecha', async () => {
