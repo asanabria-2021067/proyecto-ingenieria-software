@@ -194,7 +194,8 @@ describe('SprintClosingPage — encabezado', () => {
     renderPage();
 
     expect(useSprintClosingSummary).toHaveBeenCalledWith(42, 1);
-    expect(useHourAdjustments).toHaveBeenCalledWith(42, 1);
+    // Los ajustes de horas viven en la vista de revisión: el resumen no los monta.
+    expect(useHourAdjustments).not.toHaveBeenCalled();
   });
 });
 
@@ -210,21 +211,24 @@ describe('SprintClosingPage — render dinámico', () => {
     expect(screen.getAllByText('11 h').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('al expandir un integrante se ve rol → tarea → tramo, en lectura y con «Ajustar»', async () => {
+  it('el listado es compacto: no hay desglose expandible ni ajustes; cada fila y «Revisar horas» llevan a la revisión', () => {
     mockSummary();
     mockClose();
 
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: /Desglose de Andrea Pérez/ }));
 
-    expect(await screen.findByText('Tarea: Integración')).toBeInTheDocument();
-    // El registro del estudiante se lee; el líder ajusta aparte y bajo petición.
-    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Ajustar/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Desglose de/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Ajustar/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Integración/)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /^Ajustar/ }));
-    expect(screen.getByRole('spinbutton', { name: 'Horas aceptadas' })).toHaveValue(11);
-    expect(screen.getByRole('button', { name: /Guardar ajuste/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Revisar horas' })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42/sprints/1/finalizar/revision',
+    );
+    expect(screen.getByRole('link', { name: 'Revisar horas de Andrea Pérez' })).toHaveAttribute(
+      'href',
+      '/dashboard/proyectos/42/sprints/1/finalizar/revision?integrante=1',
+    );
   });
 
   it('ningún tramo ofrece un total editable por participación (E063 retirado)', () => {
@@ -371,7 +375,7 @@ describe('SprintClosingPage — alineada con el workspace del proyecto', () => {
     expect(document.querySelector('[data-slot="project-page-shell"]')).not.toBeNull();
   });
 
-  it('los cuatro KPIs son los de Miembros: tarjeta blanca, icono sin caja y cifra grande', () => {
+  it('los cuatro KPIs resumen integrantes, reportadas, exceso y propuestas: tarjeta blanca, sin icono y cifra grande', () => {
     mockSummary();
     mockClose();
 
@@ -379,12 +383,15 @@ describe('SprintClosingPage — alineada con el workspace del proyecto', () => {
 
     const kpis = document.querySelector('[data-slot="closing-kpis"]')!;
     expect(kpis).toHaveClass('grid-cols-2', '@3xl/project:grid-cols-4');
-    for (const nombre of ['Tareas distintas', 'Horas reportadas', 'Exceso sobre estimación', 'Horas propuestas']) {
+    for (const nombre of ['Integrantes', 'Horas reportadas', 'Exceso sobre estimación', 'Horas propuestas']) {
       const kpi = screen.getByRole('group', { name: nombre });
       expect(kpi).toHaveClass('card-base');
       expect(kpi.querySelector('.bg-primary\\/10, .rounded-xl')).toBeNull();
-      expect(kpi.querySelector('svg')).toHaveClass('text-text-primary');
+      expect(kpi.querySelector('svg')).toBeNull();
     }
+    // Las tareas distintas no se pierden: acompañan al total de integrantes.
+    expect(screen.getByRole('group', { name: 'Integrantes' })).toHaveTextContent('1');
+    expect(screen.getByRole('group', { name: 'Integrantes' })).toHaveTextContent('1 tarea distinta');
     expect(within(screen.getByRole('group', { name: 'Horas reportadas' })).getByText('11 h')).toHaveClass('text-3xl');
   });
 
@@ -426,7 +433,7 @@ describe('SprintClosingPage — alineada con el workspace del proyecto', () => {
     expect(aviso).toHaveTextContent('Hay tramos sin consolidar (5)');
   });
 
-  it('la revisión por integrante es una sola superficie con columnas alineadas y filas expandibles', () => {
+  it('las horas por integrante son una sola superficie con columnas alineadas y filas compactas', () => {
     mockSummary({
       summary: summary({
         participantes: [
@@ -439,10 +446,10 @@ describe('SprintClosingPage — alineada con el workspace del proyecto', () => {
 
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 2, name: 'Revisión por integrante' })).toBeInTheDocument();
-    const superficie = document.querySelector('[data-slot="revision-integrantes"]')!;
+    expect(screen.getByRole('heading', { level: 2, name: 'Horas por integrante' })).toBeInTheDocument();
+    const superficie = document.querySelector('[data-slot="horas-integrantes"]')!;
     expect(superficie).toHaveClass('card-base', 'overflow-hidden', 'p-0');
-    const filas = within(superficie as HTMLElement).getAllByRole('button', { name: /Desglose de/ });
+    const filas = within(superficie as HTMLElement).getAllByRole('link', { name: /Revisar horas de/ });
     expect(filas).toHaveLength(2);
 
     // El encabezado y cada fila comparten la misma rejilla de columnas.
@@ -455,10 +462,6 @@ describe('SprintClosingPage — alineada con el workspace del proyecto', () => {
       expect(fila).not.toHaveTextContent(/Total reportadas|Total propuestas/);
     }
     expect(screen.getByText('Logística')).toHaveClass('pill', 'pill-sm', 'pill-sage');
-
-    fireEvent.click(filas[0]);
-    expect(filas[0]).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('Tarea: Integración')).toBeInTheDocument();
   });
 
   it('las acciones van al final de la página, no en una barra fija', () => {
