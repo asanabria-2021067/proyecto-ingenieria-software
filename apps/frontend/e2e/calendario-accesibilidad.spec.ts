@@ -353,26 +353,106 @@ test.describe('Calendario: accesibilidad y viewport (HU-184, G05-C13)', () => {
     });
   }
 
-  test('G05-HALLAZGO-02: la cuadrícula por horas de un día sin eventos se puede alcanzar y desplazar con teclado', async ({ page }) => {
-    // Fallo esperado y documentado: hoy NO se cumple. La cuadrícula es una región con scroll (24 horas en
-    // 34rem) que, sin eventos, no contiene nada enfocable ni es enfocable ella misma: quien usa teclado no
-    // puede ver las horas que quedan fuera (axe: scrollable-region-focusable, serio; WCAG 2.1.1). Cuando el
-    // contenedor reciba tabindex y nombre, Playwright avisará de que esta prueba pasó: se quita la anotación.
-    test.fail(true, 'G05-HALLAZGO-02: región con scroll sin contenido enfocable (WCAG 2.1.1)');
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.getByRole('radio', { name: 'Día' }).click();
-    // Veinte días adelante: fuera de los eventos de esta prueba y del seed.
-    for (let i = 0; i < 20; i += 1) await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
-    const cuadricula = page.getByTestId('cuadricula-horas');
-    await expect(cuadricula).toBeVisible();
-    const estado = await cuadricula.evaluate((el) => ({
-      conScroll: el.scrollHeight > el.clientHeight + 1,
-      enfocable: (el as HTMLElement).tabIndex >= 0,
-      contenidoEnfocable: el.querySelectorAll('button:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])').length,
-    }));
-    expect(estado.conScroll).toBe(true);
-    expect(estado.enfocable || estado.contenidoEnfocable > 0, JSON.stringify(estado)).toBe(true);
-  });
+  for (const tema of TEMAS) {
+    test(`cuadrícula por horas (${tema}): vacía o con eventos, en Día y en Semana, se alcanza con Tab y se desplaza con teclado`, async ({ page }) => {
+      // G05.1-C02 (G05-HALLAZGO-02, corregido): sin eventos, la zona con scroll no era alcanzable con teclado.
+      await page.emulateMedia({ colorScheme: tema });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.reload();
+      await marcarCalendario(page);
+      const cuadricula = page.getByTestId('cuadricula-horas');
+      const estado = () =>
+        cuadricula.evaluate((el) => {
+          const estilo = getComputedStyle(el);
+          return {
+            conScroll: el.scrollHeight > el.clientHeight + 1,
+            enfocada: document.activeElement === el,
+            indicadorVisible: estilo.boxShadow !== 'none' || (estilo.outlineStyle !== 'none' && parseFloat(estilo.outlineWidth) > 0),
+            scrollTop: Math.round(el.scrollTop),
+            maximo: el.scrollHeight - el.clientHeight,
+            botonesDentro: el.querySelectorAll('button').length,
+          };
+        });
+      /** Llega a la cuadrícula solo con Tab, partiendo del selector de vista. */
+      const llegarConTab = async (vista: string) => {
+        await page.getByRole('radio', { name: vista }).focus();
+        for (let i = 0; i < 12; i += 1) {
+          await page.keyboard.press('Tab');
+          if ((await estado()).enfocada) return i + 1;
+        }
+        return -1;
+      };
+      const desplazarConTeclado = async (donde: string) => {
+        const inicial = (await estado()).scrollTop;
+        // Abre cerca de las 07:00, no arriba del todo.
+        expect(inicial, `${donde}: scroll inicial`).toBeGreaterThan(100);
+        await page.keyboard.press('ArrowDown');
+        await expect.poll(async () => (await estado()).scrollTop, { message: `${donde}: flecha abajo` }).toBeGreaterThan(inicial);
+        await page.keyboard.press('End');
+        await expect.poll(async () => { const e = await estado(); return e.maximo - e.scrollTop; }, { message: `${donde}: Fin llega a las 24:00` }).toBeLessThanOrEqual(2);
+        await page.keyboard.press('Home');
+        await expect.poll(async () => (await estado()).scrollTop, { message: `${donde}: Inicio llega a las 00:00` }).toBe(0);
+        await page.keyboard.press('PageDown');
+        await expect.poll(async () => (await estado()).scrollTop, { message: `${donde}: Av Pág` }).toBeGreaterThan(0);
+        // El desplazamiento fue de la cuadrícula, no de la página.
+        expect(await overflowHorizontal(page)).toBe(0);
+        expect((await estado()).enfocada).toBe(true);
+      };
+
+      // Con eventos (hoy): Día y Semana.
+      for (const [vista, nombre] of [['Día', 'Horario del día por horas'], ['Semana', 'Horario de la semana por horas']] as const) {
+        await page.getByRole('radio', { name: vista }).click();
+        await expect(page.locator('[data-evento-key]').filter({ hasText: `${etiqueta} reunión` }).first()).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByRole('group', { name: nombre })).toBeVisible();
+        expect((await estado()).botonesDentro, `${vista} con eventos`).toBeGreaterThan(0);
+        expect(await llegarConTab(vista), `${vista} con eventos: Tab alcanza la cuadrícula`).toBeGreaterThan(0);
+        expect(await estado()).toMatchObject({ conScroll: true, enfocada: true, indicadorVisible: true });
+        await desplazarConTeclado(`${vista} con eventos`);
+        // El siguiente Tab entra a los eventos de dentro: siguen siendo botones alcanzables.
+        await page.keyboard.press('Tab');
+        expect(await cuadricula.evaluate((el) => el !== document.activeElement && el.contains(document.activeElement) && document.activeElement?.tagName === 'BUTTON'), `${vista}: Tab entra a un evento`).toBe(true);
+      }
+
+      // Sin eventos: se avanza semana a semana hasta la primera sin ningún bloque con hora (los eventos de
+      // esta prueba y del seed ocupan algunas de las próximas).
+      await page.getByRole('radio', { name: 'Semana' }).click();
+      let semanaVacia = false;
+      for (let i = 0; i < 12 && !semanaVacia; i += 1) {
+        await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
+        await expect(page.locator('main [aria-busy="true"]')).toHaveCount(0);
+        await page.waitForLoadState('networkidle');
+        semanaVacia = (await estado()).botonesDentro === 0;
+      }
+      expect(semanaVacia, 'se encontró una semana sin eventos').toBe(true);
+      for (const vista of ['Semana', 'Día'] as const) {
+        await page.getByRole('radio', { name: vista }).click();
+        await expect(cuadricula).toBeVisible();
+        await expect(page.locator('main [aria-busy="true"]')).toHaveCount(0);
+        expect((await estado()).botonesDentro, `${vista} vacía`).toBe(0);
+        expect(await llegarConTab(vista), `${vista} vacía: Tab alcanza la cuadrícula`).toBeGreaterThan(0);
+        expect(await estado()).toMatchObject({ conScroll: true, enfocada: true, indicadorVisible: true });
+        await desplazarConTeclado(`${vista} vacía`);
+        // Y se puede salir de ella con Tab: no atrapa el foco.
+        await page.keyboard.press('Tab');
+        expect((await estado()).enfocada).toBe(false);
+      }
+
+      // Semántica de toda la página con la cuadrícula vacía: sin nombres que falten ni ARIA inválido.
+      const semantica = await medirSemantica(page, CALENDARIO);
+      expect({ sinNombre: semantica.sinNombre, ariaInvalido: semantica.ariaInvalido, gruposSinNombre: semantica.gruposSinNombre }).toEqual({ sinNombre: [], ariaInvalido: [], gruposSinNombre: 0 });
+
+      // Al estrechar, Semana pasa a lista de días: no queda ninguna cuadrícula ni su parada de tabulación; al ensanchar vuelve.
+      await page.getByRole('radio', { name: 'Semana' }).click();
+      await page.setViewportSize({ width: 1024, height: 768 });
+      await expect(cuadricula).toHaveCount(0);
+      expect(await page.locator('[role="group"][aria-label^="Horario de"]').count()).toBe(0);
+      expect(await overflowHorizontal(page)).toBe(0);
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await expect(cuadricula).toBeVisible();
+      await expect(page.getByRole('group', { name: 'Horario de la semana por horas' })).toHaveAttribute('tabindex', '0');
+      expect((await estado()).scrollTop, 'al volver a montarse abre otra vez cerca de las 07:00').toBeGreaterThan(100);
+    });
+  }
 
   test('con teclado, el foco es visible en los controles del calendario y los diálogos atrapan y devuelven el foco', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });

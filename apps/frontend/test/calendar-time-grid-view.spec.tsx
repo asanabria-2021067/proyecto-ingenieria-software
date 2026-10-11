@@ -519,3 +519,86 @@ describe('TimeGridView — lo compartido se distingue por patrón y nombre (G04-
     expect(screen.getByRole('button', { name: 'Ocupado, 09:00 a 10:30, calendario de Ana García' })).toHaveClass('border-dashed');
   });
 });
+
+/**
+ * G05.1-C02 (G05-HALLAZGO-02): la cuadrícula muestra 24 horas en una zona con scroll propio. Sin eventos
+ * no contenía nada enfocable ni lo era ella: con teclado no se podían ver las horas fuera de la ventana
+ * inicial (axe `scrollable-region-focusable`, WCAG 2.1.1). Ahora la zona es una parada de tabulación con
+ * nombre; el desplazamiento con flechas es el nativo del navegador (se comprueba en el E2E).
+ */
+describe('TimeGridView — zona de horas alcanzable con teclado (G05.1-C02, G05-HALLAZGO-02)', () => {
+  const zona = () => screen.getByTestId('cuadricula-horas');
+  const UN_DIA = () => [semana()[1]];
+  const vacio = new Map<string, AgendaItem[]>();
+
+  it.each([
+    ['Día vacío', UN_DIA, 'Horario del día por horas'],
+    ['Semana vacía', semana, 'Horario de la semana por horas'],
+  ])('%s: la zona con scroll es enfocable, es un grupo y su nombre dice qué es', (_caso, dias, nombre) => {
+    render(<TimeGridView days={dias()} todayKey="2026-10-06" itemsByDay={vacio} onSelectEvento={vi.fn()} ahora={AHORA} />);
+    expect(zona()).toHaveAttribute('tabindex', '0');
+    expect(zona()).toHaveAttribute('role', 'group');
+    expect(zona()).toHaveAccessibleName(nombre);
+    expect(screen.getByRole('group', { name: nombre })).toBe(zona());
+    // Sigue siendo la misma zona con scroll vertical propio y el mismo alto.
+    expect(zona()).toHaveClass('overflow-y-auto', 'overscroll-contain', 'h-[min(34rem,70dvh)]');
+    // Sin eventos no hay nada más que enfocar dentro: por eso la zona misma debe serlo.
+    expect(zona().querySelectorAll('button, a[href]')).toHaveLength(0);
+  });
+
+  it('el foco por teclado se ve: anillo hacia dentro (la tarjeta recorta lo que sobresale) y sin contorno por defecto duplicado', () => {
+    render(<TimeGridView days={UN_DIA()} todayKey="2026-10-06" itemsByDay={vacio} onSelectEvento={vi.fn()} ahora={AHORA} />);
+    expect(zona()).toHaveClass('outline-none', 'focus-visible:ring-2', 'focus-visible:ring-inset', 'focus-visible:ring-primary');
+    zona().focus();
+    expect(zona()).toHaveFocus();
+  });
+
+  it('al abrir sigue colocándose cerca de las 07:00 y recibir el foco no mueve ese scroll', () => {
+    render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={vacio} onSelectEvento={vi.fn()} ahora={AHORA} />);
+    const inicial = zona().scrollTop;
+    expect(inicial).toBeGreaterThan(0);
+    zona().focus();
+    expect(zona().scrollTop).toBe(inicial);
+  });
+
+  it('no captura teclas: flechas, Inicio, Fin y páginas llegan al navegador, que es quien desplaza', () => {
+    render(<TimeGridView days={UN_DIA()} todayKey="2026-10-06" itemsByDay={vacio} onSelectEvento={vi.fn()} ahora={AHORA} />);
+    zona().focus();
+    for (const key of ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' ']) {
+      // fireEvent devuelve false si algún manejador llamó a preventDefault.
+      expect(fireEvent.keyDown(zona(), { key }), key).toBe(true);
+    }
+  });
+
+  it('con eventos, los bloques siguen siendo botones dentro de la zona, con su nombre y su clic; la zona no los envuelve en otro control', () => {
+    const onSelectEvento = vi.fn();
+    const items = new Map<string, AgendaItem[]>([
+      ['2026-10-06', [evento(1, '2026-10-06'), evento(2, '2026-10-06'), evento(3, '2026-10-06'), tarea(9, '2026-10-06')]],
+      // Evento nocturno partido en dos días (23:00 → 24:00 y 00:00 → 01:00).
+      ['2026-10-07', [evento(4, '2026-10-07', { horaInicio: '23:00', horaFin: '24:00', sortKey: '23:00', terminaDiaSiguiente: true } as Partial<Extract<AgendaItem, { kind: 'evento' }>>)]],
+      ['2026-10-08', [evento(4, '2026-10-08', { horaInicio: '00:00', horaFin: '01:00', sortKey: '00:00' })]],
+    ]);
+    render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={items} onSelectEvento={onSelectEvento} onVerDia={vi.fn()} ahora={AHORA} />);
+    const dentro = [...zona().querySelectorAll('button')];
+    // De los tres solapados, Semana muestra el primero y resume los otros en "+2"; más los dos tramos del nocturno.
+    expect(dentro).toHaveLength(4);
+    expect(screen.getByRole('button', { name: '2 eventos más a esta hora, ver el día' })).toBeInTheDocument();
+    for (const boton of dentro) {
+      expect(boton.getAttribute('aria-label') ?? boton.textContent).toBeTruthy();
+      expect(boton.tabIndex).toBe(0);
+    }
+    // La zona es un grupo, no un botón ni un enlace: no hay controles interactivos anidados.
+    expect(zona().closest('button, a')).toBeNull();
+    expect(zona().tagName).toBe('DIV');
+    fireEvent.click(screen.getAllByRole('button', { name: /^Evento 1, 09:00 a 10:30/ })[0]);
+    expect(onSelectEvento).toHaveBeenCalledTimes(1);
+    // La franja "Todo el día" queda fuera de la zona con scroll: no hereda su parada de tabulación.
+    expect(zona().contains(screen.getByText('Tarea 9'))).toBe(false);
+  });
+
+  it('solo hay una parada nueva: ni la tarjeta ni el contenedor horizontal de la semana reciben tabindex', () => {
+    const { container } = render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={vacio} onSelectEvento={vi.fn()} ahora={AHORA} />);
+    expect([...container.querySelectorAll('[tabindex]')]).toEqual([zona()]);
+    expect(screen.getByTestId('cuadricula-semana')).not.toHaveAttribute('tabindex');
+  });
+});

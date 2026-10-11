@@ -205,7 +205,18 @@ export function TimeGridView({
 
       {/* G04 (UI-38): tope de 70dvh para que en pantallas bajas (568 px) la cuadrícula no
           ocupe todo el alto y deje un scroll anidado sin salida; en pantallas normales sigue en 34rem. */}
-      <div ref={scrollRef} className={`relative h-[min(34rem,70dvh)] overflow-y-auto overscroll-contain ${anchoMinimo}`} data-testid="cuadricula-horas">
+      {/* G05.1 (G05-HALLAZGO-02): la zona con scroll es una parada de tabulación con nombre. Sin eventos no
+          tenía nada enfocable dentro y con teclado no se podían ver las horas fuera de la ventana inicial
+          (WCAG 2.1.1). Enfocada, el navegador la desplaza con flechas, Re Pág, Av Pág, Inicio y Fin: no se
+          captura ninguna tecla. El anillo va hacia dentro porque la tarjeta recorta lo que sobresale. */}
+      <div
+        ref={scrollRef}
+        tabIndex={0}
+        role="group"
+        aria-label={days.length > 1 ? 'Horario de la semana por horas' : 'Horario del día por horas'}
+        className={`relative h-[min(34rem,70dvh)] overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${anchoMinimo}`}
+        data-testid="cuadricula-horas"
+      >
         <div className="grid" style={{ ...plantilla, height: 24 * HORA_ALTO_PX }}>
           <div className="relative">
             {HORAS.map((h) => (
