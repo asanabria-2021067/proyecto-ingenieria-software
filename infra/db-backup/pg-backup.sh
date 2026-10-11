@@ -11,6 +11,7 @@
 # Configuración: variables de entorno o un archivo .env (ver
 # backup.example.env). La contraseña llega solo por PGPASSWORD o PGPASSFILE:
 # nunca por argumentos, y este script no imprime ni registra credenciales.
+# Con PG_CONTAINER no hace falta contraseña.
 #
 # Rotación: tras un respaldo verificado se borran los respaldos propios (mismo
 # prefijo y misma base) con más de BACKUP_RETENTION_DAYS días. Si el volcado
@@ -53,7 +54,9 @@ case "$BACKUP_PREFIX" in '' | *[!A-Za-z0-9-]*) die 64 "BACKUP_PREFIX solo admite
 case "$PGDATABASE" in *[!A-Za-z0-9_-]*) die 64 "PGDATABASE solo admite letras, números, guiones y guiones bajos" ;; esac
 case "$BACKUP_MIN_FREE_MB" in '' | *[!0-9]*) die 64 "BACKUP_MIN_FREE_MB debe ser un número entero" ;; esac
 case "$BACKUP_RETENTION_DAYS" in '' | 0 | *[!0-9]*) die 64 "BACKUP_RETENTION_DAYS debe ser un número entero mayor que 0" ;; esac
-if [ -z "${PGPASSWORD:-}" ] && [ -z "${PGPASSFILE:-}" ]; then
+# Dentro del contenedor pg_dump entra por el socket local, que la imagen oficial
+# autoriza sin contraseña: exigirla obligaría a guardar un secreto que no se usa.
+if [ -z "$PG_CONTAINER" ] && [ -z "${PGPASSWORD:-}" ] && [ -z "${PGPASSFILE:-}" ]; then
   die 64 "define PGPASSWORD o PGPASSFILE"
 fi
 
@@ -84,7 +87,7 @@ trap 'rm -f "$tmp"' EXIT
 # PGPASSWORD` pasa la variable sin escribir su valor en la línea de comandos.
 dump() {
   if [ -n "$PG_CONTAINER" ]; then
-    docker exec -i -e PGPASSWORD -e PGDATABASE -e PGUSER "$PG_CONTAINER" "${PG_DUMP_BIN:-pg_dump}" --format=custom --no-password
+    docker exec -i ${PGPASSWORD:+-e PGPASSWORD} -e PGDATABASE -e PGUSER "$PG_CONTAINER" "${PG_DUMP_BIN:-pg_dump}" --format=custom --no-password
   else
     "${PG_DUMP_BIN:-pg_dump}" --format=custom --no-password
   fi

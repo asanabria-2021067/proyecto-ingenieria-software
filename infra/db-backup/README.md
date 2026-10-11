@@ -13,9 +13,11 @@ Restaurar un respaldo completo no es parte de esta tarea (T-314).
   temporal se borra y los respaldos anteriores no se tocan.
 - **Verificación antes de aceptar:** el archivo no está vacío, empieza por la
   firma `PGDMP` y `pg_restore --list` reconoce su contenido.
-- **Sin credenciales a la vista:** la contraseña llega por `PGPASSWORD` o
-  `PGPASSFILE`, nunca por argumentos, y el script no imprime ni registra
-  credenciales. El archivo de configuración debe tener permisos 600 o 400.
+- **Sin credenciales a la vista:** con `PG_CONTAINER` no hace falta contraseña
+  (`pg_dump` entra por el socket local del contenedor). Sin él, llega por
+  `PGPASSWORD` o `PGPASSFILE`, nunca por argumentos. El script no imprime ni
+  registra credenciales y exige permisos 600 o 400 en el archivo de
+  configuración.
 - **Un respaldo a la vez** (`flock`): una ejecución solapada termina con 75.
 - **Permisos:** directorio 700, archivos 600.
 - **No escribe dentro de un repositorio Git:** los respaldos contienen datos
@@ -155,3 +157,37 @@ bash infra/db-backup/test/pg-backup-contract.sh
 No necesita PostgreSQL: usa un `pg_dump` y un `pg_restore` falsos para
 provocar cada fallo. Cubre el volcado, la rotación, `verify-backup.sh` y la
 sintaxis de la plantilla de cron.
+
+El mismo contrato corre con la suite unitaria del backend
+(`apps/backend/test/fg13-db-backup-contract.spec.ts`), y por tanto en CI.
+
+### Con PostgreSQL real
+
+```bash
+bash infra/db-backup/test/pg-backup-integration.sh
+```
+
+Levanta su propio contenedor de PostgreSQL (datos en memoria, sin puertos
+publicados), crea una base de prueba, la respalda con el script real y borra el
+contenedor al terminar. No se conecta a ninguna otra base. Requiere Docker, así
+que no corre en CI: se ejecuta a mano.
+
+Comprueba que el respaldo queda en el host y no dentro del contenedor, que
+`pg_restore --list` encuentra las tablas, sus datos y sus claves foráneas, que
+una base inexistente o caída termina en 74 sin dejar archivos, y que la
+rotación conserva los respaldos cuando el volcado falla.
+
+Última ejecución registrada: 2026-10-11, `postgres:17-alpine`, 24 de 24.
+
+## Estado
+
+| Parte | Estado |
+|---|---|
+| Script de volcado, rotación y vigilancia | Probados (contrato y PostgreSQL desechable) |
+| Plantilla de cron y guía de instalación | Listas |
+| Cron instalado en el servidor de producción | **No instalado ni verificado** |
+| Primer respaldo real de producción | **No realizado** |
+| Restauración de un respaldo | Fuera de alcance (T-314) |
+
+La tarea no está completa en operación hasta que alguien con acceso al servidor
+instale la programación y confirme, al día siguiente, que existe el respaldo.
