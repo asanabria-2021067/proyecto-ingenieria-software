@@ -22,6 +22,7 @@ import {
 } from '@/lib/services/users';
 import { getMyProjects } from '@/lib/services/projects';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
+import { esProyectoAgendable } from '@/lib/calendar/proyectos-agendables';
 import { getMisEventos, type EventoProyectoDTO, type MiEventoDTO, type TipoEvento } from '@/lib/services/events';
 import { toDateKey } from '@/lib/calendar/utils';
 import {
@@ -371,7 +372,18 @@ export default function CalendarioPage() {
 
   const ledProjectIds = useMemo(() => new Set(misProyectos.map((p) => p.idProyecto)), [misProyectos]);
   const proyectosLiderados = useMemo(
-    () => misProyectos.map((p) => ({ idProyecto: p.idProyecto, tituloProyecto: p.tituloProyecto, tipoProyecto: p.tipoProyecto })),
+    () =>
+      misProyectos.map((p) => ({
+        idProyecto: p.idProyecto,
+        tituloProyecto: p.tituloProyecto,
+        tipoProyecto: p.tipoProyecto,
+        estadoProyecto: p.estadoProyecto,
+      })),
+    [misProyectos],
+  );
+  // GPI01-C08 (H-06): el proyecto preseleccionado es el primero donde sí se puede agendar.
+  const proyectoPorDefecto = useMemo(
+    () => misProyectos.find((p) => esProyectoAgendable(p.estadoProyecto))?.idProyecto,
     [misProyectos],
   );
 
@@ -827,7 +839,7 @@ export default function CalendarioPage() {
         onOpenChange={setDialogOpen}
         ledProjects={proyectosLiderados}
         editingEvent={editingEvent}
-        defaultProjectId={misProyectos[0]?.idProyecto}
+        defaultProjectId={proyectoPorDefecto}
         initialDate={initialDateParaNuevoEvento}
         restaurarFocoA={claveDisparador}
         restaurarFocoEn={editingEvent ? undefined : botonAgendarRef}
