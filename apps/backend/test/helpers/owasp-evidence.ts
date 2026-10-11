@@ -17,9 +17,21 @@ export const STATES = ['IMPLEMENTED', 'PASS', 'SKIPPED_BY_PREFLIGHT', 'RESIDUAL_
 export const CATEGORIES = ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09', 'A10'];
 export const TRACE = /Security\/integration contract: Gate (G0\d) · Commit (G0\d-C\d{2})/;
 
+/**
+ * GPI01-C11: tope de salida de un comando de historial. El valor por defecto de
+ * Node (1 MiB) dejó de alcanzar cuando la rama integró `develop`: el rango de la
+ * fase pasó de ~100 a miles de commits y `spawnSync git ENOBUFS` reventaba la
+ * prueba ANTES de evaluar ninguna aserción. 64 MiB cubre con margen cualquier
+ * listado de este repositorio y sigue siendo un tope: una salida mayor falla.
+ */
+export const GIT_MAX_BUFFER = 64 * 1024 * 1024;
+
 export function git(...args: string[]): string {
-  return execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
+  return execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: GIT_MAX_BUFFER }).trim();
 }
+
+/** Texto fijo de la línea de trazabilidad; lo usa `git log --grep` para acotar en origen. */
+export const TRACE_GREP = 'Security/integration contract: Gate G0';
 
 export function gitAvailable(): boolean {
   try {
@@ -30,9 +42,8 @@ export function gitAvailable(): boolean {
   }
 }
 
-/** ID `Gxx-Cnn` → SHA completo, para los commits trazables de la fase según el historial local. */
-export function historyCommitIds(): Map<string, string> {
-  const log = git('log', '--format=%H%x00%B%x1e', `${PHASE2_BASE}..HEAD`);
+/** Interpreta la salida de `git log --format=%H%x00%B%x1e`: ID `Gxx-Cnn` → SHA de cada commit trazable. */
+export function parseTraceLog(log: string): Map<string, string> {
   const ids = new Map<string, string>();
   for (const entry of log.split('\x1e')) {
     const [sha, body] = entry.trim().split('\x00');
@@ -42,6 +53,17 @@ export function historyCommitIds(): Map<string, string> {
     }
   }
   return ids;
+}
+
+/** ID `Gxx-Cnn` → SHA completo, para los commits trazables de la fase según el historial local. */
+export function historyCommitIds(): Map<string, string> {
+  // GPI01-C11: se acota en origen. Solo los commits con la línea de
+  // trazabilidad pueden aportar un ID, así que pedirle a git únicamente esos
+  // (`--grep`, texto fijo) devuelve el mismo mapa sin traer el cuerpo de todo
+  // el historial. El filtro exacto sigue siendo TRACE, en `parseTraceLog`.
+  return parseTraceLog(
+    git('log', '--fixed-strings', `--grep=${TRACE_GREP}`, '--format=%H%x00%B%x1e', `${PHASE2_BASE}..HEAD`),
+  );
 }
 
 /** Patrones que nunca pueden aparecer en la documentación versionada de seguridad. */
