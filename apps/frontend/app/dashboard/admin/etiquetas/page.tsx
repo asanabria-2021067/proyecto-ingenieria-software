@@ -112,7 +112,7 @@ const ETIQUETAS_LIBRES = [
 export default function AdminEtiquetasPage() {
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <AdminBreadcrumb seccion="Administración" pagina="Etiquetas (temporal)" />
+      <AdminBreadcrumb seccion="Diagnóstico" pagina="Etiquetas (temporal)" />
       <header className="mb-6">
         <h1 className="type-display text-balance">Etiquetas</h1>
         <p className="mt-tight max-w-3xl text-base text-tertiary">

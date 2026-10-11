@@ -10,11 +10,13 @@ import {
 
 /**
  * Miga de pan de las vistas administrativas: «Sección > Página», con los
- * mismos nombres que la sidebar (Proyectos, Gobernanza, Administración).
+ * mismos nombres que los grupos de la sidebar (Usuarios, Proyectos,
+ * Gobernanza, Verificación y seguridad, Diagnóstico).
  *
  * Empieza en la sección, no en el Dashboard: el panel es un destino hermano
  * de las secciones, no su contenedor. Una sección solo es enlace cuando tiene
- * una vista de entrada (`seccionHref`); «Administración» no la tiene.
+ * una vista de entrada (`seccionHref`); «Usuarios», «Verificación y
+ * seguridad» y «Diagnóstico» no la tienen y se muestran como texto.
  */
 export function AdminBreadcrumb({
   seccion,

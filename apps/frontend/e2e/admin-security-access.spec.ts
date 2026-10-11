@@ -116,7 +116,7 @@ test.describe('FG02-C08: acceso al visor de eventos de seguridad', () => {
     await page.goto('/dashboard/admin');
     const nav = page.getByRole('navigation', { name: 'Navegación administrativa' });
     const enlace = nav.getByRole('link', { name: 'Eventos de seguridad' });
-    if (!(await enlace.isVisible())) await nav.getByRole('button', { name: /Administración/ }).click();
+    if (!(await enlace.isVisible())) await nav.getByRole('button', { name: /Verificación y seguridad/ }).click();
 
     const consulta = page.waitForResponse((r) => r.url().startsWith(ENDPOINT) && r.request().method() === 'GET');
     await enlace.click();
@@ -127,7 +127,7 @@ test.describe('FG02-C08: acceso al visor de eventos de seguridad', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Eventos de seguridad' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Eventos de seguridad' })).toHaveAttribute('aria-current', 'page');
     const miga = page.getByRole('navigation', { name: /breadcrumb/i });
-    await expect(miga.getByText('Administración')).toBeVisible();
+    await expect(miga.getByText('Verificación y seguridad')).toBeVisible();
     await expect(miga.getByText('Eventos de seguridad')).toHaveAttribute('aria-current', 'page');
 
     // Contrato real: solo las claves saneadas, sin JSON crudo ni correos.

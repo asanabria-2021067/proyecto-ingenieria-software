@@ -598,3 +598,70 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
     }
   });
 });
+
+describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
+  const fuente = (ruta: string) => readFileSync(join(__dirname, '..', ruta), 'utf8');
+  const grupoDe = (href: string) =>
+    adminNavEntries.find((e) => 'type' in e && e.type === 'group' && e.items.some((i) => i.href === href))?.label;
+
+  it.each([
+    ['app/dashboard/admin/usuarios/page.tsx', '/dashboard/admin/usuarios', 'Gestión de Usuarios'],
+    ['app/dashboard/admin/solicitudes-recuperacion/page.tsx', '/dashboard/admin/solicitudes-recuperacion', 'Recuperación de contraseña'],
+    ['app/dashboard/admin/seguridad/page.tsx', '/dashboard/admin/seguridad', 'Eventos de seguridad'],
+    ['app/dashboard/admin/etiquetas/page.tsx', '/dashboard/admin/etiquetas', 'Etiquetas (temporal)'],
+    ['app/dashboard/admin/apelaciones/appeals-inbox-client.tsx', '/dashboard/admin/apelaciones', 'Apelaciones'],
+    ['app/dashboard/projects/admin/reviews/page.tsx', '/dashboard/projects/admin/reviews', 'Solicitudes de publicación'],
+  ])('%s: la sección de la miga es el grupo del menú y la página, su etiqueta', (archivo, href, etiqueta) => {
+    const grupo = grupoDe(href);
+    expect(grupo, href).toBeTruthy();
+    const miga = fuente(archivo).match(/<AdminBreadcrumb\s+seccion="([^"]+)"[^>]*?pagina="([^"]+)"/);
+    expect(miga, archivo).not.toBeNull();
+    expect(miga?.[1]).toBe(grupo);
+    expect(miga?.[2]).toBe(etiqueta);
+  });
+
+  it('ninguna vista administrativa conserva el nombre del grupo retirado', () => {
+    for (const archivo of [
+      'app/dashboard/admin/usuarios/page.tsx',
+      'app/dashboard/admin/solicitudes-recuperacion/page.tsx',
+      'app/dashboard/admin/seguridad/page.tsx',
+      'app/dashboard/admin/etiquetas/page.tsx',
+    ]) {
+      expect(fuente(archivo), archivo).not.toContain('seccion="Administración"');
+    }
+  });
+
+  it('todas las vistas administrativas, también las de detalle, llevan miga de pan', () => {
+    for (const archivo of [
+      'app/dashboard/admin/proyectos/admin-projects-client.tsx',
+      'app/dashboard/admin/proyectos/[id]/admin-project-detail-client.tsx',
+      'app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx',
+      'app/dashboard/admin/apelaciones/[apelacionId]/appeal-review-client.tsx',
+      'app/dashboard/admin/sprints/admin-sprints-client.tsx',
+    ]) {
+      expect(fuente(archivo), archivo).toMatch(/<AdminBreadcrumb|<Breadcrumb/);
+    }
+  });
+
+  it('la barra lateral mide 256 px expandida y 72 px plegada, y la barra móvil nombra cada destino', () => {
+    renderShell();
+    const aside = document.querySelector('aside') as HTMLElement;
+    expect(aside).toHaveClass('w-64');
+    fireEvent.click(within(aside).getByRole('button', { name: 'Colapsar barra lateral' }));
+    expect(aside).toHaveClass('w-[72px]');
+
+    const movil = screen.getByRole('navigation', { name: 'Navegación administrativa móvil' });
+    const enlaces = within(movil).getAllByRole('link');
+    expect(enlaces.map((a) => a.getAttribute('aria-label'))).toEqual(adminNavItemsMobile.map((i) => i.label));
+    // Cada destino es un enlace real: funciona sin pasar el cursor por encima.
+    for (const enlace of enlaces) expect(enlace).toHaveAttribute('href');
+  });
+
+  it('en la barra móvil el destino actual lleva aria-current, también dentro de una sección', () => {
+    pathnameMock.mockReturnValue('/dashboard/admin/usuarios');
+    renderShell();
+    const movil = within(screen.getByRole('navigation', { name: 'Navegación administrativa móvil' }));
+    expect(movil.getByRole('link', { name: 'Gestión de Usuarios' })).toHaveAttribute('aria-current', 'page');
+    expect(movil.getAllByRole('link').filter((a) => a.getAttribute('aria-current') === 'page')).toHaveLength(1);
+  });
+});

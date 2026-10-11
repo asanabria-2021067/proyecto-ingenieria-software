@@ -115,7 +115,7 @@ export default function AdminSeguridadPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <AdminBreadcrumb seccion="Administración" pagina="Eventos de seguridad" />
+      <AdminBreadcrumb seccion="Verificación y seguridad" pagina="Eventos de seguridad" />
       <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="type-display text-balance">Eventos de seguridad</h1>

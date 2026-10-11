@@ -28,7 +28,7 @@ describe('FG02-C03: tabla del visor de eventos de seguridad', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Eventos de seguridad' })).toBeInTheDocument();
     const miga = within(screen.getByRole('navigation', { name: /breadcrumb/i }));
     expect(miga.getByText('Eventos de seguridad')).toHaveAttribute('aria-current', 'page');
-    expect(miga.getByText('Administración')).toBeInTheDocument();
+    expect(miga.getByText('Verificación y seguridad')).toBeInTheDocument();
 
     const tabla = await screen.findByRole('table', { name: /Eventos de seguridad/ });
     expect(within(tabla).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([

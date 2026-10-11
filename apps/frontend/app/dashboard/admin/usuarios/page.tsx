@@ -250,7 +250,7 @@ export default function AdminUsuariosPage() {
   return (
     <>
       <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-        <AdminBreadcrumb seccion="Administración" pagina="Gestión de Usuarios" />
+        <AdminBreadcrumb seccion="Usuarios" pagina="Gestión de Usuarios" />
         {/* Header */}
         <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
