@@ -4,11 +4,6 @@ import { usePathname } from 'next/navigation';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
-import { useRequireCan } from '@/hooks/use-can';
-
-// Rutas huérfanas que nunca tuvieron shell (sidebar/header): no están
-// enlazadas desde la navegación y usan su propio layout de página completa.
-const NO_SHELL_ROUTES = new Set(['/dashboard/mis-proyectos']);
 
 // Rutas exclusivas de administrador: siempre AdminLayout (que internamente
 // bloquea el acceso a usuarios no administradores).
@@ -37,19 +32,6 @@ function isAllowAdminRoute(pathname: string) {
 export default function DashboardRootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '';
   const { data: user, isLoading } = useCurrentUser();
-  const esRutaSinShell = NO_SHELL_ROUTES.has(pathname);
-  const permisoSinShell = useRequireCan('proyectos.listadosLegacy', { activo: esRutaSinShell });
-
-  if (esRutaSinShell) {
-    if (permisoSinShell.verificando || permisoSinShell.denegado) {
-      return (
-        <div className="h-screen bg-surface flex items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
-      );
-    }
-    return <>{children}</>;
-  }
 
   if (isAdminOnlyRoute(pathname)) {
     return <AdminLayout>{children}</AdminLayout>;

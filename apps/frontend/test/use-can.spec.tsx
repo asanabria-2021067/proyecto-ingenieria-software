@@ -309,22 +309,15 @@ describe('redirección por URL directa', () => {
     expect(replaceMock).not.toHaveBeenCalled();
   });
 
-  it('administración no entra a los listados legacy sin shell', async () => {
+  // GPI01-C03 (H-02): los listados legacy dejaron de ser páginas sin shell
+  // (`/dashboard/mis-proyectos` redirige a la ruta canónica y el índice
+  // `/dashboard/projects` se eliminó). El layout raíz ya no los excluye: pasan
+  // por el shell de estudiante, que es quien saca a administración.
+  it('los listados legacy usan el shell de estudiante, sin excepción sin shell', () => {
     usarUsuario(['administrador']);
     pathnameMock.mockReturnValue('/dashboard/mis-proyectos');
     render(createElement(DashboardRootLayout, null, createElement('div', null, 'listado legacy')));
 
-    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/dashboard'));
-    expect(toastErrorMock).toHaveBeenCalledWith(MENSAJE_SIN_PERMISO, expect.anything());
-    expect(screen.queryByText('listado legacy')).not.toBeInTheDocument();
-  });
-
-  it('un estudiante sí entra a los listados legacy', () => {
-    usarUsuario(['estudiante']);
-    pathnameMock.mockReturnValue('/dashboard/projects');
-    render(createElement(DashboardRootLayout, null, createElement('div', null, 'listado legacy')));
-
-    expect(screen.getByText('listado legacy')).toBeInTheDocument();
-    expect(replaceMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('shell-estudiante')).toBeInTheDocument();
   });
 });
