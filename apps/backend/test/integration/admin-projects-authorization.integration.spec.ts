@@ -109,6 +109,13 @@ describeIntegration('GPI01-C09 — autorización antes de validar en /admin/proy
     expect(adminList).not.toHaveBeenCalled();
   });
 
+  // GPI01-C10: el 400 del administrador explica qué valores admite `grupo`.
+  it.each([CONSULTAS[0], CONSULTAS[1], CONSULTAS[2]])('administrador, %s -> el 400 enumera los grupos en español', async (_nombre, consulta) => {
+    const { status, body } = await pedir(consulta, tokens.admin);
+    expect(status).toBe(400);
+    expect(body.message).toEqual(['grupo debe ser uno de: activos, revision, cierres, cerrados']);
+  });
+
   it.each(['activos', 'revision', 'cierres', 'cerrados'])('administrador, grupo=%s -> 200 con la página', async (grupo) => {
     const { status, body } = await pedir(`?grupo=${grupo}&page=1&limit=5`, tokens.admin);
     expect(status).toBe(200);
