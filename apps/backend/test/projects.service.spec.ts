@@ -106,6 +106,21 @@ describe('ProjectsService', () => {
     expect(where.AND.length).toBeGreaterThan(2);
   });
 
+  // T-292 (HU-176): el detalle público ya no embebe las tareas del proyecto.
+  it('findOne no trae las tareas, pero sí creador, roles e hitos', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5 });
+    const service = makeService(prisma);
+
+    await service.findOne(5);
+
+    const select = prisma.proyecto.findFirst.mock.calls[0][0].select as Record<string, unknown>;
+    expect(select).not.toHaveProperty('tareas');
+    expect(select).toHaveProperty('creador');
+    expect(select).toHaveProperty('roles');
+    expect(select).toHaveProperty('hitos');
+  });
+
   it('findOne falla cuando no existe', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(null);
