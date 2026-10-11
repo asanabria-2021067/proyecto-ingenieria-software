@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -437,5 +437,66 @@ describe('AdminLayout — acceso al visor de eventos de seguridad (T-310, FG02-C
       '/dashboard/admin/apelaciones',
       '/dashboard/admin/usuarios',
     ]);
+  });
+});
+
+describe('Inventario de navegación administrativa (T-319, FG06-C01)', () => {
+  const RAIZ = join(__dirname, '..');
+  const inventario = readFileSync(join(RAIZ, '../../docs/architecture/sprint9-admin-navigation-inventory.md'), 'utf8');
+  const destinos = flattenNavEntries(adminNavEntries);
+
+  /** Rutas de página bajo un directorio de `app/`, con sus segmentos dinámicos tal como están en disco. */
+  function rutasDePagina(directorio: string, base: string): string[] {
+    return readdirSync(join(RAIZ, directorio), { withFileTypes: true }).flatMap((entrada) => {
+      if (entrada.isDirectory()) return rutasDePagina(join(directorio, entrada.name), `${base}/${entrada.name}`);
+      return entrada.name === 'page.tsx' ? [base] : [];
+    });
+  }
+  const paginas = [...rutasDePagina('app/dashboard/admin', '/dashboard/admin'), ...rutasDePagina('app/dashboard/projects/admin', '/dashboard/projects/admin')];
+  const sinQuery = (href: string) => href.split('?')[0];
+
+  it('cada destino del menú apunta a una página que existe', () => {
+    for (const { href, label } of destinos) {
+      expect(paginas, `${label} → ${href}`).toContain(sinQuery(href));
+    }
+  });
+
+  it('ningún destino ni etiqueta se repite, y cada grupo tiene al menos un destino', () => {
+    expect(new Set(destinos.map((d) => d.href)).size).toBe(destinos.length);
+    expect(new Set(destinos.map((d) => d.label)).size).toBe(destinos.length);
+    const grupos = adminNavEntries.filter((e) => 'type' in e && e.type === 'group');
+    expect(new Set(grupos.map((g) => g.label)).size).toBe(grupos.length);
+    for (const grupo of grupos) expect('items' in grupo ? grupo.items.length : 0, grupo.label).toBeGreaterThan(0);
+  });
+
+  it('el inventario documenta cada destino del menú con su ruta y su etiqueta', () => {
+    for (const { href, label } of destinos) {
+      expect(inventario, href).toContain(`| \`${href}\` | ${label} |`);
+    }
+  });
+
+  it('toda página administrativa está en el inventario: enlazada o explicada como vista de detalle', () => {
+    const enlazadas = new Set(destinos.map((d) => sinQuery(d.href)));
+    const noEnlazadas = paginas.filter((ruta) => !enlazadas.has(ruta));
+    expect(noEnlazadas.sort()).toEqual([
+      '/dashboard/admin/apelaciones/[apelacionId]',
+      '/dashboard/admin/proyectos/[id]',
+      '/dashboard/admin/proyectos/[id]/cierre',
+    ]);
+    for (const ruta of noEnlazadas) expect(inventario, ruta).toContain(`| \`${ruta}\` |`);
+    // Las que el inventario lista como no enlazadas son todas vistas con identificador.
+    expect(noEnlazadas.every((ruta) => ruta.includes('['))).toBe(true);
+  });
+
+  it('el inventario no enlaza la pantalla de HU-179 mientras no exista, y lo deja registrado', () => {
+    expect(paginas.filter((ruta) => /pendientes|verificacion/.test(ruta))).toEqual([]);
+    expect(destinos.filter((d) => /pendientes|verificaci[oó]n de cuentas/i.test(d.label))).toEqual([]);
+    expect(inventario).toMatch(/Cuentas pendientes de verificación \| HU-179 \| \*\*No existe\*\*/);
+  });
+
+  it('la barra móvil descrita en el inventario es la del código', () => {
+    for (const { label } of adminNavItemsMobile) expect(inventario).toContain(label);
+    expect(adminNavItemsMobile).toHaveLength(4);
+    expect(inventario).toContain('lista\n**curada** de cuatro destinos');
   });
 });
