@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   Award,
@@ -35,13 +35,14 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import {
-  getNotificaciones,
+  getNotificacionesPagina,
   marcarLeida,
   marcarTodasLeidas,
   getNotificationLink,
   type Notificacion,
 } from '@/lib/services/notifications';
 import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
+import { useConteoNoLeidas } from '@/hooks/use-notifications';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 
 /** Heurística por palabra clave del tipo (30+ valores en TipoNotificacion):
@@ -95,11 +96,28 @@ function NotificacionesSkeleton() {
 export default function NotificacionesPage() {
   const queryClient = useQueryClient();
 
-  const { data: notificaciones = [], isLoading, isError, refetch } = useQuery<Notificacion[]>({
-    queryKey: ['notificaciones'],
-    queryFn: getNotificaciones,
+  // T-292: se piden de a 20 en vez de las últimas 100 de una vez. La clave
+  // cuelga de ['notificaciones'], así que las invalidaciones de siempre la
+  // refrescan completa.
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['notificaciones', 'paginadas'],
+    queryFn: ({ pageParam }) => getNotificacionesPagina(pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (ultima) => (ultima.page < ultima.totalPages ? ultima.page + 1 : undefined),
     refetchOnMount: 'always',
   });
+  const notificaciones = data?.pages.flatMap((pagina) => pagina.data) ?? [];
+  // El total de no leídas sale del conteo del servidor: con paginación, las
+  // cargadas no son todas.
+  const { data: conteoNoLeidas } = useConteoNoLeidas();
 
   const markAllMutation = useMutation({
     mutationFn: marcarTodasLeidas,
@@ -145,7 +163,7 @@ export default function NotificacionesPage() {
   };
 
   const grouped = groupByDate(notificaciones);
-  const unreadCount = notificaciones.filter((n) => !n.leidaEn).length;
+  const unreadCount = conteoNoLeidas?.total ?? 0;
 
   return (
       <div className={dashboardPage('py-section flex flex-col gap-section')}>
@@ -328,6 +346,13 @@ export default function NotificacionesPage() {
               </div>
             </div>
           ))}
+          {hasNextPage && (
+            <div className="flex justify-center">
+              <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                {isFetchingNextPage ? 'Cargando…' : 'Cargar más'}
+              </Button>
+            </div>
+          )}
         </div>
         )}
       </div>

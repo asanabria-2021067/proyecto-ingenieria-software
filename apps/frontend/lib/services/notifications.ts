@@ -15,6 +15,22 @@ export function getNotificaciones(): Promise<Notificacion[]> {
   return apiFetch<Notificacion[]>('/notificaciones');
 }
 
+/** T-292: página de GET /notificaciones?page=N (misma forma que el listado paginado de proyectos). */
+export interface NotificacionesPagina {
+  data: Notificacion[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export const NOTIFICACIONES_POR_PAGINA = 20;
+
+export function getNotificacionesPagina(page: number): Promise<NotificacionesPagina> {
+  return apiFetch<NotificacionesPagina>(
+    `/notificaciones?page=${page}&limit=${NOTIFICACIONES_POR_PAGINA}`,
+  );
+}
+
 export function getConteoNoLeidas(): Promise<{ total: number }> {
   return apiFetch<{ total: number }>('/notificaciones/mias/conteo-no-leidas');
 }
