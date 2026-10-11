@@ -165,14 +165,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleLogout = useLogout();
   const { collapsed } = useAdminSidebarCollapsed();
 
-  const esAdmin = useCan('admin.panel');
-  const { data: cuentasPendientes } = useCuentasPendientes(esAdmin);
-  const totalPendientes = cuentasPendientes?.total ?? 0;
-  const navEntries = useMemo(
-    () => withCuentasPendientes(adminNavEntries, totalPendientes),
-    [totalPendientes],
-  );
-
   // «Actualizar» de la barra superior: invalida las consultas y React Query
   // vuelve a pedir las que la vista actual tiene montadas.
   const queryClient = useQueryClient();
@@ -184,6 +176,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     } finally {
       setActualizando(false);
     }
+  };
+
+  const esAdmin = useCan('admin.panel');
+  const { data: cuentasPendientes } = useCuentasPendientes(esAdmin);
+  const totalPendientes = cuentasPendientes?.total ?? 0;
+  const navEntries = useMemo(
+    () => withCuentasPendientes(adminNavEntries, totalPendientes),
+    [totalPendientes],
+  );
+
+  // T-321: «Tendencias de uso» es un ancla del Panel Admin. Si ya se está en el panel con ese
+  // mismo ancla en la URL, pulsar el enlace no cambia la ruta y Next no vuelve a desplazar:
+  // se lleva la sección a la vista aquí. Desde otra vista, el panel lo hace al terminar de cargar.
+  const irAlAncla = (evento: React.MouseEvent<HTMLElement>) => {
+    const enlace = (evento.target as HTMLElement).closest<HTMLAnchorElement>('a[href*="#"]');
+    const [ruta, ancla] = enlace?.getAttribute('href')?.split('#') ?? [];
+    if (ancla && ruta === pathname) document.getElementById(ancla)?.scrollIntoView?.();
   };
 
   useEffect(() => {
@@ -208,7 +217,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
       {/* Sidebar - Desktop Only */}
+      {/* El manejador solo delega: los elementos interactivos son los enlaces del menú. */}
       <aside
+        onClick={irAlAncla}
         data-slot="admin-sidebar"
         data-collapsed={collapsed || undefined}
         className={`admin-sidebar hidden md:flex ${collapsed ? 'w-[72px]' : 'w-64'} h-screen flex-col shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-200`}

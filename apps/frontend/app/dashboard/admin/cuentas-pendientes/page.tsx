@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Check, RefreshCw, X } from 'lucide-react';
+import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
+import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -30,7 +32,7 @@ interface AccionPendiente {
   cuenta: AdminCuentaPendiente;
 }
 
-const HEAD_CLASS = 'px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary';
+const HEAD_CLASS = 'px-4 py-3 type-micro font-black uppercase tracking-widest text-tertiary';
 
 function formatFecha(dateStr: string): string {
   try {
@@ -127,30 +129,28 @@ export default function AdminCuentasPendientesPage() {
   const procesando = resolverMutation.isPending;
 
   return (
-    <div className="px-4 pb-12 pt-8 md:px-8">
+    <div className={ADMIN_PAGE}>
+      <AdminBreadcrumb seccion="Verificación y seguridad" pagina="Cuentas pendientes" />
       <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">
-            Administración
-          </span>
-          <h1 className="font-headline text-4xl font-black tracking-tighter text-on-surface md:text-5xl">
+          <h1 className={ADMIN_PAGE_TITLE}>
             Cuentas pendientes
           </h1>
-          <p className="mt-2 max-w-2xl text-base text-tertiary">
+          <p className={ADMIN_PAGE_LEAD}>
             Cuentas nuevas que esperan verificación. Aprueba las que correspondan a la comunidad
             UVG y rechaza las que no.
           </p>
         </div>
         <button
           onClick={() => refetch()}
-          className="flex shrink-0 items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary self-start"
+          className="flex shrink-0 items-center gap-2 rounded-control bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary self-start"
         >
           <RefreshCw className="h-4 w-4" />
           Actualizar
         </button>
       </section>
 
-      <div className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
+      <div className="rounded-control border border-outline-variant bg-surface-container-lowest overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -223,7 +223,7 @@ export default function AdminCuentasPendientesPage() {
                             onClick={() => setAccion({ tipo: 'aprobar', cuenta })}
                             disabled={procesando}
                             aria-label={`Aprobar la cuenta de ${nombreCompleto}`}
-                            className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition-all hover:bg-primary/90 disabled:opacity-50"
+                            className="flex items-center gap-1.5 rounded-control bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition-all hover:bg-primary/90 disabled:opacity-50"
                           >
                             <Check className="h-3.5 w-3.5" />
                             Aprobar
@@ -232,7 +232,7 @@ export default function AdminCuentasPendientesPage() {
                             onClick={() => setAccion({ tipo: 'rechazar', cuenta })}
                             disabled={procesando}
                             aria-label={`Rechazar la cuenta de ${nombreCompleto}`}
-                            className="flex items-center gap-1.5 rounded-xl bg-error px-3 py-1.5 text-xs font-bold text-on-error transition-all hover:bg-error/90 disabled:opacity-50"
+                            className="flex items-center gap-1.5 rounded-control bg-error px-3 py-1.5 text-xs font-bold text-on-error transition-all hover:bg-error/90 disabled:opacity-50"
                           >
                             <X className="h-3.5 w-3.5" />
                             Rechazar

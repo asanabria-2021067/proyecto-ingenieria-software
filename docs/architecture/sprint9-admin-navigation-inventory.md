@@ -25,7 +25,7 @@ comprobación en cada endpoint administrativo. Ninguna ruta de este inventario e
 | `/dashboard/admin#metricas` | Tendencias de uso | Sprint 9 · T-321: ancla a la sección de HU-178 (T-301) del Panel Admin | `GET /admin/metricas` (HU-178) |
 | `/dashboard/admin/usuarios` | Gestión de Usuarios | Administración de cuentas | — |
 | `/dashboard/admin/solicitudes-recuperacion` | Recuperación de contraseña | HU-14 | — |
-| `/dashboard/admin/cuentas-pendientes` | Cuentas pendientes | HU-179 (PR #270) | `GET /admin/cuentas-pendientes` |
+| `/dashboard/admin/cuentas-pendientes` | Cuentas pendientes | HU-179 (PR #270); colocada en la estructura por T-321 | `GET /admin/cuentas-pendientes` |
 | `/dashboard/admin/seguridad` | Eventos de seguridad | Sprint 9 · T-310 (Vernel) | `GET /admin/eventos-seguridad` |
 | `/dashboard/admin/etiquetas` | Etiquetas (temporal) | Página de diagnóstico: catálogo de las 27 familias de etiquetas | — |
 
@@ -69,9 +69,22 @@ Son vistas de detalle: necesitan un identificador y no tienen sentido como desti
 | Pantalla | Historia | Estado en el HEAD | Consecuencia |
 |---|---|---|---|
 | Métricas de uso | HU-178 | No tiene ruta propia: es la sección «Tendencias de uso» del Panel Admin (`AdminMetricsSection`) | Enlazada desde «Métricas → Tendencias de uso» mediante el ancla `#metricas` (T-321). No se duplicó en otra página ni se tocó el componente de HU-178. |
-| Cuentas pendientes de verificación | HU-179 | Existe desde el PR #270: `/dashboard/admin/cuentas-pendientes` | Enlazada desde «Verificación y seguridad → Cuentas pendientes». |
+| Cuentas pendientes de verificación | HU-179 | Existe desde el PR #270: `/dashboard/admin/cuentas-pendientes` | Enlazada desde «Verificación y seguridad → Cuentas pendientes» (T-321). |
 
-## 6. Barra inferior móvil
+## 6. Matriz de T-321: pantallas nuevas dentro de la estructura
+
+| Pantalla | Historia y responsable | En la estructura | Estado | Evidencia |
+|---|---|---|---|---|
+| Métricas de uso | HU-178 (T-301), de otro responsable; se reutiliza sin cambios | Métricas → Tendencias de uso (`/dashboard/admin#metricas`) | Integrada | `admin-shell-nav.spec.tsx`, `e2e/admin-navigation-own-flows.spec.ts` |
+| Eventos de seguridad | HU-180 · T-310 (Vernel) | Verificación y seguridad → Eventos de seguridad (`/dashboard/admin/seguridad`) | Integrada | Las mismas, más los E2E del visor |
+| Cuentas pendientes | HU-179, de otro responsable (PR #270); se reutiliza su pantalla | Verificación y seguridad → Cuentas pendientes (`/dashboard/admin/cuentas-pendientes`) | Integrada | `admin-shell-nav.spec.tsx`, `admin-cuentas-pendientes.spec.tsx` |
+
+Sobre HU-179: su pantalla (`apps/frontend/app/dashboard/admin/cuentas-pendientes/page.tsx`) llegó con el PR #270.
+Al integrarla se añadió el destino «Cuentas pendientes» al grupo «Verificación y seguridad», con el contador de
+cuentas por atender que ya traía (visible en el destino y, con el grupo plegado, en su encabezado), y su miga de pan
+usa los mismos nombres que el menú. La pantalla no se rehízo.
+
+## 7. Barra inferior móvil
 
 En pantallas menores de `md` la barra lateral no se muestra y la navegación es `adminNavItemsMobile`: una lista
 **curada** de cuatro destinos (Panel Admin, Proyectos, Apelaciones, Gestión de Usuarios) más el menú de la cuenta.
@@ -80,7 +93,7 @@ Recuperación de contraseña, Cuentas pendientes, Eventos de seguridad, Etiqueta
 URL o desde los enlaces del panel. Ampliar la navegación móvil es una decisión de producto que este inventario deja
 registrada, no resuelta.
 
-## 7. Página temporal de etiquetas
+## 8. Página temporal de etiquetas
 
 `/dashboard/admin/etiquetas` no es parte del producto: es el catálogo de diagnóstico de las 27 familias de etiquetas.
 Sigue enlazada porque no hay una decisión documentada de retirarla del menú. Cuando se retire, se quitan juntas la

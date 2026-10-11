@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { useEffect, useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   FolderKanban,
@@ -328,6 +328,15 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 function AdminPanelContent({ stats }: { stats: AdminStats }) {
+  // T-321: al llegar con `#metricas` desde otra vista, el panel aún muestra su esqueleto y el ancla
+  // no existe cuando el navegador intenta desplazarse. Se repite el desplazamiento al montar el
+  // contenido. Estando ya en el panel, el enlace funciona solo (el ancla ya existe).
+  useEffect(() => {
+    if (window.location.hash === `#${ADMIN_METRICS_ANCHOR}`) {
+      document.getElementById(ADMIN_METRICS_ANCHOR)?.scrollIntoView?.();
+    }
+  }, []);
+
   return (
     <div className={PAGE_CLASS}>
       <div className={PANEL_GRID}>

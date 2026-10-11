@@ -557,6 +557,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
     ['/dashboard/admin/solicitudes-recuperacion', 'Usuarios', 'Recuperación de contraseña'],
     ['/dashboard/admin/sprints', 'Proyectos', 'Calendario de Sprints'],
     ['/dashboard/admin/apelaciones', 'Gobernanza', 'Apelaciones'],
+    ['/dashboard/admin/cuentas-pendientes', 'Verificación y seguridad', 'Cuentas pendientes'],
     ['/dashboard/admin/seguridad', 'Verificación y seguridad', 'Eventos de seguridad'],
     ['/dashboard/admin/etiquetas', 'Diagnóstico', 'Etiquetas (temporal)'],
   ])('en %s se abre «%s» y «%s» es el único destino activo', (ruta, grupo, destino) => {
@@ -611,6 +612,7 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
   it.each([
     ['app/dashboard/admin/usuarios/page.tsx', '/dashboard/admin/usuarios', 'Gestión de Usuarios'],
     ['app/dashboard/admin/solicitudes-recuperacion/page.tsx', '/dashboard/admin/solicitudes-recuperacion', 'Recuperación de contraseña'],
+    ['app/dashboard/admin/cuentas-pendientes/page.tsx', '/dashboard/admin/cuentas-pendientes', 'Cuentas pendientes'],
     ['app/dashboard/admin/seguridad/page.tsx', '/dashboard/admin/seguridad', 'Eventos de seguridad'],
     ['app/dashboard/admin/etiquetas/page.tsx', '/dashboard/admin/etiquetas', 'Etiquetas (temporal)'],
     ['app/dashboard/admin/apelaciones/appeals-inbox-client.tsx', '/dashboard/admin/apelaciones', 'Apelaciones'],
@@ -628,6 +630,7 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
     for (const archivo of [
       'app/dashboard/admin/usuarios/page.tsx',
       'app/dashboard/admin/solicitudes-recuperacion/page.tsx',
+      'app/dashboard/admin/cuentas-pendientes/page.tsx',
       'app/dashboard/admin/seguridad/page.tsx',
       'app/dashboard/admin/etiquetas/page.tsx',
     ]) {
@@ -689,6 +692,12 @@ describe('Métricas de uso en la estructura (T-321 · HU-178, FG08-C01)', () => 
     expect(existsSync(join(__dirname, '../app/dashboard/admin/metricas'))).toBe(false);
   });
 
+  it('el panel se desplaza al ancla cuando termina de cargar: el enlace funciona también desde otra vista', () => {
+    const panel = fuente('app/dashboard/admin/page.tsx');
+    expect(panel).toContain('if (window.location.hash === `#${ADMIN_METRICS_ANCHOR}`) {');
+    expect(panel).toContain('document.getElementById(ADMIN_METRICS_ANCHOR)?.scrollIntoView?.();');
+  });
+
   it('el componente y el servicio de HU-178 no se modificaron: siguen leyendo GET /admin/metricas', () => {
     expect(fuente('components/admin/AdminMetricsSection.tsx')).toContain('Tendencias de uso');
     expect(fuente('lib/services/admin.ts')).toContain('`/admin/metricas?periodo=${periodo}`');
@@ -699,6 +708,38 @@ describe('Métricas de uso en la estructura (T-321 · HU-178, FG08-C01)', () => 
     const nav = desktopNav();
     fireEvent.click(nav.getByRole('button', { name: /^Métricas/ }));
     expect(nav.getByRole('link', { name: 'Tendencias de uso' })).toHaveAttribute('href', HREF);
+  });
+
+  it('estando ya en el panel, pulsar el enlace lleva la sección a la vista aunque la URL no cambie', () => {
+    pathnameMock.mockReturnValue('/dashboard/admin');
+    renderShell();
+    const ancla = document.createElement('div');
+    ancla.id = 'metricas';
+    ancla.scrollIntoView = vi.fn();
+    document.body.appendChild(ancla);
+    const nav = desktopNav();
+    fireEvent.click(nav.getByRole('button', { name: /^Métricas/ }));
+    fireEvent.click(nav.getByRole('link', { name: 'Tendencias de uso' }));
+    expect(ancla.scrollIntoView).toHaveBeenCalledTimes(1);
+
+    // Un enlace sin ancla no desplaza nada.
+    fireEvent.click(nav.getByRole('link', { name: 'Panel Admin' }));
+    expect(ancla.scrollIntoView).toHaveBeenCalledTimes(1);
+    ancla.remove();
+  });
+
+  it('desde otra vista el menú no desplaza: lo hace el panel al terminar de cargar', () => {
+    pathnameMock.mockReturnValue('/dashboard/admin/usuarios');
+    renderShell();
+    const ancla = document.createElement('div');
+    ancla.id = 'metricas';
+    ancla.scrollIntoView = vi.fn();
+    document.body.appendChild(ancla);
+    const nav = desktopNav();
+    fireEvent.click(nav.getByRole('button', { name: /^Métricas/ }));
+    fireEvent.click(nav.getByRole('link', { name: 'Tendencias de uso' }));
+    expect(ancla.scrollIntoView).not.toHaveBeenCalled();
+    ancla.remove();
   });
 
   it('en el Panel Admin el destino activo sigue siendo «Panel Admin»: las métricas son una sección suya', () => {
@@ -715,5 +756,26 @@ describe('Métricas de uso en la estructura (T-321 · HU-178, FG08-C01)', () => 
     const aside = document.querySelector('aside') as HTMLElement;
     fireEvent.click(within(aside).getByRole('button', { name: 'Colapsar barra lateral' }));
     expect(within(aside).getByRole('link', { name: 'Tendencias de uso' })).toHaveAttribute('href', HREF);
+  });
+});
+
+describe('Matriz de T-321 en el inventario (FG08-C03)', () => {
+  const inventario = readFileSync(join(__dirname, '../../../docs/architecture/sprint9-admin-navigation-inventory.md'), 'utf8');
+  const destinos = flattenNavEntries(adminNavEntries);
+
+  it('los tres destinos están en el menú y el inventario los da por integrados', () => {
+    expect(destinos.map((d) => d.href)).toEqual(
+      expect.arrayContaining(['/dashboard/admin#metricas', '/dashboard/admin/cuentas-pendientes', '/dashboard/admin/seguridad']),
+    );
+    expect(inventario).toMatch(/\| Métricas de uso \| HU-178[^|]*\| [^|]*\| Integrada \|/);
+    expect(inventario).toMatch(/\| Eventos de seguridad \| HU-180[^|]*\| [^|]*\| Integrada \|/);
+  });
+
+  it('HU-179 dejó de ser una dependencia bloqueada: con página, con un único enlace y declarada integrada', () => {
+    expect(existsSync(join(__dirname, '../app/dashboard/admin/cuentas-pendientes/page.tsx'))).toBe(true);
+    expect(destinos.filter((d) => /pendiente/i.test(`${d.label} ${d.href}`))).toHaveLength(1);
+    expect(inventario).toMatch(/\| Cuentas pendientes \| HU-179[^|]*\| [^|]*\| Integrada \|/);
+    expect(inventario).not.toContain('BLOCKED_DEPENDENCY_HU179');
+    expect(inventario).not.toContain('Hasta entonces T-321 no está completa.');
   });
 });
