@@ -253,6 +253,8 @@ enum TipoNotificacion {
   ALERTA_SEGURIDAD
   // HU-169 (T-265): recordatorio de un EventoProyecto próximo a iniciar.
   RECORDATORIO_EVENTO
+  // HU-186 (T-330): recordatorio de una tarea próxima a vencer (24 h / 48 h).
+  TAREA_POR_VENCER
 }
 
 enum EstadoAmistad {
