@@ -1,0 +1,27 @@
+-- FG01-C06 (T-310): índice para GET /admin/eventos-seguridad.
+--
+-- SecurityEventsQueryService.list filtra SIEMPRE por
+-- `tipo_objeto = 'SEGURIDAD_CUENTA'` y ordena por
+-- `fecha_evento DESC, id_auditoria DESC` (orden total de la paginación).
+-- bitacora_auditoria es una tabla GLOBAL que comparte con la bitácora
+-- funcional de proyectos: sin índice, cada página y cada conteo del visor
+-- recorrían la tabla entera (Parallel Seq Scan + top-N sort).
+--
+-- Medido con EXPLAIN (ANALYZE, BUFFERS) en PostgreSQL 17 desechable, con
+-- 440,000 filas (40,000 de seguridad repartidas en 180 días):
+--   página 1 sin filtros      42.1 ms -> 0.12 ms  (Seq Scan -> Index Scan)
+--   página 1 por tipo         29.7 ms -> 0.14 ms
+--   rango de 7 días           41.9 ms -> 0.08 ms
+--   actor o cuenta afectada   34.7 ms -> 5.9 ms
+--   conteo sin filtros        32.1 ms -> 11.5 ms
+--
+-- Se descartó (tipo_objeto, accion, fecha_evento, id_auditoria): acelera el
+-- filtro por un solo tipo, pero la vista por defecto —todos los tipos del
+-- catálogo— sigue ordenando 40,000 filas (24.0 ms).
+--
+-- Solo añade un índice: no toca datos ni columnas. `IF NOT EXISTS` permite
+-- reintentar la migración. La creación bloquea escrituras en la tabla
+-- mientras dura (Prisma migra dentro de una transacción, así que no puede
+-- usar CONCURRENTLY).
+CREATE INDEX IF NOT EXISTS "bitacora_auditoria_tipo_objeto_fecha_evento_id_auditoria_idx"
+ON "bitacora_auditoria" ("tipo_objeto", "fecha_evento" DESC, "id_auditoria" DESC);
