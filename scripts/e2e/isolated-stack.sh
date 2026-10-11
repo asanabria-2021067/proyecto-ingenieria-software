@@ -194,7 +194,25 @@ cmd_verify() {
     'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null')"
   en_repo="$(find "$REPO/apps/backend/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
   [ "$aplicadas" = "$en_repo" ] || fail "migraciones aplicadas ($aplicadas) != carpetas en el repo ($en_repo)"
-  echo "isolated-stack: verify OK ($aplicadas migraciones, sin deriva)"
+  # El seed inserta filas con id explicito: si una tabla queda fuera de su
+  # reajuste de secuencias, el primer INSERT de la aplicacion en esa tabla
+  # responde 500 (P2002). Ninguna secuencia puede quedar por detras de sus filas.
+  local desfasadas
+  desfasadas="$(docker exec -i "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -At <<'SQL'
+SELECT string_agg(tabla, ', ') FROM (
+  SELECT c.relname AS tabla,
+         (xpath('/row/m/text()', query_to_xml(format('SELECT coalesce(max(%I), 0) AS m FROM %I', a.attname, c.relname), false, true, '')))[1]::text::bigint AS maximo,
+         (xpath('/row/n/text()', query_to_xml(format('SELECT CASE WHEN is_called THEN last_value + 1 ELSE last_value END AS n FROM %s', pg_get_serial_sequence(format('%I', c.relname), a.attname)), false, true, '')))[1]::text::bigint AS siguiente
+  FROM pg_class c
+  JOIN pg_namespace ns ON ns.oid = c.relnamespace
+  JOIN pg_attribute a ON a.attrelid = c.oid
+  WHERE ns.nspname = 'public' AND c.relkind = 'r' AND a.attnum > 0 AND NOT a.attisdropped
+    AND pg_get_serial_sequence(format('%I', c.relname), a.attname) IS NOT NULL
+) s WHERE siguiente <= maximo;
+SQL
+)"
+  [ -z "$desfasadas" ] || fail "secuencias de id por detras de las filas sembradas: $desfasadas"
+  echo "isolated-stack: verify OK ($aplicadas migraciones, sin deriva, secuencias al dia)"
 }
 
 # Las suites corren con el entorno de la pila; nunca con el .env local.
