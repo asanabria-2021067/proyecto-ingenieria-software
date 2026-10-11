@@ -6,8 +6,8 @@ import { AlertTriangle, ChevronRight, ClipboardList, Clock, type LucideIcon } fr
 export type AttentionTone = 'atencion' | 'cierre' | 'bloqueo';
 
 // Etiqueta de estado: la forma `.pill` estándar (misma que las tarjetas de
-// proyecto), centrada y de ancho fijo para alinear la columna.
-const ETIQUETA = 'pill mx-auto w-36 justify-center';
+// proyecto), de ancho fijo; centrada en su columna cuando la tarjeta es ancha.
+const ETIQUETA = 'pill w-36 justify-center @xl/atencion:mx-auto';
 
 export const ATTENTION_TONE: Record<AttentionTone, { icono: string; etiqueta: string }> = {
   // Pendiente de decisión: neutral; el número de la fila ya llama la atención.
@@ -18,11 +18,25 @@ export const ATTENTION_TONE: Record<AttentionTone, { icono: string; etiqueta: st
   bloqueo: { icono: 'text-on-tag-amber', etiqueta: 'pill-amber' },
 };
 
-// Anchos compartidos por el encabezado de columnas y las filas, y los mismos
-// (11rem y 7rem, centradas) que las tablas de Seguimiento del panel, para que
-// las columnas caigan en la misma vertical. «Estado» se oculta en móvil.
-const COL_ESTADO = 'hidden w-44 shrink-0 text-center sm:block';
-const COL_TOTAL = 'relative w-16 shrink-0 text-center sm:w-28';
+// GPI01-C07 (H-05): el diseño depende del ancho de la TARJETA, no de la
+// ventana. A 768 px con la barra lateral abierta la tarjeta mide ~450 px: con
+// las columnas fijas de Estado y Total, «Tipo» quedaba en ~70 px y partía una
+// palabra por línea. Por debajo de `@xl` (36rem) el estado baja a una segunda
+// línea bajo la descripción; desde `@xl` vuelve la tabla de siempre.
+//
+// En ancho, Estado y Total miden lo mismo (11rem y 7rem, centradas) que las
+// tablas de Seguimiento del panel, para que las columnas caigan en la misma
+// vertical.
+const FILA =
+  'grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-inline gap-y-micro @xl/atencion:grid-cols-[auto_minmax(0,1fr)_11rem_7rem]';
+const COL_ICONO = 'row-span-2 @xl/atencion:row-span-1';
+const COL_ESTADO =
+  'col-start-2 row-start-2 empty:hidden @xl/atencion:col-start-3 @xl/atencion:row-start-1 @xl/atencion:empty:block';
+const COL_TOTAL =
+  'relative col-start-3 row-span-2 row-start-1 w-16 text-center @xl/atencion:col-start-4 @xl/atencion:row-span-1 @xl/atencion:w-28';
+// Encabezado: solo visual; «Estado» solo existe como columna en ancho.
+const ENCABEZADO_ESTADO = 'hidden w-44 shrink-0 text-center @xl/atencion:block';
+const ENCABEZADO_TOTAL = 'w-16 shrink-0 text-center @xl/atencion:w-28';
 
 interface AttentionRow {
   clave: string;
@@ -91,7 +105,7 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
   const total = filas.reduce((suma, fila) => suma + fila.valor, 0);
 
   return (
-    <section aria-labelledby={tituloId} className="card-base flex flex-col overflow-hidden p-0">
+    <section aria-labelledby={tituloId} className="@container/atencion card-base flex flex-col overflow-hidden p-0">
       <header className="flex items-center justify-between gap-inline border-b border-outline-variant/50 px-card py-stack">
         <h3 id={tituloId} className="type-subtitle min-w-0 text-lg font-semibold">
           Requieren atención
@@ -107,8 +121,8 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
         className="type-meta flex items-center gap-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight font-medium"
       >
         <span className="min-w-0 flex-1">Tipo</span>
-        <span className={COL_ESTADO}>Estado</span>
-        <span className={COL_TOTAL}>Total</span>
+        <span className={ENCABEZADO_ESTADO}>Estado</span>
+        <span className={ENCABEZADO_TOTAL}>Total</span>
       </div>
 
       <ul className="divide-y divide-outline-variant/50">
@@ -119,10 +133,10 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
             <li
               key={fila.clave}
               data-fila={fila.clave}
-              className="relative flex items-center gap-inline px-card py-stack transition-colors hover:bg-surface-container-low"
+              className={`relative px-card py-stack transition-colors hover:bg-surface-container-low ${FILA}`}
             >
-              <Icono className={`size-5 shrink-0 ${tono.icono}`} aria-hidden="true" />
-              <div className="min-w-0 flex-1">
+              <Icono className={`size-5 shrink-0 ${COL_ICONO} ${tono.icono}`} aria-hidden="true" />
+              <div className="min-w-0">
                 <Link
                   href={fila.href}
                   aria-label={fila.enlaceLabel}
