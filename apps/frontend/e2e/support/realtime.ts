@@ -31,6 +31,9 @@ export async function socketDe(context: BrowserContext, namespace: '/notificatio
     transports: ['websocket'],
     extraHeaders: { Cookie: cookie },
     reconnection: false,
+    // socket.io-client reutiliza por host el gestor de la primera conexión, con SUS
+    // cabeceras: sin esto, un socket podría viajar con la cookie de otro usuario.
+    forceNew: true,
   });
   await new Promise<void>((resolve, reject) => {
     socket.once('connected', () => resolve());

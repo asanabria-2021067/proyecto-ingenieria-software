@@ -79,7 +79,9 @@ test.describe('GPI01-C02: conexión en tiempo real', () => {
 
   test('sin sesión el backend cierra el socket y nunca confirma la conexión', async () => {
     for (const namespace of ['/notifications', '/chat'] as const) {
-      const socket = io(`${API_URL}${namespace}`, { transports: ['websocket'], reconnection: false });
+      // forceNew: sin él se reutiliza el gestor que otra suite abrió con la cookie de un usuario,
+      // y este socket dejaría de ser anónimo.
+      const socket = io(`${API_URL}${namespace}`, { transports: ['websocket'], reconnection: false, forceNew: true });
       let confirmado = false;
       socket.on('connected', () => (confirmado = true));
       // El backend corta durante el saludo: según el instante, el cliente lo ve como
