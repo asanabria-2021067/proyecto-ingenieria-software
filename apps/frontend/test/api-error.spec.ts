@@ -70,3 +70,31 @@ describe('getApiErrorMessage', () => {
     expect(getApiErrorMessage(null, 'task')).toBe(MENSAJE_ERROR_GENERICO);
   });
 });
+
+describe('getApiErrorMessage — scope calendar (G03-C02, UI-21)', () => {
+  it('404: habla del evento o el proyecto, nunca de tareas ni etiquetas', () => {
+    const mensaje = getApiErrorMessage(enrichedError(404, 'Not Found'), 'calendar');
+    expect(mensaje).toBe('El evento o el proyecto ya no está disponible. Actualiza la información e inténtalo nuevamente.');
+    expect(mensaje).not.toMatch(/tarea|etiqueta|404|Not Found/i);
+  });
+
+  it('404 en otros scopes no cambia (task sigue hablando de tarea/etiqueta; general de lo buscado)', () => {
+    expect(getApiErrorMessage(enrichedError(404), 'task')).toContain('La tarea, etiqueta o proyecto');
+    expect(getApiErrorMessage(enrichedError(404), 'general')).toContain('No encontramos lo que buscabas');
+  });
+
+  it('403 conserva el mensaje de permisos y no se confunde con "no existe"', () => {
+    const mensaje = getApiErrorMessage(enrichedError(403, 'Forbidden resource'), 'calendar');
+    expect(mensaje).toMatch(/^No tienes permisos para realizar esta acción\./);
+    expect(mensaje).not.toMatch(/no está disponible|Forbidden/);
+  });
+
+  it('500: mensaje genérico seguro, sin el texto del servidor', () => {
+    expect(getApiErrorMessage(enrichedError(500, 'PrismaClientKnownRequestError: P2002'), 'calendar')).toBe(MENSAJE_ERROR_GENERICO);
+  });
+
+  it('400 y 409 del calendario muestran el mensaje funcional del backend cuando es legible', () => {
+    expect(getApiErrorMessage(enrichedError(400, 'El inicio debe ser anterior al fin.'), 'calendar')).toBe('El inicio debe ser anterior al fin.');
+    expect(getApiErrorMessage(enrichedError(409, 'Ya existe un evento en ese horario.'), 'calendar')).toBe('Ya existe un evento en ese horario.');
+  });
+});

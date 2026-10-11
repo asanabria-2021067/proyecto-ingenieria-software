@@ -233,6 +233,19 @@ export interface NotificationTemplateData {
     eventId: number;
     /** Fecha/hora de inicio ya formateada por el emisor (es-GT), lista para mostrar. */
     fechaInicioTexto: string;
+    /**
+     * G04 (UI-22): el mismo inicio como instante ISO. No se muestra: es la
+     * clave con la que EventsReminderService reconoce a quién ya avisó de este
+     * evento para esta hora de inicio. Opcional porque los avisos anteriores
+     * a G04 no lo traen (para esos se compara `fechaInicioTexto`).
+     */
+    fechaInicioIso?: string;
+  };
+
+  // HU-184: un usuario compartió su calendario (solo lectura) con el destinatario.
+  CALENDARIO_COMPARTIDO: {
+    ownerId: number;
+    ownerName: string;
   };
   // HU-186 (T-330): aviso de vencimiento emitido por TasksDueReminderService
   // al responsable de la tarea. taskId/projectId viajan en datosJson para el
@@ -462,6 +475,13 @@ export const NOTIFICATION_TEMPLATES = {
     message: (data: NotificationTemplateData['RECORDATORIO_EVENTO']) =>
       `"${data.eventTitle}" en el proyecto "${data.projectTitle}" comienza el ${data.fechaInicioTexto}.`,
   },
+
+  CALENDARIO_COMPARTIDO: {
+    title: 'Calendario compartido',
+    message: (data: NotificationTemplateData['CALENDARIO_COMPARTIDO']) =>
+      `${data.ownerName} compartió su calendario contigo. Actívalo en tu calendario para ver sus actividades.`,
+  },
+
   TAREA_POR_VENCER: {
     title: (data: NotificationTemplateData['TAREA_POR_VENCER']) =>
       data.horasAntes === 24 ? 'Tu tarea vence mañana' : 'Tu tarea vence en 2 días',
