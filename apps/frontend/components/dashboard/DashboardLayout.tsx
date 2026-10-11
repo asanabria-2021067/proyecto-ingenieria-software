@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -37,9 +38,12 @@ import { ChatDockProvider } from '@/components/chat-dock/chat-dock-context';
 import { ChatDock } from '@/components/chat-dock/chat-dock';
 import { toast } from 'sonner';
 import logo from '@/public/logo.png';
-import OnboardingTour from '@/components/dashboard/OnboardingTour';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { FontScaleToggle } from '@/components/font-scale-toggle';
+
+// T-293: la guía solo se muestra a quien entra por primera vez, pero react-joyride viajaba en el
+// JS inicial de todas las rutas del estudiante. Se carga aparte; no pinta nada hasta arrancar.
+const OnboardingTour = dynamic(() => import('@/components/dashboard/OnboardingTour'), { ssr: false });
 
 const navEntries: NavEntry[] = [
   {

@@ -22,6 +22,8 @@ export const HEAVY: Record<string, string[]> = {
   // Envoltorios de las librerías de arriba: importarlos de forma estática las arrastra igual.
   '@/components/admin/AdminMetricsSection': [],
   '@/components/ui/sparkles': ['components/ui/pricing-section-4.tsx'],
+  'react-joyride': ['components/dashboard/OnboardingTour.tsx'],
+  '@/components/dashboard/OnboardingTour': [],
 };
 
 function sources(dir: string): string[] {
@@ -94,5 +96,15 @@ describe('T-293: secciones secundarias diferidas', () => {
   it('el fondo de partículas de la landing se carga con next/dynamic, sin SSR', () => {
     expect(features).toMatch(/const Sparkles = dynamic\(\(\) => import\("@\/components\/ui\/sparkles"\)/);
     expect(features).toMatch(/ssr:\s*false/);
+  });
+});
+
+describe('T-293: trabajo redundante en el armazón del estudiante', () => {
+  it('la guía de bienvenida se carga con next/dynamic, sin SSR', () => {
+    const src = readFileSync(join(ROOT, 'components/dashboard/DashboardLayout.tsx'), 'utf8');
+    expect(src).toMatch(
+      /const OnboardingTour = dynamic\(\(\) => import\('@\/components\/dashboard\/OnboardingTour'\), \{ ssr: false \}\)/,
+    );
+    expect(src).toContain('<OnboardingTour />');
   });
 });
