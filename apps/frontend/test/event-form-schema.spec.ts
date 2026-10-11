@@ -591,3 +591,73 @@ describe('enlace de la sesión — política única con el backend (G04-C17, UI-
     expect(errores.linkSesion).toBeUndefined();
   });
 });
+
+// Matriz compartida de G05-C04: es la MISMA lista en apps/backend/test/events.dto.spec.ts y en
+// apps/frontend/test/event-form-schema.spec.ts. Cada caso cambia un solo campo de un evento válido
+// (virtual o presencial) y dice si formulario y API deben aceptarlo. `texto: n` es una cadena de n letras.
+type CasoLimite = { caso: string; campo: string; valor?: unknown; texto?: number; base?: 'VIRTUAL' | 'PRESENCIAL'; acepta: boolean };
+const LIMITES_COMPARTIDOS: CasoLimite[] = [
+  { caso: 'título de 1 carácter', campo: 'tituloEvento', texto: 1, acepta: true },
+  { caso: 'título de 200 caracteres', campo: 'tituloEvento', texto: 200, acepta: true },
+  { caso: 'título de 201 caracteres', campo: 'tituloEvento', texto: 201, acepta: false },
+  { caso: 'título vacío', campo: 'tituloEvento', valor: '', acepta: false },
+  { caso: 'título solo con espacios', campo: 'tituloEvento', valor: '    ', acepta: false },
+  { caso: 'descripción de 5000 caracteres', campo: 'descripcionEvento', texto: 5000, acepta: true },
+  { caso: 'descripción de 5001 caracteres', campo: 'descripcionEvento', texto: 5001, acepta: false },
+  { caso: 'nombre de lugar de 255 caracteres', campo: 'ubicacionNombre', texto: 255, base: 'PRESENCIAL', acepta: true },
+  { caso: 'nombre de lugar de 256 caracteres', campo: 'ubicacionNombre', texto: 256, base: 'PRESENCIAL', acepta: false },
+  { caso: 'recordatorio 0 minutos', campo: 'antelacionMinutos', valor: 0, acepta: true },
+  { caso: 'recordatorio 10080 minutos (7 días)', campo: 'antelacionMinutos', valor: 10080, acepta: true },
+  { caso: 'recordatorio 10081 minutos', campo: 'antelacionMinutos', valor: 10081, acepta: false },
+  { caso: 'recordatorio negativo', campo: 'antelacionMinutos', valor: -1, acepta: false },
+  { caso: 'recordatorio con decimales', campo: 'antelacionMinutos', valor: 30.5, acepta: false },
+  { caso: 'tipo TUTORIA', campo: 'tipoEvento', valor: 'TUTORIA', acepta: true },
+  { caso: 'tipo REUNION', campo: 'tipoEvento', valor: 'REUNION', acepta: true },
+  { caso: 'tipo ENTREGA', campo: 'tipoEvento', valor: 'ENTREGA', acepta: true },
+  { caso: 'tipo REVISION', campo: 'tipoEvento', valor: 'REVISION', acepta: true },
+  { caso: 'tipo TALLER', campo: 'tipoEvento', valor: 'TALLER', acepta: true },
+  { caso: 'tipo OTRO', campo: 'tipoEvento', valor: 'OTRO', acepta: true },
+  { caso: 'tipo inexistente', campo: 'tipoEvento', valor: 'FIESTA', acepta: false },
+  { caso: 'tipo en minúsculas', campo: 'tipoEvento', valor: 'tutoria', acepta: false },
+  { caso: 'modalidad inexistente', campo: 'modalidad', valor: 'HIBRIDA', acepta: false },
+  { caso: 'enlace de 500 caracteres', campo: 'linkSesion', valor: `https://ejemplo.com/${'a'.repeat(480)}`, acepta: true },
+  { caso: 'enlace de 501 caracteres', campo: 'linkSesion', valor: `https://ejemplo.com/${'a'.repeat(481)}`, acepta: false },
+  { caso: 'enlace vacío en evento virtual', campo: 'linkSesion', valor: '', acepta: false },
+  { caso: 'enlace javascript:', campo: 'linkSesion', valor: 'javascript:alert(1)', acepta: false },
+  { caso: 'enlace sin dominio real', campo: 'linkSesion', valor: 'http://localhost:3000/sala', acepta: false },
+  { caso: 'presencial sin coordenadas', campo: 'ubicacionLat', valor: null, base: 'PRESENCIAL', acepta: false },
+  { caso: 'presencial con enlace inválido (no se usa)', campo: 'linkSesion', valor: 'no es un enlace', base: 'PRESENCIAL', acepta: true },
+];
+const valorDe = (c: CasoLimite) => (c.texto !== undefined ? 'a'.repeat(c.texto) : c.valor);
+
+describe('límites del formulario iguales a los de la API (G05-C04, UI-15/UI-24)', () => {
+  it.each(LIMITES_COMPARTIDOS)('$caso → acepta: $acepta', (c) => {
+    const base = c.base === 'PRESENCIAL' ? valores({ modalidad: 'PRESENCIAL', linkSesion: '', ubicacionLat: 14.6, ubicacionLng: -90.5 }) : valores();
+    const errores = mensajes({ ...base, [c.campo]: valorDe(c) } as EventFormValues);
+    if (c.acepta) expect(errores).toEqual({});
+    else expect(Object.keys(errores)).toContain(c.campo);
+  });
+
+  it('lo que el formulario acepta sale en el cuerpo con los mismos límites: texto recortado y campos que la API declara', () => {
+    const payload = buildEventPayload(valores({ tituloEvento: `  ${'a'.repeat(200)}  `, descripcionEvento: '  nota  ', antelacionMinutos: 10080 }), { keepEmptyDescripcion: false });
+    expect(payload.tituloEvento).toBe('a'.repeat(200));
+    expect(payload.descripcionEvento).toBe('nota');
+    expect(payload.antelacionMinutos).toBe(10080);
+    // Solo viajan campos que CreateEventDto declara: la API rechaza cualquier otro (forbidNonWhitelisted).
+    const declarados = ['tituloEvento', 'descripcionEvento', 'fechaInicio', 'fechaFin', 'antelacionMinutos', 'modalidad', 'ubicacionLat', 'ubicacionLng', 'ubicacionNombre', 'linkSesion', 'rolesDestino', 'tipoEvento', 'invitados'];
+    // keepEmptyDescripcion: false al crear, true al editar.
+    for (const modo of [{ keepEmptyDescripcion: false }, { keepEmptyDescripcion: true }]) {
+      for (const base of [valores(), valores({ modalidad: 'PRESENCIAL', linkSesion: '', ubicacionLat: 14.6, ubicacionLng: -90.5, ubicacionNombre: 'CIT' }), valores({ modalidad: 'MIXTA', ubicacionLat: 14.6, ubicacionLng: -90.5 })]) {
+        for (const campo of Object.keys(buildEventPayload(base, modo))) expect(declarados).toContain(campo);
+      }
+    }
+  });
+
+  it('las fechas del cuerpo son ISO 8601, que es lo único que la API admite', () => {
+    const payload = buildEventPayload(valores(), { keepEmptyDescripcion: false });
+    for (const fecha of [payload.fechaInicio, payload.fechaFin]) {
+      expect(fecha).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      expect(Number.isNaN(Date.parse(fecha as string))).toBe(false);
+    }
+  });
+});
