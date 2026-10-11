@@ -9,7 +9,8 @@ import type { EstadoHito, EstadoSprint } from '@/lib/types/sprints';
  */
 export const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
   ACTIVO: { label: 'Activo', className: 'pill-success' },
-  EN_FINALIZACION: { label: 'En finalización', className: 'pill-lime' },
+  // Ámbar de atención (cierre en curso, pide una acción): el lima resultaba fluorescente.
+  EN_FINALIZACION: { label: 'En finalización', className: 'pill-amber' },
   CERRADO: { label: 'Cerrado', className: 'pill-neutral' },
 };
 
