@@ -322,6 +322,7 @@ model Usuario {
   horasAprobadas                   HorasParticipacion[]
   certificadosEmitidos             Certificado[]
   notificaciones                   Notificacion[]
+  preferenciasNotificacion         PreferenciaNotificacion[]
   solicitudesRecuperacion          SolicitudRecuperacion[]    @relation("SolicitudRecuperacionUsuario")
   solicitudesRecuperacionAtendidas SolicitudRecuperacion[]    @relation("SolicitudRecuperacionAdmin")
   rolesAcceso                      UsuarioRolAcceso[]
@@ -1394,6 +1395,20 @@ model Notificacion {
   @@index([idUsuario, creadaEn])
   @@index([tipoNotificacion])
   @@map("notificacion")
+}
+
+// HU-185 (T-326): sin fila para (usuario, tipo) la preferencia cuenta como activa.
+model PreferenciaNotificacion {
+  idPreferencia    Int              @id @default(autoincrement()) @map("id_preferencia")
+  idUsuario        Int              @map("id_usuario")
+  tipoNotificacion TipoNotificacion @map("tipo_notificacion")
+  activa           Boolean          @default(true)
+  actualizadaEn    DateTime         @default(now()) @updatedAt @map("actualizada_en")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@unique([idUsuario, tipoNotificacion])
+  @@map("preferencia_notificacion")
 }
 
 model SolicitudRecuperacion {

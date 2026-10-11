@@ -165,6 +165,10 @@ function createFakePrisma() {
         return { count: data.length };
       },
     },
+    // HU-185 (T-327): sin preferencias guardadas, todos los tipos están activos.
+    preferenciaNotificacion: {
+      findMany: async () => [],
+    },
   };
 
   return {
