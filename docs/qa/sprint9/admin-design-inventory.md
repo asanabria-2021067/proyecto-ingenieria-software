@@ -82,5 +82,85 @@ Total: 20 tamaños literales, 23 radios literales, 4 botones propios, 6 hex y 1 
 ## 6. Estados y temas
 
 Los estados de carga, vacío y error de las bandejas usan `Skeleton` y `Empty`; las tablas, `DATA_TABLE_*`. Todos los
-colores salen de tokens con variante oscura, así que el tema no requiere reglas por vista. La comprobación en
-navegador (375, 768 y 1440 px, claro y oscuro) se registra al cierre de T-320.
+colores salen de tokens con variante oscura, así que el tema no requiere reglas por vista.
+
+## 7. Estado tras T-320
+
+Medido sobre el mismo código con la misma herramienta.
+
+| Ruta | Titular `type-display` | Tamaños literales | Radios literales | `<button>` propios | Hex |
+|---|---|---:|---:|---:|---:|
+| `/dashboard/admin` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/usuarios` | sí | 0 | 0 | 2 | 0 |
+| `/dashboard/admin/solicitudes-recuperacion` | sí | 0 | 2 | 2 | 0 |
+| `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/etiquetas` | sí | 0 | 0 | 0 | 6 |
+| `/dashboard/admin/apelaciones` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/apelaciones/[apelacionId]` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/proyectos` | sí | 0 | 1 | 0 | 0 |
+| `/dashboard/admin/proyectos/[id]` | sí | 0 | 2 | 0 | 0 |
+| `/dashboard/admin/proyectos/[id]/cierre` | sí | 1 | 5 | 0 | 0 |
+| `/dashboard/admin/sprints` | sí | 0 | 1 | 0 | 0 |
+| `/dashboard/projects/admin/reviews` | sí | 0 | 0 | 0 | 0 |
+
+Árbol administrativo completo (las 12 vistas más sus componentes: 38 archivos, sin `AdminMetricsSection`):
+
+| Medida | Antes | Después |
+|---|---:|---:|
+| Tamaños literales | 46 | 2 |
+| Radios literales | 63 | 20 |
+| Titulares fuera de la escala | 1 | 0 |
+| Archivos sin ningún literal de tamaño o radio | — | 27 de 38 |
+
+Qué se hizo con cada diferencia de la sección 4:
+
+| # | Resultado |
+|---|---|
+| D1 | Corregido. Primitivas `ADMIN_PAGE*` en `components/admin/admin-page.ts`, adoptadas por las 12 vistas. Mismas clases: sin cambio de aspecto. |
+| D2 | Corregido. El detalle de proyecto usa `type-display`: su titular pasa de 24–28 px / 900 a 32 px / 700, como el resto. Es el único cambio visible medido. |
+| D3 | Corregido donde hay token de igual valor: `rounded-xl` → `rounded-control`, `rounded-2xl` → `rounded-card`. Sin cambio de aspecto. |
+| D4 | Corregido. `text-[10px]` y `text-[11px]` → `type-micro` (11 px); las migas de detalle pasan de 13 a 14 px, como `AdminBreadcrumb`. |
+| D5 | Pendiente. Los botones de fila («Ver perfil», «Generar enlace», «Copiar», «Limpiar filtros») tienen un estilo compacto propio y deliberado; unificarlos con `Button` cambia su aspecto y requiere decisión de diseño. |
+| D6 | Corregido con `ADMIN_PAGE_LEAD` (`mt-2` y `mt-tight` valen lo mismo). El catálogo de etiquetas conserva su ancho mayor. |
+| D7 | Corregido. Se retiró el «Actualizar» propio de «Eventos de seguridad»; el de la barra superior vuelve a pedir su consulta. |
+
+## 8. Excepciones que quedan, archivo por archivo
+
+`apps/frontend/test/admin-design-regression.spec.tsx` fija esta lista: un literal nuevo, o uno que desaparezca sin
+actualizarla, hace fallar la prueba.
+
+| Archivo | Literales | Motivo |
+|---|---|---|
+| `app/dashboard/admin/proyectos/[id]/admin-project-detail-client.tsx` | `rounded-lg`, `rounded-md` | Sin token de igual valor |
+| `app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx` | 4 × `rounded-lg`, `rounded-md`, `text-[13px]` | Sin token de igual valor; el texto de 13 px es el de los botones de acción en móvil, donde 14 px no cabe |
+| `app/dashboard/admin/proyectos/admin-projects-client.tsx` | `rounded-lg` | Sin token de igual valor |
+| `app/dashboard/admin/solicitudes-recuperacion/page.tsx` | 2 × `rounded-lg` | Sin token de igual valor |
+| `app/dashboard/admin/sprints/admin-sprints-client.tsx` | `rounded-md` | Sin token de igual valor |
+| `components/admin/AdminLayout.tsx` | `rounded-lg` | Tarjeta del logotipo |
+| `components/admin/ProjectFeedbackSheet.tsx` | 3 × `rounded-lg` | Sin token de igual valor |
+| `components/admin/ProjectReviewSheet.tsx` | 3 × `rounded-lg` | Sin token de igual valor |
+| `components/admin/RevisionHistoryPanel.tsx` | `rounded-lg` | Sin token de igual valor |
+| `components/admin/UserDetailSheet.tsx` | `rounded-md` | Sin token de igual valor |
+| `components/admin/sprints/sprint-month-view.tsx` | `text-[15px]` | Texto denso del calendario de Sprints |
+
+Otras excepciones:
+
+- `components/admin/AdminMetricsSection.tsx` (HU-178, otro responsable): no se modificó.
+- `bg-amber-600` / `bg-amber-700` en `components/admin/ConfirmActionDialog.tsx` y `components/admin/request-inbox.tsx`:
+  es el botón ámbar de «Revisar». No existe un token de «acción de advertencia» y su tono es una decisión de diseño
+  abierta; no se cambió.
+- Los 6 hex del catálogo temporal de etiquetas (sección 5).
+
+## 9. Comprobación en navegador
+
+Las 12 rutas (14 URL, con los tres grupos de proyectos) se abrieron en Chromium en 375, 768 y 1440 px, en claro y en
+oscuro, antes y después de los cambios: 84 combinaciones cada vez, con captura y medición.
+
+- Desborde horizontal de página: 0 antes y 0 después.
+- Etiquetas recortadas: 0 antes y 0 después.
+- Titulares: antes 11 vistas a 32 px / 700 y el detalle de proyecto a 24–28 px / 900; después, todas a 32 px / 700.
+- Únicas diferencias medidas entre ambas corridas: las 12 del titular del detalle de proyecto.
+- En 375 y 768 px, las pestañas de «Apelaciones» y del detalle de proyecto se desplazan en horizontal dentro de su
+  propia barra. Es su diseño (`ADMIN_TAB_LIST`) y no cambió.
+
+Las capturas se guardan fuera del repositorio.

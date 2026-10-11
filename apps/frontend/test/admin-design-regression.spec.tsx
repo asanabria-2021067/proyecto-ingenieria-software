@@ -1,0 +1,85 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { RAIZ, VISTAS_ADMIN, leer } from './helpers/admin-design';
+
+/**
+ * FG07-C04 (T-320). Cierre de la matriz de diseño administrativo: lo que queda
+ * fuera de la escala está enumerado archivo por archivo. Un literal nuevo —o
+ * uno que desaparezca sin actualizar la lista— hace fallar esta prueba.
+ */
+
+const tsx = (dir: string): string[] =>
+  readdirSync(join(RAIZ, dir), { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? tsx(join(dir, e.name)) : e.name.endsWith('.tsx') ? [join(dir, e.name)] : [],
+  );
+const AJENO = 'components/admin/AdminMetricsSection.tsx';
+const ARBOL = [...tsx('app/dashboard/admin'), ...tsx('app/dashboard/projects/admin'), ...tsx('components/admin')]
+  .filter((archivo) => archivo !== AJENO)
+  .sort();
+
+/** Tamaños y radios literales que siguen en el árbol administrativo, y por qué (ver el inventario, sección 8). */
+const EXCEPCIONES: Record<string, string[]> = {
+  'app/dashboard/admin/proyectos/[id]/admin-project-detail-client.tsx': ['rounded-lg', 'rounded-md'],
+  'app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-md', 'text-[13px]'],
+  'app/dashboard/admin/proyectos/admin-projects-client.tsx': ['rounded-lg'],
+  'app/dashboard/admin/solicitudes-recuperacion/page.tsx': ['rounded-lg', 'rounded-lg'],
+  'app/dashboard/admin/sprints/admin-sprints-client.tsx': ['rounded-md'],
+  'components/admin/AdminLayout.tsx': ['rounded-lg'],
+  'components/admin/ProjectFeedbackSheet.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg'],
+  'components/admin/ProjectReviewSheet.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg'],
+  'components/admin/RevisionHistoryPanel.tsx': ['rounded-lg'],
+  'components/admin/UserDetailSheet.tsx': ['rounded-md'],
+  'components/admin/sprints/sprint-month-view.tsx': ['text-[15px]'],
+};
+
+const literales = (fuente: string) =>
+  [...(fuente.match(/\btext-\[[0-9.]+px\]/g) ?? []), ...(fuente.match(/(?<![\w-])rounded-(?:md|lg|xl|2xl|3xl)\b/g) ?? [])].sort();
+
+describe('FG07-C04: regresión del diseño administrativo', () => {
+  it.each(ARBOL)('%s: sus literales de tamaño y radio son exactamente los registrados', (archivo) => {
+    expect(literales(leer(archivo))).toEqual(EXCEPCIONES[archivo] ?? []);
+  });
+
+  it('toda excepción registrada apunta a un archivo que existe', () => {
+    for (const archivo of Object.keys(EXCEPCIONES)) expect(ARBOL).toContain(archivo);
+  });
+
+  it('las excepciones son solo valores sin token equivalente', () => {
+    const valores = new Set(Object.values(EXCEPCIONES).flat());
+    // rounded-lg (0.5rem) y rounded-md (0.375rem) no tienen token; 13 px y 15 px quedan en dos textos densos.
+    expect([...valores].sort()).toEqual(['rounded-lg', 'rounded-md', 'text-[13px]', 'text-[15px]']);
+  });
+
+  it('27 de los 38 archivos del árbol quedan sin ningún literal', () => {
+    expect(ARBOL).toHaveLength(38);
+    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(27);
+  });
+});
+
+describe('FG07-C04: el inventario registra el antes y el después', () => {
+  const inventario = readFileSync(join(RAIZ, '../../docs/qa/sprint9/admin-design-inventory.md'), 'utf8');
+
+  it('conserva la línea base y añade el estado final por vista', () => {
+    expect(inventario).toContain('## 2. Línea base');
+    expect(inventario).toContain('## 7. Estado tras T-320');
+    for (const ruta of Object.keys(VISTAS_ADMIN)) {
+      expect(inventario.split('## 7. Estado tras T-320')[1], ruta).toContain(`| \`${ruta}\` |`);
+    }
+  });
+
+  it('declara los totales medidos del árbol completo, antes y después', () => {
+    expect(inventario).toContain('| Tamaños literales | 46 | 2 |');
+    expect(inventario).toContain('| Radios literales | 63 | 20 |');
+  });
+
+  it('enumera cada excepción que esta prueba fija', () => {
+    for (const archivo of Object.keys(EXCEPCIONES)) expect(inventario, archivo).toContain(archivo);
+    expect(inventario).toContain(AJENO);
+    expect(inventario).toContain('bg-amber-600');
+  });
+
+  it('no declara resuelto lo que no se tocó: los botones propios siguen contados como pendientes', () => {
+    expect(inventario).toMatch(/D5 .* Pendiente/);
+  });
+});
