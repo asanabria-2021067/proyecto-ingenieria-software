@@ -921,3 +921,30 @@ describe('EventFormDialog — la fecha de fin cabe en el diálogo angosto (G04-R
     expect(screen.getByLabelText('Fecha de fin')).toHaveTextContent('Selecciona la fecha de fin');
   });
 });
+
+describe('EventFormDialog — sin desplazamiento lateral en diálogos angostos (G05-R05, G04-OBS-03)', () => {
+  // jsdom no calcula cajas: aquí se fija el contrato de clases que evita el desborde; la medición
+  // real (scrollWidth ≤ clientWidth a 320/375/768 px) está en la evidencia del gate y en el E2E.
+  it('los selectores de tipo y de proyecto pueden encogerse hasta su columna y siguen ocupando todo el ancho', () => {
+    renderCrear();
+    for (const nombre of ['Tipo de actividad', 'Proyecto']) {
+      const selector = screen.getByRole('combobox', { name: nombre });
+      expect(selector).toHaveClass('w-full', 'min-w-0', 'h-10');
+      expect(selector.closest('[data-slot="form-item"]')).toHaveClass('min-w-0');
+    }
+  });
+
+  it('el cuerpo del diálogo conserva su scroll vertical y no oculta el desborde horizontal con overflow-hidden', () => {
+    renderCrear();
+    const cuerpo = screen.getByLabelText('Título del evento o actividad').closest('.overflow-y-auto') as HTMLElement;
+    expect(cuerpo).not.toBeNull();
+    expect(cuerpo.className).not.toMatch(/overflow-x-hidden|overflow-hidden|overflow-clip/);
+  });
+
+  it('la fecha de fin sigue en su propia fila en móvil (G04-R02 intacto)', () => {
+    renderCrear();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
+    const item = screen.getByLabelText('Fecha de fin').closest('[data-slot="form-item"]') as HTMLElement;
+    expect(item).toHaveClass('min-w-0', 'basis-full', 'sm:basis-0');
+  });
+});

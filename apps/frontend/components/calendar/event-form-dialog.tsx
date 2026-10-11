@@ -86,6 +86,9 @@ function esLinkDeMeet(link: string): boolean {
 }
 
 const LABEL_CLASS = 'flex items-center gap-1.5 text-sm font-medium text-on-surface';
+// G05-R05: `min-w-0` deja que el selector se encoja hasta su columna (el valor se trunca). Sin él, el
+// texto sin salto de línea fijaba el ancho mínimo y a 320 px el cuerpo del diálogo se desplazaba de lado.
+const SELECT_CLASS = 'h-10 w-full min-w-0 border-outline-variant bg-surface-container-low';
 
 /**
  * HU-169 (T-263/T-264), rediseñado en HU-184 (T-323) según la maqueta del
@@ -337,7 +340,7 @@ export function EventFormDialog({
                       <Select value={field.value} onValueChange={(v) => field.onChange(v as TipoEvento)} disabled={isPending}>
                         <FormControl>
                           {/* G03 (UI-09): con la ref del campo, react-hook-form puede enfocar el trigger si queda inválido. */}
-                          <SelectTrigger ref={field.ref} aria-required className="h-10 w-full border-outline-variant bg-surface-container-low">
+                          <SelectTrigger ref={field.ref} aria-required className={SELECT_CLASS}>
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
@@ -378,7 +381,7 @@ export function EventFormDialog({
                         disabled={isPending || isEditing}
                       >
                         <FormControl>
-                          <SelectTrigger ref={field.ref} aria-required className="h-10 w-full border-outline-variant bg-surface-container-low">
+                          <SelectTrigger ref={field.ref} aria-required className={SELECT_CLASS}>
                             <SelectValue placeholder="Selecciona un proyecto que lideras" />
                           </SelectTrigger>
                         </FormControl>
