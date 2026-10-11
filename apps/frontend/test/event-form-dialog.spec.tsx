@@ -987,3 +987,252 @@ describe('EventFormDialog — nombres completos de la modalidad en móvil (G05-R
     expect(screen.queryByLabelText('Enlace de conexión virtual')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * G05-C09 (UI-15, T-323, T-325): lo que faltaba del diálogo: cierre por
+ * teclado y botones, envío en curso (sin doble envío ni cierre), fechas
+ * pasadas, día inicial, cambio de proyecto y limpieza de datos al cambiar de
+ * modalidad en una edición.
+ */
+// Las respuestas "una sola vez" que otros casos dejaron sin consumir no deben colarse en estos.
+function reiniciarServicios() {
+  for (const espia of [eventsMock.createEvent, eventsMock.updateEvent, eventsMock.deleteEvent, mensajesMock.confirmar, mensajesMock.aviso.exito, mensajesMock.aviso.error]) espia.mockReset();
+}
+
+describe('EventFormDialog — cierre y envío en curso (G05-C09, T-323)', () => {
+  beforeEach(reiniciarServicios);
+
+  const rellenar = () => {
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+  };
+
+  it.each([
+    ['Escape', () => fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })],
+    ['la X', () => fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }))],
+    ['Cancelar', () => fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancelar' }))],
+  ])('sin nada en curso, %s cierra el diálogo sin enviar ni avisar', (_nombre, cerrar) => {
+    const { onOpenChange } = renderCrear();
+    rellenar();
+    cerrar();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(eventsMock.createEvent).not.toHaveBeenCalled();
+    expect(mensajesMock.aviso.exito).not.toHaveBeenCalled();
+  });
+
+  it('mientras se agenda: un segundo clic no envía otra vez, los campos se bloquean y ni Escape, ni la X, ni Cancelar cierran', async () => {
+    let resolver: (e: EventoProyectoDTO) => void = () => {};
+    eventsMock.createEvent.mockReturnValueOnce(new Promise<EventoProyectoDTO>((resolve) => (resolver = resolve)));
+    const { onOpenChange } = renderCrear();
+    rellenar();
+    const agendar = screen.getByRole('button', { name: 'Agendar evento' });
+    fireEvent.click(agendar);
+    await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalledTimes(1));
+
+    const dialogo = screen.getByRole('dialog');
+    const enCurso = within(dialogo).getAllByRole('button').find((b) => /Agendar|Guardando|Agendando/.test(b.textContent ?? '')) as HTMLElement;
+    await waitFor(() => expect(enCurso).toBeDisabled());
+    // Segundo clic con el botón ya bloqueado (lo que ve quien pulsa dos veces). Dos clics dentro del
+    // mismo instante, antes de que React pinte el bloqueo, no se cubren aquí: ver la auditoría de G05.
+    fireEvent.click(enCurso);
+    expect(screen.getByLabelText('Título del evento o actividad')).toBeDisabled();
+    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toBeDisabled();
+
+    fireEvent.keyDown(dialogo, { key: 'Escape' });
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Close' }));
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Cancelar' }));
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(eventsMock.createEvent).toHaveBeenCalledTimes(1);
+
+    resolver(evento());
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(eventsMock.createEvent).toHaveBeenCalledTimes(1);
+    expect(mensajesMock.aviso.exito).toHaveBeenCalledTimes(1);
+  });
+
+  it('mientras se guarda una edición tampoco se puede eliminar ni cerrar', async () => {
+    eventsMock.updateEvent.mockReturnValueOnce(new Promise(() => {}));
+    const onOpenChange = vi.fn();
+    render(<EventFormDialog open onOpenChange={onOpenChange} ledProjects={LED} editingEvent={evento()} />, { wrapper });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(eventsMock.updateEvent).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Eliminar evento' })).toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar evento' }));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(mensajesMock.confirmar).not.toHaveBeenCalled();
+    expect(eventsMock.deleteEvent).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('si se cancela la confirmación de eliminar, el diálogo sigue abierto con el evento intacto y sin avisos', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(false);
+    const onOpenChange = vi.fn();
+    render(<EventFormDialog open onOpenChange={onOpenChange} ledProjects={LED} editingEvent={evento()} />, { wrapper });
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar evento' }));
+    await waitFor(() => expect(mensajesMock.confirmar).toHaveBeenCalledTimes(1));
+    expect(eventsMock.deleteEvent).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Título del evento o actividad')).toHaveValue('Reunión semanal');
+    expect(mensajesMock.aviso.exito).not.toHaveBeenCalled();
+    expect(mensajesMock.aviso.error).not.toHaveBeenCalled();
+  });
+
+  it('si eliminar falla en el servidor, se avisa el error y el diálogo no se cierra', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
+    eventsMock.deleteEvent.mockRejectedValueOnce(Object.assign(new Error('x'), { statusCode: 403 }));
+    const onOpenChange = vi.fn();
+    render(<EventFormDialog open onOpenChange={onOpenChange} ledProjects={LED} editingEvent={evento()} />, { wrapper });
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar evento' }));
+    await waitFor(() => expect(mensajesMock.aviso.error).toHaveBeenCalledTimes(1));
+    expect(mensajesMock.aviso.exito).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Eliminar evento' })).toBeEnabled());
+  });
+});
+
+describe('EventFormDialog — fecha inicial y fechas pasadas (G05-C09, T-323/T-325)', () => {
+  beforeEach(reiniciarServicios);
+
+  const diasDelSelector = () => [...document.querySelectorAll<HTMLButtonElement>('[data-slot="popover-content"] button[data-day]')];
+
+  it('abre con el día que se le indica y, sin indicación, con hoy', () => {
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} defaultProjectId={1} initialDate={new Date(2026, 9, 21)} />, { wrapper });
+    expect(screen.getByLabelText('Fecha')).toHaveTextContent(/21 oct 2026/i);
+    cleanup();
+    renderCrear();
+    expect(screen.getByLabelText('Fecha')).toHaveTextContent(/5 oct 2026/i);
+  });
+
+  it('al crear, el calendario no deja elegir días anteriores a hoy; hoy y los siguientes sí', async () => {
+    renderCrear();
+    fireEvent.click(screen.getByLabelText('Fecha'));
+    await waitFor(() => expect(diasDelSelector().length).toBeGreaterThan(27));
+    const estado = (dia: number) => diasDelSelector().find((b) => b.getAttribute('data-day')?.startsWith(`${dia}/10/2026`))?.disabled;
+    expect([1, 2, 3, 4].map(estado)).toEqual([true, true, true, true]);
+    expect([5, 6, 20, 31].map(estado)).toEqual([false, false, false, false]);
+  });
+
+  it('al editar, los días pasados no se bloquean: un evento ya ocurrido se puede abrir sin perder su fecha', async () => {
+    const pasado = evento({ fechaInicio: new Date(2026, 9, 1, 9, 0).toISOString(), fechaFin: new Date(2026, 9, 1, 10, 0).toISOString() });
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={pasado} />, { wrapper });
+    expect(screen.getByLabelText('Fecha')).toHaveTextContent(/1 oct 2026/i);
+    fireEvent.click(screen.getByLabelText('Fecha'));
+    await waitFor(() => expect(diasDelSelector().length).toBeGreaterThan(27));
+    expect(diasDelSelector().filter((b) => b.disabled)).toHaveLength(0);
+  });
+
+  it('hoy con una hora que ya pasó no se envía y lo explica junto a la hora de inicio', async () => {
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    // El reloj de la prueba marca las 10:00 del 5 de octubre.
+    fireEvent.change(screen.getByLabelText('Hora de inicio'), { target: { value: '08:00' } });
+    fireEvent.change(screen.getByLabelText('Hora de fin'), { target: { value: '09:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    const mensaje = await screen.findByText('El inicio no puede ser anterior al momento actual.');
+    expect(screen.getByLabelText('Hora de inicio').getAttribute('aria-describedby')).toContain(mensaje.id);
+    expect(screen.getByLabelText('Hora de inicio')).toHaveAttribute('aria-invalid', 'true');
+    expect(eventsMock.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('al editar sin tocar el inicio, un evento que ya empezó se puede guardar (solo cambia el título)', async () => {
+    eventsMock.updateEvent.mockResolvedValueOnce(evento());
+    const enCurso = evento({ fechaInicio: new Date(2026, 9, 5, 9, 0).toISOString(), fechaFin: new Date(2026, 9, 5, 11, 0).toISOString() });
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={enCurso} />, { wrapper });
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Reunión en curso' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(eventsMock.updateEvent).toHaveBeenCalledTimes(1));
+    expect(eventsMock.updateEvent.mock.calls[0][2]).toMatchObject({ tituloEvento: 'Reunión en curso', fechaInicio: enCurso.fechaInicio, fechaFin: enCurso.fechaFin });
+  });
+});
+
+describe('EventFormDialog — proyecto, invitados y modalidad (G05-C09, T-323)', () => {
+  beforeEach(reiniciarServicios);
+
+  const DOS = [...LED, { idProyecto: 2, tituloProyecto: 'Proyecto Dos', tipoProyecto: 'ACADEMICO_HORAS_EXTENSION' }];
+  const modalidad = (nombre: string) => within(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).getByRole('radio', { name: nombre });
+
+  it('añadir y quitar invitados actualiza el contador y el cuerpo enviado solo lleva los que quedan', async () => {
+    eventsMock.createEvent.mockResolvedValueOnce(evento());
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    for (const nombre of ['Ana García', 'Luis Hernández']) {
+      fireEvent.click(screen.getByRole('button', { name: /Añadir integrante/ }));
+      fireEvent.click(await screen.findByRole('option', { name: new RegExp(nombre) }));
+    }
+    expect(await screen.findByText('2 invitados')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar a Ana García' }));
+    expect(await screen.findByText('1 invitado')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalledTimes(1));
+    expect(eventsMock.createEvent.mock.calls[0][1].invitados).toEqual([5]);
+  });
+
+  it('cambiar de proyecto vacía los invitados: los integrantes de un proyecto no se arrastran a otro', async () => {
+    eventsMock.createEvent.mockResolvedValueOnce(evento());
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={DOS} defaultProjectId={1} />, { wrapper });
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('button', { name: /Añadir integrante/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /Luis Hernández/ }));
+    expect(await screen.findByText('1 invitado')).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Proyecto' }), { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('option', { name: 'Proyecto Dos' }));
+    await waitFor(() => expect(screen.queryByText('1 invitado')).not.toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Quitar a Luis Hernández' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalledTimes(1));
+    const [projectId, payload] = eventsMock.createEvent.mock.calls[0];
+    expect(projectId).toBe(2);
+    expect(payload.invitados).toEqual([]);
+  });
+
+  it('al editar no se puede cambiar el evento de proyecto', () => {
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={DOS} editingEvent={evento()} />, { wrapper });
+    expect(screen.getByRole('combobox', { name: 'Proyecto' })).toBeDisabled();
+  });
+
+  it('editar de virtual a presencial envía el enlace como null (se borra en el servidor) junto con las coordenadas nuevas', async () => {
+    eventsMock.updateEvent.mockResolvedValueOnce(evento());
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={evento()} />, { wrapper });
+    fireEvent.click(modalidad('Presencial'));
+    expect(screen.queryByLabelText('Enlace de conexión virtual')).not.toBeInTheDocument();
+    leafletMock.handlers.click({ latlng: { lat: 14.6, lng: -90.5 } });
+    fireEvent.change(screen.getByLabelText('Ubicación presencial'), { target: { value: 'Edificio CIT' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(eventsMock.updateEvent).toHaveBeenCalledTimes(1));
+    const payload = eventsMock.updateEvent.mock.calls[0][2];
+    expect(payload).toMatchObject({ modalidad: 'PRESENCIAL', ubicacionLat: 14.6, ubicacionLng: -90.5, ubicacionNombre: 'Edificio CIT' });
+    expect(payload.linkSesion).toBeNull();
+  });
+
+  it('editar de híbrida a virtual envía coordenadas y lugar como null y conserva el enlace', async () => {
+    eventsMock.updateEvent.mockResolvedValueOnce(evento());
+    const hibrido = evento({ modalidad: 'MIXTA', ubicacionLat: 14.6, ubicacionLng: -90.5, ubicacionNombre: 'Edificio CIT' });
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={hibrido} />, { wrapper });
+    expect(screen.getByLabelText('Ubicación presencial')).toHaveValue('Edificio CIT');
+    fireEvent.click(modalidad('Virtual'));
+    expect(screen.queryByLabelText('Ubicación presencial')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(eventsMock.updateEvent).toHaveBeenCalledTimes(1));
+    const payload = eventsMock.updateEvent.mock.calls[0][2];
+    expect(payload).toMatchObject({ modalidad: 'VIRTUAL', linkSesion: 'https://meet.google.com/abc' });
+    expect([payload.ubicacionLat, payload.ubicacionLng, payload.ubicacionNombre]).toEqual([null, null, null]);
+  });
+
+  it('un enlace sin dominio real (localhost) se explica junto al campo con el mismo criterio que la API y no se envía', async () => {
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    const enlace = screen.getByLabelText('Enlace de conexión virtual');
+    fireEvent.change(enlace, { target: { value: 'http://localhost:3000/sala' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    const mensaje = await screen.findByText(/El link no parece válido/);
+    expect(enlace).toHaveAttribute('aria-invalid', 'true');
+    expect(enlace.getAttribute('aria-describedby')).toContain(mensaje.id);
+    await waitFor(() => expect(enlace).toHaveFocus());
+    expect(eventsMock.createEvent).not.toHaveBeenCalled();
+  });
+});

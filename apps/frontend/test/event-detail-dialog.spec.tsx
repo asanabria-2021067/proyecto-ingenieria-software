@@ -300,3 +300,105 @@ describe('EventDetailDialog — el foco vuelve a quien abrió el detalle (G03-C1
     unmount();
   });
 });
+
+/**
+ * G05-C09 (UI-15, T-325): eliminación desde el detalle (cancelar la
+ * confirmación, fallo del servidor, en curso), cierre por teclado y que un
+ * evento compartido nunca ofrezca acciones aunque llegue `editable`.
+ */
+describe('EventDetailDialog — eliminar, cerrar y solo lectura (G05-C09)', () => {
+  const renderLider = (onOpenChange = vi.fn()) => {
+    render(<EventDetailDialog evento={evento()} open onOpenChange={onOpenChange} editable onEditar={vi.fn()} />, { wrapper });
+    return onOpenChange;
+  };
+
+  beforeEach(() => {
+    mensajesMock.confirmar.mockReset();
+    mensajesMock.aviso.exito.mockReset();
+    mensajesMock.aviso.error.mockReset();
+    eventsMock.deleteEvent.mockReset();
+  });
+
+  it('cancelar la confirmación no elimina, no avisa y deja el detalle abierto', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(false);
+    const onOpenChange = renderLider();
+    fireEvent.click(screen.getByRole('button', { name: /Eliminar evento/ }));
+    await waitFor(() => expect(mensajesMock.confirmar).toHaveBeenCalledTimes(1));
+    expect(mensajesMock.confirmar.mock.calls[0][0]).toMatchObject({ titulo: '¿Eliminar el evento «Taller de diseño»?', textoAccion: 'Eliminar evento', destructiva: true });
+    expect(eventsMock.deleteEvent).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(mensajesMock.aviso.exito).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'Taller de diseño' })).toBeInTheDocument();
+  });
+
+  it.each([403, 404, 500])('si el servidor responde %i al eliminar, se avisa el error y el detalle sigue abierto y operable', async (statusCode) => {
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
+    eventsMock.deleteEvent.mockRejectedValueOnce(Object.assign(new Error('detalle interno'), { statusCode }));
+    const onOpenChange = renderLider();
+    fireEvent.click(screen.getByRole('button', { name: /Eliminar evento/ }));
+    await waitFor(() => expect(mensajesMock.aviso.error).toHaveBeenCalledTimes(1));
+    const [titulo, detalle] = mensajesMock.aviso.error.mock.calls[0] as [string, string];
+    expect(titulo).toBe('No se pudo eliminar el evento');
+    expect(detalle).not.toMatch(/detalle interno|\b[45]\d\d\b/);
+    expect(mensajesMock.aviso.exito).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    await waitFor(() => expect(screen.getByRole('button', { name: /Eliminar evento/ })).toBeEnabled());
+    expect(screen.getByRole('button', { name: /Editar evento/ })).toBeEnabled();
+  });
+
+  it('mientras se elimina, Editar y Eliminar quedan bloqueados y Escape o la X no cierran', async () => {
+    mensajesMock.confirmar.mockResolvedValueOnce(true);
+    let resolver: () => void = () => {};
+    eventsMock.deleteEvent.mockReturnValueOnce(new Promise<void>((resolve) => (resolver = resolve)));
+    const onOpenChange = renderLider();
+    fireEvent.click(screen.getByRole('button', { name: /Eliminar evento/ }));
+    await waitFor(() => expect(eventsMock.deleteEvent).toHaveBeenCalledTimes(1));
+    const dialogo = screen.getByRole('dialog');
+    await waitFor(() => expect(within(dialogo).getByRole('button', { name: /Editar evento/ })).toBeDisabled());
+    fireEvent.keyDown(dialogo, { key: 'Escape' });
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Close' }));
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(mensajesMock.confirmar).toHaveBeenCalledTimes(1);
+
+    resolver();
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Evento eliminado');
+    expect(eventsMock.deleteEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['Escape', (dialogo: HTMLElement) => fireEvent.keyDown(dialogo, { key: 'Escape' })],
+    ['la X', (dialogo: HTMLElement) => fireEvent.click(within(dialogo).getByRole('button', { name: 'Close' }))],
+  ])('sin nada en curso, %s cierra el detalle sin pedir confirmación ni eliminar', (_nombre, cerrar) => {
+    const onOpenChange = renderLider();
+    cerrar(screen.getByRole('dialog'));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(mensajesMock.confirmar).not.toHaveBeenCalled();
+    expect(eventsMock.deleteEvent).not.toHaveBeenCalled();
+  });
+
+  it.each(['DETALLE', 'OCUPADO'] as const)('un evento compartido (%s) no ofrece editar, eliminar ni enlaces aunque el componente reciba editable', (visibilidad) => {
+    const base = { idEvento: 7, fechaInicio: evento().fechaInicio, fechaFin: evento().fechaFin };
+    const compartido: EventoCompartidoDTO =
+      visibilidad === 'OCUPADO'
+        ? { ...base, visibilidad }
+        : { ...base, visibilidad, tituloEvento: 'Taller de diseño', tipoEvento: 'TUTORIA', modalidad: 'VIRTUAL', proyecto: { idProyecto: 3, tituloProyecto: 'App de tutorías' } };
+    const onEditar = vi.fn();
+    render(<EventDetailDialog evento={compartido} open onOpenChange={vi.fn()} editable onEditar={onEditar} compartidoPor={{ nombre: 'Luis Hernández' }} />, { wrapper });
+    const dialogo = screen.getByRole('dialog');
+    expect(within(dialogo).queryByRole('button', { name: /Editar|Eliminar/ })).not.toBeInTheDocument();
+    expect(within(dialogo).queryByRole('link')).not.toBeInTheDocument();
+    expect(dialogo.querySelector('a[href]')).toBeNull();
+    for (const privado of ['Traer laptop.', 'meet.google.com', 'Edificio CIT', 'Recordatorio', 'Ana García']) expect(dialogo).not.toHaveTextContent(privado);
+    expect(onEditar).not.toHaveBeenCalled();
+    expect(mensajesMock.confirmar).not.toHaveBeenCalled();
+  });
+
+  it('quien no lidera no puede eliminar ni con teclado: no existe ningún control que llame a la eliminación', () => {
+    render(<EventDetailDialog evento={evento()} open onOpenChange={vi.fn()} editable={false} onEditar={vi.fn()} />, { wrapper });
+    const dialogo = screen.getByRole('dialog');
+    const controles = within(dialogo).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim());
+    expect(controles.some((nombre) => /Eliminar|Editar/.test(nombre ?? ''))).toBe(false);
+    expect(within(dialogo).getByRole('link', { name: 'Ver proyecto' })).toHaveAttribute('href', '/dashboard/projects/3');
+  });
+});
