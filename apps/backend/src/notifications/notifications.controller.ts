@@ -4,11 +4,13 @@ import {
   Patch,
   Param,
   ParseIntPipe,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
 
 @Controller('notificaciones')
 @UseGuards(JwtAuthGuard)
@@ -16,7 +18,10 @@ export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 
   @Get()
-  findAll(@CurrentUser() user: { userId: number }) {
+  findAll(@CurrentUser() user: { userId: number }, @Query() query: ListNotificationsQueryDto) {
+    if (query.page !== undefined) {
+      return this.notificationsService.findPage(user.userId, query.page, query.limit);
+    }
     return this.notificationsService.findAll(user.userId);
   }
 

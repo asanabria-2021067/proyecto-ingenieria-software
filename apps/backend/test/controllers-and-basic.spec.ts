@@ -120,7 +120,7 @@ describe('Controllers and basic services', () => {
     const notifications = new NotificationsController(
       notificationsSvc as unknown as ConstructorParameters<typeof NotificationsController>[0],
     );
-    notifications.findAll({ userId: 1 });
+    notifications.findAll({ userId: 1 }, {});
     notifications.findUnreadForUser({ userId: 1 });
     notifications.getUnreadCount({ userId: 1 });
     notifications.markAllAsRead({ userId: 1 });
