@@ -50,9 +50,11 @@ export function fechaLimiteParaVentana(ventana: VentanaRecordatorio, ahora: Date
  * "Una sola vez" lo garantiza `recordatorio_tarea` (@@unique idTarea +
  * ventanaHoras): el aviso se reserva con INSERT ... ON CONFLICT DO NOTHING
  * antes de emitirlo, así que dos corridas concurrentes no lo duplican. Si
- * la emisión falla se libera la reserva para reintentar en la próxima
- * corrida. Un día sin corrida (servidor caído) es un aviso perdido, no se
- * recupera — igual que los huecos de SprintSnapshotsService.
+ * la emisión falla se libera la reserva, pero el job no reintenta por sí
+ * mismo: solo otra corrida ese mismo día volvería a intentarlo, porque al
+ * día siguiente la tarea ya no está en esa ventana. Un fallo de emisión o
+ * un día sin corrida (servidor caído) es un aviso perdido, no se recupera
+ * — igual que los huecos de SprintSnapshotsService.
  */
 @Injectable()
 export class TasksDueReminderService {

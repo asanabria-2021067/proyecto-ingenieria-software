@@ -226,7 +226,7 @@ describe('TasksDueReminderService.enviarRecordatoriosDeVencimiento (T-329)', () 
     expect([...registrados].sort()).toEqual([`${TASK_ID}:24`, `${TASK_ID}:48`]);
   });
 
-  it('si la emisión falla libera el registro para reintentar en la siguiente corrida', async () => {
+  it('si la emisión falla libera el registro: otra corrida el mismo día lo reintenta', async () => {
     const { prisma, registrados } = makePrisma(new Map([[MANANA.getTime(), [tarea()]]]));
     const service = new ServicioObservado(prisma, sinNotificaciones);
     service.emitir.mockRejectedValueOnce(new Error('db caída'));
