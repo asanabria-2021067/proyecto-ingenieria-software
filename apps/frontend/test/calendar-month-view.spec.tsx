@@ -222,14 +222,41 @@ describe('MonthView — fechas fuera del mes legibles (G04-C05, UI-14)', () => {
     expect(atenuado(numero(fuera), fuera)).toBe(false);
   });
 
-  it('lo que sigue atenuado es el contenido inactivo (chips y puntos), no la fecha', () => {
+  // G05-R02 (clase B): este caso exigía que el chip de un día fuera del mes siguiera atenuado con
+  // opacidad. Medido en navegador, ese texto quedaba en 2.35:1 (claro) y 3.36:1 (oscuro) dentro de
+  // una celda que se puede pulsar. Ahora lo atenuado son solo los puntos decorativos.
+  it('fuera del mes solo se atenúan los puntos decorativos; el título del chip va a opacidad completa en text-text-secondary', () => {
     const { fuera, dentro } = renderOctubre();
-    const chip = [...fuera.querySelectorAll('span')].find((n) => n.textContent === 'Cierre de septiembre') as HTMLElement;
-    expect(atenuado(chip, fuera)).toBe(true);
-    // Un día del mes no tiene nada atenuado y conserva su borde; el de fuera sigue sin borde visible.
+    const titulo = [...fuera.querySelectorAll('span')].find((n) => n.textContent === 'Cierre de septiembre') as HTMLElement;
+    const chip = titulo.parentElement as HTMLElement;
+    expect(atenuado(titulo, fuera)).toBe(false);
+    expect(chip).toHaveClass('text-text-secondary', 'bg-surface-container');
+    const atenuados = [...fuera.querySelectorAll('[class*="opacity-"]')];
+    expect(atenuados.length).toBeGreaterThan(0);
+    for (const n of atenuados) {
+      expect(n.textContent).toBe('');
+      expect(n.closest('[aria-hidden="true"]')).not.toBeNull();
+    }
+    // Un día del mes no tiene nada atenuado, su chip no cambia de color y conserva su borde.
     expect(dentro.querySelector('[class*="opacity-"]')).toBeNull();
     expect(dentro).toHaveClass('border-outline-variant/40');
     expect(fuera).toHaveClass('border-transparent');
+  });
+
+  it('el chip de un día del mes no recibe el color secundario y «+N más» fuera del mes sí', () => {
+    const itemsByDay = new Map<string, AgendaItem[]>([
+      ['2026-09-29', [1, 2, 3, 4].map((n) => evento(n, '2026-09-29', `Fuera ${n}`))],
+      ['2026-10-06', [evento(9, '2026-10-06', 'Dentro')]],
+    ]);
+    render(<MonthView year={2026} month={9} todayKey="2026-10-09" selectedKey={null} itemsByDay={itemsByDay} onSelectDay={() => {}} />);
+    expect((screen.getByText('Dentro').parentElement as HTMLElement).className).not.toMatch(/text-text-secondary|opacity-/);
+    const fuera = screen.getByRole('button', { name: 'martes, 29 de septiembre, 4 actividades' });
+    const resto = [...fuera.querySelectorAll('span')].filter((n) => /^\+\d/.test(n.textContent ?? '') && n.children.length === 0);
+    expect(resto.length).toBe(2);
+    for (const n of resto) {
+      expect(n).toHaveClass('text-text-secondary');
+      expect(atenuado(n as HTMLElement, fuera)).toBe(false);
+    }
   });
 
   it('etiqueta accesible, selección, hoy y contenido de las celdas no cambian', () => {
@@ -273,6 +300,8 @@ describe('MonthView — fechas fuera del mes legibles (G04-C05, UI-14)', () => {
       const texto = token(tema, 'on-surface-variant');
       expect(contraste(texto, token(tema, 'surface-container-lowest'))).toBeGreaterThanOrEqual(4.5);
       expect(contraste(texto, token(tema, 'surface-container-high'))).toBeGreaterThanOrEqual(4.5);
+      // G05-R02: el chip (surface-container) de un día fuera del mes usa este mismo color de texto.
+      expect(contraste(texto, token(tema, 'surface-container'))).toBeGreaterThanOrEqual(4.5);
     }
   });
 });

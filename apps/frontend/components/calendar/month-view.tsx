@@ -65,6 +65,7 @@ export function MonthView({
               const restantes = items.length - visibles.length;
               const isToday = day.key === todayKey;
               const isSelected = selectedKey === day.key;
+              const textoFueraDeMes = day.inCurrentMonth ? '' : 'text-text-secondary';
 
               return (
                 <button
@@ -97,17 +98,19 @@ export function MonthView({
                       {day.date.getDate()}
                     </span>
                   </span>
-                  <div className={`flex flex-wrap items-center justify-center gap-0.5 sm:hidden ${day.inCurrentMonth ? '' : 'opacity-50'}`} aria-hidden="true">
+                  {/* G05-R02: fuera del mes solo se atenúan los puntos decorativos. El texto (títulos y «+N»)
+                      va en text-text-secondary a opacidad completa: con opacity-50 quedaba en 2.35:1. */}
+                  <div className="flex flex-wrap items-center justify-center gap-0.5 sm:hidden" aria-hidden="true">
                     {visibles.map((item) => (
-                      <span key={agendaItemKey(item)} className={`h-1.5 w-1.5 rounded-pill ${puntoDe(item)}`} />
+                      <span key={agendaItemKey(item)} className={`h-1.5 w-1.5 rounded-pill ${puntoDe(item)} ${day.inCurrentMonth ? '' : 'opacity-50'}`} />
                     ))}
-                    {restantes > 0 && <span className="type-meta leading-none">+{restantes}</span>}
+                    {restantes > 0 && <span className={`type-meta leading-none ${textoFueraDeMes}`}>+{restantes}</span>}
                   </div>
-                  <div className={`hidden flex-1 flex-col gap-0.5 overflow-hidden sm:flex ${day.inCurrentMonth ? '' : 'opacity-50'}`}>
+                  <div className="hidden flex-1 flex-col gap-0.5 overflow-hidden sm:flex">
                     {visibles.map((item) => (
                       <span
                         key={agendaItemKey(item)}
-                        className="flex items-center gap-1 truncate rounded-control bg-surface-container px-1 py-0.5 type-meta"
+                        className={`flex items-center gap-1 truncate rounded-control bg-surface-container px-1 py-0.5 type-meta ${textoFueraDeMes}`}
                       >
                         {/* G01 (UI-01): un evento OCUPADO no tiene tipo real: punto, sin ícono ni nombre de tipo. */}
                         {item.kind === 'evento' && !item.ocupado ? (
@@ -119,7 +122,7 @@ export function MonthView({
                       </span>
                     ))}
                     {restantes > 0 && (
-                      <span className="type-meta px-1">+{restantes} más</span>
+                      <span className={`type-meta px-1 ${textoFueraDeMes}`}>+{restantes} más</span>
                     )}
                   </div>
                 </button>
