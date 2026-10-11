@@ -12,7 +12,9 @@
  * convención — sin inventar un tercer nombre de campo.
  */
 
-const TIPOS_NOTIFICACION_TAREA = new Set(['TAREA_ASIGNADA', 'TAREA_ACTUALIZADA']);
+// TAREA_POR_VENCER (HU-186): mismo `datosJson: { projectId, taskId }`, emitido
+// por tasks-due-reminder.service.ts.
+const TIPOS_NOTIFICACION_TAREA = new Set(['TAREA_ASIGNADA', 'TAREA_ACTUALIZADA', 'TAREA_POR_VENCER']);
 // ROL_ABANDONADO (Sección 4/18): notificación consolidada del retiro de un rol.
 // Enlaza al workspace Kanban para reasignar las tareas que quedaron sin
 // asignado. Es consolidada (varias tareas), por lo que no lleva un taskId.
