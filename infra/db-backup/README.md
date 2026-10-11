@@ -42,6 +42,24 @@ Resultado: `BACKUP_DIR/<prefijo>_<base>_<AAAAMMDDTHHMMSSZ>.dump` y su
 | 74 | Falló el volcado o su verificación |
 | 75 | Ya hay otro respaldo en curso |
 
+## Rotación
+
+Después de cada respaldo verificado se borran los respaldos propios con más de
+`BACKUP_RETENTION_DAYS` días (7 por defecto), junto con su `.sha256`.
+
+- **Si el volcado o su verificación fallan no se borra nada:** el último
+  respaldo válido se conserva aunque ya haya vencido.
+- Solo se borran archivos con el nombre exacto que genera el script
+  (`<prefijo>_<base>_<marca de tiempo>.dump`). Respaldos de otra base, con otro
+  prefijo, copias manuales y cualquier otro archivo del directorio no se tocan.
+- La antigüedad se mide por la fecha de modificación del archivo.
+- También se limpian los temporales de más de un día que haya dejado una
+  ejecución interrumpida.
+
+Con un respaldo diario y 7 días de retención, el directorio mantiene 7 u 8
+respaldos. Antes de empezar, el script exige `BACKUP_MIN_FREE_MB` de espacio
+libre; conviene fijarlo por encima del tamaño de un respaldo.
+
 ## Pruebas
 
 ```bash

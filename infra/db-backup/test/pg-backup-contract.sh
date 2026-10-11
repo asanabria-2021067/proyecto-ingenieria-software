@@ -124,6 +124,61 @@ run "$WORK/sin-espacio" BACKUP_MIN_FREE_MB=999999999
 check "sin el espacio libre mínimo termina en 73" "$([ "$code" -eq 73 ]; echo $?)"
 check "y no ejecuta pg_dump" "$([ ! -s "$WORK/argv.log" ]; echo $?)"
 
+# --- rotación ----------------------------------------------------------------
+# Siembra respaldos con fecha de modificación antigua: propios, ajenos y parecidos.
+seed() { # dir
+  mkdir -p "$1"
+  old() { printf 'x' >"$1/$2"; touch -d "$3" "$1/$2"; }
+  old "$1" uvgenius_uvg_collab_20260901T060000Z.dump '9 days ago'
+  old "$1" uvgenius_uvg_collab_20260901T060000Z.dump.sha256 '9 days ago'
+  old "$1" uvgenius_uvg_collab_20260905T060000Z.dump '6 days ago'
+  old "$1" uvgenius_otra_base_20260901T060000Z.dump '9 days ago'
+  old "$1" otroprefijo_uvg_collab_20260901T060000Z.dump '9 days ago'
+  old "$1" uvgenius_uvg_collab_manual.dump '9 days ago'
+  old "$1" notas.txt '9 days ago'
+  old "$1" .uvgenius_uvg_collab_20260901T060000Z.dump.tmp.123 '9 days ago'
+}
+D="$WORK/rotacion"
+seed "$D"
+run "$D"
+check "la rotación no altera el código de salida" "$code"
+check "borra el respaldo propio de más de 7 días" "$([ ! -e "$D/uvgenius_uvg_collab_20260901T060000Z.dump" ]; echo $?)"
+check "y su suma sha256" "$([ ! -e "$D/uvgenius_uvg_collab_20260901T060000Z.dump.sha256" ]; echo $?)"
+check "conserva el respaldo propio de 6 días" "$([ -e "$D/uvgenius_uvg_collab_20260905T060000Z.dump" ]; echo $?)"
+check "conserva el respaldo recién creado" "$([ "$(find "$D" -name 'uvgenius_uvg_collab_*Z.dump' -mmin -5 | wc -l)" -eq 1 ]; echo $?)"
+check "no toca respaldos de otra base" "$([ -e "$D/uvgenius_otra_base_20260901T060000Z.dump" ]; echo $?)"
+check "no toca respaldos con otro prefijo" "$([ -e "$D/otroprefijo_uvg_collab_20260901T060000Z.dump" ]; echo $?)"
+check "no toca un .dump que no sigue el nombre del script" "$([ -e "$D/uvgenius_uvg_collab_manual.dump" ]; echo $?)"
+check "no toca archivos ajenos" "$([ -e "$D/notas.txt" ]; echo $?)"
+check "limpia el temporal huérfano de una ejecución muerta" "$([ "$(leftovers "$D")" -eq 0 ]; echo $?)"
+check "informa cuántos respaldos eliminó" "$(grep -q 'rotación: 1 respaldo' "$WORK/out"; echo $?)"
+
+D="$WORK/rotacion-falla"
+seed "$D"
+run "$D" FAKE_DUMP=fail
+check "si el volcado falla termina en 74" "$([ "$code" -eq 74 ]; echo $?)"
+check "y no borra el respaldo antiguo: sigue siendo el último válido" "$([ -e "$D/uvgenius_uvg_collab_20260901T060000Z.dump" ]; echo $?)"
+D="$WORK/rotacion-verificacion-falla"
+seed "$D"
+run "$D" FAKE_RESTORE=fail
+check "si la verificación falla tampoco borra nada" "$([ -e "$D/uvgenius_uvg_collab_20260901T060000Z.dump" ]; echo $?)"
+
+D="$WORK/rotacion-30"
+seed "$D"
+run "$D" BACKUP_RETENTION_DAYS=30
+check "con retención de 30 días conserva el respaldo de 9 días" "$([ -e "$D/uvgenius_uvg_collab_20260901T060000Z.dump" ]; echo $?)"
+for malo in 0 -1 siete ''; do
+  D="$WORK/retencion-$malo-x"
+  seed "$D"
+  run "$D" BACKUP_RETENTION_DAYS="$malo"
+  if [ -z "$malo" ]; then
+    check "una retención vacía usa los 7 días por defecto" "$code"
+  else
+    check "una retención '$malo' termina en 64" "$([ "$code" -eq 64 ]; echo $?)"
+    check "y no borra nada" "$([ -e "$D/uvgenius_uvg_collab_20260901T060000Z.dump" ]; echo $?)"
+  fi
+done
+
 # --- concurrencia ------------------------------------------------------------
 D="$WORK/concurrente"
 env -i PATH="$WORK/bin:$PATH" HOME="$WORK" FAKE_LOG="$WORK/argv-lento.log" FAKE_DUMP=slow \

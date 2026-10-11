@@ -12,6 +12,10 @@
 # backup.example.env). La contraseña llega solo por PGPASSWORD o PGPASSFILE:
 # nunca por argumentos, y este script no imprime ni registra credenciales.
 #
+# Rotación: tras un respaldo verificado se borran los respaldos propios (mismo
+# prefijo y misma base) con más de BACKUP_RETENTION_DAYS días. Si el volcado
+# falla no se borra nada: el último respaldo válido se conserva.
+#
 # Códigos de salida: 0 ok · 64 configuración · 73 destino · 74 volcado o
 # verificación · 75 ya hay otro respaldo en curso.
 set -euo pipefail
@@ -36,6 +40,7 @@ fi
 : "${BACKUP_DIR:?define BACKUP_DIR (directorio del host, fuera del repositorio)}"
 BACKUP_PREFIX="${BACKUP_PREFIX:-uvgenius}"
 BACKUP_MIN_FREE_MB="${BACKUP_MIN_FREE_MB:-500}"
+BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 PG_CONTAINER="${PG_CONTAINER:-}"
 PGDATABASE="${PGDATABASE:-}"
 PGUSER="${PGUSER:-}"
@@ -47,6 +52,7 @@ case "$BACKUP_DIR" in /*) ;; *) die 64 "BACKUP_DIR debe ser una ruta absoluta" ;
 case "$BACKUP_PREFIX" in '' | *[!A-Za-z0-9-]*) die 64 "BACKUP_PREFIX solo admite letras, números y guiones" ;; esac
 case "$PGDATABASE" in *[!A-Za-z0-9_-]*) die 64 "PGDATABASE solo admite letras, números, guiones y guiones bajos" ;; esac
 case "$BACKUP_MIN_FREE_MB" in '' | *[!0-9]*) die 64 "BACKUP_MIN_FREE_MB debe ser un número entero" ;; esac
+case "$BACKUP_RETENTION_DAYS" in '' | 0 | *[!0-9]*) die 64 "BACKUP_RETENTION_DAYS debe ser un número entero mayor que 0" ;; esac
 if [ -z "${PGPASSWORD:-}" ] && [ -z "${PGPASSFILE:-}" ]; then
   die 64 "define PGPASSWORD o PGPASSFILE"
 fi
@@ -107,3 +113,13 @@ mv -f "$tmp" "$final"
 trap - EXIT
 ( cd "$BACKUP_DIR" && sha256sum "$(basename "$final")" >"$(basename "$final").sha256" )
 log "ok: $(basename "$final") ($(du -k "$final" | cut -f1) KB, ${entries} objetos)"
+
+# --- rotación ----------------------------------------------------------------
+# Solo se llega aquí con un respaldo nuevo ya verificado. El patrón exige el
+# nombre completo que genera este script: nada ajeno entra en el borrado.
+own="${BACKUP_PREFIX}_${PGDATABASE}_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z.dump"
+removed="$(find "$BACKUP_DIR" -maxdepth 1 -type f \( -name "$own" -o -name "$own.sha256" \) \
+  -mmin "+$((BACKUP_RETENTION_DAYS * 1440))" ! -name "$(basename "$final")*" -print -delete | grep -c '\.dump$' || true)"
+# Temporales de una ejecución que murió sin limpiar (corte de luz, kill -9).
+find "$BACKUP_DIR" -maxdepth 1 -type f -name ".${own}.tmp.*" -mmin +1440 -delete
+log "rotación: ${removed} respaldo(s) de más de ${BACKUP_RETENTION_DAYS} día(s) eliminado(s)"
