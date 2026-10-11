@@ -60,6 +60,92 @@ Con un respaldo diario y 7 días de retención, el directorio mantiene 7 u 8
 respaldos. Antes de empezar, el script exige `BACKUP_MIN_FREE_MB` de espacio
 libre; conviene fijarlo por encima del tamaño de un respaldo.
 
+## Programación diaria
+
+`pg-backup.cron.example` es la plantilla: respaldo diario a las **02:30 de
+Guatemala** y, media hora después, `verify-backup.sh` comprueba que existe un
+respaldo reciente e íntegro.
+
+> **Estado: no instalado.** Este repositorio solo entrega el paquete. Instalar
+> el cron en el servidor requiere acceso y autorización de quien administra la
+> infraestructura, y no se ha hecho.
+
+Guatemala es UTC−6 todo el año. La plantilla asume un servidor con reloj en UTC
+(08:30 y 09:00); si `timedatectl` muestra `America/Guatemala`, cambiar las
+horas a 2 y 3.
+
+### Instalación manual
+
+Como administrador del servidor, con el repositorio en `/opt/uvgenius`:
+
+```bash
+# 1. Usuario sin sesión que ejecuta el respaldo; necesita hablar con Docker.
+useradd --system --shell /usr/sbin/nologin uvgbackup
+usermod -aG docker uvgbackup
+
+# 2. Configuración, directorio de respaldos y de registro: solo de ese usuario.
+install -d -m 700 -o uvgbackup -g uvgbackup /etc/uvgenius /var/backups/uvgenius/postgres /var/log/uvgenius
+install -m 600 -o uvgbackup -g uvgbackup /opt/uvgenius/infra/db-backup/backup.example.env /etc/uvgenius/backup.env
+#    editar /etc/uvgenius/backup.env con los valores reales
+
+# 3. Probar a mano antes de programar.
+sudo -u uvgbackup /opt/uvgenius/infra/db-backup/pg-backup.sh /etc/uvgenius/backup.env
+sudo -u uvgbackup /opt/uvgenius/infra/db-backup/verify-backup.sh /etc/uvgenius/backup.env
+
+# 4. Programar.
+install -m 644 -o root -g root /opt/uvgenius/infra/db-backup/pg-backup.cron.example /etc/cron.d/uvgenius-pg-backup
+```
+
+Pertenecer al grupo `docker` equivale a ser administrador del servidor. Si eso
+no es aceptable, dejar `PG_CONTAINER` vacío y usar un `pg_dump` del host de la
+misma versión mayor que el servidor, contra `PGHOST`/`PGPORT`.
+
+### Rotación del registro
+
+`/etc/logrotate.d/uvgenius-pg-backup`:
+
+```
+/var/log/uvgenius/pg-backup.log {
+    weekly
+    rotate 8
+    compress
+    missingok
+    notifempty
+    create 600 uvgbackup uvgbackup
+}
+```
+
+### Aviso de fallos
+
+Las dos tareas escriben un error en el registro del sistema cuando fallan:
+
+```bash
+journalctl -t pg-backup -p err --since "-2 days"
+```
+
+`verify-backup.sh` detecta también el caso en que el respaldo ni siquiera
+llegó a ejecutarse (servidor apagado, cron detenido): termina con 1 si el
+último respaldo tiene más de `BACKUP_MAX_AGE_HOURS` horas (26 por defecto),
+falta, está vacío o no coincide con su `sha256`. No hay aviso por correo ni por
+chat: conectar `logger` a un canal de alertas queda para quien opere el
+servidor.
+
+### Reversión
+
+```bash
+rm /etc/cron.d/uvgenius-pg-backup /etc/logrotate.d/uvgenius-pg-backup
+```
+
+Quitar la programación no borra los respaldos ya hechos.
+
+### Cómo comprobar que quedó activo
+
+```bash
+ls -l /etc/cron.d/uvgenius-pg-backup
+ls -l /var/backups/uvgenius/postgres | tail -n 4     # al día siguiente
+tail -n 5 /var/log/uvgenius/pg-backup.log
+```
+
 ## Pruebas
 
 ```bash
@@ -67,4 +153,5 @@ bash infra/db-backup/test/pg-backup-contract.sh
 ```
 
 No necesita PostgreSQL: usa un `pg_dump` y un `pg_restore` falsos para
-provocar cada fallo.
+provocar cada fallo. Cubre el volcado, la rotación, `verify-backup.sh` y la
+sintaxis de la plantilla de cron.

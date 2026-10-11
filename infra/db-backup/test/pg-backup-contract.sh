@@ -179,6 +179,60 @@ for malo in 0 -1 siete ''; do
   fi
 done
 
+# --- verify-backup.sh ----------------------------------------------------------
+VERIFY="$HERE/../verify-backup.sh"
+verify() { # dir, [VAR=valor ...]
+  local dir="$1"; shift
+  env -i PATH="$PATH" HOME="$WORK" BACKUP_DIR="$dir" PGDATABASE=uvg_collab "$@" bash "$VERIFY" >"$WORK/out" 2>&1
+  code=$?
+}
+D="$WORK/vigilancia"
+run "$D"
+f="$(dumps "$D")"
+verify "$D"
+check "verify: un respaldo recién hecho pasa" "$code"
+check "verify: nombra el respaldo comprobado" "$(grep -q "ok: $(basename "$f")" "$WORK/out"; echo $?)"
+verify "$D" PGDATABASE=otra_base
+check "verify: sin respaldos de esa base termina en 1" "$([ "$code" -eq 1 ]; echo $?)"
+verify "$WORK/no-existe"
+check "verify: sin directorio de respaldos termina en 1" "$([ "$code" -eq 1 ]; echo $?)"
+touch -d '27 hours ago' "$f"
+verify "$D"
+check "verify: un respaldo de 27 horas termina en 1" "$([ "$code" -eq 1 ]; echo $?)"
+verify "$D" BACKUP_MAX_AGE_HOURS=48
+check "verify: el máximo de antigüedad es configurable" "$code"
+touch "$f"
+printf 'dañado' >>"$f"
+verify "$D"
+check "verify: un respaldo modificado tras crearse termina en 1" "$([ "$code" -eq 1 ]; echo $?)"
+rm -f "$f.sha256"
+verify "$D"
+check "verify: sin suma sha256 termina en 1" "$([ "$code" -eq 1 ]; echo $?)"
+printf 'no es un volcado' >"$f"
+verify "$D"
+check "verify: un archivo sin firma de pg_dump termina en 1" "$([ "$code" -eq 1 ]; echo $?)"
+: >"$f"
+verify "$D"
+check "verify: un respaldo vacío termina en 1" "$([ "$code" -eq 1 ]; echo $?)"
+verify "$D" BACKUP_MAX_AGE_HOURS=pronto
+check "verify: una antigüedad no numérica termina en 64" "$([ "$code" -eq 64 ]; echo $?)"
+
+# --- plantilla de cron ---------------------------------------------------------
+CRON="$HERE/../pg-backup.cron.example"
+jobs="$(grep -Ev '^[[:space:]]*(#|$)|^[A-Z_]+=' "$CRON")"
+check "cron: dos tareas (respaldo y vigilancia)" "$([ "$(printf '%s\n' "$jobs" | wc -l)" -eq 2 ]; echo $?)"
+# minuto hora día mes día-semana usuario comando
+check "cron: cada tarea tiene cinco campos de horario, usuario y comando" \
+  "$(! printf '%s\n' "$jobs" | grep -Evq '^[0-9]{1,2} [0-9]{1,2} \* \* \* [a-z_][a-z0-9_-]* /[^ ]+\.sh /[^ ]+ '; echo $?)"
+check "cron: el respaldo es diario, una vez" "$(printf '%s\n' "$jobs" | grep -c 'pg-backup\.sh' | grep -qx 1; echo $?)"
+check "cron: la vigilancia corre después del respaldo" "$(printf '%s\n' "$jobs" | awk '{print $2*60+$1}' | sort -nc 2>/dev/null; echo $?)"
+check "cron: cada tarea avisa si falla" "$([ "$(printf '%s\n' "$jobs" | grep -c '|| logger ')" -eq 2 ]; echo $?)"
+check "cron: no lleva credenciales" "$(! grep -Eiq 'PGPASSWORD|password|postgres(ql)?://' "$CRON"; echo $?)"
+check "cron: documenta la hora de Guatemala" "$(grep -q 'Guatemala' "$CRON"; echo $?)"
+for sh in "$SCRIPT" "$VERIFY"; do
+  check "$(basename "$sh") es sintácticamente válido y ejecutable" "$(bash -n "$sh" && [ -x "$sh" ]; echo $?)"
+done
+
 # --- concurrencia ------------------------------------------------------------
 D="$WORK/concurrente"
 env -i PATH="$WORK/bin:$PATH" HOME="$WORK" FAKE_LOG="$WORK/argv-lento.log" FAKE_DUMP=slow \
