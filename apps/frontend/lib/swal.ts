@@ -1,4 +1,4 @@
-import Swal, { type SweetAlertOptions } from 'sweetalert2';
+import type { SweetAlertOptions, SweetAlertResult } from 'sweetalert2';
 
 /**
  * SweetAlert2 combina `Swal.mixin(...)` con las opciones de cada `.fire()`
@@ -24,19 +24,37 @@ export const swalCustomClass = {
 const CHECK_ICON_HTML =
   '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" style="stroke:var(--color-on-status-success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 7"/></svg>';
 
-const base = Swal.mixin({
-  customClass: swalCustomClass,
-  buttonsStyling: false,
-  confirmButtonText: 'Aceptar',
-  padding: '1.25rem',
-});
+// T-293 (HU-176): sweetalert2 viajaba en el JS inicial de todo el dashboard
+// aunque solo se usa al mostrar un aviso. Se importa la primera vez que se
+// llama a `fire` y la instancia se reutiliza; si la carga falla, se reintenta
+// en la siguiente llamada.
+type SwalInstance = typeof import('sweetalert2').default;
+let base: Promise<SwalInstance> | null = null;
+
+function cargarBase(): Promise<SwalInstance> {
+  base ??= import('sweetalert2')
+    .then(({ default: Swal }) =>
+      Swal.mixin({
+        customClass: swalCustomClass,
+        buttonsStyling: false,
+        confirmButtonText: 'Aceptar',
+        padding: '1.25rem',
+      }),
+    )
+    .catch((error: unknown) => {
+      base = null;
+      throw error;
+    });
+  return base;
+}
 
 const uvgSwal = {
-  ...base,
-  fire: (options: SweetAlertOptions) =>
-    base.fire(
+  fire: async (options: SweetAlertOptions): Promise<SweetAlertResult> => {
+    const swal = await cargarBase();
+    return swal.fire(
       options.icon === 'success' && !options.iconHtml ? { ...options, iconHtml: CHECK_ICON_HTML } : options,
-    ),
+    );
+  },
 };
 
 export default uvgSwal;

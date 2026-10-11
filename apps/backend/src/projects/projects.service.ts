@@ -292,6 +292,11 @@ const proyectoDetalleSelect = {
   },
 } as const;
 
+// T-292 (HU-176): GET /proyectos/:id es público y el frontend solo lo usa
+// para los datos del proyecto, sus roles e hitos. Embebía todas las tareas
+// (51 KB con 236 tareas, sin importar el Sprint); el tablero las pide aparte.
+const { tareas: _tareasDetalle, ...proyectoDetallePublicoSelect } = proyectoDetalleSelect;
+
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -578,7 +583,7 @@ export class ProjectsService {
         estadoProyecto: { in: ESTADOS_CON_DETALLE },
         eliminadoEn: null,
       },
-      select: proyectoDetalleSelect,
+      select: proyectoDetallePublicoSelect,
     });
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);

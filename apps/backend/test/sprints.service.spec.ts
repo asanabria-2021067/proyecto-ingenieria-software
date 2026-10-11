@@ -2218,8 +2218,8 @@ describe('SprintsService', () => {
 
       const callArgs = prisma.sprint.findFirst.mock.calls[0][0];
       expect(callArgs.where).toEqual({ idSprint: SPRINT_ID, idProyecto: PROJECT_ID });
-      expect(callArgs.include.tareas.where).toEqual({ idProyecto: PROJECT_ID, eliminadoEn: null });
-      expect(callArgs.include.tareas.include.comentarios.where).toEqual({ eliminadoEn: null });
+      expect(callArgs.select.tareas.where).toEqual({ idProyecto: PROJECT_ID, eliminadoEn: null });
+      expect(callArgs.select.tareas.select.comentarios.where).toEqual({ eliminadoEn: null });
     });
   });
 

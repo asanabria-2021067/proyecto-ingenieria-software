@@ -128,30 +128,43 @@ export class AdminService {
       take: 20,
     });
 
-    const estudiantesConHoras = await Promise.all(
-      perfilesRiesgo.map(async (p) => {
-        const agg = await this.prisma.horasParticipacion.aggregate({
+    // T-291: una sola consulta para las horas de todos los perfiles en vez de
+    // un aggregate por estudiante; la suma se agrupa por usuario en memoria
+    // con Decimal para conservar el mismo resultado que el _sum anterior.
+    const horasAprobadas = perfilesRiesgo.length
+      ? await this.prisma.horasParticipacion.findMany({
           where: {
             participacion: {
-              idUsuario: p.idUsuario,
+              idUsuario: { in: perfilesRiesgo.map((p) => p.idUsuario) },
               rolProyecto: {
                 proyecto: { tipoProyecto: TipoProyecto.EXTRACURRICULAR_EXTENSION },
               },
             },
             estadoHoras: EstadoHoras.APROBADA,
           },
-          _sum: { horasAprobadas: true },
-        });
-        return {
-          idUsuario: p.idUsuario,
-          nombre: p.usuario.nombre,
-          apellido: p.usuario.apellido,
-          semestre: p.semestre,
-          horasExtension: Number(agg._sum.horasAprobadas ?? 0),
-          horasExtensionRequeridas: p.horasExtensionRequeridas ?? 100,
-        };
-      }),
-    );
+          select: {
+            horasAprobadas: true,
+            participacion: { select: { idUsuario: true } },
+          },
+        })
+      : [];
+
+    const horasPorUsuario = new Map<number, Prisma.Decimal>();
+    for (const registro of horasAprobadas) {
+      if (registro.horasAprobadas === null) continue;
+      const idUsuario = registro.participacion.idUsuario;
+      const acumulado = horasPorUsuario.get(idUsuario) ?? new Prisma.Decimal(0);
+      horasPorUsuario.set(idUsuario, acumulado.plus(registro.horasAprobadas));
+    }
+
+    const estudiantesConHoras = perfilesRiesgo.map((p) => ({
+      idUsuario: p.idUsuario,
+      nombre: p.usuario.nombre,
+      apellido: p.usuario.apellido,
+      semestre: p.semestre,
+      horasExtension: Number(horasPorUsuario.get(p.idUsuario) ?? 0),
+      horasExtensionRequeridas: p.horasExtensionRequeridas ?? 100,
+    }));
 
     estudiantesConHoras.sort((a, b) => a.horasExtension - b.horasExtension);
     const estudiantesEnRiesgo = estudiantesConHoras.slice(0, 5);

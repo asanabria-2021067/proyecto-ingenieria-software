@@ -1236,7 +1236,7 @@ export class SprintsService {
    *      soft-delete que TasksService.findAll/findOne) + sus asignaciones
    *      (TODOS los tramos, no solo el activo — Sección 6.C) + sus
    *      comentarios (`eliminadoEn: null`, mismo criterio que
-   *      ComentariosService), todo vía un único `include` anidado.
+   *      ComentariosService), todo vía un único `select` anidado.
    *   2) y 3) Los Hitos referenciados por esas tareas y TODAS las tareas
    *      vigentes de esos Hitos en el proyecto (no solo las de este
    *      Sprint — mismo scope que `ProjectsService.calcularAvanceHitos` /
@@ -1269,21 +1269,51 @@ export class SprintsService {
     });
     await this.sprintsAuthorization.assertCanViewSprintHistory(projectId, sprintId, userId);
 
+    // T-291: `select` acotado a los campos que se mapean en la respuesta, en
+    // vez de traer todas las columnas de tareas, asignaciones y comentarios.
     const sprint = await this.prisma.sprint.findFirst({
       where: { idSprint: sprintId, idProyecto: projectId },
-      include: {
+      select: {
+        idSprint: true,
+        idProyecto: true,
+        numero: true,
+        estado: true,
+        fechaInicio: true,
+        fechaFinalizacionIniciada: true,
+        fechaCierre: true,
+        cerradoPor: true,
         tareas: {
           where: { idProyecto: projectId, eliminadoEn: null },
           orderBy: { orden: 'asc' },
-          include: {
+          select: {
+            idTarea: true,
+            tituloTarea: true,
+            descripcionTarea: true,
+            estadoTarea: true,
+            prioridad: true,
+            idHito: true,
+            fechaCreacion: true,
+            fechaLimite: true,
+            tiempoEstimadoHoras: true,
             asignaciones: {
               orderBy: { fechaAsignacion: 'asc' },
-              include: { usuario: { select: SprintsService.HISTORY_USUARIO_SELECT } },
+              select: {
+                idAsignacion: true,
+                fechaAsignacion: true,
+                desasignadaEn: true,
+                horasReales: true,
+                usuario: { select: SprintsService.HISTORY_USUARIO_SELECT },
+              },
             },
             comentarios: {
               where: { eliminadoEn: null },
               orderBy: { creadoEn: 'asc' },
-              include: { autor: { select: SprintsService.HISTORY_USUARIO_SELECT } },
+              select: {
+                idComentario: true,
+                contenido: true,
+                creadoEn: true,
+                autor: { select: SprintsService.HISTORY_USUARIO_SELECT },
+              },
             },
           },
         },

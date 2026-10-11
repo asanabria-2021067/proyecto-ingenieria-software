@@ -529,10 +529,11 @@ describe('S7 environment foundation (TC03)', () => {
     const cacheProvider = findAsyncOptionsProvider(AppModule, CacheModule, CACHE_MODULE_OPTIONS);
     expect(cacheProvider.inject).toEqual([ConfigService]);
     const cacheOptions = (await cacheProvider.useFactory(configService)) as Record<string, unknown>;
-    expect(cacheOptions).toMatchObject({ host: 'redis.validator.local', port: 6390, ttl: 300 });
-    // El store es el namespace de cache-manager-redis-store, igual que antes (bajo vitest puede colgar de `default`).
-    const store = cacheOptions.store as { redisStore?: unknown; default?: { redisStore?: unknown } };
-    expect(typeof (store.redisStore ?? store.default?.redisStore)).toBe('function');
+    expect(cacheOptions).toMatchObject({ ttl: 300_000 });
+    // T-292: un único store de Keyv sobre Redis, apuntando al host y puerto validados.
+    const stores = cacheOptions.stores as Array<{ store: { client: { options: { url: string } } } }>;
+    expect(stores).toHaveLength(1);
+    expect(stores[0].store.client.options.url).toBe('redis://redis.validator.local:6390');
     expect(findDynamicImport(AppModule, CacheModule).global).toBe(true);
 
     // main.ts obtiene el puerto vía ConfigService tras NestFactory.create; ningún dotenv paralelo en src/.
