@@ -168,3 +168,44 @@ export function securityEventsQueryFromFilters(value: SecurityEventsFilterValue)
     ...(id ? { idUsuario: Number(id) } : {}),
   };
 }
+
+export interface SecurityEventDetailRow {
+  etiqueta: string;
+  valor: string;
+}
+
+/**
+ * Filas del detalle de un evento. Cada tipo declara qué claves muestra y cómo
+ * se leen; una clave fuera de esta lista o un valor que no se reconoce NO se
+ * pinta, aunque llegara en la respuesta.
+ */
+const DETALLE_VISIBLE: Record<SecurityEventType, Record<string, { etiqueta: string; leer: (valor: unknown) => string | null }>> = (() => {
+  const siNo = (valor: unknown) => (typeof valor === 'boolean' ? (valor ? 'Sí' : 'No') : null);
+  const numero = (valor: unknown) => (entero(valor) !== null ? String(valor) : null);
+  const referencia = (valor: unknown) => (typeof valor === 'string' && /^[0-9a-f]{16}$/.test(valor) ? valor : null);
+  const fecha = (valor: unknown) =>
+    typeof valor === 'string' && !Number.isNaN(new Date(valor).getTime()) ? formatSecurityEventDate(valor) : null;
+  const cuentaConocida = { etiqueta: 'La cuenta existe', leer: siNo };
+  const cuentaRef = { etiqueta: 'Referencia seudónima de la cuenta', leer: referencia };
+  const idSolicitud = { etiqueta: 'Solicitud de recuperación n.º', leer: numero };
+  return {
+    LOGIN_FAILED: { motivo: { etiqueta: 'Motivo', leer: (valor) => texto(valor, MOTIVO_LABEL) }, cuentaConocida, cuentaRef },
+    LOGIN_SUCCEEDED: {},
+    ACCOUNT_LOCKED: { cuentaConocida, cuentaRef },
+    PASSWORD_RESET_ISSUED: { idSolicitud, expiraEn: { etiqueta: 'El enlace vence', leer: fecha } },
+    PASSWORD_RESET_COMPLETED: { idSolicitud, sesionesRevocadas: { etiqueta: 'Sesiones revocadas', leer: numero } },
+    USER_STATUS_CHANGED: {
+      estadoAnterior: { etiqueta: 'Estado anterior', leer: (valor) => texto(valor, ESTADO_LABEL) },
+      estadoNuevo: { etiqueta: 'Estado nuevo', leer: (valor) => texto(valor, ESTADO_LABEL) },
+    },
+  };
+})();
+
+export function securityEventDetailRows(event: SecurityEvent): SecurityEventDetailRow[] {
+  const filas: SecurityEventDetailRow[] = [];
+  for (const [clave, { etiqueta, leer }] of Object.entries(DETALLE_VISIBLE[event.tipo] ?? {})) {
+    const valor = Object.prototype.hasOwnProperty.call(event.detalle, clave) ? leer(event.detalle[clave]) : null;
+    if (valor !== null) filas.push({ etiqueta, valor });
+  }
+  return filas;
+}

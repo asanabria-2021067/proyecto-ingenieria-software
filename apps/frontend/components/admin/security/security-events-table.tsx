@@ -1,3 +1,4 @@
+import { Eye } from 'lucide-react';
 import {
   DATA_TABLE_CARD,
   DATA_TABLE_HEAD_ROW,
@@ -5,6 +6,7 @@ import {
   DATA_TABLE_ROW_BORDER,
   DATA_TABLE_ROW_HOVER,
 } from '@/components/dashboard/data-table';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tag } from '@/components/ui/tag';
 import {
@@ -27,7 +29,8 @@ const COL_CUENTA = '@2xl/bandeja:table-cell';
 const META_CUENTA = '@2xl/bandeja:hidden';
 const COL_ORIGEN = '@4xl/bandeja:table-cell';
 const META_ORIGEN = '@4xl/bandeja:hidden';
-const COL_DETALLE = '@xl/bandeja:table-cell';
+// «Detalle» siempre está: lleva el botón. Su resumen solo cabe desde cierto ancho.
+const RESUMEN_DETALLE = '@xl/bandeja:block';
 const META_DETALLE = '@xl/bandeja:hidden';
 
 function Origen({ origen }: { origen: SecurityEvent['origen'] }) {
@@ -43,8 +46,16 @@ function Origen({ origen }: { origen: SecurityEvent['origen'] }) {
 /**
  * Tabla del visor de eventos de seguridad (T-310): Fecha, Tipo, Actor, Cuenta,
  * Origen y Detalle. Solo pinta textos compuestos por `lib/admin/security-events`.
+ * Con `onSelect`, cada fila ofrece «Ver detalle».
  */
-export function SecurityEventsTable({ events }: { events: SecurityEvent[] }) {
+export function SecurityEventsTable({
+  events,
+  onSelect,
+}: {
+  events: SecurityEvent[];
+  /** Recibe también el botón pulsado, para devolverle el foco al cerrar el detalle. */
+  onSelect?: (event: SecurityEvent, trigger: HTMLElement) => void;
+}) {
   return (
     <div className={DATA_TABLE_CARD}>
       <Table>
@@ -66,7 +77,7 @@ export function SecurityEventsTable({ events }: { events: SecurityEvent[] }) {
             <TableHead scope="col" className={`${TH} hidden ${COL_ORIGEN}`}>
               Origen
             </TableHead>
-            <TableHead scope="col" className={`${TH} hidden ${COL_DETALLE}`}>
+            <TableHead scope="col" className={TH}>
               Detalle
             </TableHead>
           </TableRow>
@@ -103,8 +114,22 @@ export function SecurityEventsTable({ events }: { events: SecurityEvent[] }) {
                 <TableCell className={`${TD} hidden ${COL_ORIGEN}`}>
                   <Origen origen={event.origen} />
                 </TableCell>
-                <TableCell className={`${TD} hidden ${COL_DETALLE}`}>
-                  <span className="type-body break-words text-text-secondary">{resumen}</span>
+                <TableCell className={TD}>
+                  <span className={`type-body mb-tight hidden break-words text-text-secondary ${RESUMEN_DETALLE}`}>{resumen}</span>
+                  {onSelect && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={(click) => onSelect(event, click.currentTarget)}
+                      aria-label={`Ver detalle: ${SECURITY_EVENT_LABEL[event.tipo]}, ${formatSecurityEventDate(event.fecha)}`}
+                      className="rounded-control whitespace-nowrap"
+                    >
+                      <Eye aria-hidden="true" />
+                      {/* En tarjetas estrechas queda solo el icono: el nombre accesible ya lo dice. */}
+                      <span className="hidden @md/bandeja:inline">Ver detalle</span>
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             );

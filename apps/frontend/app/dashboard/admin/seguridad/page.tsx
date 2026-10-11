@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
+import { SecurityEventDetail } from '@/components/admin/security/security-event-detail';
 import { SecurityEventsFilters } from '@/components/admin/security/security-events-filters';
 import { SecurityEventsTable } from '@/components/admin/security/security-events-table';
 import { DataTablePager } from '@/components/dashboard/data-table';
 import { useAdminSecurityEvents } from '@/hooks/use-admin-security-events';
+import type { SecurityEvent } from '@/lib/types/admin-security';
 import {
   SECURITY_EVENTS_NO_FILTERS,
   securityEventsFilterErrors,
@@ -24,6 +26,8 @@ export default function AdminSeguridadPage() {
   const [filtros, setFiltros] = useState<SecurityEventsFilterValue>(SECURITY_EVENTS_NO_FILTERS);
   const [aplicados, setAplicados] = useState<SecurityEventsFilterValue>(SECURITY_EVENTS_NO_FILTERS);
   const errores = securityEventsFilterErrors(filtros);
+  const [seleccionado, setSeleccionado] = useState<SecurityEvent | null>(null);
+  const disparador = useRef<HTMLElement | null>(null);
   const { data } = useAdminSecurityEvents({ ...securityEventsQueryFromFilters(aplicados), page });
 
   const cambiarFiltros = (siguientes: SecurityEventsFilterValue) => {
@@ -56,7 +60,13 @@ export default function AdminSeguridadPage() {
             <p className="type-body text-text-secondary" role="status" aria-live="polite">
               Eventos encontrados: <span className="font-semibold tabular-nums text-text-primary">{data.total}</span>
             </p>
-            <SecurityEventsTable events={data.data} />
+            <SecurityEventsTable
+              events={data.data}
+              onSelect={(event, trigger) => {
+                disparador.current = trigger;
+                setSeleccionado(event);
+              }}
+            />
             {data.totalPages > 1 && (
               <DataTablePager
                 pagina={data.page}
@@ -68,6 +78,8 @@ export default function AdminSeguridadPage() {
           </>
         )}
       </div>
+
+      <SecurityEventDetail event={seleccionado} onClose={() => setSeleccionado(null)} returnFocusRef={disparador} />
     </div>
   );
 }
