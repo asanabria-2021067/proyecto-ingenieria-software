@@ -33,7 +33,7 @@ import { TaskLabelChip } from '@/components/projects/task-label-chip';
 import { TipoBadge } from '@/components/projects/tipo-badge';
 import { Badge } from '@/components/ui/badge';
 import { TAG_TONES, Tag, type TagSize } from '@/components/ui/tag';
-import { ESTADO_BADGE as ESTADO_APELACION_BADGE } from '@/app/dashboard/admin/apelaciones/appeals-inbox-client';
+import { ESTADO_APELACION_BADGE } from '@/lib/admin/appeals';
 import { SITUACION_CIERRE, SITUACION_PUBLICACION } from '@/lib/admin/request-status';
 import { SITUACION_SPRINT_LABEL, SITUACION_SPRINT_TONE } from '@/lib/admin/sprint-calendar';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
@@ -359,7 +359,7 @@ export default function AdminEtiquetasPage() {
           <UserStatusBadge estado="BLOQUEADO" />
         </Familia>
 
-        <Familia numero={23} titulo="Estado de apelación" vista="Admin" origen="Particular" fuente="app/dashboard/admin/apelaciones/appeals-inbox-client.tsx · ESTADO_BADGE">
+        <Familia numero={23} titulo="Estado de apelación" vista="Admin" origen="Particular" fuente="lib/admin/appeals.ts · ESTADO_APELACION_BADGE">
           {Object.values(ESTADO_APELACION_BADGE).map((e) => (
             <span key={e.label} className={`pill ${e.className}`}>
               {e.label}

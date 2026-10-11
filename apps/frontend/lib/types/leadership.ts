@@ -112,6 +112,19 @@ export interface ApelacionItemDto {
   liderSolicitante: UsuarioResumenDto;
   candidatoPropuesto: UsuarioResumenDto;
   adminResolutor: UsuarioResumenDto | null;
+  /** Título y estado ACTUALES del proyecto; independiente del estado de la apelación. */
+  proyecto?: { idProyecto: number; tituloProyecto: string; estadoProyecto: string };
+  /** Destinatario real de la transferencia de una apelación aceptada; puede no ser el candidato propuesto. */
+  liderDesignado?: UsuarioResumenDto | null;
+}
+
+/** `GET /admin/liderazgo/apelaciones/resumen` — contadores de las pestañas de la bandeja. */
+export interface ApelacionesResumenDto {
+  PENDIENTE: number;
+  ACEPTADA: number;
+  DENEGADA: number;
+  CANCELADA: number;
+  TODAS: number;
 }
 
 /** Paginación común de §46. */
