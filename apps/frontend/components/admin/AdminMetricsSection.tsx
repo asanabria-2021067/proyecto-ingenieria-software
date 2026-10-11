@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AlertCircle, ChartLine } from 'lucide-react';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -18,6 +18,12 @@ import {
 } from '@/lib/services/admin';
 
 type Serie = Exclude<keyof AdminMetricasPunto, 'inicio'>;
+
+// T-293 (HU-176): recharts se carga aparte, solo cuando hay tendencias que dibujar.
+const MetricTrendPlot = dynamic(() => import('./metric-trend-plot'), {
+  ssr: false,
+  loading: () => <div className="h-[140px] w-full animate-pulse rounded-md bg-surface-container" />,
+});
 
 interface MetricaConfig {
   serie: Serie;
@@ -84,33 +90,17 @@ function MetricTrendCard({
           {textos.actual} · {formatearValor(total, config.esHoras)} {textos.ventana}
         </p>
       </div>
-      <ResponsiveContainer width="100%" height={140}>
-        <LineChart data={serie} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-outline-variant" vertical={false} />
-          <XAxis
-            dataKey="inicio"
-            tickFormatter={(inicio: string) => formatearInicio(inicio, periodo)}
-            tick={{ fontSize: 11 }}
-            className="fill-tertiary"
-          />
-          <YAxis allowDecimals={Boolean(config.esHoras)} tick={{ fontSize: 11 }} className="fill-tertiary" />
-          <Tooltip
-            labelFormatter={(inicio: string) =>
-              periodo === 'semana' ? `Semana del ${formatearInicio(inicio, periodo)}` : formatearInicio(inicio, periodo)
-            }
-            formatter={(valor: number) => [formatearValor(valor, config.esHoras), config.label] as [string, string]}
-          />
-          <Line
-            type="monotone"
-            dataKey={config.serie}
-            name={config.label}
-            stroke="var(--color-primary)"
-            strokeWidth={2}
-            dot={{ r: 3 }}
-            isAnimationActive={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+      <MetricTrendPlot
+        serie={serie}
+        dataKey={config.serie}
+        label={config.label}
+        esHoras={config.esHoras}
+        formatearEje={(inicio) => formatearInicio(inicio, periodo)}
+        formatearEtiqueta={(inicio) =>
+          periodo === 'semana' ? `Semana del ${formatearInicio(inicio, periodo)}` : formatearInicio(inicio, periodo)
+        }
+        formatearValor={(valor) => formatearValor(valor, config.esHoras)}
+      />
       <p className="text-xs text-tertiary">{config.descripcion}</p>
     </div>
   );
