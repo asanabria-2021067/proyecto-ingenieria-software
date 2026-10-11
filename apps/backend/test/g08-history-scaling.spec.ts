@@ -10,6 +10,7 @@ import {
   gitAvailable,
   historyCommitIds,
   parseTraceLog,
+  phaseHead,
 } from './helpers/owasp-evidence';
 
 /**
@@ -89,7 +90,14 @@ describe('GPI01-C11: parseTraceLog conserva la semántica', () => {
 
 describe.runIf(gitAvailable())('GPI01-C11: lectura acotada del historial real', () => {
   it('devuelve exactamente el mismo mapa que la lectura completa sin acotar', () => {
-    const referencia = parseTraceLog(historialCompleto());
+    // Mismo rango que audita `historyCommitIds`: de la base de la fase a su cierre.
+    const referencia = parseTraceLog(
+      execFileSync('git', ['log', '--format=%H%x00%B%x1e', `${PHASE2_BASE}..${phaseHead()}`], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        maxBuffer: 512 * 1024 * 1024,
+      }),
+    );
     const acotada = historyCommitIds();
     expect(acotada.size).toBe(referencia.size);
     expect([...acotada]).toEqual([...referencia]);

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 // Script sin dependencias (scripts/security), el mismo que corre el job OWASP_DELTA_ISOLATED.
 import { allowedGates, globToRegExp, parseAllowlist, verifyDelta } from '../../../scripts/security/verify-owasp-delta.mjs';
 import { createFixtureRepo, runVerifier, traceMessage, type FixtureRepo } from './helpers/owasp-delta-fixture';
-import { gitAvailable } from './helpers/owasp-evidence';
+import { gitAvailable, phaseHead } from './helpers/owasp-evidence';
 
 /**
  * G08-C03 · OWASP25-C048 (A08:2025). Verificador determinista y solo local del
@@ -147,7 +147,7 @@ describe('G08-C03: verificador sobre repositorios Git sintéticos', () => {
 
 describe('G08-C03: repositorio real', () => {
   it.runIf(gitAvailable())('el delta de la rama OWASP está aislado y es trazable', () => {
-    const result = runVerifier([]);
+    const result = runVerifier(['--head', phaseHead()]);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/^OWASP_DELTA_ISOLATED=PASS base=0a723a8d93b6 /);
   });

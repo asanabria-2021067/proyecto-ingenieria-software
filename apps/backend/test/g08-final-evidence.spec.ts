@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readRepoFile } from './helpers/workflow-yaml';
-import { PHASE2_BASE, git, gitAvailable, historyCommitIds, tableRows } from './helpers/owasp-evidence';
+import { PHASE2_BASE, git, gitAvailable, historyCommitIds, phaseHead, tableRows } from './helpers/owasp-evidence';
 import { runVerifier } from './helpers/owasp-delta-fixture';
 
 /**
@@ -46,29 +46,29 @@ describe('G08-C10: evidencia final y handoff', () => {
         expect(inHistory, gate).toBe(Number(count));
       }
     }
-    const total = Number(git('rev-list', '--count', `${PHASE2_BASE}..HEAD`));
+    const total = Number(git('rev-list', '--count', `${PHASE2_BASE}..${phaseHead()}`));
     expect([98, 99]).toContain(total);
-    expect(Number(git('rev-list', '--merges', '--count', `${PHASE2_BASE}..HEAD`))).toBe(0);
+    expect(Number(git('rev-list', '--merges', '--count', `${PHASE2_BASE}..${phaseHead()}`))).toBe(0);
   });
 
   it.runIf(gitAvailable())('toda la fase tiene un único autor/committer y ningún trailer de herramientas o coautoría', () => {
-    const identities = new Set(git('log', '--format=%an <%ae>|%cn <%ce>', `${PHASE2_BASE}..HEAD`).split('\n'));
+    const identities = new Set(git('log', '--format=%an <%ae>|%cn <%ce>', `${PHASE2_BASE}..${phaseHead()}`).split('\n'));
     expect(identities.size).toBe(1);
     const [author, committer] = [...identities][0].split('|');
     expect(author).toBe(committer);
     expect(author.startsWith('Junjey123-mx ')).toBe(true);
-    const bodies = git('log', '--format=%B', `${PHASE2_BASE}..HEAD`);
+    const bodies = git('log', '--format=%B', `${PHASE2_BASE}..${phaseHead()}`);
     expect(bodies).not.toMatch(/co-authored-by|signed-off-by|claude|anthropic|generated-by|ai-assisted/i);
   });
 
   it.runIf(gitAvailable())('no hay rutas sensibles versionadas en la fase (la plantilla .env.example es legítima)', () => {
-    const files = git('log', '--name-only', '--format=', `${PHASE2_BASE}..HEAD`).split('\n').filter(Boolean);
+    const files = git('log', '--name-only', '--format=', `${PHASE2_BASE}..${phaseHead()}`).split('\n').filter(Boolean);
     const sensitive = files.filter((file) => /^(\.claude|\.codex|\.env|backups?\/)|\.(dump|pem|key)$/.test(file) && file !== '.env.example');
     expect(sensitive).toEqual([]);
   });
 
   it.runIf(gitAvailable())('OWASP_DELTA_ISOLATED = PASS con el verificador real', () => {
-    const result = runVerifier([]);
+    const result = runVerifier(['--head', phaseHead()]);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/^OWASP_DELTA_ISOLATED=PASS base=0a723a8d93b6 /);
   });

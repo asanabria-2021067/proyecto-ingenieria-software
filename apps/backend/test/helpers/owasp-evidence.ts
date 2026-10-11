@@ -13,7 +13,36 @@ import { REPO_ROOT } from './workflow-yaml';
 /** BASE_SHA_PHASE2_CODE: padre local del primer commit de G01 (79230ea7). */
 export const PHASE2_BASE = '0a723a8d93b640f6077c801d9a0ad5a7b59cbef3';
 
-export const STATES = ['IMPLEMENTED', 'PASS', 'SKIPPED_BY_PREFLIGHT', 'RESIDUAL_CODE_RISK', 'OUT_OF_SCOPE_ADMIN_HANDOFF', 'NOT_APPLICABLE'];
+/** Último commit de la fase OWASP en su rama (`sprint8/vernel-owasp2025`), cerrada y auditada con 99 commits. */
+export const PHASE2_TIP = '6c9574d1888422de75b39b2778bc5e38658005df';
+
+/**
+ * Extremo del rango que auditan las pruebas de evidencia: `PHASE2_BASE..phaseHead()`.
+ *
+ * Estas pruebas certifican la fase OWASP: un solo autor, sin merges, cada commit
+ * trazable y ninguna ruta fuera de la lista. En su rama eso es `base..HEAD`. En
+ * una rama que ya integró la fase y siguió (Sprint 9 con `develop`), `HEAD`
+ * arrastra miles de commits ajenos a la fase y el historial duplicado de
+ * `develop`: las pruebas dejaban de auditar la fase y fallaban por lo integrado
+ * después. Cuando el cierre de la fase es ancestro de HEAD se audita hasta ese
+ * cierre: la fase completa, y solo la fase. Mientras la fase está en curso (su
+ * rama, antes del cierre) el extremo sigue siendo HEAD. Ninguna aserción cambia.
+ *
+ * Decisión del propietario (2026-10-11). Lo posterior al cierre NO queda cubierto
+ * por estas pruebas, incluidos cinco commits de mantenimiento de otro autor que
+ * reutilizan identificadores de la fase (G01-C13, G05-C14, G07-C13, G07-C14 y
+ * G08-C11): constan en la auditoría de GPI01, no en el índice de evidencia.
+ */
+export function phaseHead(): string {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', PHASE2_TIP, 'HEAD'], { cwd: REPO_ROOT, stdio: 'ignore' });
+    return PHASE2_TIP;
+  } catch {
+    return 'HEAD';
+  }
+}
+
+export const STATES =['IMPLEMENTED', 'PASS', 'SKIPPED_BY_PREFLIGHT', 'RESIDUAL_CODE_RISK', 'OUT_OF_SCOPE_ADMIN_HANDOFF', 'NOT_APPLICABLE'];
 export const CATEGORIES = ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09', 'A10'];
 export const TRACE = /Security\/integration contract: Gate (G0\d) · Commit (G0\d-C\d{2})/;
 
@@ -62,7 +91,7 @@ export function historyCommitIds(): Map<string, string> {
   // (`--grep`, texto fijo) devuelve el mismo mapa sin traer el cuerpo de todo
   // el historial. El filtro exacto sigue siendo TRACE, en `parseTraceLog`.
   return parseTraceLog(
-    git('log', '--fixed-strings', `--grep=${TRACE_GREP}`, '--format=%H%x00%B%x1e', `${PHASE2_BASE}..HEAD`),
+    git('log', '--fixed-strings', `--grep=${TRACE_GREP}`, '--format=%H%x00%B%x1e', `${PHASE2_BASE}..${phaseHead()}`),
   );
 }
 

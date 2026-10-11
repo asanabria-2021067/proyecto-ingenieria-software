@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readRepoFile } from './helpers/workflow-yaml';
-import { STATES, TRACE, citedSpecs, git, gitAvailable, historyCommitIds, specExists, tableRows } from './helpers/owasp-evidence';
+import { STATES, TRACE, citedSpecs, git, gitAvailable, historyCommitIds, phaseHead, specExists, tableRows } from './helpers/owasp-evidence';
 
 /**
  * G08-C05 · OWASP25-C048 (A01–A10). Índice durable control → gate/commit →
@@ -103,7 +103,7 @@ describe('G08-C05: índice de evidencia', () => {
 
   it.runIf(gitAvailable())('todo commit trazable de los gates indexados tiene fila (el commit actual de G08 puede ir como «este commit»)', () => {
     const history = historyCommitIds();
-    const headId = TRACE.exec(git('show', '-s', '--format=%B', 'HEAD'))?.[2];
+    const headId = TRACE.exec(git('show', '-s', '--format=%B', phaseHead()))?.[2];
     const indexed = new Map(rows.map((row) => [row.id, row]));
     const missing = [...history.keys()].filter((id) => INDEXED_GATES.includes(id.slice(0, 3)) && !indexed.has(id) && id !== headId);
     expect(missing).toEqual([]);
