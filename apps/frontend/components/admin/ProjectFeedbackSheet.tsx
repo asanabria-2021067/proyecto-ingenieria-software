@@ -16,7 +16,7 @@ export interface ProjectFeedbackSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const labelClass = 'block text-[10px] font-black uppercase tracking-widest text-tertiary mb-1.5';
+const labelClass = 'block type-micro font-black uppercase tracking-widest text-tertiary mb-1.5';
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -33,7 +33,7 @@ function ReadonlyField({ label, value }: { label: string; value: string | null |
   return (
     <div>
       <label className={labelClass}>{label}</label>
-      <div className={`w-full rounded-xl border px-4 py-3 text-sm whitespace-pre-wrap min-h-11 ${
+      <div className={`w-full rounded-control border px-4 py-3 text-sm whitespace-pre-wrap min-h-11 ${
         isEmpty
           ? 'border-outline-variant/20 bg-surface-container-lowest text-tertiary italic'
           : 'border-outline-variant/30 bg-surface-container-low/60 text-on-surface'
@@ -46,10 +46,10 @@ function ReadonlyField({ label, value }: { label: string; value: string | null |
 
 function SectionCommentReadonly({ comment }: { comment: string }) {
   return (
-    <div className="mt-6 rounded-xl border border-review-soft/60 bg-review-soft/10 p-4">
+    <div className="mt-6 rounded-control border border-review-soft/60 bg-review-soft/10 p-4">
       <div className="flex items-center gap-2 mb-3">
         <MessageSquare className="h-3.5 w-3.5 text-review-ink dark:text-review-soft shrink-0" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-review-ink dark:text-review-soft">
+        <span className="type-micro font-black uppercase tracking-widest text-review-ink dark:text-review-soft">
           Comentarios enviados al estudiante
         </span>
       </div>
@@ -135,14 +135,14 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
       <div className="shrink-0 flex items-center gap-4 border-b border-outline-variant/30 bg-surface px-6 py-4">
         <button
           onClick={() => onOpenChange(false)}
-          className="flex items-center gap-2 rounded-xl bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+          className="flex items-center gap-2 rounded-control bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver
         </button>
         <div className="h-5 w-px bg-outline-variant/40" />
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-widest text-review-ink dark:text-review-soft">
+          <p className="type-micro font-black uppercase tracking-widest text-review-ink dark:text-review-soft">
             Administración · Retroalimentación enviada
           </p>
           <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
@@ -154,7 +154,7 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
                 <button
                   key={r.idRevisionProyecto}
                   onClick={() => setSelectedRevision(r)}
-                  className="inline-flex items-center gap-1 rounded-lg bg-surface-container-high px-2.5 py-1 text-[10px] font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+                  className="inline-flex items-center gap-1 rounded-lg bg-surface-container-high px-2.5 py-1 type-micro font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
                 >
                   <Eye className="h-3 w-3" />
                   Ver Revisión {r.numeroEnvio}
@@ -177,7 +177,7 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
         {isLoading && (
           <div className="max-w-3xl mx-auto px-6 py-8 space-y-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-11 w-full rounded-xl" />
+              <Skeleton key={i} className="h-11 w-full rounded-control" />
             ))}
           </div>
         )}
@@ -187,7 +187,7 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
 
             {/* ── Sección 1: Información general ── */}
             <section>
-              <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
+              <h2 className="type-micro font-black uppercase tracking-widest text-primary mb-5">
                 Información general
               </h2>
               <div className="space-y-4">
@@ -221,7 +221,7 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
 
             {/* ── Sección 2: Roles y habilidades ── */}
             <section>
-              <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
+              <h2 className="type-micro font-black uppercase tracking-widest text-primary mb-5">
                 Roles y habilidades
               </h2>
               {proyecto.roles.length === 0 ? (
@@ -231,9 +231,9 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
                   {proyecto.roles.map((rol, i) => (
                     <div
                       key={rol.idRolProyecto}
-                      className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 space-y-4"
+                      className="rounded-control border border-outline-variant/40 bg-surface-container-lowest p-5 space-y-4"
                     >
-                      <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">
+                      <p className="type-micro font-black uppercase tracking-widest text-tertiary">
                         Rol {i + 1}
                       </p>
                       <div className="grid grid-cols-2 gap-4">
@@ -288,7 +288,7 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
         <div className="max-w-3xl mx-auto">
           <button
             onClick={() => onOpenChange(false)}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+            className="w-full flex items-center justify-center gap-2 rounded-control bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
           >
             Cerrar
           </button>

@@ -152,7 +152,7 @@ export default function AdminReviewsInboxPage() {
         </section>
 
         {error && (
-          <div className="mb-6 rounded-2xl border border-error/30 bg-error/10 px-5 py-4 text-sm font-medium text-error">
+          <div className="mb-6 rounded-card border border-error/30 bg-error/10 px-5 py-4 text-sm font-medium text-error">
             {error?.message ?? 'No se pudo cargar la bandeja'}
           </div>
         )}

@@ -173,12 +173,10 @@ describe('FG02-C06: estados de la consulta', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText(/no hay eventos|Ningún evento/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Actualizando…' })).toBeDisabled();
 
     pendiente.resolver(pagina(SEIS_TIPOS));
     await screen.findByRole('table');
     expect(screen.queryByRole('status', { name: 'Cargando eventos de seguridad' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Actualizar' })).toBeEnabled();
   });
 
   it('sin eventos y sin filtros explica que todavía no hay registros, sin ofrecer quitar filtros', async () => {
@@ -240,22 +238,32 @@ describe('FG02-C06: estados de la consulta', () => {
     expect(vi.mocked(getSecurityEvents).mock.calls[1][0]).toEqual(vi.mocked(getSecurityEvents).mock.calls[0][0]);
   });
 
-  it('si «Actualizar» falla, retira los datos anteriores en vez de dejarlos como vigentes', async () => {
-    vi.mocked(getSecurityEvents).mockResolvedValueOnce(pagina(SEIS_TIPOS)).mockRejectedValueOnce(fallo(500));
+  // «Actualizar» vive en la barra superior del shell: invalida las consultas montadas.
+  const actualizarDesdeElShell = (queryClient: { invalidateQueries: () => Promise<void> }) => queryClient.invalidateQueries();
+
+  it('la vista no lleva un botón «Actualizar» propio: usa el del shell administrativo', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(pagina(SEIS_TIPOS));
     renderPagina();
     await screen.findByRole('table');
+    expect(screen.queryByRole('button', { name: /Actualiza/ })).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+  it('si la actualización del shell falla, retira los datos anteriores en vez de dejarlos como vigentes', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValueOnce(pagina(SEIS_TIPOS)).mockRejectedValueOnce(fallo(500));
+    const { queryClient } = renderPagina();
+    await screen.findByRole('table');
+
+    await actualizarDesdeElShell(queryClient);
     expect(await screen.findByRole('alert')).toHaveTextContent('El servidor no pudo entregar los eventos de seguridad.');
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('«Actualizar» vuelve a pedir la consulta actual y trae los eventos nuevos', async () => {
+  it('la actualización del shell vuelve a pedir la consulta actual y trae los eventos nuevos', async () => {
     vi.mocked(getSecurityEvents).mockResolvedValueOnce(pagina(SEIS_TIPOS.slice(1))).mockResolvedValueOnce(pagina(SEIS_TIPOS));
-    renderPagina();
+    const { queryClient } = renderPagina();
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(SEIS_TIPOS.length));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+    await actualizarDesdeElShell(queryClient);
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(SEIS_TIPOS.length + 1));
     expect(getSecurityEvents).toHaveBeenCalledTimes(2);
   });

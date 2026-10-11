@@ -140,7 +140,7 @@ export function ClosureRequestsInbox({ data }: { data: AdminProjectsPage }) {
       {sinClasificar.length > 0 && (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-2xl border border-outline-variant bg-surface-container-low px-5 py-4 text-sm text-on-surface"
+          className="flex items-start gap-3 rounded-card border border-outline-variant bg-surface-container-low px-5 py-4 text-sm text-on-surface"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-attention-strong dark:text-attention" aria-hidden="true" />
           <p>

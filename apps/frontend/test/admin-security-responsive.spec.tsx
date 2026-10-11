@@ -144,13 +144,6 @@ describe('FG02-C08: filtros y cabecera en anchos pequeños', () => {
     }
   });
 
-  it('título y «Actualizar» se apilan en móvil y se alinean en fila desde sm', async () => {
-    await montar();
-    const cabecera = screen.getByRole('heading', { level: 1 }).closest('section') as HTMLElement;
-    expect(cabecera).toHaveClass('flex', 'flex-col', 'sm:flex-row');
-    expect(within(cabecera).getByRole('button', { name: 'Actualizar' })).toHaveClass('shrink-0');
-  });
-
   it('el detalle cabe en pantallas bajas: altura acotada con desplazamiento propio y filas apiladas en móvil', async () => {
     const tabla = await montar();
     fireEvent.click(within(tabla).getAllByRole('button', { name: /^Ver detalle:/ })[0]);
@@ -198,7 +191,7 @@ describe('FG02-C08: foco y teclado', () => {
       (el) => !el.hasAttribute('disabled') && el.tabIndex >= 0,
     );
     const nombres = enfocables.map((el) => el.getAttribute('aria-label') ?? el.getAttribute('id') ?? el.textContent?.trim());
-    expect(nombres.slice(0, 5)).toEqual(['Actualizar', 'filtro-tipo', 'filtro-desde', 'filtro-hasta', 'filtro-usuario']);
+    expect(nombres.slice(0, 4)).toEqual(['filtro-tipo', 'filtro-desde', 'filtro-hasta', 'filtro-usuario']);
     expect(nombres.at(-1)).toBe('Página siguiente');
     expect(nombres.filter((nombre) => nombre?.startsWith('Ver detalle:'))).toHaveLength(SEIS_TIPOS.length);
     expect(document.querySelectorAll('[tabindex]:not([tabindex="0"]):not([tabindex="-1"])')).toHaveLength(0);

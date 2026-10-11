@@ -37,7 +37,7 @@ function Persona({ rotulo, persona, children }: { rotulo: string; persona: Usuar
   return (
     <div className="flex min-w-0 items-start gap-tight">
       <Avatar className="size-8 shrink-0">
-        <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
+        <AvatarFallback className="bg-primary/10 type-micro font-bold text-primary">
           {`${persona.nombre.charAt(0)}${persona.apellido.charAt(0)}`.toUpperCase()}
         </AvatarFallback>
       </Avatar>

@@ -30,6 +30,22 @@ const LINEA_BASE: Record<string, Medida> = {
   '/dashboard/projects/admin/reviews': { px: 0, radio: 1, hex: 0, boton: 0, titular: true },
 };
 
+/** Estado tras FG07-C03: lo que queda son las excepciones que el inventario explica. */
+const ESTADO_ACTUAL: Record<string, Medida> = {
+  '/dashboard/admin': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/usuarios': { px: 0, radio: 0, hex: 0, boton: 2, titular: true },
+  '/dashboard/admin/solicitudes-recuperacion': { px: 0, radio: 2, hex: 0, boton: 2, titular: true },
+  '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/etiquetas': { px: 0, radio: 0, hex: 6, boton: 0, titular: true },
+  '/dashboard/admin/apelaciones': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/apelaciones/[apelacionId]': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/proyectos': { px: 0, radio: 1, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/proyectos/[id]': { px: 0, radio: 2, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/proyectos/[id]/cierre': { px: 1, radio: 5, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/sprints': { px: 0, radio: 1, hex: 0, boton: 0, titular: true },
+  '/dashboard/projects/admin/reviews': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+};
+
 describe('FG07-C01: tokens de diseño que usan las vistas administrativas', () => {
   const css = leer('app/global.css');
 
@@ -94,8 +110,12 @@ describe('FG07-C01: inventario de las vistas administrativas', () => {
     expect(fuente.match(/<h1\b/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
   });
 
-  it.each(Object.entries(VISTAS_ADMIN))('%s: la medición actual coincide con la línea base registrada', (ruta, archivo) => {
-    expect(medir(leer(archivo))).toEqual(LINEA_BASE[ruta]);
+  it.each(Object.entries(VISTAS_ADMIN))('%s: la medición actual es la registrada y ninguna cifra empeora respecto a la línea base', (ruta, archivo) => {
+    const actual = medir(leer(archivo));
+    expect(actual).toEqual(ESTADO_ACTUAL[ruta]);
+    const base = LINEA_BASE[ruta];
+    for (const clave of ['px', 'radio', 'hex', 'boton'] as const) expect(actual[clave], clave).toBeLessThanOrEqual(base[clave]);
+    expect(actual.titular).toBe(true);
   });
 
   it('la línea base registrada en el inventario es la que se midió', () => {

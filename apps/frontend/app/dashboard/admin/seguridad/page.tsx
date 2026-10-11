@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { AlertCircle, RefreshCw, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { AlertCircle, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { SecurityEventDetail } from '@/components/admin/security/security-event-detail';
 import { SecurityEventsFilters } from '@/components/admin/security/security-events-filters';
@@ -117,24 +117,13 @@ export default function AdminSeguridadPage() {
   return (
     <div className={ADMIN_PAGE}>
       <AdminBreadcrumb seccion="Verificación y seguridad" pagina="Eventos de seguridad" />
-      <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className={ADMIN_PAGE_TITLE}>Eventos de seguridad</h1>
-          <p className={ADMIN_PAGE_LEAD}>
-            Inicios de sesión, bloqueos, recuperaciones de contraseña y cambios de estado de cuenta que la plataforma ya
-            registra. Solo consulta: desde aquí no se modifica ningún registro.
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => void refetch()}
-          disabled={isFetching}
-          className="shrink-0 rounded-control"
-        >
-          <RefreshCw aria-hidden="true" className={isFetching ? 'motion-safe:animate-spin' : undefined} />
-          {isFetching ? 'Actualizando…' : 'Actualizar'}
-        </Button>
+      {/* Sin botón «Actualizar» propio: el de la barra superior del shell vuelve a pedir esta consulta. */}
+      <section className="mb-8">
+        <h1 className={ADMIN_PAGE_TITLE}>Eventos de seguridad</h1>
+        <p className={ADMIN_PAGE_LEAD}>
+          Inicios de sesión, bloqueos, recuperaciones de contraseña y cambios de estado de cuenta que la plataforma ya
+          registra. Solo consulta: desde aquí no se modifica ningún registro.
+        </p>
       </section>
 
       <div className="@container/bandeja flex flex-col gap-stack">

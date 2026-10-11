@@ -279,7 +279,7 @@ export default function AdminUsuariosPage() {
             value={rol || '__all__'}
             onValueChange={(v) => handleFilterChange(setRol, v === '__all__' ? '' : v)}
           >
-            <SelectTrigger className="w-full sm:w-48 py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+            <SelectTrigger className="w-full sm:w-48 py-2.5 h-auto rounded-control border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
               <SelectValue placeholder="Todos los roles" />
             </SelectTrigger>
             <SelectContent className="z-50">
@@ -297,7 +297,7 @@ export default function AdminUsuariosPage() {
             value={estado || '__all__'}
             onValueChange={(v) => handleFilterChange(setEstado, v === '__all__' ? '' : v)}
           >
-            <SelectTrigger className="w-full sm:w-44 py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+            <SelectTrigger className="w-full sm:w-44 py-2.5 h-auto rounded-control border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
               <SelectValue placeholder="Todos los estados" />
             </SelectTrigger>
             <SelectContent className="z-50">
@@ -313,7 +313,7 @@ export default function AdminUsuariosPage() {
             value={year || '__all__'}
             onValueChange={(v) => handleFilterChange(setYear, v === '__all__' ? '' : v)}
           >
-            <SelectTrigger className="w-full sm:w-40 py-2.5 h-auto rounded-xl border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
+            <SelectTrigger className="w-full sm:w-40 py-2.5 h-auto rounded-control border-outline-variant bg-surface-container-lowest text-on-surface text-sm focus:ring-2 focus:ring-primary focus-visible:ring-primary/30">
               <SelectValue placeholder="Todos los años" />
             </SelectTrigger>
             <SelectContent className="z-50">
@@ -328,7 +328,7 @@ export default function AdminUsuariosPage() {
           {(search || rol || estado || year) && (
             <button
               onClick={clearFilters}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium text-tertiary hover:bg-surface-container-high transition-colors"
+              className="flex items-center gap-1.5 rounded-control px-3 py-2.5 text-sm font-medium text-tertiary hover:bg-surface-container-high transition-colors"
             >
               <X className="h-3.5 w-3.5" />
               Limpiar filtros
@@ -426,7 +426,7 @@ export default function AdminUsuariosPage() {
                                     className="h-full w-full object-cover"
                                   />
                                 ) : (
-                                  <div className="flex h-full w-full items-center justify-center bg-primary/10 text-[10px] font-bold text-primary">
+                                  <div className="flex h-full w-full items-center justify-center bg-primary/10 type-micro font-bold text-primary">
                                     {getInitials(user.nombre, user.apellido)}
                                   </div>
                                 )}

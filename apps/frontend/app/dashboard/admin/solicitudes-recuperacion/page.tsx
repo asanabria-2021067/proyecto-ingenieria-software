@@ -334,7 +334,7 @@ export default function AdminSolicitudesRecuperacionPage() {
               {generated.map((g) => (
                 <div
                   key={g.idSolicitud}
-                  className="rounded-xl border border-outline-variant bg-surface-container-lowest p-4"
+                  className="rounded-control border border-outline-variant bg-surface-container-lowest p-4"
                 >
                   <p className="mb-2 text-sm font-medium text-on-surface">
                     {g.usuario.nombre} {g.usuario.apellido}{' '}
@@ -359,7 +359,7 @@ export default function AdminSolicitudesRecuperacionPage() {
                       Copiar
                     </button>
                   </div>
-                  <p className="mt-2 text-[11px] text-tertiary">
+                  <p className="mt-2 type-micro text-tertiary">
                     {formatVigencia(g.expiraEn)}. Envíalo manualmente al correo institucional del usuario.
                   </p>
                 </div>

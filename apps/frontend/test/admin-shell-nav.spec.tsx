@@ -181,7 +181,8 @@ describe('AdminLayout — sidebar graphite', () => {
     renderShell();
     const etiqueta = document.querySelector('[data-slot="admin-nav-section-label"]') as HTMLElement;
     expect(etiqueta).toHaveTextContent('Administración');
-    expect(etiqueta).toHaveClass('admin-nav-section-label', 'uppercase', 'font-semibold', 'tracking-wider', 'text-[11px]');
+    // T-320: el tamaño sale de la escala (`type-micro`, 11 px), no de un literal.
+    expect(etiqueta).toHaveClass('admin-nav-section-label', 'uppercase', 'font-semibold', 'tracking-wider', 'type-micro');
     expect(etiqueta).not.toHaveClass('font-black');
     expect(etiqueta.getAttribute('style')).toBeNull();
   });

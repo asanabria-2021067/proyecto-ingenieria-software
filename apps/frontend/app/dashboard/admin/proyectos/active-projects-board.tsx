@@ -281,7 +281,7 @@ function FilaProyecto({
       <TableCell className={`${TD} hidden ${COL_LIDER}`}>
         <span className="inline-flex min-w-0 items-center gap-tight">
           <Avatar className="size-7 shrink-0">
-            <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
+            <AvatarFallback className="bg-primary/10 type-micro font-bold text-primary">
               {getInitials(project.lider.nombre, project.lider.apellido)}
             </AvatarFallback>
           </Avatar>

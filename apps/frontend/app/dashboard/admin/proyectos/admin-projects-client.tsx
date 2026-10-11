@@ -89,7 +89,7 @@ export default function AdminProjectsClient() {
         </div>
       ) : (
         <div
-          className="rounded-xl border border-outline-variant bg-surface-container-lowest"
+          className="rounded-control border border-outline-variant bg-surface-container-lowest"
         >
           {isError ? (
             <Empty tone="danger" role="alert" className="border-0 shadow-none">

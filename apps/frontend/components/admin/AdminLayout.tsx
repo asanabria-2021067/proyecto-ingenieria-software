@@ -225,7 +225,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {!collapsed && (
           <p
             data-slot="admin-nav-section-label"
-            className="admin-nav-section-label px-6 pt-6 text-[11px] font-semibold uppercase tracking-wider"
+            className="admin-nav-section-label px-6 pt-6 type-micro font-semibold uppercase tracking-wider"
           >
             Administración
           </p>
@@ -297,7 +297,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               href={href}
               aria-current={active ? 'page' : undefined}
               aria-label={label}
-              className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ${
+              className={`flex flex-col items-center justify-center w-12 h-12 rounded-control transition-all duration-200 ${
                 active ? 'text-primary bg-primary/10' : 'text-outline hover:text-on-surface'
               }`}
               title={label}

@@ -40,7 +40,7 @@ import { TipoBadge } from '@/components/projects/tipo-badge';
 import { ADMIN_TAB_LIST, ADMIN_TAB_TRIGGER } from '@/components/admin/admin-tabs';
 import { ADMIN_PAGE } from '@/components/admin/admin-page';
 
-const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
+const CARD = 'rounded-control border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
 
 // Estilo compartido con la revisión de cierre (`components/admin/admin-tabs`).
 const TAB_TRIGGER = ADMIN_TAB_TRIGGER;
@@ -146,9 +146,9 @@ function DetailSkeleton() {
   return (
     <div className={ADMIN_PAGE} aria-busy="true">
       <Skeleton className="mb-4 h-4 w-72" />
-      <Skeleton className="mb-4 h-44 w-full rounded-xl" />
+      <Skeleton className="mb-4 h-44 w-full rounded-control" />
       <Skeleton className="mb-4 h-10 w-96" />
-      <Skeleton className="h-72 w-full rounded-xl" />
+      <Skeleton className="h-72 w-full rounded-control" />
     </div>
   );
 }
@@ -172,7 +172,7 @@ export function puedeTransferirLiderazgo(estadoProyecto: string): boolean {
 // trae `px-inline` (12 px), un token propio que `cn` no reconoce como conflicto
 // con `px-5`, así que sin forzarlo el rótulo queda 8 px a la izquierda de su
 // contenido (las celdas sí usan 20 px).
-const TH_MIEMBROS = 'px-5! py-3 text-[10px] font-black uppercase tracking-widest text-tertiary';
+const TH_MIEMBROS = 'px-5! py-3 type-micro font-black uppercase tracking-widest text-tertiary';
 
 export default function AdminProjectDetailClient({ id }: AdminProjectDetailClientProps) {
   const searchParams = useSearchParams();
@@ -221,7 +221,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
   return (
     <div className={ADMIN_PAGE}>
       <Breadcrumb className="mb-4">
-        <BreadcrumbList className="text-[13px]">
+        <BreadcrumbList className="text-sm">
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
               <Link href={adminProjectsGroupHref(grupo)} className="text-tertiary hover:text-on-surface">
@@ -261,7 +261,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
               </span>
               <TipoBadge tipo={vista.tipo} />
             </div>
-            <h1 className="font-headline text-2xl font-black leading-tight text-on-surface md:text-[28px]">{vista.titulo}</h1>
+            <h1 className="type-display break-words">{vista.titulo}</h1>
             <p className="max-w-3xl text-sm leading-relaxed text-on-surface-variant">
               {vista.descripcion || 'Sin descripción disponible.'}
             </p>
@@ -291,32 +291,32 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
               </AvatarFallback>
             </Avatar>
             <div>
-              <dt className="text-[11px] text-tertiary">Líder del proyecto</dt>
+              <dt className="type-micro text-tertiary">Líder del proyecto</dt>
               <dd className="font-semibold text-on-surface">
                 {vista.lider.nombre} {vista.lider.apellido}
               </dd>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden="true">
+            <span className="flex size-10 items-center justify-center rounded-control bg-primary/10 text-primary" aria-hidden="true">
               <Users className="size-5" />
             </span>
             <div>
-              <dt className="text-[11px] text-tertiary">Equipo de trabajo</dt>
+              <dt className="type-micro text-tertiary">Equipo de trabajo</dt>
               <dd className="font-semibold text-on-surface">
                 {integrantesActivos} {integrantesActivos === 1 ? 'integrante' : 'integrantes'}
               </dd>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden="true">
+            <span className="flex size-10 items-center justify-center rounded-control bg-primary/10 text-primary" aria-hidden="true">
               <Layers className="size-5" />
             </span>
             <div>
-              <dt className="text-[11px] text-tertiary">Sprints</dt>
+              <dt className="type-micro text-tertiary">Sprints</dt>
               <dd className="font-semibold text-on-surface">
                 {sprintsCerrados.length} {sprintsCerrados.length === 1 ? 'Sprint cerrado' : 'Sprints cerrados'}
-                {!vista.historico && <span className="block text-[11px] font-normal text-tertiary">El Sprint operable no es visible para administración.</span>}
+                {!vista.historico && <span className="block type-micro font-normal text-tertiary">El Sprint operable no es visible para administración.</span>}
               </dd>
             </div>
           </div>
@@ -372,15 +372,15 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
             {vista.historico && (
               <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-outline-variant/40 pt-4 text-sm sm:grid-cols-3">
                 <div>
-                  <dt className="text-[11px] text-tertiary">Horas acreditadas</dt>
+                  <dt className="type-micro text-tertiary">Horas acreditadas</dt>
                   <dd className="font-semibold text-on-surface">{formatearDecimal(vista.historico.totales.acreditadas)} h</dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] text-tertiary">Tareas distintas</dt>
+                  <dt className="type-micro text-tertiary">Tareas distintas</dt>
                   <dd className="font-semibold text-on-surface">{vista.historico.totales.tareasDistintas}</dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] text-tertiary">Revisiones de cierre</dt>
+                  <dt className="type-micro text-tertiary">Revisiones de cierre</dt>
                   <dd className="font-semibold text-on-surface">{vista.historico.revisiones.length}</dd>
                 </div>
               </dl>
@@ -415,7 +415,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
                         <TableCell className="px-5 py-3">
                           <span className="inline-flex items-center gap-2 text-sm font-medium text-on-surface">
                             <Avatar className="size-7">
-                              <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
+                              <AvatarFallback className="bg-primary/10 type-micro font-bold text-primary">
                                 {getInitials(m.usuario.nombre, m.usuario.apellido)}
                               </AvatarFallback>
                             </Avatar>
@@ -464,7 +464,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
                         {formatearFecha(s.fechaInicio)}{s.fechaCierre ? ` – ${formatearFecha(s.fechaCierre)}` : ''}
                       </span>
                     )}
-                    <Badge variant="outline" className="ml-auto text-[10px] text-tertiary">
+                    <Badge variant="outline" className="ml-auto type-micro text-tertiary">
                       Cerrado
                     </Badge>
                   </li>

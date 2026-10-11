@@ -191,7 +191,7 @@ function VerdictDialog({
                 autoFocus
                 className="mt-1 text-sm"
               />
-              <p className="mt-1 text-right text-[11px] text-tertiary" aria-live="polite">
+              <p className="mt-1 text-right type-micro text-tertiary" aria-live="polite">
                 {comentario.length}/{COMENTARIO_VEREDICTO_MAX}
               </p>
               {error && (
@@ -373,7 +373,7 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
       <div className={`${PAGE} flex-1 pb-8 pt-8`}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Breadcrumb>
-            <BreadcrumbList className="text-[13px]">
+            <BreadcrumbList className="text-sm">
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
                   <Link href={adminProjectsGroupHref('activos')} className="text-tertiary hover:text-on-surface">
@@ -593,7 +593,7 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
                           <TableCell className={TD}>
                             <span className="type-body inline-flex items-center gap-2 font-medium text-text-primary">
                               <Avatar className="size-7">
-                                <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
+                                <AvatarFallback className="bg-primary/10 type-micro font-bold text-primary">
                                   {getInitials(m.usuario.nombre, m.usuario.apellido)}
                                 </AvatarFallback>
                               </Avatar>

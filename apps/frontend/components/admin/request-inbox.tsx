@@ -38,7 +38,7 @@ export function RequestInboxSection({
     <section>
       <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">{title}</h2>
       {isEmpty ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-12 text-center">
+        <div className="flex flex-col items-center justify-center rounded-card border border-outline-variant bg-surface-container-lowest py-12 text-center">
           <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" aria-hidden="true" />
           <p className="text-sm font-medium text-tertiary">{empty}</p>
         </div>
@@ -78,7 +78,7 @@ export function RequestInboxCard({
     <div
       // En fila solo desde `lg`: con la sidebar abierta, a anchos de tablet el
       // contenido es demasiado estrecho para texto y acciones lado a lado.
-      className={`flex flex-col gap-4 rounded-2xl border p-5 lg:flex-row lg:items-center lg:justify-between ${CARD_TONE[tone]}`}
+      className={`flex flex-col gap-4 rounded-card border p-5 lg:flex-row lg:items-center lg:justify-between ${CARD_TONE[tone]}`}
     >
       <div className="flex min-w-0 items-center gap-3">
         {icon}
@@ -102,9 +102,9 @@ export function RequestInboxMeta({ children }: { children: ReactNode }) {
 /** Clases de las acciones de una tarjeta, para botones y enlaces por igual. */
 export const REQUEST_INBOX_ACTION = {
   primary:
-    'inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-on-primary outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary/40',
+    'inline-flex items-center gap-1.5 rounded-control bg-primary px-3 py-2 text-xs font-bold text-on-primary outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary/40',
   attention:
-    'inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white outline-none transition-colors hover:bg-amber-700 focus-visible:ring-2 focus-visible:ring-primary/40',
+    'inline-flex items-center gap-1.5 rounded-control bg-amber-600 px-3 py-2 text-xs font-bold text-white outline-none transition-colors hover:bg-amber-700 focus-visible:ring-2 focus-visible:ring-primary/40',
   outline:
-    'inline-flex items-center gap-1.5 rounded-xl border border-outline-variant px-3 py-2 text-xs font-bold text-on-surface outline-none transition-colors hover:bg-surface-container-high focus-visible:ring-2 focus-visible:ring-primary/40',
+    'inline-flex items-center gap-1.5 rounded-control border border-outline-variant px-3 py-2 text-xs font-bold text-on-surface outline-none transition-colors hover:bg-surface-container-high focus-visible:ring-2 focus-visible:ring-primary/40',
 } as const;
