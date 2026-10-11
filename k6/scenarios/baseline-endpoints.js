@@ -182,3 +182,10 @@ export default function (data) {
     });
   }
 }
+
+// setup() devuelve los tokens de sesión y k6 los copia a `setup_data` del
+// resumen. Se quitan para que el JSON exportado con --summary-export no los
+// guarde; al no devolver nada, k6 sigue imprimiendo su resumen normal.
+export function handleSummary(summary) {
+  delete summary.setup_data;
+}

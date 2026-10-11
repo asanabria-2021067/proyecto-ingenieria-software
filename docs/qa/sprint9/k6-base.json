@@ -794,15 +794,6 @@
             "avg": 17.928075850000006
         }
     },
-    "setup_data": {
-        "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjIsImNvcnJlbyI6ImNhcmxvcy5tZW5kb3phQHV2Zy5lZHUuZ3QiLCJ0aXBvIjoiYWNjZXNzIiwiaWF0IjoxNzkxNDMyOTQ0LCJleHAiOjE3OTE0MzY1NDR9.TQ4TL5JMhKz5Us4w-Sc5c1fJrXLX0IC6LEgjbqUtc-Y",
-        "adminToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjgsImNvcnJlbyI6ImFkbWluQHV2Zy5lZHUuZ3QiLCJ0aXBvIjoiYWNjZXNzIiwiaWF0IjoxNzkxNDMyOTQ2LCJleHAiOjE3OTE0MzY1NDZ9.OnHH1_CdO0hY7rkyIdcc73xgI2UbtGCuJQU79tlgg0k",
-        "ids": {
-            "projectId": 5,
-            "sprintId": 4,
-            "taskId": 6
-        }
-    },
     "root_group": {
         "name": "",
         "path": "",
