@@ -24,7 +24,10 @@ describeIntegration('G05-C11 — enum TipoNotificacion en PostgreSQL real', () =
       SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
       WHERE t.typname = 'TipoNotificacion' ORDER BY e.enumsortorder`;
     const values = labels.map((row) => row.enumlabel);
-    expect(values.at(-1)).toBe('ALERTA_SEGURIDAD');
+    // Mismo criterio que g05-security-alert-migration.spec.ts: tras
+    // HORAS_ACREDITADAS, no necesariamente el último (HU-186 agregó
+    // TAREA_POR_VENCER en una migración posterior).
+    expect(values.indexOf('ALERTA_SEGURIDAD')).toBeGreaterThan(values.indexOf('HORAS_ACREDITADAS'));
     expect(values.filter((value) => value === 'ALERTA_SEGURIDAD')).toHaveLength(1);
     const migration = await prisma.$queryRaw<Array<{ migration_name: string }>>`
       SELECT migration_name FROM _prisma_migrations
