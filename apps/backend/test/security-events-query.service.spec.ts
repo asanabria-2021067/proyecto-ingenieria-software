@@ -15,11 +15,15 @@ interface Escenario {
   esAdmin?: boolean;
   filas?: unknown[];
   total?: number;
+  usuarios?: { idUsuario: number; nombre: string; apellido: string }[];
 }
 
-function crear({ estado = 'ACTIVO', esAdmin = true, filas = [], total = filas.length }: Escenario = {}) {
+function crear({ estado = 'ACTIVO', esAdmin = true, filas = [], total = filas.length, usuarios = [] }: Escenario = {}) {
   const prisma = {
-    usuario: { findUnique: vi.fn().mockResolvedValue(estado ? { estado } : null) },
+    usuario: {
+      findUnique: vi.fn().mockResolvedValue(estado ? { estado } : null),
+      findMany: vi.fn().mockResolvedValue(usuarios),
+    },
     usuarioRolAcceso: { findFirst: vi.fn().mockResolvedValue(esAdmin ? { idUsuarioRolAcceso: 1 } : null) },
     bitacoraAuditoria: { findMany: vi.fn().mockResolvedValue(filas), count: vi.fn().mockResolvedValue(total) },
     $transaction: vi.fn((operaciones: Promise<unknown>[]) => Promise.all(operaciones)),
@@ -113,6 +117,7 @@ describe('FG01-C03: filtros y paginación', () => {
     const { findMany, prisma } = await consulta({});
     expect(findMany).not.toHaveProperty('include');
     expect(Object.values(findMany.select).every((valor) => valor === true)).toBe(true);
+    expect(findMany.select).not.toHaveProperty('usuario');
     expect(prisma.bitacoraAuditoria.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.bitacoraAuditoria.count).toHaveBeenCalledTimes(1);
   });
@@ -194,5 +199,206 @@ describe('FG01-C03: filtros y paginación', () => {
   it('informa el catálogo real de tipos para poblar el filtro', async () => {
     const { resultado } = await consulta({});
     expect(resultado.tipos).toEqual(ALCANCE.accion.in);
+  });
+});
+
+describe('FG01-C04: proyección por lista de permitidos', () => {
+  const FECHA = new Date('2026-10-11T06:00:00.000Z');
+  const SECRETOS = ['s3cr3t-valor', 'tok-123', 'hunter2', 'intento@uvg.edu.gt', 'https://uvg.test/reset?token=abc'];
+
+  function fila(parcial: Record<string, unknown> = {}) {
+    return {
+      idAuditoria: 1,
+      accion: 'LOGIN_FAILED',
+      idUsuario: null,
+      idObjeto: null,
+      detalleJson: null,
+      ipOrigen: null,
+      fechaEvento: FECHA,
+      ...parcial,
+    };
+  }
+
+  async function proyectar(filas: unknown[], usuarios: Escenario['usuarios'] = []) {
+    const { service, prisma } = crear({ filas, usuarios });
+    const { data } = await service.list(7);
+    return { data, prisma, json: JSON.stringify(data) };
+  }
+
+  it('cada evento sale con exactamente las claves del contrato', async () => {
+    const { data } = await proyectar([fila()]);
+    expect(Object.keys(data[0]).sort()).toEqual(['actor', 'cuenta', 'detalle', 'fecha', 'id', 'origen', 'tipo']);
+    expect(data[0]).toEqual({
+      id: 1,
+      tipo: 'LOGIN_FAILED',
+      fecha: '2026-10-11T06:00:00.000Z',
+      actor: null,
+      cuenta: null,
+      origen: { ip: null, ipConfiable: false },
+      detalle: {},
+    });
+  });
+
+  it.each([
+    [
+      'LOGIN_FAILED',
+      { motivo: 'CREDENCIALES', cuentaConocida: false, cuentaRef: '0123456789abcdef', ipTrusted: false },
+      { motivo: 'CREDENCIALES', cuentaConocida: false, cuentaRef: '0123456789abcdef' },
+    ],
+    ['LOGIN_FAILED', { motivo: 'BLOQUEO_TEMPORAL', cuentaConocida: true }, { motivo: 'BLOQUEO_TEMPORAL', cuentaConocida: true }],
+    ['LOGIN_FAILED', { motivo: 'CUENTA_NO_ACTIVA', cuentaConocida: true }, { motivo: 'CUENTA_NO_ACTIVA', cuentaConocida: true }],
+    ['LOGIN_SUCCEEDED', { ipTrusted: true }, {}],
+    ['ACCOUNT_LOCKED', { cuentaConocida: true }, { cuentaConocida: true }],
+    [
+      'ACCOUNT_LOCKED',
+      { cuentaConocida: false, cuentaRef: 'fedcba9876543210' },
+      { cuentaConocida: false, cuentaRef: 'fedcba9876543210' },
+    ],
+    [
+      'PASSWORD_RESET_ISSUED',
+      { idSolicitud: 12, expiraEn: '2026-10-11T07:00:00.000Z' },
+      { idSolicitud: 12, expiraEn: '2026-10-11T07:00:00.000Z' },
+    ],
+    ['PASSWORD_RESET_COMPLETED', { idSolicitud: 12, sesionesRevocadas: 3 }, { idSolicitud: 12, sesionesRevocadas: 3 }],
+    [
+      'USER_STATUS_CHANGED',
+      { estadoAnterior: 'ACTIVO', estadoNuevo: 'BLOQUEADO' },
+      { estadoAnterior: 'ACTIVO', estadoNuevo: 'BLOQUEADO' },
+    ],
+  ])('%s conserva el detalle que escribe su productor (%j)', async (accion, detalleJson, esperado) => {
+    const { data } = await proyectar([fila({ accion, detalleJson })]);
+    expect(data[0].tipo).toBe(accion);
+    expect(data[0].detalle).toEqual(esperado);
+  });
+
+  it.each(['LOGIN_FAILED', 'LOGIN_SUCCEEDED', 'ACCOUNT_LOCKED', 'PASSWORD_RESET_ISSUED', 'PASSWORD_RESET_COMPLETED', 'USER_STATUS_CHANGED'])(
+    '%s nunca deja pasar claves fuera de la lista ni estructuras anidadas',
+    async (accion) => {
+      const { data, json } = await proyectar([
+        fila({
+          accion,
+          detalleJson: {
+            token: SECRETOS[1],
+            resetToken: SECRETOS[1],
+            resetUrl: SECRETOS[4],
+            password: SECRETOS[2],
+            contrasena: SECRETOS[2],
+            secret: SECRETOS[0],
+            correo: SECRETOS[3],
+            correoIntentado: SECRETOS[3],
+            idProyecto: 5,
+            metadata: { nested: { secret: SECRETOS[0], lista: [SECRETOS[1]] } },
+            // Claves permitidas con una forma que no es la esperada.
+            motivo: { $ne: SECRETOS[0] },
+            cuentaRef: SECRETOS[3],
+            cuentaConocida: SECRETOS[2],
+            idSolicitud: { id: SECRETOS[1] },
+            expiraEn: SECRETOS[4],
+            sesionesRevocadas: [SECRETOS[0]],
+            estadoAnterior: SECRETOS[0],
+            estadoNuevo: { estado: SECRETOS[2] },
+          },
+        }),
+      ]);
+      expect(data[0].detalle).toEqual({});
+      for (const secreto of SECRETOS) expect(json).not.toContain(secreto);
+      for (const clave of ['token', 'password', 'contrasena', 'secret', 'correo', 'metadata', 'idProyecto', 'detalleJson', 'ipTrusted']) {
+        expect(json).not.toContain(`"${clave}`);
+      }
+    },
+  );
+
+  it.each([null, 'texto', 7, true, ['LOGIN_FAILED'], [{ motivo: 'CREDENCIALES' }]])(
+    'un detalleJson que no es un objeto (%j) da un detalle vacío',
+    async (detalleJson) => {
+      const { data } = await proyectar([fila({ detalleJson })]);
+      expect(data[0].detalle).toEqual({});
+      expect(data[0].origen.ipConfiable).toBe(false);
+    },
+  );
+
+  it('no toma del prototipo una clave permitida', async () => {
+    const detalleJson = Object.create({ motivo: 'CREDENCIALES', ipTrusted: true });
+    const { data } = await proyectar([fila({ detalleJson })]);
+    expect(data[0].detalle).toEqual({});
+  });
+
+  it.each([
+    [true, true],
+    [false, false],
+    ['true', false],
+    [1, false],
+    [undefined, false],
+  ])('ipTrusted=%j en el registro se informa como ipConfiable=%j', async (ipTrusted, ipConfiable) => {
+    const { data } = await proyectar([fila({ ipOrigen: '203.0.113.9', detalleJson: { ipTrusted } })]);
+    expect(data[0].origen).toEqual({ ip: '203.0.113.9', ipConfiable });
+  });
+
+  it.each([
+    ['203.0.113.9', '203.0.113.9'],
+    ['2001:db8::1', '2001:db8::1'],
+    ['203.0.113.9, 10.0.0.1', null],
+    ['<script>alert(1)</script>', null],
+    ['', null],
+    [null, null],
+  ])('la IP %j se informa como %j', async (ipOrigen, ip) => {
+    const { data } = await proyectar([fila({ ipOrigen })]);
+    expect(data[0].origen.ip).toBe(ip);
+  });
+
+  it('resuelve actor y cuenta afectada con una sola consulta por página', async () => {
+    const { data, prisma } = await proyectar(
+      [
+        fila({ idAuditoria: 3, accion: 'USER_STATUS_CHANGED', idUsuario: 7, idObjeto: '42' }),
+        fila({ idAuditoria: 2, accion: 'LOGIN_SUCCEEDED', idUsuario: 42, idObjeto: '42' }),
+        fila({ idAuditoria: 1, accion: 'PASSWORD_RESET_ISSUED', idUsuario: 7, idObjeto: '42' }),
+      ],
+      [
+        { idUsuario: 7, nombre: 'Ada', apellido: 'Admin' },
+        { idUsuario: 42, nombre: 'Eva', apellido: 'Estudiante' },
+      ],
+    );
+    expect(prisma.usuario.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith({
+      where: { idUsuario: { in: [7, 42] } },
+      select: { idUsuario: true, nombre: true, apellido: true },
+    });
+    expect(data[0].actor).toEqual({ idUsuario: 7, nombre: 'Ada Admin' });
+    expect(data[0].cuenta).toEqual({ idUsuario: 42, nombre: 'Eva Estudiante' });
+    expect(data[1].actor).toEqual(data[1].cuenta);
+  });
+
+  it('de las cuentas solo sale el id y el nombre, nunca el correo', async () => {
+    const { json } = await proyectar(
+      [fila({ idUsuario: 7, idObjeto: '7' })],
+      [{ idUsuario: 7, nombre: 'Ada', apellido: 'Admin', correo: SECRETOS[3], contrasena: SECRETOS[2] } as never],
+    );
+    expect(json).not.toContain(SECRETOS[3]);
+    expect(json).not.toContain(SECRETOS[2]);
+  });
+
+  it('una cuenta eliminada conserva su id con nombre null', async () => {
+    const { data } = await proyectar([fila({ idUsuario: 7, idObjeto: '99' })], [{ idUsuario: 7, nombre: 'Ada', apellido: 'Admin' }]);
+    expect(data[0].cuenta).toEqual({ idUsuario: 99, nombre: null });
+  });
+
+  it('un evento sin actor ni cuenta no consulta usuarios', async () => {
+    const { data, prisma } = await proyectar([fila({ detalleJson: { motivo: 'CREDENCIALES', cuentaConocida: false } })]);
+    expect(data[0]).toMatchObject({ actor: null, cuenta: null });
+    expect(prisma.usuario.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each(['abc', '42abc', '4 2', '-1', '0', '007', '1.5', '2147483648', '99999999999', "1' OR '1'='1"])(
+    'un idObjeto que no es un id de usuario (%j) no se trata como cuenta',
+    async (idObjeto) => {
+      const { data, prisma } = await proyectar([fila({ idObjeto })]);
+      expect(data[0].cuenta).toBeNull();
+      expect(prisma.usuario.findMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it('descarta una fila cuya acción no es del catálogo aunque la base la devolviera', async () => {
+    const { data } = await proyectar([fila({ accion: 'TASK_CREATED' }), fila({ idAuditoria: 2 })]);
+    expect(data.map((evento) => evento.id)).toEqual([2]);
   });
 });

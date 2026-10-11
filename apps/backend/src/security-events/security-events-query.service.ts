@@ -6,6 +6,13 @@ import {
   SECURITY_EVENTS_DEFAULT_LIMIT,
   type ListSecurityEventsQueryDto,
 } from './dto/list-security-events-query.dto';
+import {
+  cuentaAfectadaId,
+  toSecurityEventDto,
+  type SecurityEventDto,
+  type SecurityEventRow,
+  type SecurityEventsPageDto,
+} from './dto/security-event.dto';
 import { TIPO_OBJETO_SEGURIDAD, TipoEventoSeguridad } from './tipos-evento-seguridad';
 
 /**
@@ -23,17 +30,26 @@ export class SecurityEventsQueryService {
     private readonly policy: ProjectPolicyService,
   ) {}
 
-  async list(actorId: number, query: ListSecurityEventsQueryDto = {}) {
+  async list(actorId: number, query: ListSecurityEventsQueryDto = {}): Promise<SecurityEventsPageDto> {
     await this.assertAdminVigente(actorId);
 
     const page = query.page ?? 1;
     const limit = query.limit ?? SECURITY_EVENTS_DEFAULT_LIMIT;
     const where = this.where(query);
     // Una sola transacción: la página y el total salen de la misma foto.
-    const [data, total] = await this.prisma.$transaction([
+    const [filas, total] = await this.prisma.$transaction([
       this.prisma.bitacoraAuditoria.findMany({
         where,
-        select: { idAuditoria: true, accion: true, fechaEvento: true },
+        // `detalleJson` se lee para proyectarlo; nunca sale tal cual (ver security-event.dto.ts).
+        select: {
+          idAuditoria: true,
+          accion: true,
+          idUsuario: true,
+          idObjeto: true,
+          detalleJson: true,
+          ipOrigen: true,
+          fechaEvento: true,
+        },
         // idAuditoria desempata eventos del mismo instante: el orden es total y la paginación estable.
         orderBy: [{ fechaEvento: 'desc' }, { idAuditoria: 'desc' }],
         skip: (page - 1) * limit,
@@ -42,7 +58,28 @@ export class SecurityEventsQueryService {
       this.prisma.bitacoraAuditoria.count({ where }),
     ]);
 
+    const nombres = await this.nombres(filas);
+    const data = filas
+      .map((fila) => toSecurityEventDto(fila, nombres))
+      .filter((evento): evento is SecurityEventDto => evento !== null);
+
     return { data, total, page, totalPages: Math.ceil(total / limit), tipos: [...TipoEventoSeguridad.VALORES] };
+  }
+
+  /** Nombres de actores y cuentas afectadas de la página, en una sola consulta. */
+  private async nombres(filas: SecurityEventRow[]): Promise<Map<number, string>> {
+    const ids = new Set<number>();
+    for (const fila of filas) {
+      const afectada = cuentaAfectadaId(fila.idObjeto);
+      if (fila.idUsuario !== null) ids.add(fila.idUsuario);
+      if (afectada !== null) ids.add(afectada);
+    }
+    if (ids.size === 0) return new Map();
+    const usuarios = await this.prisma.usuario.findMany({
+      where: { idUsuario: { in: [...ids] } },
+      select: { idUsuario: true, nombre: true, apellido: true },
+    });
+    return new Map(usuarios.map((usuario) => [usuario.idUsuario, `${usuario.nombre} ${usuario.apellido}`.trim()]));
   }
 
   /**
