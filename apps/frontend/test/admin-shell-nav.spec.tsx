@@ -273,15 +273,15 @@ describe('AdminLayout — sidebar graphite', () => {
 describe('AdminLayout — sidebar colapsable', () => {
   const DESTINOS = [
     'Panel Admin',
+    'Gestión de Usuarios',
+    'Recuperación de contraseña',
     'Activos',
     'Solicitudes de publicación',
     'Solicitudes de cierre',
     'Cerrados',
     'Calendario de Sprints',
     'Apelaciones',
-    'Gestión de Usuarios',
     'Cuentas pendientes',
-    'Recuperación de contraseña',
     'Eventos de seguridad',
     // TEMPORAL: inventario de etiquetas; quitar junto con su página.
     'Etiquetas (temporal)',
@@ -378,15 +378,10 @@ describe('AdminLayout — «Actualizar» en la barra superior', () => {
 describe('AdminLayout — acceso al visor de eventos de seguridad (T-310, FG02-C07)', () => {
   const HREF = '/dashboard/admin/seguridad';
 
-  it('«Eventos de seguridad» vive en Administración, enlazado una sola vez', () => {
-    const administracion = adminNavEntries.find((e) => 'type' in e && e.type === 'group' && e.label === 'Administración');
-    const items = administracion && 'items' in administracion ? administracion.items : [];
-    expect(items.map((i) => i.label)).toEqual([
-      'Gestión de Usuarios',
-      'Recuperación de contraseña',
-      'Eventos de seguridad',
-      'Etiquetas (temporal)',
-    ]);
+  it('«Eventos de seguridad» vive en «Verificación y seguridad» junto a «Cuentas pendientes», enlazado una sola vez', () => {
+    const grupo = adminNavEntries.find((e) => 'type' in e && e.type === 'group' && e.label === 'Verificación y seguridad');
+    const items = grupo && 'items' in grupo ? grupo.items : [];
+    expect(items.map((i) => i.label)).toEqual(['Cuentas pendientes', 'Eventos de seguridad']);
 
     const destinos = flattenNavEntries(adminNavEntries);
     expect(destinos.filter((d) => d.href === HREF)).toHaveLength(1);
@@ -399,22 +394,25 @@ describe('AdminLayout — acceso al visor de eventos de seguridad (T-310, FG02-C
     expect(existsSync(join(__dirname, '../app/dashboard/admin/seguridad/page.tsx'))).toBe(true);
   });
 
-  it('en la ruta del visor, Administración se abre y «Eventos de seguridad» es el único destino activo', () => {
+  it('en la ruta del visor, su grupo se abre y «Eventos de seguridad» es el único destino activo', () => {
     pathnameMock.mockReturnValue(HREF);
     renderShell();
     const nav = desktopNav();
 
-    expect(nav.getByRole('button', { name: /Administración/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(nav.getByRole('button', { name: /Verificación y seguridad/ })).toHaveAttribute('aria-expanded', 'true');
     const enlace = nav.getByRole('link', { name: 'Eventos de seguridad' });
     expect(enlace).toHaveAttribute('href', HREF);
     expect(enlace).toHaveAttribute('aria-current', 'page');
     expect(nav.getAllByRole('link').filter((a) => a.getAttribute('aria-current') === 'page')).toEqual([enlace]);
   });
 
-  it('desde otra vista de administración el enlace está pero no activo', () => {
+  it('desde otra vista su grupo está plegado; al abrirlo el enlace está y no figura como activo', () => {
     pathnameMock.mockReturnValue('/dashboard/admin/usuarios');
     renderShell();
-    const enlace = desktopNav().getByRole('link', { name: 'Eventos de seguridad' });
+    const nav = desktopNav();
+    expect(nav.queryByRole('link', { name: 'Eventos de seguridad' })).not.toBeInTheDocument();
+    fireEvent.click(nav.getByRole('button', { name: /Verificación y seguridad/ }));
+    const enlace = nav.getByRole('link', { name: 'Eventos de seguridad' });
     expect(enlace).toHaveAttribute('href', HREF);
     expect(enlace).not.toHaveAttribute('aria-current');
   });
@@ -488,15 +486,115 @@ describe('Inventario de navegación administrativa (T-319, FG06-C01)', () => {
     expect(noEnlazadas.every((ruta) => ruta.includes('['))).toBe(true);
   });
 
-  it('el inventario no enlaza la pantalla de HU-179 mientras no exista, y lo deja registrado', () => {
-    expect(paginas.filter((ruta) => /pendientes|verificacion/.test(ruta))).toEqual([]);
-    expect(destinos.filter((d) => /pendientes|verificaci[oó]n de cuentas/i.test(d.label))).toEqual([]);
-    expect(inventario).toMatch(/Cuentas pendientes de verificación \| HU-179 \| \*\*No existe\*\*/);
+  it('la pantalla de HU-179 existe (PR #270): se enlaza una sola vez y el inventario la registra', () => {
+    expect(paginas.filter((ruta) => /pendientes|verificacion/.test(ruta))).toEqual(['/dashboard/admin/cuentas-pendientes']);
+    expect(destinos.filter((d) => /pendientes|verificaci[oó]n de cuentas/i.test(d.label)).map((d) => d.href)).toEqual([
+      '/dashboard/admin/cuentas-pendientes',
+    ]);
+    expect(inventario).toContain('| `/dashboard/admin/cuentas-pendientes` | Cuentas pendientes |');
+    expect(inventario).not.toMatch(/HU-179 \| \*\*No existe\*\*/);
   });
 
   it('la barra móvil descrita en el inventario es la del código', () => {
     for (const { label } of adminNavItemsMobile) expect(inventario).toContain(label);
     expect(adminNavItemsMobile).toHaveLength(4);
     expect(inventario).toContain('lista\n**curada** de cuatro destinos');
+  });
+});
+
+describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
+  const grupos = () =>
+    adminNavEntries.map((e) => ('type' in e && e.type === 'group' ? { grupo: e.label, items: e.items.map((i) => i.label) } : { enlace: e.label }));
+
+  it('el orden es estable: panel, usuarios, proyectos, gobernanza, verificación y diagnóstico', () => {
+    expect(grupos()).toEqual([
+      { enlace: 'Panel Admin' },
+      { grupo: 'Usuarios', items: ['Gestión de Usuarios', 'Recuperación de contraseña'] },
+      {
+        grupo: 'Proyectos',
+        items: ['Activos', 'Solicitudes de publicación', 'Solicitudes de cierre', 'Cerrados', 'Calendario de Sprints'],
+      },
+      { grupo: 'Gobernanza', items: ['Apelaciones'] },
+      { grupo: 'Verificación y seguridad', items: ['Cuentas pendientes', 'Eventos de seguridad'] },
+      { grupo: 'Diagnóstico', items: ['Etiquetas (temporal)'] },
+    ]);
+  });
+
+  it('ya no existe el grupo genérico «Administración»: cada destino está en el tema que le corresponde', () => {
+    expect(adminNavEntries.some((e) => 'type' in e && e.type === 'group' && e.label === 'Administración')).toBe(false);
+  });
+
+  it('la página temporal de etiquetas sigue enlazada, aparte del trabajo diario', () => {
+    const destinos = flattenNavEntries(adminNavEntries);
+    expect(destinos.filter((d) => d.href === '/dashboard/admin/etiquetas')).toHaveLength(1);
+    expect(existsSync(join(__dirname, '../app/dashboard/admin/etiquetas/page.tsx'))).toBe(true);
+  });
+
+  it('no enlaza pantallas que no existen: cuentas pendientes (HU-179) solo porque su página existe, y ninguna ruta de métricas inventada', () => {
+    const destinos = flattenNavEntries(adminNavEntries);
+    const pendientes = destinos.filter((d) => /pendiente/i.test(`${d.label} ${d.href}`));
+    expect(pendientes.map((d) => d.href)).toEqual(['/dashboard/admin/cuentas-pendientes']);
+    expect(existsSync(join(__dirname, '../app/dashboard/admin/cuentas-pendientes/page.tsx'))).toBe(true);
+    // Métricas no tiene ruta propia: ningún destino apunta a una página `/metricas`.
+    expect(destinos.filter((d) => /\/metricas\b/.test(d.href))).toEqual([]);
+  });
+
+  it('cada grupo y su destino usan iconos distintos entre sí dentro del mismo grupo', () => {
+    for (const entrada of adminNavEntries) {
+      if (!('type' in entrada) || entrada.type !== 'group') continue;
+      const iconos = entrada.items.map((i) => i.icon);
+      expect(new Set(iconos).size, entrada.label).toBe(iconos.length);
+      expect(iconos, entrada.label).not.toContain(entrada.icon);
+    }
+  });
+
+  it.each([
+    ['/dashboard/admin/usuarios', 'Usuarios', 'Gestión de Usuarios'],
+    ['/dashboard/admin/solicitudes-recuperacion', 'Usuarios', 'Recuperación de contraseña'],
+    ['/dashboard/admin/sprints', 'Proyectos', 'Calendario de Sprints'],
+    ['/dashboard/admin/apelaciones', 'Gobernanza', 'Apelaciones'],
+    ['/dashboard/admin/seguridad', 'Verificación y seguridad', 'Eventos de seguridad'],
+    ['/dashboard/admin/etiquetas', 'Diagnóstico', 'Etiquetas (temporal)'],
+  ])('en %s se abre «%s» y «%s» es el único destino activo', (ruta, grupo, destino) => {
+    pathnameMock.mockReturnValue(ruta);
+    renderShell();
+    const nav = desktopNav();
+    expect(nav.getByRole('button', { name: new RegExp(`^${grupo}`) })).toHaveAttribute('aria-expanded', 'true');
+    const activos = nav.getAllByRole('link').filter((a) => a.getAttribute('aria-current') === 'page');
+    expect(activos.map((a) => a.textContent)).toEqual([destino]);
+  });
+
+  it('los grupos son botones: se abren y cierran con el teclado y exponen su estado', () => {
+    renderShell();
+    const nav = desktopNav();
+    const usuarios = nav.getByRole('button', { name: /^Usuarios/ });
+    expect(usuarios.tagName).toBe('BUTTON');
+    expect(usuarios).toHaveAttribute('aria-expanded', 'false');
+    expect(nav.queryByRole('link', { name: 'Gestión de Usuarios' })).not.toBeInTheDocument();
+
+    usuarios.focus();
+    expect(usuarios).toHaveFocus();
+    fireEvent.click(usuarios);
+    expect(usuarios).toHaveAttribute('aria-expanded', 'true');
+    expect(nav.getByRole('link', { name: 'Gestión de Usuarios' })).toHaveAttribute('href', '/dashboard/admin/usuarios');
+
+    fireEvent.click(usuarios);
+    expect(usuarios).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('colapsada, los once destinos siguen alcanzables como enlaces con nombre', () => {
+    renderShell();
+    const aside = document.querySelector('aside') as HTMLElement;
+    fireEvent.click(within(aside).getByRole('button', { name: 'Colapsar barra lateral' }));
+    const nombres = within(aside).getAllByRole('link').map((a) => a.getAttribute('aria-label') ?? a.textContent);
+    expect(nombres).toEqual(flattenNavEntries(adminNavEntries).map((d) => d.label));
+  });
+
+  it('el inventario describe esta misma estructura', () => {
+    const inventario = readFileSync(join(__dirname, '../../../docs/architecture/sprint9-admin-navigation-inventory.md'), 'utf8');
+    for (const entrada of adminNavEntries) {
+      if (!('type' in entrada) || entrada.type !== 'group') continue;
+      expect(inventario, entrada.label).toContain(`| ${entrada.label} | ${entrada.items.map((i) => i.label).join(' · ')} |`);
+    }
   });
 });

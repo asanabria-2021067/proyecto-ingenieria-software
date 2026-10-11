@@ -15,10 +15,12 @@ import {
   Gavel,
   KeyRound,
   LayoutDashboard,
+  ScrollText,
   Settings2,
   ShieldAlert,
   ShieldCheck,
   UserCheck,
+  UserCog,
   Users,
   RotateCcw,
   Tags,
@@ -42,9 +44,14 @@ import logo from '@/public/logo.png';
 export const ADMIN_CUENTAS_PENDIENTES_HREF = '/dashboard/admin/cuentas-pendientes';
 
 /**
- * S7 (VIEW-12, F011). Los cuatro grupos de «Proyectos» son EXACTAMENTE los del
- * backend (`GET /admin/proyectos?grupo=activos|revision|cierres|cerrados`); no
- * existe un quinto. «Solicitudes de publicación» conserva su ruta: es la bandeja de
+ * T-319 — el menú se agrupa por TEMA de trabajo, en este orden: usuarios,
+ * proyectos, gobernanza y verificación. El inventario completo, con las rutas
+ * que no se enlazan y las pantallas que aún no existen, está en
+ * `docs/architecture/sprint9-admin-navigation-inventory.md`.
+ *
+ * S7 (VIEW-12, F011). Los grupos de «Proyectos» son EXACTAMENTE los del
+ * backend (`GET /admin/proyectos?grupo=activos|cierres|cerrados`); no existe
+ * uno más. «Solicitudes de publicación» conserva su ruta: es la bandeja de
  * revisiones de PUBLICACIÓN (V5 §31.2), un flujo distinto del cierre.
  * «Calendario de Sprints» cierra el grupo como vista de supervisión, no como
  * un grupo más de la bandeja.
@@ -53,13 +60,22 @@ export const adminNavEntries: NavEntry[] = [
   { href: '/dashboard/admin', label: 'Panel Admin', icon: LayoutDashboard, exact: true },
   {
     type: 'group',
+    label: 'Usuarios',
+    icon: Users,
+    items: [
+      { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: UserCog },
+      { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
+    ],
+  },
+  {
+    type: 'group',
     label: 'Proyectos',
     icon: FolderKanban,
     items: [
       { href: '/dashboard/admin/proyectos?grupo=activos', label: 'Activos', icon: FolderOpen },
       // La revisión de publicación es su propio flujo, no un grupo de la
-      // bandeja: se enlaza aquí para que los cuatro destinos de Proyectos
-      // sigan juntos, y no se repite abajo como entrada suelta.
+      // bandeja: se enlaza aquí para que los destinos de Proyectos sigan
+      // juntos, y no se repite abajo como entrada suelta.
       { href: '/dashboard/projects/admin/reviews', label: 'Solicitudes de publicación', icon: FileSearch },
       { href: '/dashboard/admin/proyectos?grupo=cierres', label: 'Solicitudes de cierre', icon: Clock },
       { href: '/dashboard/admin/proyectos?grupo=cerrados', label: 'Cerrados', icon: Archive },
@@ -76,14 +92,20 @@ export const adminNavEntries: NavEntry[] = [
   },
   {
     type: 'group',
-    label: 'Administración',
+    label: 'Verificación y seguridad',
+    icon: ShieldAlert,
+    items: [
+      // HU-179 (PR #270): bandeja de cuentas que esperan verificación; lleva el contador.
+      { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
+      // T-310: visor de solo lectura de los eventos de seguridad que ya se registran.
+      { href: '/dashboard/admin/seguridad', label: 'Eventos de seguridad', icon: ScrollText },
+    ],
+  },
+  {
+    type: 'group',
+    label: 'Diagnóstico',
     icon: Settings2,
     items: [
-      { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
-      { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
-      { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
-      // T-310: visor de solo lectura de los eventos de seguridad que ya se registran.
-      { href: '/dashboard/admin/seguridad', label: 'Eventos de seguridad', icon: ShieldAlert },
       // TEMPORAL: inventario de etiquetas para revisión de diseño; quitar junto con su página.
       { href: '/dashboard/admin/etiquetas', label: 'Etiquetas (temporal)', icon: Tags },
     ],
