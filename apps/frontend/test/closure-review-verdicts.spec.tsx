@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 if (typeof (globalThis as any).ResizeObserver === 'undefined') {
   (globalThis as any).ResizeObserver = class {
@@ -151,7 +151,7 @@ describe('VIEW-14 — revisión administrativa del cierre (F016)', () => {
     renderReview();
     expect(await screen.findByText(/Envío #1/)).toBeInTheDocument();
     await waitFor(() => expect(getCloseReadiness).toHaveBeenCalledWith(123, 'APPROVE'));
-    expect(await screen.findByText('2 de 10')).toBeInTheDocument();
+    expect(await screen.findByText('2 archivos adjuntos · Máximo 10')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Ver informe/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Generar|Regenerar/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Subir|Adjuntar/ })).not.toBeInTheDocument();
@@ -226,6 +226,85 @@ describe('VIEW-14 — revisión administrativa del cierre (F016)', () => {
     expect(swalFire).not.toHaveBeenCalledWith(expect.objectContaining({ icon: 'success' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(approveClosure).toHaveBeenCalledTimes(1);
+  });
+
+  it('con comprobaciones pendientes: ámbar solo en lo incompleto, acceso directo a la categoría y aviso junto a los veredictos', async () => {
+    (getCloseReadiness as any).mockResolvedValue({
+      ...readiness(),
+      canSubmit: false,
+      blockers: [
+        { code: 'HORAS_SIN_CONSOLIDAR', message: 'Hay horas sin consolidar', cantidad: 2, ids: [7, 8] },
+        { code: 'EVIDENCIAS_INVALIDAS', message: 'La entrega necesita entre una y diez evidencias disponibles en PDF', cantidad: 0, ids: [] },
+      ],
+    });
+    renderReview();
+
+    expect(await screen.findByText('14 de 16')).toBeInTheDocument();
+    // Solo las dos categorías incompletas llevan el contador en ámbar.
+    const horas = screen.getByRole('button', { name: 'Horas: 4 de 5' });
+    const sprints = screen.getByRole('button', { name: 'Sprints: 2 de 2' });
+    expect(within(horas).getByText('4 de 5')).toHaveClass('pill', 'pill-amber');
+    expect(within(sprints).getByText('2 de 2')).not.toHaveClass('pill-amber');
+    expect(document.querySelectorAll('[data-slot="accordion-trigger"] .pill-amber')).toHaveLength(2);
+    // El texto del progreso le habla al revisor, no al líder que envía.
+    expect(screen.queryByText(/habilitar el envío|puedes enviar/)).not.toBeInTheDocument();
+    expect(screen.getByText(/revísalas antes de emitir el veredicto/)).toBeInTheDocument();
+
+    // Acceso directo: abre la categoría pendiente y muestra el mensaje del backend.
+    expect(horas).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'Ver pendientes de Horas' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Horas: 4 de 5' })).toHaveAttribute('aria-expanded', 'true'));
+    expect(screen.getByText('Hay horas sin consolidar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ver pendientes de Sprints' })).not.toBeInTheDocument();
+
+    // La regla no cambia: «Aprobar cierre» sigue disponible (el servidor decide); solo se avisa.
+    const veredictos = screen.getByRole('region', { name: 'Veredictos de la revisión' });
+    await waitFor(() => expect(within(veredictos).getByRole('button', { name: 'Aprobar cierre' })).not.toBeDisabled());
+    expect(within(veredictos).getByText('2 pendientes')).toHaveClass('pill-amber');
+    expect(veredictos).toHaveTextContent(/La aprobación se rechazará mientras existan comprobaciones pendientes/);
+  });
+
+  it('sin pendientes no hay avisos ámbar ni accesos directos; pestañas y veredictos van sin iconos', async () => {
+    renderReview();
+    expect(await screen.findByText('16 de 16')).toBeInTheDocument();
+    expect(document.querySelector('[data-slot="closure-pendientes"]')).toBeNull();
+    expect(document.querySelector('[data-slot="veredicto-pendientes"]')).toBeNull();
+
+    const pestanas = screen.getAllByRole('tab');
+    expect(pestanas.map((p) => p.textContent)).toEqual(['Documentos', 'Resumen', 'Miembros', 'Sprints']);
+    for (const pestana of pestanas) {
+      expect(pestana.querySelector('svg')).toBeNull();
+      expect(pestana).toHaveClass('data-[state=active]:after:bg-primary');
+    }
+    const veredictos = screen.getByRole('region', { name: 'Veredictos de la revisión' });
+    expect(veredictos.querySelector('svg')).toBeNull();
+  });
+
+  it('Documentos distingue los obligatorios entregados de los archivos adjuntos y no da instrucciones de subida al administrador', async () => {
+    (getClosureRevision as any).mockResolvedValue(
+      revision({ documentosEnviados: [{ idDocumentoCierre: 901, tipoDocumento: 'EVIDENCIA_LIDER', nombreArchivo: 'evidencia-1.pdf', tamanoBytes: 1024, checksumSha256: null, orden: 1 }] }),
+    );
+    renderReview();
+    expect(await screen.findByText('1 archivo adjunto · Máximo 10')).toBeInTheDocument();
+    const docs = screen.getByRole('region', { name: 'Documentos del cierre' });
+    expect(within(docs).getAllByText('Obligatorio')).toHaveLength(2);
+    // Falta el informe (ámbar); la evidencia sí está entregada.
+    expect(within(docs).getByText('Pendiente')).toHaveClass('pill-amber');
+    expect(within(docs).getByText('Entregado')).toHaveClass('pill-success');
+    expect(within(docs).queryByText(/^Adjunta capturas/)).not.toBeInTheDocument();
+    expect(within(docs).getByText(/adjuntado por el líder/)).toBeInTheDocument();
+  });
+
+  it('Resumen deja la huella y los identificadores internos en un apartado técnico plegado', async () => {
+    renderReview();
+    await screen.findByText(/Envío #1/);
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Resumen' }));
+    const tecnico = (await screen.findByText('Datos técnicos de auditoría')).closest('details')!;
+    expect(tecnico).not.toHaveAttribute('open');
+    expect(within(tecnico).getByText(FINGERPRINT_ENTREGA)).toBeInTheDocument();
+    expect(within(tecnico).getByText(FINGERPRINT_INFORME)).toBeInTheDocument();
+    expect(within(tecnico).getByText('55')).toBeInTheDocument();
+    expect(screen.getByText('Máximo 10')).toBeInTheDocument();
   });
 
   it('fuera de EN_SOLICITUD_CIERRE los tres veredictos quedan deshabilitados', async () => {
