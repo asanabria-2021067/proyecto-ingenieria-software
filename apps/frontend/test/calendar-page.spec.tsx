@@ -265,6 +265,134 @@ describe('CalendarioPage — mini calendario sincronizado (G03-C06, UI-17)', () 
   });
 });
 
+/**
+ * G05-C08 (UI-15, UI-17, UI-28): recorrido completo de vistas y periodos a
+ * nivel de página: qué rango se pide al backend en cada paso, qué dice el
+ * encabezado y cómo lo sigue el mini calendario. Hoy = viernes 9 de octubre de 2026.
+ */
+describe('CalendarioPage — navegación integral de fecha y vista (G05-C08)', () => {
+  const mini = () => screen.getByRole('complementary', { name: 'Opciones del calendario' });
+  const dia = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  /** Rangos [desde, hasta) pedidos al backend, como fechas locales AAAA-MM-DD. */
+  const rangosPedidos = () => (eventsMock.getMisEventos.mock.calls as [Date, Date][]).map(([desde, hasta]) => `${dia(desde)}→${dia(hasta)}`);
+  const seleccionMini = () => [...mini().querySelectorAll('button[aria-pressed="true"]')].map((b) => b.textContent?.trim());
+
+  it('al entrar pide la semana de hoy (lunes a lunes) y el mes del mini; nunca "todos los eventos"', async () => {
+    await renderPage();
+    expect(vista('Semana')).toHaveAttribute('aria-checked', 'true');
+    await waitFor(() => expect(rangosPedidos()).toContain('2026-10-05→2026-10-12'));
+    expect(rangosPedidos()).toContain('2026-09-28→2026-11-09');
+    for (const [desde, hasta] of eventsMock.getMisEventos.mock.calls as [Date, Date][]) {
+      expect(desde).toBeInstanceOf(Date);
+      expect((hasta.getTime() - desde.getTime()) / 86_400_000).toBeLessThanOrEqual(42.1);
+    }
+  });
+
+  it('cada vista pide exactamente su rango: Día un día, Semana siete, Mes las seis semanas de la cuadrícula', async () => {
+    await renderPage();
+    fireEvent.click(vista('Día'));
+    await waitFor(() => expect(rangosPedidos()).toContain('2026-10-09→2026-10-10'));
+    expect(etiquetaPeriodo()).toHaveTextContent('9 de octubre');
+    fireEvent.click(vista('Mes'));
+    expect(etiquetaPeriodo()).toHaveTextContent('Octubre 2026');
+    // El mes ya lo había pedido el mini: es la misma clave de caché (TanStack la refresca, pero no hay un rango distinto).
+    expect([...new Set(rangosPedidos())].sort()).toEqual(['2026-09-28→2026-11-09', '2026-10-05→2026-10-12', '2026-10-09→2026-10-10']);
+    expect(screen.getAllByRole('button', { name: /de (septiembre|octubre|noviembre)/ }).filter((b) => b.hasAttribute('aria-pressed'))).toHaveLength(42);
+  });
+
+  it('en Día, ‹ y › avanzan de un día en un día cruzando el fin de mes, y Hoy vuelve al 9 de octubre', async () => {
+    await renderPage();
+    fireEvent.click(vista('Día'));
+    fireEvent.click(boton('Anterior'));
+    expect(etiquetaPeriodo()).toHaveTextContent('Jueves, 8 de octubre de 2026');
+    await waitFor(() => expect(rangosPedidos()).toContain('2026-10-08→2026-10-09'));
+    for (let i = 0; i < 9; i += 1) fireEvent.click(boton('Anterior'));
+    expect(etiquetaPeriodo()).toHaveTextContent('Martes, 29 de septiembre de 2026');
+    // El mini sigue a la fecha: cambia a septiembre y señala el 29.
+    expect(within(mini()).getByText('Septiembre 2026')).toBeInTheDocument();
+    expect(seleccionMini()).toEqual(['29']);
+
+    fireEvent.click(boton('Hoy'));
+    expect(etiquetaPeriodo()).toHaveTextContent('Viernes, 9 de octubre de 2026');
+    expect(within(mini()).getByText('Octubre 2026')).toBeInTheDocument();
+    expect(seleccionMini()).toEqual(['9']);
+  });
+
+  it('en Semana, › pide la semana siguiente completa y el encabezado cruza de mes y de año sin perder el rango', async () => {
+    await renderPage();
+    fireEvent.click(boton('Siguiente'));
+    await waitFor(() => expect(rangosPedidos()).toContain('2026-10-12→2026-10-19'));
+    for (let i = 0; i < 2; i += 1) fireEvent.click(boton('Siguiente'));
+    await waitFor(() => expect(rangosPedidos()).toContain('2026-10-26→2026-11-02'));
+    expect(etiquetaPeriodo()).toHaveTextContent('26 oct – 1 nov 2026');
+    // Hasta la semana del 28 de diciembre de 2026 al 3 de enero de 2027.
+    for (let i = 0; i < 9; i += 1) fireEvent.click(boton('Siguiente'));
+    await waitFor(() => expect(rangosPedidos()).toContain('2026-12-28→2027-01-04'));
+    expect(etiquetaPeriodo()).toHaveTextContent('28 dic – 3 ene 2027');
+    expect(within(mini()).getByText('Enero 2027')).toBeInTheDocument();
+  });
+
+  it('en Mes, ‹ y › avanzan de mes en mes cruzando el año, y el mini muestra el mismo mes que la vista', async () => {
+    await renderPage();
+    fireEvent.click(vista('Mes'));
+    for (const esperado of ['Noviembre 2026', 'Diciembre 2026', 'Enero 2027']) {
+      fireEvent.click(boton('Siguiente'));
+      expect(etiquetaPeriodo()).toHaveTextContent(esperado);
+      expect(within(mini()).getByText(esperado)).toBeInTheDocument();
+    }
+    await waitFor(() => expect(rangosPedidos()).toContain('2026-12-28→2027-02-08'));
+    fireEvent.click(boton('Anterior'));
+    expect(etiquetaPeriodo()).toHaveTextContent('Diciembre 2026');
+    fireEvent.click(boton('Hoy'));
+    expect(etiquetaPeriodo()).toHaveTextContent('Octubre 2026');
+    expect(celdaMes(9, 'octubre')).toHaveAttribute('aria-current', 'date');
+  });
+
+  it('cambiar de vista conserva la fecha en la que se estaba, no vuelve a hoy', async () => {
+    await renderPage();
+    for (let i = 0; i < 3; i += 1) fireEvent.click(boton('Siguiente'));
+    expect(etiquetaPeriodo()).toHaveTextContent('26 oct – 1 nov 2026');
+    fireEvent.click(vista('Día'));
+    expect(etiquetaPeriodo()).toHaveTextContent('30 de octubre de 2026');
+    fireEvent.click(vista('Mes'));
+    expect(etiquetaPeriodo()).toHaveTextContent('Octubre 2026');
+    fireEvent.click(boton('Siguiente'));
+    fireEvent.click(vista('Semana'));
+    // Desde Mes se navega al día 1 del mes: su semana es la del 26 de octubre al 1 de noviembre.
+    expect(etiquetaPeriodo()).toHaveTextContent('26 oct – 1 nov 2026');
+  });
+
+  it('hoy lleva aria-current solo en el periodo que lo contiene: al salir de él no queda ningún "hoy" falso en la vista ni en el mini', async () => {
+    await renderPage();
+    fireEvent.click(vista('Mes'));
+    expect(celdaMes(9, 'octubre')).toHaveAttribute('aria-current', 'date');
+    expect(mini().querySelectorAll('[aria-current="date"]')).toHaveLength(1);
+    fireEvent.click(boton('Siguiente'));
+    fireEvent.click(boton('Siguiente'));
+    expect(etiquetaPeriodo()).toHaveTextContent('Diciembre 2026');
+    expect(document.querySelectorAll('main [aria-current="date"], [aria-current="date"]')).toHaveLength(0);
+    expect(celdaMes(9, 'diciembre')).not.toHaveAttribute('aria-current');
+  });
+
+  it('volver a un periodo ya visitado no cambia lo que se muestra: los eventos de cada semana siguen en su semana', async () => {
+    eventsMock.getMisEventos.mockImplementation(async (desde: Date, hasta: Date) =>
+      [
+        eventoDTO({ idEvento: 31, tituloEvento: 'Reunión de esta semana' }),
+        eventoDTO({ idEvento: 32, tituloEvento: 'Reunión de la siguiente', fechaInicio: new Date(2026, 9, 14, 9, 0).toISOString(), fechaFin: new Date(2026, 9, 14, 10, 0).toISOString() }),
+      ].filter((e) => new Date(e.fechaInicio) >= desde && new Date(e.fechaInicio) < hasta),
+    );
+    await renderPage();
+    expect((await screen.findAllByRole('button', { name: /^Reunión de esta semana/ })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /^Reunión de la siguiente/ })).not.toBeInTheDocument();
+    fireEvent.click(boton('Siguiente'));
+    expect((await screen.findAllByRole('button', { name: /^Reunión de la siguiente/ })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /^Reunión de esta semana/ })).not.toBeInTheDocument();
+    fireEvent.click(boton('Anterior'));
+    expect((await screen.findAllByRole('button', { name: /^Reunión de esta semana/ })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /^Reunión de la siguiente/ })).not.toBeInTheDocument();
+  });
+});
+
 describe('CalendarioPage — reloj vivo: línea "Ahora" y día "Hoy" (G03-C07, UI-28)', () => {
   beforeEach(() => {
     // Aquí también se fingen los intervalos (los timeouts siguen reales para
