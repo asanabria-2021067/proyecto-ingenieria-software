@@ -4,7 +4,7 @@ import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, Loader2, Repeat, Rocket } from 'lucide-react';
+import { AlertCircle, FolderX, Loader2, Repeat, Rocket, ShieldAlert } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useFinalizeSprint, useProjectSprints } from '@/hooks/use-project-sprints';
@@ -21,7 +21,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import type { EstadoSprint, SprintDto } from '@/lib/types/sprints';
-import { getApiErrorMessage } from '@/components/projects/api-error';
+import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
 
@@ -227,7 +227,17 @@ export default function SprintListPage() {
   const { id } = useParams<{ id: string }>();
   const idProyecto = Number(id);
 
-  const { data: proyecto, isLoading: cargandoProyecto } = useProjectDetail(idProyecto);
+  const {
+    data: proyecto,
+    isLoading: cargandoProyecto,
+    isError: errorDeProyecto,
+    error: causaErrorProyecto,
+    refetch: recargarProyecto,
+  } = useProjectDetail(idProyecto);
+  // GPI01-C05 (H-03): sin proyecto no hay forma de saber quién es líder. Antes
+  // cualquier fallo de esta lectura acababa en «no eres líder», también para un
+  // proyecto inexistente o un error del servidor.
+  const estadoErrorProyecto = errorDeProyecto ? getApiErrorStatus(causaErrorProyecto) : undefined;
   const { data: currentUser, isLoading: cargandoUsuario } = useCurrentUser();
   const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
 
@@ -241,6 +251,64 @@ export default function SprintListPage() {
   const enCurso = sprints.filter((sprint) => sprint.estado !== 'CERRADO');
   const cerrados = sprints.filter((sprint) => sprint.estado === 'CERRADO');
   const horasEstimadasTotales = sprints.reduce((total, sprint) => total + (sprint.horasEstimadas ?? 0), 0);
+
+  if (errorDeProyecto) {
+    const sinAcceso = estadoErrorProyecto === 403;
+    const terminal = sinAcceso || estadoErrorProyecto === 404;
+    return (
+      <ProjectPageShell>
+        <Empty tone={terminal ? 'muted' : 'danger'} role={terminal ? 'status' : 'alert'}>
+          <EmptyMedia variant="icon">
+            {sinAcceso ? (
+              <ShieldAlert aria-hidden="true" className="h-7 w-7" />
+            ) : terminal ? (
+              <FolderX aria-hidden="true" className="h-7 w-7" />
+            ) : (
+              <AlertCircle aria-hidden="true" className="h-7 w-7" />
+            )}
+          </EmptyMedia>
+          <EmptyHeader>
+            <EmptyTitle>
+              {sinAcceso
+                ? 'No tienes acceso a este proyecto.'
+                : terminal
+                  ? 'Proyecto no encontrado'
+                  : 'No fue posible cargar el proyecto.'}
+            </EmptyTitle>
+            <EmptyDescription>
+              {sinAcceso
+                ? 'Solo quienes participan en el proyecto pueden consultar sus Sprints.'
+                : terminal
+                  ? 'El proyecto que buscas no existe o ya no está disponible.'
+                  : 'Inténtalo de nuevo en unos segundos.'}
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            {terminal ? (
+              <Link
+                href="/dashboard/proyectos"
+                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              >
+                Volver a proyectos
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => recargarProyecto()}
+                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              >
+                Reintentar
+              </button>
+            )}
+          </EmptyContent>
+        </Empty>
+      </ProjectPageShell>
+    );
+  }
+
+  // Un 403/404 de la lista tampoco cambia por repetirlo: sin botón de reintento.
+  const estadoErrorSprints = isError ? getApiErrorStatus(error) : undefined;
+  const errorSprintsTerminal = estadoErrorSprints === 403 || estadoErrorSprints === 404;
 
   return (
     <ProjectPageShell>
@@ -280,15 +348,17 @@ export default function SprintListPage() {
               {getApiErrorMessage(error, 'general', 'No fue posible cargar los Sprints del proyecto.')}
             </EmptyTitle>
           </EmptyHeader>
-          <EmptyContent>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-            >
-              Reintentar
-            </button>
-          </EmptyContent>
+          {!errorSprintsTerminal && (
+            <EmptyContent>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              >
+                Reintentar
+              </button>
+            </EmptyContent>
+          )}
         </Empty>
       )}
 
