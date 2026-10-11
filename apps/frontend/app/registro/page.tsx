@@ -1,21 +1,22 @@
 'use client';
 
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
-import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRegister } from '@/hooks/use-register';
 import { getCarreras, type Carrera } from '@/lib/services/catalogs';
 import { z } from 'zod';
 import { correoInstitucionalEsperado, FORMATO_CORREO_INSTITUCIONAL } from '@/lib/validators/correo-institucional';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  AUTH_FIELD_ERROR,
+  AUTH_INPUT_COMPACT,
+  AUTH_LABEL,
+  AUTH_PRIMARY_BUTTON,
+  AuthSplitLayout,
+} from '@/components/auth/auth-split-layout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Spinner } from '@/components/ui/spinner';
 
-import img from '@/public/login-foto.jpg';
 import logo from '@/public/logo.png';
 
 const registerSchema = z
@@ -74,7 +75,7 @@ const registerSchema = z
   });
 
 const selectClass =
-  'w-full rounded-control border border-outline-variant bg-card px-inline py-tight type-body transition-colors focus-visible:border-primary';
+  `${AUTH_INPUT_COMPACT} min-w-0`;
 
 // T-274 (OWASP): mensaje neutro para cualquier fallo del backend. Antes se
 // mostraba error.message crudo (p. ej. "El correo ya esta registrado"), lo
@@ -175,348 +176,309 @@ export default function RegistroPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-page p-stack sm:p-section">
-      <div className="grid w-full max-w-5xl overflow-hidden rounded-card bg-card shadow-raised lg:grid-cols-2">
-        {/* Branding panel: mismo patron que /login (bg-primary text-on-primary,
-            foto del campus desvanecida detras via gradiente). */}
-        <div className="relative hidden flex-col justify-between overflow-hidden bg-primary p-section text-on-primary lg:flex">
-          <Image
-            alt=""
-            src={img}
-            fill
-            className="object-cover opacity-25"
-            sizes="(min-width: 1024px) 50vw, 0px"
-            priority
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/85 to-primary/50" />
-
-          <Link
-            href="/"
-            className="relative z-10 flex items-center gap-tight self-start text-on-primary/80 transition-colors hover:text-on-primary"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="type-meta font-bold uppercase tracking-wider">Volver</span>
-          </Link>
-
-          <div className="relative z-10">
-            <span className="type-meta font-bold uppercase tracking-widest text-on-primary/80">
-              Portal institucional · UVG
-            </span>
-            <h2 className="type-display mt-tight text-on-primary">Comienza tu camino</h2>
-            <p className="type-body mt-tight text-on-primary/85">
-              Registrate y accede a oportunidades de beca, extension y experiencia academica.
-            </p>
-          </div>
-
-          <span className="relative z-10 type-meta text-on-primary/80">UVG 2025</span>
-        </div>
-
-        {/* Form panel */}
-        <div className="flex flex-col p-section">
-          <header className="mb-stack flex items-center justify-between">
-            <Link
-              href="/"
-              className="flex items-center gap-tight text-text-secondary transition-colors hover:text-text-primary lg:hidden"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="type-meta font-bold uppercase tracking-wider">Volver</span>
-            </Link>
-            <span className="hidden lg:block" />
-            <ThemeToggle />
-          </header>
-
-          <div className="mb-stack">
-            <Image src={logo} alt="UVGENIUS" className="mb-tight h-14 w-auto" />
-            <h1 className="type-section">Crear cuenta</h1>
-            <p className="type-body mt-micro text-text-secondary">
-              Usa tu correo institucional para registrarte
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-tight">
-            <div className="grid grid-cols-1 gap-tight sm:grid-cols-2">
-              <div className="flex flex-col gap-tight">
-                <Label htmlFor="nombre" className="type-meta font-bold uppercase tracking-widest text-text-secondary">
-                  Nombre
-                </Label>
-                <Input
-                  id="nombre"
-                  type="text"
-                  required
-                  value={nombre}
-                  onChange={(e) => {
-                    setNombre(e.target.value);
-                    if (errores.nombre) setErrores((prev) => ({ ...prev, nombre: undefined }));
-                  }}
-                  placeholder="Juan"
-                  aria-invalid={errores.nombre ? 'true' : 'false'}
-                  aria-describedby={errores.nombre ? 'nombre-error' : undefined}
-                />
-                {errores.nombre && (
-                  <p id="nombre-error" role="alert" className="type-meta text-on-status-error">
-                    {errores.nombre}
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-col gap-tight">
-                <Label htmlFor="apellido" className="type-meta font-bold uppercase tracking-widest text-text-secondary">
-                  Apellido
-                </Label>
-                <Input
-                  id="apellido"
-                  type="text"
-                  required
-                  value={apellido}
-                  onChange={(e) => {
-                    setApellido(e.target.value);
-                    if (errores.apellido) setErrores((prev) => ({ ...prev, apellido: undefined }));
-                  }}
-                  placeholder="Perez"
-                  aria-invalid={errores.apellido ? 'true' : 'false'}
-                  aria-describedby={errores.apellido ? 'apellido-error' : undefined}
-                />
-                {errores.apellido && (
-                  <p id="apellido-error" role="alert" className="type-meta text-on-status-error">
-                    {errores.apellido}
-                  </p>
-                )}
-              </div>
+    <AuthSplitLayout
+      titulo="Comienza tu camino"
+      descripcion="Registrate y accede a oportunidades de beca, extension y experiencia academica."
+      panelDesplazable
+    >
+          <div className="w-full max-w-lg">
+            {/* Branding */}
+            <div className="mb-8 text-left">
+              <Image src={logo} alt="UVGENIUS" className="mx-auto mb-4 h-28 w-auto" />
+              <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">Crear cuenta</h1>
+              <p className="mt-2 text-base text-tertiary">Usa tu correo institucional para registrarte</p>
             </div>
 
-            <div className="flex flex-col gap-tight">
-              <Label htmlFor="carne" className="type-meta font-bold uppercase tracking-widest text-text-secondary">
-                Carnet
-              </Label>
-              <Input
-                id="carne"
-                type="text"
-                required
-                value={carne}
-                onChange={(e) => {
-                  setCarne(e.target.value);
-                  if (errores.carne) setErrores((prev) => ({ ...prev, carne: undefined }));
-                }}
-                placeholder="24000"
-                aria-invalid={errores.carne ? 'true' : 'false'}
-                aria-describedby={errores.carne ? 'carne-error' : undefined}
-              />
-              {errores.carne && (
-                <p id="carne-error" role="alert" className="type-meta text-on-status-error">
-                  {errores.carne}
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-tight">
-              <Label htmlFor="correo" className="type-meta font-bold uppercase tracking-widest text-text-secondary">
-                Correo institucional
-              </Label>
-              <Input
-                id="correo"
-                type="email"
-                required
-                value={correo}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setCorreo(value);
-                  setCorreoEditadoManualmente(value !== '');
-                  if (errores.correo) setErrores((prev) => ({ ...prev, correo: undefined }));
-                }}
-                placeholder="usuario@uvg.edu.gt"
-                aria-invalid={errores.correo ? 'true' : 'false'}
-                aria-describedby={errores.correo ? 'correo-error' : undefined}
-              />
-              {!correoEditadoManualmente && correo && (
-                <p className="type-meta text-primary">
-                  Correo generado automaticamente. Puedes editarlo si lo necesitas.
-                </p>
-              )}
-              {errores.correo && (
-                <p id="correo-error" role="alert" className="type-meta text-on-status-error">
-                  {errores.correo}
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-tight md:grid-cols-3">
-              <div className="flex flex-col gap-tight md:col-span-2">
-                <Label htmlFor="carrera" className="type-meta font-bold uppercase tracking-widest text-text-secondary">
-                  Carrera
-                </Label>
-                <select
-                  id="carrera"
-                  data-testid="registro-carrera-select"
-                  required
-                  value={idCarrera}
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
-                    setIdCarrera(value);
-                    if (errores.idCarrera) setErrores((prev) => ({ ...prev, idCarrera: undefined }));
-                  }}
-                  className={selectClass}
-                  aria-invalid={errores.idCarrera ? 'true' : 'false'}
-                  aria-describedby={errores.idCarrera ? 'carrera-error' : undefined}
-                >
-                  <option value={0}>Seleccionar...</option>
-                  {carreras.map((c) => (
-                    <option key={c.idCarrera} value={c.idCarrera} title={c.nombreCarrera}>
-                      {c.nombreCarrera}
-                    </option>
-                  ))}
-                </select>
-                {errores.idCarrera && (
-                  <p id="carrera-error" role="alert" className="type-meta text-on-status-error">
-                    {errores.idCarrera}
-                  </p>
-                )}
-                {selectedCarreraName && (
-                  <p className="type-meta break-words leading-snug text-text-secondary">{selectedCarreraName}</p>
-                )}
-              </div>
-              <div className="flex flex-col gap-tight">
-                <Label htmlFor="semestre" className="type-meta font-bold uppercase tracking-widest text-text-secondary">
-                  Semestre
-                </Label>
-                <select
-                  id="semestre"
-                  required
-                  value={semestre}
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
-                    setSemestre(value);
-                    if (errores.semestre) setErrores((prev) => ({ ...prev, semestre: undefined }));
-                  }}
-                  className={selectClass}
-                  aria-invalid={errores.semestre ? 'true' : 'false'}
-                  aria-describedby={errores.semestre ? 'semestre-error' : undefined}
-                >
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-                {errores.semestre && (
-                  <p id="semestre-error" role="alert" className="type-meta text-on-status-error">
-                    {errores.semestre}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-tight">
-              <Label htmlFor="contrasena" className="type-meta font-bold uppercase tracking-widest text-text-secondary">
-                Contrasena
-              </Label>
-              <Input
-                id="contrasena"
-                type="password"
-                required
-                minLength={8}
-                value={contrasena}
-                onChange={(e) => {
-                  setContrasena(e.target.value);
-                  if (errores.contrasena) setErrores((prev) => ({ ...prev, contrasena: undefined }));
-                }}
-                placeholder="Minimo 8 caracteres"
-                aria-invalid={errores.contrasena ? 'true' : 'false'}
-                aria-describedby={errores.contrasena ? 'contrasena-error' : undefined}
-              />
-              {passwordStrength && (
-                <div className="flex flex-col gap-micro">
-                  <div className="flex items-center justify-between type-meta font-bold text-text-secondary">
-                    <span>Fuerza de la contraseña:</span>
-                    <span
-                      className={
-                        passwordStrength.variant === 'error'
-                          ? 'text-on-status-error'
-                          : passwordStrength.variant === 'warning'
-                            ? 'text-on-status-warning'
-                            : 'text-primary'
-                      }
-                    >
-                      {passwordStrength.label}
-                    </span>
-                  </div>
-                  {/* T-251: relleno con los tokens vivos (no -container) de cada
-                      familia, que sí contrastan >=3:1 contra la pista en oscuro. */}
-                  <div className="h-1.5 w-full overflow-hidden rounded-pill bg-surface-container-highest">
-                    <div
-                      className={`h-full rounded-pill transition-all duration-500 ${
-                        passwordStrength.variant === 'error'
-                          ? 'bg-error'
-                          : passwordStrength.variant === 'warning'
-                            ? 'bg-secondary'
-                            : 'bg-primary'
-                      }`}
-                      style={{ width: passwordStrength.width }}
-                    />
-                  </div>
+            <form onSubmit={handleSubmit} noValidate className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="min-w-0 space-y-1.5">
+                  <label htmlFor="nombre" className={AUTH_LABEL}>
+                    Nombre
+                  </label>
+                  <input
+                    id="nombre"
+                    type="text"
+                    required
+                    value={nombre}
+                    onChange={(e) => {
+                      setNombre(e.target.value);
+                      if (errores.nombre) setErrores((prev) => ({ ...prev, nombre: undefined }));
+                    }}
+                    placeholder="Juan"
+                    className={AUTH_INPUT_COMPACT}
+                    aria-invalid={errores.nombre ? 'true' : 'false'}
+                    aria-describedby={errores.nombre ? 'nombre-error' : undefined}
+                  />
+                  {errores.nombre && (
+                    <p id="nombre-error" role="alert" className={AUTH_FIELD_ERROR}>
+                      {errores.nombre}
+                    </p>
+                  )}
                 </div>
-              )}
-              {errores.contrasena && (
-                <p id="contrasena-error" role="alert" className="type-meta text-on-status-error">
-                  {errores.contrasena}
-                </p>
-              )}
-            </div>
+                <div className="min-w-0 space-y-1.5">
+                  <label htmlFor="apellido" className={AUTH_LABEL}>
+                    Apellido
+                  </label>
+                  <input
+                    id="apellido"
+                    type="text"
+                    required
+                    value={apellido}
+                    onChange={(e) => {
+                      setApellido(e.target.value);
+                      if (errores.apellido) setErrores((prev) => ({ ...prev, apellido: undefined }));
+                    }}
+                    placeholder="Perez"
+                    className={AUTH_INPUT_COMPACT}
+                    aria-invalid={errores.apellido ? 'true' : 'false'}
+                    aria-describedby={errores.apellido ? 'apellido-error' : undefined}
+                  />
+                  {errores.apellido && (
+                    <p id="apellido-error" role="alert" className={AUTH_FIELD_ERROR}>
+                      {errores.apellido}
+                    </p>
+                  )}
+                </div>
+              </div>
 
-            <div className="flex flex-col gap-tight">
-              <Label htmlFor="confirmar" className="type-meta font-bold uppercase tracking-widest text-text-secondary">
-                Confirmar Contrasena
-              </Label>
-              <Input
-                id="confirmar"
-                type="password"
-                required
-                value={confirmar}
-                onChange={(e) => {
-                  setConfirmar(e.target.value);
-                  if (errores.confirmar) setErrores((prev) => ({ ...prev, confirmar: undefined }));
-                }}
-                placeholder="••••••••"
-                aria-invalid={errores.confirmar ? 'true' : 'false'}
-                aria-describedby={errores.confirmar ? 'confirmar-error' : undefined}
-              />
-              {confirmar && (
-                <p className={`type-meta font-semibold ${passwordsMatch ? 'text-primary' : 'text-on-status-error'}`}>
-                  {passwordsMatch ? 'Las contraseñas coinciden' : 'Las contraseñas no coinciden'}
-                </p>
+              <div className="min-w-0 space-y-1.5">
+                <label htmlFor="carne" className={AUTH_LABEL}>
+                  Carnet
+                </label>
+                <input
+                  id="carne"
+                  type="text"
+                  required
+                  value={carne}
+                  onChange={(e) => {
+                    setCarne(e.target.value);
+                    if (errores.carne) setErrores((prev) => ({ ...prev, carne: undefined }));
+                  }}
+                  placeholder="24000"
+                  className={AUTH_INPUT_COMPACT}
+                  aria-invalid={errores.carne ? 'true' : 'false'}
+                  aria-describedby={errores.carne ? 'carne-error' : undefined}
+                />
+                {errores.carne && (
+                  <p id="carne-error" role="alert" className={AUTH_FIELD_ERROR}>
+                    {errores.carne}
+                  </p>
+                )}
+              </div>
+
+              <div className="min-w-0 space-y-1.5">
+                <label htmlFor="correo" className={AUTH_LABEL}>
+                  Correo institucional
+                </label>
+                <input
+                  id="correo"
+                  type="email"
+                  required
+                  value={correo}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCorreo(value);
+                    setCorreoEditadoManualmente(value !== '');
+                    if (errores.correo) setErrores((prev) => ({ ...prev, correo: undefined }));
+                  }}
+                  placeholder="usuario@uvg.edu.gt"
+                  className={AUTH_INPUT_COMPACT}
+                  aria-invalid={errores.correo ? 'true' : 'false'}
+                  aria-describedby={errores.correo ? 'correo-error' : undefined}
+                />
+                {!correoEditadoManualmente && correo && (
+                  <p className="text-xs text-primary">
+                    Correo generado automaticamente. Puedes editarlo si lo necesitas.
+                  </p>
+                )}
+                {errores.correo && (
+                  <p id="correo-error" role="alert" className={AUTH_FIELD_ERROR}>
+                    {errores.correo}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="min-w-0 space-y-1.5 sm:col-span-2">
+                  <label htmlFor="carrera" className={AUTH_LABEL}>
+                    Carrera
+                  </label>
+                  <select
+                    id="carrera"
+                    data-testid="registro-carrera-select"
+                    required
+                    value={idCarrera}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setIdCarrera(value);
+                      if (errores.idCarrera) setErrores((prev) => ({ ...prev, idCarrera: undefined }));
+                    }}
+                    className={selectClass}
+                    aria-invalid={errores.idCarrera ? 'true' : 'false'}
+                    aria-describedby={errores.idCarrera ? 'carrera-error' : undefined}
+                  >
+                    <option value={0}>Seleccionar...</option>
+                    {carreras.map((c) => (
+                      <option key={c.idCarrera} value={c.idCarrera} title={c.nombreCarrera}>
+                        {c.nombreCarrera}
+                      </option>
+                    ))}
+                  </select>
+                  {errores.idCarrera && (
+                    <p id="carrera-error" role="alert" className={AUTH_FIELD_ERROR}>
+                      {errores.idCarrera}
+                    </p>
+                  )}
+                  {selectedCarreraName && (
+                    <p className="break-words text-xs leading-snug text-tertiary">{selectedCarreraName}</p>
+                  )}
+                </div>
+                <div className="min-w-0 space-y-1.5">
+                  <label htmlFor="semestre" className={AUTH_LABEL}>
+                    Semestre
+                  </label>
+                  <select
+                    id="semestre"
+                    required
+                    value={semestre}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setSemestre(value);
+                      if (errores.semestre) setErrores((prev) => ({ ...prev, semestre: undefined }));
+                    }}
+                    className={selectClass}
+                    aria-invalid={errores.semestre ? 'true' : 'false'}
+                    aria-describedby={errores.semestre ? 'semestre-error' : undefined}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  {errores.semestre && (
+                    <p id="semestre-error" role="alert" className={AUTH_FIELD_ERROR}>
+                      {errores.semestre}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="min-w-0 space-y-1.5">
+                <label htmlFor="contrasena" className={AUTH_LABEL}>
+                  Contraseña
+                </label>
+                <input
+                  id="contrasena"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={contrasena}
+                  onChange={(e) => {
+                    setContrasena(e.target.value);
+                    if (errores.contrasena) setErrores((prev) => ({ ...prev, contrasena: undefined }));
+                  }}
+                  placeholder="Minimo 8 caracteres"
+                  className={AUTH_INPUT_COMPACT}
+                  aria-invalid={errores.contrasena ? 'true' : 'false'}
+                  aria-describedby={errores.contrasena ? 'contrasena-error' : undefined}
+                />
+                {passwordStrength && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs font-bold text-tertiary">
+                      <span>Fuerza de la contraseña:</span>
+                      <span
+                        className={
+                          passwordStrength.variant === 'error'
+                            ? 'text-error'
+                            : passwordStrength.variant === 'warning'
+                              ? 'text-attention-strong dark:text-on-tag-amber'
+                              : 'text-primary'
+                        }
+                      >
+                        {passwordStrength.label}
+                      </span>
+                    </div>
+                    {/* T-251: relleno con los tokens vivos (no -container) de cada
+                        familia, que sí contrastan >=3:1 contra la pista en oscuro. */}
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container-highest">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          passwordStrength.variant === 'error'
+                            ? 'bg-error'
+                            : passwordStrength.variant === 'warning'
+                              ? 'bg-secondary'
+                              : 'bg-primary'
+                        }`}
+                        style={{ width: passwordStrength.width }}
+                      />
+                    </div>
+                  </div>
+                )}
+                {errores.contrasena && (
+                  <p id="contrasena-error" role="alert" className={AUTH_FIELD_ERROR}>
+                    {errores.contrasena}
+                  </p>
+                )}
+              </div>
+
+              <div className="min-w-0 space-y-1.5">
+                <label htmlFor="confirmar" className={AUTH_LABEL}>
+                  Confirmar contraseña
+                </label>
+                <input
+                  id="confirmar"
+                  type="password"
+                  required
+                  value={confirmar}
+                  onChange={(e) => {
+                    setConfirmar(e.target.value);
+                    if (errores.confirmar) setErrores((prev) => ({ ...prev, confirmar: undefined }));
+                  }}
+                  placeholder="••••••••"
+                  className={AUTH_INPUT_COMPACT}
+                  aria-invalid={errores.confirmar ? 'true' : 'false'}
+                  aria-describedby={errores.confirmar ? 'confirmar-error' : undefined}
+                />
+                {confirmar && (
+                  <p className={`text-xs font-semibold ${passwordsMatch ? 'text-primary' : 'text-error'}`}>
+                    {passwordsMatch ? 'Las contraseñas coinciden' : 'Las contraseñas no coinciden'}
+                  </p>
+                )}
+                {errores.confirmar && (
+                  <p id="confirmar-error" role="alert" className={AUTH_FIELD_ERROR}>
+                    {errores.confirmar}
+                  </p>
+                )}
+              </div>
+
+              {/* T-219: un solo componente para carga/error/exito, sin popups. */}
+              {(isPending || isError || registroOk) && (
+                <Alert variant={registroOk ? 'success' : isError ? 'destructive' : 'default'}>
+                  {isPending && <Spinner />}
+                  <AlertDescription>
+                    {registroOk
+                      ? 'Cuenta creada. Administración debe verificarla antes de que puedas iniciar sesión.'
+                      : isError
+                        ? mensajeError(error as (Error & { statusCode?: number }) | null)
+                        : 'Creando tu cuenta…'}
+                  </AlertDescription>
+                </Alert>
               )}
-              {errores.confirmar && (
-                <p id="confirmar-error" role="alert" className="type-meta text-on-status-error">
-                  {errores.confirmar}
-                </p>
-              )}
-            </div>
 
-            {/* T-219: un solo componente para carga/error/exito, sin popups. */}
-            {(isPending || isError || registroOk) && (
-              <Alert variant={registroOk ? 'success' : isError ? 'destructive' : 'default'}>
-                {isPending && <Spinner />}
-                <AlertDescription>
-                  {registroOk
-                    ? 'Cuenta creada. Administración debe verificarla antes de que puedas iniciar sesión.'
-                    : isError
-                      ? mensajeError(error as (Error & { statusCode?: number }) | null)
-                      : 'Creando tu cuenta…'}
-                </AlertDescription>
-              </Alert>
-            )}
+              <button type="submit" disabled={isPending} className={AUTH_PRIMARY_BUTTON}>
+                Crear Cuenta
+              </button>
+            </form>
 
-            <Button type="submit" disabled={isPending} className="mt-tight w-full">
-              Crear Cuenta
-            </Button>
-          </form>
 
-          <p className="mt-stack text-center type-meta text-text-secondary">
-            Ya tienes cuenta?{' '}
-            <Link href="/login" className="font-bold text-primary hover:underline">
-              Inicia sesion
-            </Link>
-          </p>
-        </div>
-      </div>
-    </main>
+            <p className="mt-8 text-center text-xs text-tertiary">
+              Ya tienes cuenta?{' '}
+              <Link href="/login" className="font-bold text-primary hover:underline">
+                Inicia sesion
+              </Link>
+            </p>
+          </div>
+    </AuthSplitLayout>
   );
 }
