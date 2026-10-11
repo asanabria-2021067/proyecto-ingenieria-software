@@ -33,6 +33,7 @@ import {
   type FiltroApelacion,
 } from '@/lib/admin/appeals';
 import type { ApelacionItemDto } from '@/lib/types/leadership';
+import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
 // Mismas clases de tabla que las bandejas de Proyectos (closed-projects-board).
 const TH = `h-auto whitespace-normal px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
@@ -182,12 +183,12 @@ export default function AppealsInboxClient() {
   const hayBusqueda = busqueda.trim() !== '';
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
+    <div className={ADMIN_PAGE}>
       <AdminBreadcrumb seccion="Gobernanza" seccionHref="/dashboard/admin" pagina="Apelaciones" />
 
       <section className="mb-6">
-        <h1 className="type-display text-balance">Apelaciones de liderazgo</h1>
-        <p className="mt-tight max-w-2xl text-base text-tertiary">
+        <h1 className={ADMIN_PAGE_TITLE}>Apelaciones de liderazgo</h1>
+        <p className={ADMIN_PAGE_LEAD}>
           Solicitudes de los líderes para transferir su liderazgo. La apelación es una solicitud, no una designación.
         </p>
       </section>

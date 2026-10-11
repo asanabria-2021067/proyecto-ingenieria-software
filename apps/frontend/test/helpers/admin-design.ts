@@ -37,12 +37,13 @@ export interface Medida {
 
 export function medir(fuente: string): Medida {
   const contar = (patron: RegExp) => fuente.match(patron)?.length ?? 0;
-  const h1 = fuente.match(/<h1[^>]*className="([^"]*)"/);
+  // El titular puede llevar la clase escrita o la primitiva compartida `ADMIN_PAGE_TITLE` (= type-display).
+  const h1 = fuente.match(/<h1[^>]*className=(?:"([^"]*)"|\{(ADMIN_PAGE_TITLE)\})/);
   return {
     px: contar(/\btext-\[[0-9.]+px\]/g),
     radio: contar(/\brounded-(?:md|lg|xl|2xl|3xl)\b/g),
     hex: contar(/#[0-9a-fA-F]{6}\b/g),
     boton: contar(/<button\b/g),
-    titular: h1 !== null && h1[1].split(/\s+/).includes('type-display'),
+    titular: h1 !== null && (h1[2] === 'ADMIN_PAGE_TITLE' || (h1[1] ?? '').split(/\s+/).includes('type-display')),
   };
 }

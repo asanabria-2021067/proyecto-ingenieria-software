@@ -19,6 +19,7 @@ import {
   securityEventsQueryFromFilters,
   type SecurityEventsFilterValue,
 } from '@/lib/admin/security-events';
+import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
 function TablaSkeleton() {
   return (
@@ -114,12 +115,12 @@ export default function AdminSeguridadPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
+    <div className={ADMIN_PAGE}>
       <AdminBreadcrumb seccion="Verificación y seguridad" pagina="Eventos de seguridad" />
       <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="type-display text-balance">Eventos de seguridad</h1>
-          <p className="mt-2 max-w-2xl text-base text-tertiary">
+          <h1 className={ADMIN_PAGE_TITLE}>Eventos de seguridad</h1>
+          <p className={ADMIN_PAGE_LEAD}>
             Inicios de sesión, bloqueos, recuperaciones de contraseña y cambios de estado de cuenta que la plataforma ya
             registra. Solo consulta: desde aquí no se modifica ningún registro.
           </p>

@@ -25,9 +25,10 @@ import {
   type AdminActividadRecienteItem,
   type AdminEstudianteEnRiesgo,
 } from '@/lib/services/admin';
+import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
 /** Mismo contenedor que el resto de bandejas administrativas (1400 px centrado). */
-const PAGE_CLASS = 'mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8';
+const PAGE_CLASS = ADMIN_PAGE;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -340,10 +341,10 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <h1 className="type-display text-balance">
+          <h1 className={ADMIN_PAGE_TITLE}>
             Panel de Administración
           </h1>
-          <p className="mt-tight max-w-2xl text-base text-tertiary">
+          <p className={ADMIN_PAGE_LEAD}>
             Resumen general de actividad, usuarios y proyectos en UVGenius.
           </p>
         </header>

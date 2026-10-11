@@ -25,6 +25,7 @@ import {
   proyectoAdmiteResolucion,
 } from '@/lib/admin/appeals';
 import { motivoInelegibilidadLabel, type TransferLeadershipInput, type UsuarioResumenDto } from '@/lib/types/leadership';
+import { ADMIN_PAGE_NARROW } from '@/components/admin/admin-page';
 
 function formatearDecimal(value: string): string {
   const [entera, decimal = ''] = value.split('.');
@@ -113,7 +114,7 @@ export default function AppealReviewClient() {
 
   if (isPending) {
     return (
-      <div className="mx-auto w-full max-w-[1100px] px-4 pb-12 pt-8 md:px-8">
+      <div className={`${ADMIN_PAGE_NARROW} pb-12 pt-8`}>
         {cabecera}
         <ReviewSkeleton />
       </div>
@@ -123,7 +124,7 @@ export default function AppealReviewClient() {
   if (isError || !apelacion) {
     const noExiste = getApiErrorStatus(error) === 404 || Number.isNaN(idApelacion);
     return (
-      <div className="mx-auto w-full max-w-[1100px] px-4 pb-12 pt-8 md:px-8">
+      <div className={`${ADMIN_PAGE_NARROW} pb-12 pt-8`}>
         {cabecera}
         <Empty tone={noExiste ? 'default' : 'danger'} role="alert">
           <EmptyMedia variant="icon">
@@ -157,7 +158,7 @@ export default function AppealReviewClient() {
 
   return (
     // pb-24: el final de la página queda libre bajo cualquier elemento flotante.
-    <div className="mx-auto w-full max-w-[1100px] px-4 pb-24 pt-8 md:px-8">
+    <div className={`${ADMIN_PAGE_NARROW} pb-24 pt-8`}>
       {cabecera}
 
       <header className="mb-6">

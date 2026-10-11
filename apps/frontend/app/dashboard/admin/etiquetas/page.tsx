@@ -39,6 +39,7 @@ import { SITUACION_SPRINT_LABEL, SITUACION_SPRINT_TONE } from '@/lib/admin/sprin
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
 import { MODALIDAD_LABEL } from '@/types';
 import type { ModalidadProyecto } from '@/types';
+import { ADMIN_PAGE, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
 /**
  * VISTA TEMPORAL — catálogo de las 27 familias de etiquetas (pills, badges y
@@ -111,10 +112,10 @@ const ETIQUETAS_LIBRES = [
 
 export default function AdminEtiquetasPage() {
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
+    <div className={ADMIN_PAGE}>
       <AdminBreadcrumb seccion="Diagnóstico" pagina="Etiquetas (temporal)" />
       <header className="mb-6">
-        <h1 className="type-display text-balance">Etiquetas</h1>
+        <h1 className={ADMIN_PAGE_TITLE}>Etiquetas</h1>
         <p className="mt-tight max-w-3xl text-base text-tertiary">
           Catálogo temporal de las 27 familias de etiquetas de UVGenius. Cada familia importa el componente, el mapa o el
           token real que usan las vistas de estudiante y de administrador, y se muestra en modo claro (izquierda) y oscuro

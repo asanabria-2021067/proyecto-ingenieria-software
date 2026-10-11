@@ -21,6 +21,7 @@ import uvgSwal from '@/lib/swal';
 import { getAdminReviewInbox, resolverRevision } from '@/lib/services/projects';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { TipoBadge } from '@/components/projects/tipo-badge';
+import { ADMIN_PAGE, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
 // Acciones de la tarjeta: el mismo botón compacto de «Ver proyecto» del panel
 // (alto, radio y tipografía), sin icono y con el color semántico de cada acción.
@@ -136,12 +137,12 @@ export default function AdminReviewsInboxPage() {
 
   return (
     <>
-      <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
+      <div className={ADMIN_PAGE}>
         <AdminBreadcrumb seccion="Proyectos" seccionHref="/dashboard/admin/proyectos?grupo=activos" pagina="Solicitudes de publicación" />
         {/* Header */}
         <section className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h1 className="type-display text-balance">
+            <h1 className={ADMIN_PAGE_TITLE}>
               Solicitudes de publicación
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-tertiary">

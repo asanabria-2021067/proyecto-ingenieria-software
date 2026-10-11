@@ -19,6 +19,7 @@ import {
   isAdminProjectGroup,
   type AdminProjectGroup,
 } from '@/lib/types/admin-projects';
+import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
 const EMPTY_LABEL: Record<AdminProjectGroup, string> = {
   activos: 'No hay proyectos activos.',
@@ -61,7 +62,7 @@ export default function AdminProjectsClient() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
+    <div className={ADMIN_PAGE}>
       <AdminBreadcrumb
         seccion="Proyectos"
         seccionHref={adminProjectsGroupHref('activos')}
@@ -73,8 +74,8 @@ export default function AdminProjectsClient() {
       <section className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           {/* Título limpio: el total del grupo va justo antes de la tabla, no como badge aquí. */}
-          <h1 className="type-display text-balance">{ADMIN_PROJECT_GROUP_LABEL[grupo]}</h1>
-          <p className="mt-tight max-w-2xl text-base text-tertiary">{DESCRIPCION_GRUPO[grupo]}</p>
+          <h1 className={ADMIN_PAGE_TITLE}>{ADMIN_PROJECT_GROUP_LABEL[grupo]}</h1>
+          <p className={ADMIN_PAGE_LEAD}>{DESCRIPCION_GRUPO[grupo]}</p>
         </div>
       </section>
 

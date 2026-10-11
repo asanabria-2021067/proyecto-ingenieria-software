@@ -53,8 +53,9 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/
 import uvgSwal from '@/lib/swal';
 import { adminProjectsGroupHref } from '@/lib/types/admin-projects';
 import type { ClosureRevision } from '@/lib/types/closure';
+import { ADMIN_PAGE_WIDTH } from '@/components/admin/admin-page';
 
-const PAGE = 'mx-auto w-full max-w-[1400px] px-4 md:px-8';
+const PAGE = ADMIN_PAGE_WIDTH;
 // Misma tabla que las bandejas administrativas (`data-table`).
 const TH = `h-auto whitespace-nowrap px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
 const TD = 'px-stack py-inline align-middle';

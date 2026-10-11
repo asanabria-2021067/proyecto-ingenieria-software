@@ -29,6 +29,7 @@ import {
   generatePasswordResetLink,
   type AdminSolicitudRecuperacion,
 } from '@/lib/services/admin';
+import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
 function formatFecha(dateStr: string): string {
   try {
@@ -211,15 +212,15 @@ export default function AdminSolicitudesRecuperacionPage() {
   );
 
   return (
-      <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
+      <div className={ADMIN_PAGE}>
         <AdminBreadcrumb seccion="Usuarios" pagina="Recuperación de contraseña" />
         {/* Header */}
         <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="type-display text-balance">
+            <h1 className={ADMIN_PAGE_TITLE}>
               Recuperación de contraseña
             </h1>
-            <p className="mt-2 max-w-2xl text-base text-tertiary">
+            <p className={ADMIN_PAGE_LEAD}>
               Solicitudes de recuperación pendientes. Genera un enlace y envíalo manualmente
               al correo institucional del usuario.
             </p>

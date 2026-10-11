@@ -38,6 +38,7 @@ import {
 } from '@/lib/types/admin-projects';
 import { TipoBadge } from '@/components/projects/tipo-badge';
 import { ADMIN_TAB_LIST, ADMIN_TAB_TRIGGER } from '@/components/admin/admin-tabs';
+import { ADMIN_PAGE } from '@/components/admin/admin-page';
 
 const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
 
@@ -143,7 +144,7 @@ function toVista(detail: AdminProjectDetail | HistoricalProjectView): VistaAdmin
 
 function DetailSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8" aria-busy="true">
+    <div className={ADMIN_PAGE} aria-busy="true">
       <Skeleton className="mb-4 h-4 w-72" />
       <Skeleton className="mb-4 h-44 w-full rounded-xl" />
       <Skeleton className="mb-4 h-10 w-96" />
@@ -187,7 +188,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
   if (isError || !data) {
     const status = getApiErrorStatus(error);
     return (
-      <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
+      <div className={ADMIN_PAGE}>
         <Empty tone={status === 404 ? 'muted' : 'danger'} role={status === 404 ? 'status' : 'alert'}>
           <EmptyMedia variant="icon">
             <AlertCircle aria-hidden="true" className="h-7 w-7" />
@@ -218,7 +219,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
   const revisionAprobada = vista.historico ? [...vista.historico.revisiones].reverse().find((r) => r.estadoRevision === 'APROBADA') ?? null : null;
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
+    <div className={ADMIN_PAGE}>
       <Breadcrumb className="mb-4">
         <BreadcrumbList className="text-[13px]">
           <BreadcrumbItem>

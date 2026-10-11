@@ -31,6 +31,7 @@ import {
   sortSprintsForSupervision,
 } from '@/lib/admin/sprint-calendar';
 import type { AdminSprintSituacion } from '@/lib/types/admin-sprints';
+import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
 /**
  * Calendario administrativo de Sprints: supervisión temporal de los Sprints
@@ -156,7 +157,7 @@ export default function AdminSprintsClient() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
+    <div className={ADMIN_PAGE}>
       <Breadcrumb className="mb-4">
         <BreadcrumbList className="text-sm">
           <BreadcrumbItem>
@@ -175,10 +176,10 @@ export default function AdminSprintsClient() {
 
       <header className="mb-6 flex flex-wrap items-end justify-between gap-x-section gap-y-stack">
         <div className="min-w-0">
-          <h1 className="type-display text-balance">
+          <h1 className={ADMIN_PAGE_TITLE}>
             Calendario de Sprints
           </h1>
-          <p className="mt-tight max-w-2xl text-base text-tertiary">
+          <p className={ADMIN_PAGE_LEAD}>
             Supervisa las fechas planificadas de finalización de los Sprints activos.
           </p>
         </div>
