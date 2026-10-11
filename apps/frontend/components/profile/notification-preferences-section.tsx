@@ -11,8 +11,12 @@ import { Switch } from '@/components/ui/switch';
 import { groupNotificationPreferences, type NotificationPreference } from '@/lib/notifications/preference-groups';
 import { getNotificationPreferences, updateNotificationPreference } from '@/lib/services/notifications';
 
-/** El cierre de sesión vacía la caché (`use-logout`): la clave no necesita llevar al usuario. */
-export const notificationPreferencesQueryKey = ['notificaciones', 'preferencias'] as const;
+/**
+ * El cierre de sesión vacía la caché (`use-logout`): la clave no necesita llevar al usuario.
+ * No cuelga de `['notificaciones']`: la campana invalida ese prefijo con cada aviso que llega
+ * o se marca como leído, y las preferencias no cambian por eso.
+ */
+export const notificationPreferencesQueryKey = ['preferencias-notificacion'] as const;
 
 /** Id del interruptor de un tipo: estable y válido como id aunque el tipo traiga caracteres inesperados. */
 const switchId = (tipo: string) => `preferencia-${tipo.replace(/[^A-Za-z0-9_-]/g, '_')}`;

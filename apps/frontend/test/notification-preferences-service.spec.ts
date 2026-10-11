@@ -148,3 +148,30 @@ describe('FG03-C02: parseNotificationPreferences', () => {
     expect(parseNotificationPreferences(raw)).toEqual([]);
   });
 });
+
+describe('FG04-C05: el cliente no cambia la entrega', () => {
+  it('el tipo viaja solo en el cuerpo JSON: un valor extraño no altera la ruta ni la consulta', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, LISTA));
+    const raro = 'X/../../admin?activa=true&tipo=Y';
+    await updateNotificationPreference(raro, true);
+    const { url, init } = llamada();
+    expect(url.pathname).toBe('/api/notificaciones/preferencias');
+    expect(url.search).toBe('');
+    expect(JSON.parse(init.body as string)).toStrictEqual({ tipo: raro, activa: true });
+  });
+
+  it('leer preferencias nunca escribe y guardar nunca usa otro método que PUT', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, LISTA));
+    await getNotificationPreferences();
+    await updateNotificationPreference('TAREA_ASIGNADA', true);
+    expect(fetchMock.mock.calls.map((call) => (call[1] as RequestInit).method ?? 'GET')).toEqual(['GET', 'PUT']);
+  });
+
+  it('solo existen rutas de preferencias: el cliente no llama a notificaciones, chat ni mensajes', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, LISTA));
+    await getNotificationPreferences();
+    await updateNotificationPreference('TAREA_ASIGNADA', false);
+    const rutas = fetchMock.mock.calls.map((call) => new URL(call[0] as string, 'http://localhost').pathname);
+    expect(new Set(rutas)).toEqual(new Set(['/api/notificaciones/preferencias']));
+  });
+});

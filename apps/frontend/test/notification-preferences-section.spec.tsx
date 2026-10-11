@@ -11,6 +11,7 @@ vi.mock('../lib/services/notifications', () => ({
 
 import { getNotificationPreferences, updateNotificationPreference } from '../lib/services/notifications';
 import type { NotificationPreference } from '../lib/notifications/preference-groups';
+import { notificationPreferencesQueryKey } from '../components/profile/notification-preferences-section';
 import { TIPOS_BACKEND, diferida, fallo, preferencias, renderSeccion } from './helpers/notification-preferences';
 
 /** FG04 (T-328). Sección «Notificaciones» del perfil sobre un servicio simulado. */
@@ -354,5 +355,102 @@ describe('FG04-C03: guardar y revertir', () => {
   it('cargar la sección no guarda nada por sí sola', async () => {
     await montar(['TAREA_ASIGNADA']);
     expect(updateNotificationPreference).not.toHaveBeenCalled();
+  });
+});
+
+describe('FG04-C05: regresión de las preferencias por tipo', () => {
+  const fuente = (ruta: string) => readFileSync(join(__dirname, '..', ruta), 'utf8');
+
+  it('cada uno de los tipos del contrato guarda SU tipo, en ambos sentidos', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias());
+    vi.mocked(updateNotificationPreference).mockImplementation(async (tipo, activa) => preferencias(activa ? [] : [tipo]));
+    renderSeccion();
+    await screen.findByRole('switch', { name: 'Tarea asignada' });
+
+    for (const tipo of TIPOS_BACKEND) {
+      const control = () => seccion().querySelector(`[data-tipo="${tipo}"]`) as HTMLElement;
+      fireEvent.click(control());
+      await waitFor(() => expect(control()).toHaveAttribute('aria-checked', 'false'));
+      fireEvent.click(control());
+      await waitFor(() => expect(control()).toHaveAttribute('aria-checked', 'true'));
+    }
+    const llamadas = vi.mocked(updateNotificationPreference).mock.calls;
+    expect(llamadas).toHaveLength(TIPOS_BACKEND.length * 2);
+    expect(llamadas.filter((_, i) => i % 2 === 0)).toEqual(TIPOS_BACKEND.map((tipo) => [tipo, false]));
+    expect(llamadas.filter((_, i) => i % 2 === 1)).toEqual(TIPOS_BACKEND.map((tipo) => [tipo, true]));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('un tipo desconocido se guarda con su valor exacto, sin traducirlo ni normalizarlo', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue([...preferencias(), { tipo: 'TIPO_FUTURO', activa: true }]);
+    vi.mocked(updateNotificationPreference).mockResolvedValue([...preferencias(), { tipo: 'TIPO_FUTURO', activa: false }]);
+    renderSeccion();
+    fireEvent.click(await screen.findByRole('switch', { name: 'Tipo futuro' }));
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Tipo futuro' })).toHaveAttribute('aria-checked', 'false'));
+    expect(updateNotificationPreference).toHaveBeenCalledWith('TIPO_FUTURO', false);
+  });
+
+  it.each([
+    ['activa como texto', [{ tipo: 'TAREA_ASIGNADA', activa: 'false' }]],
+    ['activa nula', [{ tipo: 'TAREA_ASIGNADA', activa: null }]],
+  ])('un valor inesperado (%s) se muestra desactivado en vez de aparentar que está activo', async (_nombre, lista) => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(lista as never);
+    renderSeccion();
+    expect(await screen.findByRole('switch', { name: 'Tarea asignada' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('la caché de preferencias no cuelga del prefijo de la campana', () => {
+    expect(notificationPreferencesQueryKey[0]).not.toBe('notificaciones');
+    expect(fuente('hooks/use-notifications.ts')).toContain("queryKey: ['notificaciones']");
+  });
+
+  it('guardar una preferencia no toca la lista de notificaciones ni el contador de no leídas', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias());
+    vi.mocked(updateNotificationPreference).mockResolvedValue(preferencias(['TAREA_ASIGNADA']));
+    const { queryClient } = renderSeccion();
+    const lista = [{ idNotificacion: 1 }];
+    queryClient.setQueryData(['notificaciones'], lista);
+    queryClient.setQueryData(['notificaciones', 'conteo'], { total: 3 });
+    const invalidar = vi.spyOn(queryClient, 'invalidateQueries');
+
+    fireEvent.click(await screen.findByRole('switch', { name: 'Tarea asignada' }));
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Tarea asignada' })).toHaveAttribute('aria-checked', 'false'));
+
+    expect(invalidar).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(['notificaciones'])).toBe(lista);
+    expect(queryClient.getQueryData(['notificaciones', 'conteo'])).toEqual({ total: 3 });
+  });
+
+  it('una invalidación de la campana no vuelve a pedir las preferencias', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias());
+    const { queryClient } = renderSeccion();
+    await screen.findByRole('switch', { name: 'Tarea asignada' });
+    await queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+    await queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
+    expect(getNotificationPreferences).toHaveBeenCalledTimes(1);
+  });
+
+  it('la sección solo habla con el servicio de notificaciones: no importa chat, sockets ni tiempo real', () => {
+    const seccionFuente = fuente('components/profile/notification-preferences-section.tsx');
+    const imports = [...seccionFuente.matchAll(/from '([^']+)'/g)].map((m) => m[1]);
+    expect(imports.filter((ruta) => /chat|socket|realtime/i.test(ruta))).toEqual([]);
+    expect(imports.filter((ruta) => ruta.startsWith('@/lib/'))).toEqual([
+      '@/lib/notifications/preference-groups',
+      '@/lib/services/notifications',
+    ]);
+  });
+
+  it('el chat y la entrega en tiempo real no consultan las preferencias: sus mensajes no se filtran en el cliente', () => {
+    for (const ruta of ['hooks/use-chat.ts', 'hooks/use-notifications.ts', 'lib/services/chat.ts']) {
+      expect(fuente(ruta), ruta).not.toMatch(/preferenc|notificationPreferences|updateNotificationPreference/i);
+    }
+  });
+
+  it('el catálogo y el cliente no dejan un tipo fijo ni un número de tipos escrito a mano', () => {
+    const cliente = fuente('lib/services/notifications.ts');
+    const desde = cliente.indexOf('export function parseNotificationPreferences');
+    const hasta = cliente.indexOf('G03 (UI-40)');
+    expect(cliente.slice(desde, hasta)).not.toMatch(/TAREA_|PROYECTO_|41|\.length\s*[!=]==?\s*\d/);
+    expect(fuente('components/profile/notification-preferences-section.tsx')).not.toMatch(/TAREA_|PROYECTO_|41/);
   });
 });
