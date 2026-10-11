@@ -106,6 +106,7 @@ export function CalendarSidebar({
               month={mini.month}
               todayKey={mini.todayKey}
               todayTone="primary"
+              adjacentMonthTone="secondary"
               selectedKey={mini.selectedKey}
               markedDates={mini.markedDates}
               onPrevMonth={mini.onPrevMonth}

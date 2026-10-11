@@ -20,6 +20,7 @@ export function MiniCalendar({
   onSelectDay,
   size = 'sm',
   todayTone = 'accent',
+  adjacentMonthTone = 'disabled',
 }: {
   year: number;
   month: number;
@@ -37,6 +38,13 @@ export function MiniCalendar({
    * vistas Día/Semana/Mes.
    */
   todayTone?: 'accent' | 'primary';
+  /**
+   * G05-R03: color de los días de los meses vecinos. Por defecto `disabled`,
+   * como siempre (en el tablero y los widgets esos días no se pueden pulsar).
+   * El calendario del estudiante pide `secondary`: allí son botones activos y
+   * `text-text-disabled` los dejaba en 2.36:1 (claro) y 3.26:1 (oscuro).
+   */
+  adjacentMonthTone?: 'disabled' | 'secondary';
 }) {
   const weeks = getMonthMatrix(year, month);
   const cellSize = size === 'sm' ? 'h-7 w-7 text-xs' : 'h-10 w-10 text-sm';
@@ -92,6 +100,7 @@ export function MiniCalendar({
                   onClick={() => onSelectDay?.(day.key)}
                   aria-current={isToday ? 'date' : undefined}
                   aria-pressed={onSelectDay ? isSelected : undefined}
+                  data-adjacent-month={day.inCurrentMonth ? undefined : 'true'}
                   className={`relative flex ${cellSize} items-center justify-center rounded-pill font-medium transition-colors ${
                     // Con el tono primario, hoy no lleva el color base: `text-text-primary` ganaba
                     // a `text-on-primary` por orden de CSS y el número quedaba ilegible sobre el
@@ -99,7 +108,9 @@ export function MiniCalendar({
                     isToday && todayTone === 'primary'
                       ? ''
                       : !day.inCurrentMonth
-                        ? 'text-text-disabled'
+                        ? adjacentMonthTone === 'secondary'
+                          ? 'text-text-secondary'
+                          : 'text-text-disabled'
                         : 'text-text-primary'
                   } ${isToday ? hoyClase : ''} ${
                     isSelected && !isToday ? 'bg-surface-container-high' : ''

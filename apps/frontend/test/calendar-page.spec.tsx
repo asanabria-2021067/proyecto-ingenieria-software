@@ -193,11 +193,11 @@ describe('CalendarioPage — selección obsoleta al navegar (G03-C05, UI-17)', (
 
 describe('CalendarioPage — mini calendario sincronizado (G03-C06, UI-17)', () => {
   const mini = () => screen.getByRole('complementary', { name: 'Opciones del calendario' });
-  /** Celda del mini: por defecto la del mes mostrado (las de meses vecinos llevan `text-text-disabled`). */
+  /** Celda del mini: por defecto la del mes mostrado (las de meses vecinos llevan `data-adjacent-month`). */
   const diaMini = (dia: number, fueraDeMes = false) => {
     const celda = within(mini())
       .getAllByRole('button', { name: String(dia) })
-      .find((b) => b.classList.contains('text-text-disabled') === fueraDeMes);
+      .find((b) => b.hasAttribute('data-adjacent-month') === fueraDeMes);
     if (!celda) throw new Error(`sin celda ${dia} (fueraDeMes=${fueraDeMes})`);
     return celda;
   };

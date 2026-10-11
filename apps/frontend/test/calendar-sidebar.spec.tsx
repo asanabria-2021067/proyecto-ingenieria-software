@@ -271,3 +271,16 @@ describe('CalendarSidebar — identidad de propietario distinta del tipo de even
     expect(screen.getByRole('checkbox', { name: 'Ver el calendario de Luis Hernández' })).not.toBeChecked();
   });
 });
+
+describe('CalendarSidebar — mini calendario con días vecinos legibles (G05-R03)', () => {
+  it('el calendario del estudiante pide el tono secundario para los días de meses vecinos, que aquí se pueden pulsar', () => {
+    renderSidebar();
+    const vecinos = [...document.querySelectorAll<HTMLElement>('button[data-adjacent-month="true"]')];
+    expect(vecinos.length).toBeGreaterThan(0);
+    for (const b of vecinos) {
+      expect(b).toBeEnabled();
+      expect(b).toHaveClass('text-text-secondary');
+      expect(b).not.toHaveClass('text-text-disabled');
+    }
+  });
+});

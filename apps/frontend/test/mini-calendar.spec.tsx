@@ -97,3 +97,47 @@ describe('MiniCalendar — el número de "hoy" es legible con todayTone="primary
     expect(coloresDeTexto(screen.getAllByRole('button', { name: '28' }).find((b) => b.classList.contains('text-text-disabled')) as HTMLElement)).toEqual(['text-text-disabled']);
   });
 });
+
+describe('MiniCalendar — días de meses vecinos legibles cuando se pueden pulsar (G05-R03)', () => {
+  const coloresDeTexto = (el: HTMLElement) => [...el.classList].filter((c) => /^text-(text-|on-)/.test(c));
+  const vecinos = () => [...document.querySelectorAll<HTMLElement>('button[data-adjacent-month="true"]')];
+  const delMes = () => [...document.querySelectorAll<HTMLElement>('button[aria-pressed]:not([data-adjacent-month])')];
+
+  it('sin la prop no cambia nada: los vecinos siguen en text-text-disabled (tablero y widgets compartidos)', () => {
+    renderMini();
+    // Octubre de 2026: 28–30 de septiembre y 1–8 de noviembre.
+    expect(vecinos()).toHaveLength(11);
+    for (const b of vecinos()) expect(coloresDeTexto(b)).toEqual(['text-text-disabled']);
+    for (const b of delMes().filter((x) => x !== hoy())) expect(coloresDeTexto(b)).toEqual(['text-text-primary']);
+  });
+
+  it('con adjacentMonthTone="secondary" los vecinos usan text-text-secondary y el resto no cambia', () => {
+    renderMini({ adjacentMonthTone: 'secondary' });
+    for (const b of vecinos()) {
+      expect(coloresDeTexto(b)).toEqual(['text-text-secondary']);
+      expect(b.className).not.toMatch(/opacity-/);
+    }
+    for (const b of delMes().filter((x) => x !== hoy())) expect(coloresDeTexto(b)).toEqual(['text-text-primary']);
+    // Con el acento por defecto, hoy conserva su cadena de clases de siempre.
+    expect(coloresDeTexto(hoy())).toEqual(['text-text-primary', 'text-on-accent']);
+  });
+
+  it('se combina con todayTone="primary": hoy, la selección, las marcas y la navegación siguen igual', () => {
+    const { onSelectDay, onNextMonth } = renderMini({ adjacentMonthTone: 'secondary', todayTone: 'primary', selectedKey: '2026-09-29' });
+    expect(coloresDeTexto(hoy())).toEqual(['text-on-primary']);
+    const seleccionado = vecinos().find((b) => b.textContent === '29') as HTMLElement;
+    expect(seleccionado).toHaveAttribute('aria-pressed', 'true');
+    expect(seleccionado).toHaveClass('bg-surface-container-high', 'text-text-secondary');
+    fireEvent.click(vecinos().find((b) => b.textContent === '30') as HTMLElement);
+    expect(onSelectDay).toHaveBeenCalledWith('2026-09-30');
+    fireEvent.click(screen.getByRole('button', { name: 'Mes siguiente' }));
+    expect(onNextMonth).toHaveBeenCalledTimes(1);
+    expect(document.querySelectorAll('button[aria-pressed] > span[aria-hidden="true"]')).toHaveLength(1);
+  });
+
+  it('cuando hoy cae en un mes vecino conserva el color de hoy, no el de vecino', () => {
+    renderMini({ adjacentMonthTone: 'secondary', todayTone: 'primary', todayKey: '2026-09-29' });
+    expect(hoy()).toHaveAttribute('data-adjacent-month', 'true');
+    expect(coloresDeTexto(hoy())).toEqual(['text-on-primary']);
+  });
+});
