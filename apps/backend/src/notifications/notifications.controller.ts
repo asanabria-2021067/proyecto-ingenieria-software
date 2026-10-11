@@ -1,10 +1,10 @@
 import {
   Controller,
   Get,
+  Query,
   Patch,
   Param,
   ParseIntPipe,
-  Query,
   UseGuards,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
