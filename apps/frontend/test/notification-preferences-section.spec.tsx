@@ -95,3 +95,87 @@ describe('FG04-C01: sección de notificaciones en el perfil', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
+
+describe('FG04-C02: un interruptor por cada tipo real', () => {
+  const interruptores = () => within(seccion()).getAllByRole('switch');
+
+  it('hay exactamente un interruptor por tipo del contrato, enlazado a ese tipo', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias());
+    renderSeccion();
+    await within(seccion()).findAllByRole('listitem');
+    expect(interruptores().map((el) => el.getAttribute('data-tipo')).sort()).toEqual([...TIPOS_BACKEND].sort());
+    expect(new Set(interruptores().map((el) => el.id)).size).toBe(TIPOS_BACKEND.length);
+  });
+
+  it('sin filas guardadas el backend informa todo activo, y así se muestra', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias());
+    renderSeccion();
+    await within(seccion()).findAllByRole('listitem');
+    expect(interruptores().every((el) => el.getAttribute('aria-checked') === 'true')).toBe(true);
+  });
+
+  it('cada interruptor refleja el estado de SU tipo', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias(['TAREA_ASIGNADA', 'RECORDATORIO_EVENTO']));
+    renderSeccion();
+    expect(await screen.findByRole('switch', { name: 'Tarea asignada' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('switch', { name: 'Recordatorio de evento' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('switch', { name: 'Tarea actualizada' })).toHaveAttribute('aria-checked', 'true');
+    expect(interruptores().filter((el) => el.getAttribute('aria-checked') === 'false')).toHaveLength(2);
+  });
+
+  it('el nombre accesible es la etiqueta del tipo y la descripción queda asociada', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias());
+    renderSeccion();
+    const control = await screen.findByRole('switch', { name: 'Tarea asignada' });
+    expect(control).toHaveAttribute('data-tipo', 'TAREA_ASIGNADA');
+    expect(control).toHaveAccessibleDescription('Te asignan una tarea.');
+  });
+
+  it('no existen interruptores de grupo ni un «activar todo»', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias());
+    renderSeccion();
+    await within(seccion()).findAllByRole('listitem');
+    expect(interruptores()).toHaveLength(TIPOS_BACKEND.length);
+    for (const grupo of ['Tareas e hitos', 'Proyectos', 'Cuenta y seguridad']) {
+      expect(screen.queryByRole('switch', { name: grupo })).not.toBeInTheDocument();
+    }
+    expect(within(seccion()).queryByRole('button', { name: /todas|todo/i })).not.toBeInTheDocument();
+    expect(within(seccion()).queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('no hay interruptor de chat: se explica que sus mensajes no son notificaciones', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias());
+    renderSeccion();
+    await within(seccion()).findAllByRole('listitem');
+    expect(screen.queryByRole('switch', { name: /chat/i })).not.toBeInTheDocument();
+    expect(
+      within(seccion()).getByText('Los mensajes de chat no se configuran aquí: llegan siempre por el chat y no generan notificaciones.'),
+    ).toBeInTheDocument();
+  });
+
+  it('un tipo que el backend añada después obtiene su interruptor en «Otras notificaciones»', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue([...preferencias(), { tipo: 'TIPO_FUTURO', activa: false }]);
+    renderSeccion();
+    const otras = await screen.findByRole('region', { name: 'Otras notificaciones' });
+    const control = within(otras).getByRole('switch', { name: 'Tipo futuro' });
+    expect(control).toHaveAttribute('data-tipo', 'TIPO_FUTURO');
+    expect(control).toHaveAttribute('aria-checked', 'false');
+    expect(interruptores()).toHaveLength(TIPOS_BACKEND.length + 1);
+  });
+
+  it('solo se muestran interruptores de tipos presentes en la respuesta', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias([], ['RECORDATORIO_EVENTO', 'TAREA_ASIGNADA']));
+    renderSeccion();
+    await within(seccion()).findAllByRole('listitem');
+    expect(interruptores().map((el) => el.getAttribute('data-tipo'))).toEqual(['TAREA_ASIGNADA', 'RECORDATORIO_EVENTO']);
+  });
+
+  it('ningún tipo se trata como obligatorio: todos comparten el mismo estado de disponibilidad', async () => {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias());
+    renderSeccion();
+    await within(seccion()).findAllByRole('listitem');
+    const disponibilidad = new Set(interruptores().map((el) => (el as HTMLButtonElement).disabled));
+    expect(disponibilidad.size).toBe(1);
+    expect(seccion().textContent).not.toMatch(/obligatori/i);
+  });
+});
