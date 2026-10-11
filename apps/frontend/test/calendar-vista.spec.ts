@@ -92,6 +92,42 @@ describe('calendar/vista filtros (HU-184 T-324)', () => {
     expect(filtrarItems([compartido], { ...sinFiltros, proyectosOcultos: new Set([1]) })).toHaveLength(1);
   });
 
+  describe('bloques «Ocupado» de calendarios compartidos frente al filtro de tipo (G05-R01, G02-OBS-01)', () => {
+    const ANA = { idUsuario: 4, nombre: 'Ana', tono: 2 as const };
+    // Así llega un bloque sin detalle: el backend no envía tipo y la agenda le pone OTRO como relleno.
+    const ocupado = (id: number) => evento(id, { titulo: 'Ocupado', tipo: 'OTRO', projectId: 0, projectTitle: '', compartidoPor: ANA, ocupado: true });
+    const sinOtro = { ...sinFiltros, tiposOcultos: new Set<'OTRO'>(['OTRO']) };
+
+    it('ocultar «Otro» no esconde un bloque Ocupado: su tipo es un relleno, no un dato real', () => {
+      expect(filtrarItems([ocupado(900)], sinOtro).map((i) => i.id)).toEqual([900]);
+    });
+
+    it('un evento propio de tipo Otro sí se oculta', () => {
+      expect(filtrarItems([evento(1, { tipo: 'OTRO' }), ocupado(900)], sinOtro).map((i) => i.id)).toEqual([900]);
+    });
+
+    it('un evento compartido con detalle y tipo Otro obedece el filtro como cualquier otro', () => {
+      const detalle = evento(901, { tipo: 'OTRO', compartidoPor: ANA });
+      expect(filtrarItems([detalle, ocupado(900)], sinOtro).map((i) => i.id)).toEqual([900]);
+    });
+
+    it('ningún filtro de tipo esconde un Ocupado, ni siquiera con todos los tipos ocultos', () => {
+      const todos = new Set(['REUNION', 'TUTORIA', 'ENTREGA', 'REVISION', 'TALLER', 'OTRO'] as const);
+      expect(filtrarItems([ocupado(900), evento(1)], { ...sinFiltros, tiposOcultos: todos }).map((i) => i.id)).toEqual([900]);
+    });
+
+    it('la fecha límite ajena («Ocupado» de tarea) sigue obedeciendo «Fechas límite de tareas»: ese filtro sí es real', () => {
+      const fechaLimite = tarea(950, { titulo: 'Fecha límite', compartidoPor: ANA, ocupado: true });
+      expect(filtrarItems([fechaLimite], { ...sinFiltros, mostrarTareas: false })).toEqual([]);
+      expect(filtrarItems([fechaLimite], sinOtro)).toHaveLength(1);
+    });
+
+    it('no cambia nada de lo que se entrega: el bloque sale tal cual, sin título ni proyecto reales', () => {
+      const [item] = filtrarItems([ocupado(900)], sinOtro);
+      expect(item).toMatchObject({ titulo: 'Ocupado', projectId: 0, projectTitle: '', ocupado: true });
+    });
+  });
+
   it('un evento de varios días cuenta una sola vez', () => {
     expect(contarItems([evento(1, { key: '2026-10-06' }), evento(1, { key: '2026-10-07' }), tarea(2)])).toBe(2);
   });

@@ -69,7 +69,10 @@ export interface FiltrosCalendario {
 export function filtrarItems(items: AgendaItem[], filtros: FiltrosCalendario): AgendaItem[] {
   return items.filter((item) => {
     if (item.kind === 'tarea' && !filtros.mostrarTareas) return false;
-    if (item.kind === 'evento' && filtros.tiposOcultos.has(item.tipo)) return false;
+    // Un bloque «Ocupado» de un calendario compartido no trae tipo: la agenda le pone OTRO como
+    // relleno, así que el filtro por tipo no le aplica. Sigue dependiendo de que su propietario
+    // esté activo (solo entonces llega a esta lista) y de la autorización del servidor.
+    if (item.kind === 'evento' && !item.ocupado && filtros.tiposOcultos.has(item.tipo)) return false;
     if (!item.compartidoPor && filtros.proyectosOcultos.has(item.projectId)) return false;
     return true;
   });

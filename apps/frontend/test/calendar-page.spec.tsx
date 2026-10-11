@@ -582,6 +582,67 @@ describe('CalendarioPage — foco tras cerrar los diálogos de la barra (G04-R01
   });
 });
 
+describe('CalendarioPage — «Ocupado» frente a los filtros de tipo y de propietario (G05-R01, G02-OBS-01)', () => {
+  const ANA = { idUsuario: 9, nombre: 'Ana', apellido: 'García', fotoUrl: null };
+  const OCUPADO = /^Ocupado, 14:00 a 15:00, calendario de Ana García/;
+  const PROPIO_OTRO = /^Asunto propio, 09:00 a 10:00/;
+
+  beforeEach(() => {
+    projectsMock.getMyProjects.mockResolvedValue([{ idProyecto: 1, tituloProyecto: 'Proyecto Uno', tipoProyecto: 'BECA', estadoProyecto: 'ACTIVO' }]);
+    eventsMock.getMisEventos.mockResolvedValue([eventoDTO({ tituloEvento: 'Asunto propio', tipoEvento: 'OTRO' })]);
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [ANA] });
+    sharesMock.getAgendaCompartida.mockResolvedValue({
+      eventos: [{ idEvento: 900, fechaInicio: new Date(2026, 9, 9, 14, 0).toISOString(), fechaFin: new Date(2026, 9, 9, 15, 0).toISOString(), visibilidad: 'OCUPADO' }],
+      tareas: [],
+    });
+    window.localStorage.setItem('calendario:compartidos-activos:1', '[9]');
+  });
+
+  async function ocultarTipoOtro() {
+    fireEvent.keyDown(screen.getByRole('button', { name: /Todos los eventos|Eventos filtrados/ }), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Otro' }));
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+  }
+
+  it.each(['Día', 'Semana'])('en %s, ocultar «Otro» quita el evento propio de ese tipo y deja el bloque Ocupado', async (nombreVista) => {
+    await renderPage();
+    fireEvent.click(vista(nombreVista));
+    expect((await screen.findAllByRole('button', { name: OCUPADO })).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: PROPIO_OTRO }).length).toBeGreaterThan(0);
+
+    await ocultarTipoOtro();
+
+    expect(screen.queryByRole('button', { name: PROPIO_OTRO })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: OCUPADO }).length).toBeGreaterThan(0);
+  });
+
+  it('en Mes, la celda del día conserva «Ocupado» y pierde el evento propio de tipo Otro', async () => {
+    await renderPage();
+    fireEvent.click(vista('Mes'));
+    const celda = () => celdaMes(9, 'octubre');
+    await waitFor(() => expect(within(celda()).getByText('Ocupado')).toBeInTheDocument());
+    expect(within(celda()).getByText('Asunto propio')).toBeInTheDocument();
+
+    await ocultarTipoOtro();
+
+    expect(within(celda()).queryByText('Asunto propio')).not.toBeInTheDocument();
+    expect(within(celda()).getByText('Ocupado')).toBeInTheDocument();
+    // El texto del servidor para ese bloque no trae nada más: ni título real ni proyecto.
+    expect(within(celda()).queryByText('Proyecto Uno')).not.toBeInTheDocument();
+  });
+
+  it('el Ocupado sigue dependiendo de su propietario: al desactivar el calendario de Ana desaparece', async () => {
+    await renderPage();
+    await screen.findAllByRole('button', { name: OCUPADO });
+    await ocultarTipoOtro();
+    expect(screen.getAllByRole('button', { name: OCUPADO }).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ver el calendario de Ana García' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: OCUPADO })).not.toBeInTheDocument());
+  });
+});
+
 describe('CalendarioPage — derivaciones memoizadas (G04-C02, UI-11)', () => {
   const recalculos = () => ({
     porDia: vi.mocked(groupAgendaItemsByDay).mock.calls.length,
