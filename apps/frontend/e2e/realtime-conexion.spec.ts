@@ -1,7 +1,8 @@
-import type { BrowserContext, Page, WebSocketRoute } from '@playwright/test';
+import type { WebSocketRoute } from '@playwright/test';
 import { io, type Socket } from 'socket.io-client';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { API_URL, desactivarTour, noLeidas, socketDe } from './support/realtime';
 
 /**
  * GPI01-C02 (H-01): el tiempo real conecta desde un navegador real con la
@@ -14,7 +15,6 @@ import { login } from './support/auth';
  * aislada (scripts/e2e/isolated-stack.sh), igual que el resto de ./e2e.
  */
 
-const API_URL = process.env.E2E_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 const SOCKET_URL = /\/socket\.io\//;
 
 const CORREO_LIDER = 'carlos.mendoza@uvg.edu.gt';
@@ -26,47 +26,6 @@ const TAREA_ID = 1;
 const NOTIFICACIONES_OK = 'Notificaciones en vivo conectadas';
 const NOTIFICACIONES_CAIDAS = 'Reconectando notificaciones en vivo';
 const CHAT_OK = 'Chat en vivo conectado';
-
-async function desactivarTour(page: Page) {
-  await page.addInitScript(() => {
-    const originalGetItem = Storage.prototype.getItem;
-    Storage.prototype.getItem = function (key: string) {
-      if (typeof key === 'string' && key.startsWith('onboarding_seen_')) return 'true';
-      return originalGetItem.call(this, key);
-    };
-  });
-}
-
-/** Socket autenticado como el usuario del contexto, igual que el navegador: con su cookie de sesión. */
-async function socketDe(context: BrowserContext, namespace: '/notifications' | '/chat'): Promise<Socket> {
-  const cookies = await context.cookies(API_URL);
-  const cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
-  const socket = io(`${API_URL}${namespace}`, {
-    transports: ['websocket'],
-    extraHeaders: { Cookie: cookie },
-    reconnection: false,
-  });
-  await new Promise<void>((resolve, reject) => {
-    socket.once('connected', () => resolve());
-    socket.once('connect_error', reject);
-    socket.once('disconnect', () => reject(new Error(`socket ${namespace} rechazado`)));
-  });
-  return socket;
-}
-
-/**
- * Lee el contador de no leídas. La API limita las peticiones por IP y varios
- * paneles cargando a la vez la saturan: un 429 se reintenta, no se esquiva.
- */
-async function noLeidas(page: Page): Promise<number> {
-  let total = -1;
-  await expect(async () => {
-    const response = await page.request.get(`${API_URL}/api/notificaciones/mias/conteo-no-leidas`);
-    expect(response.status(), 'conteo de no leídas').toBe(200);
-    total = ((await response.json()) as { total: number }).total;
-  }).toPass({ timeout: 20_000 });
-  return total;
-}
 
 test.describe('GPI01-C02: conexión en tiempo real', () => {
   test('con sesión, notificaciones y chat conectan por un WebSocket real al backend', async ({ page }) => {
@@ -123,9 +82,12 @@ test.describe('GPI01-C02: conexión en tiempo real', () => {
       const socket = io(`${API_URL}${namespace}`, { transports: ['websocket'], reconnection: false });
       let confirmado = false;
       socket.on('connected', () => (confirmado = true));
+      // El backend corta durante el saludo: según el instante, el cliente lo ve como
+      // `disconnect`, como `connect_error` o solo como cierre del transporte.
       await new Promise<void>((resolve) => {
         socket.once('disconnect', () => resolve());
         socket.once('connect_error', () => resolve());
+        socket.io.once('close', () => resolve());
       });
       expect(confirmado, `${namespace} no debe confirmar a un anónimo`).toBe(false);
       expect(socket.connected).toBe(false);
