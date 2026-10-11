@@ -169,3 +169,46 @@ describe('FG11-C03: fixtures negativos del contrato', () => {
     expect(a11yGateFindings(sinPaso.jobs.e2e)).toEqual(['sin-paso-de-accesibilidad']);
   });
 });
+
+describe('FG11-C04: la puerta falla cerrada y la autoprueba no entra en CI', () => {
+  const contrato = readRepoFile('apps/frontend/e2e/a11y-gate-contract.spec.ts');
+  const doc = readRepoFile('docs/qa/sprint9/accesibilidad-ci.md');
+
+  it('el script de accesibilidad incluye el contrato de la puerta', () => {
+    const pkg = JSON.parse(readRepoFile('apps/frontend/package.json')) as { scripts: Record<string, string> };
+    expect(pkg.scripts['test:e2e:a11y']).toBe('playwright test e2e/accesibilidad.spec.ts e2e/a11y-gate-contract.spec.ts');
+  });
+
+  it('el contrato prueba una página limpia, una defectuosa y su corrección, sin saltarse nada', () => {
+    expect(contrato).toContain("const REGLAS_ESPERADAS = ['button-name', 'color-contrast', 'image-alt', 'label'];");
+    expect(contrato).toContain('una página accesible pasa sin violaciones bloqueantes');
+    expect(contrato).toContain('al corregir los defectos en la misma página, vuelve a pasar');
+    expect(contrato).not.toMatch(/test\.(skip|fixme|only)\b|describe\.(skip|fixme|only)\b/);
+  });
+
+  it('la página defectuosa vive solo en el spec: la aplicación no contiene ningún fixture roto', () => {
+    expect(contrato).toContain('await page.setContent(html');
+    expect(contrato).not.toMatch(/page\.goto\(/);
+  });
+
+  it('la autoprueba que DEBE fallar solo existe con una variable explícita, que CI no define', () => {
+    expect(contrato).toContain("if (process.env.A11Y_GATE_SELFTEST === 'fail') {");
+    for (const workflow of ['ci.yml', 'deploy.yml']) {
+      expect(readRepoFile(`.github/workflows/${workflow}`), workflow).not.toContain('A11Y_GATE_SELFTEST');
+    }
+    expect(readRepoFile('apps/frontend/playwright.config.ts')).not.toContain('A11Y_GATE_SELFTEST');
+  });
+
+  it('la documentación registra los dos códigos de salida y lo que sigue sin verificar', () => {
+    expect(doc).toContain('| `npm run test:e2e:a11y` | 15 pasan | **0** |');
+    expect(doc).toContain('| `A11Y_GATE_SELFTEST=fail npm run test:e2e:a11y` | 15 pasan y 1 falla, listando las cuatro violaciones | **1** |');
+    expect(doc).toContain('**`CI_REMOTE_VERIFICATION_PENDING`.**');
+    expect(doc).toContain('Ninguna ejecución de GitHub Actions ha corrido este paso todavía');
+    expect(doc).not.toMatch(/CI (pasó|pas[oó] en verde)|verificado en GitHub Actions/i);
+  });
+
+  it('la documentación describe las condiciones reales del job, sin prometer que corre en develop', () => {
+    expect(doc).toContain('| Push o pull request hacia `develop` | **No** |');
+    expect(doc).toContain('Las condiciones del job **no se cambiaron**');
+  });
+});

@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:a11y": "playwright test e2e/accesibilidad.spec.ts"
+    "test:e2e:a11y": "playwright test e2e/accesibilidad.spec.ts e2e/a11y-gate-contract.spec.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
