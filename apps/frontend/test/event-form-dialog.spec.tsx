@@ -948,3 +948,42 @@ describe('EventFormDialog — sin desplazamiento lateral en diálogos angostos (
     expect(item).toHaveClass('min-w-0', 'basis-full', 'sm:basis-0');
   });
 });
+
+describe('EventFormDialog — nombres completos de la modalidad en móvil (G05-R06, G04-OBS-04)', () => {
+  // jsdom no mide anchos: aquí se fija el contrato (sin clases de truncado, reparto por contenido en
+  // móvil). La comprobación real de que «Presencial» cabe a 320 y 375 px está en la evidencia y el E2E.
+  it('las tres opciones muestran su nombre completo, sin clases de truncado ni tooltip que lo sustituya', () => {
+    renderCrear();
+    const grupo = screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' });
+    const radios = within(grupo).getAllByRole('radio');
+    expect(radios.map((r) => r.textContent)).toEqual(['Presencial', 'Virtual', 'Híbrida']);
+    for (const radio of radios) {
+      const nombre = radio.querySelector('span') as HTMLElement;
+      expect(nombre.className).not.toMatch(/truncate|line-clamp|text-ellipsis|overflow-hidden/);
+      expect(nombre).toHaveClass('whitespace-nowrap');
+      expect(radio).not.toHaveAttribute('title');
+      expect(radio.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    }
+  });
+
+  it('en móvil apila ícono y nombre y reparte las columnas por contenido; desde sm vuelve a tres columnas iguales en fila', () => {
+    renderCrear();
+    const grupo = screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' });
+    expect(grupo).toHaveClass('grid', 'grid-cols-[repeat(3,auto)]', 'sm:grid-cols-3');
+    for (const radio of within(grupo).getAllByRole('radio')) {
+      expect(radio).toHaveClass('flex-col', 'h-12', 'sm:flex-row', 'sm:h-9', 'min-w-0');
+    }
+  });
+
+  it('sigue siendo un RadioGroup de Radix con aria-checked real y selección por clic (la parada única de tabulación se mide en navegador)', () => {
+    renderCrear();
+    const grupo = screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' });
+    const radio = (nombre: string) => within(grupo).getByRole('radio', { name: nombre });
+    expect(radio('Virtual')).toHaveAttribute('aria-checked', 'true');
+    expect(grupo).toHaveAttribute('aria-orientation', 'horizontal');
+    fireEvent.click(radio('Presencial'));
+    expect(radio('Presencial')).toHaveAttribute('aria-checked', 'true');
+    expect(radio('Virtual')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByLabelText('Enlace de conexión virtual')).not.toBeInTheDocument();
+  });
+});

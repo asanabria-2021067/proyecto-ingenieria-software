@@ -552,7 +552,9 @@ export function EventFormDialog({
                       aria-labelledby="modalidad-sesion-label"
                       orientation="horizontal"
                       loop
-                      className="grid grid-cols-3 gap-1 rounded-control bg-surface-container-low p-1"
+                      // G05-R06: en móvil cada opción apila ícono y nombre y las columnas se reparten según
+                      // su contenido; con tres columnas iguales en fila «Presencial» quedaba en «Pres…».
+                      className="grid grid-cols-[repeat(3,auto)] gap-1 rounded-control bg-surface-container-low p-1 sm:grid-cols-3"
                     >
                       {MODALIDAD_OPTIONS.map((opt) => {
                         const Icono = MODALIDAD_ESTILO[opt.value].icon;
@@ -561,14 +563,14 @@ export function EventFormDialog({
                           <RadioGroupPrimitive.Item
                             key={opt.value}
                             value={opt.value}
-                            className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-control px-2 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 sm:text-sm ${
+                            className={`flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-control px-1 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 sm:h-9 sm:flex-row sm:gap-1.5 sm:px-2 sm:text-sm ${
                               activo
                                 ? 'border border-primary/60 bg-surface-container-lowest text-on-surface shadow-card'
                                 : 'text-on-surface-variant hover:text-on-surface'
                             }`}
                           >
                             <Icono className="size-4 shrink-0" aria-hidden="true" />
-                            <span className="truncate">{opt.label}</span>
+                            <span className="whitespace-nowrap">{opt.label}</span>
                           </RadioGroupPrimitive.Item>
                         );
                       })}
