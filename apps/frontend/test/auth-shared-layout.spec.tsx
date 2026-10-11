@@ -9,6 +9,24 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
  * dividida (fotografía + mensaje, «Volver», tema y pie) y los mismos controles.
  */
 
+// Radix Select en jsdom.
+if (typeof (globalThis as any).ResizeObserver === 'undefined') {
+  (globalThis as any).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false;
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
+
+/** Abre un desplegable del sistema con el teclado y devuelve sus opciones. */
+async function abrir(disparador: HTMLElement) {
+  disparador.focus();
+  fireEvent.keyDown(disparador, { key: 'ArrowDown' });
+  return within(await screen.findByRole('listbox')).findAllByRole('option');
+}
+
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 // La fotografía y el logotipo se representan por su texto alternativo.
 vi.mock('next/image', () => ({
@@ -102,11 +120,22 @@ describe('Identidad visual compartida de Login y Registro', () => {
     for (const etiqueta of ['Nombre', 'Apellido', 'Carnet', 'Correo institucional', 'Carrera', 'Semestre', 'Contraseña', 'Confirmar contraseña']) {
       expect(screen.getByLabelText(etiqueta)).toBeInTheDocument();
     }
+    // Carrera y semestre usan el desplegable de los filtros de búsqueda, no un <select> nativo.
     const carrera = screen.getByTestId('registro-carrera-select');
-    await waitFor(() => expect(within(carrera).getAllByRole('option')).toHaveLength(3));
-    expect(within(screen.getByLabelText('Semestre')).getAllByRole('option').map((o) => o.textContent)).toEqual(
-      Array.from({ length: 12 }, (_, i) => String(i + 1)),
-    );
+    expect(carrera).toHaveAttribute('role', 'combobox');
+    expect(carrera).toHaveAttribute('data-slot', 'select-trigger');
+    expect(carrera).toHaveTextContent('Seleccionar...');
+    await waitFor(async () => expect(await abrir(carrera)).toHaveLength(2));
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Ingeniería en Ciencia de la Computación',
+      'Ingeniería Mecatrónica',
+    ]);
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
+
+    const semestre = screen.getByLabelText('Semestre');
+    expect(semestre).toHaveAttribute('data-slot', 'select-trigger');
+    expect((await abrir(semestre)).map((o) => o.textContent)).toEqual(Array.from({ length: 12 }, (_, i) => String(i + 1)));
   });
 
   it('Registro mantiene validaciones, indicador de fortaleza y el envío sin la confirmación', async () => {
@@ -121,9 +150,12 @@ describe('Identidad visual compartida de Login y Registro', () => {
     fireEvent.change(screen.getByLabelText('Carnet'), { target: { value: '24725' } });
     await waitFor(() => expect(screen.getByLabelText('Correo institucional')).toHaveValue('gar24725@uvg.edu.gt'));
     const carrera = screen.getByTestId('registro-carrera-select');
-    await waitFor(() => expect(within(carrera).getAllByRole('option')).toHaveLength(3));
-    fireEvent.change(carrera, { target: { value: '2' } });
-    fireEvent.change(screen.getByLabelText('Semestre'), { target: { value: '7' } });
+    await waitFor(async () => expect(await abrir(carrera)).toHaveLength(2));
+    fireEvent.click(screen.getByRole('option', { name: 'Ingeniería Mecatrónica' }));
+    await waitFor(() => expect(carrera).toHaveTextContent('Ingeniería Mecatrónica'));
+    await abrir(screen.getByLabelText('Semestre'));
+    fireEvent.click(screen.getByRole('option', { name: '7' }));
+    await waitFor(() => expect(screen.getByLabelText('Semestre')).toHaveTextContent('7'));
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'Passw0rd!' } });
     expect(screen.getByText('Fuerte')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Confirmar contraseña'), { target: { value: 'Passw0rd!' } });
