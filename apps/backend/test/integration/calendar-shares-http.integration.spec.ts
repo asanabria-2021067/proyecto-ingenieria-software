@@ -322,4 +322,156 @@ describeIntegration('G01-C14 — contrato HTTP de calendarios compartidos (Postg
     const conmigo = ((await lista.json()) as { compartidosConmigo: Record<string, unknown>[] }).compartidosConmigo;
     expect(conmigo.find((p) => p.idUsuario === ids.owner)).not.toHaveProperty('correo');
   });
+
+  /**
+   * G05-C02 (UI-01, UI-15): casos que G01-C14 no cubría contra PostgreSQL real.
+   * Al llegar aquí la relación propietario → viewer vuelve a existir (el caso anterior la recrea).
+   */
+  const AGENDA = () => `/usuarios/me/calendario/compartidos-conmigo/${ids.owner}/agenda?${RANGO}`;
+
+  it('G05-C02: las cinco rutas responden 401 sin sesión, con un token ilegible, firmado con otra clave, caducado o que no es de acceso', async () => {
+    const jwt = new JwtService({ secret: getJwtSecret() });
+    const credenciales: Record<string, string> = {
+      ilegible: 'no-es-un-jwt',
+      otraClave: new JwtService({ secret: 'otra-clave-que-no-es-la-del-servidor' }).sign({ sub: ids.viewer, tipo: 'access' }),
+      caducado: jwt.sign({ sub: ids.viewer, tipo: 'access' }, { expiresIn: -10 }),
+      deRefresco: jwt.sign({ sub: ids.viewer, tipo: 'refresh' }),
+      usuarioInexistente: jwt.sign({ sub: 2_000_000_000, tipo: 'access' }),
+    };
+    const rutas: [string, string][] = [
+      ['GET', '/usuarios/me/calendario/compartidos'],
+      ['POST', '/usuarios/me/calendario/compartidos'],
+      ['DELETE', `/usuarios/me/calendario/compartidos/${ids.viewer}`],
+      ['DELETE', `/usuarios/me/calendario/compartidos-conmigo/${ids.owner}`],
+      ['GET', AGENDA()],
+    ];
+    for (const [method, ruta] of rutas) {
+      const init = { method, ...(method === 'POST' ? { body: JSON.stringify({ idUsuario: ids.externo }) } : {}) };
+      const anonima = await pedir(ruta, null, init);
+      expect(anonima.status, `${method} ${ruta} sin sesión`).toBe(401);
+      expect(await anonima.text()).not.toContain('SECRETO');
+      for (const [nombre, token] of Object.entries(credenciales)) {
+        expect((await pedir(ruta, token, init)).status, `${method} ${ruta} con token ${nombre}`).toBe(401);
+      }
+    }
+    // Ninguno de esos intentos cambió nada: la relación sigue y no se creó otra.
+    expect(await prisma.calendarioCompartido.count({ where: { idPropietario: ids.owner, idInvitado: ids.viewer } })).toBe(1);
+    expect(await prisma.calendarioCompartido.count({ where: { idInvitado: ids.externo } })).toBe(0);
+  });
+
+  it('G05-C02: un parámetro de ruta que no es entero responde 400 y un parámetro de query no declarado también', async () => {
+    for (const [method, ruta] of [
+      ['GET', `/usuarios/me/calendario/compartidos-conmigo/abc/agenda?${RANGO}`],
+      ['GET', `/usuarios/me/calendario/compartidos-conmigo/1.5/agenda?${RANGO}`],
+      ['DELETE', '/usuarios/me/calendario/compartidos/abc'],
+      ['DELETE', '/usuarios/me/calendario/compartidos-conmigo/1%20OR%201=1'],
+      ['GET', `${AGENDA()}&idUsuario=${ids.owner}`],
+      ['GET', `${AGENDA()}&detalle=true`],
+    ] as const) {
+      const res = await pedir(ruta, tokens.viewer, { method });
+      expect(res.status, `${method} ${ruta}`).toBe(400);
+      expect(await res.text()).not.toContain('SECRETO');
+    }
+  });
+
+  it('G05-C02: pedir la agenda de alguien que no me compartió, de un id inexistente o la mía propia responde el mismo 403 sin datos', async () => {
+    const cuerpos: string[] = [];
+    for (const [idPropietario, token] of [[ids.externo, tokens.viewer], [2_000_000_000, tokens.viewer], [ids.owner, tokens.owner], [ids.viewer, tokens.owner]] as const) {
+      const res = await pedir(`/usuarios/me/calendario/compartidos-conmigo/${idPropietario}/agenda?${RANGO}`, token);
+      expect(res.status).toBe(403);
+      const cuerpo = await res.text();
+      expect(cuerpo).not.toContain('SECRETO');
+      expect(cuerpo).not.toContain('eventos');
+      cuerpos.push(cuerpo);
+    }
+    // Mismo cuerpo exista o no el usuario: la respuesta no sirve para enumerar cuentas.
+    expect(new Set(cuerpos).size).toBe(1);
+  });
+
+  it('G05-C02: quien fue miembro y está RETIRADO o COMPLETADO ya no ve detalle: todo lo del propietario le llega como OCUPADO', async () => {
+    for (const estadoParticipacion of ['RETIRADO', 'COMPLETADO'] as const) {
+      const exMiembro = await createIntegrationUser(prisma, { nombre: 'Ex', apellido: estadoParticipacion });
+      scope.userIds!.push(exMiembro.idUsuario);
+      const rol = await createIntegrationProjectRole(prisma, ids.comun);
+      scope.roleIds!.push(rol.idRolProyecto);
+      const participacion = await createIntegrationParticipation(prisma, exMiembro.idUsuario, rol.idRolProyecto, { estadoParticipacion });
+      scope.participationIds!.push(participacion.idParticipacion);
+      await prisma.calendarioCompartido.create({ data: { idPropietario: ids.owner, idInvitado: exMiembro.idUsuario } });
+      const token = new JwtService({ secret: getJwtSecret() }).sign({ sub: exMiembro.idUsuario, correo: exMiembro.correo, tipo: 'access' });
+
+      const res = await pedir(AGENDA(), token);
+      expect(res.status).toBe(200);
+      const texto = await res.text();
+      const json = JSON.parse(texto) as { eventos: Record<string, unknown>[]; tareas: Record<string, unknown>[] };
+      // Solo lo no restringido (2 eventos públicos) y las 2 fechas límite; nada con detalle.
+      expect(json.eventos.map((e) => e.idEvento as number).sort()).toEqual([ids.eventos.comunPublico, ids.eventos.ajenoPublico].sort());
+      for (const evento of json.eventos) expect(Object.keys(evento).sort()).toEqual(['fechaFin', 'fechaInicio', 'idEvento', 'visibilidad']);
+      for (const tarea of json.tareas) expect(Object.keys(tarea).sort()).toEqual(['fechaLimite', 'idTarea', 'visibilidad']);
+      expect(json.tareas).toHaveLength(2);
+      for (const privado of [...PRIVADOS, 'Reunión común', 'Proyecto común', 'Informe común', 'tituloEvento', 'tituloTarea', 'proyecto']) expect(texto).not.toContain(privado);
+    }
+  });
+
+  it('G05-C02: el detalle de una tarea del proyecto común trae exactamente sus campos permitidos y las listas solo nombre, apellido y foto', async () => {
+    const agenda = (await (await pedir(AGENDA(), tokens.viewer)).json()) as { tareas: Record<string, unknown>[] };
+    const comun = agenda.tareas.find((t) => t.idTarea === ids.tareaComun) as Record<string, unknown>;
+    expect(Object.keys(comun).sort()).toEqual(['estadoTarea', 'fechaLimite', 'idTarea', 'prioridad', 'proyecto', 'tituloTarea', 'visibilidad']);
+    expect(Object.keys(comun.proyecto as object).sort()).toEqual(['idProyecto', 'tituloProyecto']);
+
+    for (const token of [tokens.owner, tokens.viewer]) {
+      const lista = (await (await pedir('/usuarios/me/calendario/compartidos', token)).json()) as Record<string, Record<string, unknown>[]>;
+      expect(Object.keys(lista).sort()).toEqual(['compartidoPorMi', 'compartidosConmigo']);
+      for (const persona of [...lista.compartidoPorMi, ...lista.compartidosConmigo]) {
+        expect(Object.keys(persona).sort()).toEqual(['apellido', 'fotoUrl', 'idUsuario', 'nombre']);
+      }
+    }
+  });
+
+  it('G05-C02: si el propietario deja de estar ACTIVO el receptor pierde el acceso sin que se borre la relación, y lo recupera al reactivarse', async () => {
+    await prisma.usuario.update({ where: { idUsuario: ids.owner }, data: { estado: 'INACTIVO' } });
+    try {
+      const res = await pedir(AGENDA(), tokens.viewer);
+      expect(res.status).toBe(403);
+      expect(await res.text()).not.toContain('SECRETO');
+      const lista = (await (await pedir('/usuarios/me/calendario/compartidos', tokens.viewer)).json()) as { compartidosConmigo: { idUsuario: number }[] };
+      expect(lista.compartidosConmigo.some((p) => p.idUsuario === ids.owner)).toBe(false);
+      // El propio propietario inactivo tampoco entra con su token anterior.
+      expect((await pedir('/usuarios/me/calendario/compartidos', tokens.owner)).status).toBe(401);
+    } finally {
+      await prisma.usuario.update({ where: { idUsuario: ids.owner }, data: { estado: 'ACTIVO' } });
+    }
+    expect((await pedir(AGENDA(), tokens.viewer)).status).toBe(200);
+    expect(await prisma.calendarioCompartido.count({ where: { idPropietario: ids.owner, idInvitado: ids.viewer } })).toBe(1);
+  });
+
+  it('G05-C02: el propietario revoca; la baja es idempotente, solo borra su relación con esa persona y el receptor recibe 403 sin datos', async () => {
+    const otro = await createIntegrationUser(prisma, { nombre: 'Otro', apellido: 'Receptor' });
+    scope.userIds!.push(otro.idUsuario);
+    await prisma.calendarioCompartido.create({ data: { idPropietario: ids.owner, idInvitado: otro.idUsuario } });
+    const antes = await prisma.calendarioCompartido.count({ where: { idPropietario: ids.owner } });
+
+    // El viewer no puede usar la ruta del propietario para borrar la relación de otra persona con el owner.
+    const ajena = await pedir(`/usuarios/me/calendario/compartidos/${otro.idUsuario}`, tokens.viewer, { method: 'DELETE' });
+    expect(await ajena.json()).toEqual({ eliminado: false });
+    expect(await prisma.calendarioCompartido.count({ where: { idPropietario: ids.owner } })).toBe(antes);
+
+    const baja = await pedir(`/usuarios/me/calendario/compartidos/${ids.viewer}`, tokens.owner, { method: 'DELETE' });
+    expect(baja.status).toBe(200);
+    expect(await baja.json()).toEqual({ eliminado: true });
+    const repetida = await pedir(`/usuarios/me/calendario/compartidos/${ids.viewer}`, tokens.owner, { method: 'DELETE' });
+    expect(await repetida.json()).toEqual({ eliminado: false });
+    expect(await prisma.calendarioCompartido.count({ where: { idPropietario: ids.owner } })).toBe(antes - 1);
+    expect(await prisma.calendarioCompartido.count({ where: { idPropietario: ids.owner, idInvitado: otro.idUsuario } })).toBe(1);
+
+    const despues = await pedir(AGENDA(), tokens.viewer);
+    expect(despues.status).toBe(403);
+    const cuerpo = await despues.text();
+    for (const privado of [...PRIVADOS, 'Reunión común', 'Proyecto común']) expect(cuerpo).not.toContain(privado);
+    const lista = (await (await pedir('/usuarios/me/calendario/compartidos', tokens.viewer)).json()) as { compartidosConmigo: { idUsuario: number }[] };
+    expect(lista.compartidosConmigo.some((p) => p.idUsuario === ids.owner)).toBe(false);
+
+    // El calendario personal del propietario sigue completo tras revocar.
+    const propios = (await (await pedir(`/usuarios/me/eventos?${RANGO}`, tokens.owner)).json()) as { idEvento: number }[];
+    expect(propios.map((e) => e.idEvento).sort()).toEqual(Object.values(ids.eventos).sort());
+  });
 });
