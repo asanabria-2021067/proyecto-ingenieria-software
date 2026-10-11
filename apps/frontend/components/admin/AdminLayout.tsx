@@ -16,6 +16,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Settings2,
+  ShieldAlert,
   ShieldCheck,
   UserCheck,
   Users,
@@ -81,6 +82,8 @@ export const adminNavEntries: NavEntry[] = [
       { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
       { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
       { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
+      // T-310: visor de solo lectura de los eventos de seguridad que ya se registran.
+      { href: '/dashboard/admin/seguridad', label: 'Eventos de seguridad', icon: ShieldAlert },
       // TEMPORAL: inventario de etiquetas para revisión de diseño; quitar junto con su página.
       { href: '/dashboard/admin/etiquetas', label: 'Etiquetas (temporal)', icon: Tags },
     ],

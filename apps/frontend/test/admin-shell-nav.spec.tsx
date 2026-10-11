@@ -1,4 +1,6 @@
 import '@testing-library/jest-dom/vitest';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -280,6 +282,7 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Gestión de Usuarios',
     'Cuentas pendientes',
     'Recuperación de contraseña',
+    'Eventos de seguridad',
     // TEMPORAL: inventario de etiquetas; quitar junto con su página.
     'Etiquetas (temporal)',
   ];
@@ -369,5 +372,70 @@ describe('AdminLayout — «Actualizar» en la barra superior', () => {
 
     resolver();
     await waitFor(() => expect(boton).toBeEnabled());
+  });
+});
+
+describe('AdminLayout — acceso al visor de eventos de seguridad (T-310, FG02-C07)', () => {
+  const HREF = '/dashboard/admin/seguridad';
+
+  it('«Eventos de seguridad» vive en Administración, enlazado una sola vez', () => {
+    const administracion = adminNavEntries.find((e) => 'type' in e && e.type === 'group' && e.label === 'Administración');
+    const items = administracion && 'items' in administracion ? administracion.items : [];
+    expect(items.map((i) => i.label)).toEqual([
+      'Gestión de Usuarios',
+      'Recuperación de contraseña',
+      'Eventos de seguridad',
+      'Etiquetas (temporal)',
+    ]);
+
+    const destinos = flattenNavEntries(adminNavEntries);
+    expect(destinos.filter((d) => d.href === HREF)).toHaveLength(1);
+    expect(destinos.filter((d) => d.label === 'Eventos de seguridad')).toHaveLength(1);
+    // Ningún destino quedó duplicado al añadirlo.
+    expect(new Set(destinos.map((d) => d.href)).size).toBe(destinos.length);
+  });
+
+  it('la ruta enlazada existe como página de la aplicación', () => {
+    expect(existsSync(join(__dirname, '../app/dashboard/admin/seguridad/page.tsx'))).toBe(true);
+  });
+
+  it('en la ruta del visor, Administración se abre y «Eventos de seguridad» es el único destino activo', () => {
+    pathnameMock.mockReturnValue(HREF);
+    renderShell();
+    const nav = desktopNav();
+
+    expect(nav.getByRole('button', { name: /Administración/ })).toHaveAttribute('aria-expanded', 'true');
+    const enlace = nav.getByRole('link', { name: 'Eventos de seguridad' });
+    expect(enlace).toHaveAttribute('href', HREF);
+    expect(enlace).toHaveAttribute('aria-current', 'page');
+    expect(nav.getAllByRole('link').filter((a) => a.getAttribute('aria-current') === 'page')).toEqual([enlace]);
+  });
+
+  it('desde otra vista de administración el enlace está pero no activo', () => {
+    pathnameMock.mockReturnValue('/dashboard/admin/usuarios');
+    renderShell();
+    const enlace = desktopNav().getByRole('link', { name: 'Eventos de seguridad' });
+    expect(enlace).toHaveAttribute('href', HREF);
+    expect(enlace).not.toHaveAttribute('aria-current');
+  });
+
+  it('con la sidebar colapsada sigue alcanzable como icono con nombre', () => {
+    pathnameMock.mockReturnValue(HREF);
+    renderShell();
+    const aside = document.querySelector('aside') as HTMLElement;
+    fireEvent.click(within(aside).getByRole('button', { name: 'Colapsar barra lateral' }));
+    expect(aside).toHaveClass('w-[72px]');
+    const enlace = within(aside).getByRole('link', { name: 'Eventos de seguridad' });
+    expect(enlace).toHaveAttribute('href', HREF);
+    expect(enlace).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('la barra móvil conserva sus cuatro destinos curados: el visor no la satura', () => {
+    expect(adminNavItemsMobile.map((i) => i.href)).toEqual([
+      '/dashboard/admin',
+      '/dashboard/admin/proyectos',
+      '/dashboard/admin/apelaciones',
+      '/dashboard/admin/usuarios',
+    ]);
   });
 });
