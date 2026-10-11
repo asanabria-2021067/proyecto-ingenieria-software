@@ -43,6 +43,10 @@ function mensajeDeError(error: unknown): string {
  * servidor confirma, y muestra el valor que el servidor devolvió para ese
  * tipo. Si el guardado falla conserva su valor y lo explica. Solo el
  * interruptor que se está guardando queda en espera; los demás siguen libres.
+ *
+ * Accesibilidad: el interruptor en espera usa `aria-disabled`, no `disabled`,
+ * para no perder el foco del teclado; el resultado de cada guardado se anuncia
+ * en una región viva y un error queda asociado a su interruptor.
  */
 export function NotificationPreferencesSection() {
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
@@ -54,9 +58,12 @@ export function NotificationPreferencesSection() {
   const queryClient = useQueryClient();
   const [guardando, setGuardando] = useState<ReadonlySet<string>>(new Set());
   const [errores, setErrores] = useState<Readonly<Record<string, string>>>({});
+  /** Último resultado, para lectores de pantalla: el cambio visual del interruptor no se anuncia solo. */
+  const [aviso, setAviso] = useState('');
 
-  const cambiar = async (tipo: string, activa: boolean) => {
+  const cambiar = async (tipo: string, activa: boolean, etiqueta: string) => {
     if (guardando.has(tipo)) return;
+    setAviso('');
     setGuardando((actual) => new Set(actual).add(tipo));
     setErrores(({ [tipo]: _resuelto, ...resto }) => resto);
     try {
@@ -67,8 +74,10 @@ export function NotificationPreferencesSection() {
       queryClient.setQueryData<NotificationPreference[]>(notificationPreferencesQueryKey, (lista) =>
         (lista ?? guardadas).map((preferencia) => (preferencia.tipo === tipo ? { tipo, activa: confirmada.activa } : preferencia)),
       );
+      setAviso(`Guardado: «${etiqueta}» ${confirmada.activa ? 'activada' : 'desactivada'}.`);
     } catch (error) {
       setErrores((actual) => ({ ...actual, [tipo]: mensajeDeError(error) }));
+      setAviso(`No se guardó el cambio de «${etiqueta}».`);
     } finally {
       setGuardando((actual) => {
         const siguiente = new Set(actual);
@@ -88,6 +97,10 @@ export function NotificationPreferencesSection() {
       </p>
       <p className="type-meta mt-tight max-w-2xl">
         Los mensajes de chat no se configuran aquí: llegan siempre por el chat y no generan notificaciones.
+      </p>
+
+      <p role="status" aria-live="polite" className="sr-only">
+        {aviso}
       </p>
 
       <div className="mt-stack">
@@ -138,7 +151,7 @@ export function NotificationPreferencesSection() {
                     <li key={item.tipo} className="px-stack py-inline">
                       <div className="flex items-start justify-between gap-stack">
                         <div className="min-w-0">
-                          <Label htmlFor={switchId(item.tipo)} className="type-body break-words font-medium text-text-primary">
+                          <Label htmlFor={switchId(item.tipo)} className="type-body block cursor-pointer break-words font-medium text-text-primary">
                             {item.etiqueta}
                           </Label>
                           <p id={`${switchId(item.tipo)}-descripcion`} className="type-meta break-words">
@@ -149,15 +162,22 @@ export function NotificationPreferencesSection() {
                           id={switchId(item.tipo)}
                           data-tipo={item.tipo}
                           checked={item.activa}
-                          disabled={guardando.has(item.tipo)}
-                          onCheckedChange={(activa) => void cambiar(item.tipo, activa)}
-                          aria-describedby={`${switchId(item.tipo)}-descripcion`}
-                          className="mt-0.5"
+                          // En espera sigue enfocable: `disabled` soltaría el foco de quien navega con teclado.
+                          aria-disabled={guardando.has(item.tipo) || undefined}
+                          aria-busy={guardando.has(item.tipo) || undefined}
+                          onCheckedChange={(activa) => void cambiar(item.tipo, activa, item.etiqueta)}
+                          aria-invalid={errores[item.tipo] ? true : undefined}
+                          aria-describedby={`${switchId(item.tipo)}-descripcion${errores[item.tipo] ? ` ${switchId(item.tipo)}-error` : ''}`}
+                          className="mt-0.5 aria-disabled:cursor-progress aria-disabled:opacity-60"
                         />
                       </div>
-                      {guardando.has(item.tipo) && <p className="type-meta mt-tight">Guardando…</p>}
+                      {guardando.has(item.tipo) && (
+                        <p aria-hidden="true" className="type-meta mt-tight">
+                          Guardando…
+                        </p>
+                      )}
                       {errores[item.tipo] && (
-                        <p role="alert" className="type-meta mt-tight text-error">
+                        <p id={`${switchId(item.tipo)}-error`} role="alert" className="type-meta mt-tight text-error">
                           {errores[item.tipo]}
                         </p>
                       )}

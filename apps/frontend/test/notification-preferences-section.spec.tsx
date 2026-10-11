@@ -183,6 +183,8 @@ describe('FG04-C02: un interruptor por cada tipo real', () => {
 describe('FG04-C03: guardar y revertir', () => {
   const tarea = () => screen.getByRole('switch', { name: 'Tarea asignada' });
   const recordatorio = () => screen.getByRole('switch', { name: 'Recordatorio de evento' });
+  /** En espera = guardando: no acepta otro cambio, pero sigue enfocable. */
+  const enEspera = (el: HTMLElement) => el.getAttribute('aria-disabled') === 'true';
 
   async function montar(inactivos: string[] = []) {
     vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias(inactivos));
@@ -214,14 +216,14 @@ describe('FG04-C03: guardar y revertir', () => {
     await montar();
 
     fireEvent.click(tarea());
-    await waitFor(() => expect(tarea()).toBeDisabled());
+    await waitFor(() => expect(enEspera(tarea())).toBe(true));
     expect(tarea()).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText('Guardando…')).toBeInTheDocument();
-    expect(within(seccion()).getAllByRole('switch').filter((el) => (el as HTMLButtonElement).disabled)).toEqual([tarea()]);
+    expect(within(seccion()).getAllByRole('switch').filter(enEspera)).toEqual([tarea()]);
 
     pendiente.resolver(preferencias(['TAREA_ASIGNADA']));
     await waitFor(() => expect(tarea()).toHaveAttribute('aria-checked', 'false'));
-    expect(tarea()).toBeEnabled();
+    expect(enEspera(tarea())).toBe(false);
     expect(screen.queryByText('Guardando…')).not.toBeInTheDocument();
   });
 
@@ -230,7 +232,7 @@ describe('FG04-C03: guardar y revertir', () => {
     await montar();
     fireEvent.click(tarea());
     await waitFor(() => expect(updateNotificationPreference).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(tarea()).toBeEnabled());
+    await waitFor(() => expect(enEspera(tarea())).toBe(false));
     expect(tarea()).toHaveAttribute('aria-checked', 'true');
   });
 
@@ -241,10 +243,10 @@ describe('FG04-C03: guardar y revertir', () => {
     fireEvent.click(tarea());
     fireEvent.click(tarea());
     fireEvent.click(tarea());
-    await waitFor(() => expect(tarea()).toBeDisabled());
+    await waitFor(() => expect(enEspera(tarea())).toBe(true));
     expect(updateNotificationPreference).toHaveBeenCalledTimes(1);
     pendiente.resolver(preferencias(['TAREA_ASIGNADA']));
-    await waitFor(() => expect(tarea()).toBeEnabled());
+    await waitFor(() => expect(enEspera(tarea())).toBe(false));
   });
 
   it.each([
@@ -262,7 +264,7 @@ describe('FG04-C03: guardar y revertir', () => {
     const fila = tarea().closest('li') as HTMLElement;
     expect(await within(fila).findByRole('alert')).toHaveTextContent(mensaje);
     expect(tarea()).toHaveAttribute('aria-checked', 'true');
-    expect(tarea()).toBeEnabled();
+    expect(enEspera(tarea())).toBe(false);
     expect(screen.getAllByRole('alert')).toHaveLength(1);
     // Sin reintentos automáticos.
     expect(updateNotificationPreference).toHaveBeenCalledTimes(1);
@@ -303,7 +305,7 @@ describe('FG04-C03: guardar y revertir', () => {
     // La segunda responde antes; su lista aún no refleja el cambio de la primera.
     segunda.resolver(preferencias(['RECORDATORIO_EVENTO']));
     await waitFor(() => expect(recordatorio()).toHaveAttribute('aria-checked', 'false'));
-    expect(tarea()).toBeDisabled();
+    expect(enEspera(tarea())).toBe(true);
 
     // La primera responde con una lista anterior al segundo cambio: no lo deshace.
     primera.resolver(preferencias(['TAREA_ASIGNADA']));
