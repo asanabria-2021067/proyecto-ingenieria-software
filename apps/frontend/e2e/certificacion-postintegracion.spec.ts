@@ -17,7 +17,8 @@ import { API_URL, desactivarTour, noLeidas, socketDe } from './support/realtime'
  *  - Visual: seis pantallas en 320, 375, 768, 1024, 1280 y 1440 px, en claro y
  *    oscuro y con la barra lateral abierta y plegada donde existe: sin
  *    desborde horizontal, sin controles fuera de la ventana, sin errores de
- *    página ni respuestas 4xx/5xx inesperadas.
+ *    página ni respuestas 4xx/5xx inesperadas. Incluye H-08, la cabecera de
+ *    estudiante a 768 px, que esta matriz detectó.
  *
  * T-310 (visor administrativo de eventos de seguridad) y T-328 (preferencias
  * de notificación en el perfil) no están implementadas en el frontend y esta
@@ -337,16 +338,6 @@ test.describe('GPI01-C16: administración y regresiones H-02 a H-07', () => {
 
 const ANCHOS = [320, 375, 768, 1024, 1280, 1440];
 
-/**
- * H-08 (hallazgo abierto, detectado por esta matriz; fuera del alcance de
- * GPI01): en el shell de estudiante, a 768 px con la barra lateral abierta, la
- * cabecera no cabe y sus dos últimos controles quedan fuera de la ventana. La
- * matriz no lo oculta ni lo corrige: lo excluye por su firma exacta y la prueba
- * `H-08` de abajo lo mantiene como fallo esperado hasta que se arregle.
- */
-const H08_CONTROLES = 'Repetir tour de bienvenida, Cambiar tema';
-const esH08 = (pantalla: string, hallazgo: string) =>
-  pantalla.startsWith('estudiante-') && /^768px (claro|oscuro) barra abierta: fuera de la ventana: /.test(hallazgo) && hallazgo.endsWith(H08_CONTROLES);
 
 const PANTALLAS: { nombre: string; correo: string; ruta: string; titulo: RegExp }[] = [
   { nombre: 'admin-panel', correo: ADMIN, ruta: '/dashboard/admin', titulo: /Panel de Administración/ },
@@ -421,16 +412,13 @@ test.describe('GPI01-C16: matriz visual por ancho, tema y barra lateral', () => 
 
       await testInfo.attach('combinaciones', { body: String(combinaciones), contentType: 'text/plain' });
       expect(combinaciones, 'se midieron todos los anchos en ambos temas').toBeGreaterThanOrEqual(ANCHOS.length * 2);
-      expect(hallazgos.filter((h) => !esH08(pantalla.nombre, h))).toEqual([]);
+      expect(hallazgos).toEqual([]);
       expect(registro.errores, 'errores de página').toEqual([]);
       expect(registro.http, 'respuestas 4xx/5xx inesperadas').toEqual([]);
     });
   }
 
-  test('H-08 (hallazgo abierto): a 768 px con la barra lateral abierta, los controles de la cabecera de estudiante caben en la ventana', async ({ page }) => {
-    // Fallo esperado hoy. Cuando la cabecera se corrija esta prueba pasará y Playwright
-    // exigirá retirar esta marca y la exclusión `esH08` de la matriz.
-    test.fail();
+  test('H-08: a 768 px con la barra lateral abierta, los controles de la cabecera de estudiante caben en la ventana', async ({ page }) => {
     await desactivarTour(page);
     await page.setViewportSize({ width: 768, height: 900 });
     await login(page, CARLOS);
@@ -438,5 +426,7 @@ test.describe('GPI01-C16: matriz visual por ancho, tema y barra lateral', () => 
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: 'Colapsar barra lateral' }).first()).toBeVisible();
     expect((await medir(page)).fuera).toEqual([]);
+    await expect(page.getByRole('button', { name: 'Cambiar tema' })).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Repetir tour de bienvenida' })).toBeInViewport();
   });
 });

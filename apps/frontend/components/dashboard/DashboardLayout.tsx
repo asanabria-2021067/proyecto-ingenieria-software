@@ -184,7 +184,10 @@ export default function DashboardLayout({
         className="flex min-w-0 flex-1 flex-col overflow-hidden bg-page focus:outline-none"
       >
         {/* Top Header Bar */}
-        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:grid md:grid-cols-[1fr_auto_1fr] md:px-section">
+        {/* H-08: la columna central tiene un ancho MÁXIMO (16rem, 24rem desde lg) y puede
+            encoger. Con `auto` el buscador exigía sus 16rem fijos y, a 768 px con la barra
+            lateral abierta, empujaba fuera de la ventana los últimos controles de la derecha. */}
+        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:grid md:grid-cols-[1fr_minmax(0,16rem)_1fr] md:px-section lg:grid-cols-[1fr_minmax(0,24rem)_1fr]">
           <div className="flex items-center gap-inline">
             {/* Mobile-only logo */}
             <div className="flex items-center gap-tight md:hidden">
@@ -204,8 +207,8 @@ export default function DashboardLayout({
               <FontScaleToggle />
             </div>
           </div>
-          <div className="hidden md:block">
-            <GlobalSearchInput className="w-64 lg:w-96" />
+          <div className="hidden min-w-0 md:block">
+            <GlobalSearchInput className="w-full" />
           </div>
           <div className="flex items-center gap-tight md:justify-self-end">
             {!!user && (
