@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, CalendarDays, ClipboardList, Clock, Plus, Target } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
+import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Share2 } from 'lucide-react';
 import {
   Empty,
   EmptyContent,
@@ -12,8 +12,8 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
 import {
   getDashboardStats,
   getMisTareas,
@@ -22,46 +22,176 @@ import {
 } from '@/lib/services/users';
 import { getMyProjects } from '@/lib/services/projects';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
-import { estadoBadgeLabel } from '@/components/projects/available-project-card';
-import { getMisEventos, type EventoProyectoDTO, type MiEventoDTO } from '@/lib/services/events';
+import { getMisEventos, type EventoProyectoDTO, type MiEventoDTO, type TipoEvento } from '@/lib/services/events';
+import { toDateKey } from '@/lib/calendar/utils';
 import {
-  addDays,
-  formatMonthLabel,
-  formatWeekRangeLabel,
-  getMonthMatrix,
-  getWeekDays,
-  toDateKey,
-} from '@/lib/calendar/utils';
-import {
+  agendaItemKey,
   eventoToAgendaItems,
   groupAgendaItemsByDay,
+  tareaCompartidaToAgendaItem,
   tareaToAgendaItem,
   type AgendaItem,
+  type OrigenCompartido,
 } from '@/lib/calendar/agenda';
+import { tonoPorIndice } from '@/lib/calendar/paleta';
+import type { EventoItem } from '@/lib/calendar/time-grid';
+import {
+  contarItems,
+  etiquetaRango,
+  filtrarItems,
+  navegar,
+  proyectosDelCalendario,
+  rangoVisible,
+  type VistaCalendario,
+} from '@/lib/calendar/vista';
+import {
+  calendariosCompartidosQueryKey,
+  useAgendasCompartidas,
+  useCalendariosCompartidos,
+  useDejarDeRecibirCalendario,
+} from '@/hooks/use-calendar-shares';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { getApiErrorMessage } from '@/components/projects/api-error';
+import { aviso } from '@/lib/mensajes';
+import { getCalendariosCompartidos, type EventoCompartidoDTO } from '@/lib/services/calendar-shares';
 import { MonthView } from '@/components/calendar/month-view';
 import { WeekView } from '@/components/calendar/week-view';
+import { TimeGridView } from '@/components/calendar/time-grid-view';
 import { AgendaItemRow } from '@/components/calendar/agenda-item-row';
 import { EventFormDialog } from '@/components/calendar/event-form-dialog';
+import { EventDetailDialog } from '@/components/calendar/event-detail-dialog';
+import { ShareCalendarDialog } from '@/components/calendar/share-calendar-dialog';
+import { CalendarSidebar, type MetaHoras } from '@/components/calendar/calendar-sidebar';
+import { CalendarFilterMenu } from '@/components/calendar/calendar-filter-menu';
+import { iniciales } from '@/components/calendar/invitados-field';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { idUsuarioSeguro } from '@/lib/services/notifications';
 
-type Vista = 'mes' | 'semana';
+const VISTAS: { value: VistaCalendario; label: string }[] = [
+  { value: 'dia', label: 'Día' },
+  { value: 'semana', label: 'Semana' },
+  { value: 'mes', label: 'Mes' },
+];
 
-function tieneFechaLimite(
-  tarea: MiTareaDTO,
-): tarea is MiTareaDTO & { fechaLimite: string } {
+/**
+ * Qué calendarios compartidos tiene activados cada persona (solo comodidad
+ * local). G04 (UI-29): la clave lleva el id de la cuenta autenticada; antes
+ * era global y dos cuentas en el mismo navegador heredaban la selección de la
+ * otra. Solo se guardan ids numéricos, y nunca dan acceso por sí mismos: lo
+ * que se puede ver lo decide la API (lista de calendarios recibidos).
+ */
+const CLAVE_COMPARTIDOS_ACTIVOS = 'calendario:compartidos-activos';
+
+function claveCompartidosActivos(idUsuario: number): string {
+  return `${CLAVE_COMPARTIDOS_ACTIVOS}:${idUsuario}`;
+}
+
+function leerCompartidosActivos(idUsuario: number): number[] {
+  try {
+    // La clave global anterior no dice de quién era: no se migra a nadie y se elimina.
+    window.localStorage.removeItem(CLAVE_COMPARTIDOS_ACTIVOS);
+    const valor: unknown = JSON.parse(window.localStorage.getItem(claveCompartidosActivos(idUsuario)) ?? '[]');
+    if (!Array.isArray(valor)) return [];
+    return [...new Set(valor.filter((v): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0))];
+  } catch {
+    return [];
+  }
+}
+
+function guardarCompartidosActivos(idUsuario: number, ids: number[]) {
+  try {
+    const clave = claveCompartidosActivos(idUsuario);
+    const valor = JSON.stringify(ids);
+    if (window.localStorage.getItem(clave) !== valor) window.localStorage.setItem(clave, valor);
+  } catch {
+    // Sin almacenamiento (modo privado): la selección vive solo en esta visita.
+  }
+}
+
+// G04 (UI-11): mientras una consulta no tiene datos, el valor por defecto debe
+// ser SIEMPRE el mismo array: un `[]` literal en la desestructuración sería una
+// referencia nueva por render y rompería toda la cadena de `useMemo`.
+const SIN_TAREAS: MiTareaDTO[] = [];
+const SIN_EVENTOS: MiEventoDTO[] = [];
+const SIN_PROYECTOS: MiProyectoListItemDTO[] = [];
+
+function tieneFechaLimite(tarea: MiTareaDTO): tarea is MiTareaDTO & { fechaLimite: string } {
   return tarea.fechaLimite !== null;
 }
 
 /**
- * HU-169: calendario de actividades del proyecto. Muestra fechas límite de
- * tareas (GET /usuarios/me/tareas, comportamiento preexistente sin cambios)
- * Y eventos de proyecto (GET /usuarios/me/eventos, T-263/T-264), en vista
- * mensual o semanal sin recargar. Crear/editar eventos es exclusivo de
- * quien lidera el proyecto del evento (GET /proyectos/mine).
+ * G04 (UI-36): mismo corte que la utilidad `xl:` de Tailwind (80rem). Desde
+ * ahí la Semana cabe como cuadrícula por horas; por debajo es lista de días.
+ */
+const CONSULTA_SEMANA_EN_CUADRICULA = '(min-width: 80rem)';
+
+function suscribirAncho(alCambiar: () => void): () => void {
+  if (typeof window.matchMedia !== 'function') return () => {};
+  const consulta = window.matchMedia(CONSULTA_SEMANA_EN_CUADRICULA);
+  consulta.addEventListener('change', alCambiar);
+  return () => consulta.removeEventListener('change', alCambiar);
+}
+
+function leerAncho(): boolean | null {
+  return typeof window.matchMedia === 'function' ? window.matchMedia(CONSULTA_SEMANA_EN_CUADRICULA).matches : null;
+}
+
+function leerAnchoEnServidor(): null {
+  return null;
+}
+
+/**
+ * `true` cuadrícula, `false` lista, `null` todavía desconocido (servidor e
+ * hidratación, o un entorno sin `matchMedia`). Con `null` se dibujan ambas
+ * variantes bajo las clases `hidden xl:block` / `xl:hidden`, igual que antes:
+ * el HTML del servidor coincide con el primer render del cliente y no hay
+ * salto visual; en cuanto el navegador conoce su ancho queda montada una sola.
+ */
+function useSemanaEnCuadricula(): boolean | null {
+  return useSyncExternalStore(suscribirAncho, leerAncho, leerAnchoEnServidor);
+}
+
+/**
+ * G04 (UI-38): el periodo en formato corto para pantallas estrechas (a 320 px
+ * el largo ocupaba 2–3 líneas): "Vie, 9 oct 2026", "5 – 11 oct 2026" o, si la
+ * semana cruza de mes, "28 sept – 4 oct". El largo sigue siendo el nombre
+ * accesible del encabezado.
+ */
+function etiquetaRangoCorta(vista: VistaCalendario, anchor: Date): string {
+  if (vista === 'dia') {
+    const texto = anchor.toLocaleDateString('es-GT', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+  if (vista === 'semana') {
+    const { days } = rangoVisible('semana', anchor);
+    const inicio = days[0].date;
+    const fin = days[6].date;
+    const corto = (fecha: Date) => fecha.toLocaleDateString('es-GT', { day: 'numeric', month: 'short' });
+    return inicio.getMonth() === fin.getMonth()
+      ? `${inicio.getDate()} – ${fin.toLocaleDateString('es-GT', { day: 'numeric', month: 'short', year: 'numeric' })}`
+      : `${corto(inicio)} – ${corto(fin)}`;
+  }
+  return etiquetaRango(vista, anchor);
+}
+
+function alternar<T>(conjunto: Set<T>, valor: T): Set<T> {
+  const nuevo = new Set(conjunto);
+  if (nuevo.has(valor)) nuevo.delete(valor);
+  else nuevo.add(valor);
+  return nuevo;
+}
+
+/**
+ * HU-169: calendario de actividades. HU-184 (T-324), rediseñado según la
+ * maqueta del equipo: vistas Día/Semana (cuadrícula por horas) y Mes, filtro
+ * por tipo de actividad, columna izquierda con mini calendario, meta de
+ * horas, "Mis proyectos" con checks y, estilo Teams, los calendarios que
+ * otras personas me compartieron, superpuestos al mío con su color.
+ * Crear/editar eventos sigue siendo exclusivo de quien lidera el proyecto.
  */
 export default function CalendarioPage() {
   const {
-    data: tareas = [],
+    data: tareas = SIN_TAREAS,
     isLoading: isLoadingTareas,
     isError: isErrorTareas,
     refetch: refetchTareas,
@@ -75,37 +205,114 @@ export default function CalendarioPage() {
     queryFn: getDashboardStats,
   });
 
-  const { data: misProyectos = [] } = useQuery<MiProyectoListItemDTO[]>({
+  const { data: misProyectos = SIN_PROYECTOS } = useQuery<MiProyectoListItemDTO[]>({
     queryKey: ['dashboard-mis-proyectos'],
     queryFn: getMyProjects,
   });
 
-  const hoy = useMemo(() => new Date(), []);
-  const hoyKey = useMemo(() => toDateKey(hoy), [hoy]);
-  const [vista, setVista] = useState<Vista>('mes');
+  const {
+    data: compartidos,
+    isLoading: isLoadingCompartidos,
+    isError: isErrorCompartidos,
+    refetch: refetchCompartidos,
+  } = useCalendariosCompartidos();
+  const queryClient = useQueryClient();
+  const dejarDeRecibir = useDejarDeRecibirCalendario();
+  const { data: usuario } = useCurrentUser();
+  const idUsuarioActual = usuario?.idUsuario ?? null;
+
+  // G03 (UI-28): la hora "ahora" y el día "hoy" avanzan mientras la página
+  // sigue abierta (línea de ahora cada minuto; "Hoy" cambia a medianoche sin
+  // recargar). Solo mueve estos indicadores: las consultas dependen del rango
+  // (ancla), no de este reloj, así que un tick no vuelve a pedir la agenda.
+  const [ahora, setAhora] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setAhora(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const hoyKey = toDateKey(ahora);
+  const semanaEnCuadricula = useSemanaEnCuadricula();
+  const [vista, setVista] = useState<VistaCalendario>('semana');
   const [anchor, setAnchor] = useState(() => new Date());
+  const [miniMes, setMiniMes] = useState(() => new Date(ahora.getFullYear(), ahora.getMonth(), 1));
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [mostrarTareas, setMostrarTareas] = useState(true);
+  const [tiposOcultos, setTiposOcultos] = useState<Set<TipoEvento>>(new Set());
+  const [proyectosOcultos, setProyectosOcultos] = useState<Set<number>>(new Set());
+  // G04 (UI-29): selección cruda + de qué cuenta se leyó. Mientras no coincida con la cuenta
+  // actual (primer render, hidratación, cambio de sesión) no se aplica ni se guarda nada.
+  const [compartidosActivos, setCompartidosActivos] = useState<number[]>([]);
+  const [preferenciasDe, setPreferenciasDe] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventoProyectoDTO | null>(null);
+  // G01 (UI-01): un evento compartido llega reducido (EventoCompartidoDTO), nunca como MiEventoDTO.
+  const [detalle, setDetalle] = useState<
+    { evento: MiEventoDTO; compartidoPor: null } | { evento: EventoCompartidoDTO; compartidoPor: OrigenCompartido } | null
+  >(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  // G03 (UI-10): clave (data-evento-key) del bloque o fila que abrió el detalle, para devolverle el foco al cerrar.
+  const [claveDisparador, setClaveDisparador] = useState<string | null>(null);
+  // G04-R01: botones de la barra que abren un diálogo; recuperan el foco cuando se cierra.
+  const botonAgendarRef = useRef<HTMLButtonElement>(null);
+  const botonCompartirRef = useRef<HTMLButtonElement>(null);
 
-  const year = anchor.getFullYear();
-  const month = anchor.getMonth();
-  const monthMatrix = useMemo(() => getMonthMatrix(year, month), [year, month]);
-  const weekDays = useMemo(() => getWeekDays(anchor), [anchor]);
+  // localStorage solo existe en el navegador y la clave depende de la cuenta:
+  // se lee después de montar, cuando ya se sabe quién ha iniciado sesión.
+  useEffect(() => {
+    if (idUsuarioActual === null) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCompartidosActivos(leerCompartidosActivos(idUsuarioActual));
+    setPreferenciasDe(idUsuarioActual);
+  }, [idUsuarioActual]);
 
-  // Rango realmente visible en pantalla (T-264): la rejilla de 6 semanas en
-  // vista mensual, los 7 días en vista semanal — nunca "todos los eventos".
-  const rango = useMemo(() => {
-    if (vista === 'semana') {
-      return { desde: weekDays[0].date, hasta: addDays(weekDays[6].date, 1) };
+  // G03 (UI-40): `?compartido=<ownerId>` llega desde la notificación. Se lee
+  // una sola vez al montar, se retira de la URL en el acto (sin navegación ni
+  // bucles) y se activa SOLO si la API lo lista entre los calendarios
+  // recibidos (misma consulta que la columna izquierda: no hay petición
+  // extra). Si no está (revocado o id ajeno) se avisa y no se consulta ninguna
+  // agenda; un id inválido se ignora en silencio.
+  // El id leído se guarda en una ref: en desarrollo React monta el efecto dos
+  // veces (StrictMode) y la URL ya está limpia en la segunda pasada.
+  const compartidoSolicitadoRef = useRef<number | null | undefined>(undefined);
+  useEffect(() => {
+    if (compartidoSolicitadoRef.current === undefined) {
+      const params = new URLSearchParams(window.location.search);
+      compartidoSolicitadoRef.current = params.has('compartido') ? idUsuarioSeguro(params.get('compartido')) : null;
+      if (params.has('compartido')) {
+        params.delete('compartido');
+        const resto = params.toString();
+        window.history.replaceState(window.history.state, '', `${window.location.pathname}${resto ? `?${resto}` : ''}`);
+      }
     }
-    const primera = monthMatrix[0][0].date;
-    const ultima = monthMatrix[monthMatrix.length - 1][6].date;
-    return { desde: primera, hasta: addDays(ultima, 1) };
-  }, [vista, weekDays, monthMatrix]);
+    const idSolicitado = compartidoSolicitadoRef.current;
+    if (idSolicitado === null) return;
+    let vigente = true;
+    queryClient
+      .fetchQuery({ queryKey: calendariosCompartidosQueryKey, queryFn: getCalendariosCompartidos })
+      .then((lista) => {
+        if (!vigente) return;
+        compartidoSolicitadoRef.current = null;
+        const persona = lista.compartidosConmigo.find((p) => p.idUsuario === idSolicitado);
+        if (!persona) {
+          aviso.advertencia('Ese calendario ya no está compartido contigo', 'Quien lo compartió pudo retirarlo. Revisa la columna izquierda.');
+          return;
+        }
+        setCompartidosActivos((actuales) => (actuales.includes(persona.idUsuario) ? actuales : [...actuales, persona.idUsuario]));
+        aviso.exito('Calendario activado', `Ya ves el calendario de ${persona.nombre} ${persona.apellido} junto al tuyo.`);
+      })
+      .catch(() => {
+        // La lista falló: la columna izquierda ya lo muestra con "Reintentar".
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [queryClient]);
+
+  const rango = useMemo(() => rangoVisible(vista, anchor), [vista, anchor]);
 
   const {
-    data: eventos = [],
+    data: eventos = SIN_EVENTOS,
     isLoading: isLoadingEventos,
     isError: isErrorEventos,
     refetch: refetchEventos,
@@ -114,207 +321,391 @@ export default function CalendarioPage() {
     queryFn: () => getMisEventos(rango.desde, rango.hasta),
   });
 
-  const eventosPorId = useMemo(() => new Map(eventos.map((e) => [e.idEvento, e])), [eventos]);
-  const ledProjectIds = useMemo(() => new Set(misProyectos.map((p) => p.idProyecto)), [misProyectos]);
-  const isEventEditable = (projectId: number) => ledProjectIds.has(projectId);
+  // Calendarios compartidos conmigo, cada uno con su tono (orden de la lista = color estable).
+  const personasCompartidas = useMemo(
+    () => (compartidos?.compartidosConmigo ?? []).map((p, i) => ({ ...p, tono: tonoPorIndice(i) })),
+    [compartidos],
+  );
+  const preferenciasListas = idUsuarioActual !== null && preferenciasDe === idUsuarioActual;
+  const idsActivos = useMemo(
+    () => (preferenciasListas ? personasCompartidas.filter((p) => compartidosActivos.includes(p.idUsuario)).map((p) => p.idUsuario) : []),
+    [personasCompartidas, compartidosActivos, preferenciasListas],
+  );
+  // G04 (UI-29): único punto de escritura. Se guarda lo activo YA filtrado contra los
+  // calendarios que la API dice que recibo (uno revocado desaparece del almacenamiento),
+  // y solo cuando esa lista cargó bien: si falló, la preferencia no se toca.
+  const listaCompartidosCargada = compartidos !== undefined;
+  useEffect(() => {
+    if (!preferenciasListas || !listaCompartidosCargada || idUsuarioActual === null) return;
+    guardarCompartidosActivos(idUsuarioActual, idsActivos);
+  }, [preferenciasListas, listaCompartidosCargada, idUsuarioActual, idsActivos]);
+  // G04 (UI-11): el Set que recibe la columna izquierda solo cambia si cambian los activos.
+  const compartidosActivosSet = useMemo(() => new Set(idsActivos), [idsActivos]);
+  const { agendas: agendasCompartidas, estados: estadosCompartidos } = useAgendasCompartidas(idsActivos, rango.desde, rango.hasta);
 
-  const pendientes = useMemo(
-    () =>
-      tareas.filter(tieneFechaLimite).filter((t) => t.estadoTarea !== 'HECHO'),
-    [tareas],
+  // G03 (UI-12): un fallo por persona se avisa una sola vez (al pasar a error),
+  // nunca en cada render; si fue revocación (403) se refresca la lista para que
+  // la persona desaparezca de "compartidos conmigo". El estado se resume en un
+  // texto estable ("id:revocada,…") para que el efecto solo corra al cambiar.
+  const fallosCompartidos = idsActivos
+    .filter((id) => estadosCompartidos.get(id)?.isError)
+    .map((id) => `${id}:${estadosCompartidos.get(id)?.revocada ? 1 : 0}`)
+    .join(',');
+  const avisadosRef = useRef(new Set<number>());
+  useEffect(() => {
+    const actuales = new Map(fallosCompartidos ? fallosCompartidos.split(',').map((f) => f.split(':')).map(([id, r]) => [Number(id), r === '1']) : []);
+    for (const [id, revocada] of actuales) {
+      if (avisadosRef.current.has(id)) continue;
+      avisadosRef.current.add(id);
+      const persona = personasCompartidas.find((p) => p.idUsuario === id);
+      const nombre = persona ? `${persona.nombre} ${persona.apellido}` : 'esa persona';
+      if (revocada) {
+        aviso.advertencia('Calendario ya no disponible', `${nombre} dejó de compartir su calendario contigo.`);
+        void queryClient.invalidateQueries({ queryKey: calendariosCompartidosQueryKey });
+      } else {
+        aviso.error('No se pudo cargar un calendario compartido', `El calendario de ${nombre} no respondió. Puedes reintentarlo desde la columna izquierda.`);
+      }
+    }
+    for (const id of avisadosRef.current) if (!actuales.has(id)) avisadosRef.current.delete(id);
+  }, [fallosCompartidos, personasCompartidas, queryClient]);
+
+  const ledProjectIds = useMemo(() => new Set(misProyectos.map((p) => p.idProyecto)), [misProyectos]);
+  const proyectosLiderados = useMemo(
+    () => misProyectos.map((p) => ({ idProyecto: p.idProyecto, tituloProyecto: p.tituloProyecto, tipoProyecto: p.tipoProyecto })),
+    [misProyectos],
   );
 
-  const agendaItems = useMemo<AgendaItem[]>(
+  const itemsPropios = useMemo<AgendaItem[]>(
     () => [
-      ...pendientes.map(tareaToAgendaItem),
+      ...tareas.filter(tieneFechaLimite).filter((t) => t.estadoTarea !== 'HECHO').map(tareaToAgendaItem),
       ...eventos.flatMap((e) => eventoToAgendaItems(e, rango.desde, rango.hasta)),
     ],
-    [pendientes, eventos, rango],
+    [tareas, eventos, rango],
   );
-  const itemsByDay = useMemo(() => groupAgendaItemsByDay(agendaItems), [agendaItems]);
+
+  // Eventos de calendarios compartidos, indexados para abrir su detalle.
+  const eventosCompartidos = useMemo(() => {
+    const mapa = new Map<string, { evento: EventoCompartidoDTO; origen: OrigenCompartido }>();
+    for (const persona of personasCompartidas) {
+      const agenda = agendasCompartidas.get(persona.idUsuario);
+      if (!agenda) continue;
+      const origen = { idUsuario: persona.idUsuario, nombre: `${persona.nombre} ${persona.apellido}`, tono: persona.tono };
+      for (const evento of agenda.eventos) mapa.set(`${persona.idUsuario}-${evento.idEvento}`, { evento, origen });
+    }
+    return mapa;
+  }, [personasCompartidas, agendasCompartidas]);
+
+  const itemsCompartidos = useMemo<AgendaItem[]>(() => {
+    const misEventos = new Set(eventos.map((e) => e.idEvento));
+    const misTareas = new Set(tareas.map((t) => t.idTarea));
+    const items: AgendaItem[] = [];
+    for (const persona of personasCompartidas) {
+      const agenda = agendasCompartidas.get(persona.idUsuario);
+      if (!agenda) continue;
+      const origen = { idUsuario: persona.idUsuario, nombre: `${persona.nombre} ${persona.apellido}`, tono: persona.tono };
+      // Lo que ya está en mi calendario no se duplica.
+      for (const evento of agenda.eventos) {
+        if (!misEventos.has(evento.idEvento)) items.push(...eventoToAgendaItems(evento, rango.desde, rango.hasta, origen));
+      }
+      for (const tarea of agenda.tareas) {
+        if (!misTareas.has(tarea.idTarea)) items.push(tareaCompartidaToAgendaItem(tarea, origen));
+      }
+    }
+    return items;
+  }, [personasCompartidas, agendasCompartidas, eventos, tareas, rango]);
+
+  const proyectos = useMemo(() => proyectosDelCalendario(itemsPropios, misProyectos), [itemsPropios, misProyectos]);
+
+  const itemsVisibles = useMemo(
+    () => filtrarItems([...itemsPropios, ...itemsCompartidos], { mostrarTareas, tiposOcultos, proyectosOcultos }),
+    [itemsPropios, itemsCompartidos, mostrarTareas, tiposOcultos, proyectosOcultos],
+  );
+  const itemsByDay = useMemo(() => groupAgendaItemsByDay(itemsVisibles), [itemsVisibles]);
+  const diasConActividad = useMemo(() => new Set(itemsByDay.keys()), [itemsByDay]);
+
+  // G03 (UI-17): el mini calendario muestra un mes completo, pero en Día/Semana
+  // el rango cargado es un día o una semana: sus marcas se calculan con una
+  // consulta del mes del mini (en Mes es la misma clave y TanStack la comparte).
+  // Mientras ese mes carga no hay marcas: nunca se enseñan las del mes anterior.
+  const rangoMini = useMemo(() => rangoVisible('mes', miniMes), [miniMes]);
+  const { data: eventosMini } = useQuery<MiEventoDTO[]>({
+    queryKey: ['mis-eventos', rangoMini.desde.toISOString(), rangoMini.hasta.toISOString()],
+    queryFn: () => getMisEventos(rangoMini.desde, rangoMini.hasta),
+  });
+  const miniMuestraElMesVisible =
+    vista === 'mes' && miniMes.getFullYear() === anchor.getFullYear() && miniMes.getMonth() === anchor.getMonth();
+  const marcasMini = useMemo(() => {
+    if (miniMuestraElMesVisible) return diasConActividad;
+    const items = filtrarItems(
+      [
+        ...tareas.filter(tieneFechaLimite).filter((t) => t.estadoTarea !== 'HECHO').map(tareaToAgendaItem),
+        ...(eventosMini ?? []).flatMap((e) => eventoToAgendaItems(e, rangoMini.desde, rangoMini.hasta)),
+      ],
+      { mostrarTareas, tiposOcultos, proyectosOcultos },
+    );
+    return new Set(items.map((i) => i.key));
+  }, [miniMuestraElMesVisible, diasConActividad, tareas, eventosMini, rangoMini, mostrarTareas, tiposOcultos, proyectosOcultos]);
 
   const agendaSeleccionada = useMemo(() => {
-    const base = selectedKey ? (itemsByDay.get(selectedKey) ?? []) : agendaItems;
+    const base = selectedKey ? (itemsByDay.get(selectedKey) ?? []) : itemsVisibles;
     return [...base].sort((a, b) => (a.key + a.sortKey).localeCompare(b.key + b.sortKey));
-  }, [itemsByDay, agendaItems, selectedKey]);
+  }, [itemsByDay, itemsVisibles, selectedKey]);
 
   const isLoading = isLoadingTareas || isLoadingEventos;
   const isError = isErrorTareas || isErrorEventos;
 
-  const handleEditEvento = (item: Extract<AgendaItem, { kind: 'evento' }>) => {
-    const evento = eventosPorId.get(item.id);
-    if (!evento) return;
+  const handleSelectEvento = (item: EventoItem) => {
+    setClaveDisparador(agendaItemKey(item));
+    if (item.compartidoPor) {
+      const compartido = eventosCompartidos.get(`${item.compartidoPor.idUsuario}-${item.id}`);
+      if (!compartido) return;
+      setDetalle({ evento: compartido.evento, compartidoPor: compartido.origen });
+    } else {
+      const evento = eventos.find((e) => e.idEvento === item.id);
+      if (!evento) return;
+      setDetalle({ evento, compartidoPor: null });
+    }
+    setDetailOpen(true);
+  };
+
+  const handleEditarDesdeDetalle = (evento: MiEventoDTO) => {
+    setDetailOpen(false);
     setEditingEvent(evento);
     setDialogOpen(true);
   };
 
   const handleNuevoEvento = () => {
+    // Abierto desde "Agendar actividad": el foco vuelve a ese botón (botonAgendarRef), no a un bloque.
+    setClaveDisparador(null);
     setEditingEvent(null);
     setDialogOpen(true);
   };
 
+  const handleToggleCompartido = (idUsuario: number) => {
+    setCompartidosActivos((actuales) => (actuales.includes(idUsuario) ? actuales.filter((id) => id !== idUsuario) : [...actuales, idUsuario]));
+  };
+
+  // G01 (UI-31): quitarme un calendario recibido. Si falla, la persona sigue en la lista.
+  const handleQuitarCompartido = (idUsuario: number) => {
+    const persona = personasCompartidas.find((p) => p.idUsuario === idUsuario);
+    const nombre = persona ? `${persona.nombre} ${persona.apellido}` : 'esa persona';
+    dejarDeRecibir.mutate(idUsuario, {
+      onSuccess: () => {
+        setCompartidosActivos((actuales) => actuales.filter((id) => id !== idUsuario));
+        aviso.exito('Calendario quitado', `Ya no verás el calendario de ${nombre}.`);
+      },
+      onError: (err) => aviso.error('No se pudo quitar el calendario', getApiErrorMessage(err, 'calendar')),
+    });
+  };
+
+  const irA = (fecha: Date) => {
+    setAnchor(fecha);
+    setMiniMes(new Date(fecha.getFullYear(), fecha.getMonth(), 1));
+    // G03 (UI-17): un día elegido que ya no se ve dejaría la lista del mes
+    // filtrada por una fecha fuera del periodo (vacío falso). Si sigue
+    // visible (p. ej. "Hoy" dentro del mismo mes) se conserva.
+    setSelectedKey((actual) => (actual && rangoVisible(vista, fecha).days.some((d) => d.key === actual) ? actual : null));
+  };
+
+  const handleMiniSelect = (key: string) => {
+    const [y, m, d] = key.split('-').map(Number);
+    irA(new Date(y, m - 1, d));
+    if (vista === 'mes') setSelectedKey(key);
+  };
+
   // Meta de horas: misma fuente y misma regla que el dashboard (VIEW-08) —
   // Beca y Extensión nunca se suman. Se muestra la primera que aplique.
-  const metaHoras = useMemo(() => {
+  const metaHoras = useMemo<MetaHoras | null>(() => {
     if (!stats) return null;
     if (stats.horasBecaRequeridas !== null && stats.horasBecaRequeridas > 0) {
-      return {
-        etiqueta: 'Horas Beca',
-        actual: stats.horasBeca,
-        requeridas: stats.horasBecaRequeridas,
-      };
+      return { etiqueta: 'Horas Beca', actual: stats.horasBeca, requeridas: stats.horasBecaRequeridas };
     }
     if (stats.horasExtensionRequeridas !== null && stats.horasExtensionRequeridas > 0) {
-      return {
-        etiqueta: 'Horas de Extensión',
-        actual: stats.horasExtension,
-        requeridas: stats.horasExtensionRequeridas,
-      };
+      return { etiqueta: 'Horas de Extensión', actual: stats.horasExtension, requeridas: stats.horasExtensionRequeridas };
     }
     return null;
   }, [stats]);
-  const metaProgreso = metaHoras
-    ? Math.min(100, Math.round((metaHoras.actual / metaHoras.requeridas) * 100))
-    : 0;
 
-  const initialDateParaNuevoEvento = selectedKey
-    ? (itemsByDay.get(selectedKey)?.[0] as { fechaInicio?: Date } | undefined)?.fechaInicio ??
-      new Date(`${selectedKey}T09:00:00`)
-    : undefined;
+  // Nuevo evento: en Día, ese día a las 09:00; en Mes con un día elegido, ese día; si no, la siguiente hora.
+  const initialDateParaNuevoEvento =
+    vista === 'dia'
+      ? new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate(), 9)
+      : selectedKey
+        ? new Date(`${selectedKey}T09:00:00`)
+        : undefined;
+
+  const compartidoPorMi = compartidos?.compartidoPorMi ?? [];
+  const periodo = etiquetaRango(vista, anchor);
+  const periodoCorto = etiquetaRangoCorta(vista, anchor);
 
   return (
     <div className={dashboardPage('py-8')}>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-gap">
         <div>
-          <h1 className="mb-1 font-headline text-3xl font-extrabold text-on-surface">
-            Calendario del Proyecto
-          </h1>
-          <p className="text-sm text-tertiary">
-            Fechas de entrega de tus tareas y eventos de tus proyectos.
-          </p>
+          <h1 className="type-display mb-1">Calendario académico y proyectos</h1>
+          <p className="text-sm text-tertiary">Organiza tus tutorías, reuniones, entregas y fechas límite de tus proyectos.</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-gap">
-          <div className="flex items-center gap-tight">
-            <span className="flex items-center gap-1 type-meta">
-              <span className="h-1.5 w-1.5 rounded-pill bg-primary" aria-hidden="true" />
-              Fecha límite de tarea
-            </span>
-            <span className="flex items-center gap-1 type-meta">
-              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-control bg-accent text-on-accent">
-                <Clock className="h-2.5 w-2.5" aria-hidden="true" />
-              </span>
-              Evento
-            </span>
-          </div>
-
-          <ButtonGroup>
-            <Button
-              type="button"
-              variant={vista === 'mes' ? 'default' : 'outline'}
-              className="h-9 rounded-md text-xs font-bold"
-              onClick={() => setVista('mes')}
-            >
-              Mes
-            </Button>
-            <Button
-              type="button"
-              variant={vista === 'semana' ? 'default' : 'outline'}
-              className="h-9 rounded-md text-xs font-bold"
-              onClick={() => setVista('semana')}
-            >
-              Semana
-            </Button>
-          </ButtonGroup>
-
+        <div className="flex flex-wrap items-center gap-tight">
+          {compartidoPorMi.length > 0 && (
+            <div role="group" className="flex -space-x-2" aria-label={`Compartida con ${compartidoPorMi.length} personas`}>
+              {compartidoPorMi.slice(0, 3).map((persona) => (
+                <Avatar key={persona.idUsuario} className="size-8 ring-2 ring-card" title={`${persona.nombre} ${persona.apellido}`}>
+                  {persona.fotoUrl && <AvatarImage src={persona.fotoUrl} alt="" />}
+                  <AvatarFallback className="bg-surface-container-high type-micro font-bold">
+                    {iniciales(persona.nombre, persona.apellido)}
+                  </AvatarFallback>
+                </Avatar>
+              ))}
+              {compartidoPorMi.length > 3 && (
+                <span className="flex size-8 items-center justify-center rounded-pill bg-surface-container-high type-micro font-bold ring-2 ring-card">
+                  +{compartidoPorMi.length - 3}
+                </span>
+              )}
+            </div>
+          )}
+          <Button
+            ref={botonCompartirRef}
+            type="button"
+            variant="outline"
+            onClick={() => setShareOpen(true)}
+            className="h-9 gap-1.5 rounded-pill border-outline-variant text-xs font-bold"
+          >
+            <Share2 className="size-4" aria-hidden="true" />
+            Compartir agenda
+          </Button>
           {misProyectos.length > 0 && (
             <Button
+              ref={botonAgendarRef}
               type="button"
               onClick={handleNuevoEvento}
-              className="h-9 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
+              className="h-9 gap-1.5 rounded-pill bg-primary px-4 text-xs font-bold text-on-primary hover:bg-primary/90"
             >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Nuevo evento
+              <Plus className="size-4" aria-hidden="true" />
+              Agendar actividad
             </Button>
           )}
         </div>
       </div>
 
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-tight">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-8 w-8 rounded-control p-0"
-            aria-label={vista === 'mes' ? 'Mes anterior' : 'Semana anterior'}
-            onClick={() =>
-              setAnchor((current) =>
-                vista === 'mes'
-                  ? new Date(current.getFullYear(), current.getMonth() - 1, 1)
-                  : addDays(current, -7),
-              )
-            }
-          >
-            ‹
-          </Button>
-          <span className="type-section capitalize text-text-primary">
-            {vista === 'mes'
-              ? formatMonthLabel(year, month)
-              : formatWeekRangeLabel(weekDays[0].date, weekDays[6].date)}
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-8 w-8 rounded-control p-0"
-            aria-label={vista === 'mes' ? 'Mes siguiente' : 'Semana siguiente'}
-            onClick={() =>
-              setAnchor((current) =>
-                vista === 'mes'
-                  ? new Date(current.getFullYear(), current.getMonth() + 1, 1)
-                  : addDays(current, 7),
-              )
-            }
-          >
-            ›
-          </Button>
+      <div className="grid grid-cols-1 gap-grid lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="order-2 lg:order-1">
+          {/* G04 (UI-32): las secciones de la columna son h3; este h2 evita el salto h1 → h3. */}
+          <h2 className="sr-only">Opciones del calendario</h2>
+          <CalendarSidebar
+            mini={{
+              year: miniMes.getFullYear(),
+              month: miniMes.getMonth(),
+              todayKey: hoyKey,
+              // En Mes el mini refleja el día elegido; en Día/Semana, la fecha ancla que se está viendo.
+              selectedKey: vista === 'mes' ? (selectedKey ?? undefined) : toDateKey(anchor),
+              markedDates: marcasMini,
+              onPrevMonth: () => setMiniMes((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1)),
+              onNextMonth: () => setMiniMes((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1)),
+              onSelectDay: handleMiniSelect,
+            }}
+            metaHoras={metaHoras}
+            proyectos={proyectos}
+            proyectosOcultos={proyectosOcultos}
+            onToggleProyecto={(id) => setProyectosOcultos((s) => alternar(s, id))}
+            compartidos={personasCompartidas}
+            compartidosActivos={compartidosActivosSet}
+            onToggleCompartido={handleToggleCompartido}
+            onQuitarCompartido={handleQuitarCompartido}
+            quitandoCompartido={dejarDeRecibir.isPending ? dejarDeRecibir.variables : null}
+            compartidosEstado={isLoadingCompartidos ? 'cargando' : isErrorCompartidos ? 'error' : 'listo'}
+            onReintentarCompartidos={() => void refetchCompartidos()}
+            estadoAgendas={estadosCompartidos}
+            miniRedundanteEnMovil={vista === 'mes'}
+          />
         </div>
-        {selectedKey && (
-          <button
-            type="button"
-            onClick={() => setSelectedKey(null)}
-            className="type-body font-medium text-primary hover:underline"
-          >
-            Ver todas las fechas
-          </button>
-        )}
-      </div>
 
-      <div className="grid grid-cols-1 gap-grid lg:grid-cols-[1fr_320px]">
-        <div className="space-y-section">
-          {vista === 'mes' ? (
-            <MonthView
-              year={year}
-              month={month}
-              todayKey={hoyKey}
-              selectedKey={selectedKey}
-              itemsByDay={itemsByDay}
-              onSelectDay={(key) => setSelectedKey((current) => (current === key ? null : key))}
+        <div className="order-1 min-w-0 space-y-section lg:order-2" aria-busy={isLoading}>
+          <div className="flex flex-wrap items-center justify-between gap-tight">
+            <CalendarFilterMenu
+              total={contarItems(itemsVisibles)}
+              mostrarTareas={mostrarTareas}
+              onToggleTareas={() => setMostrarTareas((v) => !v)}
+              tiposOcultos={tiposOcultos}
+              onToggleTipo={(tipo) => setTiposOcultos((s) => alternar(s, tipo))}
+              onMostrarTodo={() => {
+                setMostrarTareas(true);
+                setTiposOcultos(new Set());
+              }}
             />
-          ) : (
-            <WeekView
-              days={weekDays}
-              todayKey={hoyKey}
-              itemsByDay={itemsByDay}
-              isEventEditable={isEventEditable}
-              onEditEvento={handleEditEvento}
-            />
-          )}
 
-          {/* T-264: un fetch fallido no puede verse igual que "sin actividad" en
-              ninguna vista — antes esto solo se mostraba en vista mensual y la
-              semanal quedaba mostrando "Sin actividad" en las 7 columnas. */}
+            {/* G03 (UI-08): mismo primitivo accesible que la modalidad del diálogo (G03-C12):
+                un solo tab stop, ←/→ cambian la vista y aria-checked es real. Los E2E
+                siguen usando getByRole('radio', { name: 'Día' | 'Semana' | 'Mes' }). */}
+            <RadioGroupPrimitive.Root
+              value={vista}
+              onValueChange={(v) => {
+                setVista(v as VistaCalendario);
+                setSelectedKey(null);
+              }}
+              aria-label="Vista del calendario"
+              orientation="horizontal"
+              loop
+              className="flex rounded-pill bg-surface-container p-1"
+            >
+              {VISTAS.map((opcion) => (
+                <RadioGroupPrimitive.Item
+                  key={opcion.value}
+                  value={opcion.value}
+                  className={`rounded-pill px-3 py-1 text-xs font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
+                    vista === opcion.value ? 'bg-surface-container-lowest text-on-surface shadow-card' : 'text-on-surface-variant'
+                  }`}
+                >
+                  {opcion.label}
+                </RadioGroupPrimitive.Item>
+              ))}
+            </RadioGroupPrimitive.Root>
+
+            <div className="flex items-center gap-tight">
+              <Button type="button" variant="outline" className="h-8 rounded-pill px-3 text-xs font-bold" onClick={() => irA(new Date())}>
+                Hoy
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="size-8 rounded-pill p-0"
+                aria-label="Anterior"
+                onClick={() => irA(navegar(vista, anchor, -1))}
+              >
+                <ChevronLeft className="size-4" aria-hidden="true" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="size-8 rounded-pill p-0"
+                aria-label="Siguiente"
+                onClick={() => irA(navegar(vista, anchor, 1))}
+              >
+                <ChevronRight className="size-4" aria-hidden="true" />
+              </Button>
+              {/* G04 (UI-32): el periodo visible es el título de la zona del calendario. */}
+              <h2 className="type-subtitle min-w-0 text-text-primary" aria-live="polite">
+                {periodoCorto === periodo ? (
+                  periodo
+                ) : (
+                  <>
+                    {/* G04 (UI-38): bajo `sm` se ve el corto; el largo sigue en el árbol accesible. */}
+                    <span className="sm:hidden" aria-hidden="true">
+                      {periodoCorto}
+                    </span>
+                    <span className="sr-only sm:not-sr-only">{periodo}</span>
+                  </>
+                )}
+              </h2>
+            </div>
+          </div>
+
+          {/* T-264: un fetch fallido no puede verse igual que "sin actividad".
+              G03 (UI-39): el estado va ANTES de la rejilla (que mientras tanto
+              está vacía y marcada aria-busy), con el botón del sistema. */}
           {isLoading && (
-            <div className="py-16 text-center text-sm text-tertiary" role="status">
+            <div className="flex items-center justify-center gap-tight py-3 text-sm text-tertiary" role="status">
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               Cargando tu calendario...
             </div>
           )}
@@ -326,36 +717,84 @@ export default function CalendarioPage() {
               </EmptyMedia>
               <EmptyHeader>
                 <EmptyTitle>No se pudo cargar tu calendario</EmptyTitle>
-                <EmptyDescription>
-                  Verifica que tu sesión siga activa o intenta actualizar.
-                </EmptyDescription>
+                <EmptyDescription>Verifica que tu sesión siga activa o intenta actualizar.</EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
-                <button
+                <Button
                   type="button"
                   onClick={() => {
                     void refetchTareas();
                     void refetchEventos();
                   }}
-                  className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                  className="h-10 rounded-pill bg-primary px-5 text-sm font-bold text-on-primary hover:bg-primary/90"
                 >
                   Reintentar
-                </button>
+                </Button>
               </EmptyContent>
             </Empty>
           )}
 
           {vista === 'mes' && (
-            <div className="space-y-section">
-              {!isLoading && !isError && agendaSeleccionada.length === 0 && (
+            <MonthView
+              year={anchor.getFullYear()}
+              month={anchor.getMonth()}
+              todayKey={hoyKey}
+              selectedKey={selectedKey}
+              itemsByDay={itemsByDay}
+              onSelectDay={(key) => setSelectedKey((current) => (current === key ? null : key))}
+            />
+          )}
+
+          {vista === 'dia' && (
+            <TimeGridView days={rango.days} todayKey={hoyKey} itemsByDay={itemsByDay} onSelectEvento={handleSelectEvento} ahora={ahora} />
+          )}
+
+          {vista === 'semana' && (
+            <>
+              {/* G02 (UI-02): con las dos barras laterales, 7 columnas de horas solo son
+                  legibles desde xl (1280 px); por debajo, la semana se ve como lista de días.
+                  G04 (UI-36): solo se monta la variante que corresponde al ancho (antes
+                  vivían las dos y una quedaba oculta por CSS: ~200 nodos de más y la
+                  cuadrícula sin su scroll inicial al mostrarse). Al montarse, la
+                  cuadrícula hace scroll a las 07:00. */}
+              {semanaEnCuadricula !== false && (
+                <div className={semanaEnCuadricula === null ? 'hidden xl:block' : undefined}>
+                  <TimeGridView
+                    days={rango.days}
+                    todayKey={hoyKey}
+                    itemsByDay={itemsByDay}
+                    onSelectEvento={handleSelectEvento}
+                    onVerDia={(key) => {
+                      const [y, m, d] = key.split('-').map(Number);
+                      irA(new Date(y, m - 1, d));
+                      setVista('dia');
+                    }}
+                    ahora={ahora}
+                  />
+                </div>
+              )}
+              {semanaEnCuadricula !== true && (
+                <div className={semanaEnCuadricula === null ? 'xl:hidden' : undefined}>
+                  <WeekView days={rango.days} todayKey={hoyKey} itemsByDay={itemsByDay} onSelectEvento={handleSelectEvento} />
+                </div>
+              )}
+            </>
+          )}
+
+          {vista === 'mes' && !isLoading && !isError && (
+            <div className="space-y-tight">
+              {selectedKey && (
+                <button type="button" onClick={() => setSelectedKey(null)} className="type-body font-medium text-primary hover:underline">
+                  Ver todas las fechas
+                </button>
+              )}
+              {agendaSeleccionada.length === 0 ? (
                 <Empty className="surface-enter" aria-live="polite">
                   <EmptyMedia variant="icon">
                     <CalendarDays aria-hidden="true" className="h-7 w-7" />
                   </EmptyMedia>
                   <EmptyHeader>
-                    <EmptyTitle>
-                      {selectedKey ? 'Nada programado ese día' : 'Sin actividad en este rango'}
-                    </EmptyTitle>
+                    <EmptyTitle>{selectedKey ? 'Nada programado ese día' : 'Sin actividad en este rango'}</EmptyTitle>
                     <EmptyDescription>
                       {selectedKey
                         ? 'Elige otro día en el calendario o vuelve a ver todas las fechas.'
@@ -363,88 +802,38 @@ export default function CalendarioPage() {
                     </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
-              )}
-
-              {!isLoading && !isError && agendaSeleccionada.length > 0 && (
-                <div className="space-y-tight">
-                  {agendaSeleccionada.map((item) => (
-                    <AgendaItemRow
-                      key={`${item.kind}-${item.id}-${item.key}`}
-                      item={item}
-                      editable={item.kind === 'evento' && isEventEditable(item.projectId)}
-                      onEditEvento={handleEditEvento}
-                    />
-                  ))}
-                </div>
+              ) : (
+                agendaSeleccionada.map((item) => (
+                  <AgendaItemRow key={agendaItemKey(item)} item={item} onSelectEvento={handleSelectEvento} />
+                ))
               )}
             </div>
           )}
-        </div>
-
-        <div className="space-y-gap">
-          {metaHoras && (
-            <div className="card-base h-fit">
-              <div className="mb-stack flex items-center gap-tight">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface-container text-text-secondary">
-                  <Target className="h-4 w-4" aria-hidden="true" />
-                </div>
-                <div>
-                  <h3 className="type-subtitle text-text-primary">Meta de Horas</h3>
-                  <p className="type-meta">{metaHoras.etiqueta}</p>
-                </div>
-                <span className="type-section ml-auto text-text-primary">{metaProgreso}%</span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-pill bg-surface-container-high">
-                <div
-                  className="h-full rounded-pill bg-accent"
-                  style={{ width: `${metaProgreso}%` }}
-                />
-              </div>
-              <p className="type-meta mt-tight">
-                {metaHoras.actual} de {metaHoras.requeridas} hrs
-              </p>
-            </div>
-          )}
-
-          {misProyectos.length > 0 && (
-            <div className="card-base h-fit">
-              <h3 className="type-subtitle mb-stack text-text-primary">Mis Proyectos</h3>
-              <ul className="space-y-tight">
-                {misProyectos.slice(0, 4).map((p) => (
-                  <li key={p.idProyecto}>
-                    <Link
-                      href={`/dashboard/projects/${p.idProyecto}`}
-                      className="flex items-center justify-between gap-tight rounded-control px-tight py-tight transition-colors hover:bg-surface-container"
-                    >
-                      <span className="type-body truncate text-text-primary">{p.tituloProyecto}</span>
-                      <span className="pill pill-neutral shrink-0">
-                        {estadoBadgeLabel(p.estadoProyecto)}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <Link
-            href="/dashboard/mis-tareas"
-            className="inline-flex items-center gap-tight text-sm font-medium text-primary hover:underline"
-          >
-            <ClipboardList className="h-4 w-4" aria-hidden="true" />
-            Ver todas mis tareas
-          </Link>
         </div>
       </div>
+
+      <EventDetailDialog
+        evento={detalle?.evento ?? null}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        editable={detalle !== null && detalle.compartidoPor === null && ledProjectIds.has(detalle.evento.idProyecto)}
+        compartidoPor={detalle?.compartidoPor ?? null}
+        onEditar={handleEditarDesdeDetalle}
+        restaurarFocoA={claveDisparador}
+      />
 
       <EventFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        ledProjects={misProyectos.map((p) => ({ idProyecto: p.idProyecto, tituloProyecto: p.tituloProyecto }))}
+        ledProjects={proyectosLiderados}
         editingEvent={editingEvent}
         defaultProjectId={misProyectos[0]?.idProyecto}
         initialDate={initialDateParaNuevoEvento}
+        restaurarFocoA={claveDisparador}
+        restaurarFocoEn={editingEvent ? undefined : botonAgendarRef}
       />
+
+      <ShareCalendarDialog open={shareOpen} onOpenChange={setShareOpen} restaurarFocoEn={botonCompartirRef} />
     </div>
   );
 }

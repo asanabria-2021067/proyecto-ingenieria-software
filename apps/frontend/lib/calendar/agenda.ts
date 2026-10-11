@@ -1,6 +1,15 @@
 import type { MiTareaDTO } from '@/lib/services/users';
-import type { MiEventoDTO } from '@/lib/services/events';
+import type { MiEventoDTO, ModalidadEvento, TipoEvento } from '@/lib/services/events';
+import type { EventoCompartidoDTO, TareaCompartidaDTO } from '@/lib/services/calendar-shares';
+import type { TonoCalendario } from './paleta';
 import { addDays, formatTime, parseFechaSolo, toDateKey } from './utils';
+
+/** HU-184: el ítem viene del calendario que otra persona me compartió (solo lectura). */
+export interface OrigenCompartido {
+  idUsuario: number;
+  nombre: string;
+  tono: TonoCalendario;
+}
 
 /**
  * HU-169 (T-264): un ítem unificado de agenda para un día del calendario —
@@ -14,10 +23,14 @@ export type AgendaItem =
       sortKey: string;
       id: number;
       titulo: string;
+      projectId: number;
       projectTitle: string;
       href: string;
       prioridad: MiTareaDTO['prioridad'];
       estado: MiTareaDTO['estadoTarea'];
+      compartidoPor?: OrigenCompartido;
+      /** G01 (UI-01): fecha límite de un calendario compartido sin acceso al proyecto: solo el día. */
+      ocupado?: true;
     }
   | {
       kind: 'evento';
@@ -27,6 +40,20 @@ export type AgendaItem =
       projectId: number;
       titulo: string;
       descripcion: string | null;
+      /** HU-184 (T-324): ícono y etiqueta de la modalidad. */
+      modalidad: ModalidadEvento;
+      /** HU-184: define el color del evento en las vistas. */
+      tipo: TipoEvento;
+      /** El evento abarca más de un día: va en la franja "todo el día", no en la cuadrícula de horas. */
+      multiDia: boolean;
+      compartidoPor?: OrigenCompartido;
+      /**
+       * G01 (UI-01): evento de un calendario compartido sin acceso al
+       * proyecto: solo horario. `titulo`, `tipo` y `modalidad` son
+       * marcadores neutros ("Ocupado"); las vistas no deben pintar tipo ni
+       * modalidad cuando está activo.
+       */
+      ocupado?: true;
       projectTitle: string;
       href: string;
       horaInicio: string;
@@ -43,6 +70,7 @@ export function tareaToAgendaItem(tarea: MiTareaDTO & { fechaLimite: string }): 
     sortKey: '24:00', // "todo el día": después de cualquier evento con hora
     id: tarea.idTarea,
     titulo: tarea.tituloTarea,
+    projectId: tarea.proyecto.idProyecto,
     projectTitle: tarea.proyecto.tituloProyecto,
     href: `/dashboard/projects/${tarea.proyecto.idProyecto}/kanban/tasks/${tarea.idTarea}`,
     prioridad: tarea.prioridad,
@@ -50,7 +78,84 @@ export function tareaToAgendaItem(tarea: MiTareaDTO & { fechaLimite: string }): 
   };
 }
 
-export function eventoToAgendaItem(evento: MiEventoDTO): AgendaItem {
+/**
+ * HU-184: fecha límite de una tarea de un calendario compartido. Sin href:
+ * quien la ve no es necesariamente integrante del proyecto, así que la
+ * tarea no es navegable.
+ */
+export function tareaCompartidaToAgendaItem(tarea: TareaCompartidaDTO, origen: OrigenCompartido): AgendaItem {
+  const fecha = parseFechaSolo(tarea.fechaLimite);
+  const base = { kind: 'tarea' as const, key: toDateKey(fecha), sortKey: '24:00', id: tarea.idTarea, href: '', compartidoPor: origen };
+  if (tarea.visibilidad === 'OCUPADO') {
+    return { ...base, titulo: 'Fecha límite', projectId: 0, projectTitle: '', prioridad: 'MEDIA', estado: 'POR_HACER', ocupado: true };
+  }
+  return {
+    ...base,
+    titulo: tarea.tituloTarea,
+    projectId: tarea.proyecto.idProyecto,
+    projectTitle: tarea.proyecto.tituloProyecto,
+    prioridad: tarea.prioridad,
+    estado: tarea.estadoTarea,
+  };
+}
+
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
+
+/**
+ * G02 (UI-05): "varios días" significa que el evento ocupa días completos
+ * (dura 24 h o más) y va en la franja "Todo el día". Un evento con horas
+ * que cruza medianoche (22:00 → 01:00) NO es de todo el día: se parte en
+ * tramos por fecha real (`eventoToAgendaItems`).
+ */
+export function ocupaDiasCompletos(fechaInicio: Date, fechaFin: Date): boolean {
+  return fechaFin.getTime() - fechaInicio.getTime() >= MS_POR_DIA;
+}
+
+function inicioDelDia(fecha: Date): Date {
+  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+}
+
+/**
+ * G01 (UI-01): un evento de una agenda compartida llega ya reducido por el
+ * backend. Se copia campo por campo (sin spread del DTO) y, cuando viene
+ * OCUPADO, sin título, tipo, modalidad ni proyecto reales.
+ */
+function eventoCompartidoToAgendaItem(evento: EventoCompartidoDTO, origen: OrigenCompartido): AgendaItem {
+  const fechaInicio = new Date(evento.fechaInicio);
+  const fechaFin = new Date(evento.fechaFin);
+  const horaInicio = formatTime(fechaInicio);
+  const base = {
+    kind: 'evento' as const,
+    key: toDateKey(fechaInicio),
+    sortKey: horaInicio,
+    id: evento.idEvento,
+    descripcion: null,
+    multiDia: ocupaDiasCompletos(fechaInicio, fechaFin),
+    href: '',
+    horaInicio,
+    horaFin: formatTime(fechaFin),
+    fechaInicio,
+    fechaFin,
+    compartidoPor: origen,
+  };
+  if (evento.visibilidad === 'OCUPADO') {
+    return { ...base, titulo: 'Ocupado', projectId: 0, projectTitle: '', modalidad: 'VIRTUAL', tipo: 'OTRO', ocupado: true };
+  }
+  return {
+    ...base,
+    titulo: evento.tituloEvento,
+    projectId: evento.proyecto.idProyecto,
+    projectTitle: evento.proyecto.tituloProyecto,
+    modalidad: evento.modalidad,
+    tipo: evento.tipoEvento,
+  };
+}
+
+export function eventoToAgendaItem(evento: MiEventoDTO | EventoCompartidoDTO, origen?: OrigenCompartido): AgendaItem {
+  if ('visibilidad' in evento) {
+    if (!origen) throw new Error('Un evento compartido necesita su origen');
+    return eventoCompartidoToAgendaItem(evento, origen);
+  }
   const fechaInicio = new Date(evento.fechaInicio);
   const fechaFin = new Date(evento.fechaFin);
   const horaInicio = formatTime(fechaInicio);
@@ -62,12 +167,16 @@ export function eventoToAgendaItem(evento: MiEventoDTO): AgendaItem {
     projectId: evento.proyecto.idProyecto,
     titulo: evento.tituloEvento,
     descripcion: evento.descripcionEvento,
+    modalidad: evento.modalidad,
+    tipo: evento.tipoEvento,
+    multiDia: ocupaDiasCompletos(fechaInicio, fechaFin),
     projectTitle: evento.proyecto.tituloProyecto,
     href: `/dashboard/projects/${evento.proyecto.idProyecto}`,
     horaInicio,
     horaFin: formatTime(fechaFin),
     fechaInicio,
     fechaFin,
+    ...(origen && { compartidoPor: origen }),
   };
 }
 
@@ -78,25 +187,59 @@ export function eventoToAgendaItem(evento: MiEventoDTO): AgendaItem {
  * es por solapamiento, así que un evento que abarca varios días — o que
  * arranca antes del rango visible y lo solapa — debe aparecer en cada día
  * que toca, no solo en el de fechaInicio.
+ *
+ * G02 (UI-05): un evento de días completos (≥ 24 h) repite el mismo ítem
+ * (`multiDia`) en cada día. Un evento con horas que cruza medianoche se
+ * parte en tramos por fecha real, cada uno con su propio horario
+ * (23:00–00:00 el primer día, 00:00–01:00 el siguiente); si termina
+ * exactamente a las 00:00 solo existe el tramo del primer día.
  */
-export function eventoToAgendaItems(evento: MiEventoDTO, rangoDesde: Date, rangoHasta: Date): AgendaItem[] {
-  const base = eventoToAgendaItem(evento);
+export function eventoToAgendaItems(
+  evento: MiEventoDTO | EventoCompartidoDTO,
+  rangoDesde: Date,
+  rangoHasta: Date,
+  origen?: OrigenCompartido,
+): AgendaItem[] {
+  const base = eventoToAgendaItem(evento, origen);
   const fechaInicioEvento = new Date(evento.fechaInicio);
   const fechaFinEvento = new Date(evento.fechaFin);
   // rangoHasta es exclusivo (ver CalendarioPage): se resta un instante para
   // obtener el último día real que sigue dentro del rango visible.
   const finRangoInclusivo = new Date(rangoHasta.getTime() - 1);
   const primerDia = fechaInicioEvento < rangoDesde ? rangoDesde : fechaInicioEvento;
-  const ultimoDia = fechaFinEvento < finRangoInclusivo ? fechaFinEvento : finRangoInclusivo;
+  // Un fin exactamente a medianoche pertenece al día anterior (no crea tramo fantasma).
+  const finEfectivo = base.kind === 'evento' && !base.multiDia ? new Date(fechaFinEvento.getTime() - 1) : fechaFinEvento;
+  const ultimoDia = finEfectivo < finRangoInclusivo ? finEfectivo : finRangoInclusivo;
 
   const items: AgendaItem[] = [];
-  let cursor = new Date(primerDia.getFullYear(), primerDia.getMonth(), primerDia.getDate());
-  const limite = new Date(ultimoDia.getFullYear(), ultimoDia.getMonth(), ultimoDia.getDate());
+  let cursor = inicioDelDia(primerDia);
+  const limite = inicioDelDia(ultimoDia);
   while (cursor <= limite) {
-    items.push({ ...base, key: toDateKey(cursor) });
+    if (base.kind === 'evento' && !base.multiDia) {
+      const siguiente = addDays(cursor, 1);
+      const tramoInicio = fechaInicioEvento > cursor ? fechaInicioEvento : cursor;
+      const tramoFin = fechaFinEvento < siguiente ? fechaFinEvento : siguiente;
+      const horaInicio = formatTime(tramoInicio);
+      items.push({
+        ...base,
+        key: toDateKey(cursor),
+        sortKey: horaInicio,
+        horaInicio,
+        horaFin: formatTime(tramoFin),
+        fechaInicio: tramoInicio,
+        fechaFin: tramoFin,
+      });
+    } else {
+      items.push({ ...base, key: toDateKey(cursor) });
+    }
     cursor = addDays(cursor, 1);
   }
   return items;
+}
+
+/** Clave estable para listas de React: el mismo evento puede venir de mi calendario y de uno compartido. */
+export function agendaItemKey(item: AgendaItem): string {
+  return `${item.kind}-${item.id}-${item.key}-${item.compartidoPor?.idUsuario ?? 'yo'}`;
 }
 
 /** Agrupa items por día (yyyy-mm-dd) y los ordena por sortKey dentro de cada grupo. */
