@@ -16,6 +16,7 @@ import {
 } from '@/components/auth/auth-split-layout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Spinner } from '@/components/ui/spinner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import logo from '@/public/logo.png';
 
@@ -74,8 +75,12 @@ const registerSchema = z
     });
   });
 
+// Mismo desplegable de los filtros de búsqueda (`components/ui/select`), con el
+// aspecto del campo de Login. `data-[size=default]:h-[50px]` iguala el alto de
+// los demás campos (el `h-9` del disparador base solo cede a su misma variante)
+// y un nombre de carrera largo se corta con puntos suspensivos en una línea.
 const selectClass =
-  `${AUTH_INPUT_COMPACT} min-w-0`;
+  `${AUTH_INPUT_COMPACT} min-w-0 text-base text-left data-[size=default]:h-[50px] aria-invalid:border-error *:data-[slot=select-value]:block *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate`;
 
 // T-274 (OWASP): mensaje neutro para cualquier fallo del backend. Antes se
 // mostraba error.message crudo (p. ej. "El correo ya esta registrado"), lo
@@ -303,27 +308,31 @@ export default function RegistroPage() {
                   <label htmlFor="carrera" className={AUTH_LABEL}>
                     Carrera
                   </label>
-                  <select
-                    id="carrera"
-                    data-testid="registro-carrera-select"
-                    required
-                    value={idCarrera}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-                      setIdCarrera(value);
+                  <Select
+                    value={idCarrera ? String(idCarrera) : ''}
+                    onValueChange={(v) => {
+                      setIdCarrera(Number(v));
                       if (errores.idCarrera) setErrores((prev) => ({ ...prev, idCarrera: undefined }));
                     }}
-                    className={selectClass}
-                    aria-invalid={errores.idCarrera ? 'true' : 'false'}
-                    aria-describedby={errores.idCarrera ? 'carrera-error' : undefined}
                   >
-                    <option value={0}>Seleccionar...</option>
-                    {carreras.map((c) => (
-                      <option key={c.idCarrera} value={c.idCarrera} title={c.nombreCarrera}>
-                        {c.nombreCarrera}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      id="carrera"
+                      data-testid="registro-carrera-select"
+                      className={selectClass}
+                      aria-required="true"
+                      aria-invalid={errores.idCarrera ? 'true' : 'false'}
+                      aria-describedby={errores.idCarrera ? 'carrera-error' : undefined}
+                    >
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-w-[calc(100vw-2rem)]">
+                      {carreras.map((c) => (
+                        <SelectItem key={c.idCarrera} value={String(c.idCarrera)} className="whitespace-normal">
+                          {c.nombreCarrera}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {errores.idCarrera && (
                     <p id="carrera-error" role="alert" className={AUTH_FIELD_ERROR}>
                       {errores.idCarrera}
@@ -337,25 +346,30 @@ export default function RegistroPage() {
                   <label htmlFor="semestre" className={AUTH_LABEL}>
                     Semestre
                   </label>
-                  <select
-                    id="semestre"
-                    required
-                    value={semestre}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-                      setSemestre(value);
+                  <Select
+                    value={String(semestre)}
+                    onValueChange={(v) => {
+                      setSemestre(Number(v));
                       if (errores.semestre) setErrores((prev) => ({ ...prev, semestre: undefined }));
                     }}
-                    className={selectClass}
-                    aria-invalid={errores.semestre ? 'true' : 'false'}
-                    aria-describedby={errores.semestre ? 'semestre-error' : undefined}
                   >
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      id="semestre"
+                      className={selectClass}
+                      aria-required="true"
+                      aria-invalid={errores.semestre ? 'true' : 'false'}
+                      aria-describedby={errores.semestre ? 'semestre-error' : undefined}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((s) => (
+                        <SelectItem key={s} value={String(s)}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {errores.semestre && (
                     <p id="semestre-error" role="alert" className={AUTH_FIELD_ERROR}>
                       {errores.semestre}
@@ -470,7 +484,6 @@ export default function RegistroPage() {
                 Crear Cuenta
               </button>
             </form>
-
 
             <p className="mt-8 text-center text-xs text-tertiary">
               Ya tienes cuenta?{' '}
