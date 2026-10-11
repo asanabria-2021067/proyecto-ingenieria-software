@@ -15,6 +15,8 @@ import {
   type VentanaRecordatorio,
 } from '../../src/tasks/tasks-due-reminder.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
+import { NotificationsService } from '../../src/notifications/notifications.service';
+import type { NotificationsGateway } from '../../src/notifications/notifications.gateway';
 
 // 08:00 en Guatemala (hora del cron) = 14:00 UTC.
 const DIA_1 = new Date('2026-10-10T14:00:00.000Z');
@@ -67,6 +69,8 @@ describeIntegration('HU-186 T-329 — detección de vencimientos en PostgreSQL r
 
   afterEach(async () => {
     vi.useRealTimers();
+    await prisma.notificacion.deleteMany({ where: { idUsuario: { in: userIds } } });
+    await prisma.preferenciaNotificacion.deleteMany({ where: { idUsuario: { in: userIds } } });
     // recordatorio_tarea cae por ON DELETE CASCADE al borrar la tarea.
     await cleanupIntegrationFixtures(prisma, { assignmentIds, taskIds });
     assignmentIds.length = 0;
@@ -92,7 +96,21 @@ describeIntegration('HU-186 T-329 — detección de vencimientos en PostgreSQL r
   }
 
   function nuevoServicio() {
-    return new ServicioObservado(prisma as unknown as PrismaService);
+    return new ServicioObservado(prisma as unknown as PrismaService, {} as NotificationsService);
+  }
+
+  /** T-330: servicio real con el NotificationsService real (gateway sin server: solo persiste). */
+  function servicioReal() {
+    const notifications = new NotificationsService(prisma as unknown as PrismaService, {} as NotificationsGateway);
+    return { notifications, service: new TasksDueReminderService(prisma as unknown as PrismaService, notifications) };
+  }
+
+  /** Bandeja del responsable tal como la lee el centro de notificaciones. */
+  async function bandejaDe(notifications: NotificationsService, idTarea: number) {
+    const noLeidas = await notifications.findUnreadForUser(responsableId);
+    return noLeidas.filter(
+      (n) => n.tipoNotificacion === 'TAREA_POR_VENCER' && (n.datosJson as { taskId?: number })?.taskId === idTarea,
+    );
   }
 
   /** Emisiones de las tareas de esta suite (la base puede tener otras). */
@@ -181,5 +199,41 @@ describeIntegration('HU-186 T-329 — detección de vencimientos en PostgreSQL r
     taskIds.length = 0;
 
     expect(await prisma.recordatorioTarea.count({ where: { idTarea: tarea.idTarea } })).toBe(0);
+  });
+
+  it('T-330: 24 h y 48 h llegan una vez cada uno a la bandeja del responsable; HECHO no llega', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(DIA_1);
+    const a24 = await tareaAsignada(MANANA);
+    const a48 = await tareaAsignada(PASADO_MANANA);
+    const hecha = await tareaAsignada(MANANA, { estadoTarea: EstadoTarea.HECHO });
+    const { notifications, service } = servicioReal();
+
+    await service.enviarRecordatoriosDeVencimiento();
+    await service.enviarRecordatoriosDeVencimiento();
+
+    const [n24] = await bandejaDe(notifications, a24.idTarea);
+    expect(await bandejaDe(notifications, a24.idTarea)).toHaveLength(1);
+    expect(n24.tituloNotificacion).toBe('Tu tarea vence mañana');
+    expect(n24.mensajeNotificacion).toContain('vence el 11 de octubre de 2026');
+    expect((await bandejaDe(notifications, a48.idTarea)).map((n) => n.tituloNotificacion)).toEqual([
+      'Tu tarea vence en 2 días',
+    ]);
+    expect(await bandejaDe(notifications, hecha.idTarea)).toHaveLength(0);
+    expect(await prisma.notificacion.count({ where: { idUsuario: liderId, tipoNotificacion: 'TAREA_POR_VENCER' } })).toBe(0);
+  });
+
+  it('T-330 / HU-185: con TAREA_POR_VENCER desactivado no llega nada y no se reintenta', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(DIA_1);
+    const tarea = await tareaAsignada(MANANA);
+    const { notifications, service } = servicioReal();
+    await notifications.updatePreference(responsableId, 'TAREA_POR_VENCER', false);
+
+    await service.enviarRecordatoriosDeVencimiento();
+    await service.enviarRecordatoriosDeVencimiento();
+
+    expect(await bandejaDe(notifications, tarea.idTarea)).toHaveLength(0);
+    expect(await prisma.recordatorioTarea.count({ where: { idTarea: tarea.idTarea, ventanaHoras: 24 } })).toBe(1);
   });
 });
