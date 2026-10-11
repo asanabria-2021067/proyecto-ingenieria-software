@@ -161,7 +161,13 @@ async function medirRol(rol) {
           wcag: v.tags.filter((t) => /^wcag\d/.test(t)),
           nodos: v.nodes.map((n) => ({ selector: n.target.join(' '), resumen: n.failureSummary, html: n.html.slice(0, 200) })),
         }));
-        escribir(`${id}.axe.json`, { pantalla: pantalla.id, ruta: pantalla.ruta, tema, estado, version: axeVersion, tags: TAGS_WCAG, violaciones, incompletas: axe.incomplete.map((v) => ({ regla: v.id, impacto: v.impact, nodos: v.nodes.length })) });
+        escribir(`${id}.axe.json`, { pantalla: pantalla.id, ruta: pantalla.ruta, tema, estado, version: axeVersion, tags: TAGS_WCAG, violaciones, incompletas: axe.incomplete.map((v) => ({
+          regla: v.id,
+          impacto: v.impact,
+          nodos: v.nodes.length,
+          // axe no pudo decidir estos casos: quedan para revisión manual, con dónde mirar y por qué.
+          elementos: v.nodes.map((n) => ({ selector: n.target.join(' '), motivo: (n.any[0]?.message ?? n.failureSummary ?? '').slice(0, 200) })),
+        })) });
         await page.screenshot({ path: path.join(salida, `${id}.png`) });
 
         // --- teclado (observacional) --------------------------------------

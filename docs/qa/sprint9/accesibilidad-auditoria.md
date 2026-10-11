@@ -157,3 +157,88 @@ formulario cuyo nombre no viene de un `aria-label` (límite del método, ver el 
 
 Los componentes señalados en A11Y-08 (menú de cuenta y botón flotante) son compartidos por toda la aplicación:
 corregirlos beneficia a todas las pantallas, pero su cambio debe comprobarse en las demás.
+
+## 6. Reauditoría tras las correcciones (T-317)
+
+| Dato | Valor |
+|---|---|
+| Fecha | 2026-10-11 |
+| Commit medido | `5439c8b0aa8af62330e0f18017733aa9c6dbd904` |
+| Método | El mismo de la línea base: mismas pantallas, temas, ventana, versiones de herramientas y pila |
+
+### 6.1. Las 20 mediciones, antes y después
+
+| Pantalla | Tema | Lighthouse antes → después | Nodos de axe antes → después |
+|---|---|---|---|
+| Dashboard del estudiante | claro | 96 → 100 | 4 → 0 |
+| Dashboard del estudiante | oscuro | 96 → 100 | 4 → 0 |
+| Dashboard de administración | claro | 92 → 100 | 4 → 0 |
+| Dashboard de administración | oscuro | 92 → 100 | 4 → 0 |
+| Proyectos (administración) | claro | 100 → 100 | 0 → 0 |
+| Proyectos (administración) | oscuro | 100 → 100 | 0 → 0 |
+| Calendario | claro | 100 → 100 | 0 → 0 |
+| Calendario | oscuro | 100 → 100 | 0 → 0 |
+| Editar perfil (paso 1) | claro | 91 → 100 | 7 → 0 |
+| Editar perfil (paso 1) | oscuro | 91 → 100 | 7 → 0 |
+
+Violaciones de axe críticas o graves en las cinco pantallas y los dos temas: **0** (antes, 30 nodos en 4 reglas).
+
+### 6.2. Qué pasó con cada hallazgo
+
+| ID | Antes | Corrección | Después |
+|---|---|---|---|
+| A11Y-01 | 3.62:1 (claro) y 3.54:1 (oscuro) | Token `on-primary-muted` (90 %) en lugar de `text-on-primary/70` | Sin violación; 4.88:1 y 5.38:1 calculados sobre los mismos fondos |
+| A11Y-02 | 2.35:1 (claro) y 3.22:1 (oscuro) | El widget pide `adjacentMonthTone="secondary"`, que el mini calendario ya ofrecía | Sin violación; 9.6:1 o más con los tokens de cada tema |
+| A11Y-03 | `<li role="group">` | El `<li>` recupera su papel; el grupo con nombre va dentro | Sin violación |
+| A11Y-04 | 6 campos sin etiqueta | `htmlFor` / `id` en las 17 etiquetas del formulario, en sus cinco pasos | Sin violación |
+| A11Y-05 | 1 lista desplegable sin nombre | Igual que A11Y-04 | Sin violación |
+| A11Y-06 | `h1` → `h3` | Los títulos de paso son `h2`, con las mismas clases | Lighthouse ya no lo señala |
+| A11Y-07 | `role` no permitido en `<li>` | Igual que A11Y-03 | Lighthouse ya no lo señala |
+| A11Y-08 (enlace del panel) | `aria-label` distinto del texto visible | El nombre empieza por el título visible y añade el destino solo para lectores de pantalla | Lighthouse ya no lo señala en el panel de administración |
+| A11Y-08 (menú de cuenta y botón del chat) | Igual | **No corregido** | Lighthouse lo sigue señalando en las tres pantallas del estudiante |
+
+Además, en «Editar perfil» se dio nombre a dos campos que solo tenían texto de ayuda (pasos no medidos), porque
+son la misma pantalla y la misma regla.
+
+### 6.3. Lo que sigue pendiente
+
+| Qué | Dónde | Responsable y decisión |
+|---|---|---|
+| A11Y-08: el `aria-label` del menú de cuenta («Cuenta de …») no contiene el texto visible | `components/dashboard/UserMenu.tsx`, variante compacta de la cabecera del estudiante | Componente compartido por toda la aplicación y usado por nombre en otras pruebas. Nivel A (2.5.3). Requiere acordar el nombre nuevo con quien mantiene el shell |
+| A11Y-08: botón flotante del chat | `components/chat-dock/chat-dock.tsx` | Componente del chat, de otro responsable |
+| Pasos 2 a 5 de «Editar perfil» | — | Sus etiquetas se asociaron, pero no se midieron con axe ni Lighthouse |
+
+Lighthouse puntúa 100 con A11Y-08 pendiente porque esa auditoría no pesa en la nota: **100 no significa AA**.
+
+### 6.4. Casos que axe no pudo decidir, revisados a mano
+
+axe marca como «incompleto» lo que no puede determinar. No son aprobados automáticos; se revisaron uno por uno:
+
+| Regla | Elemento | Por qué axe no decide | Revisión manual |
+|---|---|---|---|
+| `aria-valid-attr-value` | Botones con `aria-controls` de la cabecera y la barra lateral (uno por pantalla) | El elemento controlado no está montado mientras el control está plegado | Patrón correcto: el botón expone `aria-expanded="false"` y el panel aparece al abrirlo |
+| `color-contrast` | Contador de finalizaciones de un día en el mini calendario de Sprints | Texto de un solo carácter | Medido en el navegador: **7.02:1** (claro) y **7.74:1** (oscuro) |
+| `color-contrast` | Campo «Biografía Profesional» | Parte del campo queda bajo otro elemento | Colores calculados del campo: **15.55:1** (claro) y **15.64:1** (oscuro) |
+
+En la línea base había además 9 casos sin decidir de `color-contrast` en el panel de administración y 2 en el
+del estudiante; desaparecieron con las correcciones de A11Y-01 y A11Y-02.
+
+### 6.5. Teclado
+
+`apps/frontend/e2e/a11y-keyboard-regression.spec.ts` recorre las cinco pantallas en ambos temas: 30 pulsaciones de
+Tab por combinación con indicador de foco en todas, sin trampas, con cada control dentro de la vista y con nombre, y
+Shift+Tab deshaciendo el mismo orden. Además: el menú de la cuenta se abre con Enter y se cierra con Escape
+devolviendo el foco; los grupos del menú administrativo se manejan con Espacio y Enter; los campos de «Editar
+perfil» responden a su etiqueta y «Siguiente» avanza con Enter.
+
+La línea base no había encontrado defectos de teclado y estas pruebas pasaron sin tocar el código: en teclado no
+había nada que corregir. El recorrido automático del harness sigue contando 12 paradas «sin nombre» en «Editar
+perfil» porque solo mira `aria-label` y texto propio; los campos ya tienen etiqueta asociada (lo comprueban axe y
+el spec de teclado).
+
+### 6.6. Alcance de lo que se puede afirmar
+
+En las cinco pantallas, en claro y oscuro, a 1440 × 900 y en su estado inicial: cero violaciones automáticas
+críticas o graves, contraste medido por encima de 4.5:1 en lo que se corrigió y navegación completa con teclado.
+Eso **no** es una certificación WCAG 2.1 AA: queda un criterio de nivel A abierto (A11Y-08), cuatro pasos de un
+formulario sin medir y todo lo que las herramientas automáticas no comprueban.
