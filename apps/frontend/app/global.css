@@ -312,6 +312,12 @@
   --color-text-primary: var(--color-on-surface);
   --color-text-secondary: var(--color-on-surface-variant);
   --color-text-disabled: color-mix(in srgb, var(--color-on-surface) 38%, transparent);
+  /*
+   * T-317 (A11Y-01): texto secundario SOBRE `primary` (rótulos de las tarjetas de resumen).
+   * `text-on-primary/70` daba 3.62:1 en claro y 3.54:1 en oscuro con texto de 13 px; al 90 %
+   * queda en 4.88:1 y 5.38:1 sobre los mismos fondos. No bajar de 85 % (4.54:1).
+   */
+  --color-on-primary-muted: color-mix(in srgb, var(--color-on-primary) 90%, transparent);
   --color-page: var(--color-surface-container-low);
   --color-card: var(--color-surface-container-lowest);
 

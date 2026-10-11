@@ -176,6 +176,9 @@ function SprintPlanningContent({ calendar }: { calendar: AdminSprintCalendar }) 
             markedDates={diasMarcados}
             markedCounts={porDia}
             getDayLabel={describePlannedDay}
+            // T-317 (A11Y-02): aquí los días del mes vecino son enlaces activos, no celdas
+            // inertes; con el tono «disabled» quedaban en 2.35:1 (claro) y 3.22:1 (oscuro).
+            adjacentMonthTone="secondary"
             // El widget es el resumen: cualquier día, con o sin Sprints, enlaza
             // al calendario completo con ese día ya seleccionado.
             getDayHref={(dia) => adminSprintsHref('mes', dia)}

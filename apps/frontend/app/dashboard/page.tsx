@@ -95,14 +95,14 @@ function HorasKpiCard({
       className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack"
     >
       <div className="relative z-10 flex items-start justify-between gap-tight">
-        <span className="type-meta flex items-center gap-tight uppercase tracking-wider text-on-primary/70">
+        <span className="type-meta flex items-center gap-tight uppercase tracking-wider text-on-primary-muted">
           {titulo}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
                 aria-label={`Qué significa: ${titulo}`}
-                className="rounded-pill text-on-primary/70 hover:text-on-primary"
+                className="rounded-pill text-on-primary-muted hover:text-on-primary"
               >
                 <Info className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
@@ -116,13 +116,13 @@ function HorasKpiCard({
       </div>
       <div className="relative z-10 mt-tight">
         {valor === null ? (
-          <span className="type-subtitle block text-on-primary/70">
+          <span className="type-subtitle block text-on-primary-muted">
             No disponible por ahora
           </span>
         ) : (
           <div className="flex items-baseline gap-1">
             <span className="type-section text-on-primary">{valor}</span>
-            <span className="type-body font-medium text-on-primary/70">h</span>
+            <span className="type-body font-medium text-on-primary-muted">h</span>
           </div>
         )}
       </div>
@@ -453,7 +453,7 @@ export default function DashboardPage() {
             {requiereHorasBeca && (
               <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack">
                 <div className="flex items-start justify-between gap-tight">
-                  <span className="type-meta uppercase tracking-wider text-on-primary/70">
+                  <span className="type-meta uppercase tracking-wider text-on-primary-muted">
                     Horas Beca Acumuladas
                   </span>
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-on-primary/15 text-on-primary">
@@ -464,7 +464,7 @@ export default function DashboardPage() {
                   <span className="type-section text-on-primary">
                     {horasBeca}
                   </span>
-                  <span className="type-body text-on-primary/70">
+                  <span className="type-body text-on-primary-muted">
                     / {horasBecaRequeridas}
                   </span>
                 </div>
@@ -481,7 +481,7 @@ export default function DashboardPage() {
             {requiereHorasExtension && (
               <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack">
                 <div className="flex items-start justify-between gap-tight">
-                  <span className="type-meta uppercase tracking-wider text-on-primary/70">
+                  <span className="type-meta uppercase tracking-wider text-on-primary-muted">
                     Horas de Extension
                   </span>
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-on-primary/15 text-on-primary">
@@ -492,7 +492,7 @@ export default function DashboardPage() {
                   <span className="type-section text-on-primary">
                     {horasExtension}
                   </span>
-                  <span className="type-body text-on-primary/70">
+                  <span className="type-body text-on-primary-muted">
                     / {horasExtensionRequeridas}
                   </span>
                 </div>
@@ -508,7 +508,7 @@ export default function DashboardPage() {
             {/* Proyectos Activos */}
             <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack">
               <div className="flex items-start justify-between gap-tight">
-                <span className="type-meta uppercase tracking-wider text-on-primary/70">
+                <span className="type-meta uppercase tracking-wider text-on-primary-muted">
                   Proyectos Activos
                 </span>
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-on-primary/15 text-on-primary">
@@ -520,7 +520,7 @@ export default function DashboardPage() {
                   {String(proyectosActivos).padStart(2, '0')}
                 </span>
               </div>
-              <div className="type-meta mt-stack flex items-center gap-tight text-on-primary/70">
+              <div className="type-meta mt-stack flex items-center gap-tight text-on-primary-muted">
                 <Calendar className="h-3.5 w-3.5" />
                 <span>En curso actual</span>
               </div>
