@@ -139,10 +139,12 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
               <div className="min-w-0">
                 <Link
                   href={fila.href}
-                  aria-label={fila.enlaceLabel}
                   className="type-body font-semibold outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary/40"
                 >
                   {fila.titulo}
+                  {/* T-317 (A11Y-08): el nombre accesible empieza por el texto que se ve (WCAG 2.5.3)
+                      y añade el destino solo para lectores de pantalla. */}
+                  <span className="sr-only">. {fila.enlaceLabel}</span>
                 </Link>
                 <p className="type-meta">{fila.descripcion}</p>
               </div>

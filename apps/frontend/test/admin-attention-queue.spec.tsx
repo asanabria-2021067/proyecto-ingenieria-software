@@ -31,18 +31,19 @@ describe('AdminAttentionQueue', () => {
     expect(within(fila('bloqueados')).getByText('3')).toBeInTheDocument();
   });
 
+  // T-317 (A11Y-08): el nombre accesible del enlace empieza por el título que se ve y añade el destino.
   it('cada fila lleva a la bandeja donde se resuelve', () => {
     render(<AdminAttentionQueue enRevision={7} cierrePendiente={8} usuariosBloqueados={3} />);
 
-    expect(screen.getByRole('link', { name: 'Ver proyectos en revisión' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /\. Ver proyectos en revisión$/ })).toHaveAttribute(
       'href',
       '/dashboard/projects/admin/reviews',
     );
-    expect(screen.getByRole('link', { name: 'Ver solicitudes de cierre pendientes' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /\. Ver solicitudes de cierre pendientes$/ })).toHaveAttribute(
       'href',
       '/dashboard/admin/proyectos?grupo=cierres',
     );
-    expect(screen.getByRole('link', { name: 'Ver gestión de usuarios' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /\. Ver gestión de usuarios$/ })).toHaveAttribute(
       'href',
       '/dashboard/admin/usuarios',
     );

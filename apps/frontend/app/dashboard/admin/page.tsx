@@ -116,15 +116,19 @@ function StatRow({
   icon: React.ElementType;
 }) {
   return (
-    <li role="group" aria-label={label} className="flex items-center gap-inline px-card py-stack">
-      <Icon className="size-5 shrink-0 text-text-primary" aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <p className="type-body font-semibold">{label}</p>
-        <p className="type-meta">{subtexto}</p>
+    // T-317 (A11Y-03/A11Y-07): el `<li>` conserva su papel de elemento de lista; el grupo con
+    // nombre va en su contenido. Con `role="group"` en el `<li>`, la lista dejaba de anunciarse.
+    <li>
+      <div role="group" aria-label={label} className="flex items-center gap-inline px-card py-stack">
+        <Icon className="size-5 shrink-0 text-text-primary" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p className="type-body font-semibold">{label}</p>
+          <p className="type-meta">{subtexto}</p>
+        </div>
+        <span className="shrink-0 font-headline text-3xl font-bold tracking-tight tabular-nums text-text-primary">
+          {value}
+        </span>
       </div>
-      <span className="shrink-0 font-headline text-3xl font-bold tracking-tight tabular-nums text-text-primary">
-        {value}
-      </span>
     </li>
   );
 }
