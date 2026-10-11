@@ -282,6 +282,7 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Cerrados',
     'Calendario de Sprints',
     'Apelaciones',
+    'Tendencias de uso',
     'Cuentas pendientes',
     'Eventos de seguridad',
     // TEMPORAL: inventario de etiquetas; quitar junto con su página.
@@ -452,7 +453,8 @@ describe('Inventario de navegación administrativa (T-319, FG06-C01)', () => {
     });
   }
   const paginas = [...rutasDePagina('app/dashboard/admin', '/dashboard/admin'), ...rutasDePagina('app/dashboard/projects/admin', '/dashboard/projects/admin')];
-  const sinQuery = (href: string) => href.split('?')[0];
+  /** Ruta de la página de un destino: sin `?grupo=` ni `#ancla`. */
+  const sinQuery = (href: string) => href.split(/[?#]/)[0];
 
   it('cada destino del menú apunta a una página que existe', () => {
     for (const { href, label } of destinos) {
@@ -507,7 +509,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
   const grupos = () =>
     adminNavEntries.map((e) => ('type' in e && e.type === 'group' ? { grupo: e.label, items: e.items.map((i) => i.label) } : { enlace: e.label }));
 
-  it('el orden es estable: panel, usuarios, proyectos, gobernanza, verificación y diagnóstico', () => {
+  it('el orden es estable: panel, usuarios, proyectos, gobernanza, métricas, verificación y diagnóstico', () => {
     expect(grupos()).toEqual([
       { enlace: 'Panel Admin' },
       { grupo: 'Usuarios', items: ['Gestión de Usuarios', 'Recuperación de contraseña'] },
@@ -516,6 +518,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
         items: ['Activos', 'Solicitudes de publicación', 'Solicitudes de cierre', 'Cerrados', 'Calendario de Sprints'],
       },
       { grupo: 'Gobernanza', items: ['Apelaciones'] },
+      { grupo: 'Métricas', items: ['Tendencias de uso'] },
       { grupo: 'Verificación y seguridad', items: ['Cuentas pendientes', 'Eventos de seguridad'] },
       { grupo: 'Diagnóstico', items: ['Etiquetas (temporal)'] },
     ]);
@@ -583,7 +586,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
     expect(usuarios).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('colapsada, los once destinos siguen alcanzables como enlaces con nombre', () => {
+  it('colapsada, todos los destinos siguen alcanzables como enlaces con nombre', () => {
     renderShell();
     const aside = document.querySelector('aside') as HTMLElement;
     fireEvent.click(within(aside).getByRole('button', { name: 'Colapsar barra lateral' }));
@@ -664,5 +667,53 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
     const movil = within(screen.getByRole('navigation', { name: 'Navegación administrativa móvil' }));
     expect(movil.getByRole('link', { name: 'Gestión de Usuarios' })).toHaveAttribute('aria-current', 'page');
     expect(movil.getAllByRole('link').filter((a) => a.getAttribute('aria-current') === 'page')).toHaveLength(1);
+  });
+});
+
+describe('Métricas de uso en la estructura (T-321 · HU-178, FG08-C01)', () => {
+  const fuente = (ruta: string) => readFileSync(join(__dirname, '..', ruta), 'utf8');
+  const HREF = '/dashboard/admin#metricas';
+
+  it('«Tendencias de uso» está en el grupo «Métricas», una sola vez', () => {
+    const grupo = adminNavEntries.find((e) => 'type' in e && e.type === 'group' && e.label === 'Métricas');
+    expect(grupo && 'items' in grupo ? grupo.items.map((i) => [i.label, i.href]) : []).toEqual([['Tendencias de uso', HREF]]);
+    expect(flattenNavEntries(adminNavEntries).filter((d) => /m[eé]trica|tendencia/i.test(d.label))).toHaveLength(1);
+  });
+
+  it('el destino es el ancla de la sección real de HU-178 en el Panel Admin, no una página duplicada', () => {
+    const panel = fuente('app/dashboard/admin/page.tsx');
+    expect(fuente('components/admin/admin-page.ts')).toContain("export const ADMIN_METRICS_ANCHOR = 'metricas';");
+    expect(panel).toMatch(/<div id=\{ADMIN_METRICS_ANCHOR\}[^>]*>\s*<AdminMetricsSection \/>/);
+    // La sección de HU-178 se monta una sola vez en toda la aplicación.
+    expect(panel.match(/<AdminMetricsSection \/>/g)).toHaveLength(1);
+    expect(existsSync(join(__dirname, '../app/dashboard/admin/metricas'))).toBe(false);
+  });
+
+  it('el componente y el servicio de HU-178 no se modificaron: siguen leyendo GET /admin/metricas', () => {
+    expect(fuente('components/admin/AdminMetricsSection.tsx')).toContain('Tendencias de uso');
+    expect(fuente('lib/services/admin.ts')).toContain('`/admin/metricas?periodo=${periodo}`');
+  });
+
+  it('el enlace se muestra al abrir su grupo y lleva al ancla', () => {
+    renderShell();
+    const nav = desktopNav();
+    fireEvent.click(nav.getByRole('button', { name: /^Métricas/ }));
+    expect(nav.getByRole('link', { name: 'Tendencias de uso' })).toHaveAttribute('href', HREF);
+  });
+
+  it('en el Panel Admin el destino activo sigue siendo «Panel Admin»: las métricas son una sección suya', () => {
+    pathnameMock.mockReturnValue('/dashboard/admin');
+    renderShell();
+    const nav = desktopNav();
+    fireEvent.click(nav.getByRole('button', { name: /^Métricas/ }));
+    const activos = nav.getAllByRole('link').filter((a) => a.getAttribute('aria-current') === 'page');
+    expect(activos.map((a) => a.textContent)).toEqual(['Panel Admin']);
+  });
+
+  it('colapsada, «Tendencias de uso» sigue alcanzable como icono con nombre', () => {
+    renderShell();
+    const aside = document.querySelector('aside') as HTMLElement;
+    fireEvent.click(within(aside).getByRole('button', { name: 'Colapsar barra lateral' }));
+    expect(within(aside).getByRole('link', { name: 'Tendencias de uso' })).toHaveAttribute('href', HREF);
   });
 });

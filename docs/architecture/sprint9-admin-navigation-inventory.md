@@ -22,6 +22,7 @@ comprobación en cada endpoint administrativo. Ninguna ruta de este inventario e
 | `/dashboard/admin/proyectos?grupo=cerrados` | Cerrados | Sprint 7 · VIEW-15 (F012) | — |
 | `/dashboard/admin/sprints` | Calendario de Sprints | Supervisión de Sprints | — |
 | `/dashboard/admin/apelaciones` | Apelaciones | Sprint 7 · VIEW-18 (F015) | — |
+| `/dashboard/admin#metricas` | Tendencias de uso | Sprint 9 · T-321: ancla a la sección de HU-178 (T-301) del Panel Admin | `GET /admin/metricas` (HU-178) |
 | `/dashboard/admin/usuarios` | Gestión de Usuarios | Administración de cuentas | — |
 | `/dashboard/admin/solicitudes-recuperacion` | Recuperación de contraseña | HU-14 | — |
 | `/dashboard/admin/cuentas-pendientes` | Cuentas pendientes | HU-179 (PR #270) | `GET /admin/cuentas-pendientes` |
@@ -40,6 +41,7 @@ El menú se agrupa por tema de trabajo. «Panel Admin» va suelto arriba y los g
 | Usuarios | Gestión de Usuarios · Recuperación de contraseña | Todo lo que se hace sobre una cuenta: consultarla, cambiar su estado y devolverle el acceso. |
 | Proyectos | Activos · Solicitudes de publicación · Solicitudes de cierre · Cerrados · Calendario de Sprints | El ciclo de vida de un proyecto, de la publicación al cierre, más la supervisión de sus Sprints. |
 | Gobernanza | Apelaciones | Decisiones sobre el liderazgo de un proyecto, que resuelve la administración. |
+| Métricas | Tendencias de uso | Las métricas de uso de la plataforma (HU-178). Es un ancla a su sección del Panel Admin. |
 | Verificación y seguridad | Cuentas pendientes · Eventos de seguridad | Supervisión de accesos y cuentas: la bandeja de cuentas que esperan verificación (HU-179), con su contador, y el visor de eventos. |
 | Diagnóstico | Etiquetas (temporal) | Herramientas internas que no son parte del trabajo diario. |
 
@@ -47,7 +49,8 @@ Antes de Sprint 9 existía un grupo genérico «Administración» que mezclaba c
 de etiquetas; se repartió entre «Usuarios», «Verificación y seguridad» y «Diagnóstico». Ninguna ruta cambió: solo
 el grupo en que aparece. El rótulo «Administración» que encabeza la barra lateral es el título del menú, no un grupo.
 
-«Métricas» no es un grupo todavía porque HU-178 no tiene ruta propia (ver la sección 5).
+«Métricas» enlaza un ancla y no una página: HU-178 no tiene ruta propia (ver la sección 5). Por eso, estando en
+el panel, el destino marcado como actual sigue siendo «Panel Admin».
 
 Con la barra plegada (72 px) cada destino queda como un icono con su nombre accesible; los grupos no se muestran.
 
@@ -65,7 +68,7 @@ Son vistas de detalle: necesitan un identificador y no tienen sentido como desti
 
 | Pantalla | Historia | Estado en el HEAD | Consecuencia |
 |---|---|---|---|
-| Métricas de uso | HU-178 | No tiene ruta propia: es la sección «Tendencias de uso» del Panel Admin (`AdminMetricsSection`) | Se alcanza por «Panel Admin». Su ubicación en la estructura se resuelve en T-321. |
+| Métricas de uso | HU-178 | No tiene ruta propia: es la sección «Tendencias de uso» del Panel Admin (`AdminMetricsSection`) | Enlazada desde «Métricas → Tendencias de uso» mediante el ancla `#metricas` (T-321). No se duplicó en otra página ni se tocó el componente de HU-178. |
 | Cuentas pendientes de verificación | HU-179 | Existe desde el PR #270: `/dashboard/admin/cuentas-pendientes` | Enlazada desde «Verificación y seguridad → Cuentas pendientes». |
 
 ## 6. Barra inferior móvil

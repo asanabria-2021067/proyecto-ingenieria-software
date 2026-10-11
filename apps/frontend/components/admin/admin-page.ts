@@ -16,3 +16,10 @@ export const ADMIN_PAGE_NARROW = 'mx-auto w-full max-w-[1100px] px-4 md:px-8';
 export const ADMIN_PAGE_TITLE = 'type-display text-balance';
 /** Párrafo de entrada bajo el titular. */
 export const ADMIN_PAGE_LEAD = 'mt-tight max-w-2xl text-base text-tertiary';
+
+/**
+ * T-321 — ancla de «Tendencias de uso» (HU-178) dentro del Panel Admin. Las métricas no tienen ruta
+ * propia: el menú lateral enlaza a esta ancla en vez de duplicar la sección en otra página.
+ */
+export const ADMIN_METRICS_ANCHOR = 'metricas';
+export const ADMIN_METRICS_HREF = `/dashboard/admin#${ADMIN_METRICS_ANCHOR}`;

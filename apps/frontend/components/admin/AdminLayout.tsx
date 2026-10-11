@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Archive,
+  BarChart3,
   CalendarRange,
   Clock,
   FileSearch,
@@ -24,7 +25,9 @@ import {
   Users,
   RotateCcw,
   Tags,
+  TrendingUp,
 } from 'lucide-react';
+import { ADMIN_METRICS_HREF } from '@/components/admin/admin-page';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { avisarSinPermiso, useCan, RUTA_SIN_PERMISO } from '@/hooks/use-can';
 import { useLogout } from '@/hooks/use-logout';
@@ -45,7 +48,7 @@ export const ADMIN_CUENTAS_PENDIENTES_HREF = '/dashboard/admin/cuentas-pendiente
 
 /**
  * T-319 — el menú se agrupa por TEMA de trabajo, en este orden: usuarios,
- * proyectos, gobernanza y verificación. El inventario completo, con las rutas
+ * proyectos, gobernanza, métricas y verificación. El inventario completo, con las rutas
  * que no se enlazan y las pantallas que aún no existen, está en
  * `docs/architecture/sprint9-admin-navigation-inventory.md`.
  *
@@ -89,6 +92,16 @@ export const adminNavEntries: NavEntry[] = [
     label: 'Gobernanza',
     icon: ShieldCheck,
     items: [{ href: '/dashboard/admin/apelaciones', label: 'Apelaciones', icon: Gavel }],
+  },
+  {
+    type: 'group',
+    label: 'Métricas',
+    icon: BarChart3,
+    items: [
+      // T-321 · HU-178: las métricas de uso son una sección del Panel Admin, sin ruta propia.
+      // Se enlaza su ancla; no se duplica la sección en otra página.
+      { href: ADMIN_METRICS_HREF, label: 'Tendencias de uso', icon: TrendingUp },
+    ],
   },
   {
     type: 'group',

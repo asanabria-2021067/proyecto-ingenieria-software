@@ -18,6 +18,7 @@ import { AdminAttentionQueue } from '@/components/admin/dashboard/attention-queu
 import { adminProjectHref } from '@/lib/admin/sprint-calendar';
 import { AdminSprintPlanningWidget } from '@/components/admin/dashboard/sprint-planning-widget';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ADMIN_METRICS_ANCHOR, ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 import { AdminMetricsSection } from '@/components/admin/AdminMetricsSection';
 import {
   getAdminStats,
@@ -25,7 +26,6 @@ import {
   type AdminActividadRecienteItem,
   type AdminEstudianteEnRiesgo,
 } from '@/lib/services/admin';
-import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
 /** Mismo contenedor que el resto de bandejas administrativas (1400 px centrado). */
 const PAGE_CLASS = ADMIN_PAGE;
@@ -420,8 +420,12 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
           </div>
         </DashboardSection>
 
-        {/* 5. Tendencias de uso (HU-178): históricas, después de la operación. */}
-        <AdminMetricsSection />
+        {/* 5. Tendencias de uso (HU-178): históricas, después de la operación.
+            T-321: el ancla es el destino de «Métricas» en el menú lateral. `scroll-mt` deja
+            aire arriba al llegar por el enlace. */}
+        <div id={ADMIN_METRICS_ANCHOR} className={`${COL_PRINCIPAL} scroll-mt-6`}>
+          <AdminMetricsSection />
+        </div>
       </div>
     </div>
   );
