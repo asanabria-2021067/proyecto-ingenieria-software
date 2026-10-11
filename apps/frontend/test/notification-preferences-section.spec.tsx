@@ -2,14 +2,15 @@ import '@testing-library/jest-dom/vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 
 vi.mock('../lib/services/notifications', () => ({
   getNotificationPreferences: vi.fn(),
   updateNotificationPreference: vi.fn(),
 }));
 
-import { getNotificationPreferences } from '../lib/services/notifications';
+import { getNotificationPreferences, updateNotificationPreference } from '../lib/services/notifications';
+import type { NotificationPreference } from '../lib/notifications/preference-groups';
 import { TIPOS_BACKEND, diferida, fallo, preferencias, renderSeccion } from './helpers/notification-preferences';
 
 /** FG04 (T-328). Sección «Notificaciones» del perfil sobre un servicio simulado. */
@@ -170,12 +171,186 @@ describe('FG04-C02: un interruptor por cada tipo real', () => {
     expect(interruptores().map((el) => el.getAttribute('data-tipo'))).toEqual(['TAREA_ASIGNADA', 'RECORDATORIO_EVENTO']);
   });
 
-  it('ningún tipo se trata como obligatorio: todos comparten el mismo estado de disponibilidad', async () => {
+  it('ningún tipo se trata como obligatorio: todos los interruptores están disponibles', async () => {
     vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias());
     renderSeccion();
     await within(seccion()).findAllByRole('listitem');
-    const disponibilidad = new Set(interruptores().map((el) => (el as HTMLButtonElement).disabled));
-    expect(disponibilidad.size).toBe(1);
+    expect(interruptores().filter((el) => (el as HTMLButtonElement).disabled)).toEqual([]);
     expect(seccion().textContent).not.toMatch(/obligatori/i);
+  });
+});
+
+describe('FG04-C03: guardar y revertir', () => {
+  const tarea = () => screen.getByRole('switch', { name: 'Tarea asignada' });
+  const recordatorio = () => screen.getByRole('switch', { name: 'Recordatorio de evento' });
+
+  async function montar(inactivos: string[] = []) {
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias(inactivos));
+    const utilidades = renderSeccion();
+    await screen.findByRole('switch', { name: 'Tarea asignada' });
+    return utilidades;
+  }
+
+  it('un clic hace UN PUT con el tipo y el valor nuevo', async () => {
+    vi.mocked(updateNotificationPreference).mockResolvedValue(preferencias(['TAREA_ASIGNADA']));
+    await montar();
+    fireEvent.click(tarea());
+    await waitFor(() => expect(tarea()).toHaveAttribute('aria-checked', 'false'));
+    expect(updateNotificationPreference).toHaveBeenCalledTimes(1);
+    expect(updateNotificationPreference).toHaveBeenCalledWith('TAREA_ASIGNADA', false);
+  });
+
+  it('volver a activar envía activa=true', async () => {
+    vi.mocked(updateNotificationPreference).mockResolvedValue(preferencias());
+    await montar(['TAREA_ASIGNADA']);
+    fireEvent.click(tarea());
+    await waitFor(() => expect(tarea()).toHaveAttribute('aria-checked', 'true'));
+    expect(updateNotificationPreference).toHaveBeenCalledWith('TAREA_ASIGNADA', true);
+  });
+
+  it('el interruptor no cambia hasta que el servidor confirma, y mientras tanto solo él queda en espera', async () => {
+    const pendiente = diferida<NotificationPreference[]>();
+    vi.mocked(updateNotificationPreference).mockReturnValue(pendiente.promesa);
+    await montar();
+
+    fireEvent.click(tarea());
+    await waitFor(() => expect(tarea()).toBeDisabled());
+    expect(tarea()).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('Guardando…')).toBeInTheDocument();
+    expect(within(seccion()).getAllByRole('switch').filter((el) => (el as HTMLButtonElement).disabled)).toEqual([tarea()]);
+
+    pendiente.resolver(preferencias(['TAREA_ASIGNADA']));
+    await waitFor(() => expect(tarea()).toHaveAttribute('aria-checked', 'false'));
+    expect(tarea()).toBeEnabled();
+    expect(screen.queryByText('Guardando…')).not.toBeInTheDocument();
+  });
+
+  it('muestra lo que el servidor guardó, aunque no coincida con lo pedido', async () => {
+    vi.mocked(updateNotificationPreference).mockResolvedValue(preferencias());
+    await montar();
+    fireEvent.click(tarea());
+    await waitFor(() => expect(updateNotificationPreference).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(tarea()).toBeEnabled());
+    expect(tarea()).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('pulsar dos veces mientras guarda no lanza una segunda petición', async () => {
+    const pendiente = diferida<NotificationPreference[]>();
+    vi.mocked(updateNotificationPreference).mockReturnValue(pendiente.promesa);
+    await montar();
+    fireEvent.click(tarea());
+    fireEvent.click(tarea());
+    fireEvent.click(tarea());
+    await waitFor(() => expect(tarea()).toBeDisabled());
+    expect(updateNotificationPreference).toHaveBeenCalledTimes(1);
+    pendiente.resolver(preferencias(['TAREA_ASIGNADA']));
+    await waitFor(() => expect(tarea()).toBeEnabled());
+  });
+
+  it.each([
+    [400, 'El servidor no reconoce este tipo de notificación. No se guardó el cambio.'],
+    [401, 'Tu sesión expiró. Inicia sesión de nuevo para cambiar esta preferencia.'],
+    [403, 'No tienes permiso para cambiar esta preferencia.'],
+    [429, 'Demasiados cambios seguidos. Espera unos segundos y vuelve a intentarlo.'],
+    [500, 'No se pudo guardar el cambio. El interruptor conserva su valor anterior.'],
+    [undefined, 'No se pudo guardar el cambio. El interruptor conserva su valor anterior.'],
+  ])('un fallo %s deja el interruptor como estaba y lo explica junto a él', async (statusCode, mensaje) => {
+    vi.mocked(updateNotificationPreference).mockRejectedValue(fallo(statusCode));
+    await montar();
+    fireEvent.click(tarea());
+
+    const fila = tarea().closest('li') as HTMLElement;
+    expect(await within(fila).findByRole('alert')).toHaveTextContent(mensaje);
+    expect(tarea()).toHaveAttribute('aria-checked', 'true');
+    expect(tarea()).toBeEnabled();
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    // Sin reintentos automáticos.
+    expect(updateNotificationPreference).toHaveBeenCalledTimes(1);
+  });
+
+  it('una respuesta que no trae el tipo guardado se trata como fallo, no como éxito', async () => {
+    vi.mocked(updateNotificationPreference).mockResolvedValue([{ tipo: 'OTRO_TIPO', activa: false }]);
+    await montar();
+    fireEvent.click(tarea());
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo guardar el cambio.');
+    expect(tarea()).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('tras un fallo, un nuevo intento que funciona limpia el error', async () => {
+    vi.mocked(updateNotificationPreference).mockRejectedValueOnce(fallo(500)).mockResolvedValueOnce(preferencias(['TAREA_ASIGNADA']));
+    await montar();
+    fireEvent.click(tarea());
+    await screen.findByRole('alert');
+    fireEvent.click(tarea());
+    await waitFor(() => expect(tarea()).toHaveAttribute('aria-checked', 'false'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('dos tipos cambiados a la vez se guardan por separado y ninguna respuesta pisa a la otra', async () => {
+    const primera = diferida<NotificationPreference[]>();
+    const segunda = diferida<NotificationPreference[]>();
+    vi.mocked(updateNotificationPreference).mockReturnValueOnce(primera.promesa).mockReturnValueOnce(segunda.promesa);
+    await montar();
+
+    fireEvent.click(tarea());
+    fireEvent.click(recordatorio());
+    await waitFor(() => expect(updateNotificationPreference).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(updateNotificationPreference).mock.calls).toEqual([
+      ['TAREA_ASIGNADA', false],
+      ['RECORDATORIO_EVENTO', false],
+    ]);
+
+    // La segunda responde antes; su lista aún no refleja el cambio de la primera.
+    segunda.resolver(preferencias(['RECORDATORIO_EVENTO']));
+    await waitFor(() => expect(recordatorio()).toHaveAttribute('aria-checked', 'false'));
+    expect(tarea()).toBeDisabled();
+
+    // La primera responde con una lista anterior al segundo cambio: no lo deshace.
+    primera.resolver(preferencias(['TAREA_ASIGNADA']));
+    await waitFor(() => expect(tarea()).toHaveAttribute('aria-checked', 'false'));
+    expect(recordatorio()).toHaveAttribute('aria-checked', 'false');
+    expect(within(seccion()).getAllByRole('switch').filter((el) => el.getAttribute('aria-checked') === 'false')).toHaveLength(2);
+  });
+
+  it('si uno de dos guardados falla, solo ese conserva su valor', async () => {
+    vi.mocked(updateNotificationPreference).mockImplementation(async (tipo) => {
+      if (tipo === 'TAREA_ASIGNADA') throw fallo(500);
+      return preferencias(['RECORDATORIO_EVENTO']);
+    });
+    await montar();
+    fireEvent.click(tarea());
+    fireEvent.click(recordatorio());
+    await waitFor(() => expect(recordatorio()).toHaveAttribute('aria-checked', 'false'));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(tarea()).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('cambiar un tipo no envía ni altera ningún otro', async () => {
+    vi.mocked(updateNotificationPreference).mockResolvedValue(preferencias(['TAREA_ASIGNADA', 'NUEVO_SEGUIDOR']));
+    await montar(['NUEVO_SEGUIDOR']);
+    fireEvent.click(tarea());
+    await waitFor(() => expect(tarea()).toHaveAttribute('aria-checked', 'false'));
+    expect(vi.mocked(updateNotificationPreference).mock.calls).toEqual([['TAREA_ASIGNADA', false]]);
+    expect(within(seccion()).getAllByRole('switch').filter((el) => el.getAttribute('aria-checked') === 'false').map((el) => el.getAttribute('data-tipo'))).toEqual(
+      ['TAREA_ASIGNADA', 'NUEVO_SEGUIDOR'],
+    );
+  });
+
+  it('al volver a montar (recarga) muestra lo que el servidor tiene guardado', async () => {
+    vi.mocked(updateNotificationPreference).mockResolvedValue(preferencias(['TAREA_ASIGNADA']));
+    const { unmount } = await montar();
+    fireEvent.click(tarea());
+    await waitFor(() => expect(tarea()).toHaveAttribute('aria-checked', 'false'));
+    unmount();
+
+    vi.mocked(getNotificationPreferences).mockResolvedValue(preferencias(['TAREA_ASIGNADA']));
+    renderSeccion();
+    expect(await screen.findByRole('switch', { name: 'Tarea asignada' })).toHaveAttribute('aria-checked', 'false');
+    expect(getNotificationPreferences).toHaveBeenCalledTimes(2);
+  });
+
+  it('cargar la sección no guarda nada por sí sola', async () => {
+    await montar(['TAREA_ASIGNADA']);
+    expect(updateNotificationPreference).not.toHaveBeenCalled();
   });
 });
