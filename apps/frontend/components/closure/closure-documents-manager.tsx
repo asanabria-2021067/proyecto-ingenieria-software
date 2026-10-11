@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useRef, useState } from 'react';
-import { ChevronRight, FileText, Loader2, Paperclip, Plus, Trash2, Upload } from 'lucide-react';
+import { Loader2, Plus, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,6 +37,21 @@ export interface ClosureDocumentsManagerProps {
   fechaInforme?: string | null;
 }
 
+/** «1 archivo adjunto · Máximo 10»: el 10 es un tope de archivos, no una meta por cumplir. */
+export function resumenAdjuntos(cantidad: number): string {
+  return `${cantidad === 1 ? '1 archivo adjunto' : `${cantidad} archivos adjuntos`} · Máximo ${MAX_EVIDENCIAS}`;
+}
+
+/** Documento obligatorio de la entrega: lo que falta se marca en ámbar; lo entregado, en verde. */
+function EstadoObligatorio({ entregado }: { entregado: boolean }) {
+  return (
+    <>
+      <span className="pill pill-sm pill-neutral">Obligatorio</span>
+      <span className={`pill pill-sm ${entregado ? 'pill-success' : 'pill-amber'}`}>{entregado ? 'Entregado' : 'Pendiente'}</span>
+    </>
+  );
+}
+
 const STORAGE_REASON = 'El almacenamiento de documentos de cierre no está disponible en este momento.';
 
 function DisabledWithTooltip({ reason, children }: { reason: string; children: React.ReactNode }) {
@@ -53,9 +68,10 @@ function DisabledWithTooltip({ reason, children }: { reason: string; children: R
 }
 
 /**
- * VIEW-13 (F005) — «Documentos del cierre»: informe automático (+ «Ver
- * informe» con el visor protegido) y evidencias «n de 10» con subida y
- * borrado. Con `readOnly` (F016) solo se ve y se abre; nunca se muta.
+ * VIEW-13 (F005) — «Documentos del cierre»: los dos documentos obligatorios
+ * de la entrega (informe automático, con «Ver informe» en el visor protegido,
+ * y al menos una evidencia) y, aparte, los archivos adjuntos (máximo 10) con
+ * subida y borrado. Con `readOnly` (F016) solo se ve y se abre; nunca se muta.
  * La subida valida en cliente PDF y ≤ 10 MiB antes de cualquier petición.
  */
 export function ClosureDocumentsManager({
@@ -134,28 +150,27 @@ export function ClosureDocumentsManager({
   );
 
   return (
-    <section
-      className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm"
-      aria-labelledby="closure-docs-title"
-    >
-      <h2 id="closure-docs-title" className="text-sm font-bold text-on-surface">
+    <section className="card-base" aria-labelledby="closure-docs-title">
+      <h2 id="closure-docs-title" className="type-section text-text-primary">
         Documentos del cierre
       </h2>
-      <p className="mt-0.5 text-xs text-tertiary">
+      <p className="type-meta mt-micro">
         {readOnly ? 'Documentación entregada por el líder.' : 'Genera y adjunta la documentación requerida.'}
       </p>
 
       {/* Informe automático */}
-      <div className="mt-4 flex flex-col gap-3 rounded-xl border border-outline-variant/40 p-3 sm:flex-row sm:items-center">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
-          <FileText className="size-4" />
-        </span>
+      <div className="mt-stack flex flex-col gap-3 rounded-control border border-outline-variant/50 p-3 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-on-surface">Informe automático</p>
-          <p className="text-xs text-tertiary">
+          <p className="flex flex-wrap items-center gap-tight">
+            <span className="type-body font-semibold text-text-primary">Informe automático</span>
+            <EstadoObligatorio entregado={informe != null} />
+          </p>
+          <p className="type-meta mt-micro">
             {informe
               ? `${informe.nombreArchivo}${formatearTamano(informe.tamanoBytes) ? ` · ${formatearTamano(informe.tamanoBytes)}` : ''}`
-              : 'Generado con base en la información del proyecto.'}
+              : readOnly
+                ? 'La entrega no incluye el informe automático.'
+                : 'Generado con base en la información del proyecto.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -165,9 +180,8 @@ export function ClosureDocumentsManager({
               variant="outline"
               size="sm"
               onClick={() => setVisor(informe)}
-              className="h-9 gap-1.5 rounded-md border-primary/40 text-xs font-semibold text-primary hover:bg-primary/5 hover:text-primary"
+              className="h-9 rounded-md border-primary/40 text-xs font-semibold text-primary hover:bg-primary/5 hover:text-primary"
             >
-              <FileText className="size-3.5" aria-hidden="true" />
               Ver informe
             </Button>
           )}
@@ -184,19 +198,20 @@ export function ClosureDocumentsManager({
       </div>
 
       {/* Evidencias */}
-      <div className="mt-3 rounded-xl border border-outline-variant/40 p-3">
+      <div className="mt-tight rounded-control border border-outline-variant/50 p-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
-            <Paperclip className="size-4" />
-          </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-on-surface">Evidencias</p>
-            <p className="text-xs text-tertiary">Adjunta capturas, reportes y material de respaldo (PDF, máximo 10 MiB cada uno).</p>
+            <p className="flex flex-wrap items-center gap-tight">
+              <span className="type-body font-semibold text-text-primary">Evidencias</span>
+              <EstadoObligatorio entregado={evidencias.length > 0} />
+            </p>
+            <p className="type-meta mt-micro">
+              {readOnly
+                ? 'Material de respaldo adjuntado por el líder (PDF). La entrega requiere al menos una evidencia.'
+                : 'Adjunta capturas, reportes y material de respaldo (PDF, máximo 10 MiB cada uno).'}
+            </p>
           </div>
-          <span className="text-sm font-bold text-on-surface" aria-label={`${evidencias.length} de ${MAX_EVIDENCIAS} evidencias`}>
-            {evidencias.length} de {MAX_EVIDENCIAS}
-            <ChevronRight className="ml-1 inline size-4 text-tertiary" aria-hidden="true" />
-          </span>
+          <span className="type-meta shrink-0 font-medium tabular-nums">{resumenAdjuntos(evidencias.length)}</span>
           {!readOnly && (
             <>
               <input
@@ -225,7 +240,7 @@ export function ClosureDocumentsManager({
         </div>
 
         {(uploads.length > 0 || evidencias.length > 0) && (
-          <ul className="mt-3 divide-y divide-outline-variant/30 border-t border-outline-variant/30" aria-label="Evidencias adjuntas">
+          <ul className="mt-3 divide-y divide-outline-variant/40 border-t border-outline-variant/50" aria-label="Evidencias adjuntas">
             {!readOnly &&
               uploads.map((u) => (
               <li key={u.id} className="flex flex-wrap items-center gap-2 py-2 text-sm" aria-label={`Evidencia en curso: ${u.nombreArchivo}`}>
@@ -266,14 +281,11 @@ export function ClosureDocumentsManager({
               ))}
             {evidencias.map((doc) => (
               <li key={doc.idDocumentoCierre} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                <FileText className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate text-on-surface" title={doc.nombreArchivo}>
+                <span className="type-body min-w-0 flex-1 truncate text-text-primary" title={doc.nombreArchivo}>
                   {doc.nombreArchivo}
                 </span>
                 {formatearTamano(doc.tamanoBytes) && (
-                  <Badge variant="outline" className="text-[10px] text-tertiary">
-                    {formatearTamano(doc.tamanoBytes)}
-                  </Badge>
+                  <span className="type-meta shrink-0 tabular-nums">{formatearTamano(doc.tamanoBytes)}</span>
                 )}
                 <Button
                   type="button"
