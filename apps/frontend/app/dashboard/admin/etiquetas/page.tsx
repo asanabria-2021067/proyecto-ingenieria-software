@@ -74,7 +74,7 @@ function Familia({
   children: ReactNode;
 }) {
   return (
-    <section className="card-base flex flex-col gap-inline" aria-labelledby={`familia-${numero}`}>
+    <section className="@container/familia card-base flex flex-col gap-inline" aria-labelledby={`familia-${numero}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-inline gap-y-micro">
         <h2 id={`familia-${numero}`} className="type-subtitle font-semibold">
           {String(numero).padStart(2, '0')} · {titulo}
@@ -85,7 +85,10 @@ function Familia({
       </div>
       <p className="type-meta break-all font-mono">{fuente}</p>
       {nota && <p className="type-meta">{nota}</p>}
-      <div className="grid grid-cols-1 gap-tight sm:grid-cols-2">
+      {/* GPI01-C06 (H-04): claro y oscuro van lado a lado solo si la TARJETA tiene ancho
+          para las dos muestras. Con `sm:` (ancho de ventana) cada columna quedaba en
+          ~220 px dentro de la rejilla de familias y las etiquetas largas se recortaban. */}
+      <div className="grid grid-cols-1 gap-tight @xl/familia:grid-cols-2">
         <div className="flex flex-wrap items-center gap-tight rounded-control bg-surface-container-low p-inline">{children}</div>
         <div className="dark flex flex-wrap items-center gap-tight rounded-control bg-surface p-inline text-on-surface">{children}</div>
       </div>
@@ -130,7 +133,10 @@ export default function AdminEtiquetasPage() {
           Forma única: radio «tag» (7 px), 25 px de alto, 12 px semibold. Los 15 tonos cumplen AA (≥ 4,5:1) en ambos temas.
           Nombres históricos: accent = lime, warning = amber, error = red.
         </p>
-        <div className="grid grid-cols-1 gap-tight sm:grid-cols-2">
+        {/* GPI01-C06 (H-04): claro y oscuro van lado a lado solo si la TARJETA tiene ancho
+          para las dos muestras. Con `sm:` (ancho de ventana) cada columna quedaba en
+          ~220 px dentro de la rejilla de familias y las etiquetas largas se recortaban. */}
+      <div className="grid grid-cols-1 gap-tight @xl/familia:grid-cols-2">
           <div className="flex flex-wrap items-center gap-tight rounded-control bg-surface-container-low p-inline">
             {TAG_TONES.map((tone) => (
               <Tag key={tone} tone={tone}>
@@ -331,8 +337,12 @@ export default function AdminEtiquetasPage() {
 
         <Familia numero={19} titulo="Entidad en la bitácora" vista="Estudiante" origen="Particular" fuente="components/projects/bitacora-entity.utils.ts · ENTIDAD_TONE / ENTIDAD_LABEL">
           {(Object.keys(ENTIDAD_TONE) as Array<keyof typeof ENTIDAD_TONE>).map((e) => (
-            <span key={e} className={`pill ${ENTIDAD_TONE[e]}`}>
-              {ENTIDAD_LABEL[e]} <span className="font-normal opacity-70">({e})</span>
+            // GPI01-C06 (H-04): la clave de la enumeración va fuera de la etiqueta. Dentro,
+            // «Liderazgo (APELACION_LIDERAZGO)» no cabía en la columna y se recortaba; así la
+            // etiqueta es la misma que pinta la bitácora y la clave puede partir línea.
+            <span key={e} className="inline-flex max-w-full items-center gap-micro">
+              <span className={`pill ${ENTIDAD_TONE[e]}`}>{ENTIDAD_LABEL[e]}</span>
+              <code className="min-w-0 break-all font-mono text-xs">{e}</code>
             </span>
           ))}
         </Familia>
