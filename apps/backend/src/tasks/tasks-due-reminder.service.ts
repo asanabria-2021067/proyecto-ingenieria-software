@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EstadoTarea } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 // Mismo huso que is-future-calendar-date.validator.ts y events-reminder.service.ts.
 // America/Guatemala no tiene horario de verano: el desfase UTC-6 es fijo
@@ -37,8 +38,10 @@ export function fechaLimiteParaVentana(ventana: VentanaRecordatorio, ahora: Date
 }
 
 /**
- * HU-186 (T-329): job diario que detecta tareas próximas a vencer y registra
- * cada aviso una sola vez.
+ * HU-186 (T-329/T-330): job diario que detecta tareas próximas a vencer,
+ * registra cada aviso una sola vez y lo emite al responsable por el centro
+ * de notificaciones (notifyFromTemplate → notifyUsers). Las preferencias de
+ * HU-185 se aplican dentro de notifyUsers: este job no las consulta.
  *
  * Responsable = AsignacionTarea vigente (desasignadaEn null; PostgreSQL
  * garantiza a lo sumo una por tarea). Nunca entran tareas HECHO, eliminadas
@@ -55,7 +58,10 @@ export function fechaLimiteParaVentana(ventana: VentanaRecordatorio, ahora: Date
 export class TasksDueReminderService {
   private readonly logger = new Logger(TasksDueReminderService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: GUATEMALA_TIME_ZONE })
   async enviarRecordatoriosDeVencimiento(): Promise<void> {
@@ -109,17 +115,24 @@ export class TasksDueReminderService {
   }
 
   /**
-   * Punto de emisión por el centro de notificaciones (T-330). Hasta que
-   * exista el tipo TAREA_POR_VENCER rechaza, así que procesarAviso libera la
-   * reserva y ningún aviso queda marcado como enviado sin haberse enviado.
+   * T-330: emisión por el centro de notificaciones. Si el responsable
+   * desactivó TAREA_POR_VENCER (HU-185), notifyUsers no guarda ni emite nada
+   * y el aviso igualmente queda registrado: no se reintenta cada día.
    */
   protected async emitirRecordatorio(
     tarea: TareaPorVencer,
     ventana: VentanaRecordatorio,
     responsable: number,
   ): Promise<void> {
-    throw new Error(
-      `emisión pendiente de T-330 (tarea ${tarea.idTarea}, ${ventana} h, usuario ${responsable})`,
-    );
+    if (tarea.fechaLimite === null) return;
+    await this.notifications.notifyFromTemplate([responsable], 'TAREA_POR_VENCER', {
+      taskTitle: tarea.tituloTarea,
+      projectTitle: tarea.proyecto.tituloProyecto,
+      taskId: tarea.idTarea,
+      projectId: tarea.idProyecto,
+      horasAntes: ventana,
+      // timeZone UTC: fechaLimite es medianoche UTC del día calendario.
+      fechaLimiteTexto: tarea.fechaLimite.toLocaleDateString('es-GT', { dateStyle: 'long', timeZone: 'UTC' }),
+    });
   }
 }
