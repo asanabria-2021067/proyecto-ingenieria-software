@@ -284,3 +284,192 @@ describe('CalendarSidebar — mini calendario con días vecinos legibles (G05-R0
     }
   });
 });
+
+/**
+ * G05-C06 (UI-15, UI-12, UI-31): lo que faltaba de la columna: "Mis proyectos",
+ * meta de horas, varias personas a la vez, nombres accesibles y que nada de un
+ * usuario quede en pantalla cuando llegan los datos de otro.
+ */
+describe('CalendarSidebar — "Mis proyectos" (G05-C06, UI-15)', () => {
+  const PROYECTOS = [
+    { idProyecto: 1, tituloProyecto: 'Plataforma de Tutorías UVG' },
+    { idProyecto: 2, tituloProyecto: 'Laboratorio de Robótica' },
+  ];
+  const casilla = (nombre: string) => screen.getByRole('checkbox', { name: nombre });
+
+  it('cada proyecto tiene su casilla con nombre accesible por su etiqueta; marcada = visible, desmarcada = oculto', () => {
+    renderSidebar({ proyectos: PROYECTOS, proyectosOcultos: new Set([2]) });
+    expect(casilla('Plataforma de Tutorías UVG')).toBeChecked();
+    expect(casilla('Laboratorio de Robótica')).not.toBeChecked();
+    // La etiqueta visible es la que nombra a la casilla (label[for]), no un aria-label paralelo.
+    for (const p of PROYECTOS) {
+      const control = casilla(p.tituloProyecto);
+      expect(control).not.toHaveAttribute('aria-label');
+      expect(document.querySelector(`label[for="${control.id}"]`)).toHaveTextContent(p.tituloProyecto);
+    }
+  });
+
+  it('alternar un proyecto avisa solo de ese id, tanto desde la casilla como desde su etiqueta, y no toca lo compartido', () => {
+    const onToggleProyecto = vi.fn();
+    const { onToggleCompartido, onQuitarCompartido } = renderSidebar({ proyectos: PROYECTOS, onToggleProyecto });
+    fireEvent.click(casilla('Laboratorio de Robótica'));
+    fireEvent.click(screen.getByText('Plataforma de Tutorías UVG'));
+    expect(onToggleProyecto.mock.calls).toEqual([[2], [1]]);
+    expect(onToggleCompartido).not.toHaveBeenCalled();
+    expect(onQuitarCompartido).not.toHaveBeenCalled();
+  });
+
+  it('sin proyectos muestra su vacío propio, distinto del vacío de calendarios compartidos', () => {
+    renderSidebar({ proyectos: [], compartidos: [], compartidosActivos: new Set() });
+    expect(screen.getByText('Sin proyectos con actividad en este rango.')).toBeInTheDocument();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Mis proyectos', 'Calendarios compartidos conmigo']);
+  });
+
+  it('un nombre de proyecto muy largo se trunca dentro de su fila sin empujar la casilla', () => {
+    renderSidebar({ proyectos: [{ idProyecto: 3, tituloProyecto: 'P'.repeat(180) }] });
+    const etiqueta = screen.getByText('P'.repeat(180));
+    expect(etiqueta).toHaveClass('min-w-0', 'flex-1', 'truncate');
+    expect(casilla('P'.repeat(180))).toBeInTheDocument();
+  });
+});
+
+describe('CalendarSidebar — meta de horas (G05-C06)', () => {
+  it('sin meta no se dibuja la tarjeta; con meta muestra etiqueta, horas y porcentaje acotado a 0–100', () => {
+    renderSidebar({ metaHoras: null });
+    expect(screen.queryByRole('heading', { name: 'Meta de horas' })).not.toBeInTheDocument();
+    cleanup();
+
+    renderSidebar({ metaHoras: { etiqueta: 'Horas beca', actual: 30, requeridas: 40 } });
+    expect(screen.getByRole('heading', { name: 'Meta de horas' })).toBeInTheDocument();
+    expect(screen.getByText('Horas beca')).toBeInTheDocument();
+    expect(screen.getByText('30 de 40 hrs')).toBeInTheDocument();
+    expect(screen.getByText('75%')).toBeInTheDocument();
+    cleanup();
+
+    renderSidebar({ metaHoras: { etiqueta: 'Horas beca', actual: 90, requeridas: 40 } });
+    expect(screen.getByText('100%')).toBeInTheDocument();
+    cleanup();
+
+    // La página solo pasa una meta cuando las horas requeridas son mayores que cero.
+    renderSidebar({ metaHoras: { etiqueta: 'Horas beca', actual: 0, requeridas: 40 } });
+    expect(screen.getByText('0%')).toBeInTheDocument();
+    expect(screen.getByText('0 de 40 hrs')).toBeInTheDocument();
+  });
+});
+
+describe('CalendarSidebar — varias personas y destinatario (G05-C06, UI-12/UI-31)', () => {
+  const dos = { compartidos: [ANA, LUIS], compartidosActivos: new Set([ANA.idUsuario]) };
+  const ver = (nombre: string) => screen.getByRole('checkbox', { name: `Ver el calendario de ${nombre}` });
+  const quitar = (nombre: string) => screen.getByRole('button', { name: `Quitar el calendario de ${nombre}` });
+
+  it('cada persona refleja su propio estado activo y alternarla avisa solo de su id', () => {
+    const { onToggleCompartido, onQuitarCompartido } = renderSidebar(dos);
+    expect(ver('Ana García')).toBeChecked();
+    expect(ver('Luis Hernández')).not.toBeChecked();
+    fireEvent.click(ver('Luis Hernández'));
+    fireEvent.click(ver('Ana García'));
+    expect(onToggleCompartido.mock.calls).toEqual([[LUIS.idUsuario], [ANA.idUsuario]]);
+    // Ocultar o mostrar nunca borra la relación.
+    expect(onQuitarCompartido).not.toHaveBeenCalled();
+  });
+
+  it('pulsar el nombre de la persona equivale a su casilla (la etiqueta está asociada) y no dispara "Quitar"', () => {
+    const { onToggleCompartido, onQuitarCompartido } = renderSidebar(dos);
+    fireEvent.click(screen.getByText('Luis Hernández'));
+    expect(onToggleCompartido.mock.calls).toEqual([[LUIS.idUsuario]]);
+    expect(onQuitarCompartido).not.toHaveBeenCalled();
+  });
+
+  it('"Quitar" avisa del id correcto y, mientras está en curso, solo se deshabilita el botón de esa persona', () => {
+    const { onQuitarCompartido } = renderSidebar({ ...dos, quitandoCompartido: LUIS.idUsuario });
+    expect(quitar('Luis Hernández')).toBeDisabled();
+    expect(quitar('Ana García')).toBeEnabled();
+    // Su casilla sigue operable: quitar y ocultar son acciones independientes.
+    expect(ver('Luis Hernández')).toBeEnabled();
+    fireEvent.click(quitar('Luis Hernández'));
+    fireEvent.click(quitar('Ana García'));
+    expect(onQuitarCompartido.mock.calls).toEqual([[ANA.idUsuario]]);
+  });
+
+  it('todo control de la sección tiene nombre accesible y las iniciales del avatar no lo duplican', () => {
+    renderSidebar(dos);
+    const seccion = screen.getByRole('heading', { name: 'Calendarios compartidos conmigo' }).closest('.card-base') as HTMLElement;
+    for (const control of seccion.querySelectorAll<HTMLElement>('button, [role="checkbox"]')) {
+      expect((control.getAttribute('aria-label') ?? '').length, control.outerHTML.slice(0, 80)).toBeGreaterThan(10);
+    }
+    const nombres = [...seccion.querySelectorAll<HTMLElement>('button[aria-label], [role="checkbox"][aria-label]')].map((c) => c.getAttribute('aria-label'));
+    expect(new Set(nombres).size).toBe(nombres.length);
+    for (const icono of seccion.querySelectorAll('svg')) expect(icono.getAttribute('aria-hidden') === 'true' || icono.hasAttribute('aria-label')).toBe(true);
+  });
+
+  it('el reintento de una agenda llama a SU refetch sin argumentos y no al de la otra persona ni al de la lista', () => {
+    const refetchAna = vi.fn();
+    const refetchLuis = vi.fn();
+    const onReintentarCompartidos = vi.fn();
+    renderSidebar({
+      ...dos,
+      compartidosActivos: new Set([ANA.idUsuario, LUIS.idUsuario]),
+      onReintentarCompartidos,
+      estadoAgendas: new Map([
+        [ANA.idUsuario, { isLoading: false, isError: true, revocada: false, refetch: refetchAna }],
+        [LUIS.idUsuario, { isLoading: false, isError: true, revocada: false, refetch: refetchLuis }],
+      ]),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar el calendario de Luis Hernández' }));
+    expect(refetchLuis).toHaveBeenCalledTimes(1);
+    expect(refetchAna).not.toHaveBeenCalled();
+    expect(onReintentarCompartidos).not.toHaveBeenCalled();
+  });
+
+  it('un 403 y un 500 simultáneos se distinguen por persona: la revocada no ofrece reintento y la otra sí', () => {
+    renderSidebar({
+      ...dos,
+      compartidosActivos: new Set([ANA.idUsuario, LUIS.idUsuario]),
+      estadoAgendas: new Map([
+        [ANA.idUsuario, { isLoading: false, isError: true, revocada: true, refetch: vi.fn() }],
+        [LUIS.idUsuario, { isLoading: false, isError: true, revocada: false, refetch: vi.fn() }],
+      ]),
+    });
+    const alertas = screen.getAllByRole('alert').map((a) => a.textContent);
+    expect(alertas).toEqual(['Ana ya no comparte su calendario contigo.', 'No se pudo cargar este calendario.Reintentar']);
+    expect(screen.queryByRole('button', { name: 'Reintentar el calendario de Ana García' })).not.toBeInTheDocument();
+    // Aun revocada, la persona puede quitarse el calendario de la lista.
+    expect(quitar('Ana García')).toBeEnabled();
+  });
+});
+
+describe('CalendarSidebar — sin restos de otro usuario (G05-C06, UI-13)', () => {
+  it('al llegar los datos de otra cuenta, no queda en pantalla ninguna persona, proyecto ni estado de la anterior', () => {
+    const propsA = {
+      proyectos: [{ idProyecto: 1, tituloProyecto: 'Proyecto de A' }],
+      proyectosOcultos: new Set([1]),
+      compartidos: [ANA, LUIS],
+      compartidosActivos: new Set([ANA.idUsuario, LUIS.idUsuario]),
+      quitandoCompartido: ANA.idUsuario,
+      estadoAgendas: new Map([[LUIS.idUsuario, { isLoading: false, isError: true, revocada: true, refetch: vi.fn() }]]),
+    };
+    renderSidebar(propsA);
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+    cleanup();
+
+    // Usuario B: otro proyecto, una sola persona (la misma Ana) que B no tiene activada.
+    renderSidebar({ proyectos: [{ idProyecto: 8, tituloProyecto: 'Proyecto de B' }], compartidos: [ANA], compartidosActivos: new Set() });
+    expect(screen.queryByText('Proyecto de A')).not.toBeInTheDocument();
+    expect(screen.queryByText('Luis Hernández')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Proyecto de B' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Ver el calendario de Ana García' })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Quitar el calendario de Ana García' })).toBeEnabled();
+  });
+
+  it('la columna no guarda estado propio de comparticiones: con las mismas props siempre dibuja lo mismo', () => {
+    const props = { compartidos: [ANA, LUIS], compartidosActivos: new Set([LUIS.idUsuario]) };
+    renderSidebar(props);
+    const primera = screen.getAllByRole('checkbox').map((c) => `${c.getAttribute('aria-label')}:${c.getAttribute('aria-checked')}`);
+    cleanup();
+    renderSidebar(props);
+    expect(screen.getAllByRole('checkbox').map((c) => `${c.getAttribute('aria-label')}:${c.getAttribute('aria-checked')}`)).toEqual(primera);
+    expect(primera).toEqual(['Ver el calendario de Ana García:false', 'Ver el calendario de Luis Hernández:true']);
+  });
+});
