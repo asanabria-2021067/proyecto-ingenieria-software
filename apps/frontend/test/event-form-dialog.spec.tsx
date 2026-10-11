@@ -643,6 +643,9 @@ describe('EventFormDialog — errores del servidor dentro del diálogo (G03-C01,
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     // Nunca se muestra texto técnico ni el código HTTP.
     expect(alertaDelDialogo()).not.toHaveTextContent(/detalle interno|Error interno|\b50\d\b/);
+    // G05.1-C01: el texto de la alerta usa el color de texto de error; el fondo y el borde siguen siendo de error.
+    expect(alertaDelDialogo()).toHaveClass('text-on-status-error', 'bg-status-error/10', 'border-status-error/40');
+    expect(alertaDelDialogo()).not.toHaveClass('text-status-error');
   });
 
   it('al editar, un HTTP 409 deja la alerta dentro del diálogo con su mensaje y conserva lo escrito', async () => {
@@ -1234,5 +1237,42 @@ describe('EventFormDialog — proyecto, invitados y modalidad (G05-C09, T-323)',
     expect(enlace.getAttribute('aria-describedby')).toContain(mensaje.id);
     await waitFor(() => expect(enlace).toHaveFocus());
     expect(eventsMock.createEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe('EventFormDialog — texto de error y acción destructiva legibles (G05.1-C01, G05-HALLAZGO-01)', () => {
+  it('"Eliminar evento" usa el color de texto de error, también al pasar el cursor, y sigue siendo un botón secundario', () => {
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={evento()} />, { wrapper });
+    const eliminar = screen.getByRole('button', { name: 'Eliminar evento' });
+    expect(eliminar).toHaveClass('text-on-status-error', 'hover:text-on-status-error', 'font-bold');
+    expect(eliminar.className).not.toMatch(/(^|\s|:)text-status-error\b/);
+    // La jerarquía no cambia: la acción principal sigue siendo "Guardar cambios".
+    expect(screen.getByRole('button', { name: 'Guardar cambios' }).className).toMatch(/bg-primary/);
+    expect(eliminar.className).not.toMatch(/bg-primary|bg-status-error(?!\/)/);
+  });
+
+  it('los mensajes de validación junto a cada campo no usan el color de superficie de error', async () => {
+    renderCrear();
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).getByRole('radio', { name: 'Híbrida' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    await screen.findByText('El título no puede estar vacío.');
+    await screen.findByText('Marca la ubicación de la sesión en el mapa.');
+    expect(screen.getByRole('dialog').querySelectorAll('.text-status-error')).toHaveLength(0);
+    for (const mensaje of ['El título no puede estar vacío.', 'Ingresa el link de la sesión.', 'Marca la ubicación de la sesión en el mapa.']) {
+      expect(screen.getByText(mensaje).className).not.toMatch(/text-status-error/);
+    }
+  });
+
+  it('el error de búsqueda de lugar (Nominatim caído) se escribe con el color de texto de error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('sin red')));
+    try {
+      render(<EventLocationPicker lat={null} lng={null} nombre="Edificio" onNombreChange={vi.fn()} onPositionChange={vi.fn()} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Buscar ubicación' }));
+      const alerta = await screen.findByRole('alert');
+      expect(alerta).toHaveClass('text-on-status-error');
+      expect(alerta).not.toHaveClass('text-status-error');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

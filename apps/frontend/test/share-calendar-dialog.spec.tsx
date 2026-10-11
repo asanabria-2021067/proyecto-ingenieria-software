@@ -170,3 +170,32 @@ describe('ShareCalendarDialog — estados del buscador (G03-C10, UI-40)', () => 
     expect(screen.queryByText(/@uvg\.edu\.gt/)).not.toBeInTheDocument();
   });
 });
+
+describe('ShareCalendarDialog — errores y acción de quitar legibles (G05.1-C01, G05-HALLAZGO-01)', () => {
+  const errorHttp = (statusCode: number) => Object.assign(new Error('x'), { statusCode });
+
+  it.each([403, 500])('el error de búsqueda (HTTP %s) se escribe con el color de texto de error', async (status) => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [], compartidosConmigo: [] });
+    socialMock.buscarUsuarios.mockRejectedValue(errorHttp(status));
+    render(<ShareCalendarDialog open onOpenChange={vi.fn()} />, { wrapper });
+    fireEvent.change(screen.getByLabelText('Buscar persona'), { target: { value: 'Ana' } });
+    const alerta = await screen.findByRole('alert', {}, { timeout: 2000 });
+    expect(alerta.querySelector('.text-on-status-error')).toHaveTextContent('No se pudo buscar personas.');
+    expect(screen.getByRole('dialog').querySelectorAll('.text-status-error')).toHaveLength(0);
+  });
+
+  it('el fallo de la lista "Compartida con" se escribe con el color de texto de error', async () => {
+    sharesMock.getCalendariosCompartidos.mockRejectedValue(errorHttp(500));
+    render(<ShareCalendarDialog open onOpenChange={vi.fn()} />, { wrapper });
+    expect(await screen.findByText('No se pudo cargar con quién compartes tu agenda.')).toHaveClass('text-on-status-error');
+    expect(screen.getByRole('dialog').querySelectorAll('.text-status-error')).toHaveLength(0);
+  });
+
+  it('"Quitar" (dejar de compartir) usa el color de texto de error en reposo y al pasar el cursor', async () => {
+    sharesMock.getCalendariosCompartidos.mockResolvedValue({ compartidoPorMi: [LUIS], compartidosConmigo: [] });
+    render(<ShareCalendarDialog open onOpenChange={vi.fn()} />, { wrapper });
+    const quitar = await screen.findByRole('button', { name: 'Dejar de compartir con Luis Hernández' });
+    expect(quitar).toHaveClass('text-on-status-error', 'hover:text-on-status-error');
+    expect(quitar.className).not.toMatch(/(^|\s|:)text-status-error\b/);
+  });
+});

@@ -159,7 +159,7 @@ export function ShareCalendarDialog({
                 )}
                 {resultados.isError && (
                   <li role="alert" className="flex flex-wrap items-center justify-between gap-tight px-stack py-tight">
-                    <span className="type-meta flex items-center gap-tight text-status-error">
+                    <span className="type-meta flex items-center gap-tight text-on-status-error">
                       <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
                       No se pudo buscar personas. {getApiErrorMessage(resultados.error, 'calendar')}
                     </span>
@@ -205,7 +205,7 @@ export function ShareCalendarDialog({
               </p>
             ) : errorLista ? (
               <div role="alert" className="flex flex-wrap items-center justify-between gap-tight">
-                <span className="type-meta text-status-error">No se pudo cargar con quién compartes tu agenda.</span>
+                <span className="type-meta text-on-status-error">No se pudo cargar con quién compartes tu agenda.</span>
                 <Button type="button" size="sm" variant="outline" onClick={() => void recargarLista()} className="shrink-0">
                   Reintentar
                 </Button>
@@ -224,7 +224,7 @@ export function ShareCalendarDialog({
                       disabled={dejar.isPending}
                       onClick={() => handleDejar(persona)}
                       aria-label={`Dejar de compartir con ${persona.nombre} ${persona.apellido}`}
-                      className="shrink-0 gap-1 text-status-error hover:text-status-error"
+                      className="shrink-0 gap-1 text-on-status-error hover:text-on-status-error"
                     >
                       <UserMinus className="size-3.5" aria-hidden="true" />
                       Quitar

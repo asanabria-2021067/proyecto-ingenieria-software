@@ -685,7 +685,7 @@ export function EventFormDialog({
                   ref={errorServidorRef}
                   role="alert"
                   aria-live="assertive"
-                  className="rounded-control border border-status-error/40 bg-status-error/10 px-3 py-2 text-sm text-status-error"
+                  className="rounded-control border border-status-error/40 bg-status-error/10 px-3 py-2 text-sm text-on-status-error"
                 >
                   {errorServidor}
                 </p>
@@ -743,7 +743,7 @@ export function EventFormDialog({
                     variant="ghost"
                     disabled={isPending}
                     onClick={() => void confirmarEliminacion()}
-                    className="h-10 gap-1.5 rounded-pill text-xs font-bold text-status-error hover:text-status-error"
+                    className="h-10 gap-1.5 rounded-pill text-xs font-bold text-on-status-error hover:text-on-status-error"
                   >
                     {isCancelling ? (
                       <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />

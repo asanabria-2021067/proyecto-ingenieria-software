@@ -119,15 +119,6 @@ function guardarTabla(testInfo: TestInfo, nombre: string, filas: Fila[]) {
   }
 }
 
-/**
- * G05-HALLAZGO-01 (abierto): el calendario usa `text-status-error` como color de TEXTO en diez sitios,
- * pero ese token es un color de FONDO (error-container). Medido: 1.2–1.3:1 en claro y ~2:1 en oscuro
- * (botón "Eliminar evento", alerta de error del formulario, errores de la columna y del diálogo de
- * compartir). Corregirlo es un cambio de código que este commit de pruebas no hace: queda fuera de las
- * comprobaciones generales por este patrón exacto y tiene su propia prueba marcada como fallo esperado.
- */
-const DEUDA_TEXTO_DE_ERROR = /^Eliminar evento /;
-
 const sinProblemas = (filas: Fila[]) => filas.filter((f) => f.desbordeDocumento !== 0 || f.objetivosQueIncumplen.length > 0 || f.textosBajoContraste.length > 0 || f.semantica.length > 0);
 
 test.describe('Calendario: accesibilidad y viewport (HU-184, G05-C13)', () => {
@@ -233,49 +224,93 @@ test.describe('Calendario: accesibilidad y viewport (HU-184, G05-C13)', () => {
       retirarDeudaCspDelMapa(cspViolations);
       guardarTabla(testInfo, `c13-tabla-dialogos-${tema}`, filas);
       expect(filas).toHaveLength(12);
-      // La tabla guardada conserva el defecto conocido; para el resto de comprobaciones se aparta.
-      const conDeuda = filas.filter((f) => f.textosBajoContraste.some((t) => DEUDA_TEXTO_DE_ERROR.test(t))).map((f) => f.superficie);
-      expect([...new Set(conDeuda)].sort()).toEqual(['detalle', 'editar']);
-      expect(sinProblemas(filas.map((f) => ({ ...f, textosBajoContraste: f.textosBajoContraste.filter((t) => !DEUDA_TEXTO_DE_ERROR.test(t)) })))).toEqual([]);
+      // G05.1-C01: sin excepciones. El botón "Eliminar evento" del detalle y de la edición entra en la misma
+      // comprobación que el resto del texto (antes era el defecto conocido G05-HALLAZGO-01).
+      expect(sinProblemas(filas)).toEqual([]);
+      for (const fila of filas) expect(fila.contrasteMinimo, `${fila.ancho} ${fila.superficie}`).toBeGreaterThanOrEqual(CONTRASTE_MINIMO);
     });
 
-    test(`G05-HALLAZGO-01 (${tema}): el botón "Eliminar evento" y los mensajes de error del calendario alcanzan 4.5:1`, async ({ page }) => {
-      // Fallo esperado y documentado: hoy NO se cumple (ver DEUDA_TEXTO_DE_ERROR). Cuando se corrija el
-      // color del texto de error, Playwright avisará de que esta prueba "pasó sin esperarlo": entonces se
-      // quitan esta anotación y la constante DEUDA_TEXTO_DE_ERROR.
-      test.fail(true, 'G05-HALLAZGO-01: text-status-error (color de fondo) usado como color de texto');
+    test(`texto de error y acción destructiva (${tema}): el botón "Eliminar evento" y los mensajes de error del calendario alcanzan 4.5:1`, async ({ page }) => {
+      // G05.1-C01 (G05-HALLAZGO-01, corregido): estos textos usaban un color de superficie y medían 1.2–1.3:1
+      // en claro y ~2:1 en oscuro. Se mide el color realmente pintado, con alfa y opacidades compuestas.
       await page.emulateMedia({ colorScheme: tema });
       await page.setViewportSize({ width: 1440, height: 900 });
-      // Se fuerzan dos fallos del servidor solo para que la interfaz muestre sus mensajes de error.
-      await page.route('**/api/usuarios/me/calendario/compartidos', (ruta) => ruta.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ statusCode: 500, message: 'Internal server error' }) }));
-      await page.route(/\/api\/proyectos\/\d+\/eventos$/, (ruta) =>
-        ruta.request().method() === 'POST' ? ruta.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ statusCode: 409, message: 'Ya existe un evento en ese horario.' }) }) : ruta.continue(),
-      );
+      // Se fuerzan fallos del servidor solo para que la interfaz muestre sus mensajes de error.
+      const fallo = (status: number, message: string) => ({ status, contentType: 'application/json', body: JSON.stringify({ statusCode: status, message }) });
+      await page.route('**/api/usuarios/me/calendario/compartidos', (ruta) => ruta.fulfill(fallo(500, 'Internal server error')));
+      await page.route('**/api/social/usuarios/buscar**', (ruta) => ruta.fulfill(fallo(500, 'Internal server error')));
+      let estadoAlCrear = 409;
+      await page.route(/\/api\/proyectos\/\d+\/eventos$/, (ruta) => (ruta.request().method() === 'POST' ? ruta.fulfill(fallo(estadoAlCrear, 'Mensaje del servidor')) : ruta.continue()));
       await page.reload();
-      const medidas: { texto: string; ratio: number }[] = [];
-      const columna = page.locator('aside[aria-label="Opciones del calendario"]');
-      await expect(columna.getByRole('alert').first()).toBeVisible({ timeout: 30_000 });
-      medidas.push(...(await medirContraste(page, 'aside[aria-label="Opciones del calendario"] [role="alert"] p')));
+      const medidas: { donde: string; texto: string; ratio: number }[] = [];
+      const medir = async (donde: string, selector: string, minimo = 1) => {
+        await esperarAnimaciones(page);
+        const encontradas = await medirContraste(page, selector);
+        expect(encontradas.length, `texto medido en: ${donde}`).toBeGreaterThanOrEqual(minimo);
+        medidas.push(...encontradas.map((m) => ({ donde, texto: m.texto, ratio: m.ratio })));
+      };
 
+      // Columna: la lista de calendarios compartidos falló.
+      const columna = 'aside[aria-label="Opciones del calendario"]';
+      await expect(page.locator(`${columna} [role="alert"]`).first()).toBeVisible({ timeout: 30_000 });
+      await medir('columna: lista de compartidos', `${columna} [role="alert"] p`);
+
+      // Diálogo de compartir: su lista y la búsqueda de personas fallan.
+      await page.getByRole('button', { name: 'Compartir agenda' }).click();
+      const compartir = page.getByRole('dialog', { name: 'Compartir mi agenda' });
+      await expect(compartir.getByText('No se pudo cargar con quién compartes tu agenda.')).toBeVisible({ timeout: 30_000 });
+      await compartir.getByLabel('Buscar persona').fill('Ana');
+      await expect(compartir.getByText(/No se pudo buscar personas/)).toBeVisible({ timeout: 30_000 });
+      await medir('compartir: lista y búsqueda', '[role="dialog"] [role="alert"] span', 2);
+      await page.keyboard.press('Escape');
+      await expect(compartir).toBeHidden();
+
+      // Formulario: la alerta de error del servidor para cada código que el diálogo distingue.
       const formulario = await abrirNuevoEvento(page);
       await formulario.getByLabel('Título del evento o actividad').fill('Demo');
       await formulario.getByLabel('Enlace de conexión virtual').fill('https://meet.google.com/abc-defg-hij');
-      await formulario.getByRole('button', { name: 'Agendar evento' }).click();
       const alerta = formulario.locator('[role="alert"][aria-live="assertive"]');
-      await expect(alerta).toBeVisible();
-      await esperarAnimaciones(page);
-      medidas.push(...(await medirContraste(page, '[role="dialog"] [role="alert"][aria-live="assertive"]')));
+      for (const estado of [400, 403, 404, 409, 500]) {
+        estadoAlCrear = estado;
+        // Editar un campo retira la alerta anterior; así cada código pinta la suya.
+        await formulario.getByLabel('Título del evento o actividad').fill(`Demo ${estado}`);
+        await expect(alerta).toHaveCount(0);
+        await formulario.getByRole('button', { name: 'Agendar evento' }).click();
+        await expect(alerta).toBeVisible();
+        // La alerta sigue dentro del diálogo y a la vista.
+        expect(await alerta.evaluate((el) => { const a = el.getBoundingClientRect(); const d = (el.closest('[role="dialog"]') as HTMLElement).getBoundingClientRect(); return a.top >= d.top && a.bottom <= d.bottom && a.width > 0; })).toBe(true);
+        await medir(`formulario: HTTP ${estado}`, '[role="dialog"] [role="alert"][aria-live="assertive"]');
+      }
+      // Mensajes de validación junto a los campos, con la alerta del servidor ya retirada.
+      await formulario.getByLabel('Título del evento o actividad').fill('');
+      await formulario.getByLabel('Enlace de conexión virtual').fill('http://localhost:3000/sala');
+      await formulario.getByRole('button', { name: 'Agendar evento' }).click();
+      await expect(formulario.getByText('El título no puede estar vacío.')).toBeVisible();
+      await medir('formulario: validación por campo', '[role="dialog"] [data-slot="form-message"]', 2);
       await page.keyboard.press('Escape');
 
+      // Botón "Eliminar evento" en el detalle y en la edición.
       await page.getByRole('radio', { name: 'Día' }).click();
       await page.locator('[data-evento-key]').filter({ hasText: `${etiqueta} reunión` }).first().click();
       const detalle = page.getByRole('dialog', { name: `${etiqueta} reunión` });
       await expect(detalle).toBeVisible();
-      await esperarAnimaciones(page);
-      medidas.push(...(await medirContraste(page, '[role="dialog"] button:has-text("Eliminar evento")')));
+      // Se localiza por rol y nombre y se marca para medirlo (el medidor trabaja con selectores CSS).
+      const marcarEliminar = (dialogo: ReturnType<Page['getByRole']>) => dialogo.getByRole('button', { name: 'Eliminar evento' }).evaluate((el) => el.setAttribute('data-e2e-eliminar', ''));
+      await marcarEliminar(detalle);
+      await medir('detalle: Eliminar evento', '[role="dialog"] [data-e2e-eliminar]');
+      await detalle.getByRole('button', { name: 'Editar evento' }).click();
+      const edicion = page.getByRole('dialog', { name: 'Editar evento' });
+      await expect(edicion).toBeVisible();
+      await marcarEliminar(edicion);
+      await medir('edición: Eliminar evento', '[role="dialog"] [data-e2e-eliminar]');
+      await page.keyboard.press('Escape');
 
-      expect(medidas.length).toBeGreaterThanOrEqual(3);
-      for (const medida of medidas) expect(medida.ratio, `"${medida.texto}"`).toBeGreaterThanOrEqual(CONTRASTE_MINIMO);
+      const carpeta = process.env.G05_EVIDENCIAS;
+      if (carpeta) fs.writeFileSync(path.join(carpeta, `c13-contraste-errores-${tema}.json`), JSON.stringify(medidas, null, 1));
+      // Ningún texto de la página usa ya el color de superficie de error como color de texto.
+      expect(await page.locator('.text-status-error').count()).toBe(0);
+      expect(medidas.length).toBeGreaterThanOrEqual(12);
+      for (const medida of medidas) expect(medida.ratio, `${medida.donde}: "${medida.texto}"`).toBeGreaterThanOrEqual(CONTRASTE_MINIMO);
     });
 
     test(`contraste de lo atenuado (${tema}): chips en días de otro mes, días vecinos del mini calendario y "hoy"`, async ({ page }, testInfo) => {

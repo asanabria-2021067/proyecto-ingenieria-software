@@ -177,7 +177,7 @@ export function CalendarSidebar({
               </p>
             ) : compartidosEstado === 'error' ? (
               <div role="alert" className="space-y-tight">
-                <p className="type-meta flex items-center gap-tight text-status-error">
+                <p className="type-meta flex items-center gap-tight text-on-status-error">
                   <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
                   No se pudieron cargar los calendarios compartidos.
                 </p>
@@ -221,7 +221,7 @@ export function CalendarSidebar({
                         aria-label={`Quitar el calendario de ${nombre}`}
                         disabled={quitandoCompartido === persona.idUsuario}
                         onClick={() => onQuitarCompartido(persona.idUsuario)}
-                        className="size-7 shrink-0 text-text-secondary hover:text-status-error"
+                        className="size-7 shrink-0 text-text-secondary hover:text-on-status-error"
                       >
                         {quitandoCompartido === persona.idUsuario ? (
                           <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
@@ -232,7 +232,7 @@ export function CalendarSidebar({
                     </div>
                     {estado?.isError && (
                       <div role="alert" className="mt-1 flex flex-wrap items-center gap-tight pl-9">
-                        <span className="type-meta text-status-error">
+                        <span className="type-meta text-on-status-error">
                           {estado.revocada ? `${persona.nombre} ya no comparte su calendario contigo.` : 'No se pudo cargar este calendario.'}
                         </span>
                         {!estado.revocada && (

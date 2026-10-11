@@ -191,7 +191,7 @@ export default function EventLocationPicker({
         </ul>
       )}
       {searchError && (
-        <p role="alert" className="text-xs text-status-error">
+        <p role="alert" className="text-xs text-on-status-error">
           {searchError}
         </p>
       )}

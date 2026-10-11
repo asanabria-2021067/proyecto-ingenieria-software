@@ -402,3 +402,14 @@ describe('EventDetailDialog — eliminar, cerrar y solo lectura (G05-C09)', () =
     expect(within(dialogo).getByRole('link', { name: 'Ver proyecto' })).toHaveAttribute('href', '/dashboard/projects/3');
   });
 });
+
+describe('EventDetailDialog — acción destructiva legible (G05.1-C01, G05-HALLAZGO-01)', () => {
+  it('"Eliminar evento" usa el color de texto de error y conserva su borde neutro; nada del detalle usa el color de superficie como texto', () => {
+    render(<EventDetailDialog evento={evento()} open onOpenChange={vi.fn()} editable onEditar={vi.fn()} />, { wrapper });
+    const eliminar = screen.getByRole('button', { name: /Eliminar evento/ });
+    expect(eliminar).toHaveClass('text-on-status-error', 'border-outline-variant', 'font-bold');
+    expect(screen.getByRole('dialog').querySelectorAll('.text-status-error')).toHaveLength(0);
+    // Sigue siendo un botón de contorno: "Editar evento" es la acción principal.
+    expect(screen.getByRole('button', { name: /Editar evento/ }).className).toMatch(/bg-primary/);
+  });
+});

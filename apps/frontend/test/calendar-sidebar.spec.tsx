@@ -473,3 +473,30 @@ describe('CalendarSidebar — sin restos de otro usuario (G05-C06, UI-13)', () =
     expect(primera).toEqual(['Ver el calendario de Ana García:false', 'Ver el calendario de Luis Hernández:true']);
   });
 });
+
+describe('CalendarSidebar — errores legibles (G05.1-C01, G05-HALLAZGO-01)', () => {
+  const error = (revocada: boolean) => ({ isLoading: false, isError: true, revocada, refetch: vi.fn() });
+
+  it('el fallo de la lista de calendarios compartidos se escribe con el color de texto de error', () => {
+    renderSidebar({ compartidos: [], compartidosEstado: 'error', onReintentarCompartidos: vi.fn() });
+    const mensaje = screen.getByText(/No se pudieron cargar los calendarios compartidos/);
+    expect(mensaje.closest('.text-on-status-error')).not.toBeNull();
+    expect(document.querySelectorAll('.text-status-error')).toHaveLength(0);
+  });
+
+  it.each([
+    ['un fallo de servidor (500)', false, 'No se pudo cargar este calendario.'],
+    ['una revocación (403)', true, 'Ana ya no comparte su calendario contigo.'],
+  ])('el error de agenda por %s se escribe con el color de texto de error', (_caso, revocada, texto) => {
+    renderSidebar({ estadoAgendas: new Map([[ANA.idUsuario, error(revocada)]]) });
+    expect(screen.getByText(texto)).toHaveClass('text-on-status-error');
+    expect(document.querySelectorAll('.text-status-error')).toHaveLength(0);
+  });
+
+  it('"Quitar el calendario" se tiñe de error al pasar el cursor con el color de texto, no con el de superficie', () => {
+    renderSidebar();
+    const quitar = screen.getByRole('button', { name: 'Quitar el calendario de Ana García' });
+    expect(quitar).toHaveClass('text-text-secondary', 'hover:text-on-status-error');
+    expect(quitar.className).not.toMatch(/hover:text-status-error/);
+  });
+});

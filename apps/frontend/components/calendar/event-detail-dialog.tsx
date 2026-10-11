@@ -314,7 +314,7 @@ export function EventDetailDialog({
                 variant="outline"
                 disabled={isPending}
                 onClick={() => void handleCancelar()}
-                className="h-10 gap-1.5 rounded-md border-outline-variant text-xs font-bold text-status-error"
+                className="h-10 gap-1.5 rounded-md border-outline-variant text-xs font-bold text-on-status-error"
               >
                 {isPending ? (
                   <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
