@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Browser, Page } from '@playwright/test';
 import { test, expect } from './support/test';
-import { login } from './support/auth';
+import { login, loginFallido } from './support/auth';
 import { medirContraste } from './support/accesibilidad';
 import { API_URL, desactivarTour } from './support/realtime';
 
@@ -102,12 +102,13 @@ test.describe('FG02-C08: acceso al visor de eventos de seguridad', () => {
   });
 
   test('el administrador llega desde el menú y lee eventos reales, saneados', async ({ browser }) => {
+    // Margen para esperar la ventana del límite de inicios de sesión si otros specs la agotaron.
+    test.setTimeout(240_000);
     // Un inicio de sesión fallido contra una cuenta inexistente: lo registra la propia aplicación.
+    // El correo es único por ejecución: repetir el mismo acumularía intentos hasta el bloqueo
+    // temporal y el motivo registrado dejaría de ser «credenciales».
     const anonimo = await browser.newContext();
-    const fallido = await anonimo.request.post(`${API_URL}/api/auth/login`, {
-      data: { correo: 'no-existe-fg02@uvg.edu.gt', contrasena: 'Incorrecta-123' },
-    });
-    expect(fallido.status()).toBe(401);
+    expect(await loginFallido(anonimo.request, API_URL, `no-existe-fg02-${Date.now()}@uvg.edu.gt`)).toBe(401);
     await anonimo.close();
 
     const page = await sesion(browser, ADMIN);
