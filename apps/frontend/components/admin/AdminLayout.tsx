@@ -17,7 +17,8 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react';
-import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { avisarSinPermiso, useCan, RUTA_SIN_PERMISO } from '@/hooks/use-can';
 import { useLogout } from '@/hooks/use-logout';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { UserMenu } from '@/components/dashboard/UserMenu';
@@ -89,7 +90,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { data: user, isLoading, isError } = useCurrentUser();
   const handleLogout = useLogout();
 
-  const esAdmin = isAdminUser(user);
+  const esAdmin = useCan('admin.panel');
 
   useEffect(() => {
     if (isLoading) return;
@@ -97,7 +98,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.replace('/login');
     } else if (!esAdmin) {
       // HU-178 (T-302): quien no es administrador vuelve a su dashboard.
-      router.replace('/dashboard');
+      avisarSinPermiso();
+      router.replace(RUTA_SIN_PERMISO);
     }
   }, [isLoading, isError, esAdmin, router]);
 

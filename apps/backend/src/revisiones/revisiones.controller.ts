@@ -12,6 +12,8 @@ import {
 import { RevisionesService } from './revisiones.service';
 import { ResolverRevisionDto } from './dto/resolver-revision.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
@@ -36,6 +38,8 @@ export class RevisionesController {
 
   /** E040: bandeja admin (lectura; se amplía en C133). */
   @Get('admin/bandeja')
+  @UseGuards(RolesGuard)
+  @Roles('administrador')
   findAdminInbox(@CurrentUser() user: { userId: number }) {
     return this.revisionesService.findAdminInbox(user.userId);
   }
@@ -51,7 +55,8 @@ export class RevisionesController {
 
   /** E042: reclamar la revisión pendiente (admin, proyecto en R). */
   @Post('proyectos/:idProyecto/reclamar')
-  @UseGuards(ProjectWriteGuard)
+  @UseGuards(RolesGuard, ProjectWriteGuard)
+  @Roles('administrador')
   @ProjectWrite(PUBLICATION_REVIEW_WRITE)
   @HttpCode(HttpStatus.OK)
   reclamar(
@@ -63,7 +68,8 @@ export class RevisionesController {
 
   /** E043: resolver la revisión pendiente (admin, proyecto en R). */
   @Post('proyectos/:idProyecto/resolver')
-  @UseGuards(ProjectWriteGuard)
+  @UseGuards(RolesGuard, ProjectWriteGuard)
+  @Roles('administrador')
   @ProjectWrite(PUBLICATION_REVIEW_WRITE)
   @HttpCode(HttpStatus.OK)
   resolver(

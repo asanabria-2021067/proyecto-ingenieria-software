@@ -16,7 +16,8 @@ import { getMyProjectById, updateProject, resubmitProject, getProjectRevisions }
 import { getCarreras, getHabilidades } from '@/lib/services/catalogs';
 import type { Carrera, Habilidad } from '@/lib/services/catalogs';
 import uvgSwal from '@/lib/swal';
-import { getApiErrorMessage } from '@/components/projects/api-error';
+import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
+import { useRequireCan } from '@/hooks/use-can';
 import {
   step1Schema, rolSchema, formSchema, zodToFieldErrors,
   newRol, newRequisito, safeId,
@@ -165,6 +166,11 @@ export default function MyProjectViewClient({ id }: Props) {
     enabled: !!id,
     staleTime: 0,
     refetchOnMount: 'always',
+  });
+
+  const { denegado } = useRequireCan('proyecto.vistaDueno', {
+    esLider: getApiErrorStatus(error) !== 403,
+    listo: !isLoading,
   });
 
   const { data: revisiones = [] } = useQuery<RevisionProyectoDTO[]>({
@@ -411,7 +417,7 @@ export default function MyProjectViewClient({ id }: Props) {
       <div className="flex-1 overflow-y-auto">
         {isLoading && <ViewSkeleton />}
 
-        {(error || (!isLoading && !proyecto)) && (
+        {!denegado && (error || (!isLoading && !proyecto)) && (
           <div className="max-w-3xl mx-auto px-6 py-16 text-center">
             <p className="text-error font-medium text-sm">No se pudo cargar el proyecto.</p>
             <Link href="/dashboard/projects/mine" className="mt-4 inline-block text-sm text-primary hover:underline">

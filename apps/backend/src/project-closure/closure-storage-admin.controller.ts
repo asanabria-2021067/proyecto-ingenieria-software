@@ -1,5 +1,7 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ClosureCleanupService } from './closure-cleanup.service';
 import { SweepDto } from './dto/closure.dto';
@@ -10,7 +12,8 @@ import { SweepDto } from './dto/closure.dto';
  * del proyecto, y por eso vive en su propio controller.
  */
 @Controller('admin/storage/cierre')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('administrador')
 export class ClosureStorageAdminController {
   constructor(protected readonly cleanup: ClosureCleanupService) {}
 
