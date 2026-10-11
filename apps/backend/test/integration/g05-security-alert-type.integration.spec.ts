@@ -24,9 +24,10 @@ describeIntegration('G05-C11 — enum TipoNotificacion en PostgreSQL real', () =
       SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
       WHERE t.typname = 'TipoNotificacion' ORDER BY e.enumsortorder`;
     const values = labels.map((row) => row.enumlabel);
-    // Valores agregados después por otras migraciones (p. ej. CALENDARIO_COMPARTIDO
-    // de HU-184) pueden quedar al final: lo que importa es que ALERTA_SEGURIDAD
-    // exista una sola vez y llegue después de HORAS_ACREDITADAS, sin reordenar.
+    // Valores agregados después por otras migraciones (CALENDARIO_COMPARTIDO de
+    // HU-184, TAREA_POR_VENCER de HU-186) pueden quedar al final: lo que importa
+    // es que ALERTA_SEGURIDAD exista una sola vez y llegue después de
+    // HORAS_ACREDITADAS, sin reordenar.
     expect(values.filter((value) => value === 'ALERTA_SEGURIDAD')).toHaveLength(1);
     expect(values.indexOf('ALERTA_SEGURIDAD')).toBeGreaterThan(values.indexOf('HORAS_ACREDITADAS'));
     expect(values.indexOf('HORAS_ACREDITADAS')).toBeGreaterThan(-1);

@@ -247,6 +247,19 @@ export interface NotificationTemplateData {
     ownerId: number;
     ownerName: string;
   };
+  // HU-186 (T-330): aviso de vencimiento emitido por TasksDueReminderService
+  // al responsable de la tarea. taskId/projectId viajan en datosJson para el
+  // enlace del centro de notificaciones; el texto no los muestra.
+  TAREA_POR_VENCER: {
+    taskTitle: string;
+    projectTitle: string;
+    taskId: number;
+    projectId: number;
+    /** Ventana del aviso: 48 = pasado mañana, 24 = mañana (fechaLimite es solo fecha). */
+    horasAntes: 24 | 48;
+    /** fechaLimite ya formateada por el emisor (es-GT), lista para mostrar. */
+    fechaLimiteTexto: string;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -467,6 +480,14 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Calendario compartido',
     message: (data: NotificationTemplateData['CALENDARIO_COMPARTIDO']) =>
       `${data.ownerName} compartió su calendario contigo. Actívalo en tu calendario para ver sus actividades.`,
+  },
+
+  TAREA_POR_VENCER: {
+    title: (data: NotificationTemplateData['TAREA_POR_VENCER']) =>
+      data.horasAntes === 24 ? 'Tu tarea vence mañana' : 'Tu tarea vence en 2 días',
+    message: (data: NotificationTemplateData['TAREA_POR_VENCER']) =>
+      `La tarea "${data.taskTitle}" del proyecto "${data.projectTitle}" vence el ${data.fechaLimiteTexto}. ` +
+      `Este es tu recordatorio de ${data.horasAntes} horas.`,
   },
 } as const;
 
