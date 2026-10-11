@@ -67,6 +67,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ReadOnlyProjectBanner } from '@/components/projects/read-only-project-banner';
 import { ClosureDocumentViewer, formatearTamano } from '@/components/closure/closure-document-viewer';
 import { useHistoricalProject } from '@/hooks/use-historical-project';
+import { useProjectDetail } from '@/hooks/use-project-detail';
 import { getApiErrorStatus } from '@/components/projects/api-error';
 import uvgSwal from '@/lib/swal';
 import type { Rol } from '@/types';
@@ -102,12 +103,19 @@ export default function ProyectoDetallePage() {
   const { id } = useParams<{ id: string }>();
   const projectId = Number(id);
 
-  const { data: proyecto, isLoading, isError, error, refetch } = useQuery<Proyecto>({
-    queryKey: ['proyecto', id],
-    queryFn: () => apiFetch(`/proyectos/${id}`),
-    retry: false,
-  });
-  const publicStatus = isError ? getApiErrorStatus(error) : undefined;
+  // GPI01-C04 (H-03): misma consulta que la navegación lateral (antes eran dos
+  // peticiones al GET público, una por cada clave). Si el público responde 404,
+  // `useProjectDetail` lee por la ruta autorizada. Esta página solo pinta el
+  // detalle público y el histórico de un CERRADO: una lectura autorizada de
+  // cualquier otro estado (borrador, en revisión…) sigue siendo «no encontrado»
+  // aquí, igual que antes.
+  const detalle = useProjectDetail(projectId);
+  const fueraDelDetallePublico =
+    detalle.data?.lecturaAutorizada === true && detalle.data.estadoProyecto !== 'CERRADO';
+  const proyecto = fueraDelDetallePublico ? undefined : (detalle.data as Proyecto | undefined);
+  const { isLoading, error, refetch } = detalle;
+  const isError = detalle.isError || fueraDelDetallePublico;
+  const publicStatus = fueraDelDetallePublico ? 404 : detalle.isError ? getApiErrorStatus(error) : undefined;
   const isNotFound = isError && publicStatus === 404;
 
   // S7 (VIEW-02): un proyecto CERRADO se lee como histórico completo. El GET

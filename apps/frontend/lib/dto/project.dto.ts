@@ -295,4 +295,9 @@ export interface ProyectoDetalleDTO {
   hitos: HitoDTO[];
   tareas?: TareaDTO[];
   revisiones?: UltimaRevisionDTO[];
+  /**
+   * GPI01-C04: el detalle no salió del GET público (que respondió 404) sino de
+   * la ruta autorizada. Lo fija `getAccessibleProjectById`; nunca viene del backend.
+   */
+  lecturaAutorizada?: true;
 }
