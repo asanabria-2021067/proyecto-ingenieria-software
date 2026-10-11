@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EstadoProyecto, Prisma } from '@prisma/client';
+import { EstadoProyecto, Prisma, type ModalidadEvento, type TipoEvento } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -28,7 +28,75 @@ const EVENT_SELECT = {
   ubicacionNombre: true,
   linkSesion: true,
   rolesDestino: true,
+  tipoEvento: true,
+  invitados: true,
 } as const;
+
+/**
+ * G01 (UI-01): única `select` permitida para un evento visto desde un
+ * calendario compartido. Nunca pide descripción, enlace, ubicación,
+ * invitados, rolesDestino ni antelación: compartir la agenda no es permiso
+ * de lectura sobre el proyecto.
+ */
+export const EVENT_SHARED_SELECT = {
+  idEvento: true,
+  idProyecto: true,
+  tituloEvento: true,
+  fechaInicio: true,
+  fechaFin: true,
+  tipoEvento: true,
+  modalidad: true,
+  proyecto: { select: { idProyecto: true, tituloProyecto: true } },
+} as const satisfies Prisma.EventoProyectoSelect;
+
+export type EventoCompartidoFila = Prisma.EventoProyectoGetPayload<{ select: typeof EVENT_SHARED_SELECT }>;
+
+/**
+ * Contrato de un evento en la agenda compartida. `DETALLE` solo cuando quien
+ * recibe tiene acceso propio al proyecto; si no, `OCUPADO`: horario sin
+ * identidad (ni título, ni tipo, ni proyecto).
+ */
+export type EventoCompartido =
+  | {
+      idEvento: number;
+      fechaInicio: Date;
+      fechaFin: Date;
+      visibilidad: 'DETALLE';
+      tituloEvento: string;
+      tipoEvento: TipoEvento;
+      modalidad: ModalidadEvento;
+      proyecto: { idProyecto: number; tituloProyecto: string };
+    }
+  | { idEvento: number; fechaInicio: Date; fechaFin: Date; visibilidad: 'OCUPADO' };
+
+/**
+ * Construye el DTO compartido campo por campo (allowlist): aunque la fila
+ * traiga más columnas, nunca se copian por spread.
+ */
+export function proyectarEventoCompartido(fila: EventoCompartidoFila, puedeVerDetalle: boolean): EventoCompartido {
+  const base = { idEvento: fila.idEvento, fechaInicio: fila.fechaInicio, fechaFin: fila.fechaFin };
+  if (!puedeVerDetalle) {
+    return { ...base, visibilidad: 'OCUPADO' };
+  }
+  return {
+    ...base,
+    visibilidad: 'DETALLE',
+    tituloEvento: fila.tituloEvento,
+    tipoEvento: fila.tipoEvento,
+    modalidad: fila.modalidad,
+    proyecto: { idProyecto: fila.proyecto.idProyecto, tituloProyecto: fila.proyecto.tituloProyecto },
+  };
+}
+
+/**
+ * HU-184: un evento con invitados solo lo ven ellos y el líder del proyecto;
+ * sin invitados lo ve todo el proyecto (comportamiento previo).
+ */
+export function filtroVisibilidadEvento(userId: number): Prisma.EventoProyectoWhereInput {
+  return {
+    OR: [{ invitados: { isEmpty: true } }, { invitados: { has: userId } }, { proyecto: { creadoPor: userId } }],
+  };
+}
 
 /**
  * HU-169 (T-263): CRUD de EventoProyecto. Mismo patrón de permisos que
@@ -43,7 +111,7 @@ export class EventsService {
   async findAllForProject(projectId: number, userId: number) {
     await this.assertCanRead(projectId, userId);
     return this.prisma.eventoProyecto.findMany({
-      where: { idProyecto: projectId, eliminadoEn: null },
+      where: { idProyecto: projectId, eliminadoEn: null, ...filtroVisibilidadEvento(userId) },
       select: EVENT_SELECT,
       orderBy: { fechaInicio: 'asc' },
     });
@@ -62,6 +130,7 @@ export class EventsService {
         // termine el rango y termina después de que empiece.
         fechaInicio: { lte: new Date(hasta) },
         fechaFin: { gte: new Date(desde) },
+        ...filtroVisibilidadEvento(userId),
       },
       select: {
         ...EVENT_SELECT,
@@ -69,6 +138,37 @@ export class EventsService {
       },
       orderBy: { fechaInicio: 'asc' },
     });
+  }
+
+  /**
+   * G01 (UI-01): agenda del propietario vista por quien recibe su calendario
+   * compartido. Los proyectos son los del propietario, pero la visibilidad se
+   * evalúa contra quien mira: un evento con invitados solo aparece si quien
+   * mira está invitado (sin heredar el bypass de líder del propietario), y el
+   * detalle (título, tipo, modalidad, proyecto) solo si quien mira tiene
+   * acceso propio a ese proyecto; si no, se devuelve como OCUPADO.
+   */
+  async findSharedInRange(ownerId: number, viewerId: number, desde: string, hasta: string): Promise<EventoCompartido[]> {
+    const [idsPropietario, idsReceptor] = await Promise.all([
+      this.projectIdsForUser(ownerId),
+      this.projectIdsForUser(viewerId),
+    ]);
+    if (idsPropietario.length === 0) return [];
+
+    const filas = await this.prisma.eventoProyecto.findMany({
+      where: {
+        idProyecto: { in: idsPropietario },
+        eliminadoEn: null,
+        fechaInicio: { lte: new Date(hasta) },
+        fechaFin: { gte: new Date(desde) },
+        // Restricción por invitados contra quien mira, nunca contra el propietario.
+        OR: [{ invitados: { isEmpty: true } }, { invitados: { has: viewerId } }],
+      },
+      select: EVENT_SHARED_SELECT,
+      orderBy: { fechaInicio: 'asc' },
+    });
+    const comunes = new Set(idsReceptor);
+    return filas.map((fila) => proyectarEventoCompartido(fila, comunes.has(fila.idProyecto)));
   }
 
   async create(projectId: number, userId: number, dto: CreateEventDto) {
@@ -79,6 +179,7 @@ export class EventsService {
     }
     this.assertFechaFinPosterior(dto.fechaInicio, dto.fechaFin);
     this.assertFechaInicioNoPasada(dto.fechaInicio);
+    const invitados = await this.normalizarInvitados(projectId, proyecto.creadoPor, dto.invitados);
 
     return this.prisma.eventoProyecto.create({
       data: {
@@ -95,6 +196,8 @@ export class EventsService {
         ubicacionNombre: dto.ubicacionNombre,
         linkSesion: dto.linkSesion,
         rolesDestino: dto.rolesDestino ?? [],
+        tipoEvento: dto.tipoEvento ?? 'OTRO',
+        invitados,
       },
       select: EVENT_SELECT,
     });
@@ -112,6 +215,20 @@ export class EventsService {
       );
     }
 
+    // G04 (UI-35): en los metadatos de modalidad, `null` explícito limpia el
+    // dato y la omisión lo conserva (un cliente antiguo que no los envía no
+    // borra nada). Lo que no se permite es dejar sin ubicación o sin enlace un
+    // evento cuya modalidad resultante sí los necesita.
+    const modalidadFinal = dto.modalidad ?? actual.modalidad;
+    const requiereUbicacion = modalidadFinal === 'PRESENCIAL' || modalidadFinal === 'MIXTA';
+    const requiereLink = modalidadFinal === 'VIRTUAL' || modalidadFinal === 'MIXTA';
+    if (requiereUbicacion && (dto.ubicacionLat === null || dto.ubicacionLng === null)) {
+      throw new BadRequestException('Un evento presencial o híbrido necesita su ubicación en el mapa');
+    }
+    if (requiereLink && dto.linkSesion === null) {
+      throw new BadRequestException('Un evento virtual o híbrido necesita el enlace de la sesión');
+    }
+
     const data: Prisma.EventoProyectoUpdateInput = { actualizadoEn: new Date() };
     if (dto.tituloEvento !== undefined) data.tituloEvento = dto.tituloEvento;
     if (dto.descripcionEvento !== undefined) data.descripcionEvento = dto.descripcionEvento;
@@ -123,6 +240,22 @@ export class EventsService {
     if (dto.ubicacionNombre !== undefined) data.ubicacionNombre = dto.ubicacionNombre;
     if (dto.linkSesion !== undefined) data.linkSesion = dto.linkSesion;
     if (dto.rolesDestino !== undefined) data.rolesDestino = dto.rolesDestino;
+    if (dto.tipoEvento !== undefined) data.tipoEvento = dto.tipoEvento;
+    if (dto.invitados !== undefined) {
+      const invitados = await this.normalizarInvitados(projectId, proyecto.creadoPor, dto.invitados);
+      data.invitados = invitados;
+      // G04 (UI-22): si la audiencia CRECE (alguien nuevo en la lista, o la
+      // lista se vacía y el evento vuelve a ser de todo el proyecto), quien
+      // entra tarde se quedaba sin recordatorio cuando este ya se había
+      // enviado. Se reabre el recordatorio; EventsReminderService solo avisa a
+      // quien todavía no tiene aviso de este evento para esta hora de inicio,
+      // así que los ya notificados no reciben un duplicado. El diálogo manda
+      // `invitados` en cada edición: por eso se compara contra el valor real
+      // (cambiar solo el título, o quitar a alguien, no reabre nada).
+      if (this.audienciaCrece(actual.invitados, invitados)) {
+        data.recordatorioEnviadoEn = null;
+      }
+    }
     // T-265: mover fechaInicio invalida el recordatorio ya agendado/enviado
     // contra la fecha vieja — se resetea para que EventsReminderService lo
     // recalcule contra la fecha nueva, nunca reenvía el viejo. El diálogo del
@@ -158,6 +291,37 @@ export class EventsService {
     });
   }
 
+  /**
+   * HU-184: invitados sin duplicados y solo integrantes del proyecto (líder o
+   * participante ACTIVO). Un id ajeno es un 400, no se descarta en silencio:
+   * el líder debe enterarse de que esa persona no recibirá el evento.
+   */
+  private async normalizarInvitados(projectId: number, leaderId: number, invitados?: number[]): Promise<number[]> {
+    const unicos = [...new Set(invitados ?? [])];
+    if (unicos.length === 0) return [];
+
+    const participaciones = await this.prisma.participacionProyecto.findMany({
+      where: { idUsuario: { in: unicos }, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: projectId } },
+      select: { idUsuario: true },
+    });
+    const integrantes = new Set([leaderId, ...participaciones.map((p) => p.idUsuario)]);
+    if (unicos.some((id) => !integrantes.has(id))) {
+      throw new BadRequestException('Solo puedes invitar a integrantes activos del proyecto');
+    }
+    return unicos;
+  }
+
+  /**
+   * ¿Hay alguien que antes no recibía el evento y ahora sí? `[]` significa
+   * "todo el proyecto": pasar de una lista a `[]` amplía; pasar de `[]` a una
+   * lista restringe (los invitados son siempre integrantes, ya estaban dentro).
+   */
+  private audienciaCrece(antes: number[], ahora: number[]): boolean {
+    if (antes.length === 0) return false;
+    if (ahora.length === 0) return true;
+    return ahora.some((id) => !antes.includes(id));
+  }
+
   private assertFechaFinPosterior(fechaInicio: string, fechaFin: string): void {
     if (new Date(fechaFin).getTime() <= new Date(fechaInicio).getTime()) {
       throw new BadRequestException('La fecha y hora de fin debe ser posterior a la fecha y hora de inicio');
@@ -170,7 +334,8 @@ export class EventsService {
     }
   }
 
-  private async projectIdsForUser(userId: number): Promise<number[]> {
+  /** Proyectos donde el usuario es líder o participante ACTIVO (público: lo reutiliza la agenda compartida). */
+  async projectIdsForUser(userId: number): Promise<number[]> {
     const proyectos = await this.prisma.proyecto.findMany({
       where: {
         eliminadoEn: null,

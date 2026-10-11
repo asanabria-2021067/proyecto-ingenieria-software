@@ -30,6 +30,22 @@ export function marcarTodasLeidas(): Promise<{ actualizadas: number }> {
 }
 
 /**
+ * G03 (UI-40): id de usuario válido para un parámetro de URL: entero positivo
+ * (número o texto de dígitos). Cualquier otra cosa se descarta: la URL no
+ * puede llevar texto arbitrario ni servir para consultar agendas ajenas.
+ */
+export function idUsuarioSeguro(valor: unknown): number | null {
+  const n = typeof valor === 'number' ? valor : typeof valor === 'string' && /^\d{1,12}$/.test(valor) ? Number(valor) : NaN;
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+/** Ruta del calendario con el calendario compartido de `ownerId` para activar; sin id válido, el calendario a secas. */
+export function linkCalendarioCompartido(ownerId: unknown): string {
+  const id = idUsuarioSeguro(ownerId);
+  return id === null ? '/dashboard/calendario' : `/dashboard/calendario?compartido=${id}`;
+}
+
+/**
  * Resuelve a qué vista debe navegar el usuario al hacer clic en una notificación,
  * según su tipo. Devuelve null si el tipo no tiene una vista de destino definida.
  */
@@ -56,6 +72,11 @@ export function getNotificationLink(n: {
       return '/dashboard/admin/usuarios';
     case 'CUENTA_PENDIENTE_VERIFICACION':
       return '/dashboard/admin/cuentas-pendientes';
+    // HU-184: alguien compartió su calendario. G03 (UI-40): el enlace lleva el
+    // `ownerId` validado y la página lo activa solo si la API lo lista entre
+    // los calendarios recibidos; notificaciones antiguas sin id abren el calendario.
+    case 'CALENDARIO_COMPARTIDO':
+      return linkCalendarioCompartido(datos.ownerId);
     default:
       return null;
   }

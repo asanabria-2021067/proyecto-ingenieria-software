@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Ref } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -30,10 +30,31 @@ interface NominatimResult {
   lon: string;
 }
 
+/** Mismo tope que `ubicacionNombre` en el backend (VarChar(255)) y en el schema del diálogo. */
+export const MAX_NOMBRE_LUGAR = 255;
+
+/** G02 (UI-03): un nombre de Nominatim puede superar el tope; se recorta antes de entrar al formulario. */
+export function recortarNombreLugar(nombre: string): string {
+  return nombre.length > MAX_NOMBRE_LUGAR ? nombre.slice(0, MAX_NOMBRE_LUGAR) : nombre;
+}
+
+/**
+ * G02 (UI-25): Leaflet permite hacer clic en copias del mundo (lng fuera de
+ * ±180) y el backend las rechaza con 400. Se normaliza como `LatLng.wrap()`:
+ * lng al rango [-180, 180] y lat acotada a [-90, 90].
+ */
+export function normalizarCoordenadas(lat: number, lng: number): { lat: number; lng: number } {
+  const latAcotada = Math.min(90, Math.max(-90, lat));
+  // Un valor ya válido se devuelve tal cual (sin pasar por el módulo, que introduce error de coma flotante).
+  if (lng >= -180 && lng <= 180) return { lat: latAcotada, lng };
+  return { lat: latAcotada, lng: ((((lng + 180) % 360) + 360) % 360) - 180 };
+}
+
 function ClickHandler({ onPick }: { onPick: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(e) {
-      onPick(e.latlng.lat, e.latlng.lng);
+      const { lat, lng } = normalizarCoordenadas(e.latlng.lat, e.latlng.lng);
+      onPick(lat, lng);
     },
   });
   return null;
@@ -56,6 +77,14 @@ export interface EventLocationPickerProps {
   onNombreChange: (value: string) => void;
   onPositionChange: (lat: number, lng: number) => void;
   disabled?: boolean;
+  /** G02 (UI-03/UI-09): los pone `FormControl` del diálogo; van al input del nombre para label, error y lector. */
+  id?: string;
+  'aria-describedby'?: string;
+  'aria-invalid'?: boolean | 'true' | 'false';
+  /** G03 (UI-30): el lugar es obligatorio en presencial/híbrida; se anuncia en el input. */
+  'aria-required'?: boolean;
+  /** Para enfocar el input cuando la ubicación es el único campo inválido. */
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 /**
@@ -70,6 +99,11 @@ export default function EventLocationPicker({
   onNombreChange,
   onPositionChange,
   disabled,
+  id,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
+  inputRef,
 }: EventLocationPickerProps) {
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -95,8 +129,9 @@ export default function EventLocationPicker({
   };
 
   const elegirResultado = (result: NominatimResult) => {
-    onNombreChange(result.display_name);
-    onPositionChange(Number.parseFloat(result.lat), Number.parseFloat(result.lon));
+    onNombreChange(recortarNombreLugar(result.display_name));
+    const { lat: latLugar, lng: lngLugar } = normalizarCoordenadas(Number.parseFloat(result.lat), Number.parseFloat(result.lon));
+    onPositionChange(latLugar, lngLugar);
     setResults([]);
   };
 
@@ -106,8 +141,14 @@ export default function EventLocationPicker({
     <div className="space-y-tight">
       <div className="flex gap-tight">
         <Input
+          ref={inputRef}
+          id={id}
+          aria-describedby={ariaDescribedBy}
+          aria-invalid={ariaInvalid}
+          aria-required={ariaRequired}
           value={nombre}
           disabled={disabled}
+          maxLength={MAX_NOMBRE_LUGAR}
           onChange={(e) => onNombreChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -150,7 +191,7 @@ export default function EventLocationPicker({
         </ul>
       )}
       {searchError && (
-        <p role="alert" className="text-xs text-status-error">
+        <p role="alert" className="text-xs text-on-status-error">
           {searchError}
         </p>
       )}

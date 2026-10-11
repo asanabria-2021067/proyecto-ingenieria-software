@@ -23,6 +23,22 @@ describe('resolveTaskNotificationLink', () => {
     ).toBe('/dashboard/projects/5/kanban/tasks/9');
   });
 
+  it('resuelve TAREA_POR_VENCER (HU-186) hacia la tarea, con los datos reales del recordatorio', () => {
+    expect(
+      resolveTaskNotificationLink({
+        tipoNotificacion: 'TAREA_POR_VENCER',
+        datosJson: {
+          taskTitle: 'Diseñar el login',
+          projectTitle: 'Proyecto X',
+          taskId: 34,
+          projectId: 12,
+          horasAntes: 24,
+          fechaLimiteTexto: '11 de octubre de 2026',
+        },
+      }),
+    ).toBe('/dashboard/projects/12/kanban/tasks/34');
+  });
+
   it('acepta idProyecto/idTarea como convención alternativa', () => {
     expect(
       resolveTaskNotificationLink({

@@ -280,6 +280,10 @@ export function getApiErrorMessage(
       if (scope === 'general' || scope === 'auth') {
         return 'No encontramos lo que buscabas o ya no está disponible. Actualiza la información e inténtalo nuevamente.';
       }
+      // G03 (UI-21): en el calendario lo que desaparece es el evento o su proyecto, no una tarea o etiqueta.
+      if (scope === 'calendar') {
+        return 'El evento o el proyecto ya no está disponible. Actualiza la información e inténtalo nuevamente.';
+      }
       return 'La tarea, etiqueta o proyecto ya no está disponible. Actualiza la información e inténtalo nuevamente.';
     case 409:
       if (scope === 'label') {

@@ -42,6 +42,7 @@ import { GlobalSearchModule } from './search/global-search.module';
 import { ExportsModule } from './exports/exports.module';
 import { SecurityEventsModule } from './security-events/security-events.module';
 import { EventsModule } from './events/events.module';
+import { CalendarSharesModule } from './calendar-shares/calendar-shares.module';
 import { AttendanceModule } from './attendance/attendance.module';
 
 const skipThrottling = () => isThrottlerDisabled();
@@ -115,6 +116,7 @@ const skipThrottling = () => isThrottlerDisabled();
     // G05 (OWASP25-C037): writer best-effort de eventos de seguridad (global).
     SecurityEventsModule,
     EventsModule,
+    CalendarSharesModule,
     AttendanceModule,
   ],
   controllers: [AppController],

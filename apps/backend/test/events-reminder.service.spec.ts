@@ -12,9 +12,12 @@ function makePrisma() {
   return {
     eventoProyecto: { findMany: vi.fn(), update: vi.fn() },
     participacionProyecto: { findMany: vi.fn().mockResolvedValue([{ idUsuario: MEMBER_ID }]) },
+    // G04-C16: el servicio consulta a quién ya avisó. Por defecto, a nadie (primer envío).
+    notificacion: { findMany: vi.fn().mockResolvedValue([]) },
   } as unknown as PrismaService & {
     eventoProyecto: { findMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
     participacionProyecto: { findMany: ReturnType<typeof vi.fn> };
+    notificacion: { findMany: ReturnType<typeof vi.fn> };
   };
 }
 
@@ -31,6 +34,7 @@ function evento(overrides: Record<string, unknown> = {}) {
     tituloEvento: 'Kickoff',
     fechaInicio: new Date('2026-10-01T15:00:00.000Z'),
     antelacionMinutos: 60,
+    invitados: [],
     proyecto: { tituloProyecto: 'Proyecto X', creadoPor: LEADER_ID },
     ...overrides,
   };
@@ -162,5 +166,132 @@ describe('EventsReminderService.enviarRecordatoriosPendientes', () => {
     expect(notifications.notifyFromTemplate).toHaveBeenCalledTimes(2);
     // El evento fallido no se marca como enviado: puede reintentarse en la próxima corrida.
     expect(prisma.eventoProyecto.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('con invitados, solo los invitados que siguen en el proyecto y el líder reciben el recordatorio (HU-184)', async () => {
+    const OTRO_ID = 3;
+    const prisma = makePrisma();
+    prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: MEMBER_ID }, { idUsuario: OTRO_ID }]);
+    // 77 ya no es integrante: no recibe nada aunque siga en la lista.
+    prisma.eventoProyecto.findMany.mockResolvedValue([evento({ invitados: [OTRO_ID, 77] })]);
+    const notifications = makeNotifications();
+    const service = new EventsReminderService(prisma, notifications);
+
+    await service.enviarRecordatoriosPendientes();
+
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([LEADER_ID, OTRO_ID], 'RECORDATORIO_EVENTO', expect.any(Object));
+  });
+});
+
+/**
+ * G04-C16 (UI-22): la marca `recordatorioEnviadoEn` es global por evento. Al
+ * reabrirla porque entró un invitado nuevo, el aviso debe llegar solo a quien
+ * todavía no lo tiene: nunca un duplicado, nunca un reenvío a todos.
+ */
+describe('EventsReminderService — sin duplicados al reabrir el recordatorio (G04-C16, UI-22)', () => {
+  const NUEVO_ID = 3;
+  const INICIO = new Date('2026-10-01T15:00:00.000Z');
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-01T14:30:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function preparar(yaAvisados: number[], overrides: Record<string, unknown> = {}) {
+    const prisma = makePrisma();
+    prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: MEMBER_ID }, { idUsuario: NUEVO_ID }]);
+    prisma.eventoProyecto.findMany.mockResolvedValue([evento({ invitados: [MEMBER_ID, NUEVO_ID], ...overrides })]);
+    prisma.notificacion.findMany.mockResolvedValue(yaAvisados.map((idUsuario) => ({ idUsuario })));
+    const notifications = makeNotifications();
+    return { prisma, notifications, service: new EventsReminderService(prisma, notifications) };
+  }
+
+  it('avisa únicamente al invitado nuevo: el líder y quien ya lo recibió no se repiten', async () => {
+    const { prisma, notifications, service } = preparar([LEADER_ID, MEMBER_ID]);
+
+    await service.enviarRecordatoriosPendientes();
+
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledTimes(1);
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([NUEVO_ID], 'RECORDATORIO_EVENTO', expect.objectContaining({ eventId: EVENT_ID }));
+    expect(prisma.eventoProyecto.update).toHaveBeenCalledWith({ where: { idEvento: EVENT_ID }, data: { recordatorioEnviadoEn: expect.any(Date) } });
+  });
+
+  it('si todos ya tienen el aviso no envía nada, pero cierra de nuevo la marca (no reintenta cada 5 minutos)', async () => {
+    const { prisma, notifications, service } = preparar([LEADER_ID, MEMBER_ID, NUEVO_ID]);
+
+    await service.enviarRecordatoriosPendientes();
+
+    expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
+    expect(prisma.eventoProyecto.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('la evidencia se busca en las notificaciones persistidas: este evento, esta hora de inicio y solo sus destinatarios', async () => {
+    const { prisma, service } = preparar([]);
+
+    await service.enviarRecordatoriosPendientes();
+
+    expect(prisma.notificacion.findMany).toHaveBeenCalledWith({
+      where: {
+        tipoNotificacion: 'RECORDATORIO_EVENTO',
+        idUsuario: { in: [LEADER_ID, MEMBER_ID, NUEVO_ID] },
+        datosJson: { path: ['eventId'], equals: EVENT_ID },
+        OR: [
+          { datosJson: { path: ['fechaInicioIso'], equals: INICIO.toISOString() } },
+          { datosJson: { path: ['fechaInicioTexto'], equals: expect.stringContaining('2026') } },
+        ],
+      },
+      select: { idUsuario: true },
+    });
+  });
+
+  it('el aviso guarda la hora de inicio como instante ISO, la clave con la que se reconoce después', async () => {
+    const { notifications, service } = preparar([]);
+    await service.enviarRecordatoriosPendientes();
+    const datos = notifications.notifyFromTemplate.mock.calls[0][2] as { fechaInicioIso: string; fechaInicioTexto: string };
+    expect(datos.fechaInicioIso).toBe(INICIO.toISOString());
+    expect(datos.fechaInicioTexto).toContain('9:00');
+  });
+
+  it('si el evento se movió, los avisos de la hora anterior no cuentan: todos reciben el de la fecha nueva (T-265 intacto)', async () => {
+    const NUEVO_INICIO = new Date('2026-10-01T15:20:00.000Z');
+    const { prisma, notifications, service } = preparar([], { fechaInicio: NUEVO_INICIO });
+    // La tabla solo tiene avisos de las 15:00: la consulta por las 15:20 no encuentra a nadie.
+    prisma.notificacion.findMany.mockImplementation(async ({ where }: { where: { OR: { datosJson: { equals: string } }[] } }) =>
+      where.OR[0].datosJson.equals === INICIO.toISOString() ? [{ idUsuario: LEADER_ID }, { idUsuario: MEMBER_ID }, { idUsuario: NUEVO_ID }] : [],
+    );
+
+    await service.enviarRecordatoriosPendientes();
+
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([LEADER_ID, MEMBER_ID, NUEVO_ID], 'RECORDATORIO_EVENTO', expect.objectContaining({ fechaInicioIso: NUEVO_INICIO.toISOString() }));
+  });
+
+  it('si no se puede consultar a quién se avisó, no se envía a nadie ni se marca el evento (se reintenta en la siguiente pasada)', async () => {
+    const { prisma, notifications, service } = preparar([]);
+    prisma.notificacion.findMany.mockRejectedValue(new Error('conexión perdida'));
+
+    await expect(service.enviarRecordatoriosPendientes()).resolves.toBeUndefined();
+
+    expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
+    expect(prisma.eventoProyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('un invitado que ya no es integrante activo sigue sin recibir nada, aunque nunca se le haya avisado', async () => {
+    const { prisma, notifications, service } = preparar([LEADER_ID]);
+    prisma.participacionProyecto.findMany.mockResolvedValue([{ idUsuario: MEMBER_ID }]); // NUEVO_ID se retiró
+
+    await service.enviarRecordatoriosPendientes();
+
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([MEMBER_ID], 'RECORDATORIO_EVENTO', expect.anything());
+    expect(prisma.notificacion.findMany.mock.calls[0][0].where.idUsuario).toEqual({ in: [LEADER_ID, MEMBER_ID] });
+  });
+
+  it('en un evento de todo el proyecto que se reabre, solo recibe aviso el integrante que faltaba', async () => {
+    const { notifications, service } = preparar([LEADER_ID, MEMBER_ID], { invitados: [] });
+    await service.enviarRecordatoriosPendientes();
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([NUEVO_ID], 'RECORDATORIO_EVENTO', expect.anything());
   });
 });

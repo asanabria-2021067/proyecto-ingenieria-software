@@ -6,6 +6,13 @@ export type CalendarDay = {
 
 export const WEEKDAY_LABELS_ES = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
+/**
+ * G04 (UI-32): nombre completo de cada cabecera, en el mismo orden. Las
+ * iniciales ("L M M J V S D") no bastan para un lector de pantalla: hay dos
+ * "M" y ninguna dice qué día es.
+ */
+export const WEEKDAY_NAMES_ES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+
 const MONTH_LABELS_ES = [
   'enero',
   'febrero',

@@ -15,6 +15,8 @@ function makeTx() {
   return {
     tarea: { update: vi.fn(), findFirst: vi.fn() },
     tareaEtiqueta: { deleteMany: vi.fn(), createMany: vi.fn() },
+    // HU-186: update() borra los avisos de vencimiento al cambiar la fecha límite.
+    recordatorioTarea: { deleteMany: vi.fn() },
   };
 }
 

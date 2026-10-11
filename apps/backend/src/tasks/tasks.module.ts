@@ -7,6 +7,7 @@ import { TasksService } from './tasks.service';
 import { TasksContextService } from './tasks-context.service';
 import { TasksAuthorizationService } from './tasks-authorization.service';
 import { TasksRelationsService } from './tasks-relations.service';
+import { TasksDueReminderService } from './tasks-due-reminder.service';
 import { ComentariosModule } from '../comentarios/comentarios.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SprintsModule } from '../sprints/sprints.module';
@@ -21,6 +22,8 @@ import { BitacoraModule } from '../bitacora/bitacora.module';
     TasksContextService,
     TasksAuthorizationService,
     TasksRelationsService,
+    // HU-186 (T-329): job diario de recordatorios de vencimiento.
+    TasksDueReminderService,
   ],
   exports: [TasksService],
 })
