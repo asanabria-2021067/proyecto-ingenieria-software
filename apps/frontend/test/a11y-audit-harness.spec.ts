@@ -17,7 +17,7 @@ const ejecutar = (args: string[], env: Record<string, string> = {}) =>
   spawnSync(process.execPath, [SCRIPT, ...args], {
     encoding: 'utf8',
     // Entorno mínimo: el script no debe heredar variables de quien corre la suite.
-    env: { PATH: process.env.PATH ?? '', ...env } as NodeJS.ProcessEnv,
+    env: { PATH: process.env.PATH ?? '', NODE_ENV: 'test', ...env },
   });
 
 describe('FG09-C01: harness de auditoría de accesibilidad', () => {
@@ -91,5 +91,47 @@ describe('FG09-C01: harness de auditoría de accesibilidad', () => {
     expect(inventario).toContain('solo se mide el primero');
     expect(inventario).toContain('una puntuación de 100 no equivale a cumplir AA');
     expect(inventario).toContain('no se pudo medir con datos');
+  });
+});
+
+describe('FG09-C02: matriz de hallazgos de la línea base', () => {
+  const auditoria = readFileSync(join(REPO, 'docs/qa/sprint9/accesibilidad-auditoria.md'), 'utf8');
+
+  it('resume las 10 combinaciones de pantalla y tema', () => {
+    const filas = auditoria.split('## 2. Hallazgos')[0].match(/^\| [^|]+ \| (claro|oscuro) \| \d+ \|/gm) ?? [];
+    expect(filas).toHaveLength(10);
+    expect(filas.filter((fila) => fila.includes('| claro |'))).toHaveLength(5);
+  });
+
+  it('cada hallazgo tiene identificador, ruta, regla, criterio WCAG y evidencia o selector', () => {
+    const hallazgos = auditoria.split(/^### /m).slice(1).filter((bloque) => bloque.startsWith('A11Y-'));
+    expect(hallazgos.map((h) => h.slice(0, 7))).toEqual(['A11Y-01', 'A11Y-02', 'A11Y-03', 'A11Y-04', 'A11Y-05', 'A11Y-06', 'A11Y-07', 'A11Y-08']);
+    for (const hallazgo of hallazgos) {
+      const id = hallazgo.slice(0, 7);
+      expect(hallazgo, id).toMatch(/\| Rutas? /);
+      expect(hallazgo, id).toMatch(/\| Regla \| (axe|Lighthouse) `[a-z-]+`/);
+      expect(hallazgo, id).toMatch(/WCAG \d\.\d\.\d/);
+      expect(hallazgo, id).toMatch(/\| (Elementos?|Selectores|Elementos compartidos) \|/);
+      expect(hallazgo, id).toMatch(/— P[12]$/m);
+    }
+  });
+
+  it('los hallazgos de contraste registran la razón medida y los colores realmente pintados', () => {
+    for (const medida of ['**3.62:1** — `#bad6c8` sobre `#1a7649`', '**3.54:1** — `#1f6539` sobre `#67cc87`', '**2.35:1** — `#a7a9aa` sobre `#ffffff`', '**3.22:1** — `#5f6267` sobre `#080b0e`']) {
+      expect(auditoria).toContain(medida);
+    }
+  });
+
+  it('no declara cumplimiento AA: es una línea base con fallos y límites', () => {
+    expect(auditoria).toContain('No declara cumplimiento de WCAG AA');
+    expect(auditoria).toContain('eso no prueba que cumplan AA');
+    expect(auditoria).toContain('## 5. Fuera del alcance de esta medición');
+    expect(auditoria).not.toMatch(/cumple (con )?WCAG|conforme a AA/i);
+  });
+
+  it('prioriza los críticos y graves para la corrección', () => {
+    const prioridad = auditoria.split('## 4. Prioridad para la corrección')[1];
+    expect(prioridad.indexOf('A11Y-04')).toBeLessThan(prioridad.indexOf('A11Y-01'));
+    expect(prioridad.indexOf('A11Y-01')).toBeLessThan(prioridad.indexOf('A11Y-06'));
   });
 });
