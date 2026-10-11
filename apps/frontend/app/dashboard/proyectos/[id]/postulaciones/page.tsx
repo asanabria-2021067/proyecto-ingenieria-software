@@ -6,6 +6,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ArrowLeft, Clock, CheckCircle, XCircle, User } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
+import { getApiErrorStatus } from '@/components/projects/api-error';
+import { useRequireCan } from '@/hooks/use-can';
 import { projectAllPostulationsQueryKey } from '@/lib/query-keys/applications';
 import { EstadoPostulacion, PostulacionRecibida } from '@/types';
 
@@ -52,9 +54,15 @@ export default function PostulacionesProyectoPage() {
     data: postulaciones = [],
     isLoading,
     isError,
+    error,
   } = useQuery<PostulacionRecibida[]>({
     queryKey: projectAllPostulationsQueryKey(id),
     queryFn: () => apiFetch(`/proyectos/${id}/postulaciones`),
+  });
+
+  const { denegado } = useRequireCan('proyecto.postulaciones.resolver', {
+    esLider: getApiErrorStatus(error) !== 403,
+    listo: !isLoading,
   });
 
   const { mutate: resolverPostulacion, isPending } = useMutation({
@@ -93,6 +101,8 @@ export default function PostulacionesProyectoPage() {
       comentarioResolucion: modal.comentario.trim() || undefined,
     });
   }
+
+  if (denegado) return null;
 
   return (
     <>

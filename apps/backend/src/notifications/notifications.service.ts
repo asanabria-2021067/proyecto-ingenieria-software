@@ -10,6 +10,9 @@ import {
 
 type TxClient = Prisma.TransactionClient;
 
+/** T-292: tamaño de página por defecto de GET /notificaciones?page=N. */
+const NOTIFICATIONS_PAGE_SIZE = 20;
+
 /**
  * Sprint 7 (06 v2 §16/§40/§44/§45): efecto diferido al post-commit. Tipo
  * estructural compatible con `EffectBuffer` del runner de proyecto sin
@@ -226,6 +229,24 @@ export class NotificationsService {
       orderBy: { creadaEn: 'desc' },
       take: 100,
     });
+  }
+
+  /**
+   * T-292 (HU-176): página de notificaciones del usuario, de la más reciente a
+   * la más antigua. Misma forma que el listado paginado de proyectos.
+   */
+  async findPage(userId: number, page: number, limit = NOTIFICATIONS_PAGE_SIZE) {
+    const where = { idUsuario: userId };
+    const [data, total] = await Promise.all([
+      this.prisma.notificacion.findMany({
+        where,
+        orderBy: [{ creadaEn: 'desc' }, { idNotificacion: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.notificacion.count({ where }),
+    ]);
+    return { data, total, page, totalPages: Math.ceil(total / limit) };
   }
 
   async findUnreadForUser(userId: number) {

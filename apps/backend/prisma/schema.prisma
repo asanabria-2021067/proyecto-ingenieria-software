@@ -381,6 +381,7 @@ model Usuario {
   calendariosCompartidosPorMi      CalendarioCompartido[]     @relation("CalendarioPropietario")
   calendariosCompartidosConmigo    CalendarioCompartido[]     @relation("CalendarioInvitado")
 
+  @@index([estado, fechaCreacion])
   @@map("usuario")
 }
 
@@ -639,6 +640,7 @@ model Proyecto {
   guardadoPor          ProyectoGuardado[]
   actividades          ActividadProyecto[]
 
+  @@index([estadoProyecto, eliminadoEn])
   @@map("proyecto")
 }
 
@@ -779,6 +781,7 @@ model RolProyecto {
   participaciones  ParticipacionProyecto[]
   tareas           Tarea[]
 
+  @@index([idProyecto])
   @@map("rol_proyecto")
 }
 
@@ -887,6 +890,7 @@ model Hito {
   tareas      Tarea[]
   comentarios Comentario[]
 
+  @@index([idProyecto])
   @@map("hito")
 }
 
@@ -1039,6 +1043,7 @@ model AsignacionTarea {
   @@index([idUsuario, desasignadaEn])
   @@index([idParticipacion])
   @@index([origenReporte, reconocidoEn])
+  @@index([idTarea])
   @@map("asignacion_tarea")
 }
 
@@ -1370,6 +1375,7 @@ model HorasParticipacion {
   asistencia    AsistenciaActividad?
 
   @@index([idSprint])
+  @@index([idParticipacion])
   @@map("horas_participacion")
 }
 
@@ -1588,6 +1594,7 @@ model Comentario {
   tarea    Tarea?    @relation(fields: [idTarea], references: [idTarea])
   hito     Hito?     @relation(fields: [idHito], references: [idHito])
 
+  @@index([idTarea])
   @@map("comentario")
 }
 

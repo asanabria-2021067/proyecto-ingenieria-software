@@ -58,6 +58,7 @@ import { parseObjetivos } from '@/components/projects/detail/parse-objetivos';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useCan } from '@/hooks/use-can';
 import { useCurrentExitRequest } from '@/hooks/use-exit-request';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -132,6 +133,7 @@ export default function ProyectoDetallePage() {
   const { data: currentUser, isLoading: isLoadingCurrentUser } = useCurrentUser();
   const { members, isLoading: isLoadingMembers } = useProjectMembers(projectId);
   const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
+  const puedePostular = useCan('proyecto.postular', { esLider: isLeader });
   const esParticipante =
     !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
   const { iniciarChatCon } = useChatDock();
@@ -380,7 +382,7 @@ export default function ProyectoDetallePage() {
                       >
                         Ver mi postulación
                       </Link>
-                    ) : (
+                    ) : !puedePostular ? null : (
                       <Link
                         href={`/dashboard/proyectos/${projectId}/postular/${rol.idRolProyecto}`}
                         aria-label={`Postularme al rol ${rol.nombreRol}`}

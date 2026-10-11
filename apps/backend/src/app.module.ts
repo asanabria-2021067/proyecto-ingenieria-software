@@ -5,7 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import * as redisStore from 'cache-manager-redis-store';
+import { createKeyv } from '@keyv/redis';
 import { buildEnvOptions } from './config/env.options';
 import { isThrottlerDisabled } from './config/throttler';
 import { AppController } from './app.controller';
@@ -76,11 +76,18 @@ const skipThrottling = () => isThrottlerDisabled();
     CacheModule.registerAsync({
       isGlobal: true,
       inject: [ConfigService],
+      // T-292: cache-manager 7 solo usa stores de Keyv; la opción `store` de
+      // cache-manager-redis-store se ignoraba y la caché quedaba en memoria.
+      // Si Redis no responde, cada operación falla en silencio tras el
+      // timeout y la lectura sigue contra la base. El TTL va en milisegundos.
       useFactory: (config: ConfigService) => ({
-        store: redisStore,
-        host: config.get<string>('app.redis.host'),
-        port: config.get<number>('app.redis.port'),
-        ttl: 300,
+        stores: [
+          createKeyv(`redis://${config.get<string>('app.redis.host')}:${config.get<number>('app.redis.port')}`, {
+            throwOnConnectError: false,
+            connectionTimeout: 200,
+          }),
+        ],
+        ttl: 300_000,
       }),
     }),
     PrismaModule,
