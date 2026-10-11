@@ -364,7 +364,7 @@ describe('SprintClosingPage — alineada con el workspace del proyecto', () => {
     expect(encabezado).toHaveAttribute('data-slot', 'project-page-header');
     const titulo = within(encabezado).getByRole('heading', { level: 1, name: 'Cerrar Sprint 4' });
     expect(titulo.closest('.card-base, .rounded-xl')).toBeNull();
-    expect(within(encabezado).getByText('En finalización')).toHaveClass('pill', 'pill-lime');
+    expect(within(encabezado).getByText('En finalización')).toHaveClass('pill', 'pill-amber');
     expect(screen.getByRole('link', { name: 'Volver a Sprints' })).toHaveAttribute('href', '/dashboard/proyectos/42/sprints');
     expect(screen.queryByRole('link', { name: /volver al proyecto/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: /breadcrumb/i })).not.toBeInTheDocument();
@@ -441,7 +441,7 @@ describe('SprintClosingPage — alineada con el workspace del proyecto', () => {
 
     expect(screen.getByRole('heading', { level: 2, name: 'Revisión por integrante' })).toBeInTheDocument();
     const superficie = document.querySelector('[data-slot="revision-integrantes"]')!;
-    expect(superficie).toHaveClass('rounded-xl', 'border', 'bg-surface-container-lowest');
+    expect(superficie).toHaveClass('card-base', 'overflow-hidden', 'p-0');
     const filas = within(superficie as HTMLElement).getAllByRole('button', { name: /Desglose de/ });
     expect(filas).toHaveLength(2);
 

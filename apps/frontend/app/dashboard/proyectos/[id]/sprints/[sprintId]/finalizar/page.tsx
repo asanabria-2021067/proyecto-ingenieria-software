@@ -31,6 +31,13 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+} from '@/components/dashboard/data-table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Empty,
@@ -59,8 +66,8 @@ import type {
 const COLUMNAS_INTEGRANTE =
   'grid grid-cols-2 items-center gap-x-4 gap-y-2 @3xl/project:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_7rem_7rem]';
 
-/** Encabezado de columna, igual que las tablas de Miembros. */
-const COLUMNA_TITULO = 'text-[10px] font-black uppercase tracking-widest text-tertiary';
+/** Rótulo de columna de la tabla compartida (`data-table`), igual que Miembros y las bandejas. */
+const COLUMNA_TITULO = DATA_TABLE_HEAD_TEXT;
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -145,20 +152,20 @@ function MemberItem({
   const nombre = `${participante.nombre} ${participante.apellido}`;
 
   return (
-    <AccordionItem value={String(participante.idUsuario)} className="border-outline-variant/40">
+    <AccordionItem value={String(participante.idUsuario)} className={DATA_TABLE_ROW_BORDER}>
       <AccordionTrigger
-        className="items-center rounded-none px-4 py-3 transition-colors hover:bg-surface-container-low hover:no-underline"
+        className={`items-center rounded-none px-stack py-inline hover:no-underline ${DATA_TABLE_ROW_HOVER}`}
         aria-label={`Desglose de ${nombre}`}
       >
         <div className={`${COLUMNAS_INTEGRANTE} min-w-0 flex-1`}>
-          <span className="col-span-2 flex min-w-0 items-center gap-3 @3xl/project:col-span-1">
+          <span className="col-span-2 flex min-w-0 items-center gap-tight @3xl/project:col-span-1">
             <Avatar className="size-8 shrink-0">
               {participante.fotoUrl && <AvatarImage src={participante.fotoUrl} alt="" />}
-              <AvatarFallback className="bg-primary-container text-xs font-bold text-on-primary-container">
+              <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
                 {getInitials(participante.nombre, participante.apellido)}
               </AvatarFallback>
             </Avatar>
-            <span className="truncate text-sm font-medium text-on-surface">{nombre}</span>
+            <span className="type-body truncate font-semibold text-text-primary">{nombre}</span>
           </span>
           <span className="col-span-2 flex flex-wrap gap-1 @3xl/project:col-span-1">
             {participante.roles.map((rol) => (
@@ -173,19 +180,19 @@ function MemberItem({
           <span className="flex flex-col">
             {/* En escritorio el encabezado de la tabla ya nombra la columna. */}
             <span className={`${COLUMNA_TITULO} @3xl/project:hidden`}>Reportadas</span>
-            <span className="text-sm font-semibold tabular-nums text-on-surface">
+            <span className="type-body font-semibold tabular-nums text-text-primary">
               {formatearDecimal(totales.reportadas)} h
             </span>
           </span>
           <span className="flex flex-col">
             <span className={`${COLUMNA_TITULO} @3xl/project:hidden`}>Propuestas</span>
-            <span className="text-sm font-semibold tabular-nums text-primary">
+            <span className="type-body font-semibold tabular-nums text-primary">
               {formatearDecimal(totales.propuestas)} h
             </span>
           </span>
         </div>
       </AccordionTrigger>
-      <AccordionContent className="px-4 pb-5 pt-1">
+      <AccordionContent className="px-stack pb-card pt-micro">
         {totales.tramos.length === 0 ? (
           <p className="text-sm italic text-tertiary">Este integrante no tiene tramos de horas en el Sprint.</p>
         ) : (
@@ -512,12 +519,12 @@ export default function SprintClosingPage() {
               ) : (
                 <div
                   data-slot="revision-integrantes"
-                  className="overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest"
+                  className={DATA_TABLE_CARD}
                 >
                   {/* pr-12: deja el hueco del chevron (gap-4 + size-4) de cada fila. */}
                   <div
                     aria-hidden="true"
-                    className={`${COLUMNAS_INTEGRANTE} hidden border-b border-outline-variant/40 bg-surface-container-low py-3 pl-4 pr-12 @3xl/project:grid`}
+                    className={`${COLUMNAS_INTEGRANTE} ${DATA_TABLE_HEAD_ROW} hidden py-tight pl-stack pr-12 @3xl/project:grid`}
                   >
                     <span className={COLUMNA_TITULO}>Integrante</span>
                     <span className={COLUMNA_TITULO}>Rol</span>
