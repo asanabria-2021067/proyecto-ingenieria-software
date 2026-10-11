@@ -19,6 +19,9 @@ export const HEAVY: Record<string, string[]> = {
   ],
   leaflet: ['components/calendar/event-location-picker.tsx'],
   '@tsparticles/': ['components/ui/sparkles.tsx'],
+  // Envoltorios de las librerías de arriba: importarlos de forma estática las arrastra igual.
+  '@/components/admin/AdminMetricsSection': [],
+  '@/components/ui/sparkles': ['components/ui/pricing-section-4.tsx'],
 };
 
 function sources(dir: string): string[] {
@@ -66,5 +69,30 @@ describe('T-293: módulos ya diferidos', () => {
     expect(src).toMatch(/dynamic\(\(\) => import\('\.\/event-location-picker'\)/);
     expect(src).toMatch(/ssr:\s*false/);
     expect(src).not.toMatch(/^import .*from '\.\/event-location-picker'/m);
+  });
+});
+
+describe('T-293: secciones secundarias diferidas', () => {
+  const adminPage = readFileSync(join(ROOT, 'app/dashboard/admin/page.tsx'), 'utf8');
+  const features = readFileSync(join(ROOT, 'components/landing/FeaturesGrid.tsx'), 'utf8');
+
+  it('«Tendencias de uso» se carga con next/dynamic, sin SSR', () => {
+    expect(adminPage).toMatch(
+      /const AdminMetricsSection = dynamic\(\s*\(\) => import\('@\/components\/admin\/AdminMetricsSection'\)/,
+    );
+    expect(adminPage).toMatch(/ssr:\s*false/);
+  });
+
+  it('el hueco de «Tendencias de uso» conserva el título y el alto de las cinco tarjetas', () => {
+    const loading = adminPage.slice(adminPage.indexOf('loading: () => ('), adminPage.indexOf('// ───'));
+    expect(loading).toContain('aria-busy="true"');
+    expect(loading).toMatch(/<h2[^>]*>Tendencias de uso<\/h2>/);
+    expect(loading).toContain('length: 5');
+    expect(loading).toContain('h-72');
+  });
+
+  it('el fondo de partículas de la landing se carga con next/dynamic, sin SSR', () => {
+    expect(features).toMatch(/const Sparkles = dynamic\(\(\) => import\("@\/components\/ui\/sparkles"\)/);
+    expect(features).toMatch(/ssr:\s*false/);
   });
 });

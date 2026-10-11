@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId } from 'react';
+import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import {
   FolderKanban,
@@ -19,13 +20,33 @@ import { adminProjectHref } from '@/lib/admin/sprint-calendar';
 import { AdminSprintPlanningWidget } from '@/components/admin/dashboard/sprint-planning-widget';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ADMIN_METRICS_ANCHOR, ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
-import { AdminMetricsSection } from '@/components/admin/AdminMetricsSection';
 import {
   getAdminStats,
   type AdminStats,
   type AdminActividadRecienteItem,
   type AdminEstudianteEnRiesgo,
 } from '@/lib/services/admin';
+
+// T-293: «Tendencias de uso» trae recharts (~100 KB gzip) y queda debajo de la cola de atención:
+// se carga aparte. El hueco conserva título y alto para que nada se mueva al llegar el gráfico.
+const AdminMetricsSection = dynamic(
+  () => import('@/components/admin/AdminMetricsSection').then((m) => m.AdminMetricsSection),
+  {
+    ssr: false,
+    loading: () => (
+      <section className="mb-10" aria-busy="true">
+        <div className="mb-4 flex min-h-8 items-center">
+          <h2 className="font-headline text-lg font-black tracking-tight text-on-surface">Tendencias de uso</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 5 }, (_, i) => (
+            <Skeleton key={i} className="h-72 rounded-control" />
+          ))}
+        </div>
+      </section>
+    ),
+  },
+);
 
 /** Mismo contenedor que el resto de bandejas administrativas (1400 px centrado). */
 const PAGE_CLASS = ADMIN_PAGE;
