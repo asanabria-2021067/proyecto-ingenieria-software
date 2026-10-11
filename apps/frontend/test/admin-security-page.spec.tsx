@@ -152,3 +152,149 @@ describe('FG02-C03: tabla del visor de eventos de seguridad', () => {
     expect(screen.queryByRole('navigation', { name: 'Paginación de eventos de seguridad' })).not.toBeInTheDocument();
   });
 });
+
+describe('FG02-C06: estados de la consulta', () => {
+  const fallo = (statusCode?: number) => Object.assign(new Error('falló'), statusCode ? { statusCode } : {});
+  /** Promesa que el test resuelve a mano. */
+  function diferida<T>() {
+    let resolver!: (valor: T) => void;
+    const promesa = new Promise<T>((res) => {
+      resolver = res;
+    });
+    return { promesa, resolver };
+  }
+
+  it('mientras carga muestra un esqueleto anunciado, sin tabla, sin vacío y sin error', async () => {
+    const pendiente = diferida<ReturnType<typeof pagina>>();
+    vi.mocked(getSecurityEvents).mockReturnValue(pendiente.promesa);
+    renderPagina();
+
+    expect(screen.getByRole('status', { name: 'Cargando eventos de seguridad' })).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(/no hay eventos|Ningún evento/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actualizando…' })).toBeDisabled();
+
+    pendiente.resolver(pagina(SEIS_TIPOS));
+    await screen.findByRole('table');
+    expect(screen.queryByRole('status', { name: 'Cargando eventos de seguridad' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actualizar' })).toBeEnabled();
+  });
+
+  it('sin eventos y sin filtros explica que todavía no hay registros, sin ofrecer quitar filtros', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(pagina([]));
+    renderPagina();
+    expect(await screen.findByText('Todavía no hay eventos de seguridad registrados.')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Quitar filtros' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('sin coincidencias con filtros lo dice y permite quitarlos', async () => {
+    vi.mocked(getSecurityEvents).mockImplementation(async (query) => pagina(query?.idUsuario ? [] : SEIS_TIPOS));
+    renderPagina();
+    await screen.findByRole('table');
+    fireEvent.change(screen.getByLabelText('ID de usuario'), { target: { value: '8' } });
+
+    expect(await screen.findByText('Ningún evento coincide con estos filtros.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+    await screen.findByRole('table');
+    expect(screen.getByLabelText('ID de usuario')).toHaveValue('');
+  });
+
+  it.each([
+    [403, 'No tienes permiso para consultar los eventos de seguridad.', null],
+    [401, 'Tu sesión expiró.', null],
+    [400, 'El servidor no aceptó estos filtros.', 'Quitar filtros'],
+    [429, 'Demasiadas consultas seguidas.', 'Reintentar'],
+    [500, 'El servidor no pudo entregar los eventos de seguridad.', 'Reintentar'],
+    [503, 'El servidor no pudo entregar los eventos de seguridad.', 'Reintentar'],
+    [undefined, 'No se pudo conectar con el servidor.', 'Reintentar'],
+  ])('un fallo %s se anuncia como «%s» con la acción %s', async (statusCode, titulo, accion) => {
+    vi.mocked(getSecurityEvents).mockRejectedValue(fallo(statusCode));
+    renderPagina();
+
+    const alerta = await screen.findByRole('alert');
+    expect(alerta).toHaveTextContent(titulo);
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Todavía no hay eventos|Ningún evento coincide/)).not.toBeInTheDocument();
+    const botones = within(alerta).queryAllByRole('button');
+    expect(botones.map((boton) => boton.textContent)).toEqual(accion ? [accion] : []);
+  });
+
+  it('un error nunca se confunde con una lista vacía ni muestra el mensaje interno del servidor', async () => {
+    vi.mocked(getSecurityEvents).mockRejectedValue(Object.assign(new Error('PrismaClientKnownRequestError P2024'), { statusCode: 500 }));
+    renderPagina();
+    await screen.findByRole('alert');
+    expect(document.body.textContent).not.toContain('Prisma');
+    expect(screen.queryByText(/Eventos encontrados/)).not.toBeInTheDocument();
+  });
+
+  it('«Reintentar» repite la misma consulta y recupera los resultados', async () => {
+    vi.mocked(getSecurityEvents).mockRejectedValueOnce(fallo(500)).mockResolvedValueOnce(pagina(SEIS_TIPOS));
+    renderPagina();
+    fireEvent.click(within(await screen.findByRole('alert')).getByRole('button', { name: 'Reintentar' }));
+
+    await screen.findByRole('table');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(vi.mocked(getSecurityEvents).mock.calls[1][0]).toEqual(vi.mocked(getSecurityEvents).mock.calls[0][0]);
+  });
+
+  it('si «Actualizar» falla, retira los datos anteriores en vez de dejarlos como vigentes', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValueOnce(pagina(SEIS_TIPOS)).mockRejectedValueOnce(fallo(500));
+    renderPagina();
+    await screen.findByRole('table');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('El servidor no pudo entregar los eventos de seguridad.');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('«Actualizar» vuelve a pedir la consulta actual y trae los eventos nuevos', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValueOnce(pagina(SEIS_TIPOS.slice(1))).mockResolvedValueOnce(pagina(SEIS_TIPOS));
+    renderPagina();
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(SEIS_TIPOS.length));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(SEIS_TIPOS.length + 1));
+    expect(getSecurityEvents).toHaveBeenCalledTimes(2);
+  });
+
+  it('al cambiar de página la anterior queda marcada como ocupada hasta que llega la nueva', async () => {
+    const segunda = diferida<ReturnType<typeof pagina>>();
+    vi.mocked(getSecurityEvents)
+      .mockResolvedValueOnce(pagina(SEIS_TIPOS, { total: 45, totalPages: 3 }))
+      .mockReturnValueOnce(segunda.promesa);
+    renderPagina();
+    const tabla = await screen.findByRole('table');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await waitFor(() => expect(screen.getByText('Cargando la página solicitada…')).toBeInTheDocument());
+    expect(tabla.closest('[aria-busy="true"]')).not.toBeNull();
+    expect(screen.queryByText(/Eventos encontrados/)).not.toBeInTheDocument();
+
+    segunda.resolver(pagina(SEIS_TIPOS.slice(0, 1), { total: 45, totalPages: 3, page: 2 }));
+    await waitFor(() => expect(screen.getByText(/Eventos encontrados/)).toBeInTheDocument());
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
+  it('una página que quedó fuera de rango ofrece volver a la primera', async () => {
+    vi.mocked(getSecurityEvents).mockImplementation(async (query) =>
+      query?.page === 2 ? pagina([], { total: 3, totalPages: 1, page: 2 }) : pagina(SEIS_TIPOS, { total: 45, totalPages: 3 }),
+    );
+    renderPagina();
+    await screen.findByRole('table');
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+
+    expect(await screen.findByText('Esta página no tiene eventos.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a la primera página' }));
+    await screen.findByRole('table');
+  });
+
+  it('los filtros siguen disponibles en carga, vacío y error', async () => {
+    vi.mocked(getSecurityEvents).mockRejectedValue(fallo(500));
+    renderPagina();
+    await screen.findByRole('alert');
+    expect(screen.getByRole('search', { name: 'Filtros de eventos de seguridad' })).toBeInTheDocument();
+  });
+});
