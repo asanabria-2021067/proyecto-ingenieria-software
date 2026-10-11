@@ -34,6 +34,17 @@ export function envReadBy(files: string[]): string[] {
   return [...names].sort();
 }
 
+/**
+ * Secretos de autenticación que un spec de integración puede leer sin ser un
+ * interruptor de BD real: no deciden si la suite se omite ni apuntan a una
+ * base. CI los define con valores sintéticos a nivel de workflow.
+ */
+const AUTH_SECRETS = ['JWT_REFRESH_SECRET'];
+
+export function realDbSwitches(names: string[]): string[] {
+  return names.filter((name) => !AUTH_SECRETS.includes(name));
+}
+
 const EPHEMERAL_DB = /^postgresql:\/\/ci:ci@localhost:5432\/ci\?schema=public$/;
 
 /** Variables leídas por los specs que el paso no define, o definidas fuera del servicio efímero. */
@@ -53,19 +64,28 @@ export function realDbSwitchFindings(job: WorkflowJob, required: string[]): stri
 }
 
 describe('G02-C15: integración contra PostgreSQL real en CI', () => {
-  const backend = loadWorkflow('ci.yml').jobs.backend;
+  const workflow = loadWorkflow('ci.yml');
+  const backend = workflow.jobs.backend;
 
   it('los specs de integración leen exactamente estos interruptores de BD real', () => {
-    expect(envReadBy(integrationSpecFiles())).toEqual([
+    const leidas = envReadBy(integrationSpecFiles());
+    expect(realDbSwitches(leidas)).toEqual([
       'INTEGRATION_DATABASE_URL',
       'ROLES_IT_DATABASE_URL',
       'RUN_REAL_DB_TESTS',
     ]);
+    // Fuera de los interruptores solo se leen secretos de autenticación conocidos.
+    expect(leidas.filter((name) => !realDbSwitches(leidas).includes(name))).toEqual(AUTH_SECRETS);
   });
 
   it('CI define todos los interruptores y solo apuntan al PostgreSQL efímero del job', () => {
-    expect(realDbSwitchFindings(backend, envReadBy(integrationSpecFiles()))).toEqual([]);
+    expect(realDbSwitchFindings(backend, realDbSwitches(envReadBy(integrationSpecFiles())))).toEqual([]);
     expect(findStep(backend, (s) => s.run === 'npm run test:integration').env?.RUN_REAL_DB_TESTS).toBe('1');
+    // Los secretos de autenticación llegan al job desde el `env` del workflow.
+    const entorno = { ...(workflow.env ?? {}), ...(backend.env ?? {}) };
+    for (const name of AUTH_SECRETS) {
+      expect(entorno[name], name).toBeTruthy();
+    }
   });
 
   it('el job backend declara el servicio PostgreSQL efímero que usan esas URLs', () => {
