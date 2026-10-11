@@ -934,12 +934,32 @@ model Tarea {
   evidencias   Evidencia[]
   comentarios  Comentario[]
   etiquetas    TareaEtiqueta[]
+  // HU-186 (T-329): avisos de vencimiento ya enviados.
+  recordatorios RecordatorioTarea[]
 
   @@index([idProyecto, eliminadoEn, estadoTarea])
   @@index([idProyecto, idRolProyecto])
   @@index([idHito])
   @@index([idSprint])
   @@map("tarea")
+}
+
+/// HU-186 (T-329): registro de los avisos de vencimiento ya enviados. Una fila
+/// por (tarea, ventana): `@@unique([idTarea, ventanaHoras])` es la garantía de
+/// "cada aviso una sola vez" — TasksDueReminderService reserva el aviso con
+/// un INSERT ... ON CONFLICT DO NOTHING antes de notificar, así que dos
+/// corridas concurrentes nunca emiten el mismo aviso. `ventanaHoras` vale 24
+/// o 48 (CHECK en la migración); 24 h y 48 h se registran por separado.
+model RecordatorioTarea {
+  idRecordatorio Int      @id @default(autoincrement()) @map("id_recordatorio")
+  idTarea        Int      @map("id_tarea")
+  ventanaHoras   Int      @map("ventana_horas")
+  enviadoEn      DateTime @default(now()) @map("enviado_en")
+
+  tarea Tarea @relation(fields: [idTarea], references: [idTarea], onDelete: Cascade)
+
+  @@unique([idTarea, ventanaHoras])
+  @@map("recordatorio_tarea")
 }
 
 /// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una asignación activa (desasignadaEn IS NULL) por idTarea, vía índice único parcial `asignacion_tarea_activa_unique` (migración `20260720190329_enforce_one_active_task_assignment`).
