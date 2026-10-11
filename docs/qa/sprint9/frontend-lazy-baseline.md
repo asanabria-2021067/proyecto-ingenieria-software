@@ -91,3 +91,69 @@ Buscando una cadena propia de cada librería en los chunks de cada ruta:
 
 T-293 solo se da por cumplida si la medición posterior, con el mismo script y
 el mismo tipo de build, alcanza estos objetivos.
+
+## Después
+
+Misma medición, mismo script y mismo tipo de build, sobre el código con los
+tres módulos diferidos.
+
+| Ruta | Antes (gzip) | Después (gzip) | Diferencia | % |
+|---|---:|---:|---:|---:|
+| `/dashboard/admin` | 460 712 | 324 381 | −136 331 | −29,6 % |
+| `/` | 326 798 | 288 104 | −38 694 | −11,8 % |
+| `/dashboard` | 340 802 | 322 665 | −18 137 | −5,3 % |
+| `/dashboard/perfil` | 336 242 | 318 105 | −18 137 | −5,4 % |
+| `/dashboard/mis-horas` | 335 787 | 318 645 | −17 142 | −5,1 % |
+| `/dashboard/admin/seguridad` | 333 678 | 315 541 | −18 137 | −5,4 % |
+| `/dashboard/calendario` | 415 320 | 395 901 | −19 419 | −4,7 % |
+| `/dashboard/projects/[id]/kanban` | 406 359 | 388 222 | −18 137 | −4,5 % |
+| `/dashboard/proyectos/[id]/sprints/analytics` | 485 989 | 467 852 | −18 137 | −3,7 % |
+| `/login` | 233 130 | 233 130 | 0 | 0 % |
+
+Sin comprimir, `/dashboard/admin` pasa de 1 561 069 a 1 065 260 bytes y `/` de
+1 050 746 a 911 870.
+
+### Qué se difirió
+
+| Módulo | Dónde | Efecto medido |
+|---|---|---|
+| «Tendencias de uso» (`recharts`) | `/dashboard/admin` | −116 912 bytes gzip en esa ruta |
+| Fondo de partículas (`@tsparticles`) | `/` | −38 694 bytes gzip en esa ruta |
+| Guía de bienvenida (`react-joyride`) | Armazón del estudiante, presente en el layout de todo `/dashboard` | Entre −18 137 y −19 474 bytes gzip en cada una de las 55 rutas de `/dashboard` |
+
+La guía solo se muestra a quien entra por primera vez o la pide desde la ayuda,
+pero su librería viajaba en el JS inicial de todas las rutas del panel.
+
+### Objetivos
+
+| Ruta | Objetivo | Resultado |
+|---|---|---|
+| `/dashboard/admin` | Bajar al menos un 15 % | **−29,6 %: cumplido** |
+| `/` | Bajar al menos un 10 % | **−11,8 %: cumplido** |
+| Resto de rutas | No subir | 56 de 62 bajan más de 500 bytes; **una sube 98 bytes** (`/registro`, +0,04 %) |
+
+La subida de `/registro` no viene de código nuevo en esa ruta: al cambiar el
+grafo de módulos, el empaquetador reparte distinto los chunks compartidos. Tras
+el primer cambio ocurrió lo mismo con `/dashboard/mis-horas` (+995 bytes), que
+con el segundo terminó bajando.
+
+### Comportamiento
+
+`apps/frontend/e2e/frontend-lazy-loading.spec.ts`, en Chromium contra el build
+de producción:
+
+- los tres chunks llegan después y no figuran entre los scripts del HTML inicial;
+- con el chunk de gráficos retenido, el panel admin ya se usa, el hueco se
+  anuncia como ocupado y, al llegar, el título «Tendencias de uso» no cambia de
+  posición; el selector de periodo se alcanza y responde con el teclado;
+- llegar con `#metricas` sigue desplazando hasta la sección;
+- la landing no registra errores de página ni de hidratación y el fondo se pinta;
+- la guía de bienvenida sigue abriéndose cuando se pide.
+
+### Límites de esta medición
+
+- Es tamaño de JS inicial, no tiempo. No se midió LCP ni carga con red limitada,
+  y no se afirma una mejora de velocidad percibida.
+- Los gráficos de analítica de sprint, el Kanban y el calendario no se tocaron
+  (ver «Candidatos y decisión»): siguen siendo las rutas más pesadas.
+- Las pruebas de carga con k6 son la T-294 y no forman parte de esta tarea.
