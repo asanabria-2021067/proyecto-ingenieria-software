@@ -1,5 +1,5 @@
 import type { TagTone } from '@/components/ui/tag';
-import type { SecurityEvent, SecurityEventAccount, SecurityEventType } from '@/lib/types/admin-security';
+import type { SecurityEvent, SecurityEventAccount, SecurityEventsQuery, SecurityEventType } from '@/lib/types/admin-security';
 
 /**
  * Presentación de los eventos de seguridad (T-310). Todo texto visible sale de
@@ -110,4 +110,61 @@ export function securityEventSummary(event: SecurityEvent): string {
     default:
       return SIN_DATO;
   }
+}
+
+/** Filtros tal como los escribe el administrador: fechas `AAAA-MM-DD` del calendario de Guatemala e ID como texto. */
+export interface SecurityEventsFilterValue {
+  tipo: SecurityEventType | '';
+  desde: string;
+  hasta: string;
+  idUsuario: string;
+}
+
+export const SECURITY_EVENTS_NO_FILTERS: SecurityEventsFilterValue = { tipo: '', desde: '', hasta: '', idUsuario: '' };
+
+export type SecurityEventsFilterErrors = Partial<Record<'desde' | 'hasta' | 'idUsuario', string>>;
+
+/** Guatemala no tiene horario de verano: su desplazamiento es siempre UTC−06:00. */
+const GUATEMALA_OFFSET = '-06:00';
+const MAX_ID_USUARIO = 2147483647;
+
+function esDiaValido(dia: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return false;
+  const fecha = new Date(`${dia}T00:00:00.000Z`);
+  // `2026-02-30` se desborda a marzo: solo vale si al volver a escribirla es la misma.
+  return !Number.isNaN(fecha.getTime()) && fecha.toISOString().slice(0, 10) === dia;
+}
+
+export function hasSecurityEventsFilters(value: SecurityEventsFilterValue): boolean {
+  return Boolean(value.tipo || value.desde || value.hasta || value.idUsuario.trim());
+}
+
+/** Vacío = filtros válidos. Con algún error la consulta NO se actualiza: la tabla nunca muestra un filtro a medias. */
+export function securityEventsFilterErrors(value: SecurityEventsFilterValue): SecurityEventsFilterErrors {
+  const errores: SecurityEventsFilterErrors = {};
+  if (value.desde && !esDiaValido(value.desde)) errores.desde = 'La fecha inicial no es válida.';
+  if (value.hasta && !esDiaValido(value.hasta)) errores.hasta = 'La fecha final no es válida.';
+  if (!errores.desde && !errores.hasta && value.desde && value.hasta && value.desde > value.hasta) {
+    errores.hasta = 'La fecha final no puede ser anterior a la inicial.';
+  }
+  const id = value.idUsuario.trim();
+  if (id && !(/^[1-9]\d{0,9}$/.test(id) && Number(id) <= MAX_ID_USUARIO)) {
+    errores.idUsuario = 'El ID de usuario debe ser un número entero positivo.';
+  }
+  return errores;
+}
+
+/**
+ * Filtros visibles → consulta de la API. Un día de Guatemala va de las
+ * 00:00:00.000 a las 23:59:59.999 con desplazamiento −06:00; el backend
+ * compara instantes y ambos extremos son inclusivos.
+ */
+export function securityEventsQueryFromFilters(value: SecurityEventsFilterValue): SecurityEventsQuery {
+  const id = value.idUsuario.trim();
+  return {
+    ...(value.tipo ? { tipo: value.tipo } : {}),
+    ...(value.desde ? { desde: `${value.desde}T00:00:00.000${GUATEMALA_OFFSET}` } : {}),
+    ...(value.hasta ? { hasta: `${value.hasta}T23:59:59.999${GUATEMALA_OFFSET}` } : {}),
+    ...(id ? { idUsuario: Number(id) } : {}),
+  };
 }
