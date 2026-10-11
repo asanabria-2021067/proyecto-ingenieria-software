@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useId, useState } from 'react';
-import { History, Loader2, Pencil, RotateCcw, Save, X } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -181,98 +180,172 @@ export function HourAdjustmentRow({
         ? 'Este tramo no tiene participación histórica resuelta; no admite ajustes.'
         : 'El Sprint no admite ajustes en este momento.';
 
+  // Cada dato va arriba cuando aplica y, si «No aplica», baja al detalle
+  // secundario: así la fila enseña primero lo que hay que leer sin perder nada.
+  const campos: { label: string; aplica: boolean; valor: React.ReactNode; ancho?: boolean; tono?: string }[] = [
+    {
+      label: 'Horas sobreestimadas',
+      aplica: hayExceso,
+      valor: `${formatearDecimal(tramo.exceso)} h`,
+      tono: 'text-attention-strong dark:text-attention',
+    },
+    {
+      label: 'Horas aceptadas',
+      aplica: tieneAjuste,
+      valor: `${formatearDecimal(tramo.propuestas)} h`,
+    },
+    {
+      label: 'Justificación',
+      aplica: hayExceso,
+      valor: tramo.justificacionExceso ?? 'Sin justificación del estudiante',
+      ancho: true,
+    },
+    {
+      label: 'Justificación del líder',
+      aplica: tieneAjuste,
+      valor: tramo.justificacionAjuste ?? 'Sin justificación',
+      ancho: true,
+    },
+  ];
+  const cifrasAplicables = campos.filter((c) => c.aplica && !c.ancho);
+  const textosAplicables = campos.filter((c) => c.aplica && c.ancho);
+  const noAplican = campos.filter((c) => !c.aplica);
+  const ACCION = 'text-xs font-semibold';
+
   return (
-    <div
-      className="grid grid-cols-1 gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(120px,auto)_minmax(0,1.6fr)_auto] lg:items-start"
-      aria-label={etiquetaTramo}
-    >
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`inline-block size-2.5 rounded-full ${tramo.abierto ? 'bg-primary' : 'bg-outline-variant'}`}
-            aria-hidden="true"
-          />
-          <p className="text-sm font-semibold text-on-surface">
-            Tramo {indice} · <span className="font-normal text-on-surface-variant">{tramo.tituloTarea}</span>
-          </p>
-          {tramo.tareaEliminada && (
-            <Badge variant="outline" className="text-[10px] text-tertiary">
-              Tarea eliminada
-            </Badge>
-          )}
-          {tramo.origen !== 'GRANULAR' && (
-            <Badge variant="outline" className="text-[10px] text-tertiary">
-              {ORIGEN_LABEL[tramo.origen] ?? tramo.origen}
-            </Badge>
-          )}
+    <div className="flex flex-col gap-inline py-stack first:pt-0 last:pb-0" aria-label={etiquetaTramo}>
+      <div className="flex flex-col gap-tight sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-tight">
+          <p className="type-body font-semibold text-text-primary">Tramo {indice}</p>
           {tramo.abierto ? (
-            <Badge variant="outline" className="border-amber-500/50 text-[10px] text-amber-800 dark:text-amber-200">
-              Abierto · pendiente de cierre
-            </Badge>
+            <span className="pill pill-sm pill-amber">Abierto · pendiente de cierre</span>
           ) : consumido ? (
-            <Badge variant="outline" className="text-[10px] text-tertiary">
-              Acreditado
-            </Badge>
+            <span className="pill pill-sm pill-neutral">Acreditado</span>
           ) : (
-            <Badge variant="outline" className="text-[10px] text-tertiary">
-              Tramo cerrado
-            </Badge>
+            <span className="pill pill-sm pill-neutral">Tramo cerrado</span>
+          )}
+          {tramo.tareaEliminada && <span className="pill pill-sm pill-subtle">Tarea eliminada</span>}
+          {tramo.origen !== 'GRANULAR' && (
+            <span className="pill pill-sm pill-subtle">{ORIGEN_LABEL[tramo.origen] ?? tramo.origen}</span>
           )}
         </div>
-        <p className="mt-1 text-xs text-tertiary">
-          Reportadas: <span className="font-semibold text-on-surface">{formatearDecimal(tramo.reportadas)} h</span>
-          {tramo.ajuste != null && (
-            <>
-              {' '}
-              · Ajuste vigente:{' '}
-              <span className="font-semibold text-on-surface">{formatearSigno(tramo.ajuste)} h</span>
-            </>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-tight">
+          {!editable ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0} className="inline-flex rounded-md">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    aria-label={`Ajustar — ${etiquetaTramo}`}
+                    className={ACCION}
+                  >
+                    Ajustar
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{motivoNoEditable}</TooltipContent>
+            </Tooltip>
+          ) : !ajustando ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={abrirAjuste}
+              aria-expanded={false}
+              aria-label={`${tieneAjuste ? 'Editar ajuste' : 'Ajustar'} — ${etiquetaTramo}`}
+              className={ACCION}
+            >
+              {tieneAjuste ? 'Editar ajuste' : 'Ajustar'}
+            </Button>
+          ) : null}
+
+          {editable && tieneAjuste && !ajustando && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+              onClick={() => onRevert(tramo.idAsignacion)}
+              aria-label={`Revertir — ${etiquetaTramo}`}
+              className={`${ACCION} text-text-secondary hover:text-text-primary`}
+            >
+              Revertir
+            </Button>
           )}
-        </p>
+
+          {onLoadHistory && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={verHistorial}
+              aria-expanded={historialAbierto}
+              aria-controls={`${baseId}-historial`}
+              aria-label={`Ver historial — ${etiquetaTramo}`}
+              className={`${ACCION} text-text-secondary hover:text-text-primary`}
+            >
+              {historialAbierto ? 'Ocultar historial' : 'Ver historial'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Lo que hizo el estudiante: solo lectura. El líder no reescribe su
           registro; propone un ajuste aparte. */}
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4 lg:col-span-2">
+      <dl className="grid grid-cols-2 gap-x-card gap-y-tight sm:grid-cols-4">
         <div>
-          <dt className="text-xs font-semibold text-tertiary">Horas reportadas</dt>
-          <dd className="mt-0.5 font-bold text-on-surface">{formatearDecimal(tramo.reportadas)} h</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-semibold text-tertiary">Horas sobreestimadas</dt>
-          <dd className={`mt-0.5 font-bold ${hayExceso ? 'text-amber-700 dark:text-amber-300' : 'text-tertiary'}`}>
-            {hayExceso ? `${formatearDecimal(tramo.exceso)} h` : NO_APLICA}
-          </dd>
-        </div>
-        <div className="col-span-2">
-          <dt className="text-xs font-semibold text-tertiary">Justificación</dt>
-          <dd className="mt-0.5 whitespace-pre-wrap text-on-surface-variant">
-            {hayExceso ? tramo.justificacionExceso ?? 'Sin justificación del estudiante' : NO_APLICA}
-          </dd>
-        </div>
-
-        {/* El resultado del ajuste, una vez guardado. */}
-        <div>
-          <dt className="text-xs font-semibold text-tertiary">Horas aceptadas</dt>
-          <dd className="mt-0.5 font-bold text-on-surface">
-            {tieneAjuste ? `${formatearDecimal(tramo.propuestas)} h` : NO_APLICA}
+          <dt className="type-meta">Horas reportadas</dt>
+          <dd className="mt-micro type-body font-semibold tabular-nums text-text-primary">
+            {formatearDecimal(tramo.reportadas)} h
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold text-tertiary">Horas totales hechas</dt>
-          <dd className="mt-0.5 font-bold text-primary">{formatearDecimal(tramo.propuestas)} h</dd>
+          <dt className="type-meta">Horas totales hechas</dt>
+          <dd className="mt-micro type-body font-semibold tabular-nums text-primary">{formatearDecimal(tramo.propuestas)} h</dd>
         </div>
-        <div className="col-span-2">
-          <dt className="text-xs font-semibold text-tertiary">Justificación del líder</dt>
-          <dd className="mt-0.5 whitespace-pre-wrap text-on-surface-variant">
-            {tieneAjuste ? tramo.justificacionAjuste ?? 'Sin justificación' : NO_APLICA}
-          </dd>
-        </div>
+        {tieneAjuste && tramo.ajuste != null && (
+          <div>
+            <dt className="type-meta">Ajuste vigente</dt>
+            <dd className="mt-micro type-body font-semibold tabular-nums text-text-primary">{formatearSigno(tramo.ajuste)} h</dd>
+          </div>
+        )}
+        {cifrasAplicables.map((campo) => (
+          <div key={campo.label}>
+            <dt className="type-meta">{campo.label}</dt>
+            <dd className={`mt-micro type-body font-semibold tabular-nums ${campo.tono ?? 'text-text-primary'}`}>{campo.valor}</dd>
+          </div>
+        ))}
+        {textosAplicables.map((campo) => (
+          <div key={campo.label} className="col-span-2 sm:col-span-4">
+            <dt className="type-meta">{campo.label}</dt>
+            <dd className="mt-micro type-body whitespace-pre-wrap break-words text-text-secondary">{campo.valor}</dd>
+          </div>
+        ))}
       </dl>
+
+      {noAplican.length > 0 && (
+        <details className="group">
+          <summary className="type-meta w-fit cursor-pointer rounded-sm font-medium text-text-secondary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40">
+            Más detalles
+          </summary>
+          <dl className="mt-tight grid grid-cols-2 gap-x-card gap-y-tight sm:grid-cols-4">
+            {noAplican.map((campo) => (
+              <div key={campo.label} className={campo.ancho ? 'col-span-2' : undefined}>
+                <dt className="type-meta">{campo.label}</dt>
+                <dd className="mt-micro type-body text-text-secondary">{NO_APLICA}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      )}
 
       {/* Panel del líder: solo tras pedir «Ajustar». */}
       {ajustando && editable && (
-        <div className="grid grid-cols-1 gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 sm:grid-cols-[minmax(0,160px)_minmax(0,1fr)] lg:col-span-3">
+        <div className="grid grid-cols-1 gap-inline rounded-control bg-surface-container-low p-inline sm:grid-cols-[minmax(0,160px)_minmax(0,1fr)]">
           <div>
             <Label htmlFor={idPropuestas} className="text-xs font-semibold text-on-surface">
               Horas aceptadas
@@ -292,7 +365,7 @@ export function HourAdjustmentRow({
               autoFocus
               aria-describedby={errorPropuestas ? `${idError}-propuestas` : undefined}
               aria-invalid={errorPropuestas ? 'true' : undefined}
-              className="mt-1 h-9 text-sm"
+              className="mt-1 h-9 bg-surface-container-lowest text-sm"
             />
             {errorPropuestas && <p id={`${idError}-propuestas`} role="alert" className="mt-1 text-xs text-error">{errorPropuestas}</p>}
           </div>
@@ -315,7 +388,7 @@ export function HourAdjustmentRow({
               aria-invalid={errorJustificacion ? 'true' : undefined}
               aria-describedby={errorJustificacion ? idError : undefined}
               placeholder={requiereJustificacion ? 'Explica el ajuste propuesto' : 'Sin ajuste'}
-              className="mt-1 min-h-9 text-sm"
+              className="mt-1 min-h-9 bg-surface-container-lowest text-sm"
             />
             <div className="mt-1 flex items-start justify-between gap-2">
               {errorJustificacion ? (
@@ -330,58 +403,7 @@ export function HourAdjustmentRow({
               </span>
             </div>
           </div>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2 lg:items-stretch">
-        {!editable ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={0} className="inline-flex w-full rounded-md lg:w-auto">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled
-                  aria-label={`Ajustar — ${etiquetaTramo}`}
-                  className="h-9 w-full gap-1.5 rounded-md border-outline-variant text-xs font-semibold"
-                >
-                  <Pencil className="size-3.5" aria-hidden="true" />
-                  Ajustar
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{motivoNoEditable}</TooltipContent>
-          </Tooltip>
-        ) : !ajustando ? (
-          <Button
-            type="button"
-            size="sm"
-            onClick={abrirAjuste}
-            aria-expanded={false}
-            aria-label={`${tieneAjuste ? 'Editar ajuste' : 'Ajustar'} — ${etiquetaTramo}`}
-            className="h-9 w-full gap-1.5 rounded-md text-xs font-bold lg:w-auto"
-          >
-            <Pencil className="size-3.5" aria-hidden="true" />
-            {tieneAjuste ? 'Editar ajuste' : 'Ajustar'}
-          </Button>
-        ) : (
-          <>
-            <Button
-              type="button"
-              size="sm"
-              disabled={!puedeGuardar}
-              onClick={guardar}
-              aria-label={`Guardar ajuste — ${etiquetaTramo}`}
-              className="h-9 w-full gap-1.5 rounded-md text-xs font-bold lg:w-auto"
-            >
-              {pending ? (
-                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-              ) : (
-                <Save className="size-3.5" aria-hidden="true" />
-              )}
-              Guardar ajuste
-            </Button>
+          <div className="flex flex-wrap items-center gap-tight sm:col-span-2 sm:justify-end">
             <Button
               type="button"
               variant="outline"
@@ -389,52 +411,38 @@ export function HourAdjustmentRow({
               disabled={pending}
               onClick={cancelarAjuste}
               aria-label={`Cancelar ajuste — ${etiquetaTramo}`}
-              className="h-9 w-full gap-1.5 rounded-md border-outline-variant text-xs font-semibold lg:w-auto"
+              className={ACCION}
             >
-              <X className="size-3.5" aria-hidden="true" />
               Cancelar
             </Button>
-          </>
-        )}
+            <Button
+              type="button"
+              size="sm"
+              disabled={!puedeGuardar}
+              onClick={guardar}
+              aria-label={`Guardar ajuste — ${etiquetaTramo}`}
+              className={`${ACCION} bg-primary text-on-primary hover:bg-primary/90`}
+            >
+              {pending && <Loader2 className="animate-spin" aria-hidden="true" />}
+              Guardar ajuste
+            </Button>
+          </div>
+        </div>
+      )}
 
-        {editable && tieneAjuste && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={pending}
-            onClick={() => onRevert(tramo.idAsignacion)}
-            aria-label={`Revertir — ${etiquetaTramo}`}
-            className="h-9 w-full gap-1.5 rounded-md border-outline-variant text-xs font-semibold lg:w-auto"
-          >
-            <RotateCcw className="size-3.5" aria-hidden="true" />
-            Revertir
-          </Button>
-        )}
-
-        {onLoadHistory && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={verHistorial}
-            aria-expanded={historialAbierto}
-            aria-controls={`${baseId}-historial`}
-            aria-label={`Ver historial — ${etiquetaTramo}`}
-            className="h-9 w-full gap-1.5 rounded-md border-primary/40 text-xs font-semibold text-primary hover:bg-primary/5 hover:text-primary lg:w-auto"
-          >
-            <History className="size-3.5" aria-hidden="true" />
-            {historialAbierto ? 'Ocultar historial' : 'Ver historial'}
-          </Button>
-        )}
-      </div>
+      {/* El error del servidor (400) también se ve con el panel cerrado. */}
+      {!ajustando && error && (
+        <p role="alert" className="text-xs text-error">
+          {error}
+        </p>
+      )}
 
       {historialAbierto && (
-        <div id={`${baseId}-historial`} className="lg:col-span-3">
+        <div id={`${baseId}-historial`}>
           {cargandoHistorial ? (
-            <p className="text-xs text-tertiary">Cargando historial…</p>
+            <p className="type-meta">Cargando historial…</p>
           ) : historial == null || historial.length === 0 ? (
-            <p className="text-xs italic text-tertiary">Este tramo no tiene ajustes registrados.</p>
+            <p className="type-meta italic">Este tramo no tiene ajustes registrados.</p>
           ) : (
             <ol className="space-y-1.5 border-l-2 border-outline-variant/40 pl-3">
               {historial.map((ajuste) => (
@@ -444,13 +452,9 @@ export function HourAdjustmentRow({
                   </span>{' '}
                   (base {formatearDecimal(ajuste.horasBase)} h → {formatearDecimal(ajuste.propuesta)} h) ·{' '}
                   {formatearFechaHora(ajuste.creadoEn)}
-                  {ajuste.vigente ? (
-                    <Badge className="ml-2 border-transparent bg-primary/10 text-[10px] text-primary">Vigente</Badge>
-                  ) : (
-                    <Badge variant="outline" className="ml-2 text-[10px] text-tertiary">
-                      Anulado
-                    </Badge>
-                  )}
+                  <span className={`pill pill-sm ml-2 ${ajuste.vigente ? 'pill-green' : 'pill-subtle'}`}>
+                    {ajuste.vigente ? 'Vigente' : 'Anulado'}
+                  </span>
                   {ajuste.justificacion && <p className="mt-0.5 whitespace-pre-wrap">{ajuste.justificacion}</p>}
                 </li>
               ))}
