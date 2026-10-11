@@ -55,6 +55,21 @@ export function diaDelSelector(page: Page, fecha: Date) {
   return page.locator('[data-slot="popover-content"]').getByRole('button', { name: nombre });
 }
 
+/**
+ * Petición a la API real con la sesión de la página. El backend limita por IP
+ * (10 por segundo, 50 cada 10 s) y en el stack de pruebas todas las peticiones
+ * salen del mismo servidor Next, así que una ráfaga de preparación puede
+ * recibir 429: se espera y se repite, nunca se toca el límite.
+ */
+type Metodo = 'get' | 'post' | 'delete';
+export async function api(page: Page, metodo: Metodo, ruta: string, data?: unknown) {
+  for (let intento = 0; ; intento += 1) {
+    const respuesta = await page.request[metodo](ruta, data === undefined ? undefined : { data });
+    if (respuesta.status() !== 429 || intento >= 12) return respuesta;
+    await page.waitForTimeout(1_100);
+  }
+}
+
 export const overflowHorizontal = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
@@ -64,7 +79,7 @@ export function marca(testInfo: TestInfo, prefijo: string): string {
 }
 
 export async function idDelProyecto(page: Page, titulo = PROYECTO): Promise<number> {
-  const respuesta = await page.request.get('/api/proyectos/mine');
+  const respuesta = await api(page, 'get', '/api/proyectos/mine');
   expect(respuesta.status()).toBe(200);
   const proyectos = (await respuesta.json()) as { idProyecto: number; tituloProyecto: string }[];
   const proyecto = proyectos.find((p) => p.tituloProyecto === titulo);
@@ -93,7 +108,7 @@ export async function eventosConTitulo(page: Page, texto: string): Promise<Event
   // El backend acota cada consulta a 62 días: una sola ventana de 40 basta para estas pruebas.
   const desde = new Date(hoy - 5 * DIA).toISOString();
   const hasta = new Date(hoy + 35 * DIA).toISOString();
-  const respuesta = await page.request.get(`/api/usuarios/me/eventos?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`);
+  const respuesta = await api(page, 'get', `/api/usuarios/me/eventos?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`);
   expect(respuesta.status()).toBe(200);
   for (const evento of (await respuesta.json()) as EventoApi[]) if (evento.tituloEvento.includes(texto)) encontrados.push(evento);
   return encontrados;
@@ -103,7 +118,7 @@ export async function eventosConTitulo(page: Page, texto: string): Promise<Event
 export async function borrarEventosConTitulo(page: Page, texto: string): Promise<number> {
   const eventos = await eventosConTitulo(page, texto);
   for (const evento of eventos) {
-    const respuesta = await page.request.delete(`/api/proyectos/${evento.idProyecto}/eventos/${evento.idEvento}`);
+    const respuesta = await api(page, 'delete', `/api/proyectos/${evento.idProyecto}/eventos/${evento.idEvento}`);
     expect([200, 204, 404]).toContain(respuesta.status());
   }
   return eventos.length;
@@ -142,3 +157,53 @@ export async function capturar(page: Page, testInfo: TestInfo, nombre: string): 
     fs.copyFileSync(destino, path.join(carpeta, `${nombre}.png`));
   }
 }
+
+export interface EventoNuevo {
+  tituloEvento: string;
+  fechaInicio: Date;
+  fechaFin: Date;
+  tipoEvento?: string;
+  invitados?: number[];
+}
+
+/** Crea un evento virtual por la API real (preparación rápida de escenarios; la interfaz se prueba aparte). */
+export async function crearEventoPorApi(page: Page, idProyecto: number, evento: EventoNuevo): Promise<number> {
+  const respuesta = await api(page, 'post', `/api/proyectos/${idProyecto}/eventos`, {
+    tituloEvento: evento.tituloEvento,
+    fechaInicio: evento.fechaInicio.toISOString(),
+    fechaFin: evento.fechaFin.toISOString(),
+    modalidad: 'VIRTUAL',
+    linkSesion: LINK,
+    tipoEvento: evento.tipoEvento ?? 'REUNION',
+    invitados: evento.invitados ?? [],
+  });
+  expect(respuesta.status(), `crear "${evento.tituloEvento}"`).toBe(201);
+  return ((await respuesta.json()) as { idEvento: number }).idEvento;
+}
+
+/** `dias` días después de "hoy" del navegador (mañana a las 08:00), a la hora local indicada. */
+export function enDias(dias: number, hora: number, minuto = 0): Date {
+  const fecha = mananaTemprano();
+  fecha.setDate(fecha.getDate() + dias);
+  fecha.setHours(hora, minuto, 0, 0);
+  return fecha;
+}
+
+/**
+ * Flecha sobre un RadioGroup de Radix: selecciona al recibir el foco solo si la
+ * tecla sigue pulsada, así que se mantiene un instante en vez de `press`.
+ */
+export async function flecha(page: Page, tecla: 'ArrowRight' | 'ArrowLeft' | 'ArrowDown' | 'ArrowUp') {
+  await page.keyboard.down(tecla);
+  await page.waitForTimeout(250);
+  await page.keyboard.up(tecla);
+  await page.waitForTimeout(100);
+}
+
+/** Elemento con el foco, descrito por rol y nombre accesible. */
+export const focoActual = (page: Page) =>
+  page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el || el === document.body) return 'body';
+    return `${el.getAttribute('role') ?? el.tagName.toLowerCase()}:${(el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 60)}`;
+  });
