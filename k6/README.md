@@ -73,8 +73,14 @@ seed):
 docker run --rm -v "%cd%\k6:/k6:ro" -v "%cd%\docs\qa\sprint9:/out" grafana/k6 run -e K6_BASE_URL=http://host.docker.internal:3002 -e K6_USER_EMAIL=carlos.mendoza@uvg.edu.gt -e "K6_USER_PASSWORD=<contraseña del seed>" -e K6_ADMIN_EMAIL=admin@uvg.edu.gt -e "K6_ADMIN_PASSWORD=<contraseña del seed>" -e K6_PROJECT_ID=5 -e K6_VUS=10 -e K6_ITERATIONS=300 --summary-export=/out/k6-base.json /k6/scenarios/baseline-endpoints.js
 ```
 
-`npm run k6:baseline` sigue funcionando contra el fixture `k6.*`, pero ese
-proyecto está casi vacío y no sirve como referencia de rendimiento.
+El JSON exportado no incluye `setup_data`: `handleSummary` lo quita para que
+los tokens de sesión no queden guardados en el repo.
+
+`npm run k6:baseline` corre contra el fixture `k6.*`, pero ese proyecto está
+casi vacío y no sirve como referencia de rendimiento. Además, el fixture no
+crea tareas: en una base recién sembrada `setup()` falla al resolver la
+primera tarea hasta que exista una (por ejemplo, tras correr
+`npm run k6:kanban`) o se pase `-e K6_TASK_ID=<id>`.
 
 ## Dónde queda la evidencia
 
