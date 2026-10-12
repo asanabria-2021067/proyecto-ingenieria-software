@@ -102,6 +102,22 @@ ${colorConfig
   )
 }
 
+/**
+ * Criterio común de las gráficas de UVGenius (tendencias, burndown, velocidad):
+ * rejilla solo horizontal y punteada, ejes sin línea ni marcas con texto de
+ * 11 px. El color de las marcas y de la rejilla lo pone `ChartContainer` con
+ * los tokens del tema, y el tooltip es `ChartTooltipContent`, así que ambos
+ * siguen al tema claro y al oscuro. El alto va siempre explícito en el
+ * `className` del contenedor (`aspect-auto h-…`): su `aspect-video` por
+ * defecto cambiaría el tamaño de cada gráfica.
+ */
+export const CHART_GRID_PROPS = { vertical: false, strokeDasharray: '3 3' } as const
+export const CHART_AXIS_PROPS = {
+  tick: { fontSize: 11 },
+  tickLine: false,
+  axisLine: false,
+} as const
+
 const ChartTooltip = RechartsPrimitive.Tooltip
 
 function ChartTooltipContent({
@@ -118,6 +134,7 @@ function ChartTooltipContent({
   color,
   nameKey,
   labelKey,
+  valueFormatter,
 }: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
   React.ComponentProps<'div'> & {
     hideLabel?: boolean
@@ -125,6 +142,8 @@ function ChartTooltipContent({
     indicator?: 'line' | 'dot' | 'dashed'
     nameKey?: string
     labelKey?: string
+    /** Texto del valor (unidad, decimales, «sin dato»). A diferencia de `formatter`, conserva indicador y etiqueta. */
+    valueFormatter?: (value: unknown) => React.ReactNode
   }) {
   const { config } = useChart()
 
@@ -232,9 +251,12 @@ function ChartTooltipContent({
                         {itemConfig?.label || item.name}
                       </span>
                     </div>
-                    {item.value && (
+                    {/* `!= null` y no `&&`: un 0 es un valor, no la ausencia de uno. */}
+                    {(item.value != null || valueFormatter) && (
                       <span className="text-foreground font-mono font-medium tabular-nums">
-                        {item.value.toLocaleString()}
+                        {valueFormatter
+                          ? valueFormatter(item.value)
+                          : item.value?.toLocaleString()}
                       </span>
                     )}
                   </div>
