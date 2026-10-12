@@ -151,6 +151,18 @@ describe('formatearFechaEje', () => {
 
     expect(formatearFechaEje(iso)).toBe('1 ene');
   });
+
+  it.each([
+    ['2025-12-31T00:00:00.000Z', '31 dic'],
+    ['2026-01-31T00:00:00.000Z', '31 ene'],
+    ['2026-02-01T00:00:00.000Z', '1 feb'],
+    ['2026-03-17T00:00:00.000Z', '17 mar'],
+  ])('%s se rotula «%s» en Guatemala y en UTC', (iso, esperado) => {
+    for (const zona of ['America/Guatemala', 'UTC']) {
+      process.env.TZ = zona;
+      expect(formatearFechaEje(iso)).toBe(esperado);
+    }
+  });
 });
 
 describe('construirSerie', () => {
@@ -198,6 +210,62 @@ describe('construirSerie', () => {
     const serie = construirSerie(burndown({ fechaFinPlaneada: null }), 'puntos');
 
     expect(serie.every((punto) => punto.ideal === null)).toBe(true);
+  });
+
+  it('la serie completa de un Sprint de cuatro días conserva sus fechas y valores exactos', () => {
+    const serie = construirSerie(
+      burndown({
+        fechaFinPlaneada: '2026-01-04T00:00:00.000Z',
+        puntosHistoriaPlanificadosTotal: 12,
+        instantaneas: [
+          { fecha: '2026-01-01T00:00:00.000Z', tareasPendientes: 4, tareasCompletadas: 0, puntosHistoriaRestantes: 12 },
+          { fecha: '2026-01-03T00:00:00.000Z', tareasPendientes: 2, tareasCompletadas: 2, puntosHistoriaRestantes: 5 },
+        ],
+      }),
+      'puntos',
+    );
+
+    expect(serie).toEqual([
+      { fecha: '2026-01-01T00:00:00.000Z', ideal: 12, real: 12 },
+      { fecha: '2026-01-02T00:00:00.000Z', ideal: 8, real: null },
+      { fecha: '2026-01-03T00:00:00.000Z', ideal: 4, real: 5 },
+      { fecha: '2026-01-04T00:00:00.000Z', ideal: 0, real: null },
+    ]);
+  });
+
+  it('sin story points la serie de puntos es cero real, no un hueco: los días con instantánea valen 0', () => {
+    const serie = construirSerie(
+      burndown({
+        fechaFinPlaneada: '2026-01-03T00:00:00.000Z',
+        puntosHistoriaPlanificadosTotal: 0,
+        instantaneas: [
+          { fecha: '2026-01-01T00:00:00.000Z', tareasPendientes: 4, tareasCompletadas: 0, puntosHistoriaRestantes: 0 },
+        ],
+      }),
+      'puntos',
+    );
+
+    expect(serie.map((p) => p.ideal)).toEqual([0, 0, 0]);
+    expect(serie.map((p) => p.real)).toEqual([0, null, null]);
+  });
+
+  it('sin tareas ni puntos el eje de tareas también queda en cero, sin dividir por cero', () => {
+    const serie = construirSerie(
+      burndown({
+        fechaFinPlaneada: '2026-01-02T00:00:00.000Z',
+        tareasPlanificadasTotal: 0,
+        puntosHistoriaPlanificadosTotal: 0,
+        instantaneas: [
+          { fecha: '2026-01-01T00:00:00.000Z', tareasPendientes: 0, tareasCompletadas: 0, puntosHistoriaRestantes: 0 },
+        ],
+      }),
+      'tareas',
+    );
+
+    expect(serie).toEqual([
+      { fecha: '2026-01-01T00:00:00.000Z', ideal: 0, real: 0 },
+      { fecha: '2026-01-02T00:00:00.000Z', ideal: 0, real: null },
+    ]);
   });
 
   it('el eje "tareas" usa tareasPendientes/tareasPlanificadasTotal, nunca los campos de puntos', () => {
