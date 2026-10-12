@@ -379,7 +379,9 @@ describe('FG04-C05: regresión de las preferencias por tipo', () => {
     expect(llamadas.filter((_, i) => i % 2 === 0)).toEqual(TIPOS_BACKEND.map((tipo) => [tipo, false]));
     expect(llamadas.filter((_, i) => i % 2 === 1)).toEqual(TIPOS_BACKEND.map((tipo) => [tipo, true]));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
+    // Dos guardados por cada tipo del enum, uno tras otro y esperando cada re-render: el coste crece
+    // con el contrato (88 ciclos con 44 tipos). Son ~3 s, y con cobertura V8 superan los 5 s por defecto.
+  }, 30_000);
 
   it('un tipo desconocido se guarda con su valor exacto, sin traducirlo ni normalizarlo', async () => {
     vi.mocked(getNotificationPreferences).mockResolvedValue([...preferencias(), { tipo: 'TIPO_FUTURO', activa: true }]);
