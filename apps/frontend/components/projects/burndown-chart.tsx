@@ -2,8 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { ChartLine } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -74,8 +72,15 @@ export function construirSerie(burndown: SprintBurndownDto, eje: Eje): PuntoBurn
   return serie;
 }
 
-function formatearFechaEje(iso: string): string {
-  return format(new Date(iso), 'd MMM', { locale: es });
+const FORMATO_DIA_UTC = new Intl.DateTimeFormat('es-GT', { timeZone: 'UTC', day: 'numeric', month: 'short' });
+
+/**
+ * Rótulo del eje y del tooltip. Cada punto es un día calendario anclado a
+ * medianoche UTC (`diaUTC`), así que se rotula en UTC: en hora local de
+ * Guatemala (UTC−6) esa medianoche cae en el día anterior.
+ */
+export function formatearFechaEje(iso: string): string {
+  return FORMATO_DIA_UTC.format(new Date(iso));
 }
 
 export interface BurndownChartProps {

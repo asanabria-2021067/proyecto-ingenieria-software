@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { BurndownChart, construirSerie } from '../components/projects/burndown-chart';
+import { BurndownChart, construirSerie, formatearFechaEje } from '../components/projects/burndown-chart';
 import type { SprintBurndownDto } from '../lib/types/sprints';
 
 /**
@@ -94,6 +94,24 @@ describe('BurndownChart', () => {
 
     expect(screen.getByRole('radio', { name: 'Número de tareas' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'Story points' })).toHaveAttribute('aria-checked', 'false');
+  });
+});
+
+describe('formatearFechaEje', () => {
+  const TZ_ORIGINAL = process.env.TZ;
+
+  afterEach(() => {
+    if (TZ_ORIGINAL === undefined) delete process.env.TZ;
+    else process.env.TZ = TZ_ORIGINAL;
+  });
+
+  it('rotula el día calendario UTC del punto, no el día anterior de Guatemala', () => {
+    process.env.TZ = 'America/Guatemala';
+    const iso = '2026-01-01T00:00:00.000Z';
+    // La zona está activa: en hora local esa medianoche UTC es todavía 31 de diciembre.
+    expect(new Date(iso).getDate()).toBe(31);
+
+    expect(formatearFechaEje(iso)).toBe('1 ene');
   });
 });
 
