@@ -23,6 +23,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { AdminController } from '../src/admin/admin.controller';
 import { AdminProjectsController } from '../src/project-closure/admin-projects.controller';
 import { SecurityEventsController } from '../src/security-events/security-events.controller';
+import { AdminSprintsController } from '../src/sprints/admin-sprints.controller';
 import { ClosureStorageAdminController } from '../src/project-closure/closure-storage-admin.controller';
 import { LeadershipAdminController } from '../src/leadership/leadership-admin.controller';
 import { ValidationController } from '../src/validation/validation.controller';
@@ -149,6 +150,7 @@ describe('Rutas exclusivas de administración (T-286)', () => {
   it.each<[string, Type<unknown>]>([
     ['AdminController', AdminController],
     ['AdminProjectsController', AdminProjectsController],
+    ['AdminSprintsController', AdminSprintsController],
     ['ClosureStorageAdminController', ClosureStorageAdminController],
     ['LeadershipAdminController', LeadershipAdminController],
     ['SecurityEventsController', SecurityEventsController],

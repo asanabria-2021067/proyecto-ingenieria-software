@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
+import { PARAMTYPES_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
 import { PrismaClient, type EstadoProyecto, type EstadoSprint } from '@prisma/client';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
 import { createIntegrationProject, createIntegrationUser } from './setup/fixtures';
@@ -10,6 +12,7 @@ import {
   type IntegrationHttpHarness,
 } from './setup/http-harness';
 import { plannedEndDate } from './setup/sprint-plan';
+import { RolesGuard } from '../../src/common/guards/roles.guard';
 import { AdminSprintsController } from '../../src/sprints/admin-sprints.controller';
 import { AdminSprintsCalendarService } from '../../src/sprints/admin-sprints-calendar.service';
 import { AdminSprintCalendarQueryDto } from '../../src/sprints/dto/admin-sprint-calendar-query.dto';
@@ -23,7 +26,7 @@ import { ProjectPolicyService } from '../../src/common/project-policy/project-po
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 import { todayInGuatemala } from '../../src/common/utils/guatemala-date';
-import type { PrismaService } from '../../src/prisma/prisma.service';
+import { PrismaService } from '../../src/prisma/prisma.service';
 import type { NotificationsService } from '../../src/notifications/notifications.service';
 
 /**
@@ -171,6 +174,8 @@ describeIntegration('GET /admin/sprints/calendario — autorización, población
       observadoDb,
       new ProjectPolicyService(new ProjectIdResolverService(observadoDb)),
     );
+    // Lo que `emitDecoratorMetadata` genera en el build real.
+    Reflect.defineMetadata(PARAMTYPES_METADATA, [Reflector, PrismaService], RolesGuard);
     harness = await startIntegrationHttpHarness({
       prisma,
       controllers: [
@@ -243,6 +248,18 @@ describeIntegration('GET /admin/sprints/calendario — autorización, población
     async (query) => {
       const respuesta = await requestJson(`${ruta}?${query}`, { token: adminToken });
       expect(respuesta.status).toBe(400);
+    },
+  );
+
+  it.each([['foo=bar'], ['desde=2026-10-01&hasta=2026-10-31'], ['actorId=1']])(
+    'quien no es administrador recibe 403 aunque la consulta sea inválida: ?%s (nunca un 400)',
+    async (query) => {
+      for (const token of [estudianteToken, liderToken]) {
+        const respuesta = await requestJson(`${ruta}?${query}`, { token });
+        expect(respuesta.status).toBe(403);
+        expect(respuesta.body.items).toBeUndefined();
+      }
+      expect((await requestJson(`${ruta}?${query}`)).status).toBe(401);
     },
   );
 

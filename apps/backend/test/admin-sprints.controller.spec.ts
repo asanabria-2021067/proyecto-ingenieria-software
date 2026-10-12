@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { GUARDS_METADATA, METHOD_METADATA, MODULE_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
+import { ROLES_METADATA_KEY } from '../src/common/decorators/roles.decorator';
+import { RolesGuard } from '../src/common/guards/roles.guard';
 import { AdminSprintsController } from '../src/sprints/admin-sprints.controller';
 import type { AdminSprintsCalendarService } from '../src/sprints/admin-sprints-calendar.service';
 import { AdminSprintsCalendarService as CalendarServiceClass } from '../src/sprints/admin-sprints-calendar.service';
@@ -34,8 +36,9 @@ describe('AdminSprintsController.getCalendario (GET /admin/sprints/calendario)',
     expect(handlers).toEqual(['getCalendario']);
   });
 
-  it('exige JwtAuthGuard a nivel de clase y no es una ruta de escritura de proyecto', () => {
-    expect(Reflect.getMetadata(GUARDS_METADATA, AdminSprintsController)).toEqual([JwtAuthGuard]);
+  it('autentica y exige administrador a nivel de clase, y no es una ruta de escritura de proyecto', () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, AdminSprintsController)).toEqual([JwtAuthGuard, RolesGuard]);
+    expect(Reflect.getMetadata(ROLES_METADATA_KEY, AdminSprintsController)).toEqual(['administrador']);
     expect(Reflect.getMetadata(GUARDS_METADATA, AdminSprintsController.prototype.getCalendario)).toBeUndefined();
     expect(Reflect.getMetadata(GUARDS_METADATA, AdminSprintsController) ?? []).not.toContain(ProjectWriteGuard);
   });
