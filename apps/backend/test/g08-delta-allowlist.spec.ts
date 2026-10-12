@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { REPO_ROOT, readRepoFile } from './helpers/workflow-yaml';
-import { PHASE2_BASE, gitAvailable, phaseHead } from './helpers/owasp-evidence';
+import { PHASE2_BASE, gitAvailable, phaseBase, phaseHead } from './helpers/owasp-evidence';
 
 /**
  * G08-C02 · OWASP25-C048 (A08:2025). Allowlist declarativa del delta de la
@@ -51,7 +51,7 @@ function git(...args: string[]): string {
 /** Ruta → gates que la tocaron, según los commits trazables del historial local. */
 function gatesByPathInHistory(): Map<string, Set<string>> {
   const byPath = new Map<string, Set<string>>();
-  for (const sha of git('rev-list', '--no-merges', `${PHASE2_BASE}..${phaseHead()}`).split('\n').filter(Boolean)) {
+  for (const sha of git('rev-list', '--no-merges', `${phaseBase()}..${phaseHead()}`).split('\n').filter(Boolean)) {
     const gate = /Security\/integration contract: Gate (G0\d) · Commit/.exec(git('show', '-s', '--format=%B', sha))?.[1];
     for (const path of git('diff-tree', '--no-commit-id', '--name-only', '-r', '--no-renames', sha).split('\n').filter(Boolean)) {
       if (!byPath.has(path)) byPath.set(path, new Set());
@@ -101,7 +101,7 @@ describe('G08-C02: allowlist del delta OWASP', () => {
   });
 
   it.runIf(gitAvailable())('cada ruta del delta base..HEAD está declarada', () => {
-    const delta = git('diff', '--name-only', '--no-renames', PHASE2_BASE, phaseHead()).split('\n').filter(Boolean);
+    const delta = git('diff', '--name-only', '--no-renames', phaseBase(), phaseHead()).split('\n').filter(Boolean);
     expect(delta.filter((path) => coveringGates(allowlist, path).length === 0)).toEqual([]);
   });
 
