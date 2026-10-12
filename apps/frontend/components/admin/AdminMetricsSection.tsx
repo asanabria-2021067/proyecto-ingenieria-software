@@ -29,6 +29,8 @@ interface MetricaConfig {
   serie: Serie;
   label: string;
   descripcion: string;
+  /** Unidad del conteo en singular y plural, para el tooltip. Las horas llevan la suya. */
+  unidad?: [singular: string, plural: string];
   esHoras?: boolean;
 }
 
@@ -38,14 +40,25 @@ interface MetricaConfig {
  * `--color-primary`, igual que BurndownChart.
  */
 export const METRICAS: MetricaConfig[] = [
-  { serie: 'usuariosNuevos', label: 'Usuarios nuevos', descripcion: 'Cuentas creadas' },
+  { serie: 'usuariosNuevos', label: 'Usuarios nuevos', descripcion: 'Cuentas creadas', unidad: ['usuario', 'usuarios'] },
   {
     serie: 'usuariosActivos',
     label: 'Usuarios activos',
     descripcion: 'Según su última sesión: cada usuario cuenta solo en el periodo más reciente en que entró',
+    unidad: ['usuario', 'usuarios'],
   },
-  { serie: 'proyectosCreados', label: 'Proyectos creados', descripcion: 'Proyectos nuevos, sin contar eliminados' },
-  { serie: 'tareasCompletadas', label: 'Tareas completadas', descripcion: 'Tareas en Hecho, por su última actualización' },
+  {
+    serie: 'proyectosCreados',
+    label: 'Proyectos creados',
+    descripcion: 'Proyectos nuevos, sin contar eliminados',
+    unidad: ['proyecto', 'proyectos'],
+  },
+  {
+    serie: 'tareasCompletadas',
+    label: 'Tareas completadas',
+    descripcion: 'Tareas en Hecho, por su última actualización',
+    unidad: ['tarea', 'tareas'],
+  },
   { serie: 'horasConfirmadas', label: 'Horas confirmadas', descripcion: 'Horas aprobadas, por fecha de aprobación', esHoras: true },
 ];
 
@@ -61,6 +74,12 @@ export function formatearInicio(inicio: string, periodo: AdminMetricasPeriodo): 
 
 function formatearValor(valor: number, esHoras?: boolean): string {
   return esHoras ? formatearHoras(String(Math.round(valor * 100) / 100)) : String(valor);
+}
+
+/** Valor con su unidad: «1 usuario», «3 usuarios», «4.5 h». */
+export function formatearValorConUnidad(valor: number, config: MetricaConfig): string {
+  const texto = formatearValor(valor, config.esHoras);
+  return config.unidad ? `${texto} ${config.unidad[valor === 1 ? 0 : 1]}` : texto;
 }
 
 export function sinDatos(metricas: AdminMetricas): boolean {
@@ -80,13 +99,13 @@ function MetricTrendCard({
   const textos = PERIODO_TEXTO[periodo];
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-outline-variant bg-surface-container-lowest p-6">
+    <div className="card-base flex flex-col gap-stack">
       <div>
-        <span className="text-[10px] font-black uppercase tracking-widest text-tertiary">{config.label}</span>
-        <p className="mt-1 text-4xl font-black tracking-tighter text-on-surface">
+        <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{config.label}</span>
+        <p className="mt-micro font-headline text-4xl font-bold tracking-tight tabular-nums text-text-primary">
           {formatearValor(actual, config.esHoras)}
         </p>
-        <p className="text-xs text-tertiary">
+        <p className="type-meta">
           {textos.actual} · {formatearValor(total, config.esHoras)} {textos.ventana}
         </p>
       </div>
@@ -99,9 +118,9 @@ function MetricTrendCard({
         formatearEtiqueta={(inicio) =>
           periodo === 'semana' ? `Semana del ${formatearInicio(inicio, periodo)}` : formatearInicio(inicio, periodo)
         }
-        formatearValor={(valor) => formatearValor(valor, config.esHoras)}
+        formatearValor={(valor) => formatearValorConUnidad(valor, config)}
       />
-      <p className="text-xs text-tertiary">{config.descripcion}</p>
+      <p className="type-meta">{config.descripcion}</p>
     </div>
   );
 }
