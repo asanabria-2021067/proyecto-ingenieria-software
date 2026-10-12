@@ -1,15 +1,13 @@
 'use client';
 
+import { Bar, BarChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from 'recharts';
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+  CHART_AXIS_PROPS,
+  CHART_GRID_PROPS,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@/components/ui/chart';
 import type { PuntoVelocidad } from './velocity-chart';
 
 export interface VelocityChartPlotProps {
@@ -23,18 +21,27 @@ export interface VelocityChartPlotProps {
  */
 export default function VelocityChartPlot({ serie, promedio }: VelocityChartPlotProps) {
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={serie} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" className="stroke-outline-variant" />
-        <XAxis dataKey="sprint" tick={{ fontSize: 11 }} className="fill-tertiary" />
+    <ChartContainer config={{ puntos: { label: 'Completado' } }} className="aspect-auto h-[260px] w-full">
+      <BarChart accessibilityLayer data={serie} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+        <CartesianGrid {...CHART_GRID_PROPS} />
+        <XAxis dataKey="sprint" {...CHART_AXIS_PROPS} />
         <YAxis
           allowDecimals={false}
-          tick={{ fontSize: 11 }}
-          className="fill-tertiary"
-          label={{ value: 'Story points', angle: -90, position: 'insideLeft', fontSize: 11 }}
+          {...CHART_AXIS_PROPS}
+          label={{
+            value: 'Story points',
+            angle: -90,
+            position: 'insideLeft',
+            fontSize: 11,
+            fill: 'var(--color-muted-foreground)',
+          }}
         />
-        <Tooltip
-          formatter={(valor: number | string) => [valor ?? 'Sin puntos asignados', 'Completado'] as [string, string]}
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              valueFormatter={(valor) => (valor == null ? 'Sin puntos asignados' : `${String(valor)} pts`)}
+            />
+          }
         />
         {promedio !== null && (
           <ReferenceLine
@@ -46,6 +53,6 @@ export default function VelocityChartPlot({ serie, promedio }: VelocityChartPlot
         )}
         <Bar dataKey="puntos" name="Completado" fill="var(--color-primary)" radius={[6, 6, 0, 0]} isAnimationActive={false} />
       </BarChart>
-    </ResponsiveContainer>
+    </ChartContainer>
   );
 }
