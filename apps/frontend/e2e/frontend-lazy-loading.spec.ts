@@ -61,40 +61,66 @@ test.describe('T-293: carga diferida', () => {
     try {
       const errores = vigilarErrores(page);
 
-      // Se retiene el chunk de recharts para observar el hueco con calma.
-      let soltar!: () => void;
-      const retenido = new Promise<void>((resolve) => (soltar = resolve));
-      const diferidos: string[] = [];
+      // La sección llega en dos tiempos: su propio módulo (título, selector de periodo y tarjetas)
+      // y, dentro de ella, recharts (T-293 de HU-176). Cada chunk se reconoce por una cadena
+      // propia y se retiene para observar su hueco con calma; si un build los uniera en un solo
+      // archivo, las dos fases se resuelven con ese mismo chunk.
+      const MARCAS = { seccion: 'Periodo de las tendencias', graficos: 'recharts-wrapper' } as const;
+      const soltar: Record<keyof typeof MARCAS, () => void> = { seccion: () => undefined, graficos: () => undefined };
+      const retenido = {
+        seccion: new Promise<void>((resolve) => (soltar.seccion = resolve)),
+        graficos: new Promise<void>((resolve) => (soltar.graficos = resolve)),
+      };
+      const diferidos: Record<keyof typeof MARCAS, string[]> = { seccion: [], graficos: [] };
       await page.route(CHUNK, async (route) => {
         const response = await route.fetch();
         const body = await response.text();
-        if (body.includes('recharts-wrapper')) {
-          diferidos.push(new URL(route.request().url()).pathname);
-          await retenido;
+        const esperas: Promise<void>[] = [];
+        for (const fase of Object.keys(MARCAS) as (keyof typeof MARCAS)[]) {
+          if (body.includes(MARCAS[fase])) {
+            diferidos[fase].push(new URL(route.request().url()).pathname);
+            esperas.push(retenido[fase]);
+          }
         }
+        await Promise.all(esperas);
         await route.fulfill({ response, body });
       });
 
       const html = await htmlInicial(page, '/dashboard/admin');
       const titulo = page.getByRole('heading', { name: 'Tendencias de uso' });
+      const periodo = page.getByRole('group', { name: 'Periodo de las tendencias' });
+      const graficos = page.locator('#metricas .recharts-wrapper');
       await expect(titulo).toBeVisible();
-      await expect.poll(() => diferidos.length).toBe(1);
+      await expect.poll(() => diferidos.seccion.length).toBe(1);
 
-      // Mientras no llega: el resto del panel ya se usa y el hueco se anuncia como ocupado.
+      // Mientras no llega la sección: el resto del panel ya se usa y el hueco se anuncia como ocupado.
       await expect(page.locator('main h1').first()).toBeVisible();
       await expect(page.locator('#metricas section[aria-busy="true"]')).toBeVisible();
-      await expect(page.getByRole('group', { name: 'Periodo de las tendencias' })).toHaveCount(0);
+      await expect(periodo).toHaveCount(0);
       const antes = await titulo.boundingBox();
 
-      soltar();
-      const periodo = page.getByRole('group', { name: 'Periodo de las tendencias' });
+      // Llega la sección: el selector aparece y el título no se mueve. Los gráficos aún no.
+      soltar.seccion();
+      await expect.poll(() => diferidos.graficos.length).toBe(1);
+      if (diferidos.graficos[0] !== diferidos.seccion[0]) {
+        await expect(periodo).toBeVisible();
+        await expect(page.locator('#metricas section[aria-busy="true"]')).toHaveCount(0);
+        await expect(graficos).toHaveCount(0);
+        expect((await titulo.boundingBox())?.y).toBe(antes?.y);
+      }
+
+      // Llegan los gráficos: se dibujan y el título sigue en su sitio.
+      soltar.graficos();
       await expect(periodo).toBeVisible();
+      await expect(graficos.first()).toBeVisible();
       const despues = await titulo.boundingBox();
       expect(despues?.y).toBe(antes?.y);
       expect(despues?.x).toBe(antes?.x);
 
-      // El chunk no estaba entre los scripts del HTML inicial.
-      expect(html).not.toContain(diferidos[0].split('/').pop()!);
+      // Ninguno de los dos chunks estaba entre los scripts del HTML inicial.
+      for (const ruta of [...diferidos.seccion, ...diferidos.graficos]) {
+        expect(html).not.toContain(ruta.split('/').pop()!);
+      }
 
       // Teclado: el control que llegó tarde se alcanza y responde.
       const mes = periodo.getByRole('radio', { name: 'Mes' });
