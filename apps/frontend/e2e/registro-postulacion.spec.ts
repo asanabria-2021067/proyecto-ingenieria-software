@@ -92,7 +92,7 @@ test('un usuario nuevo se registra, administración lo aprueba, entra a proyecto
   const listado = await adminPage.request.get(API_CUENTAS_PENDIENTES);
   const { total } = (await listado.json()) as { total: number };
   expect(total).toBeGreaterThan(0);
-  const grupo = adminPage.getByRole('button', { name: /^Administración/ });
+  const grupo = adminPage.getByRole('button', { name: /^Verificación y seguridad/ });
   await expect(grupo).toContainText(`${total} por atender`);
   await grupo.click();
   const enlace = adminPage.getByRole('link', { name: /Cuentas pendientes/ });
