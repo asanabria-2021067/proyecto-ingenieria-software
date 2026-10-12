@@ -1075,6 +1075,7 @@ button:disabled {
   color: var(--admin-ink-secondary);
 }
 
+.admin-account-menu [data-slot='dropdown-menu-item'][aria-current='page'],
 .admin-account-menu [data-slot='dropdown-menu-item']:hover,
 .admin-account-menu [data-slot='dropdown-menu-item']:focus {
   background-color: var(--admin-graphite-active);
