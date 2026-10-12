@@ -268,21 +268,25 @@ export function TimeGridView({
                         width: `calc(${100 / total}% - 4px)`,
                       }}
                     >
+                      {/* El texto secundario se atenúa con el alfa del color (`text-current/90`), no con
+                          `opacity` del elemento: la opacidad crea un contexto de apilamiento y axe deja de
+                          ver el fondo del bloque (lo da por blanco: 1.22:1 en oscuro, WCAG 1.4.3). El
+                          resultado en pantalla es el mismo. */}
                       {compacto ? (
                         // G02 (UI-04): en un bloque corto solo cabe una línea: la hora de inicio y el título.
                         <span className="block truncate text-xs font-bold leading-tight">
-                          <span className="font-semibold opacity-90">{item.horaInicio}</span> · {item.titulo}
+                          <span className="font-semibold text-current/90">{item.horaInicio}</span> · {item.titulo}
                         </span>
                       ) : (
                         <>
-                          <span className="block truncate type-micro font-semibold opacity-90">
+                          <span className="block truncate type-micro font-semibold text-current/90">
                             {item.horaInicio} – {item.horaFin}
                           </span>
                           <span className="block text-xs font-bold leading-tight line-clamp-2">{item.titulo}</span>
                         </>
                       )}
                       {!compacto && (
-                        <span className="mt-0.5 flex items-center gap-1 truncate type-micro opacity-90">
+                        <span className="mt-0.5 flex items-center gap-1 truncate type-micro text-current/90">
                           {/* G01 (UI-01): un evento OCUPADO no tiene modalidad real que mostrar. */}
                           {!item.ocupado && <Modalidad className="size-3 shrink-0" aria-hidden="true" />}
                           <span className="truncate">{item.compartidoPor ? item.compartidoPor.nombre : item.projectTitle}</span>

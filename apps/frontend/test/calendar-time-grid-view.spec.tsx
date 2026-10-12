@@ -602,3 +602,34 @@ describe('TimeGridView — zona de horas alcanzable con teclado (G05.1-C02, G05-
     expect(screen.getByTestId('cuadricula-semana')).not.toHaveAttribute('tabindex');
   });
 });
+
+describe('TimeGridView — texto de los bloques medible por axe (WCAG 1.4.3)', () => {
+  // En el calendario en oscuro axe medía la hora y el pie del bloque contra un fondo blanco que no
+  // existe (1.22:1): la `opacity` del elemento crea un contexto de apilamiento y le oculta el fondo
+  // del bloque. El atenuado va en el alfa del color, que axe sí resuelve contra el fondo real.
+  const key = '2026-10-08';
+  const largo = evento(31, key);
+  const corto = evento(32, key, { titulo: 'Breve', horaInicio: '12:00', horaFin: '12:15', fechaInicio: new Date(`${key}T12:00:00`), fechaFin: new Date(`${key}T12:15:00`) });
+
+  it('ningún texto de un bloque usa opacidad de elemento, ni en el bloque normal ni en el compacto', () => {
+    render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={new Map([[key, [largo, corto]]])} onSelectEvento={() => {}} ahora={AHORA} />);
+    const bloques = [...document.querySelectorAll<HTMLElement>('button[data-evento-key]')];
+    expect(bloques).toHaveLength(2);
+    for (const bloque of bloques) {
+      expect(bloque.className).not.toMatch(/(^|\s)opacity-/);
+      expect(bloque.querySelectorAll('[class*="opacity-"]')).toHaveLength(0);
+    }
+  });
+
+  it('la hora y el pie siguen atenuados respecto al título, con el alfa del color heredado del tono', () => {
+    render(<TimeGridView days={semana()} todayKey="2026-10-06" itemsByDay={new Map([[key, [largo, corto]]])} onSelectEvento={() => {}} ahora={AHORA} />);
+    const normal = screen.getByRole('button', { name: /^Evento 31, 09:00 a 10:30/ });
+    expect(normal).toHaveClass('bg-cal-1', 'text-on-cal-1');
+    expect(screen.getByText('09:00 – 10:30')).toHaveClass('text-current/90');
+    expect(screen.getByText('Proyecto Uno').parentElement).toHaveClass('text-current/90');
+    expect(screen.getByText('Evento 31')).not.toHaveClass('text-current/90');
+    const compacto = screen.getByRole('button', { name: /^Breve, 12:00 a 12:15/ });
+    expect(compacto.querySelector('span > span')).toHaveClass('text-current/90');
+    expect(compacto.querySelector('span > span')).toHaveTextContent('12:00');
+  });
+});
