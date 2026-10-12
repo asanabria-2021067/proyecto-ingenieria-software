@@ -34,7 +34,8 @@ const EVIDENCIAS = process.env.E2E_EVIDENCE_DIR;
 async function sesion(browser: Browser, correo: string): Promise<Page> {
   const page = await (await browser.newContext()).newPage();
   await desactivarTour(page);
-  await login(page, correo);
+  // El login lleva a administración a su panel; `login` espera esa ruta exacta.
+  await login(page, correo, correo === ADMIN ? '/dashboard/admin' : undefined);
   return page;
 }
 

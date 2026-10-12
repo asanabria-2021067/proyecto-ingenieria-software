@@ -19,6 +19,8 @@ const LINEA_BASE: Record<string, Medida> = {
   '/dashboard/admin': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/usuarios': { px: 1, radio: 4, hex: 0, boton: 2, titular: true },
   '/dashboard/admin/solicitudes-recuperacion': { px: 1, radio: 3, hex: 0, boton: 2, titular: true },
+  // HU-179 (PR #270): la vista llegó después de FG07; su línea base es la del PR #270.
+  '/dashboard/admin/cuentas-pendientes': { px: 1, radio: 5, hex: 0, boton: 3, titular: false },
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/etiquetas': { px: 0, radio: 0, hex: 6, boton: 0, titular: true },
   '/dashboard/admin/apelaciones': { px: 1, radio: 0, hex: 0, boton: 0, titular: true },
@@ -35,6 +37,7 @@ const ESTADO_ACTUAL: Record<string, Medida> = {
   '/dashboard/admin': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/usuarios': { px: 0, radio: 0, hex: 0, boton: 2, titular: true },
   '/dashboard/admin/solicitudes-recuperacion': { px: 0, radio: 2, hex: 0, boton: 2, titular: true },
+  '/dashboard/admin/cuentas-pendientes': { px: 0, radio: 1, hex: 0, boton: 3, titular: true },
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/etiquetas': { px: 0, radio: 0, hex: 6, boton: 0, titular: true },
   '/dashboard/admin/apelaciones': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },

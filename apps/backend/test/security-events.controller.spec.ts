@@ -2,13 +2,15 @@ import 'reflect-metadata';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GUARDS_METADATA, METHOD_METADATA, MODULE_METADATA, PARAMTYPES_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import type { PrismaClient } from '@prisma/client';
 vi.hoisted(() => {
   process.env.FRONTEND_URL ??= 'http://localhost:3000';
 });
 import { AppModule } from '../src/app.module';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
-import { AdminAccessGuard } from '../src/common/guards/admin-access.guard';
+import { ROLES_METADATA_KEY } from '../src/common/decorators/roles.decorator';
+import { RolesGuard } from '../src/common/guards/roles.guard';
 import { ProjectPolicyModule } from '../src/common/project-policy/project-policy.module';
 import { ProjectPolicyService } from '../src/common/project-policy/project-policy.service';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -22,7 +24,7 @@ import { accessTokenFor, requestJson, startIntegrationHttpHarness, type Integrat
 /**
  * FG01-C05 (T-310). `GET /api/admin/eventos-seguridad` servido por HTTP real
  * (NestFactory, prefijo, ValidationPipe, JwtAuthGuard, JwtStrategy y
- * AdminAccessGuard reales) sobre un doble de Prisma: no necesita base.
+ * RolesGuard reales) sobre un doble de Prisma: no necesita base.
  */
 
 const ADMIN = { idUsuario: 7, correo: 'admin@example.test' };
@@ -84,7 +86,7 @@ describe('FG01-C05: GET /api/admin/eventos-seguridad', () => {
     tokens.estudiante = accessTokenFor(ESTUDIANTE);
     tokens.desactivado = accessTokenFor(DESACTIVADO);
     // Lo que `emitDecoratorMetadata` genera en el build real.
-    Reflect.defineMetadata(PARAMTYPES_METADATA, [ProjectPolicyService, PrismaService], AdminAccessGuard);
+    Reflect.defineMetadata(PARAMTYPES_METADATA, [Reflector, PrismaService], RolesGuard);
     http = await startIntegrationHttpHarness({
       prisma: prisma as unknown as PrismaClient,
       controllers: [
@@ -226,8 +228,9 @@ describe('FG01-C05: wiring de SecurityEventsController y SecurityEventsModule', 
     expect(Reflect.getMetadata(PATH_METADATA, SecurityEventsController.prototype.list)).toBe('/');
   });
 
-  it('autentica antes de autorizar: JwtAuthGuard y después AdminAccessGuard', () => {
-    expect(Reflect.getMetadata(GUARDS_METADATA, SecurityEventsController)).toEqual([JwtAuthGuard, AdminAccessGuard]);
+  it('autentica antes de autorizar: JwtAuthGuard y después RolesGuard, restringido a administrador', () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, SecurityEventsController)).toEqual([JwtAuthGuard, RolesGuard]);
+    expect(Reflect.getMetadata(ROLES_METADATA_KEY, SecurityEventsController)).toEqual(['administrador']);
   });
 
   it('el módulo registra controlador y lector, e importa la política de administración', () => {

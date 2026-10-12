@@ -168,7 +168,7 @@ const COL_PRINCIPAL = 'min-w-0 xl:col-start-1';
 // Los márgenes negativos cancelan el `pt-8`/`pb-12` de la página para que la
 // columna mida el scroll completo: sin ellos el widget arranca 32 px bajo el
 // centro y se despega en los últimos 48 px.
-const COL_SPRINTS = 'min-w-0 xl:col-start-2 xl:row-span-5 xl:row-start-1 xl:-mb-12 xl:-mt-8';
+const COL_SPRINTS = 'min-w-0 xl:col-start-2 xl:row-span-6 xl:row-start-1 xl:-mb-12 xl:-mt-8';
 /**
  * El resumen de Sprints acompaña el scroll: una caja `sticky` del alto visible
  * (viewport menos la topbar de 4rem; el scroll es del contenedor del shell,

@@ -38,6 +38,7 @@ motivo de comentario» de `docs/design-system.md`.
 | `/dashboard/admin` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/page.tsx` |
 | `/dashboard/admin/usuarios` | sí | 1 | 4 | 2 | 0 | `app/dashboard/admin/usuarios/page.tsx` |
 | `/dashboard/admin/solicitudes-recuperacion` | sí | 1 | 3 | 2 | 0 | `app/dashboard/admin/solicitudes-recuperacion/page.tsx` |
+| `/dashboard/admin/cuentas-pendientes` | no | 1 | 5 | 3 | 0 | `app/dashboard/admin/cuentas-pendientes/page.tsx` |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/seguridad/page.tsx` |
 | `/dashboard/admin/etiquetas` | sí | 0 | 0 | 0 | 6 | `app/dashboard/admin/etiquetas/page.tsx` |
 | `/dashboard/admin/apelaciones` | sí | 1 | 0 | 0 | 0 | `app/dashboard/admin/apelaciones/appeals-inbox-client.tsx` |
@@ -48,7 +49,10 @@ motivo de comentario» de `docs/design-system.md`.
 | `/dashboard/admin/sprints` | sí | 0 | 1 | 0 | 0 | `app/dashboard/admin/sprints/admin-sprints-client.tsx` |
 | `/dashboard/projects/admin/reviews` | sí | 0 | 1 | 0 | 0 | `app/dashboard/projects/admin/reviews/page.tsx` |
 
-Total: 20 tamaños literales, 23 radios literales, 4 botones propios, 6 hex y 1 titular fuera de la escala, en 12 vistas.
+Total: 21 tamaños literales, 28 radios literales, 7 botones propios, 6 hex y 2 titulares fuera de la escala, en 13 vistas.
+
+`/dashboard/admin/cuentas-pendientes` (HU-179, de otro responsable) no existía en `7091a310`: llegó con el PR #270,
+después de T-320. Su fila es la medición de la vista tal como llegó; sin ella el total era 20, 23, 4, 6 y 1 en 12 vistas.
 
 ## 3. Lo que ya es uniforme
 
@@ -93,6 +97,7 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/usuarios` | sí | 0 | 0 | 2 | 0 |
 | `/dashboard/admin/solicitudes-recuperacion` | sí | 0 | 2 | 2 | 0 |
+| `/dashboard/admin/cuentas-pendientes` | sí | 0 | 1 | 3 | 0 |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/etiquetas` | sí | 0 | 0 | 0 | 6 |
 | `/dashboard/admin/apelaciones` | sí | 0 | 0 | 0 | 0 |
@@ -103,21 +108,22 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin/sprints` | sí | 0 | 1 | 0 | 0 |
 | `/dashboard/projects/admin/reviews` | sí | 0 | 0 | 0 | 0 |
 
-Árbol administrativo completo (las 12 vistas más sus componentes: 38 archivos, sin `AdminMetricsSection`):
+Árbol administrativo completo (las 13 vistas más sus componentes: 40 archivos, sin `AdminMetricsSection`; incluye la
+vista de cuentas pendientes del PR #270 y `metric-trend-plot.tsx`, que T-293 separó de `AdminMetricsSection`):
 
 | Medida | Antes | Después |
 |---|---:|---:|
-| Tamaños literales | 46 | 2 |
-| Radios literales | 63 | 20 |
-| Titulares fuera de la escala | 1 | 0 |
-| Archivos sin ningún literal de tamaño o radio | — | 27 de 38 |
+| Tamaños literales | 47 | 2 |
+| Radios literales | 68 | 21 |
+| Titulares fuera de la escala | 2 | 0 |
+| Archivos sin ningún literal de tamaño o radio | — | 28 de 40 |
 
 Qué se hizo con cada diferencia de la sección 4:
 
 | # | Resultado |
 |---|---|
-| D1 | Corregido. Primitivas `ADMIN_PAGE*` en `components/admin/admin-page.ts`, adoptadas por las 12 vistas. Mismas clases: sin cambio de aspecto. |
-| D2 | Corregido. El detalle de proyecto usa `type-display`: su titular pasa de 24–28 px / 900 a 32 px / 700, como el resto. Es el único cambio visible medido. |
+| D1 | Corregido. Primitivas `ADMIN_PAGE*` en `components/admin/admin-page.ts`, adoptadas por las 13 vistas. Mismas clases: sin cambio de aspecto, salvo en cuentas pendientes, que no tenía ancho máximo y ahora se limita a 1400 px como las demás. |
+| D2 | Corregido. El detalle de proyecto usa `type-display`: su titular pasa de 24–28 px / 900 a 32 px / 700, como el resto. Lo mismo en cuentas pendientes (HU-179), cuyo titular pasa de 36–48 px / 900 a 32 px / 700 al integrarla. |
 | D3 | Corregido donde hay token de igual valor: `rounded-xl` → `rounded-control`, `rounded-2xl` → `rounded-card`. Sin cambio de aspecto. |
 | D4 | Corregido. `text-[10px]` y `text-[11px]` → `type-micro` (11 px); las migas de detalle pasan de 13 a 14 px, como `AdminBreadcrumb`. |
 | D5 | Pendiente. Los botones de fila («Ver perfil», «Generar enlace», «Copiar», «Limpiar filtros») tienen un estilo compacto propio y deliberado; unificarlos con `Button` cambia su aspecto y requiere decisión de diseño. |
@@ -131,6 +137,7 @@ actualizarla, hace fallar la prueba.
 
 | Archivo | Literales | Motivo |
 |---|---|---|
+| `app/dashboard/admin/cuentas-pendientes/page.tsx` | `rounded-lg` | Sin token de igual valor (esqueleto de carga de los botones de fila) |
 | `app/dashboard/admin/proyectos/[id]/admin-project-detail-client.tsx` | `rounded-lg`, `rounded-md` | Sin token de igual valor |
 | `app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx` | 4 × `rounded-lg`, `rounded-md`, `text-[13px]` | Sin token de igual valor; el texto de 13 px es el de los botones de acción en móvil, donde 14 px no cabe |
 | `app/dashboard/admin/proyectos/admin-projects-client.tsx` | `rounded-lg` | Sin token de igual valor |
@@ -164,3 +171,6 @@ oscuro, antes y después de los cambios: 84 combinaciones cada vez, con captura 
   propia barra. Es su diseño (`ADMIN_TAB_LIST`) y no cambió.
 
 Las capturas se guardan fuera del repositorio.
+
+La vista de cuentas pendientes (HU-179) se integró después de esta comprobación y no formó parte de ella: sus
+cifras de las secciones 2 y 7 están medidas sobre el código, no en navegador.

@@ -12,11 +12,15 @@ const DIRS = ['app', 'components', 'lib', 'hooks'];
 
 export const HEAVY: Record<string, string[]> = {
   recharts: [
-    'components/admin/AdminMetricsSection.tsx',
-    'components/projects/burndown-chart.tsx',
-    'components/projects/velocity-chart.tsx',
+    'components/admin/metric-trend-plot.tsx',
+    'components/projects/burndown-chart-plot.tsx',
+    'components/projects/velocity-chart-plot.tsx',
     'components/ui/chart.tsx',
   ],
+  // Los módulos de trazado de arriba solo se cargan con next/dynamic desde su envoltorio.
+  './metric-trend-plot': [],
+  './burndown-chart-plot': [],
+  './velocity-chart-plot': [],
   leaflet: ['components/calendar/event-location-picker.tsx'],
   '@tsparticles/': ['components/ui/sparkles.tsx'],
   // Envoltorios de las librerías de arriba: importarlos de forma estática las arrastra igual.

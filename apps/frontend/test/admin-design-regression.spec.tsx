@@ -20,6 +20,7 @@ const ARBOL = [...tsx('app/dashboard/admin'), ...tsx('app/dashboard/projects/adm
 
 /** Tamaños y radios literales que siguen en el árbol administrativo, y por qué (ver el inventario, sección 8). */
 const EXCEPCIONES: Record<string, string[]> = {
+  'app/dashboard/admin/cuentas-pendientes/page.tsx': ['rounded-lg'],
   'app/dashboard/admin/proyectos/[id]/admin-project-detail-client.tsx': ['rounded-lg', 'rounded-md'],
   'app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-md', 'text-[13px]'],
   'app/dashboard/admin/proyectos/admin-projects-client.tsx': ['rounded-lg'],
@@ -51,9 +52,9 @@ describe('FG07-C04: regresión del diseño administrativo', () => {
     expect([...valores].sort()).toEqual(['rounded-lg', 'rounded-md', 'text-[13px]', 'text-[15px]']);
   });
 
-  it('27 de los 38 archivos del árbol quedan sin ningún literal', () => {
-    expect(ARBOL).toHaveLength(38);
-    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(27);
+  it('28 de los 40 archivos del árbol quedan sin ningún literal', () => {
+    expect(ARBOL).toHaveLength(40);
+    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(28);
   });
 });
 
@@ -69,8 +70,8 @@ describe('FG07-C04: el inventario registra el antes y el después', () => {
   });
 
   it('declara los totales medidos del árbol completo, antes y después', () => {
-    expect(inventario).toContain('| Tamaños literales | 46 | 2 |');
-    expect(inventario).toContain('| Radios literales | 63 | 20 |');
+    expect(inventario).toContain('| Tamaños literales | 47 | 2 |');
+    expect(inventario).toContain('| Radios literales | 68 | 21 |');
   });
 
   it('enumera cada excepción que esta prueba fija', () => {

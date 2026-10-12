@@ -3,12 +3,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { PARAMTYPES_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
 import type { PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
 import { createIntegrationUser } from './setup/fixtures';
 import { accessTokenFor, requestJson, startIntegrationHttpHarness, type IntegrationHttpHarness } from './setup/http-harness';
 import { cleanupLeadershipFixture, createIntegrationAdmin, type LeadershipCleanupScope } from './setup/leadership';
-import { AdminAccessGuard } from '../../src/common/guards/admin-access.guard';
+import { RolesGuard } from '../../src/common/guards/roles.guard';
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { accountReference } from '../../src/security-events/account-reference';
@@ -243,7 +244,7 @@ describeIntegration('FG01-C07 — visor de eventos de seguridad sobre el writer 
     }
 
     // Lo que `emitDecoratorMetadata` genera en el build real.
-    Reflect.defineMetadata(PARAMTYPES_METADATA, [ProjectPolicyService, PrismaService], AdminAccessGuard);
+    Reflect.defineMetadata(PARAMTYPES_METADATA, [Reflector, PrismaService], RolesGuard);
     http = await startIntegrationHttpHarness({
       prisma,
       controllers: [

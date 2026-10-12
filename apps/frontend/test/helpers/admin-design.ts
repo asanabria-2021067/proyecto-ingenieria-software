@@ -11,6 +11,7 @@ export const VISTAS_ADMIN: Record<string, string> = {
   '/dashboard/admin': 'app/dashboard/admin/page.tsx',
   '/dashboard/admin/usuarios': 'app/dashboard/admin/usuarios/page.tsx',
   '/dashboard/admin/solicitudes-recuperacion': 'app/dashboard/admin/solicitudes-recuperacion/page.tsx',
+  '/dashboard/admin/cuentas-pendientes': 'app/dashboard/admin/cuentas-pendientes/page.tsx',
   '/dashboard/admin/seguridad': 'app/dashboard/admin/seguridad/page.tsx',
   '/dashboard/admin/etiquetas': 'app/dashboard/admin/etiquetas/page.tsx',
   '/dashboard/admin/apelaciones': 'app/dashboard/admin/apelaciones/appeals-inbox-client.tsx',

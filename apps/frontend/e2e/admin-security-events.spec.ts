@@ -54,7 +54,8 @@ const eventos = async (consulta: string) => {
 async function sesion(browser: Browser, correo: string): Promise<Page> {
   const nueva = await (await browser.newContext()).newPage();
   await desactivarTour(nueva);
-  await login(nueva, correo);
+  // El login lleva a administración a su panel; `login` espera esa ruta exacta.
+  await login(nueva, correo, correo === ADMIN ? '/dashboard/admin' : undefined);
   return nueva;
 }
 

@@ -62,6 +62,7 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   COMENTARIO_TAREA: { grupo: 'tareas', etiqueta: 'Comentario en una tarea', descripcion: 'Alguien comenta una tarea tuya.' },
   COMENTARIO_HITO: { grupo: 'tareas', etiqueta: 'Comentario en un hito', descripcion: 'Alguien comenta un hito de tu proyecto.' },
   EVIDENCIA_REVISADA: { grupo: 'tareas', etiqueta: 'Evidencia revisada', descripcion: 'Revisan una evidencia que entregaste.' },
+  TAREA_POR_VENCER: { grupo: 'tareas', etiqueta: 'Tarea por vencer', descripcion: 'Una tarea tuya está cerca de su fecha límite.' },
 
   NUEVA_POSTULACION: { grupo: 'postulaciones', etiqueta: 'Nueva postulación', descripcion: 'Alguien se postula a un rol de tu proyecto.' },
   POSTULACION_RESUELTA: { grupo: 'postulaciones', etiqueta: 'Postulación resuelta', descripcion: 'Aceptan o rechazan tu postulación.' },
@@ -122,6 +123,12 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
     etiqueta: 'Solicitud de recuperación de contraseña',
     descripcion: 'Un usuario pide recuperar su contraseña.',
   },
+  CUENTA_PENDIENTE_VERIFICACION: {
+    grupo: 'cuenta',
+    etiqueta: 'Cuenta pendiente de verificación',
+    descripcion: 'Una cuenta nueva espera que administración la verifique.',
+  },
+  CUENTA_VERIFICADA: { grupo: 'cuenta', etiqueta: 'Cuenta verificada', descripcion: 'Administración verifica tu cuenta.' },
   ALERTA_SEGURIDAD: { grupo: 'cuenta', etiqueta: 'Alerta de seguridad', descripcion: 'La plataforma detecta actividad inusual de acceso.' },
 };
 
