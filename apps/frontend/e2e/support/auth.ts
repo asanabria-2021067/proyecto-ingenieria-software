@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -37,4 +37,19 @@ export async function login(page: Page, correo: string, destino = '/dashboard'):
   const cookies = await page.context().cookies();
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   fs.writeFileSync(file, JSON.stringify(cookies));
+}
+
+/**
+ * Inicio de sesión que DEBE fallar (contraseña errónea), hecho contra la API
+ * real para que la aplicación registre su evento de seguridad. Cuenta para el
+ * mismo límite de 5 intentos por minuto: si el límite responde 429 se espera a
+ * que venza la ventana y se repite, nunca se toca el límite. Devuelve el
+ * estado final (401 cuando el intento llegó a evaluarse).
+ */
+export async function loginFallido(request: APIRequestContext, apiUrl: string, correo: string): Promise<number> {
+  for (let intento = 0; ; intento += 1) {
+    const respuesta = await request.post(`${apiUrl}/api/auth/login`, { data: { correo, contrasena: 'Incorrecta-123' } });
+    if (respuesta.status() !== 429 || intento >= 2) return respuesta.status();
+    await new Promise((resolve) => setTimeout(resolve, 61_000));
+  }
 }

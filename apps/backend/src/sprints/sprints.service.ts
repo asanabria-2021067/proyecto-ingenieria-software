@@ -1,5 +1,4 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { addDays } from 'date-fns';
 import { DestinoArrastre, EstadoHito, EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SprintsContextService } from './sprints-context.service';
@@ -44,14 +43,6 @@ import { SprintSnapshotsService } from './sprint-snapshots.service';
  * `ACTIVO`/`EN_FINALIZACION`; el cuerpo de consolidación de `closeSprint` se
  * conserva tal cual hasta su propio commit.
  */
-/**
- * HU-160: duración por defecto (en días calendario) de la fecha fin
- * planeada de un Sprint cuando `startSprint` no la recibe explícita — mismo
- * criterio que el modal "Start Sprint" de Jira, pero sin bloquear los
- * llamados existentes que aún no la envían.
- */
-const DURACION_PLANEADA_DEFAULT_DIAS = 14;
-
 /** Participante que aparece por su agregado pero no tiene tramos en el Sprint. */
 const SIN_TRAMOS: SprintClosingMemberTotalsDto = {
   tareasDistintas: 0,
@@ -335,7 +326,7 @@ export class SprintsService {
    * un posible número duplicado pudiera materializarse en una fila
    * persistida.
    */
-  async startSprint(projectId: number, userId: number, fechaFinPlaneada?: string) {
+  async startSprint(projectId: number, userId: number, fechaFinPlaneada: string) {
     return this.projectTx.run(projectId, userId, 'sprints.startSprint', async (ctx) => {
       const { tx } = ctx;
       await this.sprintsAuthorization.assertCanStartSprint(projectId, userId, tx);
@@ -357,14 +348,15 @@ export class SprintsService {
       });
       const siguienteNumero = (ultimoSprint?.numero ?? 0) + 1;
 
-      // HU-160: fecha fin planeada explícita, o `fechaInicio + 14 días` por
-      // defecto — ancla únicamente la línea ideal del burndown (T-240); el
-      // cierre real del Sprint sigue siendo el flujo Finalizar -> Cerrar,
-      // independiente de esta fecha.
+      // `fechaInicio` la fija el servidor: el Sprint nace ACTIVO en este
+      // mismo `create`, así que no existe un inicio distinto de "ahora".
+      // `fechaFinPlaneada` llega ya validada por `StartSprintDto`
+      // (YYYY-MM-DD, posterior a hoy, tope de 90 días) y se ancla a
+      // medianoche UTC, que es como Prisma lee y escribe `@db.Date`. Es la
+      // fecha esperada de fin del trabajo, no el cierre: ese sigue siendo el
+      // flujo Finalizar -> Cerrar, y ningún otro método la vuelve a escribir.
       const fechaInicio = new Date();
-      const fechaFinPlaneadaResuelta = fechaFinPlaneada
-        ? new Date(`${fechaFinPlaneada}T00:00:00.000Z`)
-        : addDays(fechaInicio, DURACION_PLANEADA_DEFAULT_DIAS);
+      const fechaFinPlaneadaResuelta = new Date(`${fechaFinPlaneada}T00:00:00.000Z`);
 
       let sprintCreado;
       try {
@@ -396,7 +388,15 @@ export class SprintsService {
         idSprint: sprintCreado.idSprint,
         tipoEntidad: 'SPRINT',
         idEntidad: sprintCreado.idSprint,
-        valorNuevo: { numero: sprintCreado.numero },
+        // El plan inicial queda en la bitácora: `fechaFinPlaneada` no se
+        // puede cambiar después, así que este evento es su registro de origen.
+        // Instante ISO para el inicio y día calendario para el plan, igual
+        // que sus columnas (timestamp y DATE).
+        valorNuevo: {
+          numero: sprintCreado.numero,
+          fechaInicio: fechaInicio.toISOString(),
+          fechaFinPlaneada,
+        },
       });
 
       await tx.tarea.updateMany({

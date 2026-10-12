@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, CheckCircle2, ChevronRight, Clock } from 'lucide-react';
+import { useId, useState } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -108,32 +108,25 @@ export interface ClosureReadinessPanelProps {
   description?: string;
   /** Oculta la card de progreso (VIEW-14 la muestra en otro sitio). */
   showProgress?: boolean;
+  /**
+   * A quién le habla la nota del progreso. `lider` (por defecto) prepara y
+   * envía la solicitud; `revisor` (administrador) solo revisa: no se le dan
+   * instrucciones de completar ni de enviar.
+   */
+  audiencia?: 'lider' | 'revisor';
   /** Enlace profundo opcional por blocker (código + ids). */
   onNavigateToBlocker?: (blocker: ClosureBlocker) => void;
 }
 
-const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
-
-function GroupIcon({ ok, parcial }: { ok: boolean; parcial: boolean }) {
-  if (ok) {
-    return (
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary" aria-hidden="true">
-        <CheckCircle2 className="size-5" />
-      </span>
-    );
+function notaProgreso(audiencia: 'lider' | 'revisor', listo: boolean): string {
+  if (audiencia === 'revisor') {
+    return listo
+      ? 'Todas las comprobaciones están superadas.'
+      : 'La entrega tiene comprobaciones pendientes; revísalas antes de emitir el veredicto.';
   }
-  if (parcial) {
-    return (
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-400/20 text-amber-700 dark:text-amber-300" aria-hidden="true">
-        <Clock className="size-5" />
-      </span>
-    );
-  }
-  return (
-    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-error/15 text-error" aria-hidden="true">
-      <AlertCircle className="size-5" />
-    </span>
-  );
+  return listo
+    ? 'Todas las comprobaciones están superadas: puedes enviar la solicitud de cierre.'
+    : 'Completa todos los elementos para habilitar el envío de la solicitud de cierre.';
 }
 
 /**
@@ -141,6 +134,9 @@ function GroupIcon({ ok, parcial }: { ok: boolean; parcial: boolean }) {
  * «N de 16» y los 6 grupos de `10` §5.3. Cada grupo se expande para mostrar
  * el `message` del backend (nunca copy inventado) y los `ids` del
  * diagnóstico. Sin acciones de resolución in situ (06 v2 §22).
+ *
+ * Solo lo incompleto se destaca (ámbar): los grupos superados quedan neutros.
+ * Con pendientes, el progreso ofrece un acceso directo a cada categoría.
  */
 export function ClosureReadinessPanel({
   summary,
@@ -148,138 +144,168 @@ export function ClosureReadinessPanel({
   title = 'Lista de verificación para el cierre',
   description = 'Revisa y completa todos los elementos requeridos.',
   showProgress = true,
+  audiencia = 'lider',
   onNavigateToBlocker,
 }: ClosureReadinessPanelProps) {
+  const baseId = useId();
+  const [abiertos, setAbiertos] = useState<string[]>([]);
+
   if (isLoading || !summary) {
     return (
       <div className="space-y-4" aria-busy="true" aria-label="Cargando verificación del cierre">
-        {showProgress && <Skeleton className="h-24 w-full rounded-xl" />}
-        <Skeleton className="h-64 w-full rounded-xl" />
+        {showProgress && <Skeleton className="h-24 w-full rounded-card" />}
+        <Skeleton className="h-56 w-full rounded-card" />
       </div>
     );
   }
 
   const grupos = groupClosureBlockers(summary.blockers);
   const superadas = countPassedChecks(summary.blockers);
+  const pendientes = TOTAL_CLOSURE_CHECKS - superadas;
   const porcentaje = Math.round((superadas / TOTAL_CLOSURE_CHECKS) * 100);
+  const gruposPendientes = grupos.filter((grupo) => !grupo.ok);
+  const triggerId = (key: ClosureGroupKey) => `${baseId}-grupo-${key}`;
+
+  /** Abre la categoría y lleva el foco a su cabecera. */
+  const irAGrupo = (key: ClosureGroupKey) => {
+    setAbiertos((prev) => (prev.includes(key) ? prev : [...prev, key]));
+    const cabecera = document.getElementById(triggerId(key));
+    cabecera?.scrollIntoView?.({ block: 'center' });
+    cabecera?.focus({ preventScroll: true });
+  };
 
   return (
     <div className="space-y-4">
       {showProgress && (
-        <section className={CARD} aria-labelledby="closure-progress-title">
-          <h2 id="closure-progress-title" className="text-sm font-bold text-on-surface">
-            Progreso
-          </h2>
-          <div className="mt-1 flex flex-wrap items-end justify-between gap-2">
-            <p className="text-lg text-on-surface">
-              <span className="font-bold">
-                {superadas} de {TOTAL_CLOSURE_CHECKS}
-              </span>{' '}
-              comprobaciones superadas
-            </p>
-            <span className="text-sm font-semibold text-on-surface-variant">{porcentaje}%</span>
+        <section className="card-base" aria-labelledby="closure-progress-title">
+          <div className="flex flex-wrap items-baseline justify-between gap-inline">
+            <h2 id="closure-progress-title" className="type-section text-text-primary">
+              Progreso
+            </h2>
+            <span className="type-meta font-semibold tabular-nums">{porcentaje}%</span>
           </div>
+          <p className="type-body mt-micro text-text-primary">
+            <span className="font-semibold tabular-nums">
+              {superadas} de {TOTAL_CLOSURE_CHECKS}
+            </span>{' '}
+            comprobaciones superadas
+          </p>
           <Progress
             value={porcentaje}
             aria-label={`${superadas} de ${TOTAL_CLOSURE_CHECKS} comprobaciones superadas`}
-            className="mt-2 h-2"
+            className="mt-tight h-2"
           />
-          <p className="mt-2 text-xs text-tertiary">
-            {summary.canSubmit
-              ? 'Todas las comprobaciones están superadas: puedes enviar la solicitud de cierre.'
-              : 'Completa todos los elementos para habilitar el envío de la solicitud de cierre.'}
-          </p>
+          {pendientes > 0 && (
+            <div className="mt-inline flex flex-wrap items-center gap-x-inline gap-y-tight" data-slot="closure-pendientes">
+              <span className="pill pill-sm pill-amber tabular-nums">
+                {pendientes === 1 ? '1 pendiente' : `${pendientes} pendientes`}
+              </span>
+              <span className="type-meta">Ir a:</span>
+              {gruposPendientes.map((grupo) => (
+                <button
+                  key={grupo.definition.key}
+                  type="button"
+                  onClick={() => irAGrupo(grupo.definition.key)}
+                  aria-label={`Ver pendientes de ${grupo.definition.titulo}`}
+                  className="type-meta rounded-control font-semibold text-text-primary underline underline-offset-2 outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40"
+                >
+                  {grupo.definition.titulo}
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="type-meta mt-tight">{notaProgreso(audiencia, summary.canSubmit)}</p>
         </section>
       )}
 
-      <section className={CARD} aria-labelledby="closure-checklist-title">
-        <h2 id="closure-checklist-title" className="text-sm font-bold text-on-surface">
+      <section className="card-base" aria-labelledby="closure-checklist-title">
+        <h2 id="closure-checklist-title" className="type-section text-text-primary">
           {title}
         </h2>
-        <p className="mt-0.5 text-xs text-tertiary">{description}</p>
+        <p className="type-meta mt-micro">{description}</p>
 
-        <Accordion type="multiple" className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {grupos.map((grupo) => {
-            const parcial = !grupo.ok && grupo.superadas > 0;
-            const cantidadTotal = grupo.blockers.reduce((acc, b) => acc + b.cantidad, 0);
-            return (
-              <AccordionItem
-                key={grupo.definition.key}
-                value={grupo.definition.key}
-                className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest px-3 last:border-b"
+        <Accordion
+          type="multiple"
+          value={abiertos}
+          onValueChange={setAbiertos}
+          className="mt-stack grid grid-cols-1 items-start gap-tight lg:grid-cols-2"
+        >
+          {grupos.map((grupo) => (
+            <AccordionItem
+              key={grupo.definition.key}
+              value={grupo.definition.key}
+              className="rounded-control border border-outline-variant/50 px-3 last:border-b"
+            >
+              <AccordionTrigger
+                id={triggerId(grupo.definition.key)}
+                className="items-center gap-3 py-2 hover:no-underline"
+                aria-label={`${grupo.definition.titulo}: ${grupo.superadas} de ${grupo.total}`}
               >
-                <AccordionTrigger
-                  className="py-3 hover:no-underline [&>svg]:hidden"
-                  aria-label={`${grupo.definition.titulo}: ${grupo.superadas} de ${grupo.total}`}
-                >
-                  <div className="flex w-full items-center gap-3">
-                    <GroupIcon ok={grupo.ok} parcial={parcial} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-black uppercase tracking-widest text-on-surface">
-                        {grupo.definition.titulo}
-                      </p>
-                      <p className="text-xs text-tertiary">
-                        {grupo.ok ? grupo.definition.descripcionOk : grupo.definition.descripcionPendiente}
-                      </p>
-                    </div>
-                    <span
-                      className={`shrink-0 text-sm font-bold ${grupo.ok ? 'text-primary' : 'text-on-surface'}`}
-                    >
-                      {grupo.superadas} de {grupo.total}
-                    </span>
-                    <ChevronRight className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pb-3">
-                  {grupo.ok ? (
-                    <p className="text-xs text-tertiary">Sin pendientes en este grupo.</p>
-                  ) : (
-                    <ul className="space-y-2" aria-label={`Pendientes de ${grupo.definition.titulo}`}>
-                      {grupo.blockers.map((blocker) => (
-                        <li
-                          key={blocker.code}
-                          className="rounded-lg border border-error/20 bg-error/5 px-3 py-2 text-xs text-on-surface"
-                        >
-                          <p className="font-semibold">{blocker.message}</p>
-                          <p className="mt-0.5 text-[11px] text-tertiary">
-                            <span className="font-mono">{blocker.code}</span>
-                            {blocker.cantidad > 0 && ` · ${blocker.cantidad} ${blocker.cantidad === 1 ? 'elemento' : 'elementos'}`}
+                <span
+                  aria-hidden="true"
+                  className={`size-2 shrink-0 rounded-full ${grupo.ok ? 'bg-primary' : 'bg-attention'}`}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="type-body block font-semibold text-text-primary">{grupo.definition.titulo}</span>
+                  <span className="type-meta block">
+                    {grupo.ok ? grupo.definition.descripcionOk : grupo.definition.descripcionPendiente}
+                  </span>
+                </span>
+                {grupo.ok ? (
+                  <span className="type-meta shrink-0 tabular-nums">
+                    {grupo.superadas} de {grupo.total}
+                  </span>
+                ) : (
+                  <span className="pill pill-sm pill-amber shrink-0 tabular-nums">
+                    {grupo.superadas} de {grupo.total}
+                  </span>
+                )}
+              </AccordionTrigger>
+              <AccordionContent className="pb-3">
+                {grupo.ok ? (
+                  <p className="type-meta">Sin pendientes en este grupo.</p>
+                ) : (
+                  <ul className="space-y-tight" aria-label={`Pendientes de ${grupo.definition.titulo}`}>
+                    {grupo.blockers.map((blocker) => (
+                      <li key={blocker.code} className="rounded-control bg-surface-container-low px-3 py-2">
+                        <p className="type-body font-medium text-text-primary">{blocker.message}</p>
+                        <p className="type-meta mt-micro">
+                          <span className="font-mono">{blocker.code}</span>
+                          {blocker.cantidad > 0 && ` · ${blocker.cantidad} ${blocker.cantidad === 1 ? 'elemento' : 'elementos'}`}
+                        </p>
+                        {blocker.ids.length > 0 && (
+                          <p className="mt-1 flex flex-wrap gap-1">
+                            {blocker.ids.slice(0, 12).map((id) =>
+                              onNavigateToBlocker ? (
+                                <button
+                                  key={id}
+                                  type="button"
+                                  onClick={() => onNavigateToBlocker({ ...blocker, ids: [id] })}
+                                  className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[11px] text-on-surface-variant underline-offset-2 hover:underline"
+                                >
+                                  #{id}
+                                </button>
+                              ) : (
+                                <span
+                                  key={id}
+                                  className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[11px] text-on-surface-variant"
+                                >
+                                  #{id}
+                                </span>
+                              ),
+                            )}
+                            {blocker.ids.length > 12 && (
+                              <span className="type-meta">+{blocker.ids.length - 12} más</span>
+                            )}
                           </p>
-                          {blocker.ids.length > 0 && (
-                            <p className="mt-1 flex flex-wrap gap-1">
-                              {blocker.ids.slice(0, 12).map((id) =>
-                                onNavigateToBlocker ? (
-                                  <button
-                                    key={id}
-                                    type="button"
-                                    onClick={() => onNavigateToBlocker({ ...blocker, ids: [id] })}
-                                    className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[11px] text-on-surface-variant underline-offset-2 hover:underline"
-                                  >
-                                    #{id}
-                                  </button>
-                                ) : (
-                                  <span
-                                    key={id}
-                                    className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[11px] text-on-surface-variant"
-                                  >
-                                    #{id}
-                                  </span>
-                                ),
-                              )}
-                              {blocker.ids.length > 12 && (
-                                <span className="text-[11px] text-tertiary">+{blocker.ids.length - 12} más</span>
-                              )}
-                            </p>
-                          )}
-                        </li>
-                      ))}
-                      {cantidadTotal === 0 && null}
-                    </ul>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
         </Accordion>
       </section>
     </div>

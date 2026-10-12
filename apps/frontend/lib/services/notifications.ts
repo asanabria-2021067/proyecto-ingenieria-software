@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api/client';
+import type { NotificationPreference } from '@/lib/notifications/preference-groups';
 
 export interface Notificacion {
   idNotificacion: number;
@@ -43,6 +44,39 @@ export function marcarTodasLeidas(): Promise<{ actualizadas: number }> {
   return apiFetch<{ actualizadas: number }>('/notificaciones/leer-todas', {
     method: 'PATCH',
   });
+}
+
+/**
+ * T-328 — lee la lista que devuelven GET y PUT de preferencias. Solo entran
+ * pares `{ tipo, activa }` bien formados; el número de tipos lo decide el
+ * backend, aquí no se asume ninguno.
+ */
+export function parseNotificationPreferences(raw: unknown): NotificationPreference[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (item): item is NotificationPreference =>
+        typeof item === 'object' && item !== null && typeof item.tipo === 'string' && item.tipo !== '' && typeof item.activa === 'boolean',
+    )
+    .map(({ tipo, activa }) => ({ tipo, activa }));
+}
+
+/** HU-185 — preferencias del usuario EN SESIÓN, una por tipo (sin fila guardada = activa). */
+export async function getNotificationPreferences(): Promise<NotificationPreference[]> {
+  return parseNotificationPreferences(await apiFetch<unknown>('/notificaciones/preferencias'));
+}
+
+/**
+ * HU-185 — activa o desactiva UN tipo para el usuario en sesión. El backend
+ * responde con la lista completa ya actualizada, que es la que se devuelve:
+ * la interfaz muestra lo que quedó guardado, no lo que pidió.
+ */
+export async function updateNotificationPreference(tipo: string, activa: boolean): Promise<NotificationPreference[]> {
+  const raw = await apiFetch<unknown>('/notificaciones/preferencias', {
+    method: 'PUT',
+    body: JSON.stringify({ tipo, activa }),
+  });
+  return parseNotificationPreferences(raw);
 }
 
 /**

@@ -3,8 +3,9 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, AlertTriangle, ClipboardList, SearchX } from 'lucide-react';
+import { AlertCircle, ClipboardList, SearchX } from 'lucide-react';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
+import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -24,9 +25,14 @@ import {
 } from '@/components/ui/empty';
 import {
   ESTADO_LABEL,
+  ESTADO_TAREA_TONE,
   PRIORIDAD_ICON,
   PRIORIDAD_LABEL,
+  PRIORIDAD_TONE,
+  VENCIMIENTO_CONFIG,
+  type VencimientoTarea,
 } from '@/components/projects/task-board.utils';
+import { Tag } from '@/components/ui/tag';
 import { getMisTareas, type MiTareaDTO } from '@/lib/services/users';
 import {
   filterTasksByPriority,
@@ -40,6 +46,14 @@ import {
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
 import { parseFechaSolo } from '@/lib/calendar/utils';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROWS,
+  DATA_TABLE_ROW_HOVER,
+  DataTablePager,
+} from '@/components/dashboard/data-table';
 
 const TAMANIO_PAGINA = 15;
 const FILTRO_TODOS = 'TODOS';
@@ -47,7 +61,7 @@ const FILTRO_TODOS = 'TODOS';
 // una tarea "próxima a vencer" si le quedan 3 días o menos
 const DIAS_PROXIMA_A_VENCER = 3;
 
-type Vencimiento = 'VENCIDA' | 'PROXIMA' | null;
+type Vencimiento = VencimientoTarea | null;
 
 function getVencimiento(tarea: MiTareaDTO): Vencimiento {
   if (!tarea.fechaLimite || tarea.estadoTarea === 'HECHO') return null;
@@ -66,26 +80,6 @@ function getVencimiento(tarea: MiTareaDTO): Vencimiento {
   return null;
 }
 
-// icono + texto en cada pastilla: el vencimiento nunca depende solo del color
-const VENCIMIENTO_CONFIG: Record<
-  Exclude<Vencimiento, null>,
-  { label: string; icon: typeof AlertCircle; tone: string }
-> = {
-  VENCIDA: { label: 'Vencida', icon: AlertCircle, tone: 'pill-error' },
-  PROXIMA: { label: 'Vence pronto', icon: AlertTriangle, tone: 'pill-warning' },
-};
-
-const ESTADO_TONE: Record<EstadoTarea, string> = {
-  POR_HACER: 'pill-neutral',
-  EN_PROGRESO: 'pill-warning',
-  EN_REVISION: 'pill-neutral',
-  HECHO: 'pill-success',
-};
-const PRIORIDAD_TONE: Record<Prioridad, string> = {
-  BAJA: 'pill-neutral',
-  MEDIA: 'pill-warning',
-  ALTA: 'pill-error',
-};
 
 const OPCIONES_ORDEN: { value: string; label: string; campo: CriterioOrdenTarea; direccion: DireccionOrden }[] = [
   { value: 'fechaLimite:asc', label: 'Fecha límite: más próxima primero', campo: 'fechaLimite', direccion: 'asc' },
@@ -104,16 +98,16 @@ function formatFecha(fecha: string): string {
 }
 
 function EstadoBadge({ estado }: { estado: EstadoTarea }) {
-  return <span className={`pill ${ESTADO_TONE[estado]}`}>{ESTADO_LABEL[estado]}</span>;
+  return <Tag tone={ESTADO_TAREA_TONE[estado]}>{ESTADO_LABEL[estado]}</Tag>;
 }
 
 function PrioridadBadge({ prioridad }: { prioridad: Prioridad }) {
   const Icono = PRIORIDAD_ICON[prioridad];
   return (
-    <span className={`pill ${PRIORIDAD_TONE[prioridad]}`}>
-      <Icono className="size-3.5" aria-hidden="true" />
+    <Tag tone={PRIORIDAD_TONE[prioridad]}>
+      <Icono aria-hidden="true" />
       {PRIORIDAD_LABEL[prioridad]}
-    </span>
+    </Tag>
   );
 }
 
@@ -171,35 +165,13 @@ function PuntoGrupo({ className }: { className: string }) {
   return <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${className}`} />;
 }
 
-function ResumenKpi({
-  label,
-  valor,
-  punto,
-  tonoValor = 'text-text-primary',
-}: {
-  label: string;
-  valor: number;
-  punto: string;
-  tonoValor?: string;
-}) {
-  return (
-    <div role="group" aria-label={label} className="card-base px-card py-stack">
-      <p className="flex items-center gap-tight text-xs font-semibold uppercase tracking-wide text-text-secondary">
-        <PuntoGrupo className={punto} />
-        {label}
-      </p>
-      <p className={`mt-tight font-headline text-3xl font-bold tabular-nums ${tonoValor}`}>{valor}</p>
-    </div>
-  );
-}
-
 function FilaTarea({ tarea }: { tarea: MiTareaDTO }) {
   const vencimiento = getVencimiento(tarea);
   const config = vencimiento ? VENCIMIENTO_CONFIG[vencimiento] : null;
   const VencimientoIcon = config?.icon;
   return (
     <li
-      className={`relative flex flex-wrap items-center gap-x-inline gap-y-micro px-card py-inline transition-colors hover:bg-surface-container-low @md/grupo:grid ${COLUMNAS_CORTAS} ${COLUMNAS_LISTA}`}
+      className={`relative flex flex-wrap items-center gap-x-inline gap-y-micro px-card py-inline ${DATA_TABLE_ROW_HOVER} @md/grupo:grid ${COLUMNAS_CORTAS} ${COLUMNAS_LISTA}`}
     >
       <div className={`min-w-0 ${CELDA_ANCHA}`}>
         {/* El enlace del título se estira sobre toda la fila (after:inset-0):
@@ -218,10 +190,10 @@ function FilaTarea({ tarea }: { tarea: MiTareaDTO }) {
           <span className="type-meta tabular-nums text-text-secondary">{formatFecha(tarea.fechaLimite)}</span>
         )}
         {config && VencimientoIcon && (
-          <span className={`pill ${config.tone}`}>
-            <VencimientoIcon className="size-3.5" aria-hidden="true" />
+          <Tag tone={config.tone}>
+            <VencimientoIcon aria-hidden="true" />
             {config.label}
-          </span>
+          </Tag>
         )}
       </div>
       <div className={CELDA_CORTA}>
@@ -248,7 +220,7 @@ function GrupoTareas({
   const idLista = `${idTitulo}-lista`;
 
   return (
-    <section aria-labelledby={idTitulo} className="card-base @container/grupo overflow-hidden p-0">
+    <section aria-labelledby={idTitulo} className={`${DATA_TABLE_CARD} @container/grupo`}>
       <header
         className={`flex items-center justify-between gap-inline px-card py-stack ${
           visible ? 'border-b border-outline-variant/50' : ''
@@ -281,7 +253,7 @@ function GrupoTareas({
               visual (cada pastilla ya dice qué es), por eso aria-hidden. */}
           <div
             aria-hidden="true"
-            className={`hidden gap-x-inline border-b border-outline-variant/50 bg-surface-container-low px-card py-tight text-xs font-semibold text-text-secondary @2xl/grupo:grid ${COLUMNAS_LISTA}`}
+            className={`hidden gap-x-inline ${DATA_TABLE_HEAD_ROW} px-card py-tight ${DATA_TABLE_HEAD_TEXT} @2xl/grupo:grid ${COLUMNAS_LISTA}`}
           >
             <span>Tarea</span>
             <span>Proyecto</span>
@@ -289,7 +261,7 @@ function GrupoTareas({
             <span>Prioridad</span>
             <span>Estado</span>
           </div>
-          <ul id={idLista} className="divide-y divide-outline-variant/50">
+          <ul id={idLista} className={DATA_TABLE_ROWS}>
             {tareas.map((tarea) => (
               <FilaTarea key={tarea.idTarea} tarea={tarea} />
             ))}
@@ -529,7 +501,7 @@ export default function MisTareasPage() {
 
         {/* loading — skeleton con forma de grupo y filas, nunca spinner */}
         {isLoading && (
-          <div className="card-base overflow-hidden p-0" role="status" aria-label="Cargando tus tareas">
+          <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando tus tareas">
             <div className="border-b border-outline-variant/50 px-card py-stack">
               <Skeleton className="h-5 w-32" />
             </div>
@@ -614,37 +586,12 @@ export default function MisTareasPage() {
               <GrupoTareas key={grupo.id} grupo={grupo} tareas={delGrupo} />
             ))}
 
-            {/* paginación */}
-            <nav
-              aria-label="Paginación de tareas"
-              className="card-base flex items-center justify-between gap-inline px-card py-inline"
-            >
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={paginado.pagina <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                aria-label="Página anterior"
-                className="rounded-control"
-              >
-                Anterior
-              </Button>
-              <span className="type-meta font-medium" aria-live="polite">
-                Página {paginado.pagina} de {paginado.totalPaginas}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={paginado.pagina >= paginado.totalPaginas}
-                onClick={() => setPage((p) => Math.min(paginado.totalPaginas, p + 1))}
-                aria-label="Página siguiente"
-                className="rounded-control"
-              >
-                Siguiente
-              </Button>
-            </nav>
+            <DataTablePager
+              label="Paginación de tareas"
+              pagina={paginado.pagina}
+              totalPaginas={paginado.totalPaginas}
+              onPagina={setPage}
+            />
           </>
         )}
       </div>

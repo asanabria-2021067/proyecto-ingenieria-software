@@ -11,6 +11,7 @@ import {
   createIntegrationTask,
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
+import { plannedEndDate } from './setup/sprint-plan';
 import { SprintsService } from '../../src/sprints/sprints.service';
 import { SprintsContextService } from '../../src/sprints/sprints-context.service';
 import { SprintsAuthorizationService } from '../../src/sprints/sprints-authorization.service';
@@ -350,7 +351,7 @@ describeIntegration(
       expect(tareaTrasCierre.idSprint).toBeNull();
       expect(tareaTrasCierre.destinoArrastre).toBe('SIGUIENTE_SPRINT');
 
-      const nuevoSprint = await service.startSprint(project.idProyecto, leader.idUsuario);
+      const nuevoSprint = await service.startSprint(project.idProyecto, leader.idUsuario, plannedEndDate());
       scope.sprintIds = [sprint.idSprint, nuevoSprint.idSprint];
 
       const tareaTrasStart = await prisma.tarea.findUniqueOrThrow({ where: { idTarea: pendiente.idTarea } });
@@ -373,7 +374,7 @@ describeIntegration(
       const service = makeService();
       await service.closeSprint(project.idProyecto, sprint.idSprint, leader.idUsuario, 'BACKLOG');
 
-      const nuevoSprint = await service.startSprint(project.idProyecto, leader.idUsuario);
+      const nuevoSprint = await service.startSprint(project.idProyecto, leader.idUsuario, plannedEndDate());
       scope.sprintIds = [sprint.idSprint, nuevoSprint.idSprint];
 
       const tareaFinal = await prisma.tarea.findUniqueOrThrow({ where: { idTarea: pendiente.idTarea } });

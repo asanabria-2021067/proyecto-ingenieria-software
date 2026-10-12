@@ -1,15 +1,19 @@
-import { ValidateIf } from 'class-validator';
 import { IsFutureCalendarDate } from '../../tasks/dto/validators/is-future-calendar-date.validator';
+import { IsWithinSprintPlanningWindow } from './validators/is-within-sprint-planning-window.validator';
 
 /**
- * HU-160: fecha de fin planeada del Sprint, como el modal "Start Sprint" de
- * Jira — ancla únicamente la línea ideal del burndown (T-240). Opcional: si
- * se omite, `SprintsService.startSprint` calcula `fechaInicio + 14 días`.
- * El cierre real del Sprint sigue siendo el flujo Finalizar -> Cerrar
- * existente, sin relación con este campo.
+ * Fecha esperada de finalización del trabajo del Sprint (`YYYY-MM-DD`),
+ * obligatoria para todo Sprint nuevo: estrictamente posterior a hoy y a lo
+ * sumo 90 días calendario después, ambos en America/Guatemala. No es el
+ * cierre formal — ese sigue siendo el flujo Finalizar -> Cerrar — y una vez
+ * iniciado el Sprint no se puede cambiar.
+ *
+ * `fechaInicio` no forma parte del contrato: la fija el servidor al iniciar.
+ * La columna sigue siendo nullable solo por los Sprints anteriores a esta
+ * regla.
  */
 export class StartSprintDto {
-  @ValidateIf((_object, value) => value !== undefined)
   @IsFutureCalendarDate()
-  fechaFinPlaneada?: string;
+  @IsWithinSprintPlanningWindow()
+  fechaFinPlaneada!: string;
 }

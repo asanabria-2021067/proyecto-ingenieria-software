@@ -11,6 +11,11 @@ import { HistoricalProjectReadService } from './historical-project-read.service'
  *
  * Da al administrador LECTURA, nunca autoridad operativa sobre el equipo: ver
  * un proyecto no convierte a nadie en su líder.
+ *
+ * GPI01-C09 (H-07) / T-286: el rol se exige en un guard (`RolesGuard`), antes
+ * de validar `grupo` o `projectId`. Sin sesión 401, sin el rol 403, y solo un
+ * administrador llega a recibir un 400 de validación. El servicio conserva su
+ * propia comprobación.
  */
 @Controller('admin/proyectos')
 @UseGuards(JwtAuthGuard, RolesGuard)

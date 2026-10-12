@@ -6,7 +6,10 @@ import { usePathname } from 'next/navigation';
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useDashboardSidebarCollapsed } from '@/components/dashboard/use-dashboard-sidebar-collapsed';
+import {
+  useAdminSidebarCollapsed,
+  useDashboardSidebarCollapsed,
+} from '@/components/dashboard/use-dashboard-sidebar-collapsed';
 import { usePinnedProjects, type PinnedProject } from '@/hooks/use-pinned-projects';
 
 export interface NavLeaf {
@@ -63,6 +66,11 @@ function NavBadge({ count }: { count?: number }) {
   );
 }
 
+/** Id de la navegación global: el control de colapsar del encabezado la referencia. */
+export const DASHBOARD_NAV_ID = 'dashboard-global-nav';
+/** Id de la navegación del administrador (mismo propósito). */
+export const ADMIN_NAV_ID = 'admin-global-nav';
+
 const LEAF_ACTIVE_CLASS = 'bg-action text-on-action shadow-card';
 const LEAF_INACTIVE_CLASS = 'text-text-secondary hover:bg-muted hover:text-text-primary';
 
@@ -77,17 +85,23 @@ interface SidebarNavProps {
 }
 
 /** Sidebar de escritorio: tema `default` usa encabezados de sección sutiles
- *  (no colapsables) + colapsado a solo iconos + "Proyectos anclados" al
- *  final; tema `admin` conserva sus grupos expandibles con chevron.
- *  Reutilizado por DashboardLayout y AdminLayout. */
+ *  (no colapsables) + "Proyectos anclados" al final; tema `admin` conserva
+ *  sus grupos expandibles con chevron. Ambos se colapsan a solo iconos, cada
+ *  uno con su propia preferencia. Reutilizado por DashboardLayout y AdminLayout. */
 export function SidebarNav({ entries, theme = 'default', search = null, idUsuario = null }: SidebarNavProps) {
   const pathname = usePathname();
   const isAdmin = theme === 'admin';
   const [expandedOverrides, setExpandedOverrides] = useState<Record<string, boolean>>({});
-  const { collapsed, toggleCollapsed } = useDashboardSidebarCollapsed();
+  const dashboardSidebar = useDashboardSidebarCollapsed();
+  const adminSidebar = useAdminSidebarCollapsed();
+  const { collapsed, toggleCollapsed } = isAdmin ? adminSidebar : dashboardSidebar;
   const { pinned } = usePinnedProjects(idUsuario);
 
-  if (!isAdmin && collapsed) {
+  if (isAdmin && collapsed) {
+    return <AdminCollapsedSidebarNav entries={entries} pathname={pathname} search={search} onExpand={toggleCollapsed} />;
+  }
+
+  if (collapsed) {
     return (
       <CollapsedSidebarNav
         entries={entries}
@@ -100,18 +114,11 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
   }
 
   return (
-    <nav className="flex-1 space-y-1 px-3 py-4">
-      {!isAdmin && (
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-label="Colapsar barra lateral"
-          className={`mb-1 flex w-full items-center gap-inline rounded-control px-inline py-tight text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${LEAF_INACTIVE_CLASS}`}
-        >
-          <PanelLeftClose className="size-4 shrink-0" aria-hidden="true" />
-          Colapsar
-        </button>
-      )}
+    <nav
+      id={isAdmin ? ADMIN_NAV_ID : DASHBOARD_NAV_ID}
+      aria-label={isAdmin ? 'Navegación administrativa' : 'Navegación principal'}
+      className="flex-1 space-y-1 px-3 py-4"
+    >
 
       {entries.map((entry) => {
         if (entry.type !== 'group') {
@@ -125,17 +132,10 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
               aria-current={active ? 'page' : undefined}
               className={
                 isAdmin
-                  ? `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-all duration-200 ${!active ? 'admin-nav-inactive' : ''}`
+                  ? `admin-nav-item ${!active ? 'admin-nav-inactive' : ''}`
                   : `flex items-center gap-inline rounded-control px-inline py-tight text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 ${
                       active ? LEAF_ACTIVE_CLASS : LEAF_INACTIVE_CLASS
                     }`
-              }
-              style={
-                isAdmin
-                  ? active
-                    ? { backgroundColor: 'var(--admin-selector-bg)', color: 'var(--admin-selector-fg)' }
-                    : { color: 'var(--admin-text-dim)' }
-                  : undefined
               }
             >
               <Icon className="w-5 h-5 shrink-0" />
@@ -195,19 +195,20 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
               onClick={() =>
                 setExpandedOverrides((current) => ({ ...current, [entry.label]: !expanded }))
               }
-              className="admin-nav-inactive flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium outline-none transition-all duration-200"
-              style={{ color: groupActiveByRoute ? 'var(--admin-selector-bg)' : 'var(--admin-text-dim)' }}
+              data-state={expanded ? 'open' : 'closed'}
+              className="admin-nav-item admin-nav-group admin-nav-inactive w-full"
             >
               <GroupIcon className="w-5 h-5 shrink-0" />
               <span className="flex-1 text-left">{entry.label}</span>
               {!expanded && <NavBadge count={groupBadge} />}
               <ChevronDown
-                className={`size-4 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+                className={`admin-nav-chevron size-4 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
                 aria-hidden="true"
               />
             </button>
             {expanded && (
-              <div id={groupId} className="ml-4 space-y-1 border-l border-outline-variant/50 pl-3">
+              // Guía vertical alineada bajo el icono del padre (padding 0.75rem + mitad del icono).
+              <div id={groupId} className="admin-nav-children ml-[1.375rem] mt-0.5 space-y-0.5 pl-2.5">
                 {entry.items.map((item) => {
                   const active = isLeafActive(pathname, item, search);
                   const ItemIcon = item.icon;
@@ -217,12 +218,7 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
                       href={item.href}
                       id={`nav-item-${slug(item.label)}`}
                       aria-current={active ? 'page' : undefined}
-                      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium outline-none transition-all duration-200 ${!active ? 'admin-nav-inactive' : ''}`}
-                      style={
-                        active
-                          ? { backgroundColor: 'var(--admin-selector-bg)', color: 'var(--admin-selector-fg)' }
-                          : { color: 'var(--admin-text-muted)' }
-                      }
+                      className={`admin-nav-subitem ${!active ? 'admin-nav-inactive' : ''}`}
                     >
                       <ItemIcon className="w-4 h-4 shrink-0" />
                       {item.label}
@@ -278,7 +274,11 @@ function CollapsedSidebarNav({ entries, pathname, search, pinned, onExpand }: Co
   const leaves = flattenNavEntries(entries);
 
   return (
-    <nav className="flex flex-1 flex-col items-center gap-micro px-2 py-4">
+    <nav
+      id={DASHBOARD_NAV_ID}
+      aria-label="Navegación principal"
+      className="flex flex-1 flex-col items-center gap-micro px-2 py-4"
+    >
       <Tooltip>
         <TooltipTrigger asChild>
           <button
@@ -336,6 +336,113 @@ function CollapsedSidebarNav({ entries, pathname, search, pinned, onExpand }: Co
             </Tooltip>
           ))}
         </>
+      )}
+    </nav>
+  );
+}
+
+/**
+ * Control del sidebar global (no es un destino de navegación): vive en el
+ * encabezado junto a la marca, como el de la sidebar contextual del proyecto.
+ * `admin` usa la preferencia y los colores graphite de la sidebar del
+ * administrador.
+ */
+export function DashboardSidebarCollapseButton({ theme = 'default' }: { theme?: 'default' | 'admin' }) {
+  const dashboardSidebar = useDashboardSidebarCollapsed();
+  const adminSidebar = useAdminSidebarCollapsed();
+  const isAdmin = theme === 'admin';
+  const { toggleCollapsed } = isAdmin ? adminSidebar : dashboardSidebar;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label="Colapsar barra lateral"
+          aria-expanded={true}
+          aria-controls={isAdmin ? ADMIN_NAV_ID : DASHBOARD_NAV_ID}
+          className={
+            isAdmin
+              ? 'admin-collapse-toggle ml-auto flex size-8 shrink-0 items-center justify-center rounded-control transition-colors'
+              : 'ml-auto flex size-8 shrink-0 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40'
+          }
+        >
+          <PanelLeftClose className="size-4" aria-hidden="true" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right">Colapsar</TooltipContent>
+    </Tooltip>
+  );
+}
+
+interface AdminCollapsedSidebarNavProps {
+  entries: NavEntry[];
+  pathname: string;
+  search: string | null;
+  onExpand: () => void;
+}
+
+/**
+ * Sidebar del administrador reducida a solo iconos: todos los destinos
+ * (los de cada grupo, separados por un divisor) con tooltip y el mismo
+ * activo graphite + barra lima.
+ */
+function AdminCollapsedSidebarNav({ entries, pathname, search, onExpand }: AdminCollapsedSidebarNavProps) {
+  const renderLeaf = (leaf: NavLeaf) => {
+    const active = isLeafActive(pathname, leaf, search);
+    const Icon = leaf.icon;
+    return (
+      <Tooltip key={leaf.href}>
+        <TooltipTrigger asChild>
+          <Link
+            href={leaf.href}
+            id={`nav-item-${slug(leaf.label)}`}
+            aria-label={leaf.label}
+            aria-current={active ? 'page' : undefined}
+            className={`admin-nav-item admin-nav-icon ${!active ? 'admin-nav-inactive' : ''}`}
+          >
+            <Icon className="size-4.5" aria-hidden="true" />
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent side="right">{leaf.label}</TooltipContent>
+      </Tooltip>
+    );
+  };
+
+  return (
+    <nav
+      id={ADMIN_NAV_ID}
+      aria-label="Navegación administrativa"
+      className="flex flex-1 flex-col items-center gap-1 px-2 py-4"
+    >
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={onExpand}
+            aria-label="Expandir barra lateral"
+            aria-expanded={false}
+            aria-controls={ADMIN_NAV_ID}
+            className="admin-nav-item admin-nav-icon admin-nav-inactive"
+          >
+            <PanelLeftOpen className="size-4.5" aria-hidden="true" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right">Expandir</TooltipContent>
+      </Tooltip>
+
+      {entries.map((entry) =>
+        entry.type === 'group' ? (
+          <div key={entry.label} role="group" aria-label={entry.label} className="flex flex-col items-center gap-1">
+            <div role="separator" aria-hidden="true" className="admin-nav-separator my-1 h-px w-8" />
+            {entry.items.map(renderLeaf)}
+          </div>
+        ) : (
+          <div key={entry.href} className="flex flex-col items-center gap-1">
+            <div role="separator" aria-hidden="true" className="admin-nav-separator my-1 h-px w-8" />
+            {renderLeaf(entry)}
+          </div>
+        ),
       )}
     </nav>
   );

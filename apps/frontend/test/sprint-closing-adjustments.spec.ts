@@ -15,7 +15,8 @@ if (typeof (globalThis as any).ResizeObserver === 'undefined') {
 const push = vi.fn();
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: '42', sprintId: '1' }),
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
@@ -52,6 +53,7 @@ const mockIo = vi.fn();
 vi.mock('socket.io-client', () => ({ io: (...args: unknown[]) => mockIo(...args) }));
 
 import SprintClosingPage from '../app/dashboard/proyectos/[id]/sprints/[sprintId]/finalizar/page';
+import SprintHoursReviewPage from '../app/dashboard/proyectos/[id]/sprints/[sprintId]/finalizar/revision/page';
 import { useRealtimeNotifications } from '../lib/hooks/useRealtimeNotifications';
 import { useProjectDetail } from '../hooks/use-project-detail';
 import { useCurrentUser } from '../hooks/use-current-user';
@@ -142,6 +144,13 @@ function renderPage() {
   return { ...utils, queryClient };
 }
 
+/** Los ajustes viven en la vista de revisión (`…/finalizar/revision`), con los mismos hooks y servicios. */
+function renderRevision() {
+  const { wrapper, queryClient } = createWrapper();
+  const utils = render(createElement(SprintHoursReviewPage), { wrapper });
+  return { ...utils, queryClient };
+}
+
 beforeEach(() => {
   (useProjectDetail as any).mockReturnValue({
     data: { idProyecto: 42, tituloProyecto: 'Portal', creador: { idUsuario: 1 } },
@@ -162,10 +171,10 @@ describe('SprintClosingPage — ajustes por asignación (F002)', () => {
   it('el upsert envía deltaHoras con signo al endpoint por asignación e invalida sprintClosingSummaryQueryKey', async () => {
     (getSprintClosingSummary as any).mockResolvedValue(summary());
     (upsertHourAdjustment as any).mockResolvedValue({});
-    const { queryClient } = renderPage();
+    const { queryClient } = renderRevision();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    fireEvent.click(await screen.findByRole('button', { name: /Desglose de Carlos Pineda/ }));
+    await screen.findByRole('heading', { level: 2, name: 'Carlos Pineda' });
     // El panel del líder solo aparece tras pedir «Ajustar».
     fireEvent.click((await screen.findAllByRole('button', { name: /^Ajustar/ }))[0]);
     fireEvent.change(screen.getAllByLabelText('Horas aceptadas')[0], { target: { value: '5' } });
@@ -198,9 +207,8 @@ describe('SprintClosingPage — ajustes por asignación (F002)', () => {
       }),
     );
     (deleteHourAdjustment as any).mockResolvedValue(undefined);
-    renderPage();
+    renderRevision();
 
-    fireEvent.click(await screen.findByRole('button', { name: /Desglose de Carlos Pineda/ }));
     fireEvent.click(await screen.findByRole('button', { name: /^Revertir/ }));
 
     await waitFor(() => expect(deleteHourAdjustment).toHaveBeenCalledWith(42, 1, 300));
@@ -248,20 +256,22 @@ describe('SprintClosingPage — ajustes por asignación (F002)', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it('Sprint CERRADO → solo lectura: sin inputs ni botón de cierre habilitado', async () => {
+  it('Sprint CERRADO → solo lectura: la revisión no ofrece ajustar y el cierre queda deshabilitado', async () => {
     (getSprintClosingSummary as any).mockResolvedValue(summary({ estadoSprint: 'CERRADO' }));
-    renderPage();
+    const revision = renderRevision();
 
-    fireEvent.click(await screen.findByRole('button', { name: /Desglose de Carlos Pineda/ }));
-    await screen.findAllByText('Horas reportadas');
+    await screen.findByRole('heading', { level: 2, name: 'Carlos Pineda' });
     // Ni siquiera se ofrece abrir el panel: el Sprint cerrado no admite ajustes.
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /^Ajustar/ })[0]).toBeDisabled();
     expect(screen.getByText('Cerrado')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /confirmar cierre del sprint/i })).toBeDisabled();
+    revision.unmount();
+
+    renderPage();
+    expect(await screen.findByRole('button', { name: /confirmar cierre del sprint/i })).toBeDisabled();
   });
 
-  it('muestra los KPI del resumen: tareas distintas, reportadas, exceso y propuestas', async () => {
+  it('muestra los KPI del resumen: integrantes (con sus tareas distintas), reportadas, exceso y propuestas', async () => {
     (getSprintClosingSummary as any).mockResolvedValue(summary());
     renderPage();
 
@@ -269,7 +279,7 @@ describe('SprintClosingPage — ajustes por asignación (F002)', () => {
     expect(reportadas).toHaveTextContent('12 h');
     expect(screen.getByRole('group', { name: 'Exceso sobre estimación' })).toHaveTextContent('2 h');
     expect(screen.getByRole('group', { name: 'Horas propuestas' })).toHaveTextContent('12 h');
-    expect(screen.getByRole('group', { name: 'Tareas distintas' })).toHaveTextContent('1');
+    expect(screen.getByRole('group', { name: 'Integrantes' })).toHaveTextContent('1 tarea distinta');
   });
 });
 

@@ -117,7 +117,11 @@ describe('VIEW-07 — horas por nivel y elegibilidad (F010)', () => {
     expect(within(screen.getByRole('group', { name: 'Horas propuestas' })).getByText('16 h')).toBeInTheDocument();
     expect(within(screen.getByRole('group', { name: 'Horas acreditadas' })).getByText('15 h')).toBeInTheDocument();
     expect(screen.getByText(/Tareas distintas:/)).toHaveTextContent('4');
-    expect(screen.getByText('Total de horas reales')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Horas reales' })).toBeInTheDocument();
+    // Los tres niveles secundarios comparten una sola superficie y se aclara que no se suman.
+    const desglose = screen.getByRole('region', { name: 'Desglose de horas' });
+    expect(within(desglose).getAllByRole('group')).toHaveLength(3);
+    expect(desglose).toHaveTextContent(/no se suman entre sí/);
     // No llama a ninguna ruta de horas de proyecto: solo candidatos (elegibilidad) y detalle de equipo.
     expect(useLeadershipCandidates).toHaveBeenCalledWith(42, true);
     expect(useHistoricalProject).toHaveBeenCalledWith(42, false);
@@ -135,6 +139,10 @@ describe('VIEW-07 — horas por nivel y elegibilidad (F010)', () => {
       'El rol no tiene cupo disponible',
     ]);
     expect(screen.queryByText(/horas mínimas/i)).not.toBeInTheDocument();
+    // Con motivos, el detalle de criterios llega abierto y la franja dice cuántos incumple.
+    const elegibilidad = screen.getByRole('region', { name: /Elegibilidad para liderazgo/ });
+    expect(elegibilidad.querySelector('details')).toHaveAttribute('open');
+    expect(within(elegibilidad).getByText('No cumple 2 criterios objetivos.')).toBeInTheDocument();
     expect(MOTIVOS_INELEGIBILIDAD).toHaveLength(9);
   });
 
@@ -142,7 +150,9 @@ describe('VIEW-07 — horas por nivel y elegibilidad (F010)', () => {
     mockAll();
     render(createElement(DetalleIntegranteProyectoPage));
 
-    expect(screen.getByText('Elegible')).toBeInTheDocument();
+    expect(screen.getByText('Elegible')).toHaveClass('pill', 'pill-success');
+    // Sin motivos, los criterios técnicos quedan plegados tras la franja.
+    expect(screen.getByRole('region', { name: /Elegibilidad para liderazgo/ }).querySelector('details')).not.toHaveAttribute('open');
     expect(screen.getByText(/no existe ranking/i)).toBeInTheDocument();
     expect(screen.queryByText(/puntuación|ranking:/i)).not.toBeInTheDocument();
   });

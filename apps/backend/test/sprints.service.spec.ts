@@ -145,6 +145,9 @@ const LIDER_ID = 1;
 const NO_LIDER_ID = 2;
 const PROJECT_ID = 10;
 const SPRINT_ID = 20;
+// El servicio recibe la fecha ya validada por StartSprintDto; aquí solo
+// importa que la persista tal cual.
+const FECHA_FIN_PLANEADA = '2026-12-01';
 
 describe('SprintsService', () => {
   describe('startSprint', () => {
@@ -159,7 +162,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      const result = await service.startSprint(PROJECT_ID, LIDER_ID);
+      const result = await service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA);
 
       expect(result).toBe(nuevoSprint);
       expect(tx.sprint.create).toHaveBeenCalledWith({
@@ -168,8 +171,7 @@ describe('SprintsService', () => {
           numero: 1,
           estado: 'ACTIVO',
           fechaInicio: expect.any(Date),
-          // HU-160: sin fechaFinPlaneada explícita, default fechaInicio + 14 días.
-          fechaFinPlaneada: expect.any(Date),
+          fechaFinPlaneada: new Date('2026-12-01T00:00:00.000Z'),
         },
       });
     });
@@ -185,7 +187,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await service.startSprint(PROJECT_ID, LIDER_ID);
+      await service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA);
 
       expect(tx.tarea.updateMany).toHaveBeenCalledWith({
         where: {
@@ -213,7 +215,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      const result = await service.startSprint(PROJECT_ID, LIDER_ID);
+      const result = await service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA);
 
       expect(result.numero).toBe(3);
       expect(tx.sprint.findFirst).toHaveBeenCalledWith({
@@ -227,12 +229,12 @@ describe('SprintsService', () => {
           numero: 3,
           estado: 'ACTIVO',
           fechaInicio: expect.any(Date),
-          fechaFinPlaneada: expect.any(Date),
+          fechaFinPlaneada: new Date('2026-12-01T00:00:00.000Z'),
         },
       });
     });
 
-    it('caso 2b (HU-160): fechaFinPlaneada explícita se usa tal cual, sin aplicar el default de 14 días', async () => {
+    it('caso 2b: persiste exactamente la fecha planeada recibida, anclada a medianoche UTC, sin ningún default', async () => {
       const tx = makeTx();
       tx.sprint.findFirst.mockResolvedValue(null);
       const nuevoSprint = { idSprint: 1, idProyecto: PROJECT_ID, numero: 1, estado: 'ACTIVO' };
@@ -243,13 +245,41 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await service.startSprint(PROJECT_ID, LIDER_ID, '2026-12-01');
+      await service.startSprint(PROJECT_ID, LIDER_ID, '2026-10-20');
 
-      expect(tx.sprint.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          fechaFinPlaneada: new Date('2026-12-01T00:00:00.000Z'),
-        }),
-      });
+      const { data } = tx.sprint.create.mock.calls[0][0];
+      expect(data.fechaFinPlaneada).toEqual(new Date('2026-10-20T00:00:00.000Z'));
+      // Ya no existe el plan implícito de 14 días: la fecha no se deriva de fechaInicio.
+      expect(data.fechaFinPlaneada.getTime() - data.fechaInicio.getTime()).not.toBe(14 * 24 * 60 * 60 * 1000);
+    });
+
+    it('caso 2c: fechaInicio es el instante del servidor al iniciar, nunca un valor del llamador', async () => {
+      vi.useFakeTimers();
+      try {
+        // 20:00 en Guatemala del 3 de octubre = 02:00Z del 4.
+        vi.setSystemTime(new Date('2026-10-04T02:00:00.000Z'));
+        const tx = makeTx();
+        tx.sprint.findFirst.mockResolvedValue(null);
+        tx.sprint.create.mockResolvedValue({ idSprint: 1, idProyecto: PROJECT_ID, numero: 1, estado: 'ACTIVO' });
+        const prisma = makePrisma(tx);
+        const context = makeSprintsContext();
+        context.getCurrentSprint.mockResolvedValue(null);
+        const service = new SprintsService(prisma, context, makeSprintsAuthorization(), makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+        await service.startSprint(PROJECT_ID, LIDER_ID, '2026-10-04');
+
+        expect(tx.sprint.create).toHaveBeenCalledWith({
+          data: {
+            idProyecto: PROJECT_ID,
+            numero: 1,
+            estado: 'ACTIVO',
+            fechaInicio: new Date('2026-10-04T02:00:00.000Z'),
+            fechaFinPlaneada: new Date('2026-10-04T00:00:00.000Z'),
+          },
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('caso 3: rechaza si ya existe un Sprint ACTIVO, sin crear ninguna fila', async () => {
@@ -264,7 +294,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+      await expect(service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA)).rejects.toBeInstanceOf(
         ConflictException,
       );
       expect(tx.sprint.create).not.toHaveBeenCalled();
@@ -282,7 +312,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+      await expect(service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA)).rejects.toBeInstanceOf(
         ConflictException,
       );
       expect(tx.sprint.create).not.toHaveBeenCalled();
@@ -301,7 +331,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      const result = await service.startSprint(PROJECT_ID, LIDER_ID);
+      const result = await service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA);
 
       expect(result).toBe(nuevoSprint);
       expect(result.numero).toBe(2);
@@ -317,7 +347,7 @@ describe('SprintsService', () => {
       );
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await expect(service.startSprint(PROJECT_ID, NO_LIDER_ID)).rejects.toBeInstanceOf(
+      await expect(service.startSprint(PROJECT_ID, NO_LIDER_ID, FECHA_FIN_PLANEADA)).rejects.toBeInstanceOf(
         ForbiddenException,
       );
       expect(context.getCurrentSprint).not.toHaveBeenCalled();
@@ -334,7 +364,7 @@ describe('SprintsService', () => {
       );
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+      await expect(service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA)).rejects.toBeInstanceOf(
         NotFoundException,
       );
       expect(tx.sprint.create).not.toHaveBeenCalled();
@@ -354,7 +384,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      const result = await service.startSprint(PROJECT_ID, LIDER_ID);
+      const result = await service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA);
 
       expect(result.numero).toBe(1);
       expect(tx.sprint.findFirst).toHaveBeenCalledWith(
@@ -372,7 +402,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+      await expect(service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA)).rejects.toBeInstanceOf(
         ConflictException,
       );
     });
@@ -387,7 +417,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+      await expect(service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA)).rejects.toBeInstanceOf(
         Prisma.PrismaClientKnownRequestError,
       );
     });
@@ -402,7 +432,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+      await expect(service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA)).rejects.toBeInstanceOf(
         Prisma.PrismaClientKnownRequestError,
       );
     });
@@ -417,7 +447,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await expect(service.startSprint(PROJECT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+      await expect(service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA)).rejects.toBeInstanceOf(
         Prisma.PrismaClientKnownRequestError,
       );
     });
@@ -437,7 +467,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await service.startSprint(PROJECT_ID, LIDER_ID);
+      await service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA);
 
       expect(authorization.assertCanStartSprint).toHaveBeenCalledTimes(1);
       expect(authorization.assertCanStartSprint).toHaveBeenCalledWith(PROJECT_ID, LIDER_ID, tx);
@@ -458,7 +488,7 @@ describe('SprintsService', () => {
       const authorization = makeSprintsAuthorization();
       const service = new SprintsService(prisma, context, authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
 
-      await service.startSprint(PROJECT_ID, LIDER_ID);
+      await service.startSprint(PROJECT_ID, LIDER_ID, FECHA_FIN_PLANEADA);
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(context.getCurrentSprint).toHaveBeenCalledWith(PROJECT_ID, tx);

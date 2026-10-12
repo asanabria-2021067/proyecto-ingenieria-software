@@ -85,7 +85,7 @@ describe('Tokens de color del tema', () => {
     const badge = readFileSync(join(UI_DIR, 'badge.tsx'), 'utf8');
     const variantePorDefecto = /default:\s*'([^']+)'/.exec(badge)?.[1] ?? '';
 
-    expect(variantePorDefecto).toContain('bg-primary');
+    expect(variantePorDefecto).toContain('bg-tag-success');
     const claseTexto = /\btext-([a-z-]+)\b/.exec(variantePorDefecto)?.[1];
     expect(tokenEstaDefinido(claseTexto as string)).toBe(true);
   });

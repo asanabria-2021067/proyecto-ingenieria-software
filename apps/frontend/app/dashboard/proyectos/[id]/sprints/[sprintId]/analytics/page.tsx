@@ -1,5 +1,7 @@
 'use client';
 
+import { ESTADO_HITO_STYLE } from '@/components/projects/sprint-status.utils';
+
 import { useParams } from 'next/navigation';
 import { AlertCircle, BarChart3, CheckCircle2, Clock, Flag, ListChecks } from 'lucide-react';
 import { useSprintAnalytics, useSprintBurndown } from '@/hooks/use-project-sprints';
@@ -19,25 +21,6 @@ import type { EstadoHito, SprintAnalyticsDto } from '@/lib/types/sprints';
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
-
-/**
- * Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE`/`ESTADO_HITO_STYLE`
- * de las páginas hermanas de Sprints. `bar` usa el mismo tono que el badge:
- * gris, verde lima e institucional.
- */
-const ESTADO_HITO_STYLE: Record<EstadoHito, { label: string; className: string; bar: string }> = {
-  PENDIENTE: { label: 'Pendiente', className: 'bg-surface-container-high text-tertiary', bar: 'bg-outline' },
-  EN_PROGRESO: {
-    label: 'En progreso',
-    className: 'bg-status-warning text-on-status-warning',
-    bar: 'bg-accent',
-  },
-  COMPLETADO: {
-    label: 'Completado',
-    className: 'bg-primary-container text-on-primary-container',
-    bar: 'bg-primary',
-  },
-};
 
 /** Barras por prioridad: alta en rojo suave, media en lima, baja en gris. */
 const PRIORIDAD_BAR: Record<Prioridad, string> = {
@@ -168,7 +151,7 @@ function AnalyticsContent({ analytics }: { analytics: SprintAnalyticsDto }) {
                     </div>
                   </div>
                   <span
-                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
+                    className={`pill shrink-0 ${estilo.className}`}
                   >
                     {estilo.label} · {hito.porcentaje}%
                   </span>

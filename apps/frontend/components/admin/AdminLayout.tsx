@@ -2,10 +2,13 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Suspense, useEffect, useMemo } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Archive,
+  BarChart3,
+  CalendarRange,
   Clock,
   FileSearch,
   FolderKanban,
@@ -13,31 +16,60 @@ import {
   Gavel,
   KeyRound,
   LayoutDashboard,
+  ScrollText,
   Settings2,
+  ShieldAlert,
   ShieldCheck,
   UserCheck,
+  UserCog,
   Users,
+  RotateCcw,
+  Tags,
+  TrendingUp,
 } from 'lucide-react';
+import { ADMIN_METRICS_HREF } from '@/components/admin/admin-page';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { avisarSinPermiso, useCan, RUTA_SIN_PERMISO } from '@/hooks/use-can';
 import { useLogout } from '@/hooks/use-logout';
 import { useCuentasPendientes } from '@/hooks/use-cuentas-pendientes';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { UserMenu } from '@/components/dashboard/UserMenu';
-import { SidebarNav, type NavEntry, type NavLeaf } from '@/components/dashboard/SidebarNav';
+import {
+  DashboardSidebarCollapseButton,
+  SidebarNav,
+  type NavEntry,
+  type NavLeaf,
+} from '@/components/dashboard/SidebarNav';
+import { useAdminSidebarCollapsed } from '@/components/dashboard/use-dashboard-sidebar-collapsed';
 import { ThemeToggle } from '@/components/theme-toggle';
 import logo from '@/public/logo.png';
 
 export const ADMIN_CUENTAS_PENDIENTES_HREF = '/dashboard/admin/cuentas-pendientes';
 
 /**
- * S7 (VIEW-12, F011). Los cuatro grupos de «Proyectos» son EXACTAMENTE los del
- * backend (`GET /admin/proyectos?grupo=activos|revision|cierres|cerrados`); no
- * existe un quinto. «Revisiones» se conserva en su ruta: es la bandeja de
+ * T-319 — el menú se agrupa por TEMA de trabajo, en este orden: usuarios,
+ * proyectos, gobernanza, métricas y verificación. El inventario completo, con las rutas
+ * que no se enlazan y las pantallas que aún no existen, está en
+ * `docs/architecture/sprint9-admin-navigation-inventory.md`.
+ *
+ * S7 (VIEW-12, F011). Los grupos de «Proyectos» son EXACTAMENTE los del
+ * backend (`GET /admin/proyectos?grupo=activos|cierres|cerrados`); no existe
+ * uno más. «Solicitudes de publicación» conserva su ruta: es la bandeja de
  * revisiones de PUBLICACIÓN (V5 §31.2), un flujo distinto del cierre.
+ * «Calendario de Sprints» cierra el grupo como vista de supervisión, no como
+ * un grupo más de la bandeja.
  */
 export const adminNavEntries: NavEntry[] = [
   { href: '/dashboard/admin', label: 'Panel Admin', icon: LayoutDashboard, exact: true },
+  {
+    type: 'group',
+    label: 'Usuarios',
+    icon: Users,
+    items: [
+      { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: UserCog },
+      { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
+    ],
+  },
   {
     type: 'group',
     label: 'Proyectos',
@@ -45,11 +77,14 @@ export const adminNavEntries: NavEntry[] = [
     items: [
       { href: '/dashboard/admin/proyectos?grupo=activos', label: 'Activos', icon: FolderOpen },
       // La revisión de publicación es su propio flujo, no un grupo de la
-      // bandeja: se enlaza aquí para que los cuatro destinos de Proyectos
-      // sigan juntos, y no se repite abajo como entrada suelta.
-      { href: '/dashboard/projects/admin/reviews', label: 'Revisiones', icon: FileSearch },
+      // bandeja: se enlaza aquí para que los destinos de Proyectos sigan
+      // juntos, y no se repite abajo como entrada suelta.
+      { href: '/dashboard/projects/admin/reviews', label: 'Solicitudes de publicación', icon: FileSearch },
       { href: '/dashboard/admin/proyectos?grupo=cierres', label: 'Solicitudes de cierre', icon: Clock },
       { href: '/dashboard/admin/proyectos?grupo=cerrados', label: 'Cerrados', icon: Archive },
+      // No es un grupo de la bandeja: es la supervisión temporal de los Sprints
+      // operables de los proyectos activos (mismo icono que su widget del panel).
+      { href: '/dashboard/admin/sprints', label: 'Calendario de Sprints', icon: CalendarRange },
     ],
   },
   {
@@ -60,12 +95,32 @@ export const adminNavEntries: NavEntry[] = [
   },
   {
     type: 'group',
-    label: 'Administración',
+    label: 'Métricas',
+    icon: BarChart3,
+    items: [
+      // T-321 · HU-178: las métricas de uso son una sección del Panel Admin, sin ruta propia.
+      // Se enlaza su ancla; no se duplica la sección en otra página.
+      { href: ADMIN_METRICS_HREF, label: 'Tendencias de uso', icon: TrendingUp },
+    ],
+  },
+  {
+    type: 'group',
+    label: 'Verificación y seguridad',
+    icon: ShieldAlert,
+    items: [
+      // HU-179 (PR #270): bandeja de cuentas que esperan verificación; lleva el contador.
+      { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
+      // T-310: visor de solo lectura de los eventos de seguridad que ya se registran.
+      { href: '/dashboard/admin/seguridad', label: 'Eventos de seguridad', icon: ScrollText },
+    ],
+  },
+  {
+    type: 'group',
+    label: 'Diagnóstico',
     icon: Settings2,
     items: [
-      { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
-      { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
-      { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
+      // TEMPORAL: inventario de etiquetas para revisión de diseño; quitar junto con su página.
+      { href: '/dashboard/admin/etiquetas', label: 'Etiquetas (temporal)', icon: Tags },
     ],
   },
 ];
@@ -108,6 +163,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const { data: user, isLoading, isError } = useCurrentUser();
   const handleLogout = useLogout();
+  const { collapsed } = useAdminSidebarCollapsed();
+
+  // «Actualizar» de la barra superior: invalida las consultas y React Query
+  // vuelve a pedir las que la vista actual tiene montadas.
+  const queryClient = useQueryClient();
+  const [actualizando, setActualizando] = useState(false);
+  const actualizar = async () => {
+    setActualizando(true);
+    try {
+      await queryClient.invalidateQueries();
+    } finally {
+      setActualizando(false);
+    }
+  };
 
   const esAdmin = useCan('admin.panel');
   const { data: cuentasPendientes } = useCuentasPendientes(esAdmin);
@@ -116,6 +185,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     () => withCuentasPendientes(adminNavEntries, totalPendientes),
     [totalPendientes],
   );
+
+  // T-321: «Tendencias de uso» es un ancla del Panel Admin. Si ya se está en el panel con ese
+  // mismo ancla en la URL, pulsar el enlace no cambia la ruta y Next no vuelve a desplazar:
+  // se lleva la sección a la vista aquí. Desde otra vista, el panel lo hace al terminar de cargar.
+  const irAlAncla = (evento: React.MouseEvent<HTMLElement>) => {
+    const enlace = (evento.target as HTMLElement).closest<HTMLAnchorElement>('a[href*="#"]');
+    const [ruta, ancla] = enlace?.getAttribute('href')?.split('#') ?? [];
+    if (ancla && ruta === pathname) document.getElementById(ancla)?.scrollIntoView?.();
+  };
 
   useEffect(() => {
     if (isLoading) return;
@@ -139,27 +217,53 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
       {/* Sidebar - Desktop Only */}
+      {/* El manejador solo delega: los elementos interactivos son los enlaces del menú. */}
       <aside
-        className="hidden md:flex w-64 h-screen flex-col shrink-0 overflow-y-auto"
-        style={{ backgroundColor: 'var(--admin-bg)', borderRight: '1px solid var(--admin-border)' }}
+        onClick={irAlAncla}
+        data-slot="admin-sidebar"
+        data-collapsed={collapsed || undefined}
+        className={`admin-sidebar hidden md:flex ${collapsed ? 'w-[72px]' : 'w-64'} h-screen flex-col shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-200`}
       >
-        <div className="px-6 py-5 flex items-center gap-3" style={{ borderBottom: '1px solid var(--admin-border)' }}>
-          <Image src={logo} alt="UVGENIUS" className="h-10 w-auto" />
-          <span className="font-headline font-extrabold text-xl" style={{ color: 'var(--admin-text)' }}>UVGenius</span>
+        {/* h-16 = alto de la topbar: el divisor de la marca continúa su borde inferior. */}
+        <div
+          data-slot="admin-sidebar-brand"
+          className={`admin-sidebar-brand flex h-16 shrink-0 items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-5'}`}
+        >
+          {/* El escudo oficial sobre una tarjeta marfil: sus detalles dorados y
+              oscuros no contrastan con el verde bosque ni con el grafito. 52 px
+              y no más: la marca mide lo mismo que la topbar (h-16). */}
+          <span
+            data-slot="admin-brand-logo"
+            className="admin-brand-logo flex size-13 shrink-0 items-center justify-center rounded-lg border p-1.5"
+          >
+            <Image src={logo} alt="UVGENIUS" className="h-full w-auto object-contain" />
+          </span>
+          {!collapsed && (
+            <>
+              <span className="admin-sidebar-brand-name font-headline text-xl font-bold tracking-tight">UVGenius</span>
+              <DashboardSidebarCollapseButton theme="admin" />
+            </>
+          )}
         </div>
 
-        <div className="px-3 pt-3 pb-1">
-          <span className="px-3 text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--admin-text-muted)' }}>
+        {!collapsed && (
+          <p
+            data-slot="admin-nav-section-label"
+            className="admin-nav-section-label px-6 pt-6 type-micro font-semibold uppercase tracking-wider"
+          >
             Administración
-          </span>
-        </div>
+          </p>
+        )}
 
         <Suspense fallback={<SidebarNav entries={navEntries} theme="admin" />}>
           <AdminSidebarNav entries={navEntries} />
         </Suspense>
 
-        <div className="px-3 py-4" style={{ borderTop: '1px solid var(--admin-border)' }}>
-          <UserMenu user={user} onLogout={handleLogout} variant="sidebar" theme="admin" />
+        <div
+          data-slot="admin-sidebar-footer"
+          className={`admin-sidebar-footer py-4 ${collapsed ? 'flex justify-center px-2' : 'px-3'}`}
+        >
+          <UserMenu user={user} onLogout={handleLogout} variant={collapsed ? 'compact' : 'sidebar'} theme="admin" />
         </div>
       </aside>
 
@@ -178,6 +282,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <div className="flex items-center gap-3">
             <NotificationsBell onlyIcon />
+            {/* Mismo botón de icono de la barra del estudiante. Vuelve a pedir
+                los datos de la vista actual: sustituye a los «Actualizar»
+                que cada página administrativa llevaba en su encabezado. */}
+            <button
+              type="button"
+              onClick={actualizar}
+              disabled={actualizando}
+              aria-label="Actualizar"
+              title="Actualizar"
+              className="flex size-10 items-center justify-center rounded-control bg-muted text-text-secondary outline-none transition-colors hover:bg-surface-container-high hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
+            >
+              <RotateCcw
+                className={`size-5 ${actualizando ? 'motion-safe:animate-spin [animation-direction:reverse]' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
             <ThemeToggle />
           </div>
         </header>
@@ -201,7 +321,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               href={href}
               aria-current={active ? 'page' : undefined}
               aria-label={label}
-              className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 ${
+              className={`flex flex-col items-center justify-center w-12 h-12 rounded-control transition-all duration-200 ${
                 active ? 'text-primary bg-primary/10' : 'text-outline hover:text-on-surface'
               }`}
               title={label}

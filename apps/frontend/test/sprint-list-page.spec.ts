@@ -148,38 +148,38 @@ describe('SprintListPage — render dinámico con datos del fixture A10.1', () =
 });
 
 describe('SprintListPage — los tres estados', () => {
-  it('ACTIVO: badge ACTIVO, líder ve Finalizar', () => {
+  it('ACTIVO: etiqueta «Activo», líder ve Finalizar', () => {
     mockLeader(true);
     mockSprints({ sprints: [sprint({ estado: 'ACTIVO' })] });
     mockFinalize();
 
     renderPage();
 
-    expect(screen.getByText('ACTIVO')).toBeInTheDocument();
+    expect(screen.getByText('Activo')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Finalizar' })).toBeInTheDocument();
   });
 
-  it('EN_FINALIZACION: badge "EN FINALIZACIÓN", nunca "Finalizar" de nuevo, líder ve "Continuar cierre" hacia F5', () => {
+  it('EN_FINALIZACION: etiqueta «En finalización», nunca "Finalizar" de nuevo, líder ve "Continuar cierre" hacia F5', () => {
     mockLeader(true);
     mockSprints({ sprints: [sprint({ estado: 'EN_FINALIZACION', idSprint: 9 })] });
     mockFinalize();
 
     renderPage();
 
-    expect(screen.getByText('EN FINALIZACIÓN')).toBeInTheDocument();
+    expect(screen.getByText('En finalización')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Finalizar' })).not.toBeInTheDocument();
     const link = screen.getByRole('link', { name: /continuar cierre/i });
     expect(link).toHaveAttribute('href', '/dashboard/proyectos/42/sprints/9/finalizar');
   });
 
-  it('CERRADO: badge CERRADO, "Ver Detalles" enlaza a F4, nunca Finalizar ni Continuar cierre', () => {
+  it('CERRADO: etiqueta «Cerrado», "Ver Detalles" enlaza a F4, nunca Finalizar ni Continuar cierre', () => {
     mockLeader(true);
     mockSprints({ sprints: [sprint({ estado: 'CERRADO', idSprint: 3 })] });
     mockFinalize();
 
     renderPage();
 
-    expect(screen.getByText('CERRADO')).toBeInTheDocument();
+    expect(screen.getByText('Cerrado')).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /ver detalles/i });
     expect(link).toHaveAttribute('href', '/dashboard/proyectos/42/sprints/3');
     expect(screen.queryByRole('button', { name: 'Finalizar' })).not.toBeInTheDocument();
@@ -199,9 +199,9 @@ describe('SprintListPage — los tres estados', () => {
 
     renderPage();
 
-    expect(screen.getByText('ACTIVO')).toBeInTheDocument();
-    expect(screen.getByText('EN FINALIZACIÓN')).toBeInTheDocument();
-    expect(screen.getByText('CERRADO')).toBeInTheDocument();
+    expect(screen.getByText('Activo')).toBeInTheDocument();
+    expect(screen.getByText('En finalización')).toBeInTheDocument();
+    expect(screen.getByText('Cerrado')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Finalizar' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /continuar cierre/i })).toBeInTheDocument();
     // «Ver detalles» existe en los tres estados, cada uno hacia su propio Sprint
@@ -390,7 +390,7 @@ describe('SprintListPage — sin cálculos auxiliares', () => {
 });
 
 describe('SprintListPage — rediseño: resumen, Sprint en curso e historial', () => {
-  it('el resumen superior se deriva de la lista: total, en curso, cerrados y horas estimadas sumadas', () => {
+  it('el resumen superior son tres indicadores sin icono (total, en curso, horas estimadas); los cerrados van en el encabezado del historial', () => {
     mockLeader(true);
     mockSprints({
       sprints: [
@@ -404,13 +404,15 @@ describe('SprintListPage — rediseño: resumen, Sprint en curso e historial', (
     renderPage();
 
     const resumen = screen.getByRole('region', { name: 'Resumen de Sprints' });
-    expect(within(resumen).getByRole('group', { name: 'Sprints' })).toHaveTextContent('3');
+    expect(within(resumen).getAllByRole('group')).toHaveLength(3);
+    expect(within(resumen).getByRole('group', { name: 'Sprints totales' })).toHaveTextContent('3');
     expect(within(resumen).getByRole('group', { name: 'En curso' })).toHaveTextContent('1');
-    expect(within(resumen).getByRole('group', { name: 'Sprints cerrados' })).toHaveTextContent('2');
     expect(within(resumen).getByRole('group', { name: 'Horas estimadas' })).toHaveTextContent('35.5 h');
+    expect(resumen.querySelector('svg')).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'Historial de Sprints' })).getByText('2 Sprints cerrados')).toBeInTheDocument();
   });
 
-  it('el Sprint en curso es el bloque principal (acciones a la derecha, 4 mini-métricas) y los cerrados van al historial', () => {
+  it('el Sprint en curso es el bloque principal (acciones a la derecha, métricas tipográficas sin tarjetas ni iconos) y los cerrados van al historial', () => {
     mockLeader(true);
     mockSprints({
       sprints: [
@@ -425,7 +427,16 @@ describe('SprintListPage — rediseño: resumen, Sprint en curso e historial', (
     const enCurso = screen.getByRole('region', { name: 'Sprint en curso' });
     const tarjeta = within(enCurso).getByRole('article', { name: 'Sprint 3' });
     expect(tarjeta).toHaveClass('card-base');
-    expect(tarjeta.querySelectorAll('[data-slot="sprint-metric"]')).toHaveLength(4);
+    const metricas = Array.from(tarjeta.querySelectorAll('[data-slot="sprint-metric"]'));
+    expect(metricas.map((m) => m.querySelector('dt')?.textContent)).toEqual([
+      'Inicio',
+      'Fin planeado',
+      'Tareas',
+      'Hitos',
+      'Horas estimadas',
+    ]);
+    for (const metrica of metricas) expect(metrica.className).not.toMatch(/bg-|rounded|border/);
+    expect(tarjeta.querySelector('svg')).toBeNull();
     const acciones = tarjeta.querySelector('[data-slot="sprint-actions"]') as HTMLElement;
     expect(Array.from(acciones.querySelectorAll('a, button')).map((el) => el.textContent?.trim())).toEqual([
       'Ver detalles',

@@ -25,7 +25,9 @@ async function registrar(page: Page): Promise<string> {
   await page.getByPlaceholder('Perez').fill('Smoke');
   await page.getByPlaceholder('24000').fill(`${marca}`);
   await page.getByPlaceholder('usuario@uvg.edu.gt').fill(correo);
-  await page.getByTestId('registro-carrera-select').selectOption({ index: 1 });
+  // Desplegable del sistema (no un <select> nativo): se abre y se elige la primera carrera.
+  await page.getByTestId('registro-carrera-select').click();
+  await page.getByRole('option').first().click();
   await page.getByPlaceholder('Minimo 8 caracteres').fill(CONTRASENA);
   await page.getByPlaceholder('••••••••').fill(CONTRASENA);
   await page.getByRole('button', { name: 'Crear Cuenta' }).click();
@@ -90,7 +92,7 @@ test('un usuario nuevo se registra, administración lo aprueba, entra a proyecto
   const listado = await adminPage.request.get(API_CUENTAS_PENDIENTES);
   const { total } = (await listado.json()) as { total: number };
   expect(total).toBeGreaterThan(0);
-  const grupo = adminPage.getByRole('button', { name: /^Administración/ });
+  const grupo = adminPage.getByRole('button', { name: /^Verificación y seguridad/ });
   await expect(grupo).toContainText(`${total} por atender`);
   await grupo.click();
   const enlace = adminPage.getByRole('link', { name: /Cuentas pendientes/ });

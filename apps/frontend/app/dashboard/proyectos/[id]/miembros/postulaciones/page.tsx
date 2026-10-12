@@ -156,7 +156,7 @@ export default function ProjectPendingPostulationsPage() {
           <section className="rounded-xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm md:p-5">
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <h2 className="font-headline text-xl font-extrabold text-on-surface">Postulaciones recibidas</h2>
-              <span className="rounded-full bg-surface-container-high px-3 py-1 text-xs font-semibold text-tertiary">
+              <span className="pill pill-neutral">
                 {isLoading ? 'Cargando' : `${postulaciones.length} pendientes`}
               </span>
             </div>
@@ -219,7 +219,7 @@ export default function ProjectPendingPostulationsPage() {
                         <div className="min-w-0 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-medium text-tertiary">Rol solicitado</span>
-                            <span className="rounded-full bg-primary-container px-3 py-1 text-xs font-bold text-on-primary-container">
+                            <span className="pill pill-sage">
                               {postulacion.rolProyecto.nombreRol}
                             </span>
                           </div>
@@ -233,7 +233,7 @@ export default function ProjectPendingPostulationsPage() {
                         </div>
 
                         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between lg:min-w-[13rem] lg:flex-col lg:items-end">
-                          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                          <span className="pill pill-neutral">
                             PENDIENTE
                           </span>
                           <div className="flex justify-end gap-2">

@@ -2,11 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-
-// Mismo huso que is-future-calendar-date.validator.ts: el contenedor corre en
-// UTC (sin TZ en docker-compose), así que sin esto el texto del recordatorio
-// sale desplazado respecto a la hora que el usuario ve en el calendario.
-const GUATEMALA_TIME_ZONE = 'America/Guatemala';
+// El contenedor corre en UTC (sin TZ en docker-compose), así que sin este huso
+// el texto del recordatorio sale desplazado respecto a la hora que el usuario
+// ve en el calendario.
+import { GUATEMALA_TIME_ZONE } from '../common/utils/guatemala-date';
 
 /**
  * HU-169 (T-265): recordatorio de EventoProyecto emitido por el centro de

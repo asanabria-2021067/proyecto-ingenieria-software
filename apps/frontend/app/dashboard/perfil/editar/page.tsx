@@ -404,13 +404,13 @@ export default function EditarPerfilPage() {
           {/* STEP 1: Datos Personales & Académicos */}
           {step === 0 && (
             <div className="space-y-6">
-              <h3 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+              <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
                 Información Personal y Académica
-              </h3>
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Nombre</label>
-                  <input
+                  <label htmlFor="perfil-nombre" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Nombre</label>
+                  <input id="perfil-nombre"
                     type="text"
                     required
                     value={nombre}
@@ -419,8 +419,8 @@ export default function EditarPerfilPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Apellido</label>
-                  <input
+                  <label htmlFor="perfil-apellido" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Apellido</label>
+                  <input id="perfil-apellido"
                     type="text"
                     required
                     value={apellido}
@@ -432,8 +432,8 @@ export default function EditarPerfilPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Carrera</label>
-                  <select
+                  <label htmlFor="perfil-carrera" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Carrera</label>
+                  <select id="perfil-carrera"
                     value={idCarrera || ''}
                     onChange={(e) => setIdCarrera(e.target.value ? Number(e.target.value) : null)}
                     className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm text-on-surface transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -445,8 +445,8 @@ export default function EditarPerfilPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Semestre Actual</label>
-                  <input
+                  <label htmlFor="perfil-semestre-actual" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Semestre Actual</label>
+                  <input id="perfil-semestre-actual"
                     type="number"
                     min="1"
                     max="20"
@@ -459,8 +459,8 @@ export default function EditarPerfilPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Disponibilidad (horas/sem)</label>
-                  <input
+                  <label htmlFor="perfil-disponibilidad-horas-sem" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Disponibilidad (horas/sem)</label>
+                  <input id="perfil-disponibilidad-horas-sem"
                     type="number"
                     min="0"
                     max="168"
@@ -470,8 +470,8 @@ export default function EditarPerfilPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Horas Beca Requeridas</label>
-                  <input
+                  <label htmlFor="perfil-horas-beca-requeridas" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Horas Beca Requeridas</label>
+                  <input id="perfil-horas-beca-requeridas"
                     type="number"
                     min="0"
                     value={horasBecaRequeridas || ''}
@@ -480,8 +480,8 @@ export default function EditarPerfilPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Horas Extensión Requeridas</label>
-                  <input
+                  <label htmlFor="perfil-horas-extension-requeridas" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Horas Extensión Requeridas</label>
+                  <input id="perfil-horas-extension-requeridas"
                     type="number"
                     min="0"
                     value={horasExtensionRequeridas || ''}
@@ -492,8 +492,8 @@ export default function EditarPerfilPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Biografía Profesional</label>
-                <textarea
+                <label htmlFor="perfil-biografia-profesional" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">Biografía Profesional</label>
+                <textarea id="perfil-biografia-profesional"
                   value={biografia}
                   onChange={(e) => setBiografia(e.target.value)}
                   rows={4}
@@ -507,16 +507,16 @@ export default function EditarPerfilPage() {
           {/* STEP 2: Habilidades */}
           {step === 1 && (
             <div className="space-y-6">
-              <h3 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+              <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
                 Gestión de Habilidades
-              </h3>
+              </h2>
               
               <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-6 space-y-4">
                 <p className="text-xs font-black uppercase tracking-wider text-primary">Agregar Nueva Habilidad</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-tertiary mb-1">Seleccionar Habilidad</label>
-                    <input
+                    <label htmlFor="perfil-seleccionar-habilidad" className="block text-xs font-bold text-tertiary mb-1">Seleccionar Habilidad</label>
+                    <input id="perfil-seleccionar-habilidad"
                       type="text"
                       list="habilidades-list"
                       placeholder="Escribe o selecciona..."
@@ -531,8 +531,8 @@ export default function EditarPerfilPage() {
                     </datalist>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-tertiary mb-1">Nivel Habilidad</label>
-                    <select
+                    <label htmlFor="perfil-nivel-habilidad" className="block text-xs font-bold text-tertiary mb-1">Nivel Habilidad</label>
+                    <select id="perfil-nivel-habilidad"
                       value={selNivel}
                       onChange={(e) => setSelNivel(e.target.value as any)}
                       className="w-full rounded-xl border border-outline-variant/30 bg-surface px-3 py-2.5 text-sm text-on-surface transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -597,16 +597,17 @@ export default function EditarPerfilPage() {
           {step === 2 && (
             <div className="space-y-8">
               <div className="space-y-4">
-                <h3 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+                <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
                   Áreas de Interés
-                </h3>
+                </h2>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
                   Haz clic en las categorías que más te llamen la atención. Las utilizaremos para sugerirte proyectos destacados.
                 </p>
                 <div className="mt-2">
                   <input 
                     type="text" 
-                    placeholder="¿No encuentras tu interés? Escríbelo y presiona Enter" 
+                    placeholder="¿No encuentras tu interés? Escríbelo y presiona Enter"
+                    aria-label="Añadir un interés que no está en la lista"
                     value={interesInput}
                     onChange={(e) => setInteresInput(e.target.value)}
                     onKeyDown={async (e) => {
@@ -660,16 +661,17 @@ export default function EditarPerfilPage() {
               </div>
 
               <div className="space-y-4 border-t border-outline-variant/30 pt-6">
-                <h3 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+                <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
                   Tus Cualidades Personales
-                </h3>
+                </h2>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
                   ¿Cuáles de estas palabras describen mejor tu forma de trabajar en equipo? Elige las cualidades que te representen.
                 </p>
                 <div className="mt-2">
                   <input 
                     type="text" 
-                    placeholder="¿No encuentras tu cualidad? Escríbela y presiona Enter" 
+                    placeholder="¿No encuentras tu cualidad? Escríbela y presiona Enter"
+                    aria-label="Añadir una cualidad que no está en la lista"
                     value={cualidadInput}
                     onChange={(e) => setCualidadInput(e.target.value)}
                     onKeyDown={async (e) => {
@@ -727,16 +729,16 @@ export default function EditarPerfilPage() {
           {/* STEP 4: Experiencias Previas */}
           {step === 3 && (
             <div className="space-y-6">
-              <h3 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+              <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
                 Experiencias Previas
-              </h3>
+              </h2>
 
               <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-6 space-y-4">
                 <p className="text-xs font-black uppercase tracking-wider text-primary">Agregar Nueva Experiencia</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-tertiary mb-1">Título del Proyecto / Empresa</label>
-                    <input
+                    <label htmlFor="perfil-titulo-del-proyecto-empresa" className="block text-xs font-bold text-tertiary mb-1">Título del Proyecto / Empresa</label>
+                    <input id="perfil-titulo-del-proyecto-empresa"
                       type="text"
                       placeholder="Ej. Rediseño del portal de biblioteca"
                       value={nuevaExpTitulo}
@@ -745,8 +747,8 @@ export default function EditarPerfilPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-tertiary mb-1">Rol Desempeñado</label>
-                    <input
+                    <label htmlFor="perfil-rol-desempenado" className="block text-xs font-bold text-tertiary mb-1">Rol Desempeñado</label>
+                    <input id="perfil-rol-desempenado"
                       type="text"
                       placeholder="Ej. Desarrollador Frontend Lead"
                       value={nuevaExpRol}
@@ -757,8 +759,8 @@ export default function EditarPerfilPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-tertiary mb-1">Tipo de Experiencia</label>
-                    <select
+                    <label htmlFor="perfil-tipo-de-experiencia" className="block text-xs font-bold text-tertiary mb-1">Tipo de Experiencia</label>
+                    <select id="perfil-tipo-de-experiencia"
                       value={nuevaExpTipo}
                       onChange={(e) => setNuevaExpTipo(e.target.value)}
                       className="w-full rounded-xl border border-outline-variant/30 bg-surface px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -819,16 +821,16 @@ export default function EditarPerfilPage() {
           {/* STEP 5: Enlaces y CV */}
           {step === 4 && (
             <div className="space-y-6">
-              <h3 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+              <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
                 Enlaces y Portafolio Digital
-              </h3>
+              </h2>
 
               <div className="space-y-5">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">
+                  <label htmlFor="perfil-enlace-de-cv-drive-dropbox-pdf-publico" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">
                     Enlace de CV (Drive, Dropbox, PDF público)
                   </label>
-                  <input
+                  <input id="perfil-enlace-de-cv-drive-dropbox-pdf-publico"
                     type="url"
                     value={urlCv}
                     onChange={(e) => setUrlCv(e.target.value)}
@@ -838,10 +840,10 @@ export default function EditarPerfilPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">
+                  <label htmlFor="perfil-sitio-web-o-portafolio-personal" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">
                     Sitio Web o Portafolio Personal
                   </label>
-                  <input
+                  <input id="perfil-sitio-web-o-portafolio-personal"
                     type="url"
                     value={enlacePortafolio}
                     onChange={(e) => setEnlacePortafolio(e.target.value)}
@@ -851,10 +853,10 @@ export default function EditarPerfilPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">
+                  <label htmlFor="perfil-perfil-de-github" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">
                     Perfil de GitHub
                   </label>
-                  <input
+                  <input id="perfil-perfil-de-github"
                     type="url"
                     value={githubUrl}
                     onChange={(e) => setGithubUrl(e.target.value)}
@@ -864,10 +866,10 @@ export default function EditarPerfilPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">
+                  <label htmlFor="perfil-perfil-de-linkedin" className="block text-xs font-black uppercase tracking-widest text-tertiary mb-2">
                     Perfil de LinkedIn
                   </label>
-                  <input
+                  <input id="perfil-perfil-de-linkedin"
                     type="url"
                     value={linkedinUrl}
                     onChange={(e) => setLinkedinUrl(e.target.value)}

@@ -31,7 +31,7 @@ function inbox(overrides: Partial<Inbox> = {}): Inbox {
         numeroEnvio: 1,
         enviadaEn: '2026-08-01T12:00:00.000Z',
         idRevisor: null,
-        proyecto: { tituloProyecto: 'App de Biblioteca', creadoPor: 3, creador: { nombre: 'Ana', apellido: 'López' } },
+        proyecto: { tituloProyecto: 'App de Biblioteca', tipoProyecto: 'ACADEMICO_HORAS_BECA', creadoPor: 3, creador: { nombre: 'Ana', apellido: 'López' } },
       },
     ],
     cierresPendientes: [
@@ -58,22 +58,124 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('VIEW-05 — bandeja de revisiones de publicación (F017)', () => {
-  it('no ofrece aprobar ni rechazar CIERRES: los cierres pendientes son solo enlaces a VIEW-15 / VIEW-14', async () => {
+describe('VIEW-05 — bandeja de solicitudes de publicación (F017)', () => {
+  it('se llama «Solicitudes de publicación» y describe su propósito', async () => {
     renderPage();
-    expect(await screen.findByText('Sistema de Tutorías Académicas UVG')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Solicitudes de publicación' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Evalúa los proyectos enviados por estudiantes, aprueba su publicación o solicita correcciones.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'breadcrumb' })).toHaveTextContent('Solicitudes de publicación');
+  });
 
-    const seccion = screen.getByRole('heading', { name: 'Solicitudes de cierre' }).closest('section')!;
-    expect(within(seccion).queryByRole('button')).not.toBeInTheDocument();
-    expect(within(seccion).queryByRole('button', { name: /Aprobar cierre|Rechazar cierre/ })).not.toBeInTheDocument();
+  it('no muestra nada de CIERRES aunque el endpoint los devuelva: ni KPI, ni sección, ni enlaces', async () => {
+    renderPage();
+    expect(await screen.findByText('App de Biblioteca')).toBeInTheDocument();
+
+    expect(screen.queryByText('Sistema de Tutorías Académicas UVG')).not.toBeInTheDocument();
+    expect(screen.queryByText(/cierre/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /cierre/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Rechazar/ })).not.toBeInTheDocument();
+  });
 
-    const enlaces = within(seccion).getAllByRole('link', { name: 'Ver en Solicitudes de cierre' });
-    expect(enlaces.length).toBeGreaterThan(0);
-    for (const enlace of enlaces) expect(enlace).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cierres');
-    expect(within(seccion).getByRole('link', { name: /Revisar cierre/ })).toHaveAttribute('href', '/dashboard/admin/proyectos/123/cierre');
+  it('separa primer envío, reenviadas y en espera de correcciones, con sus contadores', async () => {
+    (getAdminReviewInbox as any).mockResolvedValue(
+      inbox({
+        revisionesPendientes: [
+          ...inbox().revisionesPendientes,
+          {
+            idRevisionProyecto: 11,
+            idProyecto: 42,
+            numeroEnvio: 2,
+            enviadaEn: '2026-08-02T12:00:00.000Z',
+            idRevisor: null,
+            proyecto: { tituloProyecto: 'Huerto Comunitario', tipoProyecto: 'EXTRACURRICULAR_EXTENSION', creadoPor: 4, creador: { nombre: 'Luis', apellido: 'Paz' } },
+          },
+        ],
+        correccionesEnviadas: [
+          {
+            idProyecto: 43,
+            tituloProyecto: 'Feria de Ciencias',
+            tipoProyecto: 'ACADEMICO_EXPERIENCIA',
+            creador: { nombre: 'Eva', apellido: 'Ruiz' },
+            revisiones: [{ idRevisionProyecto: 12, numeroEnvio: 1, revisadaEn: '2026-08-03T12:00:00.000Z' }],
+          },
+        ] as Inbox['correccionesEnviadas'],
+      }),
+    );
+    renderPage();
+    await screen.findByText('App de Biblioteca');
 
-    expect(screen.getByRole('link', { name: /Cierre pendiente/ })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=cierres');
+    const seccion = (nombre: string) => screen.getByRole('heading', { level: 2, name: nombre }).closest('section')!;
+    expect(within(seccion('Pendientes de revisión')).getByText('App de Biblioteca')).toBeInTheDocument();
+    // Cada tarjeta lleva el icono del tipo de proyecto, como en «Mis Horas».
+    for (const nombre of ['Pendientes de revisión', 'Reenviadas para revisión', 'En espera de correcciones']) {
+      expect(seccion(nombre).querySelectorAll('[data-slot="icono-tipo"]')).toHaveLength(1);
+    }
+    expect(within(seccion('Pendientes de revisión')).queryByText('Huerto Comunitario')).not.toBeInTheDocument();
+
+    // Reenviada: ya corregida, vuelve a ser accionable por el administrador.
+    const reenviadas = within(seccion('Reenviadas para revisión'));
+    expect(reenviadas.getByText('Huerto Comunitario')).toBeInTheDocument();
+    expect(reenviadas.getByRole('button', { name: 'Aprobar' })).toBeInTheDocument();
+    expect(reenviadas.getByRole('button', { name: 'Revisar' })).toBeInTheDocument();
+
+    // En espera: le toca al estudiante; el administrador solo consulta.
+    const espera = within(seccion('En espera de correcciones'));
+    expect(espera.getByText('Feria de Ciencias')).toBeInTheDocument();
+    expect(espera.queryByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
+    expect(espera.getByRole('button', { name: 'Ver retroalimentación' })).toBeInTheDocument();
+    // Ya no hay chip de estado: la sección dice que se espera la corrección.
+    expect(screen.queryByText('Esperando corrección')).not.toBeInTheDocument();
+    // Los botones van sin icono, con el botón compacto del panel.
+    for (const boton of screen.getAllByRole('button', { name: /^(Aprobar|Revisar|Ver retroalimentación)$/ })) {
+      expect(boton.querySelector('svg')).toBeNull();
+      expect(boton).toHaveAttribute('data-slot', 'button');
+    }
+
+    for (const [etiqueta, valor] of [
+      ['Pendientes de revisión', '1'],
+      ['Reenviadas para revisión', '1'],
+      ['En espera de correcciones', '1'],
+    ]) {
+      const kpi = screen.getAllByText(etiqueta).find((el) => el.tagName === 'P')!.parentElement!;
+      expect(within(kpi).getByText(valor)).toBeInTheDocument();
+    }
+    expect(screen.queryByText('Correcciones enviadas')).not.toBeInTheDocument();
+  });
+
+  it('cada tarjeta muestra la categoría real del proyecto, el líder y el envío; sin etiquetas de estado redundantes', async () => {
+    (getAdminReviewInbox as any).mockResolvedValue(
+      inbox({
+        correccionesEnviadas: [
+          {
+            idProyecto: 43,
+            tituloProyecto: 'Feria de Ciencias',
+            tipoProyecto: 'ACADEMICO_EXPERIENCIA',
+            creador: { nombre: 'Eva', apellido: 'Ruiz' },
+            // Mediodía de Guatemala: el día no cambia en ningún huso.
+            revisiones: [{ idRevisionProyecto: 12, numeroEnvio: 1, revisadaEn: '2026-08-03T18:00:00.000Z' }],
+          },
+        ] as Inbox['correccionesEnviadas'],
+      }),
+    );
+    renderPage();
+    await screen.findByText('App de Biblioteca');
+    const seccion = (nombre: string) => within(screen.getByRole('heading', { level: 2, name: nombre }).closest('section')!);
+
+    // Misma etiqueta de categoría que las vistas de estudiante (clase y texto).
+    const beca = seccion('Pendientes de revisión').getByText('Horas Beca');
+    expect(beca).toHaveClass('pill', 'pill-sage');
+    expect(seccion('Pendientes de revisión').getByText(/Líder: Ana López · Envío #1 · Recibida el 1 ago 2026/)).toBeInTheDocument();
+
+    const espera = seccion('En espera de correcciones');
+    expect(espera.getByText('Experiencia')).toHaveClass('pill', 'pill-blue');
+    expect(espera.getByText(/Líder: Eva Ruiz · Envío #1 · Revisado el 3 ago 2026/)).toBeInTheDocument();
+    expect(espera.queryByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
+
+    for (const redundante of ['Publicado', 'En revisión', 'Pendiente', 'Líder']) {
+      expect(screen.queryByText(redundante)).not.toBeInTheDocument();
+    }
   });
 
   it('el único «Aprobar» es el de la revisión de PUBLICACIÓN y sigue funcionando invalidando adminReviewInbox', async () => {
@@ -105,10 +207,9 @@ describe('VIEW-05 — bandeja de revisiones de publicación (F017)', () => {
     await waitFor(() => expect(getAdminReviewInbox).toHaveBeenCalledTimes(2));
   });
 
-  it('sin cierres pendientes, aclara que los veredictos de cierre no se emiten aquí', async () => {
-    (getAdminReviewInbox as any).mockResolvedValue(inbox({ cierresPendientes: [] }));
+  it('sin nada pendiente de publicación muestra «Todo al día», aunque haya cierres en el endpoint', async () => {
+    (getAdminReviewInbox as any).mockResolvedValue(inbox({ revisionesPendientes: [] }));
     renderPage();
-    expect(await screen.findByText('No hay cierres pendientes')).toBeInTheDocument();
-    expect(screen.getByText('Los veredictos de cierre no se emiten desde esta bandeja.')).toBeInTheDocument();
+    expect(await screen.findByText('Todo al día')).toBeInTheDocument();
   });
 });

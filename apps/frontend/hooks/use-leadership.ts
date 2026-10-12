@@ -2,7 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { closeReadinessPrefix } from '@/lib/query-keys/closure';
-import { adminAppealsPrefix, adminAppealsQueryKey, adminProjectDetailQueryKey } from '@/lib/query-keys/admin-projects';
+import {
+  adminAppealDetailQueryKey,
+  adminAppealsPrefix,
+  adminAppealsQueryKey,
+  adminAppealsSummaryQueryKey,
+  adminProjectDetailQueryKey,
+} from '@/lib/query-keys/admin-projects';
 import { projectDetailQueryKey } from '@/lib/query-keys/project';
 import {
   leadershipAppealsPrefix,
@@ -16,7 +22,9 @@ import {
   cancelLeadershipAppeal,
   createLeadershipAppeal,
   denyAppeal,
+  getAdminAppeal,
   getAdminAppeals,
+  getAdminAppealsSummary,
   getLeadershipAppeals,
   getLeadershipCandidates,
   getLeadershipContext,
@@ -25,6 +33,7 @@ import {
 } from '@/lib/services/leadership';
 import type {
   ApelacionItemDto,
+  ApelacionesResumenDto,
   CreateLeadershipAppealInput,
   DenyAppealInput,
   LeadershipCandidatesDto,
@@ -153,6 +162,25 @@ export function useAdminAppeals(estado: string | undefined, page = 1, enabled = 
     queryKey: adminAppealsQueryKey(estado ?? 'TODAS', page),
     queryFn: () => getAdminAppeals({ estado, page }),
     enabled,
+    retry: false,
+  });
+}
+
+/** Una apelación por id (vista de revisión). Un 404 no se reintenta. */
+export function useAdminAppeal(idApelacion: number) {
+  return useQuery<ApelacionItemDto>({
+    queryKey: adminAppealDetailQueryKey(idApelacion),
+    queryFn: () => getAdminAppeal(idApelacion),
+    enabled: Number.isInteger(idApelacion) && idApelacion > 0,
+    retry: false,
+  });
+}
+
+/** Contadores por estado de la bandeja administrativa. */
+export function useAdminAppealsSummary() {
+  return useQuery<ApelacionesResumenDto>({
+    queryKey: adminAppealsSummaryQueryKey,
+    queryFn: getAdminAppealsSummary,
     retry: false,
   });
 }

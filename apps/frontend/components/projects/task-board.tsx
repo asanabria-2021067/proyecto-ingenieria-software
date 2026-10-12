@@ -539,7 +539,7 @@ export function TaskBoard({
             <h2 className="text-xl font-bold text-on-surface md:text-[22px]">
               Tablero de tareas
             </h2>
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+            <span className="pill pill-sm pill-green">
               {tareasFiltradas.length} {tareasFiltradas.length === 1 ? 'tarea' : 'tareas'}
             </span>
             {isFetching && (

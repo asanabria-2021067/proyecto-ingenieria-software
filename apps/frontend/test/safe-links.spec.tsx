@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { normalizeUrlInput, safeExternalHref } from '../lib/security/safe-url';
 import { SafeExternalLink } from '../components/profile/safe-external-link';
 
@@ -38,6 +39,11 @@ vi.mock('../hooks/use-current-user', () => ({
 }));
 vi.mock('../lib/services/users', () => ({ getDashboardStats: () => new Promise(() => undefined) }));
 vi.mock('../lib/services/admin', () => ({ getAdminUserDetail: () => new Promise(() => undefined) }));
+// T-328: el perfil monta la sección de preferencias de notificación, que consulta su propio endpoint.
+vi.mock('../lib/services/notifications', () => ({
+  getNotificationPreferences: () => new Promise(() => undefined),
+  updateNotificationPreference: vi.fn(),
+}));
 
 import PerfilPage from '../app/dashboard/perfil/page';
 
@@ -102,7 +108,9 @@ describe('SafeExternalLink', () => {
 
 describe('página de perfil con datos heredados', () => {
   it('solo el enlace http(s) es clicable; javascript:, data: y vbscript: quedan como texto inerte', () => {
-    const { container } = render(createElement(PerfilPage));
+    const { container } = render(
+      createElement(QueryClientProvider, { client: new QueryClient() }, createElement(PerfilPage)),
+    );
 
     expect(screen.getByRole('link', { name: /GitHub/ })).toHaveAttribute('href', 'https://github.com/ana');
     for (const etiqueta of [/Portafolio/, /LinkedIn/, /CV/]) {

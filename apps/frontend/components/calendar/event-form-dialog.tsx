@@ -26,6 +26,7 @@ import { useCancelEvent } from '@/hooks/use-cancel-event';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { aviso } from '@/lib/mensajes';
 import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
+import { esProyectoAgendable } from '@/lib/calendar/proyectos-agendables';
 import { TIPO_EVENTO_ESTILO, TIPOS_EVENTO_EN_ORDEN, TONO_CLASES } from '@/lib/calendar/paleta';
 import { createEvent, updateEvent, type EventoProyectoDTO, type ModalidadEvento, type TipoEvento } from '@/lib/services/events';
 import { DatePicker } from './date-picker';
@@ -54,6 +55,8 @@ export interface LedProjectOption {
   tituloProyecto: string;
   /** Para la marca "Horas beca" junto al selector de proyecto. */
   tipoProyecto?: string;
+  /** GPI01-C08: un proyecto CERRADO se lista deshabilitado; el backend rechaza eventos nuevos en él. */
+  estadoProyecto?: string;
 }
 
 const MODALIDAD_AYUDA: Record<ModalidadEvento, string> = {
@@ -172,6 +175,8 @@ export function EventFormDialog({
 
   const idProyectoActivo = isEditing ? (editingEvent?.idProyecto ?? 0) : Number(idProyectoForm) || 0;
   const proyectoActivo = ledProjects.find((p) => p.idProyecto === idProyectoActivo);
+  // GPI01-C08 (H-06): sin ningún proyecto agendable no hay nada que crear.
+  const sinProyectoAgendable = !isEditing && !ledProjects.some((p) => esProyectoAgendable(p.estadoProyecto));
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['mis-eventos'] });
@@ -386,13 +391,22 @@ export function EventFormDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {ledProjects.map((p) => (
-                            <SelectItem key={p.idProyecto} value={String(p.idProyecto)}>
-                              {p.tituloProyecto}
-                            </SelectItem>
-                          ))}
+                          {ledProjects.map((p) => {
+                            const agendable = esProyectoAgendable(p.estadoProyecto);
+                            return (
+                              <SelectItem key={p.idProyecto} value={String(p.idProyecto)} disabled={!agendable}>
+                                {p.tituloProyecto}
+                                {!agendable && ' · Cerrado'}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
+                      {sinProyectoAgendable && (
+                        <p role="status" className="type-meta">
+                          Ninguno de tus proyectos admite actividades nuevas: los proyectos cerrados son de solo lectura.
+                        </p>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -764,7 +778,7 @@ export function EventFormDialog({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isPending}
+                  disabled={isPending || sinProyectoAgendable}
                   className="h-10 gap-1.5 rounded-pill bg-primary px-5 text-xs font-bold text-on-primary hover:bg-primary/90"
                 >
                   {crear.isPending || editar.isPending ? (

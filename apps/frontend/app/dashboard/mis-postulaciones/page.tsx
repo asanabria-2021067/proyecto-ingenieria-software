@@ -2,7 +2,9 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle, ChevronRight, ClipboardList, Clock, Trash2, XCircle } from 'lucide-react';
+import { AlertCircle, ChevronRight, ClipboardList, Trash2 } from 'lucide-react';
+import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
+import { Tag } from '@/components/ui/tag';
 import { useState } from 'react';
 import { apiFetch } from '@/lib/api/client';
 import { deletePostulacion } from '@/lib/services/applications';
@@ -28,26 +30,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const ESTADO_CONFIG: Record<
-  EstadoPostulacion,
-  { label: string; icon: React.ElementType; className: string }
-> = {
-  PENDIENTE: {
-    label: 'Pendiente',
-    icon: Clock,
-    className: 'bg-surface-container text-tertiary',
-  },
-  ACEPTADA: {
-    label: 'Aceptada',
-    icon: CheckCircle,
-    className: 'bg-secondary-container text-on-secondary-container',
-  },
-  RECHAZADA: {
-    label: 'Rechazada',
-    icon: XCircle,
-    className: 'bg-error-container text-error',
-  },
-};
 
 export default function MisPostulacionesPage() {
   const queryClient = useQueryClient();
@@ -274,7 +256,7 @@ export default function MisPostulacionesPage() {
 
         <div className="space-y-4">
           {filtradas.map((p, index) => {
-            const config = ESTADO_CONFIG[p.estadoPostulacion];
+            const config = ESTADO_POSTULACION_STYLE[p.estadoPostulacion];
             const Icon = config.icon;
             return (
               <div
@@ -291,12 +273,10 @@ export default function MisPostulacionesPage() {
                       {p.rolProyecto.proyecto.tituloProyecto}
                     </p>
                   </div>
-                  <span
-                    className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${config.className}`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
+                  <Tag tone={config.tone} className="shrink-0">
+                    <Icon aria-hidden="true" />
                     {config.label}
-                  </span>
+                  </Tag>
                 </div>
 
                 <p className="text-on-surface text-sm leading-relaxed line-clamp-2 mb-3">

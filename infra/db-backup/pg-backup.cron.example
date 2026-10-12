@@ -1,0 +1,22 @@
+# T-313 · respaldo diario de PostgreSQL. Plantilla para /etc/cron.d/uvgenius-pg-backup
+# (formato de cron del sistema: lleva el usuario antes del comando).
+#
+# NO está instalado en ningún servidor: instalarlo es un paso manual y
+# autorizado, descrito en infra/db-backup/README.md.
+#
+# Horario: 02:30 de Guatemala. Guatemala es UTC-6 todo el año (sin horario de
+# verano), así que en un servidor con reloj en UTC son las 08:30. Si
+# `timedatectl` muestra America/Guatemala, cambiar las horas a 2 y 3.
+#
+# Ajustar antes de instalar: el usuario (uvgbackup) y la ruta del repositorio
+# (/opt/uvgenius). Aquí no va ninguna credencial: están en /etc/uvgenius/backup.env.
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Respaldo. Si falla, deja un error en el registro del sistema (journalctl -t pg-backup).
+30 8 * * * uvgbackup /opt/uvgenius/infra/db-backup/pg-backup.sh /etc/uvgenius/backup.env >>/var/log/uvgenius/pg-backup.log 2>&1 || logger -t pg-backup -p user.err "respaldo de PostgreSQL fallido; ver /var/log/uvgenius/pg-backup.log"
+
+# Vigilancia, media hora después: avisa si no hay un respaldo reciente e íntegro,
+# también cuando el respaldo ni siquiera llegó a ejecutarse.
+0 9 * * * uvgbackup /opt/uvgenius/infra/db-backup/verify-backup.sh /etc/uvgenius/backup.env >>/var/log/uvgenius/pg-backup.log 2>&1 || logger -t pg-backup -p user.err "no hay un respaldo reciente e íntegro de PostgreSQL"

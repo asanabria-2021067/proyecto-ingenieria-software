@@ -226,7 +226,7 @@ describe('AdminCuentasPendientesPage', () => {
 });
 
 describe('AdminLayout — sección y contador de cuentas pendientes', () => {
-  it('administración ve la sección dentro del grupo Administración', async () => {
+  it('administración ve la sección dentro del grupo «Verificación y seguridad»', async () => {
     pathnameMock.mockReturnValue('/dashboard/admin/cuentas-pendientes');
     renderShell();
 
@@ -246,12 +246,12 @@ describe('AdminLayout — sección y contador de cuentas pendientes', () => {
     );
   });
 
-  it('con el grupo colapsado el contador se muestra en Administración', async () => {
+  it('con el grupo colapsado el contador se muestra en «Verificación y seguridad»', async () => {
     vi.mocked(getCuentasPendientes).mockResolvedValue({ total: 3, cuentas: [] });
     renderShell();
 
     await waitFor(() =>
-      expect(desktopNav().getByRole('button', { name: /Administración/ })).toHaveTextContent('3 por atender'),
+      expect(desktopNav().getByRole('button', { name: /Verificación y seguridad/ })).toHaveTextContent('3 por atender'),
     );
   });
 

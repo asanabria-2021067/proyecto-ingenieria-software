@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
   ApelacionItemDto,
+  ApelacionesResumenDto,
   CreateLeadershipAppealInput,
   DenyAppealInput,
   LeadershipCandidatesDto,
@@ -92,6 +93,16 @@ export function getAdminAppeals(
   params.set('limit', String(options.limit ?? 20));
   if (options.estado) params.set('estado', options.estado);
   return apiFetch<PaginaLiderazgo<ApelacionItemDto>>(`/admin/liderazgo/apelaciones?${params.toString()}`);
+}
+
+/** Una apelación por id, para la vista administrativa de revisión y resolución. */
+export function getAdminAppeal(idApelacion: number): Promise<ApelacionItemDto> {
+  return apiFetch<ApelacionItemDto>(`/admin/liderazgo/apelaciones/${idApelacion}`);
+}
+
+/** Contadores por estado para las pestañas de la bandeja. */
+export function getAdminAppealsSummary(): Promise<ApelacionesResumenDto> {
+  return apiFetch<ApelacionesResumenDto>('/admin/liderazgo/apelaciones/resumen');
 }
 
 /**

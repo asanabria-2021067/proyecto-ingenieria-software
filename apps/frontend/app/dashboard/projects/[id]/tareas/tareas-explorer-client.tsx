@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { AlertCircle, ClipboardList, SearchX } from 'lucide-react';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
+import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { Button } from '@/components/ui/button';
@@ -32,10 +33,13 @@ import {
 } from '@/components/ui/empty';
 import {
   ESTADO_LABEL,
+  ESTADO_TAREA_TONE,
   PRIORIDAD_ICON,
   PRIORIDAD_LABEL,
+  PRIORIDAD_TONE,
   estaVencida,
 } from '@/components/projects/task-board.utils';
+import { Tag } from '@/components/ui/tag';
 import {
   filterTasksByPriority,
   filterTasksByStatus,
@@ -74,17 +78,6 @@ const CELDA_TAREA = BORDE_TARJETA;
 
 const TAMANO_PAGINA = 15;
 const FILTRO_TODOS = 'TODOS';
-const ESTADO_TONE: Record<EstadoTarea, string> = {
-  POR_HACER: 'pill-neutral',
-  EN_PROGRESO: 'pill-warning',
-  EN_REVISION: 'pill-neutral',
-  HECHO: 'pill-success',
-};
-const PRIORIDAD_TONE: Record<Prioridad, string> = {
-  BAJA: 'pill-neutral',
-  MEDIA: 'pill-warning',
-  ALTA: 'pill-error',
-};
 
 const OPCIONES_ORDEN: { value: string; label: string; campo: CriterioOrdenTarea; direccion: DireccionOrden }[] = [
   { value: 'fechaLimite:asc', label: 'Fecha límite: más próxima primero', campo: 'fechaLimite', direccion: 'asc' },
@@ -106,47 +99,16 @@ function formatFecha(fecha: string | null): string {
 }
 
 function EstadoBadge({ estado }: { estado: EstadoTarea }) {
-  return (
-    <span className={`pill ${ESTADO_TONE[estado]}`}>
-      {ESTADO_LABEL[estado]}
-    </span>
-  );
+  return <Tag tone={ESTADO_TAREA_TONE[estado]}>{ESTADO_LABEL[estado]}</Tag>;
 }
 
 function PrioridadBadge({ prioridad }: { prioridad: Prioridad }) {
   const Icono = PRIORIDAD_ICON[prioridad];
   return (
-    <span className={`pill ${PRIORIDAD_TONE[prioridad]}`}>
-      <Icono className="size-3.5" aria-hidden="true" />
+    <Tag tone={PRIORIDAD_TONE[prioridad]}>
+      <Icono aria-hidden="true" />
       {PRIORIDAD_LABEL[prioridad]}
-    </span>
-  );
-}
-
-function PuntoResumen({ className }: { className: string }) {
-  return <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${className}`} />;
-}
-
-/** Mismo patrón de tarjeta KPI que "Mis Tareas" (ResumenKpi). */
-function ResumenKpi({
-  label,
-  valor,
-  punto,
-  tonoValor = 'text-text-primary',
-}: {
-  label: string;
-  valor: number;
-  punto: string;
-  tonoValor?: string;
-}) {
-  return (
-    <div role="group" aria-label={label} className="card-base px-card py-stack">
-      <p className="flex items-center gap-tight text-xs font-semibold uppercase tracking-wide text-text-secondary">
-        <PuntoResumen className={punto} />
-        {label}
-      </p>
-      <p className={`mt-tight font-headline text-3xl font-bold tabular-nums ${tonoValor}`}>{valor}</p>
-    </div>
+    </Tag>
   );
 }
 

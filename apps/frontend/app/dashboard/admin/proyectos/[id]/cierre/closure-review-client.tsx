@@ -2,22 +2,7 @@
 
 import { useId, useState } from 'react';
 import Link from 'next/link';
-import {
-  AlertCircle,
-  AlertTriangle,
-  CalendarDays,
-  CheckCircle2,
-  FileText,
-  FolderOpen,
-  Layers,
-  ListChecks,
-  Loader2,
-  MessageSquareWarning,
-  RefreshCw,
-  Undo2,
-  User,
-  Users,
-} from 'lucide-react';
+import { AlertCircle, ChevronDown, Loader2 } from 'lucide-react';
 import { useAdminProjectDetail } from '@/hooks/use-admin-projects';
 import { useCloseReadiness, useClosureRevision, useClosureRevisions } from '@/hooks/use-closure';
 import { findRevisionEnviada, useClosureReview } from '@/hooks/use-closure-review';
@@ -26,7 +11,19 @@ import { COMENTARIO_VEREDICTO_MAX } from '@/lib/services/closure-review';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { estadoBadgeLabel, estadoBadgeStyle, tipoBadgeLabel } from '@/components/projects/available-project-card';
 import { ClosureReadinessPanel } from '@/components/closure/closure-readiness-panel';
-import { ClosureDocumentsManager } from '@/components/closure/closure-documents-manager';
+import { ClosureDocumentsManager, MAX_EVIDENCIAS } from '@/components/closure/closure-documents-manager';
+import { TOTAL_CLOSURE_CHECKS, countPassedChecks } from '@/components/closure/closure-readiness-panel';
+import { ADMIN_TAB_LIST, ADMIN_TAB_TRIGGER } from '@/components/admin/admin-tabs';
+import { ESTADO_PARTICIPACION_STYLE, type EstadoParticipacion } from '@/components/projects/member-status.utils';
+import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+} from '@/components/dashboard/data-table';
+import type { EstadoSprint } from '@/lib/types/sprints';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -56,10 +53,12 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/
 import uvgSwal from '@/lib/swal';
 import { adminProjectsGroupHref } from '@/lib/types/admin-projects';
 import type { ClosureRevision } from '@/lib/types/closure';
+import { ADMIN_PAGE_WIDTH } from '@/components/admin/admin-page';
 
-const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
-const TAB_TRIGGER =
-  'rounded-none border-b-2 border-transparent px-3 pb-2.5 pt-1 text-[13px] font-bold data-[state=active]:border-primary data-[state=active]:shadow-none';
+const PAGE = ADMIN_PAGE_WIDTH;
+// Misma tabla que las bandejas administrativas (`data-table`).
+const TH = `h-auto whitespace-nowrap px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
+const TD = 'px-stack py-inline align-middle';
 
 const ESTADO_PARTICIPACION_LABEL: Record<string, string> = { ACTIVO: 'Activa', RETIRADO: 'Retirada', COMPLETADO: 'Completada' };
 
@@ -192,7 +191,7 @@ function VerdictDialog({
                 autoFocus
                 className="mt-1 text-sm"
               />
-              <p className="mt-1 text-right text-[11px] text-tertiary" aria-live="polite">
+              <p className="mt-1 text-right type-micro text-tertiary" aria-live="polite">
                 {comentario.length}/{COMENTARIO_VEREDICTO_MAX}
               </p>
               {error && (
@@ -213,7 +212,7 @@ function VerdictDialog({
                   veredicto === 'DEVOLVER'
                     ? 'bg-error text-on-error hover:bg-error/90'
                     : veredicto === 'CORREGIR'
-                      ? 'bg-amber-500 text-white hover:bg-amber-600 dark:bg-amber-400 dark:text-amber-950'
+                      ? 'bg-attention text-on-attention hover:bg-attention-strong'
                       : ''
                 }`}
               >
@@ -230,11 +229,11 @@ function VerdictDialog({
 
 function ReviewSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8" aria-busy="true">
+    <div className={`${PAGE} pb-12 pt-8`} aria-busy="true">
       <Skeleton className="mb-4 h-4 w-72" />
-      <Skeleton className="mb-4 h-32 w-full rounded-xl" />
-      <Skeleton className="mb-4 h-64 w-full rounded-xl" />
-      <Skeleton className="h-56 w-full rounded-xl" />
+      <Skeleton className="mb-4 h-28 w-full rounded-card" />
+      <Skeleton className="mb-4 h-56 w-full rounded-card" />
+      <Skeleton className="h-56 w-full rounded-card" />
     </div>
   );
 }
@@ -267,16 +266,12 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
 
   const pending = devolver.isPending || corregir.isPending || aprobar.isPending;
 
-  const actualizar = () => {
-    invalidateAll();
-  };
-
   if (detalle.isPending) return <ReviewSkeleton />;
 
   if (detalle.isError || !detalle.data) {
     const status = getApiErrorStatus(detalle.error);
     return (
-      <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
+      <div className={`${PAGE} pb-12 pt-8`}>
         <Empty tone={status === 404 ? 'muted' : 'danger'} role={status === 404 ? 'status' : 'alert'}>
           <EmptyMedia variant="icon">
             <AlertCircle aria-hidden="true" className="h-7 w-7" />
@@ -322,6 +317,10 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
       : 'No hay una entrega ENVIADA pendiente de revisión.';
   const ultimaRevision = revisiones.data?.items.slice().sort((a, b) => b.numeroRevision - a.numeroRevision)[0] ?? null;
   const evidencias = revision?.documentosEnviados.filter((d) => d.tipoDocumento === 'EVIDENCIA_LIDER').length ?? 0;
+  const informe = revision?.documentosEnviados.find((d) => d.tipoDocumento === 'INFORME_AUTOMATICO') ?? null;
+  // Solo informativo: el servidor vuelve a evaluar las comprobaciones al aprobar.
+  const comprobacionesPendientes =
+    enSolicitud && readiness.data ? TOTAL_CLOSURE_CHECKS - countPassedChecks(readiness.data.blockers) : 0;
 
   const manejarError = (err: unknown, tipo: Veredicto) => {
     const status = getApiErrorStatus(err);
@@ -370,294 +369,347 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 pb-28 pt-8 md:px-8">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Breadcrumb>
-          <BreadcrumbList className="text-[13px]">
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href={adminProjectsGroupHref('activos')} className="text-tertiary hover:text-on-surface">
-                  Proyectos
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href={adminProjectsGroupHref('cierres')} className="text-tertiary hover:text-on-surface">
-                  Solicitudes de cierre
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="max-w-xs truncate font-medium text-on-surface">{cabecera.titulo}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-        <Button type="button" variant="outline" size="sm" onClick={actualizar} className="h-9 gap-1.5 rounded-lg text-xs font-semibold">
-          <RefreshCw className="size-3.5" aria-hidden="true" />
-          Actualizar
-        </Button>
-      </div>
+    <div className="flex min-h-full flex-col">
+      <div className={`${PAGE} flex-1 pb-8 pt-8`}>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <Breadcrumb>
+            <BreadcrumbList className="text-sm">
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href={adminProjectsGroupHref('activos')} className="text-tertiary hover:text-on-surface">
+                    Proyectos
+                  </Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href={adminProjectsGroupHref('cierres')} className="text-tertiary hover:text-on-surface">
+                    Solicitudes de cierre
+                  </Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage className="max-w-xs truncate font-medium text-on-surface">{cabecera.titulo}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
 
-      {/* Cabecera */}
-      <header className={`${CARD} mb-4`}>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <h1 className="font-headline text-2xl font-black leading-tight text-on-surface md:text-[28px]">{cabecera.titulo}</h1>
-            <dl className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-on-surface-variant">
-              <div className="flex items-center gap-1.5">
-                <User className="size-4 text-tertiary" aria-hidden="true" />
-                <dt className="sr-only">Líder</dt>
-                <dd>
-                  {cabecera.lider.nombre} {cabecera.lider.apellido}
-                </dd>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <FolderOpen className="size-4 text-tertiary" aria-hidden="true" />
-                <dt className="sr-only">Tipo</dt>
-                <dd>{tipoBadgeLabel(cabecera.tipo)}</dd>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CalendarDays className="size-4 text-tertiary" aria-hidden="true" />
-                <dt className="sr-only">Envío</dt>
-                <dd>
-                  {revision
-                    ? `Envío #${revision.numeroRevision} · ${formatearFecha(revision.enviadaEn)}`
-                    : ultimaRevision
-                      ? `Última revisión #${ultimaRevision.numeroRevision}`
-                      : 'Sin entrega'}
-                </dd>
-              </div>
-            </dl>
+        {/* Cabecera */}
+        <header className="card-base mb-4">
+          <div className="flex flex-col gap-stack lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <h1 className="type-display break-words text-text-primary">{cabecera.titulo}</h1>
+              <dl className="mt-inline flex flex-wrap gap-x-card gap-y-tight">
+                <div>
+                  <dt className="type-meta">Líder</dt>
+                  <dd className="type-body font-medium text-text-primary">
+                    {cabecera.lider.nombre} {cabecera.lider.apellido}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="type-meta">Tipo</dt>
+                  <dd className="type-body font-medium text-text-primary">{tipoBadgeLabel(cabecera.tipo)}</dd>
+                </div>
+                <div>
+                  <dt className="type-meta">Entrega</dt>
+                  <dd className="type-body font-medium tabular-nums text-text-primary">
+                    {revision
+                      ? `Envío #${revision.numeroRevision} · ${formatearFecha(revision.enviadaEn)}`
+                      : ultimaRevision
+                        ? `Última revisión #${ultimaRevision.numeroRevision}`
+                        : 'Sin entrega'}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+            <span className={`pill shrink-0 ${estadoBadgeStyle(cabecera.estado)}`}>
+              {estadoBadgeLabel(cabecera.estado)}
+            </span>
           </div>
-          <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${estadoBadgeStyle(cabecera.estado)}`}>
-            {estadoBadgeLabel(cabecera.estado)}
-          </span>
-        </div>
-      </header>
+        </header>
 
-      {!enSolicitud && (
-        <div role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-low px-4 py-3 text-sm text-on-surface">
-          <CheckCircle2 className="size-5 text-primary" aria-hidden="true" />
-          <span className="flex-1">
-            {cabecera.estado === 'CERRADO'
-              ? 'Este proyecto ya está cerrado. La revisión se muestra en solo lectura.'
-              : 'Este proyecto ya no está en solicitud de cierre. La revisión se muestra en solo lectura.'}
-          </span>
-          <Button asChild variant="outline" size="sm" className="h-8 text-xs font-semibold">
-            <Link href={`/dashboard/admin/proyectos/${id}`}>Ver detalle del proyecto</Link>
-          </Button>
-        </div>
-      )}
+        {!enSolicitud && (
+          <div
+            role="status"
+            className="type-body mb-4 flex flex-wrap items-center gap-inline rounded-card border border-outline-variant/50 bg-surface-container-low px-card py-inline text-text-secondary"
+          >
+            <span className="min-w-0 flex-1">
+              {cabecera.estado === 'CERRADO'
+                ? 'Este proyecto ya está cerrado. La revisión se muestra en solo lectura.'
+                : 'Este proyecto ya no está en solicitud de cierre. La revisión se muestra en solo lectura.'}
+            </span>
+            <Button asChild variant="outline" size="sm" className="h-8 text-xs font-semibold">
+              <Link href={`/dashboard/admin/proyectos/${id}`}>Ver detalle del proyecto</Link>
+            </Button>
+          </div>
+        )}
 
-      {ultimaRevision?.comentarioRevisor && ultimaRevision.estadoRevision !== 'ENVIADA' && (
-        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-400/10 px-4 py-3 text-sm text-on-surface">
-          <p className="text-[11px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-200">Último veredicto</p>
-          <p className="mt-1 whitespace-pre-wrap">{ultimaRevision.comentarioRevisor}</p>
-        </div>
-      )}
+        {ultimaRevision?.comentarioRevisor && ultimaRevision.estadoRevision !== 'ENVIADA' && (
+          <div className="mb-4 rounded-card border border-outline-variant/50 bg-surface-container-low px-card py-inline">
+            <span className="pill pill-sm pill-amber">Último veredicto</span>
+            <p className="type-body mt-tight whitespace-pre-wrap text-text-primary">{ultimaRevision.comentarioRevisor}</p>
+          </div>
+        )}
 
-      {/* Verificación */}
-      {enSolicitud && (
-        <div className="mb-4">
-          <ClosureReadinessPanel
-            summary={readiness.data}
-            isLoading={readiness.isPending}
-            title="Verificación"
-            description="Revisa el cumplimiento de todos los requisitos para el cierre del proyecto."
-            showProgress
-          />
-          {readiness.isError && (
-            <p role="alert" className="mt-2 text-xs text-error">
-              {getApiErrorMessage(readiness.error, 'closure')}
-            </p>
-          )}
-        </div>
-      )}
-
-      <Tabs defaultValue="documentos">
-        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-outline-variant/50 bg-transparent p-0">
-          <TabsTrigger value="documentos" className={TAB_TRIGGER}>
-            <FileText className="mr-1.5 size-4" aria-hidden="true" />
-            Documentos
-          </TabsTrigger>
-          <TabsTrigger value="resumen" className={TAB_TRIGGER}>
-            <ListChecks className="mr-1.5 size-4" aria-hidden="true" />
-            Resumen
-          </TabsTrigger>
-          <TabsTrigger value="miembros" className={TAB_TRIGGER}>
-            <Users className="mr-1.5 size-4" aria-hidden="true" />
-            Miembros
-          </TabsTrigger>
-          <TabsTrigger value="sprints" className={TAB_TRIGGER}>
-            <Layers className="mr-1.5 size-4" aria-hidden="true" />
-            Sprints
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="documentos" className="mt-4">
-          {revisiones.isError ? (
-            <p role="alert" className={`${CARD} text-sm text-error`}>
-              {getApiErrorMessage(revisiones.error, 'closure')}
-            </p>
-          ) : revision || revisiones.isPending || revisionDetalle.isPending ? (
-            <ClosureDocumentsManager
-              projectId={id}
-              revision={revision ?? undefined}
-              isLoading={revisiones.isPending || (enviadaResumen != null && revisionDetalle.isPending && !revisionDetalle.data)}
-              readOnly
-              allowGenerate={false}
-              fechaInforme={revision?.enviadaEn ?? null}
+        {/* Verificación */}
+        {enSolicitud && (
+          <div className="mb-4">
+            <ClosureReadinessPanel
+              summary={readiness.data}
+              isLoading={readiness.isPending}
+              title="Verificación"
+              description="Cumplimiento de los requisitos de cierre, por categoría."
+              audiencia="revisor"
+              showProgress
             />
-          ) : (
-            <div className={`${CARD} text-sm text-tertiary`}>No hay una entrega enviada para revisar.</div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="resumen" className="mt-4">
-          <div className={CARD}>
-            <h2 className="mb-3 font-headline text-xs font-black uppercase tracking-widest text-tertiary">Resumen</h2>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-on-surface-variant">{cabecera.descripcion || 'Sin descripción disponible.'}</p>
-            <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-outline-variant/40 pt-4 text-sm sm:grid-cols-4">
-              <div>
-                <dt className="text-[11px] text-tertiary">Entrega</dt>
-                <dd className="font-semibold text-on-surface">{revision ? `#${revision.numeroRevision}` : '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-[11px] text-tertiary">Evidencias</dt>
-                <dd className="font-semibold text-on-surface">{evidencias} de 10</dd>
-              </div>
-              <div>
-                <dt className="text-[11px] text-tertiary">Integrantes activos</dt>
-                <dd className="font-semibold text-on-surface">{cabecera.miembros.filter((m) => m.participacion === 'ACTIVO').length}</dd>
-              </div>
-              <div>
-                <dt className="text-[11px] text-tertiary">Sprints cerrados</dt>
-                <dd className="font-semibold text-on-surface">{cabecera.sprints.filter((s) => s.estado === 'CERRADO').length}</dd>
-              </div>
-            </dl>
-            {revision?.fingerprintEntrega && (
-              <p className="mt-3 break-all text-[11px] text-tertiary">
-                Huella de la entrega: <code className="font-mono">{revision.fingerprintEntrega}</code>
+            {readiness.isError && (
+              <p role="alert" className="mt-2 text-xs text-error">
+                {getApiErrorMessage(readiness.error, 'closure')}
               </p>
             )}
           </div>
-        </TabsContent>
+        )}
 
-        <TabsContent value="miembros" className="mt-4">
-          <div className={`${CARD} p-0`}>
-            {cabecera.miembros.length === 0 ? (
-              <p className="px-5 py-6 text-sm italic text-tertiary">Sin integrantes registrados.</p>
+        <Tabs defaultValue="documentos">
+          <TabsList className={ADMIN_TAB_LIST} aria-label="Secciones de la revisión">
+            <TabsTrigger value="documentos" className={ADMIN_TAB_TRIGGER}>
+              Documentos
+            </TabsTrigger>
+            <TabsTrigger value="resumen" className={ADMIN_TAB_TRIGGER}>
+              Resumen
+            </TabsTrigger>
+            <TabsTrigger value="miembros" className={ADMIN_TAB_TRIGGER}>
+              Miembros
+            </TabsTrigger>
+            <TabsTrigger value="sprints" className={ADMIN_TAB_TRIGGER}>
+              Sprints
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="documentos" className="mt-4">
+            {revisiones.isError ? (
+              <p role="alert" className="card-base text-sm text-error">
+                {getApiErrorMessage(revisiones.error, 'closure')}
+              </p>
+            ) : revision || revisiones.isPending || revisionDetalle.isPending ? (
+              <ClosureDocumentsManager
+                projectId={id}
+                revision={revision ?? undefined}
+                isLoading={revisiones.isPending || (enviadaResumen != null && revisionDetalle.isPending && !revisionDetalle.data)}
+                readOnly
+                allowGenerate={false}
+                fechaInforme={revision?.enviadaEn ?? null}
+              />
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                      <TableHead className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Integrante</TableHead>
-                      <TableHead className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Rol</TableHead>
-                      <TableHead className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Participación</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cabecera.miembros.map((m) => (
-                      <TableRow key={m.key} className="border-outline-variant/40">
-                        <TableCell className="px-5 py-3">
-                          <span className="inline-flex items-center gap-2 text-sm font-medium text-on-surface">
-                            <Avatar className="size-7">
-                              <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
-                                {getInitials(m.usuario.nombre, m.usuario.apellido)}
-                              </AvatarFallback>
-                            </Avatar>
-                            {m.usuario.nombre} {m.usuario.apellido}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-5 py-3">
-                          <Badge className="border-transparent bg-primary/10 text-[11px] font-semibold text-primary">{m.rol}</Badge>
-                        </TableCell>
-                        <TableCell className="px-5 py-3 text-sm text-on-surface-variant">
-                          {ESTADO_PARTICIPACION_LABEL[m.participacion] ?? m.participacion}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <div className="card-base type-body text-text-secondary">No hay una entrega enviada para revisar.</div>
             )}
-          </div>
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="sprints" className="mt-4">
-          <div className={CARD}>
-            <h2 className="mb-1 text-base font-bold text-on-surface">Sprints cerrados</h2>
-            <p className="mb-4 text-xs text-tertiary">En solicitud de cierre no existe Sprint operable; todos los Sprints deben estar cerrados.</p>
-            {cabecera.sprints.length === 0 ? (
-              <p className="text-sm italic text-tertiary">Aún no hay Sprints cerrados.</p>
-            ) : (
-              <ul className="divide-y divide-outline-variant/30" aria-label="Sprints cerrados">
-                {cabecera.sprints.map((s) => (
-                  <li key={s.idSprint} className="flex flex-wrap items-center gap-3 py-2 text-sm">
-                    <span className="font-medium text-on-surface">Sprint {s.numero}</span>
-                    {(s.fechaInicio || s.fechaCierre) && (
-                      <span className="text-on-surface-variant">
-                        {formatearFecha(s.fechaInicio)}
-                        {s.fechaCierre ? ` – ${formatearFecha(s.fechaCierre)}` : ''}
-                      </span>
+          <TabsContent value="resumen" className="mt-4">
+            <section className="card-base" aria-labelledby="resumen-entrega-titulo">
+              <h2 id="resumen-entrega-titulo" className="type-section text-text-primary">
+                Resumen
+              </h2>
+              <p className="type-body mt-tight max-w-prose whitespace-pre-wrap text-text-secondary">
+                {cabecera.descripcion || 'Sin descripción disponible.'}
+              </p>
+              <dl className="mt-stack grid grid-cols-2 gap-x-card gap-y-stack border-t border-outline-variant/50 pt-stack sm:grid-cols-4">
+                <div>
+                  <dt className="type-meta">Entrega</dt>
+                  <dd className="type-subtitle mt-micro font-semibold tabular-nums text-text-primary">
+                    {revision ? `#${revision.numeroRevision}` : '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="type-meta">Evidencias adjuntas</dt>
+                  <dd className="type-subtitle mt-micro font-semibold tabular-nums text-text-primary">{evidencias}</dd>
+                  <dd className="type-meta">Máximo {MAX_EVIDENCIAS}</dd>
+                </div>
+                <div>
+                  <dt className="type-meta">Integrantes activos</dt>
+                  <dd className="type-subtitle mt-micro font-semibold tabular-nums text-text-primary">
+                    {cabecera.miembros.filter((m) => m.participacion === 'ACTIVO').length}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="type-meta">Sprints cerrados</dt>
+                  <dd className="type-subtitle mt-micro font-semibold tabular-nums text-text-primary">
+                    {cabecera.sprints.filter((s) => s.estado === 'CERRADO').length}
+                  </dd>
+                </div>
+              </dl>
+              {revision && (
+                <details className="group mt-stack border-t border-outline-variant/50 pt-inline">
+                  <summary className="type-meta flex w-fit cursor-pointer list-none items-center gap-micro rounded-control font-semibold outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden">
+                    Datos técnicos de auditoría
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="size-4 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                    />
+                  </summary>
+                  <dl className="mt-tight space-y-tight">
+                    <div>
+                      <dt className="type-meta">Identificador interno de la revisión</dt>
+                      <dd className="type-meta font-mono text-text-primary">{revision.idRevisionCierre}</dd>
+                    </div>
+                    {revision.fingerprintEntrega && (
+                      <div>
+                        <dt className="type-meta">Huella de la entrega</dt>
+                        <dd className="type-meta break-all font-mono text-text-primary">{revision.fingerprintEntrega}</dd>
+                      </div>
                     )}
-                    <Badge variant="outline" className="ml-auto text-[10px] text-tertiary">
-                      {s.estado === 'CERRADO' ? 'Cerrado' : s.estado}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
+                    {informe?.checksumSha256 && (
+                      <div>
+                        <dt className="type-meta">SHA-256 del informe automático</dt>
+                        <dd className="type-meta break-all font-mono text-text-primary">{informe.checksumSha256}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </details>
+              )}
+            </section>
+          </TabsContent>
 
-      {/* Footer sticky con los tres veredictos */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-outline-variant/40 bg-surface-container-lowest/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur md:left-64 md:px-8">
-        <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-          {!revisable && (
-            <p className="flex items-center gap-1.5 text-xs text-tertiary sm:mr-auto">
-              <AlertTriangle className="size-3.5" aria-hidden="true" />
-              {motivoBloqueo}
-            </p>
+          <TabsContent value="miembros" className="mt-4">
+            <div className={DATA_TABLE_CARD}>
+              {cabecera.miembros.length === 0 ? (
+                <p className="type-body px-card py-card text-text-secondary">Sin integrantes registrados.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
+                        <TableHead className={TH}>Integrante</TableHead>
+                        <TableHead className={TH}>Rol</TableHead>
+                        <TableHead className={TH}>Participación</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {cabecera.miembros.map((m) => (
+                        <TableRow key={m.key} className={`${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER}`}>
+                          <TableCell className={TD}>
+                            <span className="type-body inline-flex items-center gap-2 font-medium text-text-primary">
+                              <Avatar className="size-7">
+                                <AvatarFallback className="bg-primary/10 type-micro font-bold text-primary">
+                                  {getInitials(m.usuario.nombre, m.usuario.apellido)}
+                                </AvatarFallback>
+                              </Avatar>
+                              {m.usuario.nombre} {m.usuario.apellido}
+                            </span>
+                          </TableCell>
+                          <TableCell className={TD}>
+                            <Badge variant="secondary">{m.rol}</Badge>
+                          </TableCell>
+                          <TableCell className={TD}>
+                            <span
+                              className={`pill pill-sm ${ESTADO_PARTICIPACION_STYLE[m.participacion as EstadoParticipacion]?.className ?? 'pill-neutral'}`}
+                            >
+                              {ESTADO_PARTICIPACION_LABEL[m.participacion] ?? m.participacion}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="sprints" className="mt-4">
+            <section className="card-base" aria-labelledby="sprints-cerrados-titulo">
+              <h2 id="sprints-cerrados-titulo" className="type-section text-text-primary">
+                Sprints cerrados
+              </h2>
+              <p className="type-meta mt-micro">
+                En solicitud de cierre no existe Sprint operable; todos los Sprints deben estar cerrados.
+              </p>
+              {cabecera.sprints.length === 0 ? (
+                <p className="type-body mt-stack text-text-secondary">Aún no hay Sprints cerrados.</p>
+              ) : (
+                <ul className="mt-inline divide-y divide-outline-variant/50" aria-label="Sprints cerrados">
+                  {cabecera.sprints.map((s) => {
+                    const estilo = ESTADO_SPRINT_STYLE[s.estado as EstadoSprint];
+                    return (
+                      <li key={s.idSprint} className="flex flex-wrap items-center gap-inline py-tight">
+                        <span className="type-body font-semibold text-text-primary">Sprint {s.numero}</span>
+                        {(s.fechaInicio || s.fechaCierre) && (
+                          <span className="type-meta tabular-nums">
+                            {formatearFecha(s.fechaInicio)}
+                            {s.fechaCierre ? ` → ${formatearFecha(s.fechaCierre)}` : ''}
+                          </span>
+                        )}
+                        <span className={`pill pill-sm ml-auto ${estilo?.className ?? 'pill-neutral'}`}>
+                          {estilo?.label ?? s.estado}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Barra inferior fija con los tres veredictos. `sticky` dentro del área
+          desplazable: sigue el ancho real del contenido (sidebar abierta o
+          plegada). En móvil el área ya reserva 80 px para la navegación
+          inferior (64 px): `-bottom-4` deja la barra pegada a ella. */}
+      <div
+        role="region"
+        aria-label="Veredictos de la revisión"
+        className="sticky -bottom-4 z-20 border-t border-outline-variant/50 bg-surface-container-lowest/95 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur md:bottom-0"
+      >
+        <div className={`${PAGE} grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end`}>
+          {!revisable ? (
+            <p className="type-meta col-span-2 min-w-0 sm:flex-1">{motivoBloqueo}</p>
+          ) : (
+            comprobacionesPendientes > 0 && (
+              <p className="type-meta col-span-2 flex min-w-0 flex-wrap items-center gap-tight sm:flex-1" data-slot="veredicto-pendientes">
+                <span className="pill pill-sm pill-amber tabular-nums">
+                  {comprobacionesPendientes === 1 ? '1 pendiente' : `${comprobacionesPendientes} pendientes`}
+                </span>
+                La aprobación se rechazará mientras existan comprobaciones pendientes.
+              </p>
+            )
           )}
           {(
             [
-              { tipo: 'DEVOLVER' as Veredicto, icon: Undo2, label: 'Devolver a ejecución', className: 'border-error/50 text-error hover:bg-error/10 hover:text-error', variant: 'outline' as const },
+              { tipo: 'DEVOLVER' as Veredicto, label: 'Devolver a ejecución', className: 'border-error/50 text-error hover:bg-error/10 hover:text-error', variant: 'outline' as const, ancho: '' },
               {
                 tipo: 'CORREGIR' as Veredicto,
-                icon: MessageSquareWarning,
                 label: 'Solicitar corrección documental',
-                className: 'border-amber-500/60 text-amber-800 hover:bg-amber-400/10 hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100',
+                className:
+                  'border-attention/60 text-attention-strong hover:bg-attention/10 hover:text-attention-strong dark:text-on-tag-amber dark:hover:text-on-tag-amber',
                 variant: 'outline' as const,
+                ancho: '',
               },
-              { tipo: 'APROBAR' as Veredicto, icon: CheckCircle2, label: 'Aprobar cierre', className: '', variant: 'default' as const },
+              { tipo: 'APROBAR' as Veredicto, label: 'Aprobar cierre', className: '', variant: 'default' as const, ancho: 'col-span-2' },
             ] as const
-          ).map(({ tipo, icon: Icon, label, className, variant }) => {
+          ).map(({ tipo, label, className, variant, ancho }) => {
             const boton = (
               <Button
                 type="button"
                 variant={variant}
                 disabled={!revisable || pending}
                 onClick={() => abrir(tipo)}
-                className={`h-10 w-full gap-1.5 rounded-lg text-sm font-bold sm:w-auto ${className}`}
+                className={`h-auto min-h-10 w-full whitespace-normal rounded-lg px-3 py-1.5 text-[13px] font-bold leading-tight sm:w-auto sm:px-4 sm:text-sm ${className}`}
               >
-                <Icon className="size-4" aria-hidden="true" />
                 {label}
               </Button>
             );
             return revisable ? (
-              <span key={tipo} className="inline-flex w-full sm:w-auto">
+              <span key={tipo} className={`inline-flex w-full sm:w-auto sm:shrink-0 ${ancho}`}>
                 {boton}
               </span>
             ) : (
-              <DisabledWithTooltip key={tipo} reason={motivoBloqueo}>
-                {boton}
-              </DisabledWithTooltip>
+              <span key={tipo} className={`inline-flex w-full sm:w-auto sm:shrink-0 ${ancho}`}>
+                <DisabledWithTooltip reason={motivoBloqueo}>{boton}</DisabledWithTooltip>
+              </span>
             );
           })}
         </div>

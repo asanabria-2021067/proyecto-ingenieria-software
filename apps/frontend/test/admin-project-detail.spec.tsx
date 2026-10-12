@@ -173,6 +173,36 @@ describe('VIEW-16 — detalle administrativo (F013)', () => {
     expect(grupoDeEstado('EN_PROGRESO')).toBe('activos');
   });
 
+  it('pestañas: la activa se marca con una línea inferior verde, sin contorno; cambian igual que antes', async () => {
+    renderPage();
+    await screen.findByRole('heading', { level: 1 });
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(4);
+    for (const tab of tabs) {
+      // sin borde propio (el rectángulo verde venía de `border-primary` sobre el borde base)
+      expect(tab).toHaveClass('border-0', 'data-[state=active]:after:bg-primary', 'data-[state=active]:after:h-0.5');
+      expect(tab.className).not.toMatch(/data-\[state=active\]:border-primary/);
+      expect(tab).toHaveClass('focus-visible:ring-2', 'hover:bg-surface-container-low');
+      expect(tab.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    }
+    expect(screen.getByRole('tab', { name: 'Resumen' })).toHaveAttribute('data-state', 'active');
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Liderazgo' }));
+    expect(screen.getByRole('tab', { name: 'Liderazgo' })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByRole('tab', { name: 'Resumen' })).toHaveAttribute('data-state', 'inactive');
+  });
+
+  it('la etiqueta de rol en Miembros usa la variante salvia del sistema de etiquetas', async () => {
+    renderPage();
+    await screen.findByRole('heading', { level: 1 });
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /miembros/i }));
+    await screen.findByText('Elena Gómez');
+    const etiquetas = document.querySelectorAll('[data-slot="badge"].bg-tag-sage');
+    expect(etiquetas.length).toBeGreaterThan(0);
+    for (const etiqueta of etiquetas) expect(etiqueta).toHaveClass('text-on-tag-sage', 'font-semibold');
+  });
+
   it('cabecera: líder, integrantes activos (usuarios distintos) y Sprints cerrados', async () => {
     renderPage();
     await screen.findByRole('heading', { level: 1 });

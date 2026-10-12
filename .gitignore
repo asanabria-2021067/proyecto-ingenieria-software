@@ -44,6 +44,8 @@ yarn-error.log*
 coverage/
 .nyc_output/
 playwright-report/
+# T-318: reporte del paso de accesibilidad (axe) de la suite E2E.
+playwright-report-a11y/
 test-results/
 blob-report/
 k6/results/*

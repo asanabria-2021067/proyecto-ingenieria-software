@@ -1,5 +1,15 @@
 'use client';
 
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+} from '@/components/dashboard/data-table';
+
+import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
+
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AlertCircle, Repeat } from 'lucide-react';
@@ -31,15 +41,6 @@ function sprintMasReciente(sprints: SprintComparativeAnalyticsItemDto[]): Sprint
   return cerrados[0] ?? null;
 }
 
-/** Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE` en `sprints/page.tsx`/`sprints/[sprintId]/page.tsx`. */
-const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
-  ACTIVO: { label: 'Activo', className: 'bg-primary-container text-on-primary-container' },
-  EN_FINALIZACION: {
-    label: 'En finalización',
-    className: 'bg-status-warning text-on-status-warning',
-  },
-  CERRADO: { label: 'Cerrado', className: 'bg-surface-container-high text-tertiary' },
-};
 
 /**
  * Barra horizontal proporcional al máximo de `tareasCompletadas` entre los
@@ -120,35 +121,35 @@ function ComparativeContent({ idProyecto, sprints }: { idProyecto: number; sprin
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface-container-lowest shadow-sm">
+      <div className={`${DATA_TABLE_CARD} overflow-x-auto`}>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-outline-variant text-left text-xs font-semibold text-tertiary">
-              <th className="px-4 py-3">Sprint</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Planificadas</th>
-              <th className="px-4 py-3">Completadas</th>
-              <th className="px-4 py-3">Cumplimiento</th>
-              <th className="px-4 py-3">Hitos (evolución)</th>
+            <tr className={`${DATA_TABLE_HEAD_ROW} text-left ${DATA_TABLE_HEAD_TEXT}`}>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Sprint</th>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Estado</th>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Planificadas</th>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Completadas</th>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Cumplimiento</th>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Hitos (evolución)</th>
             </tr>
           </thead>
           <tbody>
             {sprints.map((sprint) => {
               const estilo = ESTADO_SPRINT_STYLE[sprint.estado];
               return (
-                <tr key={sprint.idSprint} className="border-b border-outline-variant/50 last:border-0">
-                  <td className="px-4 py-3 font-semibold text-on-surface">Sprint {sprint.numero}</td>
-                  <td className="px-4 py-3">
+                <tr key={sprint.idSprint} className={`border-b ${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER} last:border-0`}>
+                  <td className="px-stack py-inline type-body font-semibold text-text-primary">Sprint {sprint.numero}</td>
+                  <td className="px-stack py-inline">
                     <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
+                      className={`pill ${estilo.className}`}
                     >
                       {estilo.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-on-surface">{sprint.tareasPlanificadas}</td>
-                  <td className="px-4 py-3 text-on-surface">{sprint.tareasCompletadas}</td>
-                  <td className="px-4 py-3 text-on-surface">{sprint.porcentajeCumplimiento}%</td>
-                  <td className="px-4 py-3 text-on-surface">
+                  <td className="px-stack py-inline type-body tabular-nums text-text-primary">{sprint.tareasPlanificadas}</td>
+                  <td className="px-stack py-inline type-body tabular-nums text-text-primary">{sprint.tareasCompletadas}</td>
+                  <td className="px-stack py-inline type-body tabular-nums text-text-primary">{sprint.porcentajeCumplimiento}%</td>
+                  <td className="px-stack py-inline type-body tabular-nums text-text-primary">
                     {sprint.hitosCompletados} / {sprint.hitosTotales}
                   </td>
                 </tr>
@@ -219,7 +220,7 @@ export default function SprintsAnalyticsPage() {
       )}
 
       {!isLoading && !isError && sprints.length === 0 && (
-        <Empty tone="muted" role="status">
+        <Empty role="status">
           <EmptyMedia variant="icon">
             <Repeat aria-hidden="true" className="h-7 w-7" />
           </EmptyMedia>

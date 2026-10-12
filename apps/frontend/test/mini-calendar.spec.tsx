@@ -3,9 +3,151 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MiniCalendar } from '../components/calendar/mini-calendar';
 
-afterEach(() => {
-  cleanup();
+afterEach(cleanup);
+
+// Octubre 2026 (mes 9). El calendario es presentación pura: estas pruebas
+// fijan su contrato para las dos vistas que lo comparten —la agenda del
+// estudiante (solo `markedDates`) y el resumen de Sprints del panel de
+// administración (`markedCounts` + `getDayLabel`)— sin datos de dominio.
+
+function renderCalendar(props: Partial<React.ComponentProps<typeof MiniCalendar>> = {}) {
+  const onPrevMonth = vi.fn();
+  const onNextMonth = vi.fn();
+  render(
+    <MiniCalendar
+      year={2026}
+      month={9}
+      onPrevMonth={onPrevMonth}
+      onNextMonth={onNextMonth}
+      markedDates={new Set<string>()}
+      todayKey="2026-10-05"
+      {...props}
+    />,
+  );
+  return { onPrevMonth, onNextMonth };
+}
+
+/** Botón de un día del mes visible (los días de relleno repiten número). */
+function dia(numero: number): HTMLElement {
+  const boton = screen
+    .getAllByRole('button')
+    .find(
+      (candidato) =>
+        candidato.firstChild?.textContent === String(numero) &&
+        !candidato.className.includes('text-text-disabled'),
+    );
+  if (!boton) throw new Error(`no se encontró el día ${numero}`);
+  return boton;
+}
+
+describe('MiniCalendar', () => {
+  it('muestra el mes, los siete encabezados y seis semanas completas', () => {
+    renderCalendar();
+
+    expect(screen.getByText('Octubre 2026')).toBeInTheDocument();
+    expect(screen.getAllByText(/^[LMJVSD]$/)).toHaveLength(7);
+    // 42 días + las dos flechas de navegación.
+    expect(screen.getAllByRole('button')).toHaveLength(44);
+  });
+
+  it('navega con las flechas sin decidir él mismo el mes', () => {
+    const { onPrevMonth, onNextMonth } = renderCalendar();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mes anterior' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mes siguiente' }));
+
+    expect(onPrevMonth).toHaveBeenCalledTimes(1);
+    expect(onNextMonth).toHaveBeenCalledTimes(1);
+  });
+
+  it('el día actual es el que recibe por todayKey, no el del reloj del navegador', () => {
+    renderCalendar({ todayKey: '2026-10-20' });
+
+    expect(dia(20)).toHaveAttribute('aria-current', 'date');
+    expect(dia(5)).not.toHaveAttribute('aria-current');
+  });
+
+  describe('uso existente (agenda del estudiante): solo markedDates', () => {
+    it('marca con un punto los días indicados y ninguno más', () => {
+      renderCalendar({ markedDates: new Set(['2026-10-08', '2026-10-12']) });
+
+      expect(dia(8).querySelector('span[aria-hidden="true"]')).not.toBeNull();
+      expect(dia(12).querySelector('span[aria-hidden="true"]')).not.toBeNull();
+      expect(dia(9).querySelector('span')).toBeNull();
+    });
+
+    it('no dibuja el punto sobre el día de hoy ni muestra conteos o etiquetas', () => {
+      renderCalendar({ markedDates: new Set(['2026-10-05', '2026-10-08']) });
+
+      expect(dia(5).querySelector('span')).toBeNull();
+      expect(document.querySelector('[data-slot="day-count"]')).toBeNull();
+      expect(dia(8)).not.toHaveAttribute('aria-label');
+    });
+
+    it('sin onSelectDay los días no son interactivos', () => {
+      renderCalendar({ markedDates: new Set(['2026-10-08']) });
+      expect(dia(8)).toBeDisabled();
+    });
+  });
+
+  describe('con conteos por día (resumen de Sprints)', () => {
+    const counts = new Map([
+      ['2026-10-05', 1],
+      ['2026-10-08', 3],
+      ['2026-10-12', 1],
+    ]);
+
+    it('un solo elemento se marca con el punto, sin número', () => {
+      renderCalendar({ markedCounts: counts });
+
+      expect(dia(12)).toHaveAttribute('data-marked', 'true');
+      expect(dia(12).querySelector('[data-slot="day-count"]')).toBeNull();
+      expect(dia(12).querySelectorAll('span[aria-hidden="true"]')).toHaveLength(1);
+    });
+
+    it('dos o más muestran además cuántos son', () => {
+      renderCalendar({ markedCounts: counts });
+
+      expect(dia(8).querySelector('[data-slot="day-count"]')).toHaveTextContent('3');
+    });
+
+    it('el día de hoy también se marca', () => {
+      renderCalendar({ markedCounts: counts });
+
+      expect(dia(5)).toHaveAttribute('aria-current', 'date');
+      expect(dia(5)).toHaveAttribute('data-marked', 'true');
+      expect(dia(5).querySelector('span[aria-hidden="true"]')).not.toBeNull();
+    });
+
+    it('un día sin elementos no lleva marca ni etiqueta', () => {
+      renderCalendar({ markedCounts: counts, getDayLabel: (key, n) => `${key}: ${n}` });
+
+      expect(dia(9)).not.toHaveAttribute('data-marked');
+      expect(dia(9)).not.toHaveAttribute('aria-label');
+      expect(dia(9).querySelector('span')).toBeNull();
+    });
+
+    it('expone un nombre accesible por día marcado, sin depender del color', () => {
+      renderCalendar({
+        markedCounts: counts,
+        getDayLabel: (key, n) => `${key}, ${n} finalizaciones planificadas`,
+      });
+
+      expect(
+        screen.getByRole('button', { name: '2026-10-08, 3 finalizaciones planificadas' }),
+      ).toBe(dia(8));
+      expect(dia(8)).toHaveAttribute('title', '2026-10-08, 3 finalizaciones planificadas');
+    });
+
+    it('nunca escribe texto libre dentro de una celda: solo el número del día y el conteo', () => {
+      renderCalendar({ markedCounts: counts, getDayLabel: () => 'Proyecto con un nombre muy largo' });
+
+      expect(dia(8).textContent).toBe('83');
+    });
+  });
 });
+
+// ─── Pruebas de develop (HU-184: tono de hoy, meses vecinos, estructura e interacción) ───
 
 function renderMini(extra: Partial<Parameters<typeof MiniCalendar>[0]> = {}) {
   const onSelectDay = vi.fn();

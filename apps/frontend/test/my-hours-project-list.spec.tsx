@@ -78,7 +78,7 @@ describe('MyHoursProjectList', () => {
     );
 
     const cabecera = screen.getByRole('button', { name: /Tutorías/ });
-    expect(within(cabecera).getByText('Horas Beca')).toHaveClass('pill');
+    expect(within(cabecera).getByText('Horas Beca')).toHaveClass('pill', 'pill-sage');
     expect(within(cabecera).getByText('En progreso')).toHaveClass('pill');
     // 5.5 h registradas, NO 7.5 h: el legacy va aparte.
     expect(cabecera).toHaveTextContent('Registradas5.5 h');
@@ -130,7 +130,7 @@ describe('MyHoursProjectList', () => {
     render(<MyHoursProjectList proyectos={[proyecto({ esLider: true, participacionActiva: false })]} />);
 
     const cabecera = screen.getByRole('button', { name: /Tutorías/ });
-    expect(within(cabecera).getByText('Líder')).toHaveClass('pill', 'bg-[#E2E9F7]');
+    expect(within(cabecera).getByText('Líder')).toHaveClass('pill', 'pill-slate');
     expect(within(cabecera).queryByText('Participación finalizada')).not.toBeInTheDocument();
     expect(within(abrir('Tutorías')).getByRole('link', { name: 'Diseñar sesiones' })).toBeInTheDocument();
   });
@@ -180,7 +180,7 @@ describe('MyHoursProjectList', () => {
       '0 h',
       '2 h',
     ]);
-    expect(within(agenda).getByText('En progreso')).toHaveClass('pill', 'pill-warning');
+    expect(within(agenda).getByText('En progreso')).toHaveClass('pill', 'pill-lime');
     expect(within(riego).getAllByRole('cell').map((td) => td.textContent)).toEqual([
       'Riego',
       'Sin sprint',

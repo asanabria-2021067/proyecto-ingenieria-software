@@ -2,7 +2,8 @@ import type { LucideIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface HoursKpiCardProps {
-  icon: LucideIcon;
+  /** Opcional solo en `en-linea`: sin icono la cifra se alinea con la etiqueta. */
+  icon?: LucideIcon;
   /** También es el nombre accesible del grupo. */
   label: string;
   /** Valor ya formateado (p. ej. «12.5 h»): la tarjeta no calcula. */
@@ -48,12 +49,12 @@ export function HoursKpiCard({
         className="card-base"
       >
         <p className="flex items-center gap-tight text-xs font-semibold uppercase tracking-wide text-text-primary">
-          <Icon className="size-5 shrink-0 text-text-primary" aria-hidden="true" />
+          {Icon && <Icon className="size-5 shrink-0 text-text-primary" aria-hidden="true" />}
           {label}
         </p>
         {/* Cifra y nota alineadas con el texto de la etiqueta, no con el
             icono: pl-7 = icono (size-5) + gap-tight. */}
-        <div className="pl-7">
+        <div className={Icon ? 'pl-7' : undefined}>
           {isLoading ? (
             <Skeleton data-slot="kpi-cargando" className="mt-tight h-9 w-16" />
           ) : (
@@ -78,9 +79,11 @@ export function HoursKpiCard({
       data-destacado={destacado || undefined}
       className="flex items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5"
     >
-      <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${destacado ? 'bg-primary/15' : 'bg-primary/10'}`}>
-        <Icon className="size-5 text-primary" aria-hidden="true" />
-      </div>
+      {Icon && (
+        <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${destacado ? 'bg-primary/15' : 'bg-primary/10'}`}>
+          <Icon className="size-5 text-primary" aria-hidden="true" />
+        </div>
+      )}
       <div className="min-w-0">
         <p className="text-xs font-bold uppercase tracking-wide text-tertiary">{label}</p>
         <p className="font-headline text-2xl font-extrabold text-on-surface">{value}</p>

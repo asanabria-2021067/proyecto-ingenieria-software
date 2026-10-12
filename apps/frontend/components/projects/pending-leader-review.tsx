@@ -44,8 +44,8 @@ export function PendingLeaderReview({ solicitadaEn, motivo }: PendingLeaderRevie
         Mientras el líder revisa tu solicitud, no necesitas realizar ninguna acción adicional.
       </p>
 
-      <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-3 py-1 text-xs font-semibold text-tertiary">
-        <Clock className="size-3.5" aria-hidden="true" />
+      <span className="pill pill-neutral mt-4">
+        <Clock aria-hidden="true" />
         Pendiente de revisión
       </span>
 

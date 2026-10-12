@@ -4,7 +4,7 @@ import {
   EstadoProyecto,
   OrigenCambioLiderazgo,
   Prisma,
-  type EstadoApelacionLiderazgo,
+  EstadoApelacionLiderazgo,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -116,6 +116,26 @@ export interface ApelacionItemDto {
   liderSolicitante: UsuarioResumenDto;
   candidatoPropuesto: UsuarioResumenDto;
   adminResolutor: UsuarioResumenDto | null;
+  /**
+   * Proyecto de la apelación: título y estado ACTUALES. El estado del proyecto
+   * es independiente del de la apelación (una resuelta sobrevive al cierre).
+   */
+  proyecto: { idProyecto: number; tituloProyecto: string; estadoProyecto: EstadoProyecto };
+  /**
+   * Destinatario REAL de la transferencia de una apelación aceptada, leído del
+   * historial por su FK única. El administrador puede designar a alguien
+   * distinto del candidato propuesto; `null` mientras no haya transferencia.
+   */
+  liderDesignado: UsuarioResumenDto | null;
+}
+
+/** Conteo de la bandeja administrativa por estado, más el total. */
+export interface ApelacionesResumenDto {
+  PENDIENTE: number;
+  ACEPTADA: number;
+  DENEGADA: number;
+  CANCELADA: number;
+  TODAS: number;
 }
 
 const USUARIO_RESUMEN_SELECT = {
@@ -149,7 +169,16 @@ const APELACION_ITEM_SELECT = {
   liderSolicitante: { select: USUARIO_RESUMEN_SELECT },
   candidatoPropuesto: { select: USUARIO_RESUMEN_SELECT },
   adminResolutor: { select: USUARIO_RESUMEN_SELECT },
+  proyecto: { select: { idProyecto: true, tituloProyecto: true, estadoProyecto: true } },
+  historial: { select: { liderNuevo: { select: USUARIO_RESUMEN_SELECT } } },
 } satisfies Prisma.ApelacionLiderazgoSelect;
+
+function mapApelacion(
+  row: Prisma.ApelacionLiderazgoGetPayload<{ select: typeof APELACION_ITEM_SELECT }>,
+): ApelacionItemDto {
+  const { historial, ...apelacion } = row;
+  return { ...apelacion, liderDesignado: historial?.liderNuevo ?? null };
+}
 
 function mapHistorial(
   row: Prisma.HistorialLiderazgoGetPayload<{ select: typeof HISTORIAL_SELECT }>,
@@ -171,6 +200,16 @@ function mapHistorial(
 }
 
 type Db = Prisma.TransactionClient | PrismaService;
+
+const ORDEN_POR_CREACION: Prisma.ApelacionLiderazgoOrderByWithRelationInput[] = [
+  { creadaEn: 'desc' },
+  { idApelacion: 'desc' },
+];
+/** Historial de resueltas: por fecha de resolución o cancelación; sin ella, por creación. */
+const ORDEN_POR_RESOLUCION: Prisma.ApelacionLiderazgoOrderByWithRelationInput[] = [
+  { resueltaEn: { sort: 'desc', nulls: 'last' } },
+  ...ORDEN_POR_CREACION,
+];
 
 const CERO = new Prisma.Decimal(0);
 const dec2 = (valor: Prisma.Decimal): string => valor.toFixed(2);
@@ -310,29 +349,73 @@ export class LeadershipReadService {
     const db: Db = tx ?? this.prisma;
     await this.policy.assertAdminTx(db as Prisma.TransactionClient, input.actorId);
     const { page, limit, skip } = resolveAppealPage(input.query);
-    const where: Prisma.ApelacionLiderazgoWhereInput = input.query?.estado
-      ? { estadoApelacion: input.query.estado }
-      : {};
-    return this.pageOfAppeals(db, where, { page, limit, skip });
+    const estado = input.query?.estado;
+    const where: Prisma.ApelacionLiderazgoWhereInput = estado ? { estadoApelacion: estado } : {};
+    // Una pestaña de resueltas (aceptadas, denegadas, canceladas) es historial:
+    // lo último RESUELTO va primero. Pendientes y «todas» conservan el orden
+    // congelado por fecha de creación.
+    const orderBy =
+      estado && estado !== EstadoApelacionLiderazgo.PENDIENTE ? ORDEN_POR_RESOLUCION : ORDEN_POR_CREACION;
+    return this.pageOfAppeals(db, where, { page, limit, skip }, orderBy);
   }
 
-  /** Orden congelado de §41: `creadaEn DESC, id DESC`. */
+  /**
+   * Una apelación por su id, para la vista administrativa de revisión. Solo
+   * administradores; una apelación inexistente es 404.
+   */
+  async adminAppeal(
+    tx: Prisma.TransactionClient | undefined,
+    input: { actorId: number; appealId: number },
+  ): Promise<ApelacionItemDto> {
+    const db: Db = tx ?? this.prisma;
+    await this.policy.assertAdminTx(db as Prisma.TransactionClient, input.actorId);
+    const fila = await db.apelacionLiderazgo.findUnique({
+      where: { idApelacion: input.appealId },
+      select: APELACION_ITEM_SELECT,
+    });
+    if (!fila) {
+      throw new NotFoundException(`Apelación con id ${input.appealId} no encontrada`);
+    }
+    return mapApelacion(fila);
+  }
+
+  /** Cuántas apelaciones hay en cada estado: los contadores de las pestañas de la bandeja. */
+  async adminInboxSummary(
+    tx: Prisma.TransactionClient | undefined,
+    input: { actorId: number },
+  ): Promise<ApelacionesResumenDto> {
+    const db: Db = tx ?? this.prisma;
+    await this.policy.assertAdminTx(db as Prisma.TransactionClient, input.actorId);
+    const grupos = await db.apelacionLiderazgo.groupBy({
+      by: ['estadoApelacion'],
+      _count: { _all: true },
+    });
+    const resumen: ApelacionesResumenDto = { PENDIENTE: 0, ACEPTADA: 0, DENEGADA: 0, CANCELADA: 0, TODAS: 0 };
+    for (const grupo of grupos) {
+      resumen[grupo.estadoApelacion] = grupo._count._all;
+      resumen.TODAS += grupo._count._all;
+    }
+    return resumen;
+  }
+
+  /** Orden congelado de §41 por defecto: `creadaEn DESC, id DESC`. */
   private async pageOfAppeals(
     db: Db,
     where: Prisma.ApelacionLiderazgoWhereInput,
     paginacion: { page: number; limit: number; skip: number },
+    orderBy: Prisma.ApelacionLiderazgoOrderByWithRelationInput[] = ORDEN_POR_CREACION,
   ): Promise<PaginaLiderazgo<ApelacionItemDto>> {
     const [total, filas] = await Promise.all([
       db.apelacionLiderazgo.count({ where }),
       db.apelacionLiderazgo.findMany({
         where,
-        orderBy: [{ creadaEn: 'desc' }, { idApelacion: 'desc' }],
+        orderBy,
         skip: paginacion.skip,
         take: paginacion.limit,
         select: APELACION_ITEM_SELECT,
       }),
     ]);
-    return { items: filas, total, page: paginacion.page, limit: paginacion.limit };
+    return { items: filas.map(mapApelacion), total, page: paginacion.page, limit: paginacion.limit };
   }
 
 

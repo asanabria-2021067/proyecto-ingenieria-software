@@ -24,8 +24,8 @@ export function ExitRequestBadge({ request }: { request: PendingLeaderReviewDto 
   }
 
   return (
-    <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-      <Clock aria-hidden="true" className="h-3 w-3" />
+    <span className="pill pill-sm pill-amber mt-1 w-fit">
+      <Clock aria-hidden="true" />
       Salida pendiente
     </span>
   );

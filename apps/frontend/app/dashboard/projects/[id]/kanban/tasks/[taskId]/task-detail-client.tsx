@@ -54,8 +54,8 @@ import { getApiErrorMessage } from '@/components/projects/api-error';
 import { aviso, confirmar } from '@/lib/mensajes';
 import {
   COLUMNAS_TABLERO,
-  ESTADO_COLUMNA_STYLE,
   ESTADO_LABEL,
+  ESTADO_TAREA_TONE,
   PRIORIDAD_COLOR,
   PRIORIDAD_ICON,
   PRIORIDAD_LABEL,
@@ -190,7 +190,6 @@ function TaskDetailView({
 
   const PrioridadIcon = PRIORIDAD_ICON[tarea.prioridad];
   const vencida = estaVencida(tarea);
-  const estiloEstado = ESTADO_COLUMNA_STYLE[tarea.estadoTarea];
 
   const kanbanHref = `/dashboard/projects/${idProyecto}/kanban`;
 
@@ -403,10 +402,7 @@ function TaskDetailView({
         </h1>
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${estiloEstado.headerBg} ${estiloEstado.headerText}`}
-          >
-            <span className={`inline-block size-2 rounded-full ${estiloEstado.dot}`} aria-hidden="true" />
+          <span className={`pill pill-sm pill-${ESTADO_TAREA_TONE[tarea.estadoTarea]}`}>
             {ESTADO_LABEL[tarea.estadoTarea]}
           </span>
           <span className={`inline-flex items-center gap-1 text-xs font-semibold ${PRIORIDAD_COLOR[tarea.prioridad]}`}>

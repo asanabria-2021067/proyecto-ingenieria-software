@@ -1551,6 +1551,10 @@ model RolPermiso {
 /// BitacoraConsultaService.listEventos (`detalleJson.idProyecto`) combinado
 /// con el orden estable de la paginación; medido ~9x más rápido con volumen
 /// realista (ver el comentario del propio archivo de migración).
+///
+/// FG01-C06 (T-310): el `@@index` de abajo sirve al visor administrativo de
+/// eventos de seguridad, que filtra siempre por `tipoObjeto` y pagina con ese
+/// mismo orden (medición en la migración `20261011120000_security_audit_timeline`).
 model BitacoraAuditoria {
   idAuditoria Int      @id @default(autoincrement()) @map("id_auditoria")
   idUsuario   Int?     @map("id_usuario")
@@ -1563,6 +1567,7 @@ model BitacoraAuditoria {
 
   usuario Usuario? @relation(fields: [idUsuario], references: [idUsuario])
 
+  @@index([tipoObjeto, fechaEvento(sort: Desc), idAuditoria(sort: Desc)])
   @@map("bitacora_auditoria")
 }
 

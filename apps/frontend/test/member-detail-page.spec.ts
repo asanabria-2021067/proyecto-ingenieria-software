@@ -123,7 +123,7 @@ describe('DetalleIntegranteProyectoPage — guard de liderazgo', () => {
     renderPage();
 
     expect(screen.getByText('Solo el líder puede ver este detalle')).toBeInTheDocument();
-    expect(screen.queryByText('Total de horas reales')).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Horas reales' })).not.toBeInTheDocument();
   });
 
   it('el líder ve el desglose', () => {
@@ -131,7 +131,7 @@ describe('DetalleIntegranteProyectoPage — guard de liderazgo', () => {
     renderPage();
 
     expect(screen.queryByText('Solo el líder puede ver este detalle')).not.toBeInTheDocument();
-    expect(screen.getByText('Total de horas reales')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Horas reales' })).toBeInTheDocument();
   });
 });
 
@@ -165,8 +165,32 @@ describe('DetalleIntegranteProyectoPage — cabecera y resumen preservados', () 
 
     // "Total de horas reales" sigue viniendo de `tareas` (flat), nunca de
     // `sprints[].horasAprobadas`: 7.5 + 2 = 9.5 h, no confundir con reconocidas.
-    expect(screen.getByText('9.5 h')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument(); // TAREAS
+    expect(within(screen.getByRole('group', { name: 'Horas reales' })).getByText('9.5 h')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Tareas realizadas' })).getByText('2')).toBeInTheDocument();
+  });
+
+  it('el rol muestra su estado de participación como etiqueta estándar y desde cuándo participa', () => {
+    mockHooks({ isLeader: true });
+    renderPage();
+
+    const rol = within(screen.getByRole('list', { name: 'Roles en el proyecto' })).getByRole('listitem');
+    expect(within(rol).getByText('Backend')).toBeInTheDocument();
+    expect(within(rol).getByText('Activo')).toHaveClass('pill', 'pill-success');
+    expect(rol).toHaveTextContent(/Desde 5 ene 2026/);
+  });
+
+  it('los tres indicadores principales son Horas reales, Horas registradas y Tareas realizadas, sin iconos', () => {
+    mockHooks({ isLeader: true });
+    renderPage();
+
+    const resumen = screen.getByRole('region', { name: 'Resumen del integrante' });
+    const indicadores = within(resumen).getAllByRole('group');
+    expect(indicadores.map((i) => i.getAttribute('aria-label'))).toEqual([
+      'Horas reales',
+      'Horas registradas',
+      'Tareas realizadas',
+    ]);
+    expect(resumen.querySelector('svg')).toBeNull();
   });
 });
 
@@ -299,6 +323,30 @@ describe('DetalleIntegranteProyectoPage — Historial por Sprint (F15)', () => {
 
     const sprint1 = getSprintSection(1);
     expect(within(sprint1).getByText('No hay tareas registradas para este Sprint.')).toBeInTheDocument();
+  });
+
+  it('cada Sprint es una fila desplegable: los cerrados llegan plegados y los que siguen en curso, abiertos', () => {
+    mockHooks({
+      isLeader: true,
+      detalleData: detalle({
+        sprints: [
+          sprintGrupo({ idSprint: 501, numero: 1, estado: 'CERRADO' }),
+          sprintGrupo({ idSprint: 502, numero: 2, estado: 'ACTIVO', fechaCierre: null }),
+        ],
+      }),
+    });
+    renderPage();
+
+    const cerrado = getSprintSection(1).querySelector('details');
+    const activo = getSprintSection(2).querySelector('details');
+    expect(cerrado).not.toHaveAttribute('open');
+    expect(activo).toHaveAttribute('open');
+    // El resumen de la fila (lo que se ve plegado) lleva nombre, estado, fechas, tareas y horas.
+    const resumen = cerrado!.querySelector('summary')!;
+    expect(within(resumen).getByRole('heading', { name: 'Sprint 1' })).toBeInTheDocument();
+    expect(within(resumen).getByText('Cerrado')).toHaveClass('pill', 'pill-neutral');
+    expect(resumen).toHaveTextContent(/tareas realizadas/);
+    expect(resumen).toHaveTextContent(/0 h reconocidas/);
   });
 
   it('sin historial de Sprints, muestra el estado vacío y no fabrica un Sprint 1', () => {
