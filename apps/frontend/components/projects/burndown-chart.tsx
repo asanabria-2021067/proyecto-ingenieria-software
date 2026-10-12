@@ -95,7 +95,10 @@ export interface BurndownChartProps {
  * atenuado y punteado — nunca un segundo color.
  */
 export function BurndownChart({ burndown }: BurndownChartProps) {
-  const [eje, setEje] = useState<Eje>('puntos');
+  // Sin story points planificados el eje de puntos es una recta en 0 que parece
+  // «todo completado»: se abre en número de tareas y se explica por qué.
+  const sinPuntos = burndown.puntosHistoriaPlanificadosTotal === 0;
+  const [eje, setEje] = useState<Eje>(sinPuntos ? 'tareas' : 'puntos');
   const serie = useMemo(() => construirSerie(burndown, eje), [burndown, eje]);
   const etiquetaEje = eje === 'puntos' ? 'Story points' : 'Tareas';
 
@@ -132,6 +135,12 @@ export function BurndownChart({ burndown }: BurndownChartProps) {
           <ToggleGroupItem value="tareas">Número de tareas</ToggleGroupItem>
         </ToggleGroup>
       </div>
+
+      {sinPuntos && (
+        <p role="note" className="mb-4 text-xs text-tertiary">
+          Este Sprint no tiene story points asignados; consulta el número de tareas.
+        </p>
+      )}
 
       <BurndownChartPlot serie={serie} etiquetaEje={etiquetaEje} formatearFecha={formatearFechaEje} />
     </div>

@@ -95,6 +95,44 @@ describe('BurndownChart', () => {
     expect(screen.getByRole('radio', { name: 'Número de tareas' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'Story points' })).toHaveAttribute('aria-checked', 'false');
   });
+
+  it('sin story points planificados: abre en número de tareas y lo explica, con Story points aún disponible', () => {
+    render(
+      <BurndownChart
+        burndown={burndown({
+          puntosHistoriaPlanificadosTotal: 0,
+          instantaneas: [
+            { fecha: '2026-01-01T00:00:00.000Z', tareasPendientes: 4, tareasCompletadas: 0, puntosHistoriaRestantes: 0 },
+            { fecha: '2026-01-02T00:00:00.000Z', tareasPendientes: 3, tareasCompletadas: 1, puntosHistoriaRestantes: 0 },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('note')).toHaveTextContent(
+      'Este Sprint no tiene story points asignados; consulta el número de tareas.',
+    );
+    expect(screen.getByRole('radio', { name: 'Número de tareas' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Story points' }));
+    expect(screen.getByRole('radio', { name: 'Story points' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('con story points planificados no aparece la nota, aunque ya no quede ninguno pendiente', () => {
+    render(
+      <BurndownChart
+        burndown={burndown({
+          instantaneas: [
+            { fecha: '2026-01-01T00:00:00.000Z', tareasPendientes: 4, tareasCompletadas: 0, puntosHistoriaRestantes: 13 },
+            { fecha: '2026-01-02T00:00:00.000Z', tareasPendientes: 0, tareasCompletadas: 4, puntosHistoriaRestantes: 0 },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Story points' })).toHaveAttribute('aria-checked', 'true');
+  });
 });
 
 describe('formatearFechaEje', () => {
