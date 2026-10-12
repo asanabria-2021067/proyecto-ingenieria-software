@@ -141,7 +141,10 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
               <p className="mt-1 text-xs text-tertiary">
                 {notificaciones.length === 0
                   ? 'Te avisaremos cuando haya actividad nueva.'
-                  : 'Revisa "Ver todas" para tu historial completo.'}
+                  : unread > 0
+                    ? // El contador incluye avisos antiguos que este panel no lista.
+                      `Tienes ${unread} sin leer de días anteriores. Ábrelas en "Ver todas".`
+                    : 'Revisa "Ver todas" para tu historial completo.'}
               </p>
             </div>
           ) : (
