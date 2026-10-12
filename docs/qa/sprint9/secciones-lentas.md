@@ -271,3 +271,31 @@ comparable:
 
 El comando completo está en `k6/README.md`, sección "Medición base sin
 limitador".
+
+### Comparativo antes y después
+
+Resultado completo: `docs/qa/sprint9/k6-despues.json`. Se corrió desde
+`develop` con las mejoras del PR #269 (índices de T-291, caché en Redis y
+paginación de T-292), el mismo escenario y los mismos parámetros. Hubo 11 215
+peticiones en 30 s (≈370 peticiones/s), 0 fallidas y 0 respuestas 429.
+
+| Sección | Endpoint | p95 antes | p95 después | Diferencia | Tamaño antes | Tamaño después |
+|---|---|---|---|---|---|---|
+| Tablero (kanban) | `GET /proyectos/:id/tareas` | 206 ms | 75 ms | −63.7 % | 100.1 KB | 148.2 KB |
+| Detalle de Sprint | `GET /proyectos/:id/sprints/:sprintId` | 164 ms | 67 ms | −59.2 % | 68.5 KB | 102.9 KB |
+| Detalle de proyecto | `GET /proyectos/:id` | 155 ms | 37 ms | −76.4 % | 51.3 KB | 2.1 KB |
+| Panel de administración | `GET /admin/estadisticas` | 143 ms | 49 ms | −65.5 % | 1.3 KB | 1.5 KB |
+| Sesión del usuario | `GET /usuarios/me` | 117 ms | 44 ms | −62.5 % | 2.6 KB | 2.6 KB |
+
+La base local ya no tenía los datos de la medición base (el proyecto 5 tenía
+6 tareas), así que antes de medir se cargó `datos-medicion.sql` para volver a
+236 tareas en el Sprint 4, 144 notificaciones del administrador y 534
+registros de bitácora. Las tareas generadas traen una descripción de unos 200
+caracteres, por eso el tablero y el detalle de Sprint pesan cerca de un 50 %
+más que en la base: la comparación de esas dos secciones es conservadora.
+
+**Conclusión:** las cinco secciones más lentas bajaron su p95 entre 59 % y
+76 %, y ninguna pasa de 75 ms. La mayor mejora es el detalle de proyecto, que
+dejó de embeber las tareas y pasó de 51 KB a 2 KB. El tablero y el detalle de
+Sprint siguen siendo las respuestas más pesadas, así que son los candidatos
+para paginar por columna o servir los comentarios aparte.
