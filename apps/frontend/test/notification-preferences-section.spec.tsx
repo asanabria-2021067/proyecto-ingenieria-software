@@ -16,7 +16,7 @@ import { TIPOS_BACKEND, diferida, fallo, preferencias, renderSeccion } from './h
 
 /** FG04 (T-328). Sección «Notificaciones» del perfil sobre un servicio simulado. */
 
-const seccion = () => screen.getByRole('region', { name: 'Notificaciones' });
+const seccion = () => screen.getByRole('region', { name: 'Preferencias de notificaciones' });
 
 afterEach(() => {
   cleanup();
@@ -24,19 +24,25 @@ afterEach(() => {
 });
 
 describe('FG04-C01: sección de notificaciones en el perfil', () => {
-  it('es una región con su título, montada en el perfil que comparten estudiantes y administradores', () => {
+  it('es una región con su título, montada en Configuración, que comparten estudiantes y administradores', () => {
     vi.mocked(getNotificationPreferences).mockReturnValue(diferida<never>().promesa);
     renderSeccion();
-    expect(within(seccion()).getByRole('heading', { level: 2, name: 'Notificaciones' })).toBeInTheDocument();
+    expect(within(seccion()).getByRole('heading', { level: 2, name: 'Preferencias de notificaciones' })).toBeInTheDocument();
+    expect(within(seccion()).getByText('Los cambios se guardan automáticamente.')).toBeInTheDocument();
 
-    const pagina = readFileSync(join(__dirname, '../app/dashboard/perfil/page.tsx'), 'utf8');
+    const pagina = readFileSync(join(__dirname, '../app/dashboard/configuracion/page.tsx'), 'utf8');
     expect(pagina).toContain("from '@/components/profile/notification-preferences-section'");
     expect(pagina.match(/<NotificationPreferencesSection \/>/g)).toHaveLength(1);
-    // El perfil conserva sus secciones: la de notificaciones se añade al final.
+    // El perfil conserva sus secciones y deja de consultar las preferencias.
+    const perfil = readFileSync(join(__dirname, '../app/dashboard/perfil/page.tsx'), 'utf8');
     for (const existente of ['Editar perfil', 'Experiencias previas', 'Sin cualidades registradas']) {
-      expect(pagina).toContain(existente);
+      expect(perfil).toContain(existente);
     }
-    expect(readFileSync(join(__dirname, '../app/dashboard/layout.tsx'), 'utf8')).toContain("'/dashboard/perfil'");
+    expect(perfil).not.toContain('NotificationPreferencesSection');
+    // Ruta de rol compartido: el administrador la ve con su propio armazón.
+    expect(readFileSync(join(__dirname, '../app/dashboard/layout.tsx'), 'utf8')).toMatch(
+      /SHARED_ROLE_ROUTES = new Set\(\[[^\]]*'\/dashboard\/configuracion'/,
+    );
   });
 
   it('mientras carga muestra un esqueleto anunciado, sin lista ni error', () => {
@@ -52,7 +58,8 @@ describe('FG04-C01: sección de notificaciones en el perfil', () => {
     renderSeccion();
 
     const grupos = await within(seccion()).findAllByRole('heading', { level: 3 });
-    expect(grupos.map((h) => h.textContent)).toEqual([
+    // El encabezado contiene todo el disparador (título, descripción y contador): se compara el título.
+    expect(grupos.map((h) => h.querySelector('[id^="preferencias-grupo-"]')?.textContent)).toEqual([
       'Tareas e hitos',
       'Postulaciones y equipo',
       'Proyectos',

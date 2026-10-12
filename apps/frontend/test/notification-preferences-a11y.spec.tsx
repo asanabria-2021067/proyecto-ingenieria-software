@@ -20,7 +20,7 @@ import { diferida, fallo, preferencias, renderSeccion } from './helpers/notifica
  */
 
 const FUENTE = readFileSync(join(__dirname, '../components/profile/notification-preferences-section.tsx'), 'utf8');
-const seccion = () => screen.getByRole('region', { name: 'Notificaciones' });
+const seccion = () => screen.getByRole('region', { name: 'Preferencias de notificaciones' });
 const tarea = () => screen.getByRole('switch', { name: 'Tarea asignada' });
 const aviso = () => within(seccion()).getAllByRole('status').find((el) => el.getAttribute('aria-live') === 'polite') as HTMLElement;
 
@@ -177,11 +177,11 @@ describe('FG04-C04: anuncios de guardado y error', () => {
 });
 
 describe('FG04-C04: responsive, truncamiento y tema', () => {
-  it('los grupos van en una columna y pasan a dos en pantallas anchas', async () => {
+  it('las familias se apilan en una sola columna a cualquier ancho', async () => {
     await montar();
-    const rejilla = screen.getByRole('region', { name: 'Tareas e hitos' }).parentElement as HTMLElement;
-    expect(rejilla).toHaveClass('grid', 'lg:grid-cols-2');
-    expect(rejilla.className).not.toMatch(/(^|\s)grid-cols-[2-9]/);
+    const acordeon = screen.getByRole('region', { name: 'Tareas e hitos' }).closest('[data-slot="accordion"]') as HTMLElement;
+    expect(acordeon).toHaveClass('space-y-inline');
+    expect(acordeon.className).not.toMatch(/\bgrid\b/);
   });
 
   it('los textos largos se parten y el interruptor nunca se encoge ni sale de su fila', async () => {
@@ -191,7 +191,7 @@ describe('FG04-C04: responsive, truncamiento y tema', () => {
     expect(fila.firstElementChild).toHaveClass('min-w-0');
     expect(screen.getByText('Tarea asignada', { selector: 'label' })).toHaveClass('break-words');
     expect(tarea()).toHaveClass('shrink-0');
-    expect(screen.getByRole('region', { name: 'Tareas e hitos' })).toHaveClass('min-w-0');
+    expect(screen.getByRole('region', { name: 'Tareas e hitos' }).closest('[data-slot="accordion-item"]')).toHaveClass('min-w-0');
   });
 
   it('la sección usa tokens del sistema: sin colores fijos, estilos en línea ni variantes `dark:` propias', () => {
@@ -201,9 +201,12 @@ describe('FG04-C04: responsive, truncamiento y tema', () => {
     expect(FUENTE).not.toMatch(/style=\{|\bdark:/);
   });
 
-  it('el perfil conserva sus secciones y la de notificaciones no altera su estructura', () => {
-    const pagina = readFileSync(join(__dirname, '../app/dashboard/perfil/page.tsx'), 'utf8');
-    expect(pagina.indexOf('<NotificationPreferencesSection />')).toBeGreaterThan(pagina.indexOf('Experiencias previas'));
-    expect(pagina.match(/<section /g)?.length).toBeGreaterThanOrEqual(5);
+  it('el perfil conserva sus secciones y ya no monta las preferencias: viven en Configuración', () => {
+    const perfil = readFileSync(join(__dirname, '../app/dashboard/perfil/page.tsx'), 'utf8');
+    expect(perfil).not.toContain('NotificationPreferencesSection');
+    expect(perfil).toContain('Experiencias previas');
+    expect(perfil.match(/<section /g)?.length).toBeGreaterThanOrEqual(5);
+    const configuracion = readFileSync(join(__dirname, '../app/dashboard/configuracion/page.tsx'), 'utf8');
+    expect(configuracion.match(/<NotificationPreferencesSection \/>/g)).toHaveLength(1);
   });
 });

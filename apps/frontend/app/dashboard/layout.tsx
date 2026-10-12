@@ -17,7 +17,7 @@ function isAdminOnlyRoute(pathname: string) {
 }
 
 // Rutas compartidas: el shell cambia según el rol del usuario actual.
-const SHARED_ROLE_ROUTES = new Set(['/dashboard/perfil', '/dashboard/notificaciones']);
+const SHARED_ROLE_ROUTES = new Set(['/dashboard/perfil', '/dashboard/notificaciones', '/dashboard/configuracion']);
 
 // Rutas donde tanto estudiantes como administradores usan el shell de
 // estudiante (DashboardLayout allowAdmin).
