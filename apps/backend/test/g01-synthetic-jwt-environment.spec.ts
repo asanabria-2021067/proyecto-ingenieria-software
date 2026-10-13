@@ -25,10 +25,9 @@ describe('G01-C01: JWT_SECRET sintético en tests y CI', () => {
     expect(PREDICTABLE_DEFAULTS).not.toContain(SYNTHETIC_JWT_SECRET);
   });
 
-  it('ci.yml define JWT_SECRET para el job backend (nivel workflow) y para el E2E', () => {
+  it('ci.yml define JWT_SECRET a nivel de workflow (lo heredan backend y frontend)', () => {
     const secrets = ciJwtSecrets();
-    // Uno a nivel de workflow (lo heredan backend y frontend) y el override del E2E.
-    expect(secrets.length).toBeGreaterThanOrEqual(2);
+    expect(secrets.length).toBeGreaterThanOrEqual(1);
     expect(CI_WORKFLOW).toMatch(/^env:\n(?:  .*\n|\n)*?  JWT_SECRET: \S+$/m);
   });
 

@@ -16,7 +16,6 @@ const ci = loadWorkflow('ci.yml');
 const STABLE_JOB_NAMES: Record<string, string> = {
   backend: 'Backend - lint y pruebas',
   frontend: 'Frontend - lint y pruebas',
-  e2e: 'E2E - suite de humo (Playwright)',
 };
 const topology = ci.jobs.topology;
 
