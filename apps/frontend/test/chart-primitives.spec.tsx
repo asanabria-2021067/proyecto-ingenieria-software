@@ -60,6 +60,14 @@ describe('primitivas compartidas de gráficas', () => {
     expect(screen.getByText('Horas confirmadas')).toBeInTheDocument();
   });
 
+  it('la etiqueta y el valor del tooltip van separados, no pegados', () => {
+    renderTooltip({ valueFormatter: (valor) => `${String(valor)} h` });
+
+    const fila = screen.getByText('0 h').parentElement;
+    expect(fila).toContainElement(screen.getByText('Horas confirmadas'));
+    expect(fila).toHaveClass('justify-between', 'gap-2');
+  });
+
   it('valueFormatter también se aplica a un valor ausente, para poder decir «sin dato»', () => {
     renderTooltip({
       payload: [{ dataKey: 'horas', name: 'horas', value: undefined, color: 'red', payload: {} }] as TooltipProps['payload'],

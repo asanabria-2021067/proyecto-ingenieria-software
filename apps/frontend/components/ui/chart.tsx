@@ -241,7 +241,8 @@ function ChartTooltipContent({
                   )}
                   <div
                     className={cn(
-                      'flex flex-1 justify-between leading-none',
+                      // `gap-2`: en un tooltip estrecho la etiqueta y el valor no deben quedar pegados.
+                      'flex flex-1 justify-between gap-2 leading-none',
                       nestLabel ? 'items-end' : 'items-center',
                     )}
                   >
