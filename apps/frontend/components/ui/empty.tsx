@@ -9,8 +9,10 @@ const emptyVariants = cva(
       tone: {
         default:
           'border-outline-variant/70 bg-surface-container-lowest text-on-surface',
+        // «Sin registros»: la misma tarjeta blanca de borde sutil que `default` (referencia:
+        // Chats archivados). Antes era una superficie tintada con borde punteado.
         muted:
-          'border-dashed border-outline-variant bg-surface-container-low text-on-surface',
+          'border-outline-variant/70 bg-surface-container-lowest text-on-surface',
         danger:
           'border-error/25 bg-error-container/20 text-on-surface',
         // Dentro de una tarjeta: el vacío va directo sobre ella, sin otra
@@ -58,7 +60,8 @@ const emptyMediaVariants = cva(
     variants: {
       variant: {
         default: 'bg-transparent',
-        icon: "flex size-16 shrink-0 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm ring-8 ring-primary/5 [&_svg:not([class*='size-'])]:size-7",
+        // Icono neutro, sin verde ni anillo (referencia: Chats archivados): acompaña sin decorar.
+        icon: "flex size-12 shrink-0 items-center justify-center rounded-control bg-surface-container text-text-secondary [animation:none] [&_svg:not([class*='size-'])]:size-6",
         compact:
           "flex size-12 shrink-0 items-center justify-center rounded-xl border border-outline-variant bg-surface-container text-primary [&_svg:not([class*='size-'])]:size-6",
         // Icono pequeño y neutro, sin anillo ni animación: acompaña sin decorar.

@@ -24,7 +24,6 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
-import { NotificationPreferencesSection } from '@/components/profile/notification-preferences-section';
 import { SafeExternalLink } from '@/components/profile/safe-external-link';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { getAdminUserDetail, type AdminUserDetail } from '@/lib/services/admin';
@@ -554,11 +553,6 @@ export default function PerfilPage() {
               </>
             )}
           </div>
-        </div>
-
-        {/* T-328: preferencias de notificación por tipo, para estudiantes y administradores. */}
-        <div className="mt-8">
-          <NotificationPreferencesSection />
         </div>
       </div>
   );

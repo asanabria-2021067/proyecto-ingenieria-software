@@ -2,10 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { ChartLine } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { SEGMENTED_ITEM_CLASS, ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import type { SprintBurndownDto } from '@/lib/types/sprints';
 
@@ -74,8 +72,15 @@ export function construirSerie(burndown: SprintBurndownDto, eje: Eje): PuntoBurn
   return serie;
 }
 
-function formatearFechaEje(iso: string): string {
-  return format(new Date(iso), 'd MMM', { locale: es });
+const FORMATO_DIA_UTC = new Intl.DateTimeFormat('es-GT', { timeZone: 'UTC', day: 'numeric', month: 'short' });
+
+/**
+ * Rótulo del eje y del tooltip. Cada punto es un día calendario anclado a
+ * medianoche UTC (`diaUTC`), así que se rotula en UTC: en hora local de
+ * Guatemala (UTC−6) esa medianoche cae en el día anterior.
+ */
+export function formatearFechaEje(iso: string): string {
+  return FORMATO_DIA_UTC.format(new Date(iso));
 }
 
 export interface BurndownChartProps {
@@ -90,7 +95,10 @@ export interface BurndownChartProps {
  * atenuado y punteado — nunca un segundo color.
  */
 export function BurndownChart({ burndown }: BurndownChartProps) {
-  const [eje, setEje] = useState<Eje>('puntos');
+  // Sin story points planificados el eje de puntos es una recta en 0 que parece
+  // «todo completado»: se abre en número de tareas y se explica por qué.
+  const sinPuntos = burndown.puntosHistoriaPlanificadosTotal === 0;
+  const [eje, setEje] = useState<Eje>(sinPuntos ? 'tareas' : 'puntos');
   const serie = useMemo(() => construirSerie(burndown, eje), [burndown, eje]);
   const etiquetaEje = eje === 'puntos' ? 'Story points' : 'Tareas';
 
@@ -112,9 +120,9 @@ export function BurndownChart({ burndown }: BurndownChartProps) {
   }
 
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
+    <div className="card-base">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-bold text-on-surface">Burndown del Sprint</h2>
+        <h2 className="type-subtitle">Burndown del Sprint</h2>
         <ToggleGroup
           type="single"
           variant="outline"
@@ -123,12 +131,43 @@ export function BurndownChart({ burndown }: BurndownChartProps) {
           onValueChange={(valor) => valor && setEje(valor as Eje)}
           aria-label="Eje del burndown"
         >
-          <ToggleGroupItem value="puntos">Story points</ToggleGroupItem>
-          <ToggleGroupItem value="tareas">Número de tareas</ToggleGroupItem>
+          <ToggleGroupItem value="puntos" className={SEGMENTED_ITEM_CLASS}>Story points</ToggleGroupItem>
+          <ToggleGroupItem value="tareas" className={SEGMENTED_ITEM_CLASS}>Número de tareas</ToggleGroupItem>
         </ToggleGroup>
       </div>
 
+      {sinPuntos && (
+        <p role="note" className="type-meta mb-4">
+          Este Sprint no tiene story points asignados; consulta el número de tareas.
+        </p>
+      )}
+
       <BurndownChartPlot serie={serie} etiquetaEje={etiquetaEje} formatearFecha={formatearFechaEje} />
+
+      {/* Los mismos puntos de la gráfica, día a día, para quien no puede leer el SVG.
+          Un día sin instantánea se dice «Sin dato»: no es un cero. `sr-only` va en un
+          contenedor: una tabla no se deja recortar y desbordaría la página. */}
+      <div className="sr-only">
+        <table>
+          <caption>Burndown del Sprint, en {etiquetaEje.toLowerCase()} pendientes por día</caption>
+          <thead>
+            <tr>
+              <th scope="col">Día</th>
+              <th scope="col">Ideal</th>
+              <th scope="col">Real</th>
+            </tr>
+          </thead>
+          <tbody>
+            {serie.map((punto) => (
+              <tr key={punto.fecha}>
+                <th scope="row">{formatearFechaEje(punto.fecha)}</th>
+                <td>{punto.ideal ?? 'Sin dato'}</td>
+                <td>{punto.real ?? 'Sin dato'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

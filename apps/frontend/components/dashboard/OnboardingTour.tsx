@@ -190,8 +190,8 @@ export default function OnboardingTour() {
       target: '#dashboard-account-menu',
       title: 'Tu Perfil Profesional',
       content:
-        'Mantén al día tus habilidades e intereses desde tu cuenta, aquí arriba, para que los directores de proyectos puedan invitarte a colaborar.',
-      placement: 'bottom',
+        'Mantén al día tus habilidades e intereses desde tu cuenta, aquí abajo, para que los directores de proyectos puedan invitarte a colaborar.',
+      placement: 'top',
       disableBeacon: true,
     },
   ];

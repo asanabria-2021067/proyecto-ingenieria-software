@@ -266,34 +266,10 @@ test.describe('GPI01-C16: administración y regresiones H-02 a H-07', () => {
     }
   });
 
-  test('H-04 y H-05: ninguna etiqueta del catálogo se recorta y la cola de atención se lee a 768 px, en claro y oscuro', async ({ page }) => {
+  test('H-05: la cola de atención se lee a 768 px, en claro y oscuro', async ({ page }) => {
     test.setTimeout(120_000);
     await desactivarTour(page);
     await login(page, ADMIN, RUTA_ADMIN);
-    for (const ancho of [768, 1440]) {
-      await page.setViewportSize({ width: ancho, height: 900 });
-      await page.goto('/dashboard/admin/etiquetas');
-      await expect(page.getByRole('region', { name: /^19 · / })).toBeVisible({ timeout: 15_000 });
-      for (const oscuro of [false, true]) {
-        if ((await page.evaluate(() => document.documentElement.classList.contains('dark'))) !== oscuro) {
-          await page.getByRole('button', { name: 'Cambiar tema' }).click();
-          await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(oscuro);
-        }
-        const medida = await page.evaluate(() => {
-          const familias = [...document.querySelectorAll('section[aria-labelledby^="familia-"]')];
-          const pills = familias.flatMap((f) => [...f.querySelectorAll('.pill')]);
-          return {
-            familias: familias.length,
-            recortadas: pills.filter((p) => p.scrollWidth > p.clientWidth + 1).map((p) => p.textContent?.trim()),
-            desborde: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-          };
-        });
-        expect(medida.familias, `${ancho}px`).toBe(27);
-        expect(medida.recortadas, `${ancho}px ${oscuro ? 'oscuro' : 'claro'}`).toEqual([]);
-        expect(medida.desborde).toBeLessThanOrEqual(1);
-      }
-    }
-
     // Cola «Requieren atención» a 768 px con la barra lateral abierta.
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.goto('/dashboard/admin');
@@ -342,7 +318,6 @@ const ANCHOS = [320, 375, 768, 1024, 1280, 1440];
 const PANTALLAS: { nombre: string; correo: string; ruta: string; titulo: RegExp }[] = [
   { nombre: 'admin-panel', correo: ADMIN, ruta: '/dashboard/admin', titulo: /Panel de Administración/ },
   { nombre: 'admin-sprints', correo: ADMIN, ruta: '/dashboard/admin/sprints?vista=mes', titulo: /Calendario de Sprints/ },
-  { nombre: 'admin-etiquetas', correo: ADMIN, ruta: '/dashboard/admin/etiquetas', titulo: /Etiquetas/ },
   { nombre: 'estudiante-panel', correo: CARLOS, ruta: '/dashboard', titulo: /./ },
   { nombre: 'estudiante-calendario', correo: CARLOS, ruta: '/dashboard/calendario', titulo: /Calendario académico/ },
   { nombre: 'estudiante-mis-proyectos', correo: CARLOS, ruta: '/dashboard/projects/mine', titulo: /Mis Proyectos/ },

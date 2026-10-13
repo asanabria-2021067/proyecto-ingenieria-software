@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NotificationPreferencesSection } from '../../components/profile/notification-preferences-section';
-import type { NotificationPreference } from '../../lib/notifications/preference-groups';
+import { NOTIFICATION_GROUP_IDS, type NotificationGroupId, type NotificationPreference } from '../../lib/notifications/preference-groups';
 
 /** Datos y montaje compartidos por las suites de preferencias de notificación (T-328). */
 
@@ -23,12 +23,16 @@ export const TIPOS_BACKEND: string[] = (() => {
 export const preferencias = (inactivos: string[] = [], tipos: string[] = TIPOS_BACKEND): NotificationPreference[] =>
   tipos.map((tipo) => ({ tipo, activa: !inactivos.includes(tipo) }));
 
-export function renderSeccion() {
+/**
+ * Monta la sección con todas las familias abiertas, para que las suites vean cada interruptor.
+ * En la vista real empiezan cerradas: pasar `[]` para probar ese estado.
+ */
+export function renderSeccion(abiertas: readonly NotificationGroupId[] = NOTIFICATION_GROUP_IDS) {
   const queryClient = new QueryClient();
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
-  return { queryClient, ...render(<NotificationPreferencesSection />, { wrapper }) };
+  return { queryClient, ...render(<NotificationPreferencesSection defaultExpanded={abiertas} />, { wrapper }) };
 }
 
 /** Promesa que el test resuelve o rechaza a mano. */

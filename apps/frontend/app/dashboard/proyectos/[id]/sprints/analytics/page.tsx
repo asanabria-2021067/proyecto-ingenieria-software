@@ -18,6 +18,7 @@ import { ProjectExportButtons } from '@/components/projects/project-export-butto
 import { BurndownChart } from '@/components/projects/burndown-chart';
 import { VelocityChart } from '@/components/projects/velocity-chart';
 import { ReportsDialogTrigger, SprintReportsDialog } from '@/components/projects/sprint-reports-dialog';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Empty,
@@ -76,9 +77,9 @@ function BarraTareasCompletadas({ sprint, maximo }: { sprint: SprintComparativeA
  */
 function SeccionVelocidad({ sprints }: { sprints: SprintComparativeAnalyticsItemDto[] }) {
   return (
-    <div className="mb-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
-      <h2 className="mb-1 text-sm font-bold text-on-surface">Velocidad (story points completados)</h2>
-      <p className="mb-4 text-xs text-tertiary">
+    <div className="card-base mb-6">
+      <h2 className="type-subtitle mb-1">Velocidad (story points completados)</h2>
+      <p className="type-meta mb-4">
         Story points completados por Sprint cerrado. El promedio es la referencia para comprometer el siguiente
         Sprint.
       </p>
@@ -90,10 +91,31 @@ function SeccionVelocidad({ sprints }: { sprints: SprintComparativeAnalyticsItem
 /** Vista previa del burndown del Sprint mas relevante, directo en la
  * comparativa — sin tener que exportar ni navegar a otra pantalla primero. */
 function SeccionBurndownPreview({ idProyecto, sprint }: { idProyecto: number; sprint: SprintComparativeAnalyticsItemDto }) {
-  const { burndown, isLoading, isError } = useSprintBurndown(idProyecto, sprint.idSprint);
+  const { burndown, isLoading, isError, error, refetch } = useSprintBurndown(idProyecto, sprint.idSprint);
 
   if (isLoading) return <Skeleton className="mb-6 h-[340px] w-full rounded-xl" />;
-  if (isError || !burndown) return null;
+  // Un fallo se dice y se puede reintentar; el resto de la comparativa sigue disponible.
+  if (isError) {
+    return (
+      <Empty tone="danger" role="alert" className="mb-6">
+        <EmptyMedia variant="icon">
+          <AlertCircle aria-hidden="true" className="h-7 w-7" />
+        </EmptyMedia>
+        <EmptyHeader>
+          <EmptyTitle>
+            {getApiErrorMessage(error, 'general', `No fue posible cargar el burndown del Sprint ${sprint.numero}.`)}
+          </EmptyTitle>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button type="button" onClick={() => refetch()}>
+            Reintentar
+          </Button>
+        </EmptyContent>
+      </Empty>
+    );
+  }
+  // Sin error y sin datos no hay vista previa que mostrar (la consulta está deshabilitada o aún no aplica).
+  if (!burndown) return null;
 
   return (
     <div className="mb-6">
@@ -111,9 +133,9 @@ function ComparativeContent({ idProyecto, sprints }: { idProyecto: number; sprin
       {sprintPreview && <SeccionBurndownPreview idProyecto={idProyecto} sprint={sprintPreview} />}
       <SeccionVelocidad sprints={sprints} />
 
-      <div className="mb-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
-        <h2 className="mb-1 text-sm font-bold text-on-surface">Tareas completadas por sprint</h2>
-        <p className="mb-4 text-xs text-tertiary">Vista alternativa por número de tareas, no la métrica principal.</p>
+      <div className="card-base mb-6">
+        <h2 className="type-subtitle mb-1">Tareas completadas por sprint</h2>
+        <p className="type-meta mb-4">Vista alternativa por número de tareas, no la métrica principal.</p>
         <div className="space-y-3">
           {sprints.map((sprint) => (
             <BarraTareasCompletadas key={sprint.idSprint} sprint={sprint} maximo={maximoTareasCompletadas} />
@@ -208,13 +230,9 @@ export default function SprintsAnalyticsPage() {
             </EmptyTitle>
           </EmptyHeader>
           <EmptyContent>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-            >
+            <Button type="button" onClick={() => refetch()}>
               Reintentar
-            </button>
+            </Button>
           </EmptyContent>
         </Empty>
       )}

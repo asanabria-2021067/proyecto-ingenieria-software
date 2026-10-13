@@ -176,7 +176,11 @@ export default function DashboardLayout({
 
         <SidebarNav entries={navEntries} idUsuario={user?.idUsuario ?? null} />
 
-        <div className={`border-t border-outline-variant py-stack ${sidebarCollapsed ? 'flex justify-center px-tight' : 'px-inline'}`}>
+        {/* Único acceso a la cuenta en escritorio y tableta; en móvil está en la barra inferior. */}
+        <div
+          id="dashboard-account-menu"
+          className={`border-t border-outline-variant py-stack ${sidebarCollapsed ? 'flex justify-center px-tight' : 'px-inline'}`}
+        >
           <UserMenu user={user} onLogout={handleLogout} variant={sidebarCollapsed ? 'compact' : 'sidebar'} />
         </div>
       </aside>
@@ -248,12 +252,6 @@ export default function DashboardLayout({
             </button>
             <div id="dashboard-theme-toggle">
               <ThemeToggle />
-            </div>
-            <div
-              id="dashboard-account-menu"
-              className="hidden border-l border-outline-variant pl-tight lg:block"
-            >
-              <UserMenu user={user} onLogout={handleLogout} variant="compact" />
             </div>
           </div>
         </header>

@@ -1,15 +1,16 @@
 'use client';
 
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+  CHART_AXIS_PROPS,
+  CHART_GRID_PROPS,
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
 import type { PuntoBurndown } from './burndown-chart';
 
 export interface BurndownChartPlotProps {
@@ -18,32 +19,60 @@ export interface BurndownChartPlotProps {
   formatearFecha: (iso: string) => string;
 }
 
+/** Muestra de cada serie en leyenda y tooltip: las dos comparten color y se distinguen por el trazo. */
+function Trazo({ punteado = false }: { punteado?: boolean }) {
+  return (
+    <svg viewBox="0 0 12 12" aria-hidden="true">
+      <line
+        x1="0"
+        y1="6"
+        x2="12"
+        y2="6"
+        stroke="var(--color-primary)"
+        strokeWidth={2}
+        strokeOpacity={punteado ? 0.45 : 1}
+        strokeDasharray={punteado ? '3 2' : undefined}
+      />
+    </svg>
+  );
+}
+
+const CONFIG: ChartConfig = {
+  ideal: { label: 'Ideal', icon: () => <Trazo punteado /> },
+  real: { label: 'Real', icon: () => <Trazo /> },
+};
+
 /**
  * T-293 (HU-176): solo el dibujo de recharts del burndown. BurndownChart lo
  * carga con next/dynamic para que recharts no viaje en el JS inicial.
  */
 export default function BurndownChartPlot({ serie, etiquetaEje, formatearFecha }: BurndownChartPlotProps) {
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <LineChart data={serie} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" className="stroke-outline-variant" />
-        <XAxis
-          dataKey="fecha"
-          tickFormatter={formatearFecha}
-          tick={{ fontSize: 11 }}
-          className="fill-tertiary"
-        />
+    <ChartContainer config={CONFIG} className="aspect-auto h-[280px] w-full">
+      <LineChart accessibilityLayer data={serie} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+        <CartesianGrid {...CHART_GRID_PROPS} />
+        <XAxis dataKey="fecha" tickFormatter={formatearFecha} {...CHART_AXIS_PROPS} />
         <YAxis
           allowDecimals={false}
-          tick={{ fontSize: 11 }}
-          className="fill-tertiary"
-          label={{ value: etiquetaEje, angle: -90, position: 'insideLeft', fontSize: 11 }}
+          {...CHART_AXIS_PROPS}
+          label={{
+            value: etiquetaEje,
+            angle: -90,
+            position: 'insideLeft',
+            fontSize: 11,
+            fill: 'var(--color-muted-foreground)',
+          }}
         />
-        <Tooltip
-          labelFormatter={(fecha: string) => formatearFecha(fecha)}
-          formatter={(valor: number | string, nombre: string) => [valor ?? '—', nombre] as [string, string]}
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              labelFormatter={(fecha) => formatearFecha(String(fecha))}
+              // Un día sin instantánea no tiene valor real: se dice, no se muestra como 0.
+              valueFormatter={(valor) => (valor == null ? 'Sin dato' : String(valor))}
+            />
+          }
         />
-        <Legend />
+        <ChartLegend content={<ChartLegendContent />} />
         <Line
           type="monotone"
           dataKey="ideal"
@@ -67,6 +96,6 @@ export default function BurndownChartPlot({ serie, etiquetaEje, formatearFecha }
           isAnimationActive={false}
         />
       </LineChart>
-    </ResponsiveContainer>
+    </ChartContainer>
   );
 }

@@ -82,19 +82,28 @@ describe('T-293: secciones secundarias diferidas', () => {
   const adminPage = readFileSync(join(ROOT, 'app/dashboard/admin/page.tsx'), 'utf8');
   const features = readFileSync(join(ROOT, 'components/landing/FeaturesGrid.tsx'), 'utf8');
 
-  it('«Tendencias de uso» se carga con next/dynamic, sin SSR', () => {
-    expect(adminPage).toMatch(
+  const metricasPage = readFileSync(join(ROOT, 'app/dashboard/admin/metricas/page.tsx'), 'utf8');
+
+  it('«Tendencias de uso» se carga con next/dynamic, sin SSR, desde su propia página', () => {
+    expect(metricasPage).toMatch(
       /const AdminMetricsSection = dynamic\(\s*\(\) => import\('@\/components\/admin\/AdminMetricsSection'\)/,
     );
-    expect(adminPage).toMatch(/ssr:\s*false/);
+    expect(metricasPage).toMatch(/ssr:\s*false/);
   });
 
-  it('el hueco de «Tendencias de uso» conserva el título y el alto de las cinco tarjetas', () => {
-    const loading = adminPage.slice(adminPage.indexOf('loading: () => ('), adminPage.indexOf('// ───'));
-    expect(loading).toContain('aria-busy="true"');
-    expect(loading).toMatch(/<h2[^>]*>Tendencias de uso<\/h2>/);
+  it('el hueco de la página de Tendencias reserva el sitio de las cinco tarjetas y se anuncia como carga', () => {
+    const loading = metricasPage.slice(metricasPage.indexOf('loading: () => ('), metricasPage.indexOf('/**'));
+    expect(loading).toContain('role="status"');
     expect(loading).toContain('length: 5');
-    expect(loading).toContain('h-72');
+    expect(loading).toContain('h-96');
+  });
+
+  it('el Panel Admin ya no carga la sección de gráficas, ni diferida: su resumen no necesita recharts', () => {
+    expect(adminPage).not.toContain('AdminMetricsSection');
+    expect(adminPage).not.toContain('next/dynamic');
+    expect(adminPage).not.toMatch(/from ['"]recharts['"]|import\(['"]recharts['"]\)|metric-trend-plot|components\/ui\/chart/);
+    // El resumen lee la misma consulta que la página, para compartir caché.
+    expect(adminPage).toContain("queryKey: ['adminMetricas', 'semana']");
   });
 
   it('el fondo de partículas de la landing se carga con next/dynamic, sin SSR', () => {

@@ -56,7 +56,7 @@ async function sesion(browser: Browser, correo: string, conTour = false): Promis
 }
 
 test.describe('T-293: carga diferida', () => {
-  test('panel admin: los gráficos llegan aparte y el título no se mueve al cargar', async ({ browser }) => {
+  test('tendencias de uso: los gráficos llegan aparte y el título no se mueve al cargar', async ({ browser }) => {
     const page = await sesion(browser, ADMIN);
     try {
       const errores = vigilarErrores(page);
@@ -86,16 +86,16 @@ test.describe('T-293: carga diferida', () => {
         await route.fulfill({ response, body });
       });
 
-      const html = await htmlInicial(page, '/dashboard/admin');
-      const titulo = page.getByRole('heading', { name: 'Tendencias de uso' });
+      const html = await htmlInicial(page, '/dashboard/admin/metricas');
+      const titulo = page.getByRole('heading', { level: 1, name: 'Tendencias de uso' });
       const periodo = page.getByRole('group', { name: 'Periodo de las tendencias' });
-      const graficos = page.locator('#metricas .recharts-wrapper');
+      const hueco = page.getByRole('status', { name: 'Cargando las tendencias de uso' });
+      const graficos = page.locator('main .recharts-wrapper');
       await expect(titulo).toBeVisible();
       await expect.poll(() => diferidos.seccion.length).toBe(1);
 
-      // Mientras no llega la sección: el resto del panel ya se usa y el hueco se anuncia como ocupado.
-      await expect(page.locator('main h1').first()).toBeVisible();
-      await expect(page.locator('#metricas section[aria-busy="true"]')).toBeVisible();
+      // Mientras no llega la sección: el titular ya está y el hueco se anuncia como carga.
+      await expect(hueco).toBeVisible();
       await expect(periodo).toHaveCount(0);
       const antes = await titulo.boundingBox();
 
@@ -104,7 +104,7 @@ test.describe('T-293: carga diferida', () => {
       await expect.poll(() => diferidos.graficos.length).toBe(1);
       if (diferidos.graficos[0] !== diferidos.seccion[0]) {
         await expect(periodo).toBeVisible();
-        await expect(page.locator('#metricas section[aria-busy="true"]')).toHaveCount(0);
+        await expect(hueco).toHaveCount(0);
         await expect(graficos).toHaveCount(0);
         expect((await titulo.boundingBox())?.y).toBe(antes?.y);
       }
@@ -135,12 +135,36 @@ test.describe('T-293: carga diferida', () => {
     }
   });
 
-  test('panel admin: llegar con #metricas desplaza hasta la sección', async ({ browser }) => {
+  test('panel admin: su resumen de tendencias no descarga los gráficos', async ({ browser }) => {
+    const page = await sesion(browser, ADMIN);
+    try {
+      const errores = vigilarErrores(page);
+      const graficos = vigilarChunks(page, 'recharts-wrapper');
+      const metricas = page.waitForResponse((r) => r.url().includes('/api/admin/metricas') && r.status() === 200);
+
+      await page.goto('/dashboard/admin');
+      await metricas;
+      const resumen = page.locator('#metricas');
+      await expect(resumen.getByRole('group', { name: 'Usuarios nuevos' })).toBeVisible();
+      await expect(resumen.getByRole('link', { name: 'Ver tendencias de uso' })).toBeVisible();
+      await page.waitForLoadState('networkidle');
+
+      // El panel se usa completo sin que recharts haya viajado: ni en el HTML inicial ni después.
+      expect(graficos).toEqual([]);
+      await expect(page.locator('.recharts-wrapper')).toHaveCount(0);
+      expect(errores).toEqual([]);
+    } finally {
+      await page.context().close();
+    }
+  });
+
+  test('panel admin: llegar con #metricas desplaza hasta el resumen de tendencias', async ({ browser }) => {
     const page = await sesion(browser, ADMIN);
     try {
       await page.goto('/dashboard/admin#metricas');
-      await expect(page.getByRole('group', { name: 'Periodo de las tendencias' })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Tendencias de uso' })).toBeInViewport();
+      const resumen = page.locator('#metricas');
+      await expect(resumen.getByRole('link', { name: 'Ver tendencias de uso' })).toBeVisible();
+      await expect(resumen.getByRole('heading', { name: 'Tendencias de uso' })).toBeInViewport();
     } finally {
       await page.context().close();
     }

@@ -7,9 +7,10 @@ import { API_URL, desactivarTour } from './support/realtime';
  * FG08-C03 (T-321): los destinos nuevos dentro del menú administrativo
  * agrupado, en un navegador real contra la pila aislada.
  *
- *  - Métricas (HU-178): «Métricas → Tendencias de uso» lleva a la sección real
- *    del Panel Admin; su API responde 200 al administrador, 403 a un
- *    estudiante y 401 sin sesión.
+ *  - Métricas (HU-178): «Métricas → Tendencias de uso» lleva a su página
+ *    propia, con el periodo en la URL; el enlace antiguo `#metricas` sigue
+ *    llegando al resumen del Panel Admin; su API responde 200 al
+ *    administrador, 403 a un estudiante y 401 sin sesión.
  *  - Eventos de seguridad (T-310): «Verificación y seguridad → Eventos de
  *    seguridad», con miga de pan y destino activo.
  *  - Cuentas pendientes (HU-179, PR #270): «Verificación y seguridad →
@@ -44,7 +45,7 @@ const MENU: [string, [string, string, RegExp][]][] = [
     ],
   ],
   ['Gobernanza', [['Apelaciones', '/dashboard/admin/apelaciones', /Apelaciones de liderazgo/]]],
-  ['Métricas', [['Tendencias de uso', '/dashboard/admin#metricas', /Panel de Administración/]]],
+  ['Métricas', [['Tendencias de uso', '/dashboard/admin/metricas', /Tendencias de uso/]]],
   [
     'Verificación y seguridad',
     [
@@ -52,7 +53,6 @@ const MENU: [string, [string, string, RegExp][]][] = [
       ['Eventos de seguridad', '/dashboard/admin/seguridad', /Eventos de seguridad/],
     ],
   ],
-  ['Diagnóstico', [['Etiquetas (temporal)', '/dashboard/admin/etiquetas', /Etiquetas/]]],
 ];
 
 async function sesion(browser: Browser, correo: string): Promise<Page> {
@@ -80,29 +80,40 @@ test.describe('FG08-C03: destinos nuevos en el menú administrativo', () => {
     await admin.goto('/dashboard/admin/usuarios');
 
     const enlace = await destino(admin, 'Métricas', 'Tendencias de uso');
-    await expect(enlace).toHaveAttribute('href', '/dashboard/admin#metricas');
+    await expect(enlace).toHaveAttribute('href', '/dashboard/admin/metricas');
     const metricas = admin.waitForResponse((r) => r.url().startsWith(`${API}/admin/metricas`) && r.request().method() === 'GET');
     await enlace.click();
-    await admin.waitForURL(/\/dashboard\/admin#metricas$/);
+    await admin.waitForURL(/\/dashboard\/admin\/metricas$/);
     expect((await metricas).status()).toBe(200);
 
-    const seccion = admin.locator('#metricas');
-    await expect(seccion.getByRole('heading', { name: 'Tendencias de uso' })).toBeInViewport();
-    await expect(admin.getByRole('heading', { level: 1, name: 'Panel de Administración' })).toHaveCount(1);
-    // Es una sección del panel: el destino actual del menú sigue siendo «Panel Admin».
-    await expect(nav(admin).getByRole('link', { name: 'Panel Admin', exact: true })).toHaveAttribute('aria-current', 'page');
-    // La sección de HU-178 existe una sola vez.
-    await expect(admin.getByRole('heading', { name: 'Tendencias de uso' })).toHaveCount(1);
+    // Página propia: un solo titular, miga de pan con los nombres del menú y destino activo.
+    await expect(admin.getByRole('heading', { level: 1 })).toHaveText('Tendencias de uso');
+    const miga = admin.getByRole('navigation', { name: /breadcrumb/i });
+    await expect(miga.getByRole('listitem')).toHaveText(['Métricas', 'Tendencias de uso']);
+    await expect(nav(admin).locator('a[aria-current="page"]')).toHaveText(['Tendencias de uso']);
+    await expect(nav(admin).getByRole('button', { name: /^Métricas/ })).toHaveAttribute('aria-expanded', 'true');
 
-    // Ya en el panel, y de vuelta arriba, el mismo enlace vuelve a llevar a la sección.
-    await admin.locator('main h1').scrollIntoViewIfNeeded();
-    await expect(seccion.getByRole('heading', { name: 'Tendencias de uso' })).not.toBeInViewport();
-    await (await destino(admin, 'Métricas', 'Tendencias de uso')).click();
-    await expect(seccion.getByRole('heading', { name: 'Tendencias de uso' })).toBeInViewport();
+    // El periodo vive en la URL: sobrevive a una recarga y a un enlace compartido.
+    const periodo = admin.getByRole('group', { name: 'Periodo de las tendencias' });
+    await periodo.getByRole('radio', { name: 'Mes' }).click();
+    await admin.waitForURL(/\/dashboard\/admin\/metricas\?periodo=mes$/);
+    await admin.reload();
+    await expect(periodo.getByRole('radio', { name: 'Mes' })).toHaveAttribute('aria-checked', 'true');
+    await expect(nav(admin).locator('a[aria-current="page"]')).toHaveText(['Tendencias de uso']);
+    await expect(nav(admin).getByRole('button', { name: /^Métricas/ })).toHaveAttribute('aria-expanded', 'true');
+    // Un valor desconocido cae en semana, sin error.
+    await admin.goto('/dashboard/admin/metricas?periodo=anio');
+    await expect(periodo.getByRole('radio', { name: 'Semana' })).toHaveAttribute('aria-checked', 'true');
 
-    // Y abriendo la URL directamente (recarga o enlace compartido).
+    // El enlace antiguo (`#metricas`) sigue llegando a algo coherente: el resumen del panel, que lleva a la página.
     await admin.goto('/dashboard/admin#metricas');
-    await expect(seccion.getByRole('heading', { name: 'Tendencias de uso' })).toBeInViewport();
+    await expect(admin.getByRole('heading', { level: 1, name: 'Panel de Administración' })).toHaveCount(1);
+    const resumen = admin.locator('#metricas');
+    await expect(resumen.getByRole('heading', { name: 'Tendencias de uso' })).toBeInViewport();
+    await expect(nav(admin).getByRole('link', { name: 'Panel Admin', exact: true })).toHaveAttribute('aria-current', 'page');
+    await resumen.getByRole('link', { name: 'Ver tendencias de uso' }).click();
+    await admin.waitForURL(/\/dashboard\/admin\/metricas$/);
+    await expect(admin.getByRole('heading', { level: 1 })).toHaveText('Tendencias de uso');
 
     for (const periodo of ['semana', 'mes']) {
       expect((await admin.request.get(`${API}/admin/metricas?periodo=${periodo}`)).status(), periodo).toBe(200);
@@ -155,7 +166,7 @@ test.describe('FG08-C03: destinos nuevos en el menú administrativo', () => {
 
   test('una ruta administrativa inexistente responde 404', async ({ browser }) => {
     const admin = await sesion(browser, ADMIN);
-    for (const ruta of ['/dashboard/admin/metricas', '/dashboard/admin/no-existe']) {
+    for (const ruta of ['/dashboard/admin/tendencias', '/dashboard/admin/no-existe']) {
       expect((await admin.goto(ruta))?.status(), ruta).toBe(404);
     }
     await admin.context().close();
@@ -220,7 +231,7 @@ test.describe('FG08-C03: navegación por el menú agrupado', () => {
     await admin.keyboard.press('Tab');
     await expect(nav(admin).getByRole('link', { name: 'Tendencias de uso' })).toBeFocused();
     await admin.keyboard.press('Enter');
-    await admin.waitForURL(/#metricas$/);
+    await admin.waitForURL(/\/dashboard\/admin\/metricas$/);
     await admin.context().close();
   });
 
@@ -230,7 +241,7 @@ test.describe('FG08-C03: navegación por el menú agrupado', () => {
     await admin.goto('/dashboard/admin');
     await admin.getByRole('button', { name: 'Colapsar barra lateral' }).click();
     await expect(admin.getByRole('button', { name: 'Expandir barra lateral' })).toBeVisible();
-    await expect(nav(admin).getByRole('link', { name: 'Tendencias de uso' })).toHaveAttribute('href', '/dashboard/admin#metricas');
+    await expect(nav(admin).getByRole('link', { name: 'Tendencias de uso' })).toHaveAttribute('href', '/dashboard/admin/metricas');
     await nav(admin).getByRole('link', { name: 'Eventos de seguridad' }).click();
     await admin.waitForURL(/\/dashboard\/admin\/seguridad$/);
     await expect(admin.getByRole('heading', { level: 1, name: 'Eventos de seguridad' })).toBeVisible();
@@ -240,7 +251,13 @@ test.describe('FG08-C03: navegación por el menú agrupado', () => {
 
   test('un estudiante no entra a ningún destino administrativo', async ({ browser }) => {
     const estudiante = await sesion(browser, ESTUDIANTE);
-    for (const ruta of ['/dashboard/admin', '/dashboard/admin/seguridad', '/dashboard/admin/usuarios', '/dashboard/projects/admin/reviews']) {
+    for (const ruta of [
+      '/dashboard/admin',
+      '/dashboard/admin/metricas',
+      '/dashboard/admin/seguridad',
+      '/dashboard/admin/usuarios',
+      '/dashboard/projects/admin/reviews',
+    ]) {
       await estudiante.goto(ruta);
       await estudiante.waitForURL(/\/dashboard$/);
       await expect(estudiante.getByRole('navigation', { name: 'Navegación administrativa' })).toHaveCount(0);
@@ -251,7 +268,7 @@ test.describe('FG08-C03: navegación por el menú agrupado', () => {
   test('sin sesión, los destinos administrativos mandan al login', async ({ browser }) => {
     const contexto = await browser.newContext();
     const page = await contexto.newPage();
-    for (const ruta of ['/dashboard/admin', '/dashboard/admin/seguridad']) {
+    for (const ruta of ['/dashboard/admin', '/dashboard/admin/metricas', '/dashboard/admin/seguridad']) {
       await page.goto(ruta);
       await page.waitForURL(/\/login/);
     }

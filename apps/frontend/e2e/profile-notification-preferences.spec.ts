@@ -61,12 +61,22 @@ async function restaurar(page: Page) {
   }
 }
 
-async function abrirPerfil(page: Page) {
-  await page.goto('/dashboard/perfil');
-  const seccion = page.getByRole('region', { name: 'Notificaciones', exact: true });
-  await expect(seccion.getByRole('heading', { level: 2, name: 'Notificaciones' })).toBeVisible();
+/** Abre todas las familias: las preferencias viven en acordeones que empiezan cerrados. */
+async function abrirFamilias(page: Page) {
+  const seccion = page.getByRole('region', { name: 'Preferencias de notificaciones', exact: true });
+  await expect(seccion.locator('[data-slot="accordion-trigger"]').first()).toBeVisible();
+  const cerradas = seccion.locator('[data-slot="accordion-trigger"][aria-expanded="false"]');
+  while ((await cerradas.count()) > 0) await cerradas.first().click();
   await expect(seccion.getByRole('switch').first()).toBeVisible();
   return seccion;
+}
+
+/** Las preferencias se movieron del perfil a Configuración; el nombre del helper se conserva. */
+async function abrirPerfil(page: Page) {
+  await page.goto('/dashboard/configuracion');
+  const seccion = page.getByRole('region', { name: 'Preferencias de notificaciones', exact: true });
+  await expect(seccion.getByRole('heading', { level: 2, name: 'Preferencias de notificaciones' })).toBeVisible();
+  return abrirFamilias(page);
 }
 
 /**
@@ -126,7 +136,8 @@ test.describe('FG05-C03: preferencias de notificación por tipo en el perfil', (
     const enPantalla = await seccion.getByRole('switch').evaluateAll((els) => els.map((el) => el.getAttribute('data-tipo')));
     expect([...enPantalla].sort()).toEqual(delBackend.map((p) => p.tipo).sort());
     await expect(seccion.locator('[role="switch"][aria-checked="false"]')).toHaveCount(0);
-    await expect(seccion.getByRole('heading', { level: 3 })).toHaveText([
+    // Cada encabezado es el disparador de su familia: el título va en su propio elemento.
+    await expect(seccion.locator('h3 [id^="preferencias-grupo-"]')).toHaveText([
       'Tareas e hitos',
       'Postulaciones y equipo',
       'Proyectos',
@@ -135,8 +146,10 @@ test.describe('FG05-C03: preferencias de notificación por tipo en el perfil', (
       'Red de contactos',
       'Cuenta y seguridad',
     ]);
-    // El resto del perfil sigue ahí.
+    // El perfil sigue ahí, ya sin las preferencias.
+    await carlos.goto('/dashboard/perfil');
     await expect(carlos.getByRole('button', { name: 'Editar perfil' })).toBeVisible();
+    await expect(carlos.getByRole('switch')).toHaveCount(0);
   });
 
   test('Chat: no hay interruptor porque el backend no tiene ese tipo (criterio bloqueado, no simulado)', async () => {
@@ -159,8 +172,9 @@ test.describe('FG05-C03: preferencias de notificación por tipo en el perfil', (
     expect(await inactivos(carlos)).toEqual(['TAREA_ASIGNADA']);
 
     await carlos.reload();
+    const recargada = await abrirFamilias(carlos);
     await expect(carlos.getByRole('switch', { name: 'Tarea asignada', exact: true })).toHaveAttribute('aria-checked', 'false');
-    await expect(carlos.getByRole('region', { name: 'Notificaciones', exact: true }).locator('[role="switch"][aria-checked="false"]')).toHaveCount(1);
+    await expect(recargada.locator('[role="switch"][aria-checked="false"]')).toHaveCount(1);
 
     // María no ve el cambio de Carlos, ni en la API ni en su perfil.
     expect(await inactivos(maria)).toEqual([]);
@@ -210,7 +224,7 @@ test.describe('FG05-C03: preferencias de notificación por tipo en el perfil', (
     expect((await inactivos(carlos)).length).toBe(nombres.length);
 
     await carlos.reload();
-    const trasRecarga = carlos.getByRole('region', { name: 'Notificaciones', exact: true });
+    const trasRecarga = await abrirFamilias(carlos);
     await expect(trasRecarga.locator('[role="switch"][aria-checked="false"]')).toHaveCount(nombres.length);
     await expect(trasRecarga.locator('[role="switch"][aria-checked="true"]')).toHaveCount(0);
 
@@ -348,13 +362,12 @@ test.describe('FG05-C03: preferencias de notificación por tipo en el perfil', (
         if (medida.seccionFuera) hallazgos.push(`${etiqueta}: la sección sale de la ventana`);
         if (medida.controlesFuera) hallazgos.push(`${etiqueta}: ${medida.controlesFuera} interruptores fuera de su tarjeta`);
         if (medida.etiquetasRecortadas) hallazgos.push(`${etiqueta}: ${medida.etiquetasRecortadas} textos recortados`);
-        // Una columna de grupos en estrecho; dos en ancho.
-        if (ancho === 375 && medida.columnas !== 1) hallazgos.push(`${etiqueta}: se esperaba una columna y hay ${medida.columnas}`);
-        if (ancho === 1440 && medida.columnas !== 2) hallazgos.push(`${etiqueta}: se esperaban dos columnas y hay ${medida.columnas}`);
+        // Las familias se apilan: una sola columna de interruptores a cualquier ancho.
+        if (medida.columnas !== 1) hallazgos.push(`${etiqueta}: se esperaba una columna y hay ${medida.columnas}`);
 
         const contrastes = await medirContraste(
           carlos,
-          '[aria-labelledby="preferencias-notificacion-titulo"] h2, [aria-labelledby="preferencias-notificacion-titulo"] h3, [aria-labelledby="preferencias-notificacion-titulo"] p, [aria-labelledby="preferencias-notificacion-titulo"] label',
+          '[aria-labelledby="preferencias-notificacion-titulo"] h2, [aria-labelledby="preferencias-notificacion-titulo"] h3 span, [aria-labelledby="preferencias-notificacion-titulo"] p, [aria-labelledby="preferencias-notificacion-titulo"] label',
         );
         expect(contrastes.length, `${etiqueta}: se midió texto`).toBeGreaterThan(80);
         for (const c of contrastes.filter((c) => c.ratio < 4.5)) {

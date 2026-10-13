@@ -1,4 +1,6 @@
 import '@testing-library/jest-dom/vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 
@@ -9,6 +11,7 @@ import {
   securityEventsFilterErrors,
   securityEventsQueryFromFilters,
 } from '../lib/admin/security-events';
+import { DASHBOARD_FILTER_TRIGGER_CLASS } from '../components/dashboard/dashboard-search-field';
 import { getSecurityEvents } from '../lib/services/admin-security';
 import { SEIS_TIPOS, pagina, renderPagina } from './helpers/admin-security';
 
@@ -96,6 +99,132 @@ describe('FG02-C04: de los filtros visibles a la consulta', () => {
   );
 });
 
+describe('Filtros con el aspecto del dashboard, sin cambiar lo que hacen', () => {
+  it('el select usa la clase compartida de los filtros del dashboard y los tres campos igualan su alto y radio', async () => {
+    const filtros = await montar();
+    const tipo = filtros.getByRole('combobox', { name: 'Tipo de evento' });
+    // `h-auto` lo descarta la fusión de clases (gana `h-11.5`, que va después en la clase compartida).
+    const compartidas = DASHBOARD_FILTER_TRIGGER_CLASS.split(' ').filter((c) => c !== 'h-auto');
+    expect(compartidas).toEqual(expect.arrayContaining(['h-11.5', 'rounded-lg', 'border-outline-variant', 'bg-surface-container-lowest']));
+    for (const control of [tipo, filtros.getByLabelText('Desde'), filtros.getByLabelText('Hasta'), filtros.getByLabelText('ID de usuario')]) {
+      for (const clase of compartidas) expect(control, clase).toHaveClass(clase);
+      // Ningún control conserva el radio por defecto de su primitiva.
+      expect(control).not.toHaveClass('rounded-md');
+    }
+    // El alto del disparador vive en una variante que gana a una clase simple: se iguala con la misma variante.
+    expect(tipo).toHaveClass('data-[size=default]:h-11.5');
+    expect(tipo).not.toHaveClass('data-[size=default]:h-9');
+  });
+
+  it('los filtros van sobre el fondo de la página, sin tarjeta, y «Limpiar filtros» queda por encima de los campos', async () => {
+    const filtros = await montar();
+    const formulario = screen.getByRole('search', { name: 'Filtros de eventos de seguridad' });
+    expect(formulario).not.toHaveClass('card-base');
+    expect(formulario.className).not.toMatch(/\bp-card\b|\bborder\b|\bshadow/);
+
+    const limpiar = filtros.getByRole('button', { name: 'Limpiar filtros' });
+    const tipo = filtros.getByRole('combobox', { name: 'Tipo de evento' });
+    // En el documento el botón va antes que el primer campo: se lee y se pinta encima.
+    expect(limpiar.compareDocumentPosition(tipo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(formulario.firstElementChild).toContainElement(limpiar);
+    expect(formulario.firstElementChild).toHaveClass('justify-end', 'sm:col-span-2', 'xl:col-span-4');
+  });
+
+  it('«Ver detalle» usa el mismo botón compacto que «Ver perfil» en Gestión de Usuarios', async () => {
+    await montar();
+    const verPerfil = readFileSync(join(__dirname, '../app/dashboard/admin/usuarios/page.tsx'), 'utf8').match(/className="([^"]*)"\s*aria-label=\{`Ver perfil de/)?.[1] ?? '';
+    expect(verPerfil).toContain('hover:bg-primary');
+
+    const botones = screen.getAllByRole('button', { name: /^Ver detalle:/ });
+    expect(botones).toHaveLength(SEIS_TIPOS.length);
+    for (const boton of botones) {
+      expect(boton).toHaveAttribute('type', 'button');
+      for (const clase of verPerfil.split(' ').filter(Boolean)) expect(boton, clase).toHaveClass(clase);
+    }
+  });
+
+  it('las fechas siguen siendo campos nativos con rótulo visible: no se sustituyen por otro selector', async () => {
+    const filtros = await montar();
+    for (const [rotulo, id] of [['Tipo de evento', 'filtro-tipo'], ['Desde', 'filtro-desde'], ['Hasta', 'filtro-hasta'], ['ID de usuario', 'filtro-usuario']]) {
+      const etiqueta = filtros.getByText(rotulo, { selector: 'label' });
+      expect(etiqueta).toBeVisible();
+      expect(etiqueta).toHaveAttribute('for', id);
+      expect(document.getElementById(id)).not.toBeNull();
+    }
+    expect(filtros.getByLabelText('Desde').tagName).toBe('INPUT');
+    expect(filtros.getByLabelText('Hasta').tagName).toBe('INPUT');
+  });
+
+  it('conserva la nota de zona horaria y la enlaza a los dos campos de fecha', async () => {
+    const filtros = await montar();
+    const nota = filtros.getByText('Las fechas son días completos en hora de Guatemala e incluyen ambos extremos.');
+    expect(nota).toHaveAttribute('id', 'filtro-fechas-ayuda');
+    expect(filtros.getByLabelText('Desde')).toHaveAttribute('aria-describedby', 'filtro-fechas-ayuda');
+    expect(filtros.getByLabelText('Hasta')).toHaveAttribute('aria-describedby', 'filtro-fechas-ayuda');
+  });
+
+  it('«Limpiar filtros» es un botón que no envía el formulario y sigue montado, deshabilitado, cuando no hay filtros', async () => {
+    const filtros = await montar();
+    const limpiar = filtros.getByRole('button', { name: 'Limpiar filtros' });
+    expect(limpiar).toHaveAttribute('type', 'button');
+    expect(limpiar).toBeDisabled();
+    // Mismo botón compacto que «Ver perfil» en Gestión de Usuarios.
+    expect(limpiar).toHaveClass('min-h-8', 'rounded-tag', 'bg-surface-container-high', 'px-3', 'py-1.5', 'text-xs', 'font-bold', 'text-on-surface');
+    const verPerfil = readFileSync(join(__dirname, '../app/dashboard/admin/usuarios/page.tsx'), 'utf8').match(/className="([^"]*)"\s*aria-label=\{`Ver perfil de/)?.[1] ?? '';
+    for (const clase of verPerfil.split(' ').filter((c) => c && !c.startsWith('hover:'))) expect(limpiar, clase).toHaveClass(clase);
+    expect(verPerfil).toContain('rounded-tag');
+
+    fireEvent.change(filtros.getByLabelText('ID de usuario'), { target: { value: '8' } });
+    await waitFor(() => expect(limpiar).toBeEnabled());
+    // Es el mismo nodo: el botón no se desmonta ni se vuelve a montar, así la rejilla no salta.
+    expect(filtros.getByRole('button', { name: 'Limpiar filtros' })).toBe(limpiar);
+  });
+
+  it('volver a «Todos los tipos» quita el tipo de la consulta', async () => {
+    await montar();
+    elegirTipo('Bloqueo temporal');
+    await waitFor(() => expect(ultimaConsulta()).toMatchObject({ tipo: 'ACCOUNT_LOCKED' }));
+
+    elegirTipo('Todos los tipos');
+    await waitFor(() => expect(ultimaConsulta()).toEqual({ page: 1, limit: 20 }));
+  });
+
+  it('un rango invertido se señala y no consulta; al corregirlo se aplica con ambos extremos inclusivos', async () => {
+    const filtros = await montar();
+    fireEvent.change(filtros.getByLabelText('Desde'), { target: { value: '2026-10-12' } });
+    await waitFor(() => expect(ultimaConsulta()).toMatchObject({ desde: '2026-10-12T00:00:00.000-06:00' }));
+    const antes = llamadas();
+
+    fireEvent.change(filtros.getByLabelText('Hasta'), { target: { value: '2026-10-11' } });
+    expect(await filtros.findByText('La fecha final no puede ser anterior a la inicial.')).toHaveAttribute('role', 'alert');
+    expect(filtros.getByLabelText('Hasta')).toHaveAttribute('aria-invalid', 'true');
+    expect(llamadas()).toBe(antes);
+
+    fireEvent.change(filtros.getByLabelText('Hasta'), { target: { value: '2026-10-12' } });
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        desde: '2026-10-12T00:00:00.000-06:00',
+        hasta: '2026-10-12T23:59:59.999-06:00',
+        page: 1,
+        limit: 20,
+      }),
+    );
+  });
+
+  it('el visor solo lee: toda consulta sale por el servicio de lectura y ningún filtro añade parámetros nuevos', async () => {
+    const filtros = await montar();
+    elegirTipo('Inicio de sesión fallido');
+    fireEvent.change(filtros.getByLabelText('Desde'), { target: { value: '2026-10-01' } });
+    fireEvent.change(filtros.getByLabelText('ID de usuario'), { target: { value: '8' } });
+    await waitFor(() => expect(ultimaConsulta()).toMatchObject({ idUsuario: 8 }));
+
+    const permitidas = new Set(['tipo', 'desde', 'hasta', 'idUsuario', 'page', 'limit']);
+    for (const [consulta] of vi.mocked(getSecurityEvents).mock.calls) {
+      for (const clave of Object.keys(consulta ?? {})) expect(permitidas.has(clave), clave).toBe(true);
+    }
+  });
+});
+
 describe('FG02-C04: filtros en la página', () => {
   it('cada control tiene su etiqueta y el tipo ofrece el catálogo real', async () => {
     const filtros = await montar();
@@ -103,7 +232,7 @@ describe('FG02-C04: filtros en la página', () => {
     expect(filtros.getByLabelText('Hasta')).toHaveAttribute('type', 'date');
     expect(filtros.getByLabelText('ID de usuario')).toHaveAttribute('inputmode', 'numeric');
     expect(filtros.getByRole('combobox', { name: 'Tipo de evento' })).toHaveTextContent('Todos los tipos');
-    expect(filtros.getByRole('button', { name: 'Limpiar' })).toBeDisabled();
+    expect(filtros.getByRole('button', { name: 'Limpiar filtros' })).toBeDisabled();
 
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Tipo de evento' }), { key: 'Enter' });
     expect(screen.getAllByRole('option').map((opcion) => opcion.textContent)).toEqual([
@@ -158,19 +287,19 @@ describe('FG02-C04: filtros en la página', () => {
     await waitFor(() => expect(screen.getByText('Página 1 de 3')).toBeInTheDocument());
   });
 
-  it('«Limpiar» quita todos los filtros, vuelve a la página 1 y se desactiva', async () => {
+  it('«Limpiar filtros» quita todos los filtros, vuelve a la página 1 y se desactiva', async () => {
     const filtros = await montar();
     elegirTipo('Inicio de sesión');
     fireEvent.change(filtros.getByLabelText('Desde'), { target: { value: '2026-10-01' } });
     fireEvent.change(filtros.getByLabelText('ID de usuario'), { target: { value: '8' } });
     await waitFor(() => expect(ultimaConsulta()).toMatchObject({ tipo: 'LOGIN_SUCCEEDED', idUsuario: 8 }));
 
-    fireEvent.click(filtros.getByRole('button', { name: 'Limpiar' }));
+    fireEvent.click(filtros.getByRole('button', { name: 'Limpiar filtros' }));
     await waitFor(() => expect(ultimaConsulta()).toEqual({ page: 1, limit: 20 }));
     expect(filtros.getByLabelText('Desde')).toHaveValue('');
     expect(filtros.getByLabelText('ID de usuario')).toHaveValue('');
     expect(filtros.getByRole('combobox', { name: 'Tipo de evento' })).toHaveTextContent('Todos los tipos');
-    expect(filtros.getByRole('button', { name: 'Limpiar' })).toBeDisabled();
+    expect(filtros.getByRole('button', { name: 'Limpiar filtros' })).toBeDisabled();
   });
 
   it('un ID inválido se señala en su campo y NO lanza una consulta nueva', async () => {

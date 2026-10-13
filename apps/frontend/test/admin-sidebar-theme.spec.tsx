@@ -286,9 +286,9 @@ describe('Menú desplegable de la cuenta del administrador', () => {
   it('solo el menú del administrador lleva la paleta; conserva ancho, opciones y orden', async () => {
     await abrir('admin');
     expect(contenido()).toHaveClass('admin-account-menu', 'w-56');
-    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Perfil', 'Notificaciones', 'Cerrar sesión']);
-    expect(screen.getByRole('menuitem', { name: 'Perfil' })).toHaveAttribute('href', '/dashboard/perfil');
-    expect(screen.getByRole('menuitem', { name: 'Notificaciones' })).toHaveAttribute('href', '/dashboard/notificaciones');
+    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Mi perfil', 'Configuración', 'Cerrar sesión']);
+    expect(screen.getByRole('menuitem', { name: 'Mi perfil' })).toHaveAttribute('href', '/dashboard/perfil');
+    expect(screen.getByRole('menuitem', { name: 'Configuración' })).toHaveAttribute('href', '/dashboard/configuracion');
   });
 
   it('el menú del estudiante no cambia', async () => {

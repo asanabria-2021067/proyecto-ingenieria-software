@@ -118,16 +118,12 @@ const DESTINOS: Destino[] = [
   {
     grupo: 'Métricas',
     etiqueta: 'Tendencias de uso',
-    ruta: '/dashboard/admin#metricas',
-    titular: /Panel de Administración/,
+    ruta: '/dashboard/admin/metricas',
+    titular: /Tendencias de uso/,
     api: /^\/api\/admin\/metricas\?/,
     // Con datos, cada gráfica lleva su descripción; sin actividad, el estado vacío.
-    contenido: (main) => {
-      const seccion = main.locator('#metricas');
-      return seccion
-        .getByText('Cuentas creadas', { exact: true })
-        .or(estado(seccion, 'Aún no hay actividad para mostrar tendencias.'));
-    },
+    contenido: (main) =>
+      main.getByText('Cuentas creadas', { exact: true }).or(estado(main, 'Aún no hay actividad para mostrar tendencias.')),
   },
   {
     grupo: 'Verificación y seguridad',
@@ -149,15 +145,6 @@ const DESTINOS: Destino[] = [
     api: /^\/api\/admin\/eventos-seguridad(\?|$)/,
     contenido: (main) =>
       main.getByRole('table', { name: /Eventos de seguridad/ }).or(estado(main, 'Todavía no hay eventos de seguridad registrados.')),
-  },
-  {
-    grupo: 'Diagnóstico',
-    etiqueta: 'Etiquetas (temporal)',
-    ruta: '/dashboard/admin/etiquetas',
-    titular: /^Etiquetas$/,
-    // Catálogo estático: no consulta la API.
-    api: null,
-    contenido: (main) => main.getByRole('region', { name: 'Sistema: tonos y tamaños' }),
   },
   {
     grupo: null,

@@ -2,7 +2,8 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Bell, ChevronsUpDown, LogOut, User } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { ChevronsUpDown, LogOut, Settings, User } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,6 +56,12 @@ function UserAvatar({ user, theme }: { user: UserMenuUser | null | undefined; th
   );
 }
 
+/** Destinos de cuenta. La bandeja de avisos no va aquí: se abre desde la campana. */
+const ACCOUNT_LINKS = [
+  { href: '/dashboard/perfil', label: 'Mi perfil', icon: User },
+  { href: '/dashboard/configuracion', label: 'Configuración', icon: Settings },
+] as const;
+
 function UserMenuContent({
   user,
   onLogout,
@@ -64,6 +71,7 @@ function UserMenuContent({
   onLogout: () => void;
   theme: 'default' | 'admin';
 }) {
+  const pathname = usePathname();
   return (
     // `admin-account-menu` solo cambia colores (paleta Forest Graphite); el
     // menú se pinta en un portal, fuera de `.admin-sidebar`.
@@ -79,18 +87,22 @@ function UserMenuContent({
           <DropdownMenuSeparator />
         </>
       )}
-      <DropdownMenuItem asChild className="cursor-pointer">
-        <Link href="/dashboard/perfil">
-          <User className="size-4" aria-hidden="true" />
-          Perfil
-        </Link>
-      </DropdownMenuItem>
-      <DropdownMenuItem asChild className="cursor-pointer">
-        <Link href="/dashboard/notificaciones">
-          <Bell className="size-4" aria-hidden="true" />
-          Notificaciones
-        </Link>
-      </DropdownMenuItem>
+      {ACCOUNT_LINKS.map(({ href, label, icon: Icon }) => {
+        // «Mi perfil» también cubre su edición (/dashboard/perfil/editar).
+        const current = pathname === href || pathname?.startsWith(`${href}/`);
+        return (
+          <DropdownMenuItem
+            key={href}
+            asChild
+            className="cursor-pointer aria-[current=page]:bg-muted aria-[current=page]:font-semibold"
+          >
+            <Link href={href} aria-current={current ? 'page' : undefined}>
+              <Icon className="size-4" aria-hidden="true" />
+              {label}
+            </Link>
+          </DropdownMenuItem>
+        );
+      })}
       <DropdownMenuSeparator />
       <DropdownMenuItem
         variant="destructive"
@@ -107,9 +119,10 @@ function UserMenuContent({
   );
 }
 
-/** Dropdown de cuenta: Perfil, Notificaciones y Cerrar sesión detrás de un solo trigger
+/** Dropdown de cuenta: Mi perfil, Configuración y Cerrar sesión detrás de un solo trigger
  *  (avatar/nombre del usuario), reutilizado por DashboardLayout y AdminLayout tanto en
- *  el pie del sidebar de escritorio como en la barra inferior móvil. */
+ *  el pie del sidebar de escritorio como en la barra inferior móvil. Es el único acceso a la
+ *  cuenta en cada ancho: la barra superior no lo repite. */
 export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default' }: UserMenuProps) {
   const isAdmin = theme === 'admin';
 

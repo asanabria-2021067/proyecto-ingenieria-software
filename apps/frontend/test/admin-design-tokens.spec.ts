@@ -21,8 +21,9 @@ const LINEA_BASE: Record<string, Medida> = {
   '/dashboard/admin/solicitudes-recuperacion': { px: 1, radio: 3, hex: 0, boton: 2, titular: true },
   // HU-179 (PR #270): la vista llegó después de FG07; su línea base es la del PR #270.
   '/dashboard/admin/cuentas-pendientes': { px: 1, radio: 5, hex: 0, boton: 3, titular: false },
+  // Página propia de «Tendencias de uso»: nació ya con los tokens; su línea base es su primera medición.
+  '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
-  '/dashboard/admin/etiquetas': { px: 0, radio: 0, hex: 6, boton: 0, titular: true },
   '/dashboard/admin/apelaciones': { px: 1, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/apelaciones/[apelacionId]': { px: 1, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/proyectos': { px: 0, radio: 2, hex: 0, boton: 0, titular: true },
@@ -37,9 +38,10 @@ const ESTADO_ACTUAL: Record<string, Medida> = {
   '/dashboard/admin': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/usuarios': { px: 0, radio: 0, hex: 0, boton: 2, titular: true },
   '/dashboard/admin/solicitudes-recuperacion': { px: 0, radio: 2, hex: 0, boton: 2, titular: true },
-  '/dashboard/admin/cuentas-pendientes': { px: 0, radio: 1, hex: 0, boton: 3, titular: true },
+  // Al pasar a la tabla compartida perdió su radio literal y sus tres `<button>` propios.
+  '/dashboard/admin/cuentas-pendientes': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
-  '/dashboard/admin/etiquetas': { px: 0, radio: 0, hex: 6, boton: 0, titular: true },
   '/dashboard/admin/apelaciones': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/apelaciones/[apelacionId]': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/proyectos': { px: 0, radio: 1, hex: 0, boton: 0, titular: true },
