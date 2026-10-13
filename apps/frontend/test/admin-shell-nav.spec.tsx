@@ -481,14 +481,12 @@ describe('Inventario de navegación administrativa (T-319, FG06-C01)', () => {
     const noEnlazadas = paginas.filter((ruta) => !enlazadas.has(ruta));
     expect(noEnlazadas.sort()).toEqual([
       '/dashboard/admin/apelaciones/[apelacionId]',
-      // Página propia de «Tendencias de uso»: existe, pero el menú todavía enlaza el ancla del panel.
-      '/dashboard/admin/metricas',
       '/dashboard/admin/proyectos/[id]',
       '/dashboard/admin/proyectos/[id]/cierre',
     ]);
     for (const ruta of noEnlazadas) expect(inventario, ruta).toContain(`| \`${ruta}\` |`);
-    // Salvo la de métricas, las que el inventario lista como no enlazadas son vistas con identificador.
-    expect(noEnlazadas.filter((ruta) => ruta !== '/dashboard/admin/metricas').every((ruta) => ruta.includes('['))).toBe(true);
+    // Las que el inventario lista como no enlazadas son todas vistas con identificador.
+    expect(noEnlazadas.every((ruta) => ruta.includes('['))).toBe(true);
   });
 
   it('la pantalla de HU-179 existe (PR #270): se enlaza una sola vez y el inventario la registra', () => {
@@ -536,13 +534,15 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
     expect(existsSync(join(__dirname, '../app/dashboard/admin/etiquetas/page.tsx'))).toBe(true);
   });
 
-  it('no enlaza pantallas que no existen: cuentas pendientes (HU-179) solo porque su página existe, y ninguna ruta de métricas inventada', () => {
+  it('no enlaza pantallas que no existen: cuentas pendientes (HU-179) y métricas (HU-178) solo porque sus páginas existen', () => {
     const destinos = flattenNavEntries(adminNavEntries);
     const pendientes = destinos.filter((d) => /pendiente/i.test(`${d.label} ${d.href}`));
     expect(pendientes.map((d) => d.href)).toEqual(['/dashboard/admin/cuentas-pendientes']);
     expect(existsSync(join(__dirname, '../app/dashboard/admin/cuentas-pendientes/page.tsx'))).toBe(true);
-    // Métricas no tiene ruta propia: ningún destino apunta a una página `/metricas`.
-    expect(destinos.filter((d) => /\/metricas\b/.test(d.href))).toEqual([]);
+    // Métricas tiene una única ruta propia, y ningún destino conserva el ancla antigua.
+    expect(destinos.filter((d) => /\/metricas\b/.test(d.href)).map((d) => d.href)).toEqual(['/dashboard/admin/metricas']);
+    expect(existsSync(join(__dirname, '../app/dashboard/admin/metricas/page.tsx'))).toBe(true);
+    expect(destinos.filter((d) => d.href.includes('#'))).toEqual([]);
   });
 
   it('cada grupo y su destino usan iconos distintos entre sí dentro del mismo grupo', () => {
@@ -559,6 +559,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
     ['/dashboard/admin/solicitudes-recuperacion', 'Usuarios', 'Recuperación de contraseña'],
     ['/dashboard/admin/sprints', 'Proyectos', 'Calendario de Sprints'],
     ['/dashboard/admin/apelaciones', 'Gobernanza', 'Apelaciones'],
+    ['/dashboard/admin/metricas', 'Métricas', 'Tendencias de uso'],
     ['/dashboard/admin/cuentas-pendientes', 'Verificación y seguridad', 'Cuentas pendientes'],
     ['/dashboard/admin/seguridad', 'Verificación y seguridad', 'Eventos de seguridad'],
     ['/dashboard/admin/etiquetas', 'Diagnóstico', 'Etiquetas (temporal)'],
@@ -616,6 +617,7 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
     ['app/dashboard/admin/solicitudes-recuperacion/page.tsx', '/dashboard/admin/solicitudes-recuperacion', 'Recuperación de contraseña'],
     ['app/dashboard/admin/cuentas-pendientes/page.tsx', '/dashboard/admin/cuentas-pendientes', 'Cuentas pendientes'],
     ['app/dashboard/admin/seguridad/page.tsx', '/dashboard/admin/seguridad', 'Eventos de seguridad'],
+    ['app/dashboard/admin/metricas/page.tsx', '/dashboard/admin/metricas', 'Tendencias de uso'],
     ['app/dashboard/admin/etiquetas/page.tsx', '/dashboard/admin/etiquetas', 'Etiquetas (temporal)'],
     ['app/dashboard/admin/apelaciones/appeals-inbox-client.tsx', '/dashboard/admin/apelaciones', 'Apelaciones'],
     ['app/dashboard/projects/admin/reviews/page.tsx', '/dashboard/projects/admin/reviews', 'Solicitudes de publicación'],
@@ -677,7 +679,7 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
 
 describe('Métricas de uso en la estructura (T-321 · HU-178, FG08-C01)', () => {
   const fuente = (ruta: string) => readFileSync(join(__dirname, '..', ruta), 'utf8');
-  const HREF = '/dashboard/admin#metricas';
+  const HREF = '/dashboard/admin/metricas';
 
   it('«Tendencias de uso» está en el grupo «Métricas», una sola vez', () => {
     const grupo = adminNavEntries.find((e) => 'type' in e && e.type === 'group' && e.label === 'Métricas');
@@ -685,54 +687,33 @@ describe('Métricas de uso en la estructura (T-321 · HU-178, FG08-C01)', () => 
     expect(flattenNavEntries(adminNavEntries).filter((d) => /m[eé]trica|tendencia/i.test(d.label))).toHaveLength(1);
   });
 
-  it('el destino es el ancla de la sección real de HU-178 en el Panel Admin, no una página duplicada', () => {
-    const panel = fuente('app/dashboard/admin/page.tsx');
-    expect(fuente('components/admin/admin-page.ts')).toContain("export const ADMIN_METRICS_ANCHOR = 'metricas';");
-    expect(panel).toMatch(/<div id=\{ADMIN_METRICS_ANCHOR\}[^>]*>\s*<AdminMetricsSection \/>/);
-    // La sección de HU-178 se monta una sola vez en toda la aplicación.
-    expect(panel.match(/<AdminMetricsSection \/>/g)).toHaveLength(1);
-    // La página propia ya existe y monta la misma sección, en su variante amplia.
+  it('el destino es la página propia de HU-178, que monta la sección real en su variante amplia', () => {
+    expect(fuente('components/admin/admin-page.ts')).toContain(`export const ADMIN_METRICS_ROUTE = '${HREF}';`);
+    expect(existsSync(join(__dirname, '../app/dashboard/admin/metricas/page.tsx'))).toBe(true);
     expect(fuente('app/dashboard/admin/metricas/page.tsx')).toContain('<AdminMetricsSection amplia />');
   });
 
-  it('el panel se desplaza al ancla cuando termina de cargar: el enlace funciona también desde otra vista', () => {
+  it('el ancla antigua `#metricas` sigue existiendo en el panel y el panel se desplaza a ella al cargar', () => {
     const panel = fuente('app/dashboard/admin/page.tsx');
+    expect(fuente('components/admin/admin-page.ts')).toContain("export const ADMIN_METRICS_ANCHOR = 'metricas';");
+    expect(panel).toMatch(/id=\{ADMIN_METRICS_ANCHOR\}/);
     expect(panel).toContain('if (window.location.hash === `#${ADMIN_METRICS_ANCHOR}`) {');
     expect(panel).toContain('document.getElementById(ADMIN_METRICS_ANCHOR)?.scrollIntoView?.();');
   });
 
-  it('el componente y el servicio de HU-178 no se modificaron: siguen leyendo GET /admin/metricas', () => {
-    expect(fuente('components/admin/AdminMetricsSection.tsx')).toContain('Tendencias de uso');
+  it('el servicio de HU-178 no cambió: sigue leyendo GET /admin/metricas', () => {
     expect(fuente('lib/services/admin.ts')).toContain('`/admin/metricas?periodo=${periodo}`');
   });
 
-  it('el enlace se muestra al abrir su grupo y lleva al ancla', () => {
+  it('el enlace se muestra al abrir su grupo y lleva a la página', () => {
     renderShell();
     const nav = desktopNav();
     fireEvent.click(nav.getByRole('button', { name: /^Métricas/ }));
     expect(nav.getByRole('link', { name: 'Tendencias de uso' })).toHaveAttribute('href', HREF);
   });
 
-  it('estando ya en el panel, pulsar el enlace lleva la sección a la vista aunque la URL no cambie', () => {
+  it('el menú ya no desplaza a mano: el enlace es una navegación normal, sin manejador en la barra lateral', () => {
     pathnameMock.mockReturnValue('/dashboard/admin');
-    renderShell();
-    const ancla = document.createElement('div');
-    ancla.id = 'metricas';
-    ancla.scrollIntoView = vi.fn();
-    document.body.appendChild(ancla);
-    const nav = desktopNav();
-    fireEvent.click(nav.getByRole('button', { name: /^Métricas/ }));
-    fireEvent.click(nav.getByRole('link', { name: 'Tendencias de uso' }));
-    expect(ancla.scrollIntoView).toHaveBeenCalledTimes(1);
-
-    // Un enlace sin ancla no desplaza nada.
-    fireEvent.click(nav.getByRole('link', { name: 'Panel Admin' }));
-    expect(ancla.scrollIntoView).toHaveBeenCalledTimes(1);
-    ancla.remove();
-  });
-
-  it('desde otra vista el menú no desplaza: lo hace el panel al terminar de cargar', () => {
-    pathnameMock.mockReturnValue('/dashboard/admin/usuarios');
     renderShell();
     const ancla = document.createElement('div');
     ancla.id = 'metricas';
@@ -743,15 +724,47 @@ describe('Métricas de uso en la estructura (T-321 · HU-178, FG08-C01)', () => 
     fireEvent.click(nav.getByRole('link', { name: 'Tendencias de uso' }));
     expect(ancla.scrollIntoView).not.toHaveBeenCalled();
     ancla.remove();
+
+    const shell = fuente('components/admin/AdminLayout.tsx');
+    expect(shell).not.toContain('scrollIntoView');
+    expect(shell).not.toMatch(/<aside[^>]*onClick/);
   });
 
-  it('en el Panel Admin el destino activo sigue siendo «Panel Admin»: las métricas son una sección suya', () => {
+  it('en el Panel Admin el único destino activo es «Panel Admin» y el grupo «Métricas» queda cerrado', () => {
     pathnameMock.mockReturnValue('/dashboard/admin');
     renderShell();
     const nav = desktopNav();
+    expect(nav.getByRole('button', { name: /^Métricas/ })).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(nav.getByRole('button', { name: /^Métricas/ }));
     const activos = nav.getAllByRole('link').filter((a) => a.getAttribute('aria-current') === 'page');
     expect(activos.map((a) => a.textContent)).toEqual(['Panel Admin']);
+  });
+
+  it('en la página de Tendencias, al entrar directo o recargar, «Métricas» se abre solo y su destino es el único activo', () => {
+    pathnameMock.mockReturnValue(HREF);
+    renderShell();
+    const nav = desktopNav();
+    expect(nav.getByRole('button', { name: /^Métricas/ })).toHaveAttribute('aria-expanded', 'true');
+    const activos = nav.getAllByRole('link').filter((a) => a.getAttribute('aria-current') === 'page');
+    expect(activos.map((a) => a.textContent)).toEqual(['Tendencias de uso']);
+    expect(nav.getByRole('link', { name: 'Panel Admin' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('el enlace se alcanza y se activa con el teclado como cualquier otro destino', () => {
+    renderShell();
+    const nav = desktopNav();
+    const grupo = nav.getByRole('button', { name: /^Métricas/ });
+    grupo.focus();
+    fireEvent.click(grupo);
+    const enlace = nav.getByRole('link', { name: 'Tendencias de uso' });
+    enlace.focus();
+    expect(enlace).toHaveFocus();
+    expect(enlace.tagName).toBe('A');
+  });
+
+  it('la barra móvil no gana un icono para Métricas: en móvil se llega desde el panel', () => {
+    expect(adminNavItemsMobile.map((i) => i.href)).not.toContain(HREF);
+    expect(adminNavItemsMobile).toHaveLength(4);
   });
 
   it('colapsada, «Tendencias de uso» sigue alcanzable como icono con nombre', () => {
@@ -768,7 +781,7 @@ describe('Matriz de T-321 en el inventario (FG08-C03)', () => {
 
   it('los tres destinos están en el menú y el inventario los da por integrados', () => {
     expect(destinos.map((d) => d.href)).toEqual(
-      expect.arrayContaining(['/dashboard/admin#metricas', '/dashboard/admin/cuentas-pendientes', '/dashboard/admin/seguridad']),
+      expect.arrayContaining(['/dashboard/admin/metricas', '/dashboard/admin/cuentas-pendientes', '/dashboard/admin/seguridad']),
     );
     expect(inventario).toMatch(/\| Métricas de uso \| HU-178[^|]*\| [^|]*\| Integrada \|/);
     expect(inventario).toMatch(/\| Eventos de seguridad \| HU-180[^|]*\| [^|]*\| Integrada \|/);

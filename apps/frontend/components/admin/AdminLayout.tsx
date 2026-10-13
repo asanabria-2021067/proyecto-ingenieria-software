@@ -27,7 +27,7 @@ import {
   Tags,
   TrendingUp,
 } from 'lucide-react';
-import { ADMIN_METRICS_HREF } from '@/components/admin/admin-page';
+import { ADMIN_METRICS_ROUTE } from '@/components/admin/admin-page';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { avisarSinPermiso, useCan, RUTA_SIN_PERMISO } from '@/hooks/use-can';
 import { useLogout } from '@/hooks/use-logout';
@@ -98,9 +98,8 @@ export const adminNavEntries: NavEntry[] = [
     label: 'Métricas',
     icon: BarChart3,
     items: [
-      // T-321 · HU-178: las métricas de uso son una sección del Panel Admin, sin ruta propia.
-      // Se enlaza su ancla; no se duplica la sección en otra página.
-      { href: ADMIN_METRICS_HREF, label: 'Tendencias de uso', icon: TrendingUp },
+      // HU-178: las métricas de uso tienen página propia; el Panel Admin solo conserva un resumen.
+      { href: ADMIN_METRICS_ROUTE, label: 'Tendencias de uso', icon: TrendingUp },
     ],
   },
   {
@@ -186,15 +185,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     [totalPendientes],
   );
 
-  // T-321: «Tendencias de uso» es un ancla del Panel Admin. Si ya se está en el panel con ese
-  // mismo ancla en la URL, pulsar el enlace no cambia la ruta y Next no vuelve a desplazar:
-  // se lleva la sección a la vista aquí. Desde otra vista, el panel lo hace al terminar de cargar.
-  const irAlAncla = (evento: React.MouseEvent<HTMLElement>) => {
-    const enlace = (evento.target as HTMLElement).closest<HTMLAnchorElement>('a[href*="#"]');
-    const [ruta, ancla] = enlace?.getAttribute('href')?.split('#') ?? [];
-    if (ancla && ruta === pathname) document.getElementById(ancla)?.scrollIntoView?.();
-  };
-
   useEffect(() => {
     if (isLoading) return;
     if (isError) {
@@ -217,9 +207,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="h-screen bg-surface flex overflow-hidden">
       {/* Sidebar - Desktop Only */}
-      {/* El manejador solo delega: los elementos interactivos son los enlaces del menú. */}
       <aside
-        onClick={irAlAncla}
         data-slot="admin-sidebar"
         data-collapsed={collapsed || undefined}
         className={`admin-sidebar hidden md:flex ${collapsed ? 'w-[72px]' : 'w-64'} h-screen flex-col shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-200`}
