@@ -52,7 +52,7 @@ el grupo en que aparece. El rótulo «Administración» que encabeza la barra la
 «Métricas» enlaza una página propia (`/dashboard/admin/metricas`): al entrar en ella, también por la URL o al
 recargar, el grupo se abre solo y «Tendencias de uso» es el destino marcado como actual. Ningún destino del menú
 es ya un ancla, y la barra lateral no desplaza el contenido a mano. El enlace anterior, `/dashboard/admin#metricas`,
-sigue llevando al Panel Admin: el panel conserva el `id="metricas"` (ver la sección 5).
+sigue llevando al Panel Admin: el panel conserva el `id="metricas"` (ver la sección 8).
 
 Con la barra plegada (72 px) cada destino queda como un icono con su nombre accesible; los grupos no se muestran.
 
@@ -96,7 +96,47 @@ URL o desde los enlaces del panel. «Tendencias de uso» tiene el suyo: el resum
 con «Ver tendencias de uso». Ampliar la navegación móvil es una decisión de producto que este inventario deja
 registrada, no resuelta.
 
-## 8. Página temporal de etiquetas
+## 8. Tendencias de uso: rutas, semántica y límites conocidos
+
+Estado al cierre de Sprint 9 (gates de métricas, gráficas y UI administrativa).
+
+| Ruta | Qué muestra |
+|---|---|
+| `/dashboard/admin/metricas` | Las cinco métricas de HU-178 con su gráfica. El periodo va en la URL: `?periodo=semana` (por defecto) o `?periodo=mes`; cualquier otro valor se trata como `semana`. |
+| `/dashboard/admin` | Un resumen sin gráficas: usuarios nuevos, proyectos creados y horas confirmadas de la semana en curso, con el total de las últimas 8 semanas y el enlace «Ver tendencias de uso». No carga la librería de gráficas. |
+| `/dashboard/admin#metricas` | Enlace anterior a la página propia. Sigue funcionando: el resumen del panel conserva el `id="metricas"` y el panel se desplaza hasta él. |
+
+Las dos vistas leen `GET /admin/metricas` con la misma consulta, así que comparten caché. El endpoint, su cálculo y
+sus permisos (solo `administrador`) no cambiaron.
+
+Qué significa cada número (lo calcula el backend; la interfaz solo lo presenta):
+
+| Métrica | Unidad | Cómo se cuenta |
+|---|---|---|
+| Usuarios nuevos | usuarios | Cuentas creadas en el periodo. |
+| Usuarios activos | usuarios | Usuarios cuya **última** sesión cae en el periodo. |
+| Proyectos creados | proyectos | Proyectos creados en el periodo, sin contar eliminados. |
+| Tareas completadas | tareas | Tareas hoy en «Hecho», por la fecha de su última actualización. |
+| Horas confirmadas | horas | Suma de horas aprobadas, por fecha de aprobación. |
+
+`semana` son las últimas 8 semanas de lunes a domingo y `mes` los últimos 6 meses calendario, en hora de Guatemala.
+Todos los valores son agregados por periodo: ninguno es acumulado.
+
+Límites que estos gates **no** corrigen, porque exigen cambiar el cálculo en el backend:
+
+- **Usuarios activos no es un histórico real.** Solo se guarda la última sesión de cada usuario, así que quien
+  entra cada semana cuenta únicamente en la más reciente y los periodos pasados se vacían con el tiempo. Por eso el
+  resumen del panel no la muestra. Contarla desde los inicios de sesión registrados daría una serie real.
+- **Tareas completadas usa una fecha aproximada.** No existe una fecha de completado: editar una tarea ya hecha la
+  mueve al periodo de la edición.
+- **El último punto es un periodo en curso.** Su valor todavía está incompleto y no es comparable con los
+  anteriores; la página lo dice y la tabla de valores lo marca «(en curso)».
+
+Las gráficas de tendencias, burndown y velocidad comparten contenedor, rejilla, ejes y tooltip
+(`components/ui/chart.tsx`) y se cargan aparte desde sus módulos `*-plot`. Tendencias y burndown llevan además una
+tabla de valores oculta a la vista para lectores de pantalla.
+
+## 9. Página temporal de etiquetas
 
 `/dashboard/admin/etiquetas` no es parte del producto: es el catálogo de diagnóstico de las 27 familias de etiquetas.
 Sigue enlazada porque no hay una decisión documentada de retirarla del menú. Cuando se retire, se quitan juntas la
