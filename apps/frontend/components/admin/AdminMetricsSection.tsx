@@ -8,7 +8,7 @@ import { es } from 'date-fns/locale';
 import { AlertCircle, ChartLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { SEGMENTED_ITEM_CLASS, ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { formatearHoras } from '@/lib/hours/format';
 import {
@@ -279,8 +279,8 @@ export function AdminMetricsSection({ amplia = false }: { amplia?: boolean }) {
           onValueChange={(valor) => valor && cambiarPeriodo(periodoDeLaUrl(valor))}
           aria-label="Periodo de las tendencias"
         >
-          <ToggleGroupItem value="semana">Semana</ToggleGroupItem>
-          <ToggleGroupItem value="mes">Mes</ToggleGroupItem>
+          <ToggleGroupItem value="semana" className={SEGMENTED_ITEM_CLASS}>Semana</ToggleGroupItem>
+          <ToggleGroupItem value="mes" className={SEGMENTED_ITEM_CLASS}>Mes</ToggleGroupItem>
         </ToggleGroup>
       </div>
       <p className="type-meta mb-stack max-w-3xl">{PERIODO_TEXTO[mostrado].explicacion}</p>

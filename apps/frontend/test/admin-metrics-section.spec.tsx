@@ -108,6 +108,22 @@ describe('AdminMetricsSection — HU-178', () => {
     expect(screen.getByRole('radio', { name: 'Semana' })).toHaveAttribute('aria-checked', 'true');
   });
 
+  it('el selector Semana/Mes es holgado, marca la opción elegida en verde y realza la otra al pasar el cursor', async () => {
+    vi.mocked(getAdminMetricas).mockResolvedValue(conDatos);
+    renderSection();
+    await screen.findByText('Usuarios nuevos');
+
+    for (const opcion of [screen.getByRole('radio', { name: 'Semana' }), screen.getByRole('radio', { name: 'Mes' })]) {
+      expect(opcion).toHaveClass('px-4', 'data-[state=on]:bg-primary', 'data-[state=on]:text-on-primary', 'hover:bg-primary', 'hover:text-on-primary');
+      // El relleno estrecho y los grises de la primitiva ya no aplican.
+      expect(opcion).not.toHaveClass('px-1.5');
+      expect(opcion).not.toHaveClass('data-[state=on]:bg-muted');
+      expect(opcion).not.toHaveClass('hover:bg-muted');
+    }
+    expect(screen.getByRole('radio', { name: 'Semana' })).toHaveAttribute('data-state', 'on');
+    expect(screen.getByRole('radio', { name: 'Mes' })).toHaveAttribute('data-state', 'off');
+  });
+
   it('explica la ventana y que el periodo en curso está incompleto', async () => {
     vi.mocked(getAdminMetricas).mockResolvedValue(conDatos);
     renderSection();

@@ -87,6 +87,16 @@ describe('BurndownChart', () => {
     expect(screen.getByRole('radio', { name: 'Número de tareas' })).toHaveAttribute('aria-checked', 'false');
   });
 
+  it('el selector de eje usa el mismo estilo segmentado que Semana/Mes: opción elegida en verde y realce al pasar el cursor', () => {
+    render(<BurndownChart burndown={burndown()} />);
+
+    for (const opcion of screen.getAllByRole('radio')) {
+      expect(opcion).toHaveClass('px-4', 'data-[state=on]:bg-primary', 'data-[state=on]:text-on-primary', 'hover:bg-primary', 'hover:text-on-primary');
+      expect(opcion).not.toHaveClass('data-[state=on]:bg-muted');
+    }
+    expect(screen.getByRole('radio', { name: 'Story points' })).toHaveAttribute('data-state', 'on');
+  });
+
   it('cambiar el toggle a "Número de tareas" lo activa y desactiva "Story points"', () => {
     render(<BurndownChart burndown={burndown()} />);
 

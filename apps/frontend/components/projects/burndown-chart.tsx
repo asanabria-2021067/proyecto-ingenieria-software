@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { ChartLine } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { SEGMENTED_ITEM_CLASS, ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import type { SprintBurndownDto } from '@/lib/types/sprints';
 
@@ -131,8 +131,8 @@ export function BurndownChart({ burndown }: BurndownChartProps) {
           onValueChange={(valor) => valor && setEje(valor as Eje)}
           aria-label="Eje del burndown"
         >
-          <ToggleGroupItem value="puntos">Story points</ToggleGroupItem>
-          <ToggleGroupItem value="tareas">Número de tareas</ToggleGroupItem>
+          <ToggleGroupItem value="puntos" className={SEGMENTED_ITEM_CLASS}>Story points</ToggleGroupItem>
+          <ToggleGroupItem value="tareas" className={SEGMENTED_ITEM_CLASS}>Número de tareas</ToggleGroupItem>
         </ToggleGroup>
       </div>
 
