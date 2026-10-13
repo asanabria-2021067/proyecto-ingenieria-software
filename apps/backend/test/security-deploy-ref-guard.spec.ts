@@ -34,6 +34,7 @@ describe('T23: deploy.yml solo corre desde main', () => {
       'build-backend',
       'build-frontend',
       'deploy',
+      'e2e-gate',
       'frontend-variant',
       'promote-latest',
       'test',
