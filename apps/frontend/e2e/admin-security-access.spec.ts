@@ -297,7 +297,7 @@ test.describe('FG02-C08: teclado en el visor', () => {
     await expect(tabla.locator('[data-slot="tag"]').first()).toHaveText('Inicio de sesión fallido');
     await expect(tabla.locator('[data-slot="tag"]').filter({ hasNotText: 'Inicio de sesión fallido' })).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Limpiar' }).focus();
+    await page.getByRole('button', { name: 'Limpiar filtros' }).focus();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('combobox', { name: 'Tipo de evento' })).toHaveText('Todos los tipos');
     await page.context().close();

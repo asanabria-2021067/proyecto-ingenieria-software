@@ -9,6 +9,7 @@ import {
   securityEventsFilterErrors,
   securityEventsQueryFromFilters,
 } from '../lib/admin/security-events';
+import { DASHBOARD_FILTER_TRIGGER_CLASS } from '../components/dashboard/dashboard-search-field';
 import { getSecurityEvents } from '../lib/services/admin-security';
 import { SEIS_TIPOS, pagina, renderPagina } from './helpers/admin-security';
 
@@ -94,6 +95,100 @@ describe('FG02-C04: de los filtros visibles a la consulta', () => {
       expect(securityEventsFilterErrors({ ...SECURITY_EVENTS_NO_FILTERS, ...parcial })).toEqual({});
     },
   );
+});
+
+describe('Filtros con el aspecto del dashboard, sin cambiar lo que hacen', () => {
+  it('el select usa la clase compartida de los filtros del dashboard y los tres campos igualan su alto y radio', async () => {
+    const filtros = await montar();
+    const tipo = filtros.getByRole('combobox', { name: 'Tipo de evento' });
+    // El alto `h-auto` y el radio de la clase compartida los resuelve la fusión de clases (gana el último).
+    const compartidas = DASHBOARD_FILTER_TRIGGER_CLASS.split(' ').filter((c) => c !== 'h-auto' && !c.startsWith('rounded-'));
+    expect(compartidas).toContain('bg-surface-container-lowest');
+    for (const clase of compartidas) expect(tipo, clase).toHaveClass(clase);
+    for (const control of [tipo, filtros.getByLabelText('Desde'), filtros.getByLabelText('Hasta'), filtros.getByLabelText('ID de usuario')]) {
+      expect(control).toHaveClass('h-11.5', 'rounded-control');
+    }
+  });
+
+  it('las fechas siguen siendo campos nativos con rótulo visible: no se sustituyen por otro selector', async () => {
+    const filtros = await montar();
+    for (const [rotulo, id] of [['Tipo de evento', 'filtro-tipo'], ['Desde', 'filtro-desde'], ['Hasta', 'filtro-hasta'], ['ID de usuario', 'filtro-usuario']]) {
+      const etiqueta = filtros.getByText(rotulo, { selector: 'label' });
+      expect(etiqueta).toBeVisible();
+      expect(etiqueta).toHaveAttribute('for', id);
+      expect(document.getElementById(id)).not.toBeNull();
+    }
+    expect(filtros.getByLabelText('Desde').tagName).toBe('INPUT');
+    expect(filtros.getByLabelText('Hasta').tagName).toBe('INPUT');
+  });
+
+  it('conserva la nota de zona horaria y la enlaza a los dos campos de fecha', async () => {
+    const filtros = await montar();
+    const nota = filtros.getByText('Las fechas son días completos en hora de Guatemala e incluyen ambos extremos.');
+    expect(nota).toHaveAttribute('id', 'filtro-fechas-ayuda');
+    expect(filtros.getByLabelText('Desde')).toHaveAttribute('aria-describedby', 'filtro-fechas-ayuda');
+    expect(filtros.getByLabelText('Hasta')).toHaveAttribute('aria-describedby', 'filtro-fechas-ayuda');
+  });
+
+  it('«Limpiar filtros» es un botón que no envía el formulario y sigue montado, deshabilitado, cuando no hay filtros', async () => {
+    const filtros = await montar();
+    const limpiar = filtros.getByRole('button', { name: 'Limpiar filtros' });
+    expect(limpiar).toHaveAttribute('type', 'button');
+    expect(limpiar).toBeDisabled();
+    // Variante `ghost` de `Button`: sin borde propio, con el acento del sistema.
+    expect(limpiar).toHaveAttribute('data-slot', 'button');
+    expect(limpiar).toHaveClass('text-primary');
+    expect(limpiar).not.toHaveClass('border');
+
+    fireEvent.change(filtros.getByLabelText('ID de usuario'), { target: { value: '8' } });
+    await waitFor(() => expect(limpiar).toBeEnabled());
+    // Es el mismo nodo: el botón no se desmonta ni se vuelve a montar, así la rejilla no salta.
+    expect(filtros.getByRole('button', { name: 'Limpiar filtros' })).toBe(limpiar);
+  });
+
+  it('volver a «Todos los tipos» quita el tipo de la consulta', async () => {
+    await montar();
+    elegirTipo('Bloqueo temporal');
+    await waitFor(() => expect(ultimaConsulta()).toMatchObject({ tipo: 'ACCOUNT_LOCKED' }));
+
+    elegirTipo('Todos los tipos');
+    await waitFor(() => expect(ultimaConsulta()).toEqual({ page: 1, limit: 20 }));
+  });
+
+  it('un rango invertido se señala y no consulta; al corregirlo se aplica con ambos extremos inclusivos', async () => {
+    const filtros = await montar();
+    fireEvent.change(filtros.getByLabelText('Desde'), { target: { value: '2026-10-12' } });
+    await waitFor(() => expect(ultimaConsulta()).toMatchObject({ desde: '2026-10-12T00:00:00.000-06:00' }));
+    const antes = llamadas();
+
+    fireEvent.change(filtros.getByLabelText('Hasta'), { target: { value: '2026-10-11' } });
+    expect(await filtros.findByText('La fecha final no puede ser anterior a la inicial.')).toHaveAttribute('role', 'alert');
+    expect(filtros.getByLabelText('Hasta')).toHaveAttribute('aria-invalid', 'true');
+    expect(llamadas()).toBe(antes);
+
+    fireEvent.change(filtros.getByLabelText('Hasta'), { target: { value: '2026-10-12' } });
+    await waitFor(() =>
+      expect(ultimaConsulta()).toEqual({
+        desde: '2026-10-12T00:00:00.000-06:00',
+        hasta: '2026-10-12T23:59:59.999-06:00',
+        page: 1,
+        limit: 20,
+      }),
+    );
+  });
+
+  it('el visor solo lee: toda consulta sale por el servicio de lectura y ningún filtro añade parámetros nuevos', async () => {
+    const filtros = await montar();
+    elegirTipo('Inicio de sesión fallido');
+    fireEvent.change(filtros.getByLabelText('Desde'), { target: { value: '2026-10-01' } });
+    fireEvent.change(filtros.getByLabelText('ID de usuario'), { target: { value: '8' } });
+    await waitFor(() => expect(ultimaConsulta()).toMatchObject({ idUsuario: 8 }));
+
+    const permitidas = new Set(['tipo', 'desde', 'hasta', 'idUsuario', 'page', 'limit']);
+    for (const [consulta] of vi.mocked(getSecurityEvents).mock.calls) {
+      for (const clave of Object.keys(consulta ?? {})) expect(permitidas.has(clave), clave).toBe(true);
+    }
+  });
 });
 
 describe('FG02-C04: filtros en la página', () => {

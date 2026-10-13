@@ -187,7 +187,7 @@ test.describe('FG05-C02: eventos reales en el visor', () => {
   });
 
   test('filtro por actor: el administrador aparece como quien ejecutó los cambios', async () => {
-    await page.getByRole('button', { name: 'Limpiar' }).click();
+    await page.getByRole('button', { name: 'Limpiar filtros' }).click();
     await expect(page.getByLabel('ID de usuario')).toHaveValue('');
     await trasConsulta(`idUsuario=${idAdmin}`, () => page.getByLabel('ID de usuario').fill(String(idAdmin)));
     const cuerpo = await eventos(`idUsuario=${idAdmin}&tipo=USER_STATUS_CHANGED&limit=50`);
@@ -197,7 +197,7 @@ test.describe('FG05-C02: eventos reales en el visor', () => {
   });
 
   test('filtro por fecha: hoy (día de Guatemala) los incluye y mañana no encuentra ninguno', async () => {
-    await page.getByRole('button', { name: 'Limpiar' }).click();
+    await page.getByRole('button', { name: 'Limpiar filtros' }).click();
     const hoy = diaGuatemala();
     await trasConsulta('desde=', () => page.getByLabel('Desde').fill(hoy));
     const deHoy = await trasConsulta('hasta=', () => page.getByLabel('Hasta').fill(hoy));
@@ -217,7 +217,7 @@ test.describe('FG05-C02: eventos reales en el visor', () => {
 
   test('un rango invertido se señala en el campo y no consulta la API', async () => {
     // La prueba anterior dejó los filtros vacíos.
-    await expect(page.getByRole('button', { name: 'Limpiar' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Limpiar filtros' })).toBeDisabled();
     // Esta consulta ya está en caché desde la prueba anterior: puede no salir a la red.
     await page.getByLabel('Desde').fill(diaGuatemala());
     await expect(tabla()).toBeVisible();
@@ -233,7 +233,7 @@ test.describe('FG05-C02: eventos reales en el visor', () => {
     await page.waitForTimeout(500);
     page.off('request', contar);
     expect(consultas).toBe(0);
-    await page.getByRole('button', { name: 'Limpiar' }).click();
+    await page.getByRole('button', { name: 'Limpiar filtros' }).click();
   });
 
   test('el detalle muestra la transición real, sin JSON crudo, y Escape devuelve el foco', async () => {
