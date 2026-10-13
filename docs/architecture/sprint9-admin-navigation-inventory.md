@@ -15,7 +15,7 @@ comprobación en cada endpoint administrativo. Ninguna ruta de este inventario e
 
 | Ruta | Etiqueta en el menú | Origen | Depende de |
 |---|---|---|---|
-| `/dashboard/admin` | Panel Admin | Panel administrativo; incluye «Tendencias de uso» de HU-178 (T-301) | HU-178 para las métricas |
+| `/dashboard/admin` | Panel Admin | Panel administrativo; incluye un resumen de «Tendencias de uso» de HU-178 (T-301), sin gráficas, con el ancla `#metricas` | HU-178 para las métricas |
 | `/dashboard/admin/proyectos?grupo=activos` | Activos | Sprint 7 · VIEW-15 (F012) | — |
 | `/dashboard/projects/admin/reviews` | Solicitudes de publicación | Sprint 7 · revisión de publicación | — |
 | `/dashboard/admin/proyectos?grupo=cierres` | Solicitudes de cierre | Sprint 7 · VIEW-15 (F012) | — |
@@ -91,8 +91,9 @@ usa los mismos nombres que el menú. La pantalla no se rehízo.
 En pantallas menores de `md` la barra lateral no se muestra y la navegación es `adminNavItemsMobile`: una lista
 **curada** de cuatro destinos (Panel Admin, Proyectos, Apelaciones, Gestión de Usuarios) más el menú de la cuenta.
 Aplanar todo el menú daría más de diez iconos y la saturaría. El resto de los destinos (Calendario de Sprints,
-Recuperación de contraseña, Cuentas pendientes, Eventos de seguridad, Etiquetas) no tienen acceso directo en móvil: se alcanzan por su
-URL o desde los enlaces del panel. Ampliar la navegación móvil es una decisión de producto que este inventario deja
+Recuperación de contraseña, Tendencias de uso, Cuentas pendientes, Eventos de seguridad, Etiquetas) no tienen acceso directo en móvil: se alcanzan por su
+URL o desde los enlaces del panel. «Tendencias de uso» tiene el suyo: el resumen del Panel Admin enlaza a la página
+con «Ver tendencias de uso». Ampliar la navegación móvil es una decisión de producto que este inventario deja
 registrada, no resuelta.
 
 ## 8. Página temporal de etiquetas
