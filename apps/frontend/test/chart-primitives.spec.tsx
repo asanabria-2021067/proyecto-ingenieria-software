@@ -40,6 +40,12 @@ describe('primitivas compartidas de gráficas', () => {
     expect(chart).not.toHaveClass('aspect-video');
   });
 
+  it('sin colores en la configuración el contenedor no inyecta ninguna hoja de estilos', () => {
+    const { container } = renderTooltip({});
+
+    expect(container.querySelector('style')).not.toBeInTheDocument();
+  });
+
   it('el tooltip muestra la etiqueta de la serie y un valor 0 como valor, con su estilo', () => {
     renderTooltip({});
 
