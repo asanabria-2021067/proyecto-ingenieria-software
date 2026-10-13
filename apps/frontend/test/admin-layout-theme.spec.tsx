@@ -46,7 +46,7 @@ describe('FG07-C03: superficies administrativas sobre tokens', () => {
     );
     // Línea base del mismo árbol en 7091a310: 46 tamaños y 63 radios; con la vista de cuentas
     // pendientes (HU-179, PR #270) tal como llegó, 47 y 68.
-    expect(total).toEqual({ px: 2, radio: 20, hex: 6 });
+    expect(total).toEqual({ px: 2, radio: 20, hex: 0 });
     // Los radios que quedan son rounded-lg y rounded-md: no existe un token con su valor.
     const restantes = ARBOL.flatMap((archivo) => leer(archivo).match(/(?<![\w-])rounded-(?:md|lg|xl|2xl|3xl)\b/g) ?? []);
     expect(new Set(restantes)).toEqual(new Set(['rounded-lg', 'rounded-md']));
@@ -74,8 +74,8 @@ describe('FG07-C03: superficies administrativas sobre tokens', () => {
     }
   });
 
-  it('ninguna vista escribe colores hexadecimales, salvo el catálogo temporal de etiquetas', () => {
-    for (const archivo of ARBOL.filter((a) => a !== 'app/dashboard/admin/etiquetas/page.tsx')) {
+  it('ninguna vista escribe colores hexadecimales', () => {
+    for (const archivo of ARBOL) {
       expect(leer(archivo), archivo).not.toMatch(/#[0-9a-fA-F]{6}\b/);
     }
   });

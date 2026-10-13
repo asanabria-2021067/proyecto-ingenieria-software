@@ -147,15 +147,6 @@ const DESTINOS: Destino[] = [
       main.getByRole('table', { name: /Eventos de seguridad/ }).or(estado(main, 'Todavía no hay eventos de seguridad registrados.')),
   },
   {
-    grupo: 'Diagnóstico',
-    etiqueta: 'Etiquetas (temporal)',
-    ruta: '/dashboard/admin/etiquetas',
-    titular: /^Etiquetas$/,
-    // Catálogo estático: no consulta la API.
-    api: null,
-    contenido: (main) => main.getByRole('region', { name: 'Sistema: tonos y tamaños' }),
-  },
-  {
     grupo: null,
     etiqueta: 'Panel Admin',
     ruta: '/dashboard/admin',

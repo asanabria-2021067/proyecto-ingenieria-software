@@ -17,14 +17,12 @@ import {
   KeyRound,
   LayoutDashboard,
   ScrollText,
-  Settings2,
   ShieldAlert,
   ShieldCheck,
   UserCheck,
   UserCog,
   Users,
   RotateCcw,
-  Tags,
   TrendingUp,
 } from 'lucide-react';
 import { ADMIN_METRICS_ROUTE } from '@/components/admin/admin-page';
@@ -111,15 +109,6 @@ export const adminNavEntries: NavEntry[] = [
       { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
       // T-310: visor de solo lectura de los eventos de seguridad que ya se registran.
       { href: '/dashboard/admin/seguridad', label: 'Eventos de seguridad', icon: ScrollText },
-    ],
-  },
-  {
-    type: 'group',
-    label: 'Diagnóstico',
-    icon: Settings2,
-    items: [
-      // TEMPORAL: inventario de etiquetas para revisión de diseño; quitar junto con su página.
-      { href: '/dashboard/admin/etiquetas', label: 'Etiquetas (temporal)', icon: Tags },
     ],
   },
 ];

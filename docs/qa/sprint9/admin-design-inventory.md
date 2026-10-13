@@ -83,7 +83,7 @@ Sprint 9, ya con los tokens. Su fila es su primera medición y no suma incumplim
 
 | Qué | Por qué |
 |---|---|
-| Los 6 hex de `/dashboard/admin/etiquetas` | Es el catálogo de diagnóstico: muestra como texto los valores de las 27 familias. No pinta con ellos. |
+| Los 6 hex de `/dashboard/admin/etiquetas` | Era el catálogo de diagnóstico: mostraba como texto los valores de las 27 familias. La vista se retiró del proyecto al cierre de Sprint 9 y con ella desaparecen. |
 | `components/admin/AdminMetricsSection.tsx` | Pertenece a HU-178 (otro responsable). En T-320 se reutilizó tal cual; sus literales se corrigieron después, en el cierre de Sprint 9 (ver la sección 8). |
 | `rounded-lg` y `rounded-md` (0.5rem y 0.375rem) | No tienen un token de igual valor; cambiarlos altera el aspecto. Quedan contados y a la espera de una decisión de diseño. |
 
@@ -104,7 +104,6 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin/cuentas-pendientes` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 |
-| `/dashboard/admin/etiquetas` | sí | 0 | 0 | 0 | 6 |
 | `/dashboard/admin/apelaciones` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/apelaciones/[apelacionId]` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/proyectos` | sí | 0 | 1 | 0 | 0 |
@@ -116,14 +115,16 @@ Medido sobre el mismo código con la misma herramienta.
 Árbol administrativo completo (las 13 vistas de T-320 más sus componentes: 40 archivos, sin `AdminMetricsSection`;
 incluye la vista de cuentas pendientes del PR #270 y `metric-trend-plot.tsx`, que T-293 separó de
 `AdminMetricsSection`). La página propia de «Tendencias de uso» (`app/dashboard/admin/metricas/page.tsx`) es el
-archivo 41: se creó después, sin literales, y no altera los totales:
+archivo 41: se creó después, sin literales, y no altera los totales. Al retirarse el catálogo temporal de
+etiquetas (`app/dashboard/admin/etiquetas/page.tsx`, que tampoco tenía literales de tamaño o radio) el árbol vuelve
+a 40 archivos:
 
 | Medida | Antes | Después |
 |---|---:|---:|
 | Tamaños literales | 47 | 2 |
 | Radios literales | 68 | 20 |
 | Titulares fuera de la escala | 2 | 0 |
-| Archivos sin ningún literal de tamaño o radio | — | 30 de 41 |
+| Archivos sin ningún literal de tamaño o radio | — | 29 de 40 |
 
 Qué se hizo con cada diferencia de la sección 4:
 
@@ -164,7 +165,7 @@ Otras excepciones:
 - `bg-amber-600` / `bg-amber-700` en `components/admin/ConfirmActionDialog.tsx` y `components/admin/request-inbox.tsx`:
   es el botón ámbar de «Revisar». No existe un token de «acción de advertencia» y su tono es una decisión de diseño
   abierta; no se cambió.
-- Los 6 hex del catálogo temporal de etiquetas (sección 5).
+- Los 6 hex del catálogo temporal de etiquetas (sección 5) ya no existen: la vista se retiró del proyecto al cierre de Sprint 9.
 
 ## 9. Comprobación en navegador
 

@@ -285,8 +285,6 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Tendencias de uso',
     'Cuentas pendientes',
     'Eventos de seguridad',
-    // TEMPORAL: inventario de etiquetas; quitar junto con su página.
-    'Etiquetas (temporal)',
   ];
 
   function colapsar() {
@@ -509,7 +507,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
   const grupos = () =>
     adminNavEntries.map((e) => ('type' in e && e.type === 'group' ? { grupo: e.label, items: e.items.map((i) => i.label) } : { enlace: e.label }));
 
-  it('el orden es estable: panel, usuarios, proyectos, gobernanza, métricas, verificación y diagnóstico', () => {
+  it('el orden es estable: panel, usuarios, proyectos, gobernanza, métricas y verificación', () => {
     expect(grupos()).toEqual([
       { enlace: 'Panel Admin' },
       { grupo: 'Usuarios', items: ['Gestión de Usuarios', 'Recuperación de contraseña'] },
@@ -520,7 +518,6 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
       { grupo: 'Gobernanza', items: ['Apelaciones'] },
       { grupo: 'Métricas', items: ['Tendencias de uso'] },
       { grupo: 'Verificación y seguridad', items: ['Cuentas pendientes', 'Eventos de seguridad'] },
-      { grupo: 'Diagnóstico', items: ['Etiquetas (temporal)'] },
     ]);
   });
 
@@ -528,10 +525,11 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
     expect(adminNavEntries.some((e) => 'type' in e && e.type === 'group' && e.label === 'Administración')).toBe(false);
   });
 
-  it('la página temporal de etiquetas sigue enlazada, aparte del trabajo diario', () => {
+  it('el catálogo temporal de etiquetas se retiró del proyecto: ni página, ni destino, ni grupo «Diagnóstico»', () => {
     const destinos = flattenNavEntries(adminNavEntries);
-    expect(destinos.filter((d) => d.href === '/dashboard/admin/etiquetas')).toHaveLength(1);
-    expect(existsSync(join(__dirname, '../app/dashboard/admin/etiquetas/page.tsx'))).toBe(true);
+    expect(destinos.filter((d) => /etiquetas/i.test(`${d.label} ${d.href}`))).toEqual([]);
+    expect(adminNavEntries.some((e) => 'type' in e && e.type === 'group' && e.label === 'Diagnóstico')).toBe(false);
+    expect(existsSync(join(__dirname, '../app/dashboard/admin/etiquetas'))).toBe(false);
   });
 
   it('no enlaza pantallas que no existen: cuentas pendientes (HU-179) y métricas (HU-178) solo porque sus páginas existen', () => {
@@ -562,7 +560,6 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
     ['/dashboard/admin/metricas', 'Métricas', 'Tendencias de uso'],
     ['/dashboard/admin/cuentas-pendientes', 'Verificación y seguridad', 'Cuentas pendientes'],
     ['/dashboard/admin/seguridad', 'Verificación y seguridad', 'Eventos de seguridad'],
-    ['/dashboard/admin/etiquetas', 'Diagnóstico', 'Etiquetas (temporal)'],
   ])('en %s se abre «%s» y «%s» es el único destino activo', (ruta, grupo, destino) => {
     pathnameMock.mockReturnValue(ruta);
     renderShell();
@@ -618,7 +615,6 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
     ['app/dashboard/admin/cuentas-pendientes/page.tsx', '/dashboard/admin/cuentas-pendientes', 'Cuentas pendientes'],
     ['app/dashboard/admin/seguridad/page.tsx', '/dashboard/admin/seguridad', 'Eventos de seguridad'],
     ['app/dashboard/admin/metricas/page.tsx', '/dashboard/admin/metricas', 'Tendencias de uso'],
-    ['app/dashboard/admin/etiquetas/page.tsx', '/dashboard/admin/etiquetas', 'Etiquetas (temporal)'],
     ['app/dashboard/admin/apelaciones/appeals-inbox-client.tsx', '/dashboard/admin/apelaciones', 'Apelaciones'],
     ['app/dashboard/projects/admin/reviews/page.tsx', '/dashboard/projects/admin/reviews', 'Solicitudes de publicación'],
   ])('%s: la sección de la miga es el grupo del menú y la página, su etiqueta', (archivo, href, etiqueta) => {
@@ -636,7 +632,6 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
       'app/dashboard/admin/solicitudes-recuperacion/page.tsx',
       'app/dashboard/admin/cuentas-pendientes/page.tsx',
       'app/dashboard/admin/seguridad/page.tsx',
-      'app/dashboard/admin/etiquetas/page.tsx',
     ]) {
       expect(fuente(archivo), archivo).not.toContain('seccion="Administración"');
     }

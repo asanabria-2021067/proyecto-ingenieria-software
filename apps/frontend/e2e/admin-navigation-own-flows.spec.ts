@@ -53,7 +53,6 @@ const MENU: [string, [string, string, RegExp][]][] = [
       ['Eventos de seguridad', '/dashboard/admin/seguridad', /Eventos de seguridad/],
     ],
   ],
-  ['Diagnóstico', [['Etiquetas (temporal)', '/dashboard/admin/etiquetas', /Etiquetas/]]],
 ];
 
 async function sesion(browser: Browser, correo: string): Promise<Page> {
