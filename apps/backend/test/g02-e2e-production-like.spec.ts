@@ -34,7 +34,9 @@ export function productionLikeE2EFindings(job: WorkflowJob): string[] {
 }
 
 describe('G02-C14: E2E representativo de producción', () => {
-  const e2e = loadWorkflow('ci.yml').jobs.e2e;
+  // FASE-CI01: la suite corre ahora en el job matriz `e2e-shard` (3 shards);
+  // `e2e` pasó a ser el job final, sin matriz, que solo combina reportes.
+  const e2e = loadWorkflow('ci.yml').jobs['e2e-shard'];
 
   it('el job e2e usa migraciones reales, backend compilado y build de producción del frontend', () => {
     expect(productionLikeE2EFindings(e2e)).toEqual([]);
