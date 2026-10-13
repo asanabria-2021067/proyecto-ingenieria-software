@@ -6,17 +6,26 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('../lib/services/admin', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/services/admin')>();
-  return { ...actual, getAdminStats: vi.fn() };
+  return { ...actual, getAdminStats: vi.fn(), getAdminMetricas: vi.fn() };
 });
 vi.mock('../lib/services/admin-sprints', () => ({ getAdminSprintCalendar: vi.fn() }));
 
 import AdminPanelPage from '../app/dashboard/admin/page';
-import { getAdminStats, type AdminStats } from '../lib/services/admin';
+import { getAdminMetricas, getAdminStats, type AdminMetricas, type AdminStats } from '../lib/services/admin';
 import { getAdminSprintCalendar } from '../lib/services/admin-sprints';
 import type { AdminSprintCalendar } from '../lib/types/admin-sprints';
 
 const statsMock = vi.mocked(getAdminStats);
+const metricasMock = vi.mocked(getAdminMetricas);
 const calendarMock = vi.mocked(getAdminSprintCalendar);
+
+const METRICAS: AdminMetricas = {
+  periodo: 'semana',
+  serie: [
+    { inicio: '2026-09-28', usuariosNuevos: 3, usuariosActivos: 9, proyectosCreados: 2, tareasCompletadas: 7, horasConfirmadas: 4.5 },
+    { inicio: '2026-10-05', usuariosNuevos: 2, usuariosActivos: 6, proyectosCreados: 0, tareasCompletadas: 4, horasConfirmadas: 5.25 },
+  ],
+};
 
 const STATS: AdminStats = {
   proyectosActivos: 14,
@@ -74,8 +83,10 @@ function kpi(label: string): HTMLElement {
 
 beforeEach(() => {
   statsMock.mockReset();
+  metricasMock.mockReset();
   calendarMock.mockReset();
   statsMock.mockResolvedValue(STATS);
+  metricasMock.mockResolvedValue(METRICAS);
   calendarMock.mockResolvedValue(CALENDARIO);
 });
 
@@ -228,5 +239,97 @@ describe('Panel de Administración (/dashboard/admin)', () => {
 
     expect(statsMock).toHaveBeenCalledTimes(1);
     expect(calendarMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Panel de Administración — resumen de tendencias', () => {
+  it('muestra tres indicadores de la semana en curso con el total de la ventana, sin ninguna gráfica', async () => {
+    renderPage();
+    const tendencias = await screen.findByRole('region', { name: 'Tendencias de uso' });
+
+    expect(await within(tendencias).findAllByRole('group')).toHaveLength(3);
+    expect(within(kpi('Usuarios nuevos')).getByText('2')).toBeInTheDocument();
+    expect(within(kpi('Usuarios nuevos')).getByText('Esta semana, aún en curso · 5 en las últimas 8 semanas')).toBeInTheDocument();
+    expect(within(kpi('Proyectos creados')).getByText('0')).toBeInTheDocument();
+    expect(within(kpi('Horas confirmadas')).getByText('5.25 h')).toBeInTheDocument();
+    expect(within(kpi('Horas confirmadas')).getByText('Esta semana, aún en curso · 9.75 h en las últimas 8 semanas')).toBeInTheDocument();
+    expect(document.querySelector('.recharts-wrapper, [data-slot="chart"]')).not.toBeInTheDocument();
+  });
+
+  it('no presenta «Usuarios activos» como indicador: su serie no es un histórico real', async () => {
+    renderPage();
+    const tendencias = await screen.findByRole('region', { name: 'Tendencias de uso' });
+    await within(tendencias).findAllByRole('group');
+
+    expect(within(tendencias).queryByRole('group', { name: 'Usuarios activos' })).not.toBeInTheDocument();
+  });
+
+  it('enlaza a la página de Tendencias: es el acceso desde móvil, donde la barra inferior no la tiene', async () => {
+    renderPage();
+    const tendencias = await screen.findByRole('region', { name: 'Tendencias de uso' });
+
+    expect(within(tendencias).getByRole('link', { name: 'Ver tendencias de uso' })).toHaveAttribute(
+      'href',
+      '/dashboard/admin/metricas',
+    );
+  });
+
+  it('pide las métricas una sola vez, por semana: la misma consulta que usa la página', async () => {
+    renderPage();
+    await screen.findByRole('group', { name: 'Usuarios nuevos' });
+
+    expect(metricasMock).toHaveBeenCalledTimes(1);
+    expect(metricasMock).toHaveBeenCalledWith('semana');
+  });
+
+  it('el bloque conserva el ancla `metricas` de los enlaces antiguos y el panel se desplaza a ella al llegar con el fragmento', async () => {
+    const desplazar = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = desplazar;
+    window.location.hash = '#metricas';
+    try {
+      renderPage();
+      const tendencias = await screen.findByRole('region', { name: 'Tendencias de uso' });
+
+      const ancla = document.getElementById('metricas');
+      expect(ancla).toContainElement(tendencias);
+      expect(desplazar).toHaveBeenCalledTimes(1);
+      expect(desplazar.mock.instances[0]).toBe(ancla);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+      window.location.hash = '';
+    }
+  });
+
+  it('sin el fragmento en la URL el panel no se desplaza', async () => {
+    const desplazar = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = desplazar;
+    try {
+      renderPage();
+      await screen.findByRole('region', { name: 'Tendencias de uso' });
+
+      expect(desplazar).not.toHaveBeenCalled();
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it('si fallan solo las métricas, avisa en su bloque, mantiene el enlace y el resto del panel sigue', async () => {
+    metricasMock.mockRejectedValue(new Error('500'));
+    renderPage();
+    const tendencias = await screen.findByRole('region', { name: 'Tendencias de uso' });
+
+    expect(await within(tendencias).findByRole('alert')).toHaveTextContent('No se pudo cargar el resumen de tendencias.');
+    expect(within(tendencias).getByRole('link', { name: 'Ver tendencias de uso' })).toBeInTheDocument();
+    expect(within(kpi('Proyectos Activos')).getByText('14')).toBeInTheDocument();
+  });
+
+  it('mientras llegan las métricas reserva el sitio de las tres tarjetas', async () => {
+    metricasMock.mockReturnValue(new Promise(() => {}));
+    renderPage();
+    const tendencias = await screen.findByRole('region', { name: 'Tendencias de uso' });
+
+    expect(within(tendencias).getByRole('status', { name: 'Cargando las tendencias de uso' })).toBeInTheDocument();
   });
 });

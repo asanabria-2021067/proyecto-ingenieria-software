@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useId } from 'react';
-import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import {
   FolderKanban,
+  FolderPlus,
   Users,
+  UserPlus,
   AlertCircle,
   Calendar,
+  Clock,
   ArrowRight,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -19,34 +21,23 @@ import { AdminAttentionQueue } from '@/components/admin/dashboard/attention-queu
 import { adminProjectHref } from '@/lib/admin/sprint-calendar';
 import { AdminSprintPlanningWidget } from '@/components/admin/dashboard/sprint-planning-widget';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ADMIN_METRICS_ANCHOR, ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 import {
+  ADMIN_METRICS_ANCHOR,
+  ADMIN_METRICS_ROUTE,
+  ADMIN_PAGE,
+  ADMIN_PAGE_LEAD,
+  ADMIN_PAGE_TITLE,
+} from '@/components/admin/admin-page';
+import { formatearHoras } from '@/lib/hours/format';
+import {
+  getAdminMetricas,
   getAdminStats,
+  type AdminMetricas,
+  type AdminMetricasPunto,
   type AdminStats,
   type AdminActividadRecienteItem,
   type AdminEstudianteEnRiesgo,
 } from '@/lib/services/admin';
-
-// T-293: «Tendencias de uso» trae recharts (~100 KB gzip) y queda debajo de la cola de atención:
-// se carga aparte. El hueco conserva título y alto para que nada se mueva al llegar el gráfico.
-const AdminMetricsSection = dynamic(
-  () => import('@/components/admin/AdminMetricsSection').then((m) => m.AdminMetricsSection),
-  {
-    ssr: false,
-    loading: () => (
-      <section className="mb-10" aria-busy="true">
-        <div className="mb-4 flex min-h-8 items-center">
-          <h2 className="font-headline text-lg font-black tracking-tight text-on-surface">Tendencias de uso</h2>
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 5 }, (_, i) => (
-            <Skeleton key={i} className="h-72 rounded-control" />
-          ))}
-        </div>
-      </section>
-    ),
-  },
-);
 
 /** Mismo contenedor que el resto de bandejas administrativas (1400 px centrado). */
 const PAGE_CLASS = ADMIN_PAGE;
@@ -94,7 +85,8 @@ function StatCard({
   iconColor = 'text-primary',
 }: {
   label: string;
-  value: number;
+  /** Un conteo, o un valor ya formateado con su unidad (p. ej. «4.5 h»). */
+  value: number | string;
   subtexto: string;
   icon: React.ElementType;
   iconBg?: string;
@@ -350,12 +342,81 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
   );
 }
 
+// ─── Resumen de tendencias ────────────────────────────────────────────────────
+
+/** Las tres métricas del resumen. El histórico completo, con sus gráficas, vive en la página de Tendencias. */
+const RESUMEN_TENDENCIAS: Array<{
+  serie: Exclude<keyof AdminMetricasPunto, 'inicio'>;
+  label: string;
+  icon: React.ElementType;
+  esHoras?: boolean;
+}> = [
+  { serie: 'usuariosNuevos', label: 'Usuarios nuevos', icon: UserPlus },
+  { serie: 'proyectosCreados', label: 'Proyectos creados', icon: FolderPlus },
+  { serie: 'horasConfirmadas', label: 'Horas confirmadas', icon: Clock, esHoras: true },
+];
+
+/**
+ * Resumen de «Tendencias de uso» (HU-178): el valor de la semana en curso de
+ * tres métricas, sin gráficas —y por tanto sin recharts—. Usa la misma
+ * consulta que la página de Tendencias (`['adminMetricas', 'semana']`), así
+ * que comparten caché. Consulta por su cuenta: si falla, el resto del panel sigue.
+ */
+function ResumenTendencias() {
+  const { data, isLoading, isError } = useQuery<AdminMetricas>({
+    queryKey: ['adminMetricas', 'semana'],
+    queryFn: () => getAdminMetricas('semana'),
+  });
+  const valor = (n: number, esHoras?: boolean) => (esHoras ? formatearHoras(String(Math.round(n * 100) / 100)) : n);
+
+  return (
+    <>
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-grid sm:grid-cols-3" role="status" aria-label="Cargando las tendencias de uso">
+          {RESUMEN_TENDENCIAS.map((m) => (
+            <Skeleton key={m.serie} className="h-36 rounded-card" />
+          ))}
+        </div>
+      ) : isError || !data ? (
+        <p role="alert" className="card-base type-body text-text-secondary">
+          No se pudo cargar el resumen de tendencias.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-grid sm:grid-cols-3">
+          {RESUMEN_TENDENCIAS.map((m) => {
+            const actual = data.serie[data.serie.length - 1]?.[m.serie] ?? 0;
+            const total = data.serie.reduce((suma, punto) => suma + punto[m.serie], 0);
+            return (
+              <StatCard
+                key={m.serie}
+                label={m.label}
+                value={valor(actual, m.esHoras)}
+                subtexto={`Esta semana, aún en curso · ${valor(total, m.esHoras)} en las últimas 8 semanas`}
+                icon={m.icon}
+                iconBg="bg-surface-container-high"
+                iconColor="text-tertiary"
+              />
+            );
+          })}
+        </div>
+      )}
+      <Link
+        href={ADMIN_METRICS_ROUTE}
+        className="type-meta mt-stack inline-flex items-center gap-micro rounded-control py-tight font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+      >
+        Ver tendencias de uso
+        <ArrowRight className="size-3.5" aria-hidden="true" />
+      </Link>
+    </>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 function AdminPanelContent({ stats }: { stats: AdminStats }) {
-  // T-321: al llegar con `#metricas` desde otra vista, el panel aún muestra su esqueleto y el ancla
-  // no existe cuando el navegador intenta desplazarse. Se repite el desplazamiento al montar el
-  // contenido. Estando ya en el panel, el enlace funciona solo (el ancla ya existe).
+  // Compatibilidad con `/dashboard/admin#metricas`, el destino que tuvo «Tendencias de uso» en el
+  // menú (T-321): al llegar desde otra vista el panel aún muestra su esqueleto y el ancla no existe
+  // cuando el navegador intenta desplazarse. Se repite el desplazamiento al montar el contenido.
   useEffect(() => {
     if (window.location.hash === `#${ADMIN_METRICS_ANCHOR}`) {
       document.getElementById(ADMIN_METRICS_ANCHOR)?.scrollIntoView?.();
@@ -454,11 +515,13 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
           </div>
         </DashboardSection>
 
-        {/* 5. Tendencias de uso (HU-178): históricas, después de la operación.
-            T-321: el ancla es el destino de «Métricas» en el menú lateral. `scroll-mt` deja
-            aire arriba al llegar por el enlace. */}
+        {/* 5. Tendencias de uso (HU-178): solo un resumen; las gráficas están en su página.
+            El `id` conserva el destino de los enlaces antiguos a `#metricas`, y `scroll-mt`
+            deja aire arriba al llegar por ellos. */}
         <div id={ADMIN_METRICS_ANCHOR} className={`${COL_PRINCIPAL} scroll-mt-6`}>
-          <AdminMetricsSection />
+          <DashboardSection titulo="Tendencias de uso">
+            <ResumenTendencias />
+          </DashboardSection>
         </div>
       </div>
     </div>
