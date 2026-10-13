@@ -11,13 +11,10 @@ import { loadWorkflow } from './helpers/workflow-yaml';
 
 const ci = loadWorkflow('ci.yml');
 const deploy = loadWorkflow('deploy.yml');
-// FASE-CI01: la condición de disparo vive en el job matriz `e2e-shard` (3
-// shards); `e2e` es ahora el job final sin matriz que solo combina reportes
-// y conserva el nombre estable para los checks requeridos.
 const e2eCondition = () => {
-  const condition = ci.jobs['e2e-shard'].if;
+  const condition = ci.jobs.e2e.if;
   if (!condition) {
-    throw new Error('El job e2e-shard no tiene condición');
+    throw new Error('El job e2e no tiene condición');
   }
   return condition;
 };
@@ -51,14 +48,8 @@ describe('G02-C13: E2E del reusable por input explícito', () => {
     expect(callInputs.e2e).toMatchObject({ type: 'string', required: true });
   });
 
-  it('deploy.yml deja que e2e-gate decida, en vez de pedir el E2E siempre fijo', () => {
-    // FASE-CI01: antes era { e2e: 'run' } literal. Ahora un job previo
-    // (e2e-gate, ver g02-deploy-e2e-skip-gate.spec.ts) decide 'run' o 'skip'
-    // fail-closed, y 'test' solo reenvía esa salida.
-    expect((deploy.jobs.test as { with?: Record<string, string> }).with).toEqual({
-      e2e: "${{ needs.e2e-gate.outputs.e2e }}",
-    });
-    expect((deploy.jobs.test as { needs?: string | string[] }).needs).toBe('e2e-gate');
+  it('deploy.yml pide el E2E en todo deploy', () => {
+    expect((deploy.jobs.test as { with?: Record<string, string> }).with).toEqual({ e2e: 'run' });
   });
 
   it('el evaluador rechaza construcciones que no entiende en lugar de inventar un resultado', () => {

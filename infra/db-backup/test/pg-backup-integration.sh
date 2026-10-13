@@ -7,7 +7,7 @@
 # único), crea una base de prueba, la respalda con el script real y borra el
 # contenedor al terminar. No se conecta a ninguna otra base: el único
 # contenedor que toca es el que crea, y lo comprueba por su etiqueta antes de
-# cada uso. No restaura ningún respaldo (ver pg-restore-integration.sh, T-314).
+# cada uso. No restaura ningún respaldo (eso es T-314).
 #
 # Requiere Docker. Imagen: PG_IMAGE (por defecto postgres:17-alpine, la misma
 # versión que la base del proyecto).
