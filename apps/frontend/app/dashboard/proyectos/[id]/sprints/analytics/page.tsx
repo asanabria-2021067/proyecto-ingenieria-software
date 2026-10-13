@@ -91,10 +91,31 @@ function SeccionVelocidad({ sprints }: { sprints: SprintComparativeAnalyticsItem
 /** Vista previa del burndown del Sprint mas relevante, directo en la
  * comparativa — sin tener que exportar ni navegar a otra pantalla primero. */
 function SeccionBurndownPreview({ idProyecto, sprint }: { idProyecto: number; sprint: SprintComparativeAnalyticsItemDto }) {
-  const { burndown, isLoading, isError } = useSprintBurndown(idProyecto, sprint.idSprint);
+  const { burndown, isLoading, isError, error, refetch } = useSprintBurndown(idProyecto, sprint.idSprint);
 
   if (isLoading) return <Skeleton className="mb-6 h-[340px] w-full rounded-xl" />;
-  if (isError || !burndown) return null;
+  // Un fallo se dice y se puede reintentar; el resto de la comparativa sigue disponible.
+  if (isError) {
+    return (
+      <Empty tone="danger" role="alert" className="mb-6">
+        <EmptyMedia variant="icon">
+          <AlertCircle aria-hidden="true" className="h-7 w-7" />
+        </EmptyMedia>
+        <EmptyHeader>
+          <EmptyTitle>
+            {getApiErrorMessage(error, 'general', `No fue posible cargar el burndown del Sprint ${sprint.numero}.`)}
+          </EmptyTitle>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button type="button" onClick={() => refetch()}>
+            Reintentar
+          </Button>
+        </EmptyContent>
+      </Empty>
+    );
+  }
+  // Sin error y sin datos no hay vista previa que mostrar (la consulta está deshabilitada o aún no aplica).
+  if (!burndown) return null;
 
   return (
     <div className="mb-6">
