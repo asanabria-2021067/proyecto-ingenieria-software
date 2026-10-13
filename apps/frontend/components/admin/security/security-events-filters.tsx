@@ -1,6 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
+import { DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +17,9 @@ import { SECURITY_EVENT_TYPES, isSecurityEventType, type SecurityEventType } fro
 
 const TODOS = '__todos__';
 const CAMPO = 'flex min-w-0 flex-col gap-tight';
+// Mismo alto que el disparador de los selects de las barras de filtros del dashboard, con el
+// radio de control de las vistas administrativas (el mismo que usa «Gestión de Usuarios»).
+const CONTROL = 'h-11.5 rounded-control';
 const ERROR = 'type-meta text-error';
 
 /**
@@ -47,7 +51,7 @@ export function SecurityEventsFilters({
       <div className={CAMPO}>
         <Label htmlFor="filtro-tipo">Tipo de evento</Label>
         <Select value={value.tipo || TODOS} onValueChange={(tipo) => cambiar({ tipo: isSecurityEventType(tipo) ? tipo : '' })}>
-          <SelectTrigger id="filtro-tipo" className="w-full">
+          <SelectTrigger id="filtro-tipo" className={`w-full ${DASHBOARD_FILTER_TRIGGER_CLASS} rounded-control`}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -66,6 +70,7 @@ export function SecurityEventsFilters({
         <Input
           id="filtro-desde"
           type="date"
+          className={CONTROL}
           value={value.desde}
           max={value.hasta || undefined}
           onChange={(event) => cambiar({ desde: event.target.value })}
@@ -84,6 +89,7 @@ export function SecurityEventsFilters({
         <Input
           id="filtro-hasta"
           type="date"
+          className={CONTROL}
           value={value.hasta}
           min={value.desde || undefined}
           onChange={(event) => cambiar({ hasta: event.target.value })}
@@ -102,6 +108,7 @@ export function SecurityEventsFilters({
         <Input
           id="filtro-usuario"
           type="text"
+          className={CONTROL}
           inputMode="numeric"
           autoComplete="off"
           placeholder="Actor o cuenta afectada"
@@ -117,16 +124,18 @@ export function SecurityEventsFilters({
         )}
       </div>
 
-      <div className="flex sm:col-span-2 xl:col-span-1 xl:pt-[1.375rem]">
+      {/* Siempre montado (deshabilitado sin filtros) para que la rejilla no salte; en `xl` se centra con la fila de controles. */}
+      <div className="flex items-center sm:col-span-2 xl:col-span-1 xl:mt-[1.375rem] xl:h-11.5">
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
+          size="sm"
           disabled={!hasSecurityEventsFilters(value)}
           onClick={() => onChange(SECURITY_EVENTS_NO_FILTERS)}
-          className="w-full rounded-control xl:w-auto"
+          className="w-full font-medium text-primary xl:w-auto"
         >
           <X aria-hidden="true" />
-          Limpiar
+          Limpiar filtros
         </Button>
       </div>
 

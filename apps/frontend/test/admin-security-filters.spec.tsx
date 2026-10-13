@@ -103,7 +103,7 @@ describe('FG02-C04: filtros en la página', () => {
     expect(filtros.getByLabelText('Hasta')).toHaveAttribute('type', 'date');
     expect(filtros.getByLabelText('ID de usuario')).toHaveAttribute('inputmode', 'numeric');
     expect(filtros.getByRole('combobox', { name: 'Tipo de evento' })).toHaveTextContent('Todos los tipos');
-    expect(filtros.getByRole('button', { name: 'Limpiar' })).toBeDisabled();
+    expect(filtros.getByRole('button', { name: 'Limpiar filtros' })).toBeDisabled();
 
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Tipo de evento' }), { key: 'Enter' });
     expect(screen.getAllByRole('option').map((opcion) => opcion.textContent)).toEqual([
@@ -158,19 +158,19 @@ describe('FG02-C04: filtros en la página', () => {
     await waitFor(() => expect(screen.getByText('Página 1 de 3')).toBeInTheDocument());
   });
 
-  it('«Limpiar» quita todos los filtros, vuelve a la página 1 y se desactiva', async () => {
+  it('«Limpiar filtros» quita todos los filtros, vuelve a la página 1 y se desactiva', async () => {
     const filtros = await montar();
     elegirTipo('Inicio de sesión');
     fireEvent.change(filtros.getByLabelText('Desde'), { target: { value: '2026-10-01' } });
     fireEvent.change(filtros.getByLabelText('ID de usuario'), { target: { value: '8' } });
     await waitFor(() => expect(ultimaConsulta()).toMatchObject({ tipo: 'LOGIN_SUCCEEDED', idUsuario: 8 }));
 
-    fireEvent.click(filtros.getByRole('button', { name: 'Limpiar' }));
+    fireEvent.click(filtros.getByRole('button', { name: 'Limpiar filtros' }));
     await waitFor(() => expect(ultimaConsulta()).toEqual({ page: 1, limit: 20 }));
     expect(filtros.getByLabelText('Desde')).toHaveValue('');
     expect(filtros.getByLabelText('ID de usuario')).toHaveValue('');
     expect(filtros.getByRole('combobox', { name: 'Tipo de evento' })).toHaveTextContent('Todos los tipos');
-    expect(filtros.getByRole('button', { name: 'Limpiar' })).toBeDisabled();
+    expect(filtros.getByRole('button', { name: 'Limpiar filtros' })).toBeDisabled();
   });
 
   it('un ID inválido se señala en su campo y NO lanza una consulta nueva', async () => {
