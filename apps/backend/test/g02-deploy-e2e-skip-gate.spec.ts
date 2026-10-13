@@ -78,9 +78,7 @@ describe('G02-C13: deploy.yml pide la decision antes de correr las pruebas', () 
     expect(gate.permissions).toBeDefined();
     const perms = gate.permissions as Record<string, string>;
     expect(Object.values(perms).every((scope) => scope === 'read')).toBe(true);
-    expect((deploy.jobs.test as { needs?: string | string[] }).needs).toEqual(
-      expect.arrayContaining(['e2e-gate']),
-    );
+    expect((deploy.jobs.test as { needs?: string | string[] }).needs).toBe('e2e-gate');
   });
 
   it('"test" ya no pide el E2E fijo: lo decide el job de arriba', () => {
