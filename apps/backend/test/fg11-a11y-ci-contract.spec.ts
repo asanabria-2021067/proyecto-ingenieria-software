@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { REPO_ROOT, loadWorkflow, parseWorkflow, readRepoFile, type WorkflowJob, type WorkflowStep } from './helpers/workflow-yaml';
@@ -14,6 +14,12 @@ import { REPO_ROOT, loadWorkflow, parseWorkflow, readRepoFile, type WorkflowJob,
 const PASO_A11Y = 'Accesibilidad con axe (cinco pantallas, claro y oscuro)';
 const PASO_SUITE = 'Ejecutar suite de humo E2E';
 
+// FASE-CI01: la suite ahora corre en 3 shards (matriz `shardIndex`); axe solo
+// debe correr una vez, así que el paso puede estar condicionado EXACTAMENTE a
+// "es el shard 1" — ninguna otra condición (ni siquiera parecida) es
+// aceptable, para que esto no se convierta en una puerta trasera.
+const CONDICION_AXE_PERMITIDA = 'matrix.shardIndex == 1';
+
 type PasoCompleto = WorkflowStep & { if?: string; 'continue-on-error'?: boolean | string; 'working-directory'?: string };
 
 /** Razones por las que el job NO impone la comprobación de accesibilidad. Vacío = la impone. */
@@ -26,7 +32,7 @@ export function a11yGateFindings(job: WorkflowJob): string[] {
   if (!/^npm run test:e2e:a11y$/.test((a11y.run ?? '').trim())) hallazgos.push('el-paso-no-ejecuta-la-suite-a11y');
   if (/\|\|\s*true|;\s*true\s*$|set \+e/.test(a11y.run ?? '')) hallazgos.push('fallo-ignorado-en-el-comando');
   if (a11y['continue-on-error']) hallazgos.push('continue-on-error');
-  if (a11y.if) hallazgos.push('paso-condicional');
+  if (a11y.if && a11y.if.trim() !== CONDICION_AXE_PERMITIDA) hallazgos.push('paso-condicional');
   if (a11y['working-directory'] !== 'apps/frontend') hallazgos.push('directorio-incorrecto');
   const indice = nombres.indexOf(PASO_A11Y);
   for (const previo of ['Build de produccion del frontend para E2E', 'Esperar a que el backend responda', 'Preparar base de datos (migraciones + seed)']) {
@@ -42,11 +48,16 @@ export function a11yGateFindings(job: WorkflowJob): string[] {
 
 describe('FG11-C03: el job e2e de CI impone la accesibilidad', () => {
   const ci = loadWorkflow('ci.yml');
-  const e2e = ci.jobs.e2e;
+  // FASE-CI01: la suite y el paso de axe viven en el job matriz `e2e-shard`
+  // (3 shards); `e2e` pasó a ser el job final sin matriz que combina los
+  // reportes y conserva el nombre estable para los checks requeridos.
+  const e2e = ci.jobs['e2e-shard'];
   const pasos = (e2e.steps ?? []) as PasoCompleto[];
 
   it('el workflow sigue siendo YAML válido y conserva sus jobs', () => {
-    expect(Object.keys(ci.jobs)).toEqual(expect.arrayContaining(['backend', 'frontend', 'e2e', 'dependency-audit']));
+    expect(Object.keys(ci.jobs)).toEqual(
+      expect.arrayContaining(['backend', 'frontend', 'e2e-shard', 'e2e', 'dependency-audit']),
+    );
   });
 
   it('hay un paso propio de accesibilidad, bloqueante y en el orden correcto', () => {
@@ -59,10 +70,55 @@ describe('FG11-C03: el job e2e de CI impone la accesibilidad', () => {
     );
   });
 
-  it('la suite completa sigue ejecutándose igual: no se sustituyó ni se filtró', () => {
+  it('axe corre una sola vez (shard 1), con la única condición permitida', () => {
+    const a11y = pasos.find((paso) => paso.name === PASO_A11Y);
+    expect(a11y?.if).toBe(CONDICION_AXE_PERMITIDA);
+  });
+
+  it('la suite completa sigue ejecutándose igual: ahora repartida en 3 shards, nada se pierde', () => {
     const suite = pasos.find((paso) => paso.name === PASO_SUITE);
-    expect(suite?.run?.trim()).toBe('npm run test:e2e');
+    expect(suite?.run?.trim()).toBe('npm run test:e2e:sin-a11y -- --reporter=blob --shard=${{ matrix.shardIndex }}/3');
     expect(suite?.['continue-on-error']).toBeUndefined();
+    expect(e2e.strategy).toMatchObject({ matrix: { shardIndex: [1, 2, 3] } });
+
+    // La garantía original era "la suite completa corre, sin filtrar nada
+    // por fuera del gate de axe". Ahora se reparte en 3 shards: hay que
+    // probar que el filtro de `test:e2e:sin-a11y` excluye EXACTAMENTE los
+    // dos specs que `test:e2e:a11y` ya cubrió arriba, y ningún otro — por
+    // ejemplo que no se trague de pasada un spec con un nombre parecido
+    // (como calendario-accesibilidad.spec.ts).
+    const pkg = JSON.parse(readRepoFile('apps/frontend/package.json')) as { scripts: Record<string, string> };
+    const sinA11y = pkg.scripts['test:e2e:sin-a11y'];
+    expect(sinA11y).toMatch(/^playwright test --grep-invert '/);
+    const patron = sinA11y.match(/--grep-invert '(.+)'$/)?.[1];
+    if (!patron) throw new Error('no se pudo extraer el patrón de --grep-invert');
+    const filtro = new RegExp(patron);
+
+    const especificosDeA11y = pkg.scripts['test:e2e:a11y']
+      .split(' ')
+      .slice(2)
+      .map((ruta) => ruta.split('/').pop() as string);
+    for (const nombre of especificosDeA11y) {
+      expect(filtro.test(nombre), `${nombre} debe quedar excluido de test:e2e:sin-a11y`).toBe(true);
+    }
+
+    const e2eDir = join(REPO_ROOT, 'apps/frontend/e2e');
+    const otrosSpecs = readdirSync(e2eDir)
+      .filter((archivo) => archivo.endsWith('.spec.ts'))
+      .filter((archivo) => !especificosDeA11y.includes(archivo));
+    for (const nombre of otrosSpecs) {
+      expect(filtro.test(nombre), `${nombre} NO debe quedar excluido de test:e2e:sin-a11y`).toBe(false);
+    }
+  });
+
+  it('el job final mantiene el nombre estable y falla si algún shard falló', () => {
+    const final = ci.jobs.e2e;
+    expect(final.name).toBe('E2E - suite de humo (Playwright)');
+    expect(final.needs).toBe('e2e-shard');
+    expect((final.if ?? '').trim()).toBe("always() && needs.e2e-shard.result != 'skipped'");
+    const fallo = (final.steps ?? []).find((paso) => (paso as PasoCompleto).run?.includes('exit 1'));
+    expect(fallo, 'debe haber un paso que falle explícitamente si el shard no terminó en success').toBeDefined();
+    expect((fallo as PasoCompleto)?.if).toBe("needs.e2e-shard.result != 'success'");
   });
 
   it('el paso corre contra el build de producción y los servicios efímeros del job', () => {

@@ -33,3 +33,21 @@ describe('T-313: scripts de respaldo de PostgreSQL', () => {
     expect(cron).not.toMatch(/PGPASS|postgres(ql)?:\/\//i);
   });
 });
+
+/**
+ * T-314: el contrato de pg-restore.sh (infra/db-backup/test/pg-restore-contract.sh)
+ * usa psql, pg_dump y pg_restore simulados. Corre con la suite unitaria y en CI:
+ * no necesita PostgreSQL ni Docker.
+ */
+describe('T-314: script de restauración de PostgreSQL', () => {
+  it('el contrato en bash pasa completo', () => {
+    let salida: string;
+    try {
+      salida = execFileSync('bash', [join(DIR, 'test/pg-restore-contract.sh')], { encoding: 'utf8', timeout: 60_000 });
+    } catch (error) {
+      throw new Error(String((error as { stdout?: string }).stdout ?? error));
+    }
+    expect(salida).not.toMatch(/^FAIL/m);
+    expect(salida).toMatch(/pg-restore-contract: (\d+)\/\1\n$/);
+  }, 90_000);
+});

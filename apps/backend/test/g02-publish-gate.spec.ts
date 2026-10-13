@@ -64,10 +64,15 @@ describe('G02-C04: publicar solo tras tests verdes', () => {
     expect(publishGateFindings(deploy)).toEqual([]);
     expect(needsOf(deploy, 'build-frontend')).toContain('test');
     expect(needsOf(deploy, 'build-backend')).toEqual(['test']);
+    // FASE-CI01: 'test' ahora tambien depende de 'e2e-gate' (decide si el
+    // deploy necesita el E2E completo o puede omitirlo porque un PR hacia
+    // main ya lo probo con exito sobre el mismo arbol); eso entra en el
+    // cierre transitivo de 'promote-latest' igual que el resto.
     expect([...upstreamJobs(deploy, 'promote-latest')].sort()).toEqual([
       'build-backend',
       'build-frontend',
       'deploy',
+      'e2e-gate',
       'frontend-variant',
       'test',
     ]);

@@ -4,7 +4,8 @@
 (`-Fc`) y lo deja en un directorio del **host**, fuera del contenedor de la
 base y fuera del repositorio.
 
-Restaurar un respaldo completo no es parte de esta tarea (T-314).
+Restaurar un respaldo se hace con `pg-restore.sh`; ver
+[docs/infra/restauracion.md](../../docs/infra/restauracion.md).
 
 ## Qué garantiza
 
@@ -179,6 +180,16 @@ rotación conserva los respaldos cuando el volcado falla.
 
 Última ejecución registrada: 2026-10-11, `postgres:17-alpine`, 24 de 24.
 
+### Restauración
+
+```bash
+bash infra/db-backup/test/pg-restore-contract.sh      # sin PostgreSQL ni Docker, corre en CI
+bash infra/db-backup/test/pg-restore-integration.sh   # PostgreSQL real y desechable, a mano
+```
+
+Ver [docs/infra/restauracion.md](../../docs/infra/restauracion.md) para el
+procedimiento completo y los resultados medidos.
+
 ## Estado
 
 | Parte | Estado |
@@ -187,7 +198,7 @@ rotación conserva los respaldos cuando el volcado falla.
 | Plantilla de cron y guía de instalación | Listas |
 | Cron instalado en el servidor de producción | **No instalado ni verificado** |
 | Primer respaldo real de producción | **No realizado** |
-| Restauración de un respaldo | Fuera de alcance (T-314) |
+| Script de restauración (`pg-restore.sh`) | Probado (contrato y PostgreSQL desechable); ver [docs/infra/restauracion.md](../../docs/infra/restauracion.md) |
 
 La tarea no está completa en operación hasta que alguien con acceso al servidor
 instale la programación y confirme, al día siguiente, que existe el respaldo.

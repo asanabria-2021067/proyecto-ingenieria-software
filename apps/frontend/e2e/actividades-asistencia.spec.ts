@@ -7,11 +7,13 @@ import { login } from './support/auth';
  * aplicación real y aislada (scripts/e2e/isolated-stack.sh): backend, base
  * sembrada y sesiones reales.
  *
- * El frontend todavía NO tiene pantalla para crear actividades ni marcar
- * asistencia: esas dos acciones se ejercen aquí por la API real con la sesión
- * del navegador, y lo que sí existe en pantalla se comprueba en pantalla: las
- * horas acreditadas en «Mis Horas» y los eventos en la bitácora del proyecto.
- * Las reglas de dominio y la idempotencia a nivel de fila las cubre
+ * T-298: el flujo principal (el líder crea la actividad, marca asistencia y
+ * el integrante ve sus horas en «Mis Horas») ejerce la pantalla real
+ * (/dashboard/proyectos/:id/asistencia) — ya no hace falta pasar por la API
+ * a mano. Las reglas de autorización (quién puede y en qué estado del
+ * proyecto) sí se verifican por la API real con la sesión del navegador: son
+ * negativas por diseño y no necesitan la UI para probarse. Las reglas de
+ * dominio y la idempotencia a nivel de fila las cubre
  * attendance-http.integration.spec.ts.
  *
  * No existe una ruta para eliminar actividades: las que crea esta suite
@@ -96,7 +98,7 @@ async function acreditadasEnPantalla(page: Page): Promise<number> {
 }
 
 test.describe('GPI01-C15: actividad y asistencia con efectos reales', () => {
-  test('el líder crea una actividad y confirma asistencia: las horas se acreditan una sola vez, se ven en Mis Horas y en la bitácora, y se retiran al quitarla', async ({ browser }, testInfo) => {
+  test('el líder crea una actividad y confirma asistencia desde la pantalla: las horas se acreditan, se ven en Mis Horas y en la bitácora, y se retiran al quitarla', async ({ browser }, testInfo) => {
     test.setTimeout(150_000);
     const titulo = `C15 taller ${Date.now()}-${testInfo.workerIndex}${testInfo.retry}`;
     const lider = await sesion(browser, CORREO_LIDER);
@@ -104,35 +106,37 @@ test.describe('GPI01-C15: actividad y asistencia con efectos reales', () => {
     let rutaAsistencia = '';
     try {
       const proyecto = await idProyecto(lider.page, PROYECTO);
-      const idIntegrante = await miId(integrante.page);
+      const yo = await json<{ idUsuario: number; nombre: string; apellido: string }>(integrante.page, '/api/usuarios/me');
       const horasIniciales = await acreditadas(integrante.page);
       expect(await acreditadasEnPantalla(integrante.page), 'la página parte del mismo total que la API').toBe(horasIniciales);
 
-      // ── Crear ──────────────────────────────────────────────────────────
-      const creada = await pedir(lider.page, 'POST', `/api/proyectos/${proyecto}/actividades`, cuerpo(titulo));
-      expect(creada.status(), 'crear la actividad').toBe(201);
-      const { idActividad } = (await creada.json()) as Actividad;
-      rutaAsistencia = `/api/proyectos/${proyecto}/actividades/${idActividad}/asistencia/${idIntegrante}`;
+      // ── Crear desde la pantalla ──────────────────────────────────────────
+      await lider.page.goto(`/dashboard/proyectos/${proyecto}/asistencia`);
+      await lider.page.getByRole('button', { name: 'Nueva actividad' }).click();
+      const dialogo = lider.page.getByRole('dialog', { name: 'Nueva actividad' });
+      await dialogo.getByLabel('Título').fill(titulo);
+      await dialogo.getByLabel('Fecha').fill(hoy());
+      await dialogo.getByLabel('Horas que vale').fill(String(HORAS));
+      await dialogo.getByRole('button', { name: 'Crear actividad' }).click();
+      await expect(dialogo).toBeHidden({ timeout: 15_000 });
 
-      // La integrante la ve en la lista y aparece como integrante sin asistencia.
+      const fila = lider.page.getByRole('button', { name: new RegExp(titulo) });
+      await expect(fila).toBeVisible({ timeout: 15_000 });
+      await expect(fila).toContainText('0/');
+
+      // La integrante la ve en la lista, sin asistencia.
       const lista = await json<Actividad[]>(integrante.page, `/api/proyectos/${proyecto}/actividades`);
-      expect(lista.find((a) => a.idActividad === idActividad)).toMatchObject({ tituloActividad: titulo, totalAsistieron: 0 });
-      const antes = await json<Detalle>(integrante.page, `/api/proyectos/${proyecto}/actividades/${idActividad}`);
-      expect(antes.integrantes.find((i) => i.idUsuario === idIntegrante)).toMatchObject({ asistio: false });
+      const actividadCreada = lista.find((a) => a.tituloActividad === titulo);
+      expect(actividadCreada).toMatchObject({ tituloActividad: titulo, totalAsistieron: 0 });
+      const idActividad = actividadCreada!.idActividad;
+      rutaAsistencia = `/api/proyectos/${proyecto}/actividades/${idActividad}/asistencia/${yo.idUsuario}`;
 
-      // ── Confirmar asistencia ───────────────────────────────────────────
-      const marcada = await pedir(lider.page, 'PATCH', rutaAsistencia, { asistio: true });
-      expect(marcada.status()).toBe(200);
-      const { idRegistroHoras } = (await marcada.json()) as { idRegistroHoras: number };
+      // ── Confirmar asistencia desde el switch ─────────────────────────────
+      await fila.click();
+      const switchAsistio = lider.page.getByRole('switch', { name: `Asistió ${yo.nombre} ${yo.apellido}` });
+      await switchAsistio.click();
+      await expect(switchAsistio).toHaveAttribute('aria-checked', 'true', { timeout: 15_000 });
       expect(await acreditadas(integrante.page), 'horas acreditadas').toBe(horasIniciales + HORAS);
-
-      // Repetir no vuelve a acreditar.
-      const repetida = await pedir(lider.page, 'PATCH', rutaAsistencia, { asistio: true });
-      expect(((await repetida.json()) as { idRegistroHoras: number }).idRegistroHoras).toBe(idRegistroHoras);
-      expect(await acreditadas(integrante.page), 'sin doble acreditación').toBe(horasIniciales + HORAS);
-
-      const despues = await json<Detalle>(integrante.page, `/api/proyectos/${proyecto}/actividades/${idActividad}`);
-      expect(despues.integrantes.find((i) => i.idUsuario === idIntegrante)).toMatchObject({ asistio: true });
 
       // En pantalla: Mis Horas de la integrante y la bitácora del proyecto.
       expect(await acreditadasEnPantalla(integrante.page), 'Mis Horas refleja lo acreditado').toBe(horasIniciales + HORAS);
@@ -140,10 +144,12 @@ test.describe('GPI01-C15: actividad y asistencia con efectos reales', () => {
       await expect(lider.page.getByText('Asistencia marcada').first()).toBeVisible({ timeout: 15_000 });
       await expect(lider.page.getByText('Actividad creada').first()).toBeVisible();
 
-      // ── Quitar la asistencia ───────────────────────────────────────────
-      const quitada = await pedir(lider.page, 'PATCH', rutaAsistencia, { asistio: false });
-      expect(quitada.status()).toBe(200);
-      expect(await quitada.json()).toMatchObject({ asistio: false, idRegistroHoras: null });
+      // ── Quitar la asistencia desde el switch ─────────────────────────────
+      await lider.page.goto(`/dashboard/proyectos/${proyecto}/asistencia`);
+      await fila.click();
+      const switchDespues = lider.page.getByRole('switch', { name: `Asistió ${yo.nombre} ${yo.apellido}` });
+      await switchDespues.click();
+      await expect(switchDespues).toHaveAttribute('aria-checked', 'false', { timeout: 15_000 });
       rutaAsistencia = '';
       expect(await acreditadas(integrante.page), 'las horas vuelven a su valor').toBe(horasIniciales);
       expect(await acreditadasEnPantalla(integrante.page)).toBe(horasIniciales);

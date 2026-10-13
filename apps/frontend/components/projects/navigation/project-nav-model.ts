@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  CalendarCheck2,
   ClipboardCheck,
   Crown,
   FolderOutput,
@@ -142,6 +143,15 @@ export function buildProjectNavGroups(ctx: ProjectNavContext): ProjectNavGroup[]
         href: `/dashboard/proyectos/${idProyecto}/sprints/analytics`,
         label: 'Analítica',
         icon: BarChart3,
+      },
+      // T-298 (HU-177): el backend (ProjectReadPolicyService, scope
+      // 'asistencia') abre esta pantalla al líder y al integrante activo, en
+      // solo lectura para este último — mismo criterio que la bitácora.
+      {
+        id: 'asistencia',
+        href: `/dashboard/proyectos/${idProyecto}/asistencia`,
+        label: 'Asistencia',
+        icon: CalendarCheck2,
       },
     );
   }
