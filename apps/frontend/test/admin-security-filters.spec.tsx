@@ -1,4 +1,6 @@
 import '@testing-library/jest-dom/vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 
@@ -114,6 +116,20 @@ describe('Filtros con el aspecto del dashboard, sin cambiar lo que hacen', () =>
     expect(tipo).not.toHaveClass('data-[size=default]:h-9');
   });
 
+  it('los filtros van sobre el fondo de la página, sin tarjeta, y «Limpiar filtros» queda por encima de los campos', async () => {
+    const filtros = await montar();
+    const formulario = screen.getByRole('search', { name: 'Filtros de eventos de seguridad' });
+    expect(formulario).not.toHaveClass('card-base');
+    expect(formulario.className).not.toMatch(/\bp-card\b|\bborder\b|\bshadow/);
+
+    const limpiar = filtros.getByRole('button', { name: 'Limpiar filtros' });
+    const tipo = filtros.getByRole('combobox', { name: 'Tipo de evento' });
+    // En el documento el botón va antes que el primer campo: se lee y se pinta encima.
+    expect(limpiar.compareDocumentPosition(tipo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(formulario.firstElementChild).toContainElement(limpiar);
+    expect(formulario.firstElementChild).toHaveClass('justify-end', 'sm:col-span-2', 'xl:col-span-4');
+  });
+
   it('las fechas siguen siendo campos nativos con rótulo visible: no se sustituyen por otro selector', async () => {
     const filtros = await montar();
     for (const [rotulo, id] of [['Tipo de evento', 'filtro-tipo'], ['Desde', 'filtro-desde'], ['Hasta', 'filtro-hasta'], ['ID de usuario', 'filtro-usuario']]) {
@@ -139,10 +155,11 @@ describe('Filtros con el aspecto del dashboard, sin cambiar lo que hacen', () =>
     const limpiar = filtros.getByRole('button', { name: 'Limpiar filtros' });
     expect(limpiar).toHaveAttribute('type', 'button');
     expect(limpiar).toBeDisabled();
-    // Variante `ghost` de `Button`: sin borde propio, con el acento del sistema.
-    expect(limpiar).toHaveAttribute('data-slot', 'button');
-    expect(limpiar).toHaveClass('text-primary');
-    expect(limpiar).not.toHaveClass('border');
+    // Mismo botón compacto que «Ver perfil» en Gestión de Usuarios.
+    expect(limpiar).toHaveClass('min-h-8', 'rounded-tag', 'bg-surface-container-high', 'px-3', 'py-1.5', 'text-xs', 'font-bold', 'text-on-surface');
+    const verPerfil = readFileSync(join(__dirname, '../app/dashboard/admin/usuarios/page.tsx'), 'utf8').match(/className="([^"]*)"\s*aria-label=\{`Ver perfil de/)?.[1] ?? '';
+    for (const clase of verPerfil.split(' ').filter((c) => c && !c.startsWith('hover:'))) expect(limpiar, clase).toHaveClass(clase);
+    expect(verPerfil).toContain('rounded-tag');
 
     fireEvent.change(filtros.getByLabelText('ID de usuario'), { target: { value: '8' } });
     await waitFor(() => expect(limpiar).toBeEnabled());

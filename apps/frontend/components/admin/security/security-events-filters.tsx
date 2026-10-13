@@ -2,7 +2,6 @@
 
 import { X } from 'lucide-react';
 import { DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,11 +22,14 @@ const CONTROL = DASHBOARD_FILTER_TRIGGER_CLASS;
 // El disparador del select trae su alto en una variante (`data-[size=default]:h-9`) que gana a
 // una clase simple: se iguala con la misma variante.
 const SELECT = `w-full ${CONTROL} data-[size=default]:h-11.5`;
+// Mismo botón compacto que «Ver perfil» en Gestión de Usuarios; el realce solo aplica cuando está activo.
+const LIMPIAR =
+  'flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-tag bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface transition-all enabled:hover:bg-primary enabled:hover:text-on-primary disabled:cursor-not-allowed disabled:opacity-50';
 const ERROR = 'type-meta text-error';
 
 /**
  * Filtros del visor de eventos de seguridad (T-310): tipo, rango de fechas e
- * ID de usuario, combinables. Es controlado; la página decide cuándo unos
+ * ID de usuario, combinables, sobre el fondo de la página (sin tarjeta). Es controlado; la página decide cuándo unos
  * filtros son válidos y se convierten en consulta.
  */
 export function SecurityEventsFilters({
@@ -49,8 +51,21 @@ export function SecurityEventsFilters({
       role="search"
       aria-label="Filtros de eventos de seguridad"
       onSubmit={(event) => event.preventDefault()}
-      className="card-base grid grid-cols-1 items-start gap-stack p-card sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_auto]"
+      className="grid grid-cols-1 items-start gap-stack sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]"
     >
+      {/* Sobre los campos y siempre montado (deshabilitado sin filtros), para que la rejilla no salte. */}
+      <div className="flex justify-end sm:col-span-2 xl:col-span-4">
+        <button
+          type="button"
+          disabled={!hasSecurityEventsFilters(value)}
+          onClick={() => onChange(SECURITY_EVENTS_NO_FILTERS)}
+          className={LIMPIAR}
+        >
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
+          Limpiar filtros
+        </button>
+      </div>
+
       <div className={CAMPO}>
         <Label htmlFor="filtro-tipo">Tipo de evento</Label>
         <Select value={value.tipo || TODOS} onValueChange={(tipo) => cambiar({ tipo: isSecurityEventType(tipo) ? tipo : '' })}>
@@ -127,22 +142,7 @@ export function SecurityEventsFilters({
         )}
       </div>
 
-      {/* Siempre montado (deshabilitado sin filtros) para que la rejilla no salte; en `xl` se centra con la fila de controles. */}
-      <div className="flex items-center sm:col-span-2 xl:col-span-1 xl:mt-[1.375rem] xl:h-11.5">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={!hasSecurityEventsFilters(value)}
-          onClick={() => onChange(SECURITY_EVENTS_NO_FILTERS)}
-          className="w-full font-medium text-primary xl:w-auto"
-        >
-          <X aria-hidden="true" />
-          Limpiar filtros
-        </Button>
-      </div>
-
-      <p id="filtro-fechas-ayuda" className="type-meta sm:col-span-2 xl:col-span-5">
+      <p id="filtro-fechas-ayuda" className="type-meta sm:col-span-2 xl:col-span-4">
         Las fechas son días completos en hora de Guatemala e incluyen ambos extremos.
       </p>
     </form>

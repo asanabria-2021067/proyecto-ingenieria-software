@@ -134,11 +134,13 @@ describe('FG02-C08: filtros y cabecera en anchos pequeños', () => {
     expect(filtros.className).toContain('xl:grid-cols-[');
   });
 
-  it('cada control ocupa todo el ancho de su columna y «Limpiar filtros» ocupa el de la fila en móvil', async () => {
+  it('cada control ocupa todo el ancho de su columna y «Limpiar filtros» va en su propia fila, alineado a la derecha', async () => {
     await montar();
     const filtros = within(screen.getByRole('search', { name: 'Filtros de eventos de seguridad' }));
     expect(filtros.getByRole('combobox', { name: 'Tipo de evento' })).toHaveClass('w-full');
-    expect(filtros.getByRole('button', { name: 'Limpiar filtros' })).toHaveClass('w-full', 'xl:w-auto');
+    const limpiar = filtros.getByRole('button', { name: 'Limpiar filtros' });
+    expect(limpiar).not.toHaveClass('w-full');
+    expect(limpiar.parentElement).toHaveClass('flex', 'justify-end', 'sm:col-span-2', 'xl:col-span-4');
     for (const etiqueta of ['Desde', 'Hasta', 'ID de usuario']) {
       expect(filtros.getByLabelText(etiqueta).parentElement).toHaveClass('min-w-0');
     }
