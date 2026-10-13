@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
 import { useSprintsAnalytics } from '@/hooks/use-project-sprints';
 import { VelocityChart } from '@/components/projects/velocity-chart';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { getApiErrorMessage } from '@/components/projects/api-error';
@@ -39,19 +40,15 @@ export default function InformeVelocidadPage() {
             <EmptyTitle>{getApiErrorMessage(error, 'general', 'No fue posible cargar la velocidad del proyecto.')}</EmptyTitle>
           </EmptyHeader>
           <EmptyContent>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-            >
+            <Button type="button" onClick={() => refetch()}>
               Reintentar
-            </button>
+            </Button>
           </EmptyContent>
         </Empty>
       )}
 
       {!isLoading && !isError && (
-        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
+        <div className="card-base">
           <VelocityChart sprints={sprints} />
         </div>
       )}

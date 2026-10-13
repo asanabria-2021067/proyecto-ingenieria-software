@@ -120,9 +120,9 @@ export function BurndownChart({ burndown }: BurndownChartProps) {
   }
 
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
+    <div className="card-base">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-bold text-on-surface">Burndown del Sprint</h2>
+        <h2 className="type-subtitle">Burndown del Sprint</h2>
         <ToggleGroup
           type="single"
           variant="outline"
@@ -137,7 +137,7 @@ export function BurndownChart({ burndown }: BurndownChartProps) {
       </div>
 
       {sinPuntos && (
-        <p role="note" className="mb-4 text-xs text-tertiary">
+        <p role="note" className="type-meta mb-4">
           Este Sprint no tiene story points asignados; consulta el número de tareas.
         </p>
       )}

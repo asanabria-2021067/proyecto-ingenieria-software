@@ -100,6 +100,20 @@ describe('AdminMetricsSection — HU-178', () => {
 
     expect(await screen.findByText('No se pudieron cargar las tendencias de uso.')).toBeInTheDocument();
   });
+
+  it('el error se anuncia como alerta y «Reintentar» vuelve a consultar en el sitio del fallo', async () => {
+    vi.mocked(getAdminMetricas).mockRejectedValueOnce(new Error('500')).mockResolvedValue(conDatos);
+    renderSection();
+
+    const alerta = await screen.findByRole('alert');
+    expect(alerta).toHaveTextContent('No se pudieron cargar las tendencias de uso.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+
+    expect(await screen.findByText('Usuarios nuevos')).toBeInTheDocument();
+    expect(getAdminMetricas).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });
 
 describe('helpers de AdminMetricsSection', () => {

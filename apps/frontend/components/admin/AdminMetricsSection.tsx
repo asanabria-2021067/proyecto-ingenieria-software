@@ -6,9 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AlertCircle, ChartLine } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { formatearHoras } from '@/lib/hours/format';
 import {
   getAdminMetricas,
@@ -137,7 +138,7 @@ function MetricasSkeleton() {
 
 export function AdminMetricsSection() {
   const [periodo, setPeriodo] = useState<AdminMetricasPeriodo>('semana');
-  const { data, isLoading, isError } = useQuery<AdminMetricas>({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery<AdminMetricas>({
     queryKey: ['adminMetricas', periodo],
     queryFn: () => getAdminMetricas(periodo),
   });
@@ -147,10 +148,19 @@ export function AdminMetricsSection() {
     contenido = <MetricasSkeleton />;
   } else if (isError || !data) {
     contenido = (
-      <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-8 text-center">
-        <AlertCircle className="mx-auto mb-3 h-8 w-8 text-error" />
-        <p className="text-sm font-medium text-on-surface">No se pudieron cargar las tendencias de uso.</p>
-      </div>
+      <Empty tone="danger" role="alert">
+        <EmptyMedia variant="icon">
+          <AlertCircle aria-hidden="true" className="size-7" />
+        </EmptyMedia>
+        <EmptyHeader>
+          <EmptyTitle>No se pudieron cargar las tendencias de uso.</EmptyTitle>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button type="button" onClick={() => void refetch()} disabled={isFetching}>
+            Reintentar
+          </Button>
+        </EmptyContent>
+      </Empty>
     );
   } else if (sinDatos(data)) {
     contenido = (
