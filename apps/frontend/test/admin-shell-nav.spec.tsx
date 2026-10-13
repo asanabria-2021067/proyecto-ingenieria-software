@@ -481,12 +481,14 @@ describe('Inventario de navegación administrativa (T-319, FG06-C01)', () => {
     const noEnlazadas = paginas.filter((ruta) => !enlazadas.has(ruta));
     expect(noEnlazadas.sort()).toEqual([
       '/dashboard/admin/apelaciones/[apelacionId]',
+      // Página propia de «Tendencias de uso»: existe, pero el menú todavía enlaza el ancla del panel.
+      '/dashboard/admin/metricas',
       '/dashboard/admin/proyectos/[id]',
       '/dashboard/admin/proyectos/[id]/cierre',
     ]);
     for (const ruta of noEnlazadas) expect(inventario, ruta).toContain(`| \`${ruta}\` |`);
-    // Las que el inventario lista como no enlazadas son todas vistas con identificador.
-    expect(noEnlazadas.every((ruta) => ruta.includes('['))).toBe(true);
+    // Salvo la de métricas, las que el inventario lista como no enlazadas son vistas con identificador.
+    expect(noEnlazadas.filter((ruta) => ruta !== '/dashboard/admin/metricas').every((ruta) => ruta.includes('['))).toBe(true);
   });
 
   it('la pantalla de HU-179 existe (PR #270): se enlaza una sola vez y el inventario la registra', () => {
@@ -689,7 +691,8 @@ describe('Métricas de uso en la estructura (T-321 · HU-178, FG08-C01)', () => 
     expect(panel).toMatch(/<div id=\{ADMIN_METRICS_ANCHOR\}[^>]*>\s*<AdminMetricsSection \/>/);
     // La sección de HU-178 se monta una sola vez en toda la aplicación.
     expect(panel.match(/<AdminMetricsSection \/>/g)).toHaveLength(1);
-    expect(existsSync(join(__dirname, '../app/dashboard/admin/metricas'))).toBe(false);
+    // La página propia ya existe y monta la misma sección, en su variante amplia.
+    expect(fuente('app/dashboard/admin/metricas/page.tsx')).toContain('<AdminMetricsSection amplia />');
   });
 
   it('el panel se desplaza al ancla cuando termina de cargar: el enlace funciona también desde otra vista', () => {

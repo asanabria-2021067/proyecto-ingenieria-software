@@ -87,12 +87,20 @@ export function sinDatos(metricas: AdminMetricas): boolean {
   return metricas.serie.every((p) => METRICAS.every((m) => p[m.serie] === 0));
 }
 
+/** Rejilla de las tarjetas: tres columnas en la sección compacta, dos en la página de Tendencias. */
+const REJILLA = {
+  compacta: 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3',
+  amplia: 'grid grid-cols-1 gap-grid lg:grid-cols-2',
+} as const;
+
 function MetricTrendCard({
   config,
   metricas,
+  amplia,
 }: {
   config: MetricaConfig;
   metricas: AdminMetricas;
+  amplia: boolean;
 }) {
   const { serie, periodo } = metricas;
   const actual = serie[serie.length - 1]?.[config.serie] ?? 0;
@@ -110,33 +118,41 @@ function MetricTrendCard({
           {textos.actual} · {formatearValor(total, config.esHoras)} {textos.ventana}
         </p>
       </div>
-      <MetricTrendPlot
-        serie={serie}
-        dataKey={config.serie}
-        label={config.label}
-        esHoras={config.esHoras}
-        formatearEje={(inicio) => formatearInicio(inicio, periodo)}
-        formatearEtiqueta={(inicio) =>
-          periodo === 'semana' ? `Semana del ${formatearInicio(inicio, periodo)}` : formatearInicio(inicio, periodo)
-        }
-        formatearValor={(valor) => formatearValorConUnidad(valor, config)}
-      />
+      {/* El alto mínimo reserva el sitio mientras llega el módulo de dibujo. */}
+      <div className={amplia ? 'min-h-[240px]' : 'min-h-[140px]'}>
+        <MetricTrendPlot
+          serie={serie}
+          dataKey={config.serie}
+          label={config.label}
+          esHoras={config.esHoras}
+          alto={amplia ? 'amplio' : 'compacto'}
+          formatearEje={(inicio) => formatearInicio(inicio, periodo)}
+          formatearEtiqueta={(inicio) =>
+            periodo === 'semana' ? `Semana del ${formatearInicio(inicio, periodo)}` : formatearInicio(inicio, periodo)
+          }
+          formatearValor={(valor) => formatearValorConUnidad(valor, config)}
+        />
+      </div>
       <p className="type-meta">{config.descripcion}</p>
     </div>
   );
 }
 
-function MetricasSkeleton() {
+function MetricasSkeleton({ amplia }: { amplia: boolean }) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-busy="true">
+    <div className={amplia ? REJILLA.amplia : REJILLA.compacta} aria-busy="true">
       {METRICAS.map((m) => (
-        <Skeleton key={m.serie} className="h-72 rounded-xl" />
+        <Skeleton key={m.serie} className={`rounded-card ${amplia ? 'h-96' : 'h-72'}`} />
       ))}
     </div>
   );
 }
 
-export function AdminMetricsSection() {
+/**
+ * `amplia`: la variante de la página de Tendencias (`/dashboard/admin/metricas`),
+ * con gráficas más altas en dos columnas. El titular lo pone la página.
+ */
+export function AdminMetricsSection({ amplia = false }: { amplia?: boolean }) {
   const [periodo, setPeriodo] = useState<AdminMetricasPeriodo>('semana');
   const { data, isLoading, isError, isFetching, refetch } = useQuery<AdminMetricas>({
     queryKey: ['adminMetricas', periodo],
@@ -145,7 +161,7 @@ export function AdminMetricsSection() {
 
   let contenido: React.ReactNode;
   if (isLoading) {
-    contenido = <MetricasSkeleton />;
+    contenido = <MetricasSkeleton amplia={amplia} />;
   } else if (isError || !data) {
     contenido = (
       <Empty tone="danger" role="alert">
@@ -178,9 +194,9 @@ export function AdminMetricsSection() {
     );
   } else {
     contenido = (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className={amplia ? REJILLA.amplia : REJILLA.compacta}>
         {METRICAS.map((m) => (
-          <MetricTrendCard key={m.serie} config={m} metricas={data} />
+          <MetricTrendCard key={m.serie} config={m} metricas={data} amplia={amplia} />
         ))}
       </div>
     );
@@ -189,7 +205,7 @@ export function AdminMetricsSection() {
   return (
     <section className="mb-10">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-headline text-lg font-black tracking-tight text-on-surface">Tendencias de uso</h2>
+        <h2 className="type-section">{amplia ? 'Métricas por periodo' : 'Tendencias de uso'}</h2>
         <ToggleGroup
           type="single"
           variant="outline"

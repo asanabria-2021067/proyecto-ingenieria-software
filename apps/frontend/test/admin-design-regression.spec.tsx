@@ -52,9 +52,10 @@ describe('FG07-C04: regresión del diseño administrativo', () => {
     expect([...valores].sort()).toEqual(['rounded-lg', 'rounded-md', 'text-[13px]', 'text-[15px]']);
   });
 
-  it('28 de los 40 archivos del árbol quedan sin ningún literal', () => {
-    expect(ARBOL).toHaveLength(40);
-    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(28);
+  it('29 de los 41 archivos del árbol quedan sin ningún literal', () => {
+    // 40 al cerrar T-320; el 41 es la página propia de «Tendencias de uso», que nació sin literales.
+    expect(ARBOL).toHaveLength(41);
+    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(29);
   });
 });
 

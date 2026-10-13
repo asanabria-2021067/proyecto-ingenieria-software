@@ -19,7 +19,11 @@ export interface MetricTrendPlotProps {
   formatearEtiqueta: (inicio: string) => string;
   /** Valor con su unidad, para el tooltip (p. ej. «3 usuarios», «4.5 h»). */
   formatearValor: (valor: number) => string;
+  /** `amplio` en la página de Tendencias; `compacto` (por defecto) en tarjetas pequeñas. */
+  alto?: 'compacto' | 'amplio';
 }
+
+export const ALTO_PLOT = { compacto: 'h-[140px]', amplio: 'h-[240px]' } as const;
 
 /**
  * T-293 (HU-176): solo el dibujo de recharts de una tendencia del panel de
@@ -34,9 +38,10 @@ export default function MetricTrendPlot({
   formatearEje,
   formatearEtiqueta,
   formatearValor,
+  alto = 'compacto',
 }: MetricTrendPlotProps) {
   return (
-    <ChartContainer config={{ [dataKey]: { label } }} className="aspect-auto h-[140px] w-full">
+    <ChartContainer config={{ [dataKey]: { label } }} className={`aspect-auto w-full ${ALTO_PLOT[alto]}`}>
       <LineChart accessibilityLayer data={serie} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
         <CartesianGrid {...CHART_GRID_PROPS} />
         <XAxis dataKey="inicio" tickFormatter={formatearEje} {...CHART_AXIS_PROPS} />

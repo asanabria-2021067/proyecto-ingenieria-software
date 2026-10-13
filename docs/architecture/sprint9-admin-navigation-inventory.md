@@ -61,8 +61,9 @@ Con la barra plegada (72 px) cada destino queda como un icono con su nombre acce
 | `/dashboard/admin/proyectos/[id]` | Detalle de un proyecto (VIEW-16, F013) | Desde una fila de la bandeja de proyectos |
 | `/dashboard/admin/proyectos/[id]/cierre` | Revisión de una solicitud de cierre (VIEW-14, F016) | Desde «Solicitudes de cierre» |
 | `/dashboard/admin/apelaciones/[apelacionId]` | Revisión de una apelación | Desde la bandeja de apelaciones |
+| `/dashboard/admin/metricas` | Página propia de «Tendencias de uso» (HU-178), recién creada: el menú todavía enlaza el ancla del panel | Por su URL, hasta que el menú la enlace |
 
-Son vistas de detalle: necesitan un identificador y no tienen sentido como destino fijo.
+Las tres primeras son vistas de detalle: necesitan un identificador y no tienen sentido como destino fijo.
 
 ## 5. Pantallas que el backlog pide y hoy no existen como ruta
 

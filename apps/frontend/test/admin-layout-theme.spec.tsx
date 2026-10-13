@@ -14,7 +14,11 @@ const tsx = (dir: string): string[] =>
     e.isDirectory() ? tsx(join(dir, e.name)) : e.name.endsWith('.tsx') ? [join(dir, e.name)] : [],
   );
 
-/** `AdminMetricsSection` es de HU-178 (otro responsable): se reutiliza sin modificar. */
+/**
+ * `AdminMetricsSection` es de HU-178 (otro responsable). T-320 lo dejó fuera de su conteo y sin tocar;
+ * los gates de métricas y gráficas del cierre de Sprint 9 lo alinearon con los tokens. Sigue fuera del
+ * conteo histórico de abajo, pero ya se le exige lo mismo que al resto.
+ */
 const AJENO = 'components/admin/AdminMetricsSection.tsx';
 const ARBOL = [...tsx('app/dashboard/admin'), ...tsx('app/dashboard/projects/admin'), ...tsx('components/admin')].filter(
   (archivo) => archivo !== AJENO,
@@ -48,11 +52,13 @@ describe('FG07-C03: superficies administrativas sobre tokens', () => {
     expect(new Set(restantes)).toEqual(new Set(['rounded-lg', 'rounded-md']));
   });
 
-  it('el componente ajeno de métricas no se tocó', () => {
-    expect(leer(AJENO)).toMatch(/rounded-xl/);
+  it('el componente de métricas ya cumple las mismas reglas que el árbol: sin radios ni tamaños con token equivalente', () => {
+    expect(leer(AJENO)).not.toMatch(/(?<![\w-])rounded-(xl|2xl|3xl)\b/);
+    expect(leer(AJENO)).not.toMatch(/text-\[1[01]px\]/);
+    expect(leer(AJENO)).toContain('card-base');
   });
 
-  it('las trece vistas tienen su titular en la escala tipográfica', () => {
+  it('todas las vistas tienen su titular en la escala tipográfica', () => {
     for (const [ruta, archivo] of Object.entries(VISTAS_ADMIN)) {
       expect(medir(leer(archivo)).titular, ruta).toBe(true);
     }

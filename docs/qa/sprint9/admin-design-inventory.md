@@ -39,6 +39,7 @@ motivo de comentario» de `docs/design-system.md`.
 | `/dashboard/admin/usuarios` | sí | 1 | 4 | 2 | 0 | `app/dashboard/admin/usuarios/page.tsx` |
 | `/dashboard/admin/solicitudes-recuperacion` | sí | 1 | 3 | 2 | 0 | `app/dashboard/admin/solicitudes-recuperacion/page.tsx` |
 | `/dashboard/admin/cuentas-pendientes` | no | 1 | 5 | 3 | 0 | `app/dashboard/admin/cuentas-pendientes/page.tsx` |
+| `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/metricas/page.tsx` |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/seguridad/page.tsx` |
 | `/dashboard/admin/etiquetas` | sí | 0 | 0 | 0 | 6 | `app/dashboard/admin/etiquetas/page.tsx` |
 | `/dashboard/admin/apelaciones` | sí | 1 | 0 | 0 | 0 | `app/dashboard/admin/apelaciones/appeals-inbox-client.tsx` |
@@ -53,6 +54,9 @@ Total: 21 tamaños literales, 28 radios literales, 7 botones propios, 6 hex y 2 
 
 `/dashboard/admin/cuentas-pendientes` (HU-179, de otro responsable) no existía en `7091a310`: llegó con el PR #270,
 después de T-320. Su fila es la medición de la vista tal como llegó; sin ella el total era 20, 23, 4, 6 y 1 en 12 vistas.
+
+`/dashboard/admin/metricas` (página propia de «Tendencias de uso») tampoco existía en `7091a310`: se creó al final de
+Sprint 9, ya con los tokens. Su fila es su primera medición y no suma incumplimientos al total.
 
 ## 3. Lo que ya es uniforme
 
@@ -80,7 +84,7 @@ después de T-320. Su fila es la medición de la vista tal como llegó; sin ella
 | Qué | Por qué |
 |---|---|
 | Los 6 hex de `/dashboard/admin/etiquetas` | Es el catálogo de diagnóstico: muestra como texto los valores de las 27 familias. No pinta con ellos. |
-| `components/admin/AdminMetricsSection.tsx` | Pertenece a HU-178 (otro responsable). Se reutiliza tal cual; sus literales quedan anotados, no modificados. |
+| `components/admin/AdminMetricsSection.tsx` | Pertenece a HU-178 (otro responsable). En T-320 se reutilizó tal cual; sus literales se corrigieron después, en el cierre de Sprint 9 (ver la sección 8). |
 | `rounded-lg` y `rounded-md` (0.5rem y 0.375rem) | No tienen un token de igual valor; cambiarlos altera el aspecto. Quedan contados y a la espera de una decisión de diseño. |
 
 ## 6. Estados y temas
@@ -98,6 +102,7 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin/usuarios` | sí | 0 | 0 | 2 | 0 |
 | `/dashboard/admin/solicitudes-recuperacion` | sí | 0 | 2 | 2 | 0 |
 | `/dashboard/admin/cuentas-pendientes` | sí | 0 | 1 | 3 | 0 |
+| `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/etiquetas` | sí | 0 | 0 | 0 | 6 |
 | `/dashboard/admin/apelaciones` | sí | 0 | 0 | 0 | 0 |
@@ -108,15 +113,17 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin/sprints` | sí | 0 | 1 | 0 | 0 |
 | `/dashboard/projects/admin/reviews` | sí | 0 | 0 | 0 | 0 |
 
-Árbol administrativo completo (las 13 vistas más sus componentes: 40 archivos, sin `AdminMetricsSection`; incluye la
-vista de cuentas pendientes del PR #270 y `metric-trend-plot.tsx`, que T-293 separó de `AdminMetricsSection`):
+Árbol administrativo completo (las 13 vistas de T-320 más sus componentes: 40 archivos, sin `AdminMetricsSection`;
+incluye la vista de cuentas pendientes del PR #270 y `metric-trend-plot.tsx`, que T-293 separó de
+`AdminMetricsSection`). La página propia de «Tendencias de uso» (`app/dashboard/admin/metricas/page.tsx`) es el
+archivo 41: se creó después, sin literales, y no altera los totales:
 
 | Medida | Antes | Después |
 |---|---:|---:|
 | Tamaños literales | 47 | 2 |
 | Radios literales | 68 | 21 |
 | Titulares fuera de la escala | 2 | 0 |
-| Archivos sin ningún literal de tamaño o radio | — | 28 de 40 |
+| Archivos sin ningún literal de tamaño o radio | — | 29 de 41 |
 
 Qué se hizo con cada diferencia de la sección 4:
 
@@ -152,7 +159,9 @@ actualizarla, hace fallar la prueba.
 
 Otras excepciones:
 
-- `components/admin/AdminMetricsSection.tsx` (HU-178, otro responsable): no se modificó.
+- `components/admin/AdminMetricsSection.tsx` (HU-178, otro responsable): T-320 no lo modificó y sigue fuera de los
+  totales de arriba. En el cierre de Sprint 9 (gates de métricas y gráficas) se alineó con los tokens: tarjetas con
+  `card-base`, tipografía de la escala y sin radios ni tamaños con token equivalente.
 - `bg-amber-600` / `bg-amber-700` en `components/admin/ConfirmActionDialog.tsx` y `components/admin/request-inbox.tsx`:
   es el botón ámbar de «Revisar». No existe un token de «acción de advertencia» y su tono es una decisión de diseño
   abierta; no se cambió.

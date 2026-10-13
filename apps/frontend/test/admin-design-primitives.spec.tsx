@@ -36,9 +36,10 @@ describe('FG07-C02: primitivas de página', () => {
   it('las vistas con titular y párrafo de entrada estándar usan las primitivas', () => {
     const conTitular = Object.values(VISTAS_ADMIN).filter((archivo) => leer(archivo).includes('className={ADMIN_PAGE_TITLE}'));
     const conEntrada = Object.values(VISTAS_ADMIN).filter((archivo) => leer(archivo).includes('className={ADMIN_PAGE_LEAD}'));
-    // Incluye la vista de cuentas pendientes (HU-179, PR #270), migrada a las primitivas al integrarla.
-    expect(conTitular).toHaveLength(10);
-    expect(conEntrada).toHaveLength(8);
+    // Incluye la vista de cuentas pendientes (HU-179, PR #270), migrada a las primitivas al integrarla,
+    // y la página propia de «Tendencias de uso».
+    expect(conTitular).toHaveLength(11);
+    expect(conEntrada).toHaveLength(9);
     for (const archivo of Object.values(VISTAS_ADMIN)) {
       expect(leer(archivo), archivo).not.toContain('className="type-display text-balance"');
       expect(leer(archivo), archivo).not.toMatch(/className="mt-(2|tight) max-w-2xl text-base text-tertiary"/);
