@@ -32,6 +32,7 @@ const SCENARIOS = {
   'project-listing': 'scenarios/project-listing.js',
   'kanban-operations': 'scenarios/kanban-operations.js',
   'socket-io': 'scenarios/socket-io.js',
+  'baseline-endpoints': 'scenarios/baseline-endpoints.js',
 };
 
 const DEFAULT_LOCAL_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5433/uvg_collab?schema=public';
@@ -106,7 +107,7 @@ function main() {
     K6_USER_PASSWORD: fixture.password,
   };
 
-  if (scenarioArg === 'kanban-operations') {
+  if (scenarioArg === 'kanban-operations' || scenarioArg === 'baseline-endpoints') {
     k6Env.K6_PROJECT_ID = String(fixture.projectId);
     k6Env.K6_USER_ID = String(fixture.userId);
   }

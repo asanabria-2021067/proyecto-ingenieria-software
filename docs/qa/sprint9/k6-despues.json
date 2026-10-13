@@ -1,0 +1,1339 @@
+{
+    "metrics": {
+        "duration_chat_project": {
+            "max": 35.93039,
+            "p(90)": 20.3592742,
+            "p(95)": 22.026821900000016,
+            "p(99)": 32.02152657999999,
+            "avg": 16.14909014333333,
+            "min": 7.614389,
+            "med": 15.393254
+        },
+        "size_my_applications": {
+            "max": 1147,
+            "p(90)": 1147,
+            "p(95)": 1147,
+            "p(99)": 1147,
+            "avg": 1147,
+            "min": 1147,
+            "med": 1147
+        },
+        "size_admin_stats": {
+            "max": 1584,
+            "p(90)": 1584,
+            "p(95)": 1584,
+            "p(99)": 1584,
+            "avg": 1584,
+            "min": 1584,
+            "med": 1584
+        },
+        "duration_notifications": {
+            "min": 5.407202,
+            "med": 10.881775000000001,
+            "max": 30.544852,
+            "p(90)": 14.4387013,
+            "p(95)": 17.63385235,
+            "p(99)": 24.162241919999996,
+            "avg": 11.509131270000005
+        },
+        "size_search": {
+            "p(90)": 371,
+            "p(95)": 371,
+            "p(99)": 371,
+            "avg": 371,
+            "min": 371,
+            "med": 371,
+            "max": 371
+        },
+        "size_bitacora": {
+            "avg": 6567,
+            "min": 6567,
+            "med": 6567,
+            "max": 6567,
+            "p(90)": 6567,
+            "p(95)": 6567,
+            "p(99)": 6567
+        },
+        "duration_admin_notifications": {
+            "max": 29.822288,
+            "p(90)": 20.4242978,
+            "p(95)": 21.772654900000003,
+            "p(99)": 25.639085269999985,
+            "avg": 15.981834516666671,
+            "min": 6.512841,
+            "med": 15.4732585
+        },
+        "vus_max": {
+            "value": 10,
+            "min": 10,
+            "max": 10
+        },
+        "data_sent": {
+            "count": 4129870,
+            "rate": 136315.10966217532
+        },
+        "size_my_projects": {
+            "min": 4466,
+            "med": 4466,
+            "max": 4466,
+            "p(90)": 4466,
+            "p(95)": 4466,
+            "p(99)": 4466,
+            "avg": 4466
+        },
+        "http_req_sending": {
+            "med": 0.019504,
+            "max": 1.302536,
+            "p(90)": 0.0496242,
+            "p(95)": 0.0587855,
+            "p(99)": 0.10218182000000021,
+            "avg": 0.02710861087828798,
+            "min": 0.0041
+        },
+        "duration_sprint_burndown": {
+            "p(90)": 35.6700866,
+            "p(95)": 41.4736635,
+            "p(99)": 55.96541039999996,
+            "avg": 28.049851403333335,
+            "min": 14.892773,
+            "med": 26.616538,
+            "max": 68.389139
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 11215,
+            "value": 0
+        },
+        "size_board": {
+            "p(99)": 151759,
+            "avg": 151759,
+            "min": 151759,
+            "med": 151759,
+            "max": 151759,
+            "p(90)": 151759,
+            "p(95)": 151759
+        },
+        "duration_sprint_detail": {
+            "p(95)": 67.02310305,
+            "p(99)": 111.23111887999991,
+            "avg": 53.26074210333333,
+            "min": 34.374144,
+            "med": 51.963854999999995,
+            "max": 133.181944,
+            "p(90)": 60.162044900000005
+        },
+        "size_activities": {
+            "avg": 2,
+            "min": 2,
+            "med": 2,
+            "max": 2,
+            "p(90)": 2,
+            "p(95)": 2,
+            "p(99)": 2
+        },
+        "duration_my_tasks": {
+            "med": 13.055131,
+            "max": 28.011567,
+            "p(90)": 17.5993553,
+            "p(95)": 19.7738415,
+            "p(99)": 23.135459299999997,
+            "avg": 13.282168823333322,
+            "min": 6.354753
+        },
+        "size_project_comments": {
+            "p(95)": 2,
+            "p(99)": 2,
+            "avg": 2,
+            "min": 2,
+            "med": 2,
+            "max": 2,
+            "p(90)": 2
+        },
+        "size_admin_metrics": {
+            "p(90)": 1046,
+            "p(95)": 1046,
+            "p(99)": 1046,
+            "avg": 1046,
+            "min": 1046,
+            "med": 1046,
+            "max": 1046
+        },
+        "duration_task_comments": {
+            "min": 11.964644,
+            "med": 20.2817485,
+            "max": 59.266899,
+            "p(90)": 29.67270070000001,
+            "p(95)": 35.42498305,
+            "p(99)": 52.14855344,
+            "avg": 22.203992996666653
+        },
+        "iterations": {
+            "count": 300,
+            "rate": 9.902135635904422
+        },
+        "duration_task_detail": {
+            "p(90)": 41.98936460000001,
+            "p(95)": 46.5532345,
+            "p(99)": 70.71267874,
+            "avg": 32.21996064666666,
+            "min": 16.509689,
+            "med": 30.7627005,
+            "max": 75.014
+        },
+        "size_chat_project": {
+            "p(90)": 2,
+            "p(95)": 2,
+            "p(99)": 2,
+            "avg": 2,
+            "min": 2,
+            "med": 2,
+            "max": 2
+        },
+        "duration_board": {
+            "min": 36.653895,
+            "med": 53.503519499999996,
+            "max": 193.089458,
+            "p(90)": 67.91022120000001,
+            "p(95)": 74.86350215000002,
+            "p(99)": 175.27706773999995,
+            "avg": 57.46146542666667
+        },
+        "duration_project_comments": {
+            "med": 18.0897735,
+            "max": 36.096825,
+            "p(90)": 24.408858900000006,
+            "p(95)": 29.843656050000003,
+            "p(99)": 34.12410807,
+            "avg": 18.920833553333328,
+            "min": 10.589308
+        },
+        "size_sprint_burndown": {
+            "p(90)": 270,
+            "p(95)": 270,
+            "p(99)": 270,
+            "avg": 270,
+            "min": 270,
+            "med": 270,
+            "max": 270
+        },
+        "duration_admin_stats": {
+            "p(90)": 45.53080540000001,
+            "p(95)": 49.16202995000001,
+            "p(99)": 53.72184151,
+            "avg": 45.95427493333332,
+            "min": 22.385583,
+            "med": 39.06175,
+            "max": 2092.715632
+        },
+        "duration_admin_users": {
+            "p(95)": 31.65625575,
+            "p(99)": 36.72710319999999,
+            "avg": 23.865204723333353,
+            "min": 13.547687,
+            "med": 23.3403415,
+            "max": 60.292267,
+            "p(90)": 29.168816900000003
+        },
+        "duration_me": {
+            "med": 28.506491,
+            "max": 77.030174,
+            "p(90)": 40.47506390000001,
+            "p(95)": 43.99458415000001,
+            "p(99)": 66.68534017999998,
+            "avg": 30.767035046666674,
+            "min": 16.76855
+        },
+        "size_events": {
+            "p(95)": 2,
+            "p(99)": 2,
+            "avg": 2,
+            "min": 2,
+            "med": 2,
+            "max": 2,
+            "p(90)": 2
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "p(99)": 0
+        },
+        "duration_admin_projects": {
+            "p(95)": 35.23099975,
+            "p(99)": 37.944843819999996,
+            "avg": 27.37814103666666,
+            "min": 14.505407,
+            "med": 27.4347945,
+            "max": 42.081854,
+            "p(90)": 33.2630558
+        },
+        "size_admin_review_inbox": {
+            "min": 1164,
+            "med": 1164,
+            "max": 1164,
+            "p(90)": 1164,
+            "p(95)": 1164,
+            "p(99)": 1164,
+            "avg": 1164
+        },
+        "size_notifications": {
+            "p(90)": 1399,
+            "p(95)": 1399,
+            "p(99)": 1399,
+            "avg": 1399,
+            "min": 1399,
+            "med": 1399,
+            "max": 1399
+        },
+        "duration_admin_metrics": {
+            "max": 36.436232,
+            "p(90)": 25.163052400000005,
+            "p(95)": 27.06284335,
+            "p(99)": 34.367067819999995,
+            "avg": 20.931472010000018,
+            "min": 10.099868,
+            "med": 20.4916475
+        },
+        "size_admin_projects": {
+            "avg": 3105,
+            "min": 3105,
+            "med": 3105,
+            "max": 3105,
+            "p(90)": 3105,
+            "p(95)": 3105,
+            "p(99)": 3105
+        },
+        "size_my_tasks": {
+            "avg": 2,
+            "min": 2,
+            "med": 2,
+            "max": 2,
+            "p(90)": 2,
+            "p(95)": 2,
+            "p(99)": 2
+        },
+        "size_sprints": {
+            "max": 198,
+            "p(90)": 198,
+            "p(95)": 198,
+            "p(99)": 198,
+            "avg": 198,
+            "min": 198,
+            "med": 198
+        },
+        "duration_profile": {
+            "avg": 31.535878233333314,
+            "min": 14.770908,
+            "med": 23.156608,
+            "max": 2073.6259,
+            "p(90)": 33.483521200000006,
+            "p(95)": 36.41247955,
+            "p(99)": 57.80414771999997
+        },
+        "http_req_blocked": {
+            "p(99)": 0.028522240000000167,
+            "avg": 0.010703250111457856,
+            "min": 0.001243,
+            "med": 0.005627,
+            "max": 5.688683,
+            "p(90)": 0.008528,
+            "p(95)": 0.009839599999999999
+        },
+        "size_my_hours": {
+            "p(95)": 980,
+            "p(99)": 980,
+            "avg": 980,
+            "min": 980,
+            "med": 980,
+            "max": 980,
+            "p(90)": 980
+        },
+        "size_catalogs": {
+            "p(95)": 1329,
+            "p(99)": 1329,
+            "avg": 1329,
+            "min": 1329,
+            "med": 1329,
+            "max": 1329,
+            "p(90)": 1329
+        },
+        "size_project_detail": {
+            "avg": 2183,
+            "min": 2183,
+            "med": 2183,
+            "max": 2183,
+            "p(90)": 2183,
+            "p(95)": 2183,
+            "p(99)": 2183
+        },
+        "duration_admin_review_inbox": {
+            "p(95)": 32.75767155000001,
+            "p(99)": 39.75241308999998,
+            "avg": 25.61091812999998,
+            "min": 12.809324,
+            "med": 25.184721,
+            "max": 43.417416,
+            "p(90)": 30.757321300000005
+        },
+        "size_project_progress": {
+            "p(99)": 161,
+            "avg": 161,
+            "min": 161,
+            "med": 161,
+            "max": 161,
+            "p(90)": 161,
+            "p(95)": 161
+        },
+        "duration_sprint_analytics": {
+            "p(90)": 27.649709400000003,
+            "p(95)": 30.462047000000005,
+            "p(99)": 42.05972563999999,
+            "avg": 21.08251728333333,
+            "min": 10.521119,
+            "med": 20.1160595,
+            "max": 62.107509
+        },
+        "duration_roles": {
+            "p(95)": 31.705611350000012,
+            "p(99)": 41.10499769999999,
+            "avg": 23.39129574333334,
+            "min": 13.370852,
+            "med": 22.798755999999997,
+            "max": 48.571954,
+            "p(90)": 28.4581006
+        },
+        "iteration_duration": {
+            "p(95)": 959.58401195,
+            "p(99)": 1539.4650114599824,
+            "avg": 908.6819051100006,
+            "min": 652.160621,
+            "med": 878.152572,
+            "max": 3544.895777,
+            "p(90)": 940.2801458
+        },
+        "duration_dashboard": {
+            "max": 2066.245296,
+            "p(90)": 37.09816990000001,
+            "p(95)": 44.03295275000002,
+            "p(99)": 64.93945085999994,
+            "avg": 37.49743761000002,
+            "min": 17.88215,
+            "med": 29.641203
+        },
+        "checks": {
+            "passes": 22202,
+            "fails": 0,
+            "thresholds": {
+                "rate==1.0": false
+            },
+            "value": 1
+        },
+        "size_dashboard": {
+            "p(99)": 1369,
+            "avg": 1369,
+            "min": 1369,
+            "med": 1369,
+            "max": 1369,
+            "p(90)": 1369,
+            "p(95)": 1369
+        },
+        "duration_notifications_unread_count": {
+            "min": 5.543643,
+            "med": 10.851049,
+            "max": 26.168234,
+            "p(90)": 14.710751400000005,
+            "p(95)": 18.19129475,
+            "p(99)": 24.270795399999994,
+            "avg": 11.332151436666669
+        },
+        "rate_limited_responses": {
+            "count": 0,
+            "rate": 0,
+            "thresholds": {
+                "count==0": false
+            }
+        },
+        "size_admin_notifications": {
+            "p(90)": 29463,
+            "p(95)": 29463,
+            "p(99)": 29463,
+            "avg": 29463,
+            "min": 29463,
+            "med": 29463,
+            "max": 29463
+        },
+        "duration_team": {
+            "min": 9.138562,
+            "med": 17.227539,
+            "max": 38.969365,
+            "p(90)": 24.1006798,
+            "p(95)": 27.111390050000008,
+            "p(99)": 36.552298029999996,
+            "avg": 18.21303777
+        },
+        "duration_members_summary": {
+            "max": 86.945212,
+            "p(90)": 47.383533500000006,
+            "p(95)": 59.06680670000002,
+            "p(99)": 69.56555918999999,
+            "avg": 38.697579569999974,
+            "min": 21.402155,
+            "med": 36.772114
+        },
+        "size_notifications_unread_count": {
+            "avg": 11,
+            "min": 11,
+            "med": 11,
+            "max": 11,
+            "p(90)": 11,
+            "p(95)": 11,
+            "p(99)": 11
+        },
+        "data_received": {
+            "count": 112797586,
+            "rate": 3723123.3199153123
+        },
+        "size_me": {
+            "avg": 2666,
+            "min": 2666,
+            "med": 2666,
+            "max": 2666,
+            "p(90)": 2666,
+            "p(95)": 2666,
+            "p(99)": 2666
+        },
+        "duration_my_hours": {
+            "avg": 18.626688279999982,
+            "min": 11.04426,
+            "med": 18.390292,
+            "max": 39.697802,
+            "p(90)": 22.998547100000003,
+            "p(95)": 24.991764,
+            "p(99)": 30.291390849999996
+        },
+        "duration_chat_dock": {
+            "min": 6.758705,
+            "med": 12.374234,
+            "max": 29.683967,
+            "p(90)": 16.623154900000003,
+            "p(95)": 18.352130550000002,
+            "p(99)": 24.027722489999984,
+            "avg": 12.955865809999997
+        },
+        "http_reqs": {
+            "count": 11215,
+            "rate": 370.1748371888936
+        },
+        "http_req_connecting": {
+            "p(99)": 0,
+            "avg": 0.0034562395006687476,
+            "min": 0,
+            "med": 0,
+            "max": 2.785557,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "duration_project_progress": {
+            "p(90)": 24.821910000000003,
+            "p(95)": 29.105895400000005,
+            "p(99)": 45.203753679999984,
+            "avg": 20.287256190000004,
+            "min": 10.976719,
+            "med": 19.361556999999998,
+            "max": 56.333656
+        },
+        "duration_sprints": {
+            "p(90)": 24.46335280000001,
+            "p(95)": 28.414568100000007,
+            "p(99)": 47.05186696,
+            "avg": 18.502129213333347,
+            "min": 10.10613,
+            "med": 16.669456500000003,
+            "max": 52.646256
+        },
+        "duration_project_list": {
+            "max": 80.124552,
+            "p(90)": 45.78898070000001,
+            "p(95)": 56.38759575000002,
+            "p(99)": 72.02175751,
+            "avg": 37.878344649999974,
+            "min": 21.820253,
+            "med": 36.8714885
+        },
+        "duration_bitacora": {
+            "p(95)": 28.206473250000002,
+            "p(99)": 37.04735738999997,
+            "avg": 18.72674422999998,
+            "min": 10.274398,
+            "med": 18.0176245,
+            "max": 44.216198,
+            "p(90)": 22.368122100000004
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(95)": 48.84416239999999,
+            "p(99)": 64.84104096000011,
+            "avg": 25.173925373160937,
+            "min": 2.36402,
+            "med": 20.481234,
+            "max": 2116.026829,
+            "p(90)": 39.864237800000005
+        },
+        "size_roles": {
+            "min": 472,
+            "med": 472,
+            "max": 472,
+            "p(90)": 472,
+            "p(95)": 472,
+            "p(99)": 472,
+            "avg": 472
+        },
+        "size_profile": {
+            "p(90)": 2396,
+            "p(95)": 2396,
+            "p(99)": 2396,
+            "avg": 2396,
+            "min": 2396,
+            "med": 2396,
+            "max": 2396
+        },
+        "vus": {
+            "value": 7,
+            "min": 0,
+            "max": 10
+        },
+        "duration_search": {
+            "avg": 19.962919329999988,
+            "min": 10.595574,
+            "med": 19.9501025,
+            "max": 30.732786,
+            "p(90)": 23.912020000000002,
+            "p(95)": 25.935053000000003,
+            "p(99)": 30.11412955
+        },
+        "duration_events": {
+            "avg": 16.293252966666667,
+            "min": 8.632523,
+            "med": 15.502588,
+            "max": 31.175041,
+            "p(90)": 21.00910120000001,
+            "p(95)": 25.3153383,
+            "p(99)": 27.92028982999998
+        },
+        "duration_featured_projects": {
+            "p(95)": 10.860166750000001,
+            "p(99)": 14.852762719999994,
+            "avg": 6.545523760000001,
+            "min": 2.36402,
+            "med": 6.146341,
+            "max": 17.720879,
+            "p(90)": 9.7809612
+        },
+        "duration_my_projects": {
+            "p(90)": 39.6206764,
+            "p(95)": 42.102106500000005,
+            "p(99)": 52.95489094999992,
+            "avg": 31.650151956666644,
+            "min": 17.403772,
+            "med": 32.551092499999996,
+            "max": 64.60659
+        },
+        "size_featured_projects": {
+            "avg": 3114,
+            "min": 3114,
+            "med": 3114,
+            "max": 3114,
+            "p(90)": 3114,
+            "p(95)": 3114,
+            "p(99)": 3114
+        },
+        "size_project_list": {
+            "max": 6176,
+            "p(90)": 6176,
+            "p(95)": 6176,
+            "p(99)": 6176,
+            "avg": 6176,
+            "min": 6176,
+            "med": 6176
+        },
+        "duration_project_detail": {
+            "avg": 24.87228141333333,
+            "min": 13.728255,
+            "med": 25.6364885,
+            "max": 44.628508,
+            "p(90)": 32.88569450000001,
+            "p(95)": 36.621167750000005,
+            "p(99)": 38.82088132999999
+        },
+        "duration_catalogs": {
+            "p(90)": 9.6707633,
+            "p(95)": 10.533169800000003,
+            "p(99)": 16.37999168,
+            "avg": 7.002036243333335,
+            "min": 2.428462,
+            "med": 6.8699449999999995,
+            "max": 17.763079
+        },
+        "duration_activities": {
+            "p(99)": 26.854587969999997,
+            "avg": 14.957614016666664,
+            "min": 7.851696,
+            "med": 14.51168,
+            "max": 27.936173,
+            "p(90)": 18.389678500000002,
+            "p(95)": 21.082812150000002
+        },
+        "size_task_detail": {
+            "avg": 693,
+            "min": 693,
+            "med": 693,
+            "max": 693,
+            "p(90)": 693,
+            "p(95)": 693,
+            "p(99)": 693
+        },
+        "size_team": {
+            "p(95)": 1218,
+            "p(99)": 1218,
+            "avg": 1218,
+            "min": 1218,
+            "med": 1218,
+            "max": 1218,
+            "p(90)": 1218
+        },
+        "http_req_waiting": {
+            "min": 2.245084,
+            "med": 20.271108,
+            "max": 2115.841515,
+            "p(90)": 38.6484024,
+            "p(95)": 43.607794500000004,
+            "p(99)": 57.49606484000005,
+            "avg": 24.4361388863131
+        },
+        "size_members_summary": {
+            "max": 1080,
+            "p(90)": 1080,
+            "p(95)": 1080,
+            "p(99)": 1080,
+            "avg": 1080,
+            "min": 1080,
+            "med": 1080
+        },
+        "size_sprint_analytics": {
+            "p(95)": 219,
+            "p(99)": 219,
+            "avg": 219,
+            "min": 219,
+            "med": 219,
+            "max": 219,
+            "p(90)": 219
+        },
+        "http_req_duration": {
+            "p(90)": 39.864237800000005,
+            "p(95)": 48.84416239999999,
+            "p(99)": 64.84104096000011,
+            "avg": 25.173925373160937,
+            "min": 2.36402,
+            "med": 20.481234,
+            "max": 2116.026829
+        },
+        "http_req_receiving": {
+            "max": 77.182921,
+            "p(90)": 0.5657076000000012,
+            "p(95)": 4.40397919999999,
+            "p(99)": 12.762774380000012,
+            "avg": 0.7106778759696867,
+            "min": 0.021847,
+            "med": 0.133469
+        },
+        "size_sprint_detail": {
+            "p(90)": 105369,
+            "p(95)": 105369,
+            "p(99)": 105369,
+            "avg": 105369,
+            "min": 105369,
+            "med": 105369,
+            "max": 105369
+        },
+        "size_task_comments": {
+            "avg": 2,
+            "min": 2,
+            "med": 2,
+            "max": 2,
+            "p(90)": 2,
+            "p(95)": 2,
+            "p(99)": 2
+        },
+        "duration_my_applications": {
+            "avg": 16.19603937333333,
+            "min": 7.995938,
+            "med": 15.9621755,
+            "max": 30.568757,
+            "p(90)": 20.285465000000002,
+            "p(95)": 22.100853850000007,
+            "p(99)": 24.519469939999997
+        },
+        "size_chat_dock": {
+            "p(90)": 2,
+            "p(95)": 2,
+            "p(99)": 2,
+            "avg": 2,
+            "min": 2,
+            "med": 2,
+            "max": 2
+        },
+        "size_admin_users": {
+            "min": 1942,
+            "med": 1942,
+            "max": 1942,
+            "p(90)": 1942,
+            "p(95)": 1942,
+            "p(99)": 1942,
+            "avg": 1942
+        }
+    },
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "setup": {
+                "checks": {
+                    "login: status es 201": {
+                        "id": "5870cf3dce53efd1b927ae67690ea3a8",
+                        "passes": 2,
+                        "fails": 0,
+                        "name": "login: status es 201",
+                        "path": "::setup::login: status es 201"
+                    }
+                },
+                "name": "setup",
+                "path": "::setup",
+                "id": "5c0f8025f7e0b6654089e5b00e950f1a",
+                "groups": {}
+            }
+        },
+        "checks": {
+            "listado de proyectos: status es 200": {
+                "fails": 0,
+                "name": "listado de proyectos: status es 200",
+                "path": "::listado de proyectos: status es 200",
+                "id": "66ea56e1d43c1875c15900fdc7afdc48",
+                "passes": 300
+            },
+            "listado de proyectos: respuesta es JSON parseable": {
+                "name": "listado de proyectos: respuesta es JSON parseable",
+                "path": "::listado de proyectos: respuesta es JSON parseable",
+                "id": "d329eea3b6d06599eb9cf6e3099e0cfa",
+                "passes": 300,
+                "fails": 0
+            },
+            "detalle de proyecto: status es 200": {
+                "path": "::detalle de proyecto: status es 200",
+                "id": "5e13bc6d176cb67791220f1677a87d9c",
+                "passes": 300,
+                "fails": 0,
+                "name": "detalle de proyecto: status es 200"
+            },
+            "detalle de proyecto: respuesta es JSON parseable": {
+                "name": "detalle de proyecto: respuesta es JSON parseable",
+                "path": "::detalle de proyecto: respuesta es JSON parseable",
+                "id": "dc5d61d213338fb2a69e75ff5e6599bb",
+                "passes": 300,
+                "fails": 0
+            },
+            "mis proyectos: status es 200": {
+                "fails": 0,
+                "name": "mis proyectos: status es 200",
+                "path": "::mis proyectos: status es 200",
+                "id": "ed4295d913aad7c1eab76a68a105c1e5",
+                "passes": 300
+            },
+            "mis proyectos: respuesta es JSON parseable": {
+                "name": "mis proyectos: respuesta es JSON parseable",
+                "path": "::mis proyectos: respuesta es JSON parseable",
+                "id": "2f3fd4c7eb1ee2795bbc0f60cfa60511",
+                "passes": 300,
+                "fails": 0
+            },
+            "proyectos destacados: status es 200": {
+                "fails": 0,
+                "name": "proyectos destacados: status es 200",
+                "path": "::proyectos destacados: status es 200",
+                "id": "63eeb3782e95120492903f7c86ccaf59",
+                "passes": 300
+            },
+            "proyectos destacados: respuesta es JSON parseable": {
+                "fails": 0,
+                "name": "proyectos destacados: respuesta es JSON parseable",
+                "path": "::proyectos destacados: respuesta es JSON parseable",
+                "id": "fbbfbb7d279318aba08a41d333fd65bc",
+                "passes": 300
+            },
+            "avance del proyecto: status es 200": {
+                "fails": 0,
+                "name": "avance del proyecto: status es 200",
+                "path": "::avance del proyecto: status es 200",
+                "id": "f8d4110c4243eb92a058642685831567",
+                "passes": 300
+            },
+            "avance del proyecto: respuesta es JSON parseable": {
+                "path": "::avance del proyecto: respuesta es JSON parseable",
+                "id": "c2023eab589d522f5df9945a804b1748",
+                "passes": 300,
+                "fails": 0,
+                "name": "avance del proyecto: respuesta es JSON parseable"
+            },
+            "tablero: status es 200": {
+                "fails": 0,
+                "name": "tablero: status es 200",
+                "path": "::tablero: status es 200",
+                "id": "a1e9b3e9dc06c1cb8354f89d55b808b2",
+                "passes": 300
+            },
+            "tablero: respuesta es JSON parseable": {
+                "id": "b1a05426566d199477cbc9eb6031d967",
+                "passes": 300,
+                "fails": 0,
+                "name": "tablero: respuesta es JSON parseable",
+                "path": "::tablero: respuesta es JSON parseable"
+            },
+            "detalle de tarea: status es 200": {
+                "passes": 300,
+                "fails": 0,
+                "name": "detalle de tarea: status es 200",
+                "path": "::detalle de tarea: status es 200",
+                "id": "4b959b416c67fc2fed557122e3bfc33f"
+            },
+            "detalle de tarea: respuesta es JSON parseable": {
+                "id": "ebb7bbf8a63bf0ebc49f1045dce48e95",
+                "passes": 300,
+                "fails": 0,
+                "name": "detalle de tarea: respuesta es JSON parseable",
+                "path": "::detalle de tarea: respuesta es JSON parseable"
+            },
+            "comentarios de tarea: status es 200": {
+                "name": "comentarios de tarea: status es 200",
+                "path": "::comentarios de tarea: status es 200",
+                "id": "0c79d4d8616791ba49f8db3cc6cf882e",
+                "passes": 300,
+                "fails": 0
+            },
+            "comentarios de tarea: respuesta es JSON parseable": {
+                "name": "comentarios de tarea: respuesta es JSON parseable",
+                "path": "::comentarios de tarea: respuesta es JSON parseable",
+                "id": "37fe37ac69b98f5b70ad8be96a94d0e6",
+                "passes": 300,
+                "fails": 0
+            },
+            "sprints: status es 200": {
+                "path": "::sprints: status es 200",
+                "id": "88fd813dadde2b48ce7b33e9789839b4",
+                "passes": 300,
+                "fails": 0,
+                "name": "sprints: status es 200"
+            },
+            "sprints: respuesta es JSON parseable": {
+                "name": "sprints: respuesta es JSON parseable",
+                "path": "::sprints: respuesta es JSON parseable",
+                "id": "8ce473b4924e03c2376c8067eaa85f0d",
+                "passes": 300,
+                "fails": 0
+            },
+            "detalle de sprint: status es 200": {
+                "fails": 0,
+                "name": "detalle de sprint: status es 200",
+                "path": "::detalle de sprint: status es 200",
+                "id": "7a382bf76d1ec8dd7914f7a9c38f4112",
+                "passes": 300
+            },
+            "detalle de sprint: respuesta es JSON parseable": {
+                "name": "detalle de sprint: respuesta es JSON parseable",
+                "path": "::detalle de sprint: respuesta es JSON parseable",
+                "id": "4ca59919c338ef373140fd532d7ad24c",
+                "passes": 300,
+                "fails": 0
+            },
+            "analítica de sprints: status es 200": {
+                "name": "analítica de sprints: status es 200",
+                "path": "::analítica de sprints: status es 200",
+                "id": "f68242ea7c4dd2682564e660ff5768d1",
+                "passes": 300,
+                "fails": 0
+            },
+            "analítica de sprints: respuesta es JSON parseable": {
+                "id": "31947948b75ed31fdc4deef4cf1e16e2",
+                "passes": 300,
+                "fails": 0,
+                "name": "analítica de sprints: respuesta es JSON parseable",
+                "path": "::analítica de sprints: respuesta es JSON parseable"
+            },
+            "burndown del sprint: status es 200": {
+                "name": "burndown del sprint: status es 200",
+                "path": "::burndown del sprint: status es 200",
+                "id": "4538de895db008703b6b43dffe31140a",
+                "passes": 300,
+                "fails": 0
+            },
+            "burndown del sprint: respuesta es JSON parseable": {
+                "fails": 0,
+                "name": "burndown del sprint: respuesta es JSON parseable",
+                "path": "::burndown del sprint: respuesta es JSON parseable",
+                "id": "e194e878cd3052ca45a095812e316b76",
+                "passes": 300
+            },
+            "equipo: status es 200": {
+                "fails": 0,
+                "name": "equipo: status es 200",
+                "path": "::equipo: status es 200",
+                "id": "c5dbe876acd5aef435a4790b14a7e4e7",
+                "passes": 300
+            },
+            "equipo: respuesta es JSON parseable": {
+                "name": "equipo: respuesta es JSON parseable",
+                "path": "::equipo: respuesta es JSON parseable",
+                "id": "9aa88442070d4d7b4cf93b26fb0f9aef",
+                "passes": 300,
+                "fails": 0
+            },
+            "resumen de miembros: status es 200": {
+                "name": "resumen de miembros: status es 200",
+                "path": "::resumen de miembros: status es 200",
+                "id": "c7f3fcf8e71b40496e3110fec6b67894",
+                "passes": 300,
+                "fails": 0
+            },
+            "resumen de miembros: respuesta es JSON parseable": {
+                "fails": 0,
+                "name": "resumen de miembros: respuesta es JSON parseable",
+                "path": "::resumen de miembros: respuesta es JSON parseable",
+                "id": "7fb66e096f51bc9b828c695b5f7a58e7",
+                "passes": 300
+            },
+            "roles del proyecto: status es 200": {
+                "path": "::roles del proyecto: status es 200",
+                "id": "e2a0297401af59d82909e77084334f24",
+                "passes": 300,
+                "fails": 0,
+                "name": "roles del proyecto: status es 200"
+            },
+            "roles del proyecto: respuesta es JSON parseable": {
+                "passes": 300,
+                "fails": 0,
+                "name": "roles del proyecto: respuesta es JSON parseable",
+                "path": "::roles del proyecto: respuesta es JSON parseable",
+                "id": "b3fd178800e2213734af7e7b09cf9699"
+            },
+            "actividades y asistencia: status es 200": {
+                "path": "::actividades y asistencia: status es 200",
+                "id": "facba68b30e18b0bf981e7e72377d8cc",
+                "passes": 300,
+                "fails": 0,
+                "name": "actividades y asistencia: status es 200"
+            },
+            "actividades y asistencia: respuesta es JSON parseable": {
+                "name": "actividades y asistencia: respuesta es JSON parseable",
+                "path": "::actividades y asistencia: respuesta es JSON parseable",
+                "id": "17ef4e1175d9f5fe91fe5dc611e1d814",
+                "passes": 300,
+                "fails": 0
+            },
+            "eventos del proyecto: status es 200": {
+                "passes": 300,
+                "fails": 0,
+                "name": "eventos del proyecto: status es 200",
+                "path": "::eventos del proyecto: status es 200",
+                "id": "a3b82d44c0ce4f3ba4bdb31972b0bfeb"
+            },
+            "eventos del proyecto: respuesta es JSON parseable": {
+                "fails": 0,
+                "name": "eventos del proyecto: respuesta es JSON parseable",
+                "path": "::eventos del proyecto: respuesta es JSON parseable",
+                "id": "d9da74cc263ec948990e6c9bacea7db2",
+                "passes": 300
+            },
+            "bitácora: status es 200": {
+                "name": "bitácora: status es 200",
+                "path": "::bitácora: status es 200",
+                "id": "19df9c62fb4e7900ff571945f83cc5ea",
+                "passes": 300,
+                "fails": 0
+            },
+            "bitácora: respuesta es JSON parseable": {
+                "name": "bitácora: respuesta es JSON parseable",
+                "path": "::bitácora: respuesta es JSON parseable",
+                "id": "02366bb1c4e1319fb8d9f2057a9db32b",
+                "passes": 300,
+                "fails": 0
+            },
+            "comentarios del proyecto: status es 200": {
+                "name": "comentarios del proyecto: status es 200",
+                "path": "::comentarios del proyecto: status es 200",
+                "id": "a9337e7cf3e163b44133a09ab7b2a67c",
+                "passes": 300,
+                "fails": 0
+            },
+            "comentarios del proyecto: respuesta es JSON parseable": {
+                "name": "comentarios del proyecto: respuesta es JSON parseable",
+                "path": "::comentarios del proyecto: respuesta es JSON parseable",
+                "id": "bf4ac008684753e61e527998f9c51bab",
+                "passes": 300,
+                "fails": 0
+            },
+            "chat del proyecto: status es 200": {
+                "fails": 0,
+                "name": "chat del proyecto: status es 200",
+                "path": "::chat del proyecto: status es 200",
+                "id": "39ad82de12dea0f8e73d21ef60edf64d",
+                "passes": 300
+            },
+            "chat del proyecto: respuesta es JSON parseable": {
+                "name": "chat del proyecto: respuesta es JSON parseable",
+                "path": "::chat del proyecto: respuesta es JSON parseable",
+                "id": "d98ef508095f2659c6fa603617cda0dc",
+                "passes": 300,
+                "fails": 0
+            },
+            "chat global: status es 200": {
+                "name": "chat global: status es 200",
+                "path": "::chat global: status es 200",
+                "id": "4277140a55d58b2bd162a0867d4fd6e5",
+                "passes": 300,
+                "fails": 0
+            },
+            "chat global: respuesta es JSON parseable": {
+                "name": "chat global: respuesta es JSON parseable",
+                "path": "::chat global: respuesta es JSON parseable",
+                "id": "b3ad8e7427361c312cdf71bbe11880d2",
+                "passes": 300,
+                "fails": 0
+            },
+            "notificaciones: status es 200": {
+                "name": "notificaciones: status es 200",
+                "path": "::notificaciones: status es 200",
+                "id": "26b1cdaef55610913a34c2cd7db107d0",
+                "passes": 300,
+                "fails": 0
+            },
+            "notificaciones: respuesta es JSON parseable": {
+                "passes": 300,
+                "fails": 0,
+                "name": "notificaciones: respuesta es JSON parseable",
+                "path": "::notificaciones: respuesta es JSON parseable",
+                "id": "14ede6fbe8c737cf5027f60d93424f36"
+            },
+            "conteo de no leídas: status es 200": {
+                "name": "conteo de no leídas: status es 200",
+                "path": "::conteo de no leídas: status es 200",
+                "id": "6a492e8cc561cc8e78d321187e0d0d0d",
+                "passes": 300,
+                "fails": 0
+            },
+            "conteo de no leídas: respuesta es JSON parseable": {
+                "passes": 300,
+                "fails": 0,
+                "name": "conteo de no leídas: respuesta es JSON parseable",
+                "path": "::conteo de no leídas: respuesta es JSON parseable",
+                "id": "d8185e241fbfbdae19f14678e7ed73d2"
+            },
+            "catálogos: status es 200": {
+                "name": "catálogos: status es 200",
+                "path": "::catálogos: status es 200",
+                "id": "2fab145fc939005cde62e7711dfcfb4f",
+                "passes": 300,
+                "fails": 0
+            },
+            "catálogos: respuesta es JSON parseable": {
+                "id": "a1b57a81321dd0b0edee46213ea7eaa5",
+                "passes": 300,
+                "fails": 0,
+                "name": "catálogos: respuesta es JSON parseable",
+                "path": "::catálogos: respuesta es JSON parseable"
+            },
+            "sesión del usuario: status es 200": {
+                "name": "sesión del usuario: status es 200",
+                "path": "::sesión del usuario: status es 200",
+                "id": "754b19345a25398654f6b0471fb19416",
+                "passes": 300,
+                "fails": 0
+            },
+            "sesión del usuario: respuesta es JSON parseable": {
+                "passes": 300,
+                "fails": 0,
+                "name": "sesión del usuario: respuesta es JSON parseable",
+                "path": "::sesión del usuario: respuesta es JSON parseable",
+                "id": "adcbd688ef39026c8ba8d8398aa7f716"
+            },
+            "perfil: status es 200": {
+                "passes": 300,
+                "fails": 0,
+                "name": "perfil: status es 200",
+                "path": "::perfil: status es 200",
+                "id": "af1644d2f2af85931960c2f1561e8387"
+            },
+            "perfil: respuesta es JSON parseable": {
+                "name": "perfil: respuesta es JSON parseable",
+                "path": "::perfil: respuesta es JSON parseable",
+                "id": "5364b8b8b3aed1872216be6702c7030d",
+                "passes": 300,
+                "fails": 0
+            },
+            "dashboard: status es 200": {
+                "name": "dashboard: status es 200",
+                "path": "::dashboard: status es 200",
+                "id": "1f3510cf798d75d0bc7f0087181aaca3",
+                "passes": 300,
+                "fails": 0
+            },
+            "dashboard: respuesta es JSON parseable": {
+                "name": "dashboard: respuesta es JSON parseable",
+                "path": "::dashboard: respuesta es JSON parseable",
+                "id": "f4e1db41ac99dc029d4a7c3db2bbaa9e",
+                "passes": 300,
+                "fails": 0
+            },
+            "mis tareas: status es 200": {
+                "fails": 0,
+                "name": "mis tareas: status es 200",
+                "path": "::mis tareas: status es 200",
+                "id": "99ecd9e8be6f64ae7124c3516245862e",
+                "passes": 300
+            },
+            "mis tareas: respuesta es JSON parseable": {
+                "name": "mis tareas: respuesta es JSON parseable",
+                "path": "::mis tareas: respuesta es JSON parseable",
+                "id": "cb46ef359b43eae44f0072d5fce1fef7",
+                "passes": 300,
+                "fails": 0
+            },
+            "mis horas: status es 200": {
+                "path": "::mis horas: status es 200",
+                "id": "82bcacedac6ade7f63e2c72fbdba56aa",
+                "passes": 300,
+                "fails": 0,
+                "name": "mis horas: status es 200"
+            },
+            "mis horas: respuesta es JSON parseable": {
+                "name": "mis horas: respuesta es JSON parseable",
+                "path": "::mis horas: respuesta es JSON parseable",
+                "id": "fb23c87901aaf7e495e4124c6c31e220",
+                "passes": 300,
+                "fails": 0
+            },
+            "mis postulaciones: status es 200": {
+                "path": "::mis postulaciones: status es 200",
+                "id": "fac885ca1ea9c31894cc621dff348fa9",
+                "passes": 300,
+                "fails": 0,
+                "name": "mis postulaciones: status es 200"
+            },
+            "mis postulaciones: respuesta es JSON parseable": {
+                "fails": 0,
+                "name": "mis postulaciones: respuesta es JSON parseable",
+                "path": "::mis postulaciones: respuesta es JSON parseable",
+                "id": "49809ba6d02d929cc066a5fb59983315",
+                "passes": 300
+            },
+            "búsqueda global: status es 200": {
+                "name": "búsqueda global: status es 200",
+                "path": "::búsqueda global: status es 200",
+                "id": "0a7edb057da892fd399bdc2faa8d5e47",
+                "passes": 300,
+                "fails": 0
+            },
+            "búsqueda global: respuesta es JSON parseable": {
+                "name": "búsqueda global: respuesta es JSON parseable",
+                "path": "::búsqueda global: respuesta es JSON parseable",
+                "id": "c92dbd18eb56a085c896ba1cca9f8668",
+                "passes": 300,
+                "fails": 0
+            },
+            "admin: estadísticas: status es 200": {
+                "path": "::admin: estadísticas: status es 200",
+                "id": "9222d0bd2fbab0872b2503482604839c",
+                "passes": 300,
+                "fails": 0,
+                "name": "admin: estadísticas: status es 200"
+            },
+            "admin: estadísticas: respuesta es JSON parseable": {
+                "name": "admin: estadísticas: respuesta es JSON parseable",
+                "path": "::admin: estadísticas: respuesta es JSON parseable",
+                "id": "bb9bcc3eb8f2afbfdee949ea86e15b92",
+                "passes": 300,
+                "fails": 0
+            },
+            "admin: métricas: status es 200": {
+                "name": "admin: métricas: status es 200",
+                "path": "::admin: métricas: status es 200",
+                "id": "b7b2d6bfe1bf5e01abf9251b90c64de2",
+                "passes": 300,
+                "fails": 0
+            },
+            "admin: métricas: respuesta es JSON parseable": {
+                "name": "admin: métricas: respuesta es JSON parseable",
+                "path": "::admin: métricas: respuesta es JSON parseable",
+                "id": "527255085ba074f6fd4196bec47d4b88",
+                "passes": 300,
+                "fails": 0
+            },
+            "admin: usuarios: status es 200": {
+                "id": "fd724b417bd54d030962c91422e888de",
+                "passes": 300,
+                "fails": 0,
+                "name": "admin: usuarios: status es 200",
+                "path": "::admin: usuarios: status es 200"
+            },
+            "admin: usuarios: respuesta es JSON parseable": {
+                "name": "admin: usuarios: respuesta es JSON parseable",
+                "path": "::admin: usuarios: respuesta es JSON parseable",
+                "id": "3008af8c04f6528fd0b1ace6a06594bb",
+                "passes": 300,
+                "fails": 0
+            },
+            "admin: proyectos activos: status es 200": {
+                "fails": 0,
+                "name": "admin: proyectos activos: status es 200",
+                "path": "::admin: proyectos activos: status es 200",
+                "id": "84661d9cecefd0ddbf0c9f102ac06969",
+                "passes": 300
+            },
+            "admin: proyectos activos: respuesta es JSON parseable": {
+                "name": "admin: proyectos activos: respuesta es JSON parseable",
+                "path": "::admin: proyectos activos: respuesta es JSON parseable",
+                "id": "d651eb92de549199d5abf96215bcd0a1",
+                "passes": 300,
+                "fails": 0
+            },
+            "admin: bandeja de revisiones: status es 200": {
+                "path": "::admin: bandeja de revisiones: status es 200",
+                "id": "d4e8a320971a700c09c470fa7c076d55",
+                "passes": 300,
+                "fails": 0,
+                "name": "admin: bandeja de revisiones: status es 200"
+            },
+            "admin: bandeja de revisiones: respuesta es JSON parseable": {
+                "path": "::admin: bandeja de revisiones: respuesta es JSON parseable",
+                "id": "c67d0bca172cd9f0590cd2602646b195",
+                "passes": 300,
+                "fails": 0,
+                "name": "admin: bandeja de revisiones: respuesta es JSON parseable"
+            },
+            "admin: notificaciones: status es 200": {
+                "name": "admin: notificaciones: status es 200",
+                "path": "::admin: notificaciones: status es 200",
+                "id": "21dd190060365bea211eff3130af92d3",
+                "passes": 300,
+                "fails": 0
+            },
+            "admin: notificaciones: respuesta es JSON parseable": {
+                "name": "admin: notificaciones: respuesta es JSON parseable",
+                "path": "::admin: notificaciones: respuesta es JSON parseable",
+                "id": "055a473d2182fb4d06728e1c9ea2f31c",
+                "passes": 300,
+                "fails": 0
+            }
+        }
+    }
+}

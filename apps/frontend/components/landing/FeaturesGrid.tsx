@@ -1,10 +1,14 @@
 "use client";
 
 import { useRef } from "react";
+import dynamic from "next/dynamic";
 import { GraduationCap, HeartHandshake, Network } from "lucide-react";
-import { Sparkles } from "@/components/ui/sparkles";
 import { VerticalCutReveal } from "@/components/ui/vertical-cut-reveal";
 import { TimelineContent } from "@/components/ui/timeline-animation";
+
+// T-293: el fondo de partículas es decorativo y no pinta nada hasta que su motor arranca en el
+// cliente; se carga aparte para que @tsparticles no entre en el JS inicial de la landing.
+const Sparkles = dynamic(() => import("@/components/ui/sparkles").then((m) => m.Sparkles), { ssr: false });
 
 const revealVariants = {
   visible: (i: number) => ({

@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 
 if (typeof (globalThis as any).ResizeObserver === 'undefined') {
   (globalThis as any).ResizeObserver = class {
@@ -22,6 +22,7 @@ vi.mock('../lib/services/admin-projects', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/services/admin-projects')>();
   return { ...actual, getAdminProjects: vi.fn(), getAdminProjectDetail: vi.fn() };
 });
+vi.mock('../lib/services/admin-sprints', () => ({ getAdminSprintCalendar: vi.fn() }));
 
 function createMockSocket() {
   const handlers = new Map<string, Set<(...args: any[]) => void>>();
@@ -41,9 +42,10 @@ function createMockSocket() {
 const mockIo = vi.fn();
 vi.mock('socket.io-client', () => ({ io: (...args: unknown[]) => mockIo(...args) }));
 
-import AdminProjectsClient, { accionHref } from '../app/dashboard/admin/proyectos/admin-projects-client';
+import AdminProjectsClient from '../app/dashboard/admin/proyectos/admin-projects-client';
 import { useRealtimeNotifications } from '../lib/hooks/useRealtimeNotifications';
 import { getAdminProjects } from '../lib/services/admin-projects';
+import { getAdminSprintCalendar } from '../lib/services/admin-sprints';
 import { adminProjectsPrefix, adminProjectsQueryKey } from '../lib/query-keys/admin-projects';
 import {
   ADMIN_PROJECT_GROUP_LABEL,
@@ -56,6 +58,7 @@ function item(overrides: Partial<AdminProjectListItem> = {}): AdminProjectListIt
   return {
     idProyecto: 37,
     tituloProyecto: 'Plataforma de Seguimiento de Laboratorios',
+    tipoProyecto: 'ACADEMICO_HORAS_BECA',
     estadoProyecto: 'EN_PROGRESO',
     lider: { idUsuario: 1, nombre: 'Valeria', apellido: 'Ortiz' },
     usuariosActivos: 8,
@@ -85,6 +88,12 @@ function renderPage() {
 beforeEach(() => {
   searchParamsMock.mockReturnValue(new URLSearchParams('grupo=activos'));
   (getAdminProjects as any).mockResolvedValue(pagina([item()]));
+  (getAdminSprintCalendar as any).mockResolvedValue({
+    hoy: '2026-10-06',
+    items: [],
+    conteos: { EN_CURSO: 0, VENCE_HOY: 0, PLAN_VENCIDO: 0, EN_FINALIZACION: 0, SIN_FECHA: 0 },
+    resumen: { proximos7Dias: 0, planVencido: 0 },
+  });
 });
 
 afterEach(() => {
@@ -94,13 +103,18 @@ afterEach(() => {
 
 describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
   it('el grupo vive en la URL y encabeza la página, con su total', async () => {
-    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cierres&page=2'));
-    (getAdminProjects as any).mockResolvedValue(pagina([item({ accion: 'REVISAR_CIERRE', estadoProyecto: 'EN_SOLICITUD_CIERRE' })], { total: 25, page: 2 }));
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cerrados&page=2'));
+    (getAdminProjects as any).mockResolvedValue(pagina([item({ accion: 'CONSULTAR_HISTORICO', estadoProyecto: 'CERRADO' })], { total: 25, page: 2 }));
     renderPage();
 
-    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cierres', page: 2, limit: 20 }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Solicitudes de cierre' })).toBeInTheDocument();
-    expect(await screen.findByText('25 proyectos')).toBeInTheDocument();
+    // Cerrados carga el grupo completo (páginas de 50): `page` en la URL ya no pagina en servidor.
+    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page: 1, limit: 50 }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Cerrados' })).toBeInTheDocument();
+    // El total real (todas las páginas) va antes de la tabla, sin badge junto al título.
+    const total = await screen.findByText(/Total de proyectos cerrados:/);
+    expect(total.textContent?.replace(/\s+/g, ' ')).toBe('Total de proyectos cerrados: 25');
+    expect(screen.getByRole('heading', { level: 1 }).parentElement).not.toHaveTextContent('25');
+    expect(screen.queryByText('25 proyectos')).not.toBeInTheDocument();
     expect(ADMIN_PROJECT_GROUPS).toEqual(['activos', 'cierres', 'cerrados']);
   });
 
@@ -109,7 +123,7 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
     (getAdminProjects as any).mockResolvedValue(pagina([item({ estadoProyecto: 'CERRADO', accion: 'CONSULTAR_HISTORICO' })]));
     renderPage();
 
-    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page: 1, limit: 20 }));
+    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page: 1, limit: 50 }));
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(screen.queryAllByRole('tab')).toHaveLength(0);
     // Ningún enlace de la página apunta a otro grupo de la bandeja.
@@ -120,6 +134,47 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
     }
   });
 
+  it('la miga de pan empieza en la sección Proyectos, sin Dashboard, en los tres grupos', async () => {
+    for (const [grupo, etiqueta] of [
+      ['activos', 'Activos'],
+      ['cierres', 'Solicitudes de cierre'],
+      ['cerrados', 'Cerrados'],
+    ] as const) {
+      searchParamsMock.mockReturnValue(new URLSearchParams(`grupo=${grupo}`));
+      (getAdminProjects as any).mockResolvedValue(pagina([item()]));
+      const { unmount } = renderPage();
+      const miga = within(screen.getByRole('navigation', { name: /breadcrumb/i }));
+
+      expect(miga.getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Proyectos', etiqueta]);
+      expect(miga.queryByText('Dashboard')).not.toBeInTheDocument();
+      expect(miga.getByRole('link', { name: 'Proyectos' })).toHaveAttribute(
+        'href',
+        '/dashboard/admin/proyectos?grupo=activos',
+      );
+      unmount();
+    }
+  });
+
+  it('Cerrados y Activos tampoco llevan badge en el título; cada uno etiqueta su total', async () => {
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cerrados'));
+    (getAdminProjects as any).mockResolvedValue(pagina([item({ estadoProyecto: 'CERRADO' })], { total: 61 }));
+    const cerrados = renderPage();
+    const total = await screen.findByText(/Total de proyectos cerrados:/);
+    expect(total.textContent?.replace(/\s+/g, ' ')).toBe('Total de proyectos cerrados: 61');
+    expect(screen.getByRole('heading', { level: 1 }).parentElement).not.toHaveTextContent('61');
+    cerrados.unmount();
+
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=activos'));
+    (getAdminProjects as any).mockResolvedValue(pagina([item()], { total: 1 }));
+    renderPage();
+    const activos = await screen.findByText(/Total de proyectos activos:/);
+    expect(activos.textContent?.replace(/\s+/g, ' ')).toBe('Total de proyectos activos: 1');
+    // Un solo contador: el del tablero, antes de la tabla.
+    expect(screen.getAllByText(/Total de proyectos/)).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Activos' })).toBeInTheDocument();
+    expect(screen.queryByText(/^\d+ proyectos?$/)).not.toBeInTheDocument();
+  });
+
   it('un grupo inválido en la URL redirige a ?grupo=activos', async () => {
     searchParamsMock.mockReturnValue(new URLSearchParams('grupo=todos'));
     renderPage();
@@ -127,21 +182,43 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/dashboard/admin/proyectos?grupo=activos'));
   });
 
-  it('renderiza proyecto, líder, usuarios activos (sin recalcular), Sprint ambiente y acción sugerida', async () => {
+  it('Activos renderiza proyecto, líder, usuarios activos (sin recalcular) y Sprint actual; sin acción sugerida', async () => {
     renderPage();
 
     expect(await screen.findByRole('link', { name: 'Plataforma de Seguimiento de Laboratorios' })).toHaveAttribute('href', '/dashboard/admin/proyectos/37');
-    expect(screen.getByText('Valeria Ortiz')).toBeInTheDocument();
+    expect(screen.getAllByText('Valeria Ortiz').length).toBeGreaterThan(0);
     expect(screen.getByText('8')).toBeInTheDocument();
-    expect(screen.getByText('Sprint 6')).toBeInTheDocument();
-    expect(screen.getByText('Monitorear')).toBeInTheDocument();
+    expect(screen.getAllByText(/Sprint 6/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('columnheader', { name: 'Sprint actual' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Finalización esperada' })).toBeInTheDocument();
+    expect(screen.queryByText('Sprint ambiente')).not.toBeInTheDocument();
+    expect(screen.queryByText('Acción sugerida')).not.toBeInTheDocument();
+    expect(screen.queryByText('Monitorear')).not.toBeInTheDocument();
   });
 
-  it('sprintAmbiente: null renderiza «—»', async () => {
+  it('sprintAmbiente: null se explica como «Sin Sprint», no como un guion mudo', async () => {
     (getAdminProjects as any).mockResolvedValue(pagina([item({ sprintAmbiente: null })]));
     renderPage();
 
-    expect(await screen.findByLabelText('Sin Sprint operable')).toHaveTextContent('—');
+    expect((await screen.findAllByText('Sin Sprint')).length).toBeGreaterThan(0);
+  });
+
+  it('Activos carga la población completa (páginas de 50) en vez de paginar en la URL', async () => {
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=activos&page=1&limit=500'));
+    (getAdminProjects as any).mockImplementation(({ page }: { page: number }) =>
+      Promise.resolve(pagina([item({ idProyecto: page, tituloProyecto: `Proyecto ${page}` })], { total: 120, limit: 50, page })),
+    );
+    renderPage();
+
+    await screen.findByRole('link', { name: 'Proyecto 1' });
+    expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'activos', page: 1, limit: 50 });
+    expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'activos', page: 2, limit: 50 });
+    expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'activos', page: 3, limit: 50 });
+    expect(getAdminProjects).toHaveBeenCalledTimes(3);
+    expect(screen.getByRole('link', { name: 'Proyecto 3' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Paginación' })).not.toBeInTheDocument();
+    // El calendario se pide una sola vez para toda la bandeja.
+    expect(getAdminSprintCalendar).toHaveBeenCalledTimes(1);
   });
 
   it('no ofrece ninguna acción de escritura sobre el Sprint', async () => {
@@ -154,22 +231,29 @@ describe('VIEW-15 — bandeja administrativa por grupo (F012)', () => {
     expect(links.some((h) => h?.includes('/sprints/'))).toBe(false);
   });
 
-  it('accionHref enruta por la acción sugerida sin habilitar escrituras', () => {
-    expect(accionHref(item({ accion: 'REVISAR_CIERRE' }))).toBe('/dashboard/admin/proyectos/37/cierre');
-    // «Abrir» nunca saca al administrador del proyecto elegido hacia otra bandeja.
-    expect(accionHref(item({ accion: 'REVISAR_PUBLICACION' }))).toBe('/dashboard/admin/proyectos/37');
-    expect(accionHref(item({ accion: 'CONSULTAR_HISTORICO' }))).toBe('/dashboard/admin/proyectos/37');
-  });
-
-  it('la paginación respeta limit y nunca supera 50', async () => {
-    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=activos&page=1&limit=500'));
-    (getAdminProjects as any).mockResolvedValue(pagina([item()], { total: 120, limit: 50 }));
+  it('Cerrados carga el grupo completo en páginas de 50 y pagina el resultado en cliente', async () => {
+    searchParamsMock.mockReturnValue(new URLSearchParams('grupo=cerrados'));
+    (getAdminProjects as any).mockImplementation(({ page }: { page: number }) =>
+      Promise.resolve(
+        pagina(
+          Array.from({ length: page === 3 ? 20 : 50 }, (_, i) =>
+            item({ idProyecto: page * 100 + i, tituloProyecto: `Proyecto ${page}-${i}`, estadoProyecto: 'CERRADO', accion: 'CONSULTAR_HISTORICO' }),
+          ),
+          { total: 120, limit: 50, page },
+        ),
+      ),
+    );
     renderPage();
 
-    await waitFor(() => expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'activos', page: 1, limit: 50 }));
-    expect(await screen.findByText(/Página 1 de 3/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Página siguiente' })).toHaveAttribute('href', '/dashboard/admin/proyectos?grupo=activos&page=2&limit=50');
-    expect(adminProjectsQueryKey('activos', 1, 50)).toEqual(['admin', 'proyectos', 'activos', 1, 50]);
+    expect(await screen.findByText(/Página 1 de 6/)).toBeInTheDocument();
+    expect(getAdminProjects).toHaveBeenCalledTimes(3);
+    for (const page of [1, 2, 3]) expect(getAdminProjects).toHaveBeenCalledWith({ grupo: 'cerrados', page, limit: 50 });
+    expect(screen.getAllByRole('row')).toHaveLength(21);
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText(/Página 2 de 6/)).toBeInTheDocument();
+    expect(screen.getByText('Proyecto 1-20')).toBeInTheDocument();
+    // La consulta histórica no arrastra columnas de supervisión.
+    expect(screen.queryByText(/Usuarios activos|Sprint ambiente|Acción sugerida|Consultar histórico/)).not.toBeInTheDocument();
   });
 
   it('un grupo vacío muestra su Empty específico', async () => {

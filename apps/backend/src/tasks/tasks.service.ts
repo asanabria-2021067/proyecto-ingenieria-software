@@ -620,6 +620,17 @@ export class TasksService {
 
       await tx.tarea.update({ where: { idTarea: taskId }, data });
 
+      // HU-186: los avisos de vencimiento ya registrados eran de la fecha
+      // anterior. Si la fecha cambia de verdad se borran en esta misma
+      // transacción, para que TasksDueReminderService vuelva a avisar a 48 h
+      // y 24 h de la nueva. Las notificaciones ya entregadas no se tocan.
+      if (
+        data.fechaLimite instanceof Date &&
+        data.fechaLimite.getTime() !== tareaAntes?.fechaLimite?.getTime()
+      ) {
+        await tx.recordatorioTarea.deleteMany({ where: { idTarea: taskId } });
+      }
+
       if (Object.prototype.hasOwnProperty.call(dto, 'idsEtiquetas')) {
         await tx.tareaEtiqueta.deleteMany({ where: { idTarea: taskId } });
 

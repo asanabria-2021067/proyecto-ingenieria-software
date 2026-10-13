@@ -40,17 +40,17 @@ export function SectionCommentReadonly({
   variant?: 'field' | 'plain';
 }) {
   return (
-    <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+    <div className="mt-6 rounded-xl border border-review-soft/60 bg-review-soft/10 p-4">
       <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+        <MessageSquare className="h-3.5 w-3.5 text-review-ink dark:text-review-soft shrink-0" />
+        <span className="text-[10px] font-black uppercase tracking-widest text-review-ink dark:text-review-soft">
           Comentarios del revisor
         </span>
       </div>
       {variant === 'plain' ? (
         <p className="text-sm text-on-surface whitespace-pre-wrap">{comment}</p>
       ) : (
-        <div className="w-full rounded-lg border border-amber-500/30 bg-transparent px-3 py-2.5 text-sm min-h-18 text-on-surface whitespace-pre-wrap">
+        <div className="w-full rounded-lg border border-review-soft/60 bg-transparent px-3 py-2.5 text-sm min-h-18 text-on-surface whitespace-pre-wrap">
           {comment?.trim() || (
             <span className="text-outline-variant italic">Sin comentarios aún.</span>
           )}

@@ -9,13 +9,12 @@ import {
   SLATE_BADGE,
   estadoBadgeLabel,
   estadoBadgeStyle,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
-import { ESTADO_LABEL } from '@/components/projects/task-board.utils';
+import { ESTADO_LABEL, ESTADO_TAREA_TONE } from '@/components/projects/task-board.utils';
 import { formatearHoras } from '@/lib/hours/format';
 import type { MisHorasProyecto, MisHorasTarea } from '@/lib/services/users';
 import type { EstadoTarea, TipoProyecto } from '@/types';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 const ICONO_TIPO: Record<TipoProyecto, LucideIcon> = {
   ACADEMICO_HORAS_BECA: GraduationCap,
@@ -23,16 +22,9 @@ const ICONO_TIPO: Record<TipoProyecto, LucideIcon> = {
   ACADEMICO_EXPERIENCIA: Briefcase,
 };
 
-/** Mismos tonos que Mis Tareas y el explorador de tareas (el mapa no se extrae aquí). */
-const ESTADO_TAREA_TONE: Record<EstadoTarea, string> = {
-  POR_HACER: 'pill-neutral',
-  EN_PROGRESO: 'pill-warning',
-  EN_REVISION: 'pill-neutral',
-  HECHO: 'pill-success',
-};
 
 /** Icono del tipo de proyecto: neutro y sin fondo, al par del título. */
-function IconoTipo({ tipo }: { tipo: TipoProyecto }) {
+export function IconoTipo({ tipo }: { tipo: TipoProyecto }) {
   const Icono = ICONO_TIPO[tipo] ?? FolderOpen;
   return <Icono data-slot="icono-tipo" className="size-5 shrink-0 text-text-primary" aria-hidden="true" />;
 }
@@ -99,7 +91,7 @@ function TablaTareas({ proyecto }: { proyecto: MisHorasProyecto }) {
               {tarea.sprint ? `Sprint ${tarea.sprint.numero}` : <span className="text-text-secondary">Sin sprint</span>}
             </TableCell>
             <TableCell className="hidden sm:table-cell">
-              <span className={`pill ${ESTADO_TAREA_TONE[tarea.estadoTarea]}`}>{ESTADO_LABEL[tarea.estadoTarea]}</span>
+              <span className={`pill pill-${ESTADO_TAREA_TONE[tarea.estadoTarea]}`}>{ESTADO_LABEL[tarea.estadoTarea]}</span>
             </TableCell>
             <TableCell className="text-right tabular-nums">{formatearHoras(tarea.registradas)}</TableCell>
             <TableCell className="hidden text-right tabular-nums sm:table-cell">{formatearHoras(tarea.legacy)}</TableCell>
@@ -123,7 +115,7 @@ function ProyectoAbierto({ proyecto }: { proyecto: MisHorasProyecto }) {
               <span className="type-subtitle font-semibold">{proyecto.tituloProyecto}</span>
             </span>
             <span className="flex flex-wrap gap-micro">
-              <span className={`pill ${tipoBadgeStyle(proyecto.tipoProyecto)}`}>{tipoBadgeLabel(proyecto.tipoProyecto)}</span>
+              <TipoBadge tipo={proyecto.tipoProyecto} />
               <span className={`pill ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
                 {estadoBadgeLabel(proyecto.estadoProyecto)}
               </span>

@@ -121,6 +121,16 @@ export interface NotificationTemplateData {
     solicitudId: number;
   };
 
+  CUENTA_PENDIENTE_VERIFICACION: {
+    userName: string;
+    carne: string;
+    userId: number;
+  };
+
+  CUENTA_VERIFICADA: {
+    userName: string;
+  };
+
   // G05-C12 (OWASP25-C038): ráfaga de eventos de seguridad. Solo conteos:
   // nunca IPs, correos, cuentas ni tokens.
   ALERTA_SEGURIDAD: {
@@ -233,6 +243,32 @@ export interface NotificationTemplateData {
     eventId: number;
     /** Fecha/hora de inicio ya formateada por el emisor (es-GT), lista para mostrar. */
     fechaInicioTexto: string;
+    /**
+     * G04 (UI-22): el mismo inicio como instante ISO. No se muestra: es la
+     * clave con la que EventsReminderService reconoce a quién ya avisó de este
+     * evento para esta hora de inicio. Opcional porque los avisos anteriores
+     * a G04 no lo traen (para esos se compara `fechaInicioTexto`).
+     */
+    fechaInicioIso?: string;
+  };
+
+  // HU-184: un usuario compartió su calendario (solo lectura) con el destinatario.
+  CALENDARIO_COMPARTIDO: {
+    ownerId: number;
+    ownerName: string;
+  };
+  // HU-186 (T-330): aviso de vencimiento emitido por TasksDueReminderService
+  // al responsable de la tarea. taskId/projectId viajan en datosJson para el
+  // enlace del centro de notificaciones; el texto no los muestra.
+  TAREA_POR_VENCER: {
+    taskTitle: string;
+    projectTitle: string;
+    taskId: number;
+    projectId: number;
+    /** Ventana del aviso: 48 = pasado mañana, 24 = mañana (fechaLimite es solo fecha). */
+    horasAntes: 24 | 48;
+    /** fechaLimite ya formateada por el emisor (es-GT), lista para mostrar. */
+    fechaLimiteTexto: string;
   };
 }
 
@@ -448,6 +484,32 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Recordatorio de evento',
     message: (data: NotificationTemplateData['RECORDATORIO_EVENTO']) =>
       `"${data.eventTitle}" en el proyecto "${data.projectTitle}" comienza el ${data.fechaInicioTexto}.`,
+  },
+
+  CUENTA_PENDIENTE_VERIFICACION: {
+    title: 'Cuenta nueva pendiente de verificación',
+    message: (data: NotificationTemplateData['CUENTA_PENDIENTE_VERIFICACION']) =>
+      `${data.userName} (carné ${data.carne}) creó una cuenta y espera verificación.`,
+  },
+
+  CUENTA_VERIFICADA: {
+    title: 'Tu cuenta fue verificada',
+    message: (data: NotificationTemplateData['CUENTA_VERIFICADA']) =>
+      `${data.userName}, administración aprobó tu cuenta. Ya puedes usar la plataforma.`,
+  },
+
+  CALENDARIO_COMPARTIDO: {
+    title: 'Calendario compartido',
+    message: (data: NotificationTemplateData['CALENDARIO_COMPARTIDO']) =>
+      `${data.ownerName} compartió su calendario contigo. Actívalo en tu calendario para ver sus actividades.`,
+  },
+
+  TAREA_POR_VENCER: {
+    title: (data: NotificationTemplateData['TAREA_POR_VENCER']) =>
+      data.horasAntes === 24 ? 'Tu tarea vence mañana' : 'Tu tarea vence en 2 días',
+    message: (data: NotificationTemplateData['TAREA_POR_VENCER']) =>
+      `La tarea "${data.taskTitle}" del proyecto "${data.projectTitle}" vence el ${data.fechaLimiteTexto}. ` +
+      `Este es tu recordatorio de ${data.horasAntes} horas.`,
   },
 } as const;
 

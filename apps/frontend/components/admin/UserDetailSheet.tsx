@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -15,14 +15,21 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import uvgSwal from '@/lib/swal';
 import { getApiErrorMessage } from '@/components/projects/api-error';
+import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
+import { adminProjectHref } from '@/lib/admin/sprint-calendar';
+import { perfilUsuarioQueryKey } from '@/lib/query-keys/social';
+import { getPerfilUsuario } from '@/lib/services/social';
 import {
   getAdminUserDetail,
   updateAdminUserStatus,
@@ -83,6 +90,12 @@ function timeAgo(dateStr: string | null): string {
   return `Hace ${Math.floor(diff / 86400)} d`;
 }
 
+const ESTADO_USUARIO_LABEL: Record<string, string> = {
+  ACTIVO: 'Activo',
+  INACTIVO: 'Inactivo',
+  BLOQUEADO: 'Bloqueado',
+};
+
 function getInitials(nombre: string, apellido: string): string {
   return ((nombre?.[0] ?? '') + (apellido?.[0] ?? '')).toUpperCase() || 'U';
 }
@@ -102,67 +115,56 @@ function getPrimaryRole(roles: string[]): string {
   return priority.find((r) => roles.includes(r)) ?? roles[0] ?? '';
 }
 
-function estadoBadgeClasses(estado: string): string {
-  const e = estado.toUpperCase();
-  if (['PUBLICADO', 'EN_PROGRESO', 'CERRADO'].some((s) => e.includes(s.replace('_', '')))) {
-    if (e.includes('CERRADO')) return 'bg-surface-container-high text-tertiary';
-    return 'bg-primary/10 text-primary';
-  }
-  if (
-    ['EN_REVISION', 'OBSERVADO', 'EN_SOLICITUD_CIERRE'].some((s) =>
-      e.replace(/_/g, '').includes(s.replace(/_/g, '')),
-    )
-  ) {
-    return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200';
-  }
-  if (['CANCELADO'].some((s) => e.includes(s))) {
-    return 'bg-error-container text-error';
-  }
-  return 'bg-surface-container-high text-tertiary';
-}
-
-const ESTADO_LABELS: Record<string, string> = {
-  EN_REVISION: 'En revisión',
-  PUBLICADO: 'Publicado',
-  OBSERVADO: 'Observado',
-  EN_PROGRESO: 'En progreso',
-  EN_SOLICITUD_CIERRE: 'Solicitud de cierre',
-  CERRADO: 'Cerrado',
-  BORRADOR: 'Borrador',
-  CANCELADO: 'Cancelado',
-};
-
-function formatEstadoProyecto(estado: string): string {
-  return ESTADO_LABELS[estado] ?? estado;
-}
-
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * Encabezado de sección del drawer: el título centrado en una caja pequeña,
+ * con una línea de 1 px a cada lado. Va ENCIMA de la tarjeta, no dentro. Es un
+ * rótulo, no un control: sin sombra, sin hover y sin forma de píldora.
+ */
+function DrawerSectionHeading({ title }: { title: string }) {
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4">
-      <h4 className="mb-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
+    <div className="flex items-center gap-inline">
+      <span aria-hidden="true" className="h-px flex-1 bg-outline-variant/60" />
+      <h3 className="rounded-md border border-outline-variant/60 bg-surface-container-lowest px-inline py-micro text-xs font-semibold uppercase tracking-wide text-text-secondary">
         {title}
-      </h4>
-      {children}
+      </h3>
+      <span aria-hidden="true" className="h-px flex-1 bg-outline-variant/60" />
     </div>
+  );
+}
+
+/**
+ * Sección del drawer: encabezado centrado y, debajo, su tarjeta blanca (la
+ * misma del perfil del estudiante). `aside` va dentro de la tarjeta, arriba a
+ * la derecha (p. ej. el contador de colaboraciones).
+ */
+function Section({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="space-y-inline">
+      <DrawerSectionHeading title={title} />
+      <div className="card-base p-stack">
+        {aside && <div className="mb-inline flex justify-end">{aside}</div>}
+        {children}
+      </div>
+    </section>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-2 py-1.5 border-b border-outline-variant/30 last:border-0">
-      <span className="text-xs text-tertiary shrink-0">{label}</span>
-      <span className="text-xs font-medium text-on-surface text-right">{value}</span>
+    <div className="flex items-baseline justify-between gap-stack border-b border-outline-variant/40 py-tight first:pt-0 last:border-0 last:pb-0">
+      <dt className="type-meta shrink-0">{label}</dt>
+      <dd className="type-body min-w-0 break-words text-right font-medium text-text-primary">{value}</dd>
     </div>
   );
 }
 
 function MetricCard({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="flex flex-col items-center rounded-xl bg-surface-container p-3 text-center">
-      <span className="text-2xl font-black tracking-tighter text-on-surface">{value}</span>
-      <span className="mt-0.5 text-[10px] font-medium text-tertiary leading-tight">{label}</span>
+    <div className="flex flex-col items-center rounded-control bg-surface-container p-inline text-center">
+      <span className="font-headline text-2xl font-bold tabular-nums text-text-primary">{value}</span>
+      <span className="type-meta mt-micro leading-tight">{label}</span>
     </div>
   );
 }
@@ -171,19 +173,16 @@ function MetricCard({ label, value }: { label: string; value: number | string })
 
 function DrawerSkeleton() {
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex flex-col items-center gap-3 pb-4 border-b border-outline-variant">
-        <Skeleton className="h-16 w-16 rounded-full bg-surface-container-high" />
-        <Skeleton className="h-5 w-40 rounded bg-surface-container-high" />
-        <Skeleton className="h-4 w-52 rounded bg-surface-container-high" />
-        <div className="flex gap-2">
-          <Skeleton className="h-5 w-16 rounded-full bg-surface-container-high" />
-          <Skeleton className="h-5 w-20 rounded-full bg-surface-container-high" />
-        </div>
+    <div className="space-y-stack" role="status" aria-label="Cargando el detalle del usuario">
+      <div className="flex flex-col items-center gap-tight pb-tight">
+        <Skeleton className="size-20 rounded-full" />
+        <Skeleton className="h-6 w-44" />
+        <Skeleton className="h-4 w-52" />
+        <Skeleton className="h-5 w-16 rounded-pill" />
       </div>
-      <Skeleton className="h-28 w-full rounded-xl bg-surface-container-high" />
-      <Skeleton className="h-36 w-full rounded-xl bg-surface-container-high" />
-      <Skeleton className="h-24 w-full rounded-xl bg-surface-container-high" />
+      <Skeleton className="h-40 w-full rounded-card" />
+      <Skeleton className="h-36 w-full rounded-card" />
+      <Skeleton className="h-28 w-full rounded-card" />
     </div>
   );
 }
@@ -196,7 +195,7 @@ function EstudianteContent({ user }: { user: AdminUserDetail }) {
 
   const horasExtReq = perfil?.horasExtensionRequeridas ?? 100;
   const horasExtAcum = actividad?.horasExtensionAcumuladas ?? 0;
-  const progreso = Math.min(100, Math.round((horasExtAcum / horasExtReq) * 100));
+  const progreso = horasExtReq > 0 ? Math.min(100, Math.round((horasExtAcum / horasExtReq) * 100)) : 0;
   const semestre = perfil?.semestre ?? null;
   const enRiesgo =
     semestre !== null &&
@@ -209,71 +208,58 @@ function EstudianteContent({ user }: { user: AdminUserDetail }) {
     (actividad?.postulaciones.rechazadas ?? 0);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-card">
       {enRiesgo && (
-        <div
-          className="flex gap-2 rounded-xl border p-3"
-          style={{ backgroundColor: '#FCF8F4', borderColor: '#E6D6C3' }}
-        >
-          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: '#C07D2C' }} />
-          <p className="text-xs" style={{ color: '#8B5A1A' }}>
+        <div className="flex gap-tight rounded-control border border-attention/30 bg-attention/10 p-inline">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-attention-strong dark:text-attention" aria-hidden="true" />
+          <p className="type-meta text-text-primary">
             Semestre {semestre} · {horasExtAcum} horas de extensión acumuladas. Estudiante en riesgo
             de no cumplir requisito de graduación.
           </p>
         </div>
       )}
 
-      <Section title="Información académica">
-        <InfoRow label="Carrera" value={perfil?.carrera ?? 'No registrada'} />
-        <InfoRow label="Carné" value={perfil?.carne ?? 'No registrado'} />
-        <InfoRow
-          label="Semestre"
-          value={semestre !== null ? `S${semestre}` : 'No registrado'}
-        />
-        <InfoRow
-          label="Disponibilidad"
-          value={
-            perfil?.disponibilidadHorasSemana
-              ? `${perfil.disponibilidadHorasSemana} horas/semana`
-              : 'No registrada'
-          }
-        />
-      </Section>
-
       <Section title="Progreso de horas">
         <div className="grid grid-cols-2 gap-3 mb-3">
-          <div className="rounded-xl bg-surface-container p-3">
-            <p className="text-[10px] font-black uppercase tracking-widest text-tertiary mb-1">
+          <div className="rounded-control bg-surface-container p-inline">
+            <p className="type-meta mb-micro uppercase tracking-wide">
               Horas beca
             </p>
-            <p className="text-2xl font-black text-on-surface">
+            <p className="font-headline text-2xl font-bold tabular-nums text-text-primary">
               {actividad?.horasBecaAcumuladas ?? 0}
             </p>
-            <p className="text-[10px] text-tertiary mt-0.5">
+            <p className="type-meta mt-micro">
               Meta:{' '}
               {perfil?.horasBecaRequeridas ? `${perfil.horasBecaRequeridas} hrs` : 'No definida'}
             </p>
           </div>
-          <div className="rounded-xl bg-surface-container p-3">
-            <p className="text-[10px] font-black uppercase tracking-widest text-tertiary mb-1">
+          <div className="rounded-control bg-surface-container p-inline">
+            <p className="type-meta mb-micro uppercase tracking-wide">
               Horas extensión
             </p>
-            <p className="text-2xl font-black text-on-surface">
+            <p className="font-headline text-2xl font-bold tabular-nums text-text-primary">
               {horasExtAcum}
             </p>
-            <p className="text-[10px] text-tertiary mt-0.5">
+            <p className="type-meta mt-micro">
               Meta: {horasExtReq} hrs
             </p>
           </div>
         </div>
         <div>
           <div className="flex justify-between mb-1">
-            <span className="text-[10px] text-tertiary">Horas extensión</span>
-            <span className="text-[10px] font-bold text-on-surface">{progreso}%</span>
+            <span className="type-meta">Horas extensión</span>
+            <span className="type-meta font-semibold tabular-nums text-text-primary">{progreso}%</span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">
+          <div
+            role="progressbar"
+            aria-label="Progreso de horas de extensión"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progreso}
+            className="h-2 w-full overflow-hidden rounded-pill bg-surface-container-high"
+          >
             <div
-              className="h-full rounded-full bg-primary transition-all"
+              className="h-full rounded-pill bg-primary"
               style={{ width: `${progreso}%` }}
             />
           </div>
@@ -299,7 +285,7 @@ function MentorContent({ user }: { user: AdminUserDetail }) {
   const act = user.actividadMentor;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-card">
       <Section title="Actividad como mentor">
         <div className="grid grid-cols-2 gap-2">
           <MetricCard label="Proyectos donde participa" value={act?.proyectosDondeParticipa ?? 0} />
@@ -311,18 +297,18 @@ function MentorContent({ user }: { user: AdminUserDetail }) {
 
       <Section title="Proyectos asociados">
         {!act?.proyectosAsociados.length ? (
-          <p className="text-xs text-tertiary">No hay proyectos asociados.</p>
+          <p className="type-body text-text-secondary">No hay proyectos asociados.</p>
         ) : (
-          <ul className="divide-y divide-outline-variant/30">
+          <ul className="divide-y divide-outline-variant/40">
             {act.proyectosAsociados.map((p) => (
               <li key={p.idProyecto} className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
-                <span className="text-xs font-medium text-on-surface line-clamp-1 flex-1">
+                <span className="type-body line-clamp-1 flex-1 font-medium text-text-primary">
                   {p.tituloProyecto}
                 </span>
                 <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${estadoBadgeClasses(p.estadoProyecto)}`}
+                  className={`pill shrink-0 ${estadoBadgeStyle(p.estadoProyecto)}`}
                 >
-                  {formatEstadoProyecto(p.estadoProyecto)}
+                  {estadoBadgeLabel(p.estadoProyecto)}
                 </span>
               </li>
             ))}
@@ -337,27 +323,27 @@ function LiderContent({ user }: { user: AdminUserDetail }) {
   const act = user.actividadLider;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-card">
       <Section title="Actividad como líder">
         <div className="grid grid-cols-2 gap-2">
           <MetricCard label="Proyectos creados" value={act?.proyectosCreados ?? 0} />
           <MetricCard label="Proyectos activos" value={act?.proyectosActivos ?? 0} />
           <MetricCard label="Proyectos cerrados" value={act?.proyectosCerrados ?? 0} />
-          <div className="flex flex-col items-center rounded-xl bg-surface-container p-3 text-center">
+          <div className="flex flex-col items-center rounded-control bg-surface-container p-inline text-center">
             <span
               className={`text-2xl font-black tracking-tighter ${
                 (act?.postulacionesPendientes ?? 0) > 0
-                  ? 'text-amber-700 dark:text-amber-300'
+                  ? 'text-attention-strong dark:text-attention'
                   : 'text-on-surface'
               }`}
             >
               {act?.postulacionesPendientes ?? 0}
             </span>
-            <span className="mt-0.5 text-[10px] font-medium text-tertiary leading-tight">
+            <span className="type-meta mt-micro leading-tight">
               Postulaciones pendientes
             </span>
             {(act?.postulacionesPendientes ?? 0) > 0 && (
-              <span className="mt-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+              <span className="pill pill-amber mt-micro">
                 Requiere atención
               </span>
             )}
@@ -367,23 +353,23 @@ function LiderContent({ user }: { user: AdminUserDetail }) {
 
       <Section title="Proyectos recientes">
         {!act?.proyectosRecientes.length ? (
-          <p className="text-xs text-tertiary">No hay proyectos recientes.</p>
+          <p className="type-body text-text-secondary">No hay proyectos recientes.</p>
         ) : (
-          <ul className="divide-y divide-outline-variant/30">
+          <ul className="divide-y divide-outline-variant/40">
             {act.proyectosRecientes.map((p) => (
               <li key={p.idProyecto} className="py-2 first:pt-0 last:pb-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-on-surface line-clamp-1 flex-1">
+                  <span className="type-body line-clamp-1 flex-1 font-medium text-text-primary">
                     {p.tituloProyecto}
                   </span>
                   <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${estadoBadgeClasses(p.estadoProyecto)}`}
+                    className={`pill shrink-0 ${estadoBadgeStyle(p.estadoProyecto)}`}
                   >
-                    {formatEstadoProyecto(p.estadoProyecto)}
+                    {estadoBadgeLabel(p.estadoProyecto)}
                   </span>
                 </div>
                 {p.postulacionesPendientes > 0 && (
-                  <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-300">
+                  <p className="type-meta mt-micro text-attention-strong dark:text-attention">
                     {p.postulacionesPendientes} postulación(es) pendiente(s)
                   </p>
                 )}
@@ -393,9 +379,9 @@ function LiderContent({ user }: { user: AdminUserDetail }) {
         )}
       </Section>
 
-      <div className="flex gap-2 rounded-xl border border-outline-variant bg-surface-container-low p-3">
-        <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-        <p className="text-xs text-tertiary">
+      <div className="flex gap-tight rounded-control bg-surface-container-low p-inline">
+        <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+        <p className="type-meta">
           Este usuario puede crear y administrar proyectos asociados a su organización.
         </p>
       </div>
@@ -407,7 +393,7 @@ function CoordinadorContent({ user }: { user: AdminUserDetail }) {
   const act = user.actividadCoordinador;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-card">
       <Section title="Actividad como coordinador">
         <div className="grid grid-cols-2 gap-2">
           <MetricCard label="Proyectos supervisados" value={act?.proyectosSupervisados ?? 0} />
@@ -419,18 +405,18 @@ function CoordinadorContent({ user }: { user: AdminUserDetail }) {
 
       <Section title="Proyectos recientes">
         {!act?.proyectosRecientes.length ? (
-          <p className="text-xs text-tertiary">No hay proyectos recientes.</p>
+          <p className="type-body text-text-secondary">No hay proyectos recientes.</p>
         ) : (
-          <ul className="divide-y divide-outline-variant/30">
+          <ul className="divide-y divide-outline-variant/40">
             {act.proyectosRecientes.map((p) => (
               <li key={p.idProyecto} className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
-                <span className="text-xs font-medium text-on-surface line-clamp-1 flex-1">
+                <span className="type-body line-clamp-1 flex-1 font-medium text-text-primary">
                   {p.tituloProyecto}
                 </span>
                 <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${estadoBadgeClasses(p.estadoProyecto)}`}
+                  className={`pill shrink-0 ${estadoBadgeStyle(p.estadoProyecto)}`}
                 >
-                  {formatEstadoProyecto(p.estadoProyecto)}
+                  {estadoBadgeLabel(p.estadoProyecto)}
                 </span>
               </li>
             ))}
@@ -438,9 +424,9 @@ function CoordinadorContent({ user }: { user: AdminUserDetail }) {
         )}
       </Section>
 
-      <div className="flex gap-2 rounded-xl border border-outline-variant bg-surface-container-low p-3">
-        <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-        <p className="text-xs text-tertiary">
+      <div className="flex gap-tight rounded-control bg-surface-container-low p-inline">
+        <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+        <p className="type-meta">
           Este usuario puede supervisar proyectos académicos y validar actividad relacionada.
         </p>
       </div>
@@ -452,8 +438,9 @@ function AdministradorContent({ user }: { user: AdminUserDetail }) {
   const act = user.actividadAdmin;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-card">
       <Section title="Permisos administrativos">
+        <dl>
         <InfoRow
           label="Puede gestionar usuarios"
           value={
@@ -470,11 +457,12 @@ function AdministradorContent({ user }: { user: AdminUserDetail }) {
             </span>
           }
         />
+      </dl>
       </Section>
 
-      <div className="flex gap-2 rounded-xl border border-outline-variant bg-surface-container-low p-3">
-        <Shield className="h-4 w-4 shrink-0 text-tertiary mt-0.5" />
-        <p className="text-xs text-tertiary">
+      <div className="flex gap-tight rounded-control bg-surface-container-low p-inline">
+        <Shield className="mt-0.5 size-4 shrink-0 text-text-secondary" aria-hidden="true" />
+        <p className="type-meta">
           Las cuentas administradoras no pueden ser desactivadas ni bloqueadas desde esta vista.
         </p>
       </div>
@@ -496,15 +484,13 @@ function AdminActions({
   const userName = `${user.nombre} ${user.apellido}`;
 
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4">
-      <h4 className="mb-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-        Acciones administrativas
-      </h4>
-
+    <Section title="Acciones administrativas">
       {user.estado === 'ACTIVO' && (
-        <div className="space-y-2">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <button
+        <>
+          <div className="grid grid-cols-1 gap-tight sm:grid-cols-2">
+            <Button
+              type="button"
+              variant="outline"
               onClick={() =>
                 onAction({
                   nuevoEstado: 'INACTIVO',
@@ -514,12 +500,14 @@ function AdminActions({
                   variant: 'warning',
                 })
               }
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-surface-container-high py-2 text-sm font-semibold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
             >
-              <UserX className="h-4 w-4" />
+              <UserX aria-hidden="true" />
               Desactivar usuario
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-error/40 text-error hover:bg-error/10 hover:text-error"
               onClick={() =>
                 onAction({
                   nuevoEstado: 'BLOQUEADO',
@@ -529,59 +517,129 @@ function AdminActions({
                   variant: 'destructive',
                 })
               }
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-error-container py-2 text-sm font-semibold text-error hover:bg-error/20 transition-colors"
             >
-              <ShieldOff className="h-4 w-4" />
+              <ShieldOff aria-hidden="true" />
               Bloquear usuario
-            </button>
+            </Button>
           </div>
-          <p className="text-[10px] text-tertiary">
+          <p className="type-meta mt-inline">
             Desactivar suspende temporalmente la cuenta. Bloquear restringe el acceso por decisión
             administrativa.
           </p>
-        </div>
+        </>
       )}
 
       {user.estado === 'INACTIVO' && (
-        <div className="space-y-2">
-          <button
-            onClick={() =>
-              onAction({
-                nuevoEstado: 'ACTIVO',
-                title: 'Activar usuario',
-                description: `¿Deseas activar a ${userName}? Recuperará acceso a la plataforma.`,
-                actionLabel: 'Activar',
-                variant: 'default',
-              })
-            }
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2 text-sm font-bold text-on-primary hover:bg-primary/90 transition-colors"
-          >
-            <UserCheck className="h-4 w-4" />
-            Activar usuario
-          </button>
-        </div>
+        <Button
+          type="button"
+          className="w-full"
+          onClick={() =>
+            onAction({
+              nuevoEstado: 'ACTIVO',
+              title: 'Activar usuario',
+              description: `¿Deseas activar a ${userName}? Recuperará acceso a la plataforma.`,
+              actionLabel: 'Activar',
+              variant: 'default',
+            })
+          }
+        >
+          <UserCheck aria-hidden="true" />
+          Activar usuario
+        </Button>
       )}
 
       {user.estado === 'BLOQUEADO' && (
-        <div className="space-y-2">
-          <button
-            onClick={() =>
-              onAction({
-                nuevoEstado: 'ACTIVO',
-                title: 'Desbloquear usuario',
-                description: `¿Deseas desbloquear a ${userName}? Recuperará acceso normal.`,
-                actionLabel: 'Desbloquear',
-                variant: 'default',
-              })
-            }
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2 text-sm font-bold text-on-primary hover:bg-primary/90 transition-colors"
-          >
-            <UserCheck className="h-4 w-4" />
-            Desbloquear usuario
-          </button>
-        </div>
+        <Button
+          type="button"
+          className="w-full"
+          onClick={() =>
+            onAction({
+              nuevoEstado: 'ACTIVO',
+              title: 'Desbloquear usuario',
+              description: `¿Deseas desbloquear a ${userName}? Recuperará acceso normal.`,
+              actionLabel: 'Desbloquear',
+              variant: 'default',
+            })
+          }
+        >
+          <UserCheck aria-hidden="true" />
+          Desbloquear usuario
+        </Button>
       )}
-    </div>
+    </Section>
+  );
+}
+
+// ─── Proyectos activos ────────────────────────────────────────────────────────
+
+/** Estados que UVGenius trata como proyecto activo (los mismos de la bandeja de Proyectos Activos). */
+const ESTADOS_PROYECTO_ACTIVO = new Set(['PUBLICADO', 'EN_PROGRESO']);
+
+/**
+ * Participaciones activas del usuario en proyectos activos, con la misma
+ * tarjeta del perfil del estudiante.
+ *
+ * El detalle administrativo (`GET /admin/usuarios/:id`) solo trae el CONTEO de
+ * participaciones; la lista con proyecto, rol y estado sale del perfil público
+ * (`GET /social/usuarios/:id`), que cualquier usuario autenticado puede leer:
+ * el administrador no gana aquí ningún acceso. De esa respuesta solo se usan
+ * los proyectos; nada social (amistades, seguimiento) se muestra.
+ */
+function ProyectosActivos({ idUsuario }: { idUsuario: number }) {
+  const { data, isPending, isError, isFetching, refetch } = useQuery({
+    queryKey: perfilUsuarioQueryKey(idUsuario),
+    queryFn: () => getPerfilUsuario(idUsuario),
+    select: (perfil) => perfil.proyectosActivos.filter((p) => ESTADOS_PROYECTO_ACTIVO.has(p.estadoProyecto)),
+  });
+
+  return (
+    <Section
+      title="Proyectos activos"
+      aside={
+        data && (
+          <span className="pill pill-neutral tabular-nums">
+            {data.length} {data.length === 1 ? 'colaboración' : 'colaboraciones'}
+          </span>
+        )
+      }
+    >
+      {isPending ? (
+        <div className="flex flex-col gap-tight" role="status" aria-label="Cargando proyectos activos">
+          <Skeleton className="h-14 w-full rounded-control" />
+          <Skeleton className="h-14 w-full rounded-control" />
+        </div>
+      ) : isError || !data ? (
+        <div className="flex flex-wrap items-center justify-between gap-tight" role="alert">
+          <p className="type-body text-text-secondary">No se pudieron cargar los proyectos de este usuario.</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void refetch()} disabled={isFetching}>
+            Reintentar
+          </Button>
+        </div>
+      ) : data.length === 0 ? (
+        <p className="type-body text-text-secondary">Este usuario no participa actualmente en proyectos activos.</p>
+      ) : (
+        // Alto acotado: con muchos proyectos la lista se desplaza por dentro y
+        // las acciones administrativas siguen a un scroll corto de distancia.
+        <ul className="flex max-h-72 flex-col gap-tight overflow-y-auto overscroll-contain">
+          {data.map((p) => (
+            <li key={`${p.idProyecto}-${p.rolNombre}`}>
+              <Link
+                href={adminProjectHref(p.idProyecto)}
+                className="flex items-center justify-between gap-tight rounded-control border border-outline-variant p-tight transition-colors hover:bg-surface-container"
+              >
+                <div className="min-w-0">
+                  <p className="type-body truncate font-medium text-text-primary">{p.tituloProyecto}</p>
+                  <p className="type-meta truncate">{p.rolNombre}</p>
+                </div>
+                <span className={`pill shrink-0 ${estadoBadgeStyle(p.estadoProyecto)}`}>
+                  {estadoBadgeLabel(p.estadoProyecto)}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
   );
 }
 
@@ -598,6 +656,7 @@ function DetailContent({
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
   const primaryRole = getPrimaryRole(user.roles);
+  const perfil = user.perfilEstudiante;
 
   const statusMutation = useMutation({
     mutationFn: (nuevoEstado: AdminUserStatus) =>
@@ -627,51 +686,47 @@ function DetailContent({
 
   return (
     <>
-      {/* Avatar & identity */}
-      <div className="flex flex-col items-center gap-3 border-b border-outline-variant pb-5 text-center">
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-outline-variant">
-          {user.fotoUrl ? (
-            <Image
-              src={user.fotoUrl}
-              alt=""
-              width={64}
-              height={64}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-primary-container text-lg font-black text-on-primary-container">
-              {getInitials(user.nombre, user.apellido)}
-            </div>
-          )}
-        </div>
-        <div>
-          <p className="font-headline text-lg font-black text-on-surface">
+      {/* Identidad: avatar, nombre y correo como en el perfil del estudiante, con un único badge de estado. */}
+      <header className="flex flex-col items-center gap-tight pb-tight text-center">
+        <Avatar className="size-20">
+          {user.fotoUrl && <AvatarImage src={user.fotoUrl} alt="" />}
+          <AvatarFallback className="type-section text-text-secondary">
+            {getInitials(user.nombre, user.apellido)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 max-w-full">
+          <h2 className="type-section break-words text-text-primary">
             {user.nombre} {user.apellido}
-          </p>
-          <p className="text-xs text-tertiary">{user.correo}</p>
+          </h2>
+          <p className="type-body break-all text-text-secondary">{user.correo}</p>
         </div>
-        <div className="flex flex-wrap justify-center gap-2">
-          <UserStatusBadge estado={user.estado} />
-          <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-primary">
-            {formatRol(primaryRole)}
-          </span>
-        </div>
-      </div>
+        <UserStatusBadge estado={user.estado} />
+      </header>
 
-      {/* Información básica */}
-      <Section title="Información básica">
-        <InfoRow label="Estado" value={<UserStatusBadge estado={user.estado} />} />
-        <InfoRow label="Rol principal" value={formatRol(primaryRole)} />
-        <InfoRow label="Fecha de registro" value={formatFecha(user.fechaCreacion)} />
-        <InfoRow
-          label="Último acceso"
-          value={
-            user.fechaUltimaSesion
-              ? `${timeAgo(user.fechaUltimaSesion)} · ${formatFecha(user.fechaUltimaSesion)}`
-              : 'Sin registro'
-          }
-        />
+      <Section title="Información institucional">
+        <dl>
+          <InfoRow label="Estado" value={ESTADO_USUARIO_LABEL[user.estado] ?? user.estado} />
+          <InfoRow label="Rol principal" value={primaryRole ? formatRol(primaryRole) : 'Sin rol asignado'} />
+          {/* Datos académicos: solo las filas que el backend trae con valor. */}
+          {perfil?.carrera && <InfoRow label="Carrera" value={perfil.carrera} />}
+          {perfil?.carne && <InfoRow label="Carné" value={perfil.carne} />}
+          {perfil?.semestre != null && <InfoRow label="Semestre" value={`Semestre ${perfil.semestre}`} />}
+          {perfil?.disponibilidadHorasSemana ? (
+            <InfoRow label="Disponibilidad" value={`${perfil.disponibilidadHorasSemana} horas/semana`} />
+          ) : null}
+          <InfoRow label="Fecha de registro" value={formatFecha(user.fechaCreacion)} />
+          <InfoRow
+            label="Último acceso"
+            value={
+              user.fechaUltimaSesion
+                ? `${timeAgo(user.fechaUltimaSesion)} · ${formatFecha(user.fechaUltimaSesion)}`
+                : 'Sin registro'
+            }
+          />
+        </dl>
       </Section>
+
+      <ProyectosActivos idUsuario={user.idUsuario} />
 
       {/* Role-specific content */}
       {primaryRole === 'administrador' && <AdministradorContent user={user} />}
@@ -679,9 +734,6 @@ function DetailContent({
       {primaryRole === 'lider_asociacion' && <LiderContent user={user} />}
       {primaryRole === 'mentor' && <MentorContent user={user} />}
       {primaryRole === 'estudiante' && <EstudianteContent user={user} />}
-      {!primaryRole && (
-        <p className="text-xs text-tertiary">No hay datos disponibles para esta sección.</p>
-      )}
 
       {/* Admin actions */}
       <AdminActions user={user} onAction={setPendingAction} />
@@ -721,24 +773,23 @@ export function UserDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-[460px] lg:max-w-[520px] bg-surface-container-lowest border-l border-outline-variant flex flex-col p-0 gap-0"
+        className="flex w-full flex-col gap-0 border-l border-outline-variant bg-surface p-0 sm:max-w-[460px] lg:max-w-[520px]"
       >
-        <SheetHeader className="border-b border-outline-variant px-5 py-4 shrink-0">
-          <SheetTitle className="text-xs font-black uppercase tracking-widest text-tertiary">
-            Detalle de usuario
-          </SheetTitle>
+        <SheetHeader className="shrink-0 border-b border-outline-variant bg-surface-container-lowest px-stack py-stack">
+          <SheetTitle className="type-meta font-semibold uppercase tracking-wide">Detalle de usuario</SheetTitle>
+          <SheetDescription className="sr-only">
+            Datos de la cuenta, proyectos en los que participa y acciones disponibles para el usuario seleccionado.
+          </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-4 p-5">
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          <div className="space-y-card p-stack">
             {isLoading && <DrawerSkeleton />}
 
             {isError && (
-              <div className="flex flex-col items-center gap-2 rounded-xl border border-outline-variant p-8 text-center">
-                <AlertCircle className="h-6 w-6 text-error" />
-                <p className="text-sm font-medium text-on-surface">
-                  No se pudo cargar el detalle del usuario.
-                </p>
+              <div role="alert" className="card-base flex flex-col items-center gap-tight text-center">
+                <AlertCircle className="size-6 text-error" aria-hidden="true" />
+                <p className="type-body font-medium">No se pudo cargar el detalle del usuario.</p>
               </div>
             )}
 

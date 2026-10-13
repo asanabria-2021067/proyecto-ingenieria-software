@@ -12,9 +12,29 @@ import type {
   AssignHitoTasksResult,
   ResolverRevisionPayload,
 } from '@/lib/dto/project.dto';
+import type { TipoProyecto } from '@/types';
 
 export async function getProjectById(id: number): Promise<ProyectoDetalleDTO> {
   return apiFetch<ProyectoDetalleDTO>(`/proyectos/${id}`);
+}
+
+/**
+ * GPI01-C04 (H-03): detalle del proyecto para quien navega el dashboard.
+ *
+ * El GET público solo sirve estados con detalle público: un proyecto CERRADO
+ * (o aún no publicado) responde 404 aunque lo pida su líder, un participante o
+ * un administrador. En ese único caso se consulta la ruta autorizada, donde la
+ * política de lectura del backend decide (403 para un tercero, 404 si no
+ * existe). Cualquier otro error del GET público se propaga tal cual: un 403,
+ * un 5xx o un fallo de red no se convierten en éxito.
+ */
+export async function getAccessibleProjectById(id: number): Promise<ProyectoDetalleDTO> {
+  try {
+    return await getProjectById(id);
+  } catch (error) {
+    if ((error as { statusCode?: number } | null)?.statusCode !== 404) throw error;
+    return { ...(await getMyProjectById(id)), lecturaAutorizada: true };
+  }
 }
 
 /**
@@ -131,7 +151,7 @@ export async function getAdminReviewInbox(): Promise<{
     numeroEnvio: number;
     enviadaEn: string;
     idRevisor: number | null;
-    proyecto: { tituloProyecto: string; creadoPor: number; creador: { nombre: string; apellido: string } };
+    proyecto: { tituloProyecto: string; tipoProyecto: TipoProyecto; creadoPor: number; creador: { nombre: string; apellido: string } };
   }>;
   cierresPendientes: Array<{
     idProyecto: number;
@@ -142,6 +162,7 @@ export async function getAdminReviewInbox(): Promise<{
   correccionesEnviadas: Array<{
     idProyecto: number;
     tituloProyecto: string;
+    tipoProyecto: TipoProyecto;
     creador: { nombre: string; apellido: string };
     revisiones: Array<{ idRevisionProyecto: number; numeroEnvio: number; revisadaEn: string | null }>;
   }>;

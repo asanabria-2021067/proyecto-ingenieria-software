@@ -15,6 +15,7 @@ function makePrisma() {
   const prisma = {
     notificacion: { createMany: vi.fn() },
     participacionProyecto: { findMany: vi.fn() },
+    preferenciaNotificacion: { findMany: vi.fn().mockResolvedValue([]) },
   };
   return prisma as typeof prisma & PrismaService;
 }

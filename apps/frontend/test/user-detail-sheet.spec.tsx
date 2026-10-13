@@ -2,7 +2,7 @@ import { UserDetailSheet } from '@/components/admin/UserDetailSheet';
 import type { AdminUserDetail, AdminUserStatus } from '@/lib/services/admin';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/image', () => ({
@@ -20,6 +20,12 @@ vi.mock('@/lib/services/admin', async () => {
     updateAdminUserStatus: (id: unknown, estado: AdminUserStatus) => updateAdminUserStatusMock(id, estado),
   };
 });
+
+// La tarjeta «Proyectos activos» lee el perfil público (`GET /social/usuarios/:id`).
+const getPerfilUsuarioMock = vi.fn();
+vi.mock('@/lib/services/social', () => ({
+  getPerfilUsuario: (id: unknown) => getPerfilUsuarioMock(id),
+}));
 
 const swalFireMock = vi.fn();
 vi.mock('@/lib/swal', () => ({
@@ -51,6 +57,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   getAdminUserDetailMock.mockResolvedValue(baseUserDetail());
   updateAdminUserStatusMock.mockResolvedValue({});
+  getPerfilUsuarioMock.mockResolvedValue({ proyectosActivos: [] });
 });
 
 function renderSheet(opts: { userId?: number | null; open?: boolean; onStatusChanged?: () => void } = {}) {
@@ -80,11 +87,11 @@ describe('UserDetailSheet (T-203)', () => {
     );
     renderSheet();
 
-    expect(screen.queryByText(/Información básica/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Información institucional/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/No se pudo cargar/i)).not.toBeInTheDocument();
 
     resolver?.(baseUserDetail());
-    await screen.findByText(/Información básica/i);
+    await screen.findByText(/Información institucional/i);
   });
 
   it('si la consulta falla, muestra el mensaje de error', async () => {
@@ -170,7 +177,7 @@ describe('UserDetailSheet (T-203)', () => {
     );
     renderSheet();
 
-    await screen.findByText(/Información básica/i);
+    await screen.findByText(/Información institucional/i);
     expect(screen.queryByText(/Estudiante en riesgo/i)).not.toBeInTheDocument();
   });
 
@@ -230,7 +237,7 @@ describe('UserDetailSheet (T-203)', () => {
     );
     renderSheet();
 
-    await screen.findByText(/Información básica/i);
+    await screen.findByText(/Información institucional/i);
     expect(screen.queryByRole('button', { name: /Desactivar usuario/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Bloquear usuario/i })).not.toBeInTheDocument();
   });
@@ -288,5 +295,117 @@ describe('UserDetailSheet (T-203)', () => {
     getAdminUserDetailMock.mockResolvedValue(baseUserDetail({ idUsuario: 3, estado: 'BLOQUEADO' }));
     renderSheet({ userId: 3 });
     expect(await screen.findByRole('button', { name: /Desbloquear usuario/i })).toBeInTheDocument();
+  });
+});
+
+describe('UserDetailSheet — rediseño con el lenguaje del perfil del estudiante', () => {
+  const proyectosActivos = () => screen.getByText('Proyectos activos').closest('section') as HTMLElement;
+
+  it('ordena las tarjetas: información institucional, proyectos activos y, al final, acciones administrativas', async () => {
+    renderSheet();
+    await screen.findByText(/Información institucional/i);
+    await screen.findByText('Este usuario no participa actualmente en proyectos activos.');
+
+    const titulos = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(titulos[0]).toBe('Información institucional');
+    expect(titulos[1]).toBe('Proyectos activos');
+    expect(titulos[titulos.length - 1]).toBe('Acciones administrativas');
+  });
+
+  it('el estado se muestra una sola vez como badge; la tarjeta institucional lo da como texto junto al rol y las fechas', async () => {
+    getAdminUserDetailMock.mockResolvedValue(
+      baseUserDetail({
+        perfilEstudiante: {
+          carrera: 'Ingeniería en Ciencias de la Computación',
+          carne: '21001',
+          semestre: 6,
+          disponibilidadHorasSemana: null,
+          horasBecaRequeridas: null,
+          horasExtensionRequeridas: 100,
+        },
+      }),
+    );
+    renderSheet();
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'Samuel Robledo' })).toBeInTheDocument();
+    const info = screen.getByText('Información institucional').closest('section') as HTMLElement;
+    expect(document.querySelectorAll('.pill-success')).toHaveLength(1);
+    expect(within(info).getByText('Estado').nextElementSibling).toHaveTextContent('Activo');
+    expect(within(info).getByText('Rol principal').nextElementSibling).toHaveTextContent('Estudiante');
+    expect(within(info).getByText('Carrera').nextElementSibling).toHaveTextContent('Ingeniería en Ciencias de la Computación');
+    expect(within(info).getByText('Semestre', { selector: 'dt' }).nextElementSibling).toHaveTextContent('Semestre 6');
+    expect(within(info).getByText('Fecha de registro')).toBeInTheDocument();
+    expect(within(info).getByText('Último acceso').nextElementSibling).toHaveTextContent('Sin registro');
+    // No se inventa lo que el backend no trae: sin disponibilidad, sin fila.
+    expect(within(info).queryByText('Disponibilidad')).not.toBeInTheDocument();
+    expect(screen.queryByText(/No hay datos disponibles/i)).not.toBeInTheDocument();
+  });
+
+  it('lista las participaciones en proyectos activos con rol, estado y enlace al detalle administrativo', async () => {
+    getPerfilUsuarioMock.mockResolvedValue({
+      proyectosActivos: [
+        { idProyecto: 7, tituloProyecto: 'Plataforma de Tutorías UVG', estadoProyecto: 'PUBLICADO', rolNombre: 'Desarrollador Frontend' },
+        { idProyecto: 9, tituloProyecto: 'Portal de Empleo UVG', estadoProyecto: 'EN_PROGRESO', rolNombre: 'Backend Developer' },
+        // Participación viva en un proyecto que ya no está activo: no se cuenta ni se muestra.
+        { idProyecto: 11, tituloProyecto: 'Feria 2025', estadoProyecto: 'CERRADO', rolNombre: 'Colaborador' },
+      ],
+    });
+    renderSheet();
+
+    await screen.findByText('Plataforma de Tutorías UVG');
+    const tarjeta = within(proyectosActivos());
+    expect(tarjeta.getByText('2 colaboraciones')).toBeInTheDocument();
+    const enlaces = tarjeta.getAllByRole('link');
+    expect(enlaces.map((a) => a.getAttribute('href'))).toEqual(['/dashboard/admin/proyectos/7', '/dashboard/admin/proyectos/9']);
+    expect(within(enlaces[0]).getByText('Desarrollador Frontend')).toBeInTheDocument();
+    expect(within(enlaces[0]).getByText('Publicado')).toBeInTheDocument();
+    expect(within(enlaces[1]).getByText('En progreso')).toBeInTheDocument();
+    expect(tarjeta.queryByText('Feria 2025')).not.toBeInTheDocument();
+    expect(getPerfilUsuarioMock).toHaveBeenCalledWith(1);
+  });
+
+  it('sin proyectos lo dice; si la lista falla, el resto del drawer y las acciones siguen disponibles', async () => {
+    renderSheet();
+    expect(await screen.findByText('Este usuario no participa actualmente en proyectos activos.')).toBeInTheDocument();
+    expect(within(proyectosActivos()).getByText('0 colaboraciones')).toBeInTheDocument();
+  });
+
+  it('un fallo al cargar los proyectos no tumba el drawer y permite reintentar', async () => {
+    getPerfilUsuarioMock.mockRejectedValue(new Error('500'));
+    renderSheet();
+
+    expect(await screen.findByText('No se pudieron cargar los proyectos de este usuario.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Desactivar usuario/i })).toBeInTheDocument();
+    fireEvent.click(within(proyectosActivos()).getByRole('button', { name: 'Reintentar' }));
+    await waitFor(() => expect(getPerfilUsuarioMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('cada sección lleva su título encima de la tarjeta, no dentro, y el contador de proyectos queda dentro', async () => {
+    getPerfilUsuarioMock.mockResolvedValue({
+      proyectosActivos: [{ idProyecto: 7, tituloProyecto: 'Plataforma de Tutorías UVG', estadoProyecto: 'EN_PROGRESO', rolNombre: 'Colaborador' }],
+    });
+    renderSheet();
+    await screen.findByText('Plataforma de Tutorías UVG');
+
+    for (const titulo of ['Información institucional', 'Proyectos activos', 'Acciones administrativas']) {
+      const encabezado = screen.getByRole('heading', { level: 3, name: titulo });
+      const seccion = encabezado.closest('section') as HTMLElement;
+      const tarjeta = seccion.querySelector('.card-base') as HTMLElement;
+      expect(tarjeta).not.toBeNull();
+      expect(tarjeta).not.toContainElement(encabezado);
+      // El título precede a su tarjeta y va flanqueado por dos líneas decorativas.
+      expect(encabezado.compareDocumentPosition(tarjeta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(encabezado.parentElement?.querySelectorAll('span[aria-hidden="true"]')).toHaveLength(2);
+    }
+    const proyectos = proyectosActivos();
+    const contador = within(proyectos).getByText('1 colaboración');
+    expect(proyectos.querySelector('.card-base')).toContainElement(contador);
+    expect(screen.getByRole('heading', { level: 3, name: 'Proyectos activos' })).toHaveTextContent(/^Proyectos activos$/);
+  });
+
+  it('no trae nada social del perfil del estudiante', async () => {
+    renderSheet();
+    await screen.findByText(/Información institucional/i);
+    expect(screen.queryByText(/Amigos en común|Seguir|Compartir perfil|Agregar amigo|Habilidades|Intereses/i)).not.toBeInTheDocument();
   });
 });

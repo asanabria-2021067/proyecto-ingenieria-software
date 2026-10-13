@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../src/prisma/prisma.service';
@@ -13,15 +13,16 @@ import { AdminService } from '../src/admin/admin.service';
 function setup(estadoActual: string, esAdminCaller = true) {
   const create = vi.fn().mockResolvedValue({});
   const persona = { idUsuario: 5, nombre: 'Ana', apellido: 'Pérez', correo: 'ana@uvg.edu.gt', fechaCreacion: new Date('2026-01-01T00:00:00Z'), rolesAcceso: [] };
+  const update = vi.fn(async ({ data }: { data: { estado: string } }) => ({ ...persona, estado: data.estado }));
   const prisma = {
     usuarioRolAcceso: { findFirst: vi.fn().mockResolvedValue(esAdminCaller ? { idUsuario: 1 } : null) },
     usuario: {
       findUnique: vi.fn().mockResolvedValue({ ...persona, estado: estadoActual }),
-      update: vi.fn(async ({ data }: { data: { estado: string } }) => ({ ...persona, estado: data.estado })),
+      update,
     },
     bitacoraAuditoria: { create },
   };
-  return { admin: new AdminService(prisma as unknown as PrismaService, new JwtService({})), create };
+  return { admin: new AdminService(prisma as unknown as PrismaService, new JwtService({})), create, update };
 }
 
 describe('G05-C07: cambios administrativos de estado de cuenta', () => {
@@ -49,6 +50,18 @@ describe('G05-C07: cambios administrativos de estado de cuenta', () => {
     await admin.updateUsuarioEstado(1, 5, 'ACTIVO');
     expect(create).not.toHaveBeenCalled();
   });
+
+  it.each(['ACTIVO', 'INACTIVO', 'BLOQUEADO'] as const)(
+    'cuenta pendiente de verificación → %s responde 409 y no cambia el estado ni deja evento',
+    async (nuevo) => {
+      const { admin, create, update } = setup('PENDIENTE_VERIFICACION');
+      const intento = admin.updateUsuarioEstado(1, 5, nuevo);
+      await expect(intento).rejects.toBeInstanceOf(ConflictException);
+      await expect(intento).rejects.toThrow(/aprobar o rechazar en cuentas pendientes/);
+      expect(update).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+    },
+  );
 
   it('sin rol admin: se rechaza y no hay evento', async () => {
     const { admin, create } = setup('ACTIVO', false);

@@ -40,7 +40,7 @@ describe('Controllers and basic services', () => {
     // G05-C09: login recibe la petición para el origen del evento de seguridad (req.ip).
     const req = { ip: '127.0.0.1', app: { get: () => false } } as unknown as Parameters<AuthController['login']>[1];
     await auth.login({ correo: 'a', contrasena: 'b' }, req, res);
-    await auth.register({} as Parameters<AuthController['register']>[0], res);
+    await auth.register({} as Parameters<AuthController['register']>[0]);
 
     const usersSvc = {
       getMe: vi.fn(),
@@ -120,7 +120,7 @@ describe('Controllers and basic services', () => {
     const notifications = new NotificationsController(
       notificationsSvc as unknown as ConstructorParameters<typeof NotificationsController>[0],
     );
-    notifications.findAll({ userId: 1 });
+    notifications.findAll({ userId: 1 }, {});
     notifications.findUnreadForUser({ userId: 1 });
     notifications.getUnreadCount({ userId: 1 });
     notifications.markAllAsRead({ userId: 1 });
@@ -184,8 +184,11 @@ describe('Controllers and basic services', () => {
       interes: { findMany: vi.fn().mockResolvedValue([{ idInteres: 1, nombreInteres: 'AI' }]) },
       cualidad: { findMany: vi.fn().mockResolvedValue([{ idCualidad: 1, nombreCualidad: 'Liderazgo' }]) },
     };
+    // T-292: caché vacía; el comportamiento de la caché se prueba en catalogs-cache.service.spec.ts.
+    const cache = { get: vi.fn().mockResolvedValue(undefined), set: vi.fn().mockResolvedValue(undefined), del: vi.fn() };
     const catalogsService = new CatalogsService(
       prisma as unknown as ConstructorParameters<typeof CatalogsService>[0],
+      cache as unknown as ConstructorParameters<typeof CatalogsService>[1],
     );
     const catalogs = new CatalogsController(catalogsService);
     const result = await catalogs.findAll();

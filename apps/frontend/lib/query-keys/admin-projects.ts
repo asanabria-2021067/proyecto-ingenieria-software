@@ -15,3 +15,7 @@ export const adminAppealsPrefix = ['admin', 'apelaciones'] as const;
 /** `estado` es el filtro de la apelación o `'TODAS'`. */
 export const adminAppealsQueryKey = (estado: string, page: number) =>
   ['admin', 'apelaciones', estado, page] as const;
+
+/** Una apelación y los contadores de la bandeja cuelgan del mismo prefijo: resolver una los invalida. */
+export const adminAppealDetailQueryKey = (idApelacion: number) => ['admin', 'apelaciones', 'detalle', idApelacion] as const;
+export const adminAppealsSummaryQueryKey = ['admin', 'apelaciones', 'resumen'] as const;

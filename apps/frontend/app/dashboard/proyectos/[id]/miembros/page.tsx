@@ -25,6 +25,13 @@ import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+} from '@/components/dashboard/data-table';
+import {
   Table,
   TableHeader,
   TableBody,
@@ -64,6 +71,10 @@ const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
   { key: 'horasReconocidas', label: 'Horas reconocidas' },
 ];
 
+// Misma tabla que las bandejas administrativas (`data-table`).
+const TH = `h-auto whitespace-nowrap px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
+const TD = 'px-stack py-inline align-middle';
+
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
 }
@@ -76,27 +87,27 @@ function SkeletonRows() {
   return (
     <>
       {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i} className="border-outline-variant/40">
-          <TableCell className="px-4 py-3">
+        <TableRow key={i} className={DATA_TABLE_ROW_BORDER}>
+          <TableCell className={TD}>
             <div className="flex items-center gap-3">
-              <Skeleton className="h-8 w-8 rounded-full bg-surface-container-high" />
-              <Skeleton className="h-4 w-32 rounded bg-surface-container-high" />
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-4 w-32" />
             </div>
           </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-28 rounded bg-surface-container-high" />
+          <TableCell className={TD}>
+            <Skeleton className="h-4 w-28" />
           </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-5 w-16 rounded-full bg-surface-container-high" />
+          <TableCell className={TD}>
+            <Skeleton className="h-5 w-16 rounded-tag" />
           </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-10 rounded bg-surface-container-high" />
+          <TableCell className={TD}>
+            <Skeleton className="h-4 w-10" />
           </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-14 rounded bg-surface-container-high" />
+          <TableCell className={TD}>
+            <Skeleton className="h-4 w-14" />
           </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-16 rounded bg-surface-container-high" />
+          <TableCell className={TD}>
+            <Skeleton className="h-4 w-16" />
           </TableCell>
         </TableRow>
       ))}
@@ -123,15 +134,16 @@ function SortableHeader({
   return (
     <TableHead
       aria-sort={isActive ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-      className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary whitespace-nowrap"
+      scope="col"
+      className={TH}
     >
       <button
         type="button"
         onClick={() => onSort(columnKey)}
-        className="inline-flex items-center gap-1 hover:text-on-surface transition-colors"
+        className="inline-flex items-center gap-1 transition-colors hover:text-text-primary"
       >
         {label}
-        <Icon aria-hidden="true" className={`h-3 w-3 ${isActive ? 'text-primary' : 'text-tertiary/60'}`} />
+        <Icon aria-hidden="true" className={`h-3 w-3 ${isActive ? 'text-primary' : 'text-text-secondary/60'}`} />
       </button>
     </TableHead>
   );
@@ -165,56 +177,54 @@ function MiembroRow({
   const nombreCompleto = `${miembro.nombre} ${miembro.apellido}`;
 
   return (
-    <TableRow className="border-outline-variant/40 hover:bg-surface-container-low transition-colors">
-      <TableCell className="px-4 py-3">
-        <div className="flex items-center gap-3">
+    <TableRow className={`${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER}`}>
+      <TableCell className={TD}>
+        <div className="flex items-center gap-tight">
           <Avatar className="size-8 shrink-0">
             {miembro.fotoUrl && <AvatarImage src={miembro.fotoUrl} alt="" />}
-            <AvatarFallback className="bg-primary-container text-xs font-bold text-on-primary-container">
+            <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
               {getInitials(miembro.nombre, miembro.apellido)}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <span className="text-sm font-medium text-on-surface whitespace-nowrap">{nombreCompleto}</span>
+            <span className="type-body whitespace-nowrap font-semibold text-text-primary">{nombreCompleto}</span>
             <ExitRequestBadge request={exitRequest} />
           </div>
         </div>
       </TableCell>
-      <TableCell className="px-4 py-3">
+      <TableCell className={TD}>
         <div className="flex flex-wrap gap-1">
           {miembro.roles.map((rol) => (
             <span
               key={rol.idRolProyecto}
-              className="inline-flex items-center rounded-full bg-secondary-container/30 px-2 py-0.5 text-xs font-bold text-secondary"
+              className="pill pill-sm pill-sage"
             >
               {rol.nombreRol}
             </span>
           ))}
         </div>
       </TableCell>
-      <TableCell className="px-4 py-3">
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
-        >
+      <TableCell className={TD}>
+        <span className={`pill ${estilo.className}`}>
           {estilo.label}
         </span>
       </TableCell>
-      <TableCell className="px-4 py-3">
-        <span className="text-sm text-on-surface">{miembro.tareasActivas}</span>
+      <TableCell className={TD}>
+        <span className="type-body tabular-nums text-text-primary">{miembro.tareasActivas}</span>
       </TableCell>
-      <TableCell className="px-4 py-3">
-        <span className="text-sm text-on-surface whitespace-nowrap">{formatHoras(miembro.horasReconocidas)} h</span>
+      <TableCell className={TD}>
+        <span className="type-body whitespace-nowrap tabular-nums text-text-primary">{formatHoras(miembro.horasReconocidas)} h</span>
       </TableCell>
-      <TableCell className="px-4 py-3">
+      <TableCell className={TD}>
         {exitRequest ? (
           <ExitRequestActions request={exitRequest} idProyecto={idProyecto} nombreCompleto={nombreCompleto} />
         ) : (
           <Link
             href={`/dashboard/proyectos/${idProyecto}/equipo/${miembro.idUsuario}`}
-            className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline whitespace-nowrap"
+            className="inline-flex items-center gap-micro whitespace-nowrap type-meta font-semibold text-primary hover:underline"
           >
             Ver detalle
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="size-3.5" aria-hidden="true" />
           </Link>
         )}
       </TableCell>
@@ -259,16 +269,14 @@ function MembersGroupSection({
 
   return (
     <section aria-labelledby={headingId}>
-      <div className="flex items-center gap-2 mb-1">
-        <Icon aria-hidden className="w-5 h-5 text-primary" />
-        <h2 id={headingId} className="font-headline font-extrabold text-xl text-on-surface">
-          {title}
-        </h2>
-      </div>
-      <p className="text-tertiary text-sm mb-4">{description}</p>
+      <h2 id={headingId} className="mb-1 font-headline text-xl font-extrabold text-on-surface">
+        {title}
+      </h2>
+      <p className="mb-4 text-sm text-tertiary">{description}</p>
 
       {miembros.length === 0 ? (
-        <Empty tone="muted" role="status">
+        // Tarjeta blanca (tono por defecto), como los vacíos de las bandejas administrativas.
+        <Empty role="status">
           <EmptyMedia variant="icon">
             <Icon aria-hidden className="h-7 w-7" />
           </EmptyMedia>
@@ -278,11 +286,11 @@ function MembersGroupSection({
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest">
+        <div className={DATA_TABLE_CARD}>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
+                <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
                   {COLUMNAS_ORDENABLES.map((columna) => (
                     <SortableHeader
                       key={columna.key}
@@ -293,7 +301,7 @@ function MembersGroupSection({
                       onSort={onSort}
                     />
                   ))}
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary whitespace-nowrap">
+                  <TableHead scope="col" className={TH}>
                     Detalle
                   </TableHead>
                 </TableRow>
@@ -482,20 +490,17 @@ export default function MiembrosProyectoPage() {
           </EmptyContent>
         </Empty>
       ) : isLoading ? (
-        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest">
+        <div className={DATA_TABLE_CARD}>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
+                <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
                   {COLUMNAS_ORDENABLES.map((columna) => (
-                    <TableHead
-                      key={columna.key}
-                      className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary whitespace-nowrap"
-                    >
+                    <TableHead key={columna.key} scope="col" className={TH}>
                       {columna.label}
                     </TableHead>
                   ))}
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary whitespace-nowrap">
+                  <TableHead scope="col" className={TH}>
                     Detalle
                   </TableHead>
                 </TableRow>

@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 /**
  * HU-178 (T-302): solo administración entra a /dashboard/admin/*. Sin rol de
@@ -30,14 +31,22 @@ vi.mock('../hooks/use-current-user', () => ({
   isAdminUser: (u?: { roles?: string[] } | null) => (u?.roles ?? []).some((r) => r.toLowerCase() === 'administrador'),
 }));
 vi.mock('../hooks/use-logout', () => ({ useLogout: () => vi.fn() }));
+vi.mock('../hooks/use-cuentas-pendientes', () => ({ useCuentasPendientes: () => ({ data: undefined }) }));
 vi.mock('../components/layout/notifications-bell', () => ({ NotificationsBell: () => null }));
 vi.mock('../components/theme-toggle', () => ({ ThemeToggle: () => null }));
 vi.mock('../components/dashboard/UserMenu', () => ({ UserMenu: () => null }));
 
 import AdminLayout from '../components/admin/AdminLayout';
 
+// El shell usa `useQueryClient` para su botón «Actualizar»: necesita un proveedor.
 function renderShell() {
-  return render(createElement(AdminLayout, null, createElement('div', null, 'contenido admin')));
+  return render(
+    createElement(
+      QueryClientProvider,
+      { client: new QueryClient() },
+      createElement(AdminLayout, null, createElement('div', null, 'contenido admin')),
+    ),
+  );
 }
 
 afterEach(() => {

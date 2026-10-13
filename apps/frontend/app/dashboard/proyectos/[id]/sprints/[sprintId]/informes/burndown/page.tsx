@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
 import { useProjectSprints, useSprintBurndown } from '@/hooks/use-project-sprints';
 import { BurndownChart } from '@/components/projects/burndown-chart';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -75,13 +76,9 @@ export default function InformeBurndownPage() {
             <EmptyTitle>{getApiErrorMessage(error, 'general', 'No fue posible cargar el burndown de este Sprint.')}</EmptyTitle>
           </EmptyHeader>
           <EmptyContent>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-            >
+            <Button type="button" onClick={() => refetch()}>
               Reintentar
-            </button>
+            </Button>
           </EmptyContent>
         </Empty>
       )}

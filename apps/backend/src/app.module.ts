@@ -5,8 +5,9 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import * as redisStore from 'cache-manager-redis-store';
+import { createKeyv } from '@keyv/redis';
 import { buildEnvOptions } from './config/env.options';
+import { isThrottlerDisabled } from './config/throttler';
 import { AppController } from './app.controller';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { PrismaModule } from './prisma/prisma.module';
@@ -41,7 +42,10 @@ import { GlobalSearchModule } from './search/global-search.module';
 import { ExportsModule } from './exports/exports.module';
 import { SecurityEventsModule } from './security-events/security-events.module';
 import { EventsModule } from './events/events.module';
+import { CalendarSharesModule } from './calendar-shares/calendar-shares.module';
 import { AttendanceModule } from './attendance/attendance.module';
+
+const skipThrottling = () => isThrottlerDisabled();
 
 @Module({
   imports: [
@@ -54,26 +58,36 @@ import { AttendanceModule } from './attendance/attendance.module';
         name: 'short',
         ttl: 1000,
         limit: 10,
+        skipIf: skipThrottling,
       },
       {
         name: 'medium',
         ttl: 10000,
         limit: 50,
+        skipIf: skipThrottling,
       },
       {
         name: 'long',
         ttl: 60000,
         limit: 200,
+        skipIf: skipThrottling,
       },
     ]),
     CacheModule.registerAsync({
       isGlobal: true,
       inject: [ConfigService],
+      // T-292: cache-manager 7 solo usa stores de Keyv; la opción `store` de
+      // cache-manager-redis-store se ignoraba y la caché quedaba en memoria.
+      // Si Redis no responde, cada operación falla en silencio tras el
+      // timeout y la lectura sigue contra la base. El TTL va en milisegundos.
       useFactory: (config: ConfigService) => ({
-        store: redisStore,
-        host: config.get<string>('app.redis.host'),
-        port: config.get<number>('app.redis.port'),
-        ttl: 300,
+        stores: [
+          createKeyv(`redis://${config.get<string>('app.redis.host')}:${config.get<number>('app.redis.port')}`, {
+            throwOnConnectError: false,
+            connectionTimeout: 200,
+          }),
+        ],
+        ttl: 300_000,
       }),
     }),
     PrismaModule,
@@ -109,6 +123,7 @@ import { AttendanceModule } from './attendance/attendance.module';
     // G05 (OWASP25-C037): writer best-effort de eventos de seguridad (global).
     SecurityEventsModule,
     EventsModule,
+    CalendarSharesModule,
     AttendanceModule,
   ],
   controllers: [AppController],

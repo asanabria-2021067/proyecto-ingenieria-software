@@ -17,6 +17,9 @@ function mensajeErrorLogin(error: (Error & { statusCode?: number }) | null): str
   if (error.statusCode === 429) {
     return 'Demasiados intentos de inicio de sesion. Espera un minuto antes de volver a intentarlo.';
   }
+  if (error.statusCode === 403) {
+    return 'Tu cuenta está pendiente de verificación por administración.';
+  }
   return 'No se pudo iniciar sesion. Verifica tu correo y contraseña.';
 }
 

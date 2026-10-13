@@ -481,7 +481,15 @@ jobs:
             fi
 
             docker compose --profile app ps
-            docker image prune -f --filter "until=168h"
+
+            # T-315: limpia solo imagenes huerfanas (dangling); nunca volumenes
+            # (pgdata, redis-data guardan datos) ni imagenes en uso. Un fallo
+            # aqui no tumba un deploy que ya quedo sano.
+            echo "Espacio en disco ANTES de la limpieza:"
+            df -h /
+            docker image prune -f || echo "Aviso: la limpieza de imagenes fallo; el deploy ya quedo aplicado"
+            echo "Espacio en disco DESPUES de la limpieza:"
+            df -h /
 
   # G02 (OWASP25-C035): `:latest` es mutable y lo usa compose por defecto. Solo
   # se mueve cuando tests, ambas imagenes y el deploy terminaron en verde, y

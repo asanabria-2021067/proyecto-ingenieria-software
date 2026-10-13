@@ -823,12 +823,6 @@
       ]
     },
     {
-      "path": "apps/backend/test/jwt-secret.spec.ts",
-      "gates": [
-        "G01"
-      ]
-    },
-    {
       "path": "apps/backend/test/notifications.gateway.spec.ts",
       "gates": [
         "G07"

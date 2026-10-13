@@ -129,6 +129,11 @@ describe('T-221: useLogin', () => {
     const error = Object.assign(new Error('Too Many Requests'), { statusCode: 429 });
     expect(mensajeErrorLogin(error)).toMatch(/demasiados intentos/i);
   });
+
+  it('403 → aviso de cuenta pendiente de verificación', () => {
+    const error = Object.assign(new Error('Forbidden'), { statusCode: 403 });
+    expect(mensajeErrorLogin(error)).toBe('Tu cuenta está pendiente de verificación por administración.');
+  });
 });
 
 describe('T-221: página de login', () => {

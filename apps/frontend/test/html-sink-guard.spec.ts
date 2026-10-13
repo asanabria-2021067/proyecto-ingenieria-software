@@ -31,7 +31,8 @@ export const HTML_SINK_ALLOWLIST: ReadonlyArray<{ file: string; content: string;
   {
     file: 'components/ui/chart.tsx',
     content: 'CSS de colores desde ChartConfig',
-    reason: 'Primitiva de shadcn; ninguna vista usa ChartContainer, así que no recibe datos de usuario.',
+    reason:
+      'Primitiva de shadcn. Solo la usan los tres módulos de dibujo (`*-plot`), con un ChartConfig de claves fijas y sin `color`, `theme` ni `id`: sin colores que emitir, ChartStyle no renderiza nada y no recibe datos de usuario.',
   },
   {
     file: 'components/ui/cinematic-landing-hero.tsx',
@@ -101,11 +102,25 @@ describe('G07-C10: guarda de sumideros de HTML', () => {
     expect(template).toBeDefined();
     expect(template).not.toContain('${');
 
-    // La primitiva de gráficos solo inyecta CSS de su ChartConfig y ninguna vista la usa.
+    // La primitiva de gráficos solo inyecta CSS de los colores de su ChartConfig (y de su `id`).
+    // La usan exactamente los tres módulos de dibujo, y ninguno le pasa `color`, `theme` ni `id`:
+    // así ChartStyle devuelve `null` y el sumidero no llega a renderizarse. Un uso nuevo, o un
+    // color en la configuración, hace fallar esta prueba: quien lo agregue debe justificarlo aquí.
     const usesChart = Object.entries(files).filter(
       ([file, source]) => file !== 'components/ui/chart.tsx' && /\bChartContainer\b|\bChartStyle\b/.test(source),
     );
-    expect(usesChart.map(([file]) => file)).toEqual([]);
+    expect(usesChart.map(([file]) => file).sort()).toEqual([
+      'components/admin/metric-trend-plot.tsx',
+      'components/projects/burndown-chart-plot.tsx',
+      'components/projects/velocity-chart-plot.tsx',
+    ]);
+    for (const [file, source] of usesChart) {
+      expect(source, file).not.toMatch(/\bChartStyle\b/);
+      expect(source, file).not.toMatch(/\b(color|theme)\s*:/);
+      expect(source, file).not.toMatch(/<ChartContainer\b[^>]*\bid=/);
+    }
+    // Y la primitiva sigue sin emitir nada cuando no hay colores configurados.
+    expect(files['components/ui/chart.tsx']).toMatch(/if \(!colorConfig\.length\) \{\s*return null/);
   });
 
   it.each([

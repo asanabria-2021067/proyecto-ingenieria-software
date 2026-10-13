@@ -474,7 +474,7 @@ export function ProjectRolesSheet({
                     </p>
                   </div>
                   {view === 'EDIT' && rolEditando && (
-                    <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                    <span className="pill pill-sm pill-green shrink-0">
                       {rolEditando.participantesActivos}/{rolEditando.cupos} ocupados
                     </span>
                   )}

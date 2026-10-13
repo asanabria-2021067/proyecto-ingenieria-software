@@ -111,6 +111,30 @@
   --color-inverse-on-surface: #eef1f7;
   --color-inverse-primary: #72dc93;
 
+  /* HU-184: paleta del calendario (tipos de evento, proyectos y calendarios
+     compartidos). Cada tono: fondo suave, texto on-* y borde/punto -strong.
+     Solo para el calendario; ver docs/design-system.md. */
+  --color-cal-1: #efe7fb;
+  --color-on-cal-1: #4b2a86;
+  --color-cal-1-strong: #7c4dcc;
+  --color-cal-2: #e3f6e8;
+  --color-on-cal-2: #14532d;
+  --color-cal-2-strong: #2f9e5a;
+  --color-cal-3: #e2eefc;
+  --color-on-cal-3: #173d74;
+  --color-cal-3-strong: #3b7dd8;
+  --color-cal-4: #fdf3d6;
+  --color-on-cal-4: #6b4a00;
+  /* G04 (UI-14): #c99700 daba 2.65:1 sobre blanco y 2.40:1 sobre cal-4; #9c7400 da 4.28 y 3.86. */
+  --color-cal-4-strong: #9c7400;
+  --color-cal-5: #fce4ee;
+  --color-on-cal-5: #7a1f45;
+  --color-cal-5-strong: #d94b86;
+  --color-cal-6: #dcf3f3;
+  --color-on-cal-6: #0f4c4c;
+  /* G04 (UI-14): #2a9d9d daba 3.28:1 sobre blanco y 2.83:1 sobre cal-6; #1f8585 da 4.42 y 3.82. */
+  --color-cal-6-strong: #1f8585;
+
   --font-family-headline: var(--font-manrope, 'Manrope'), sans-serif;
   --font-family-body: var(--font-inter, 'Inter'), sans-serif;
 }
@@ -124,6 +148,8 @@
 }
 
 .dark {
+  /* Sobre el salvia de revisión: texto blanco en claro, negro en oscuro. */
+  --color-on-review: #000000;
   --color-primary: #72dc93;
   --color-on-primary: #003918;
   --color-primary-container: #0f2f1d;
@@ -169,6 +195,57 @@
   --color-inverse-on-surface: #1a1f24;
   --color-inverse-primary: #006735;
 
+  /* Etiquetas: pares fondo/texto propios del modo oscuro (AA verificado). */
+  --color-tag-neutral: #2a3036;
+  --color-on-tag-neutral: #d5dae0;
+  --color-tag-subtle: #23292e;
+  --color-on-tag-subtle: #aeb5bd;
+  --color-tag-sage: #2a4530;
+  --color-on-tag-sage: #b9d6b4;
+  --color-tag-green: #214a2c;
+  --color-on-tag-green: #a9e3a6;
+  --color-tag-success: #72dc93;
+  --color-on-tag-success: #003918;
+  --color-tag-lime: #3e5a14;
+  --color-on-tag-lime: #d4f59a;
+  --color-tag-forest: #3b7048;
+  --color-on-tag-forest: #e4f5e6;
+  --color-tag-closed: #4a7362;
+  --color-on-tag-closed: #e6f2ec;
+  --color-tag-blue: #1c3a66;
+  --color-on-tag-blue: #a9c8ff;
+  --color-tag-violet: #3b2a6b;
+  --color-on-tag-violet: #cdb8ff;
+  --color-tag-turquoise: #154a44;
+  --color-on-tag-turquoise: #9fe3d6;
+  --color-tag-amber: #5c3d10;
+  --color-on-tag-amber: #ffd9a3;
+  --color-tag-orange: #5e2e12;
+  --color-on-tag-orange: #ffc49b;
+  --color-tag-red: #5e2323;
+  --color-on-tag-red: #ffb4ab;
+  --color-tag-slate: #27395a;
+  --color-on-tag-slate: #b4c9ee;
+  /* HU-184: paleta del calendario en oscuro (mismo orden de tonos). */
+  --color-cal-1: #2e2445;
+  --color-on-cal-1: #e3d4ff;
+  --color-cal-1-strong: #a98bf0;
+  --color-cal-2: #1c3324;
+  --color-on-cal-2: #c4f0d0;
+  --color-cal-2-strong: #5cc982;
+  --color-cal-3: #1d2b40;
+  --color-on-cal-3: #cfe0fb;
+  --color-cal-3-strong: #6fa4ec;
+  --color-cal-4: #3a3218;
+  --color-on-cal-4: #fbe7a6;
+  --color-cal-4-strong: #e6bd3a;
+  --color-cal-5: #3d2230;
+  --color-on-cal-5: #fbd0e2;
+  --color-cal-5-strong: #ee7fac;
+  --color-cal-6: #183535;
+  --color-on-cal-6: #c6efef;
+  --color-cal-6-strong: #57c3c3;
+
   --gradient-color: #224a33;
   --sparkles-color: #72dc93;
 }
@@ -197,6 +274,10 @@
   --text-meta: 0.8125rem;
   --text-meta--line-height: 1.125rem;
   --text-meta--font-weight: 400;
+
+  /* G04 (UI-33): 11 px para texto denso del calendario; ver `.type-micro`. */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.5;
 
   --spacing-micro: 0.25rem;
   --spacing-tight: 0.5rem;
@@ -230,6 +311,12 @@
   --color-text-primary: var(--color-on-surface);
   --color-text-secondary: var(--color-on-surface-variant);
   --color-text-disabled: color-mix(in srgb, var(--color-on-surface) 38%, transparent);
+  /*
+   * T-317 (A11Y-01): texto secundario SOBRE `primary` (rótulos de las tarjetas de resumen).
+   * `text-on-primary/70` daba 3.62:1 en claro y 3.54:1 en oscuro con texto de 13 px; al 90 %
+   * queda en 4.88:1 y 5.38:1 sobre los mismos fondos. No bajar de 85 % (4.54:1).
+   */
+  --color-on-primary-muted: color-mix(in srgb, var(--color-on-primary) 90%, transparent);
   --color-page: var(--color-surface-container-low);
   --color-card: var(--color-surface-container-lowest);
 
@@ -240,11 +327,82 @@
   --color-status-error: var(--color-error-container);
   --color-on-status-error: var(--color-error);
 
+  /*
+   * Etiquetas (pills, badges, chips): un solo juego de tonos semánticos para
+   * estudiante y administrador. Cada tono es un par fondo (`tag-*`) / texto
+   * (`on-tag-*`) verificado en AA (≥ 4.5:1) en claro y en oscuro; `.dark`
+   * redefine los pares abajo, nunca reutiliza los fondos claros. La forma
+   * (radio, alto, tipografía) vive en `.pill` y sus tamaños.
+   */
+  --radius-tag: 0.4375rem;
+
+  --color-tag-neutral: #e5e7eb;
+  --color-on-tag-neutral: #374151;
+  --color-tag-subtle: #edf0f3;
+  --color-on-tag-subtle: #5d6470;
+  --color-tag-sage: #e2ece1;
+  --color-on-tag-sage: #295a3a;
+  --color-tag-green: #dff0da;
+  --color-on-tag-green: #276039;
+  --color-tag-success: #006837;
+  --color-on-tag-success: #ffffff;
+  --color-tag-lime: #b7f567;
+  --color-on-tag-lime: #183300;
+  --color-tag-forest: #315d3c;
+  --color-on-tag-forest: #ffffff;
+  --color-tag-closed: #496b5d;
+  --color-on-tag-closed: #ffffff;
+  --color-tag-blue: #dbeafe;
+  --color-on-tag-blue: #1d4ed8;
+  --color-tag-violet: #ede9fe;
+  --color-on-tag-violet: #6d28d9;
+  --color-tag-turquoise: #d5f5ef;
+  --color-on-tag-turquoise: #0f6459;
+  --color-tag-amber: #fff0d4;
+  --color-on-tag-amber: #8b4b0a;
+  --color-tag-orange: #ffedd5;
+  --color-on-tag-orange: #9a3412;
+  --color-tag-red: #fee2e2;
+  --color-on-tag-red: #991b1b;
+  --color-tag-slate: #e4ebf6;
+  --color-on-tag-slate: #3d5686;
+
   /* Atención / corrección requerida (proyecto observado): el mismo naranja
      que `amber-600` / `amber-700` del botón «Editar» en Mis Proyectos. */
   --color-attention: oklch(66.6% 0.179 58.318);
   --color-attention-strong: oklch(55.5% 0.163 48.998);
   --color-on-attention: #ffffff;
+
+  /* Revisión / corrección de solicitudes de publicación: verde salvia
+     #9AB07E exacto, en botones (`review`) y en bordes, puntos y fondos
+     suaves (`review-soft`). Sobre él el texto (`on-review`) va en blanco en modo
+     claro por decisión de diseño (2.4:1, bajo AA) y en negro en modo oscuro. `review-strong` es el
+     hover y `review-ink` el salvia oscuro para texto sobre superficies claras. */
+  --color-review: #9ab07e;
+  --color-review-strong: #879d6b;
+  --color-review-soft: #9ab07e;
+  --color-on-review: #ffffff;
+  --color-review-ink: #486d3c;
+
+  /* Verde salvia claro de las acciones de consulta en las bandejas de
+     solicitudes («Ver solicitud», «Ver proyecto»). Lleva texto oscuro: el
+     blanco no alcanza contraste AA sobre este tono. */
+  --color-consult: #9ab07e;
+  --color-consult-strong: #8aa16e;
+  --color-on-consult: #16210f;
+}
+
+/* G04 (UI-33): texto denso del calendario (horas dentro de un bloque, chips de
+   "Todo el día", iniciales de avatar, chip de duración). A diferencia del resto
+   de `type-*` no fija color ni peso: dentro de un bloque el color es el
+   `on-cal-N` del tono. Es una utilidad propia (`@utility`), así que gana a las
+   clases de componente (`pill`, `type-meta`) cuando conviven, y se llama
+   `type-micro` y no `text-micro` a propósito: `cn()` (tailwind-merge) toma un
+   `text-*` que no conoce por un color y lo descarta junto a otro color de texto. */
+@utility type-micro {
+  font-family: var(--font-family-body);
+  font-size: var(--text-micro);
+  line-height: var(--text-micro--line-height);
 }
 
 @layer components {
@@ -298,40 +456,130 @@
     padding: var(--spacing-card);
   }
 
+  /*
+   * Etiqueta estándar (familia «pill»): la forma aprobada de «Estado del
+   * proyecto» —radio `tag`, 25 px de alto, 12 px semibold— para TODAS las
+   * etiquetas de estado, categoría y prioridad. Tamaños: `pill-sm` (tablas
+   * compactas, calendarios, listas) y `pill-lg` (solo cabeceras que lo
+   * justifiquen). Los tonos `pill-<tono>` toman su par de `--color-tag-*`.
+   * Las utilidades Tailwind siguen ganando a esta capa para ajustes puntuales.
+   */
   .pill {
     align-items: center;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-tag);
     display: inline-flex;
-    font-size: var(--text-meta);
-    font-weight: 500;
+    font-size: 0.75rem;
+    font-weight: 600;
     gap: var(--spacing-micro);
-    line-height: var(--text-meta--line-height);
-    padding: var(--spacing-micro) var(--spacing-tight);
+    height: 1.5625rem;
+    line-height: 1;
+    max-width: 100%;
+    padding-inline: var(--spacing-inline);
+    white-space: nowrap;
   }
 
-  .pill-accent {
-    background: var(--color-accent);
-    color: var(--color-on-accent);
+  .pill > svg {
+    flex-shrink: 0;
+    height: 0.875rem;
+    width: 0.875rem;
+  }
+
+  .pill-sm {
+    font-size: 0.6875rem;
+    height: 1.25rem;
+    padding-inline: var(--spacing-tight);
+  }
+
+  .pill-sm > svg {
+    height: 0.75rem;
+    width: 0.75rem;
+  }
+
+  .pill-lg {
+    font-size: 0.8125rem;
+    height: 1.75rem;
+    padding-inline: 0.875rem;
   }
 
   .pill-neutral {
-    background: var(--color-surface-container-high);
-    color: var(--color-text-secondary);
+    background: var(--color-tag-neutral);
+    color: var(--color-on-tag-neutral);
+  }
+
+  .pill-subtle {
+    background: var(--color-tag-subtle);
+    color: var(--color-on-tag-subtle);
+  }
+
+  .pill-sage {
+    background: var(--color-tag-sage);
+    color: var(--color-on-tag-sage);
+  }
+
+  .pill-green {
+    background: var(--color-tag-green);
+    color: var(--color-on-tag-green);
   }
 
   .pill-success {
-    background: var(--color-status-success);
-    color: var(--color-on-status-success);
+    background: var(--color-tag-success);
+    color: var(--color-on-tag-success);
   }
 
+  /* `accent` conserva su nombre histórico: es el lima del sistema. */
+  .pill-lime,
+  .pill-accent {
+    background: var(--color-tag-lime);
+    color: var(--color-on-tag-lime);
+  }
+
+  .pill-forest {
+    background: var(--color-tag-forest);
+    color: var(--color-on-tag-forest);
+  }
+
+  .pill-closed {
+    background: var(--color-tag-closed);
+    color: var(--color-on-tag-closed);
+  }
+
+  .pill-blue {
+    background: var(--color-tag-blue);
+    color: var(--color-on-tag-blue);
+  }
+
+  .pill-violet {
+    background: var(--color-tag-violet);
+    color: var(--color-on-tag-violet);
+  }
+
+  .pill-turquoise {
+    background: var(--color-tag-turquoise);
+    color: var(--color-on-tag-turquoise);
+  }
+
+  /* `warning` conserva su nombre histórico: es el ámbar de atención. */
+  .pill-amber,
   .pill-warning {
-    background: var(--color-status-warning);
-    color: var(--color-on-status-warning);
+    background: var(--color-tag-amber);
+    color: var(--color-on-tag-amber);
   }
 
+  .pill-orange {
+    background: var(--color-tag-orange);
+    color: var(--color-on-tag-orange);
+  }
+
+  /* `error` conserva su nombre histórico: es el rojo. */
+  .pill-red,
   .pill-error {
-    background: var(--color-status-error);
-    color: var(--color-on-status-error);
+    background: var(--color-tag-red);
+    color: var(--color-on-tag-red);
+  }
+
+  .pill-slate {
+    background: var(--color-tag-slate);
+    color: var(--color-on-tag-slate);
   }
 
   .layout-grid {
@@ -383,17 +631,12 @@ html {
 }
 
 :root {
-  --blink-gray-bg: #e9edf1;
-  --blink-gray-text: #59616c;
-  --blink-gold-bg: #f6e7b0;
-  --blink-gold-text: #775700;
-}
-
-.dark {
-  --blink-gray-bg: #262b30;
-  --blink-gray-text: #c3c7cc;
-  --blink-gold-bg: #453405;
-  --blink-gold-text: #ffd873;
+  /* Parpadeo de «En solicitud de cierre»: entre el tono sutil y el bosque
+     de las etiquetas, así sigue al tema sin valores propios. */
+  --blink-gray-bg: var(--color-tag-subtle);
+  --blink-gray-text: var(--color-on-tag-subtle);
+  --blink-gold-bg: var(--color-tag-forest);
+  --blink-gold-text: var(--color-on-tag-forest);
 }
 
 @keyframes blink-gold-gray {
@@ -537,35 +780,331 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* Admin sidebar CSS variables - change automatically with dark mode */
+/* Admin sidebar CSS variables. Superficie y textos: paleta Forest Graphite (ver abajo). */
 :root {
-  --admin-bg:           #054526;
-  --admin-border:       rgba(255, 255, 255, 0.1);
-  --admin-text:         #ffffff;
-  --admin-text-muted:   rgba(255, 255, 255, 0.65);
-  --admin-text-dim:     rgba(255, 255, 255, 0.75);
-  --admin-selector-bg:  #5AB33E;
-  --admin-selector-fg:  #ffffff;
-  --admin-hover-bg:     rgba(255, 255, 255, 0.08);
-  --admin-avatar-bg:    #5AB33E;
-  --admin-avatar-fg:    #ffffff;
+  --admin-bg:           var(--admin-graphite);
+  --admin-border:       var(--admin-graphite-border);
+  --admin-text:         var(--admin-ink);
+  --admin-text-muted:   var(--admin-ink-secondary);
+  --admin-text-dim:     var(--admin-ink-muted);
+  --admin-avatar-bg:    var(--admin-green);
+  --admin-avatar-fg:    var(--admin-ink);
+
+  /* «Forest Graphite»: la sidebar del administrador es verde bosque
+     institucional en modo claro y grafito verdoso en modo oscuro (el bloque
+     `.dark` de abajo redefine solo superficies y texto secundario). Son
+     valores propios: los `--color-primary` / `--color-secondary-container`
+     del resto de la app no sirven aquí. El hover queda entre el fondo de
+     grupo y el de la opción seleccionada. Lima solo como acento puntual. */
+  --admin-graphite:          #103d30;
+  --admin-graphite-surface:  #204b3b;
+  --admin-graphite-hover:    #254f3e;
+  --admin-graphite-active:   #295441;
+  --admin-graphite-border:   #356050;
+  --admin-ink:               #f7faf8;
+  --admin-ink-muted:         #c0d8cc;
+  --admin-ink-secondary:     #c0d8cc;
+  --admin-icon:              #c0d8cc;
+  --admin-green:             #007a3d;
+  --admin-lime:              #a3e635;
+  /* Menú de la cuenta: superficie de grupo, hover de selección y coral para salir. */
+  --admin-menu-border:       #356050;
+  --admin-menu-danger:       #ffada6;
+  /* Tarjeta del escudo UVG: marfil para que sus dorados y verdes oscuros se
+     lean sobre la sidebar. Nunca blanco puro ni un tono de la propia sidebar. */
+  --admin-logo-bg:           #f7f2e7;
+  --admin-logo-border:       #daceb5;
 }
 
 .dark {
-  --admin-bg:           var(--color-surface-container-low);
-  --admin-border:       var(--color-outline-variant);
-  --admin-text:         var(--color-on-surface);
-  --admin-text-muted:   var(--color-tertiary);
-  --admin-text-dim:     var(--color-on-surface);
-  --admin-selector-bg:  var(--color-primary);
-  --admin-selector-fg:  var(--color-on-primary);
-  --admin-hover-bg:     var(--color-surface-container-high);
-  --admin-avatar-bg:    var(--color-primary-container);
-  --admin-avatar-fg:    var(--color-on-primary-container);
+  --admin-menu-border:       #3d5548;
+  --admin-graphite:          #192320;
+  --admin-graphite-surface:  #242f2a;
+  --admin-graphite-hover:    #2a3831;
+  --admin-graphite-active:   #304239;
+  --admin-graphite-border:   #34413b;
+  --admin-ink-muted:         #b6c4bd;
+  --admin-ink-secondary:     #b6c4bd;
+  --admin-icon:              #b6c4bd;
+  /* Marfil algo más apagado sobre el grafito: sigue siendo una superficie clara. */
+  --admin-logo-bg:           #e8e1d2;
+  --admin-logo-border:       #c9bfa8;
 }
 
-.admin-nav-inactive:hover {
-  background-color: var(--admin-hover-bg);
+/* Carcasa graphite de la sidebar del administrador: texto neutro por defecto
+   e iconos inactivos en gris claro. */
+.admin-sidebar {
+  background-color: var(--admin-bg);
+  border-right: 1px solid var(--admin-border);
+  color: var(--admin-text-dim);
+}
+
+.admin-sidebar .admin-nav-inactive svg {
+  color: var(--admin-icon);
+}
+
+/* Encabezado de marca: mismo logo y nombre, en blanco sobre graphite y
+   separado del menú por un divisor sutil. */
+.admin-sidebar-brand {
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-sidebar-brand-name {
+  color: var(--admin-text);
+}
+
+/* Tarjeta del escudo: solo superficie y borde; el escudo original va dentro
+   sin filtros ni recolorear. */
+.admin-brand-logo {
+  background-color: var(--admin-logo-bg);
+  border-color: var(--admin-logo-border);
+}
+
+/* Etiqueta de sección: discreta pero legible (gris secundario, no verde). */
+.admin-nav-section-label {
+  color: var(--admin-text-muted);
+}
+
+/* Destinos raíz (Panel Admin) y encabezados de grupo: mismo alto, radio del
+   sistema, iconos alineados y hover graphite con texto e icono en blanco. */
+.admin-nav-item {
+  align-items: center;
+  border-radius: var(--radius-control);
+  color: var(--admin-text-dim);
+  display: flex;
+  font-size: 0.875rem;
+  font-weight: 500;
+  gap: 0.75rem;
+  line-height: 1.25rem;
+  min-height: 2.5rem;
+  outline: none;
+  padding: 0.5rem 0.75rem;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.admin-nav-item svg {
+  flex-shrink: 0;
+  transition: color 150ms ease;
+}
+
+.admin-sidebar .admin-nav-item:hover {
+  background-color: var(--admin-graphite-hover);
+  color: var(--admin-ink);
+}
+
+.admin-sidebar .admin-nav-item:hover svg {
+  color: var(--admin-ink);
+}
+
+/* Activo: graphite elevado, texto/icono blancos y barra lima de 3px a la
+   izquierda (forma + peso, no solo color). Va después del hover para
+   prevalecer con la misma especificidad. */
+.admin-sidebar .admin-nav-item[aria-current='page'] {
+  background-color: var(--admin-graphite-active);
+  box-shadow: inset 3px 0 0 var(--admin-lime);
+  color: var(--admin-ink);
+  font-weight: 600;
+}
+
+.admin-sidebar .admin-nav-item[aria-current='page'] svg {
+  color: var(--admin-ink);
+}
+
+/* Grupos (Proyectos, Gobernanza, Administración): el padre desplegado se
+   aclara apenas y pasa a blanco; nunca un bloque verde. El chevron queda
+   visible en gris y en blanco al abrir. */
+.admin-sidebar .admin-nav-group .admin-nav-chevron {
+  color: var(--admin-text-muted);
+}
+
+.admin-sidebar .admin-nav-group[data-state='open'] {
+  background-color: var(--admin-graphite-surface);
+  color: var(--admin-ink);
+}
+
+.admin-sidebar .admin-nav-group[data-state='open'] svg,
+.admin-sidebar .admin-nav-group[data-state='open'] .admin-nav-chevron {
+  color: var(--admin-ink);
+}
+
+.admin-sidebar .admin-nav-group[data-state='open']:hover {
+  background-color: var(--admin-graphite-hover);
+}
+
+/* Hijos de un grupo: guía vertical discreta, hover propio y el mismo activo
+   que los destinos raíz (graphite + barra lima), sin iluminar al padre. */
+.admin-nav-children {
+  border-left: 1px solid var(--admin-graphite-border);
+}
+
+.admin-nav-subitem {
+  align-items: center;
+  border-radius: var(--radius-control);
+  color: var(--admin-text-dim);
+  display: flex;
+  font-size: 0.875rem;
+  font-weight: 500;
+  gap: 0.625rem;
+  line-height: 1.25rem;
+  min-height: 2.25rem;
+  outline: none;
+  padding: 0.375rem 0.75rem;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.admin-nav-subitem svg {
+  flex-shrink: 0;
+  transition: color 150ms ease;
+}
+
+.admin-sidebar .admin-nav-subitem:hover {
+  background-color: var(--admin-graphite-hover);
+  color: var(--admin-ink);
+}
+
+.admin-sidebar .admin-nav-subitem:hover svg {
+  color: var(--admin-ink);
+}
+
+.admin-sidebar .admin-nav-subitem[aria-current='page'] {
+  background-color: var(--admin-graphite-active);
+  box-shadow: inset 3px 0 0 var(--admin-lime);
+  color: var(--admin-ink);
+  font-weight: 600;
+}
+
+.admin-sidebar .admin-nav-subitem[aria-current='page'] svg {
+  color: var(--admin-ink);
+}
+
+/* Pie de cuenta: avatar verde institucional (nunca lima) con iniciales
+   blancas, nombre en blanco, correo en gris secundario y hover discreto. */
+.admin-sidebar-footer {
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-account-avatar {
+  background-color: var(--admin-avatar-bg);
+  color: var(--admin-avatar-fg);
+}
+
+.admin-account-photo {
+  border: 1px solid var(--admin-border);
+}
+
+.admin-account-trigger {
+  color: var(--admin-text);
+}
+
+.admin-sidebar .admin-account-trigger:hover {
+  background-color: var(--admin-graphite-hover);
+}
+
+.admin-account-name {
+  color: var(--admin-text);
+}
+
+.admin-account-email,
+.admin-account-chevron {
+  color: var(--admin-text-muted);
+}
+
+/* Sidebar colapsada a solo iconos: cuadros de 40px centrados, divisores
+   entre secciones y la cuenta compacta con hover graphite. */
+.admin-nav-icon {
+  height: 2.5rem;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0;
+  width: 2.5rem;
+}
+
+.admin-nav-separator {
+  background-color: var(--admin-border);
+}
+
+.admin-collapse-toggle {
+  color: var(--admin-text-muted);
+}
+
+.admin-sidebar .admin-collapse-toggle:hover,
+.admin-sidebar [data-slot='account-compact-trigger']:hover {
+  background-color: var(--admin-graphite-hover);
+  color: var(--admin-ink);
+}
+
+/* Foco de teclado: contorno lima (≥3:1 sobre graphite), distinto del hover
+   (solo fondo) y del activo (fondo + barra). */
+.admin-sidebar .admin-nav-item:focus-visible,
+.admin-sidebar .admin-nav-subitem:focus-visible,
+.admin-sidebar .admin-account-trigger:focus-visible,
+.admin-sidebar .admin-collapse-toggle:focus-visible,
+.admin-sidebar [data-slot='account-compact-trigger']:focus-visible {
+  outline: 2px solid var(--admin-lime);
+  outline-offset: 2px;
+}
+
+/* Menú desplegable de la cuenta del administrador: misma paleta que la
+   sidebar (se pinta en un portal, por eso no cuelga de `.admin-sidebar`).
+   Solo colores, borde y sombra; sin lima, que queda para el indicador de la
+   opción activa. */
+.admin-account-menu {
+  background-color: var(--admin-graphite-surface);
+  border-color: var(--admin-menu-border);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.32);
+  color: var(--admin-ink);
+}
+
+.admin-account-menu .type-body {
+  color: var(--admin-ink);
+}
+
+.admin-account-menu .type-meta {
+  color: var(--admin-ink-secondary);
+}
+
+.admin-account-menu [data-slot='dropdown-menu-separator'] {
+  background-color: var(--admin-menu-border);
+}
+
+.admin-account-menu [data-slot='dropdown-menu-item'] {
+  color: var(--admin-ink);
+}
+
+.admin-account-menu [data-slot='dropdown-menu-item'] svg {
+  color: var(--admin-ink-secondary);
+}
+
+.admin-account-menu [data-slot='dropdown-menu-item'][aria-current='page'],
+.admin-account-menu [data-slot='dropdown-menu-item']:hover,
+.admin-account-menu [data-slot='dropdown-menu-item']:focus {
+  background-color: var(--admin-graphite-active);
+  color: var(--admin-ink);
+}
+
+.admin-account-menu [data-slot='dropdown-menu-item']:focus-visible {
+  outline: 2px solid var(--admin-ink-secondary);
+  outline-offset: -2px;
+}
+
+/* «Cerrar sesión»: coral en texto e icono, y un velo rojizo solo al pasar o enfocar. */
+.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive'],
+.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive']:hover,
+.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive']:focus {
+  color: var(--admin-menu-danger);
+}
+
+/* El icono destructivo lo fija una utilidad con `!important`; entre reglas
+   importantes gana la capa más temprana, así que esta va en `components`. */
+@layer components {
+  .admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive'] svg {
+    color: var(--admin-menu-danger) !important;
+  }
+}
+
+.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive']:hover,
+.admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive']:focus {
+  background-color: color-mix(in srgb, var(--admin-menu-danger) 14%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

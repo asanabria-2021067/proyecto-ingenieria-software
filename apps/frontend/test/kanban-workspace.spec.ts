@@ -573,7 +573,14 @@ describe('KanbanWorkspaceClient — sin Sprint activo (F2)', () => {
     expect(screen.getByRole('button', { name: /nueva tarea/i })).toBeInTheDocument();
   });
 
-  it('Caso 5 (HU-160) — "Iniciar Sprint" abre el diálogo de fecha planeada y confirmar invoca la mutación de F1 exactamente una vez', async () => {
+  /** `YYYY-MM-DD` local a `n` días de hoy, dentro de la ventana que acepta el flujo (1–90). */
+  function diaDesdeHoy(n: number): string {
+    const fecha = new Date();
+    fecha.setDate(fecha.getDate() + n);
+    return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+  }
+
+  it('Caso 5 — "Iniciar Sprint" abre la planificación; la mutación se invoca una sola vez y solo tras confirmar', async () => {
     mockUseProjectSprints({ sprints: [] });
     const mutateAsync = vi.fn().mockResolvedValue(undefined);
     mockUseStartSprint({ mutateAsync });
@@ -582,13 +589,19 @@ describe('KanbanWorkspaceClient — sin Sprint activo (F2)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar Sprint' }));
 
     const dialog = screen.getByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Iniciar Sprint' }));
+    const fecha = diaDesdeHoy(14);
+    fireEvent.change(within(dialog).getByLabelText(/Fecha esperada de finalización/), { target: { value: fecha } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }));
+    expect(mutateAsync).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Sí, iniciar Sprint' }));
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync).toHaveBeenCalledWith(fecha);
     expect(useStartSprint).toHaveBeenCalledWith(42);
   });
 
-  it('Caso 6 (HU-160) — mientras startSprint está pendiente, el botón de confirmar del diálogo queda disabled y evita doble click', () => {
+  it('Caso 6 — mientras startSprint está pendiente, el botón de confirmar queda disabled y evita doble click', () => {
     mockUseProjectSprints({ sprints: [] });
     const mutateAsync = vi.fn();
     mockUseStartSprint({ mutateAsync, isPending: true });
@@ -597,6 +610,9 @@ describe('KanbanWorkspaceClient — sin Sprint activo (F2)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar Sprint' }));
 
     const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/Fecha esperada de finalización/), { target: { value: diaDesdeHoy(14) } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Continuar' }));
+
     const boton = within(dialog).getByRole('button', { name: /iniciando/i });
     expect(boton).toBeDisabled();
 

@@ -622,6 +622,32 @@ describeIntegration('S7 liderazgo y Q1', () => {
     );
     await expectStatus(403, () => read.adminInbox(undefined, { actorId: c.idUsuario }));
 
+    // Bandeja con pestañas y vista de revisión: cada fila trae su proyecto, el
+    // historial de resueltas se ordena por fecha de resolución, los contadores
+    // cuadran con la bandeja y una apelación se lee por su id.
+    expect(bandeja.items.every((fila) => fila.proyecto.idProyecto === fila.idProyecto)).toBe(true);
+    expect(bandeja.items.every((fila) => typeof fila.proyecto.tituloProyecto === 'string')).toBe(true);
+    for (const estado of ['ACEPTADA', 'DENEGADA', 'CANCELADA'] as const) {
+      const resueltas = await read.adminInbox(undefined, { actorId: f.admin.idUsuario, query: { estado } });
+      expect(resueltas.items.every((fila) => fila.estadoApelacion === estado)).toBe(true);
+      const fechas = resueltas.items.map((fila) => fila.resueltaEn?.getTime() ?? -Infinity);
+      expect(fechas).toEqual([...fechas].sort((x, y) => y - x));
+    }
+    const resumen = await read.adminInboxSummary(undefined, { actorId: f.admin.idUsuario });
+    expect(resumen.TODAS).toBe(bandeja.total);
+    expect(resumen.PENDIENTE).toBe(pendientes.total);
+    expect(resumen.PENDIENTE + resumen.ACEPTADA + resumen.DENEGADA + resumen.CANCELADA).toBe(resumen.TODAS);
+    const unaApelacion = await read.adminAppeal(undefined, {
+      actorId: f.admin.idUsuario,
+      appealId: apelacionDeB.idApelacion,
+    });
+    expect(unaApelacion.idApelacion).toBe(apelacionDeB.idApelacion);
+    expect(unaApelacion.proyecto.idProyecto).toBe(unaApelacion.idProyecto);
+    expect(unaApelacion.liderDesignado).toBeNull();
+    await expectStatus(404, () => read.adminAppeal(undefined, { actorId: f.admin.idUsuario, appealId: 2_000_000_000 }));
+    await expectStatus(403, () => read.adminAppeal(undefined, { actorId: a, appealId: apelacionDeB.idApelacion }));
+    await expectStatus(403, () => read.adminInboxSummary(undefined, { actorId: a }));
+
     // Un participante AUTORIZADO por la policy sí lee la historia completa:
     // en un proyecto cerrado el histórico le corresponde.
     const cerrado = await createIntegrationProject(db, f.admin.idUsuario, {

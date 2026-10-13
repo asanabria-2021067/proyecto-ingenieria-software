@@ -1,8 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { REPO_ROOT } from './workflow-yaml';
+import { phaseLineage } from './owasp-evidence';
 
 /**
  * G08 (OWASP25-C048): repositorios Git SINTÉTICOS y desechables para probar el
@@ -58,4 +59,28 @@ export function runVerifier(args: string[], cwd = REPO_ROOT) {
     env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', LANG: 'C' },
   });
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
+}
+
+/**
+ * Ejecuta el verificador real sobre la fase OWASP del repositorio, en el linaje
+ * que contiene HEAD. En el de la rama usa la allowlist versionada tal cual. En el
+ * de `develop` la base declarada (`baseSha`) no es ancestro de HEAD, así que se
+ * le pasa una copia temporal de la MISMA allowlist con la base equivalente de
+ * ese linaje (mismo árbol; lo comprueba `g08-phase-lineage.spec.ts`). El script,
+ * las rutas, los gates y las reglas son los versionados.
+ */
+export function runPhaseVerifier() {
+  const lineage = phaseLineage();
+  if (lineage.name === 'branch') {
+    return runVerifier(['--head', lineage.head]);
+  }
+  const dir = mkdtempSync(join(tmpdir(), 'owasp-lineage-'));
+  try {
+    const allowlist = JSON.parse(readFileSync(join(REPO_ROOT, 'docs/security/owasp-delta-allowlist.json'), 'utf8'));
+    const path = join(dir, 'allowlist.json');
+    writeFileSync(path, JSON.stringify({ ...allowlist, baseSha: lineage.base }));
+    return runVerifier(['--allowlist', path, '--head', lineage.head]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }

@@ -29,8 +29,6 @@ import {
 import {
   estadoBadgeLabel,
   estadoBadgeStyle,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import {
   ESTADO_COLUMNA_STYLE,
@@ -41,6 +39,7 @@ import { getApiErrorMessage } from '@/components/projects/api-error';
 import { MODALIDAD_LABEL } from '@/types';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 import type { ExitPreparationBlockerDto, ExitPreparationSummaryDto } from '@/lib/types/exit-requests';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
 interface Props {
   id: number;
@@ -117,7 +116,7 @@ function ResponsibilityCard({
           (desasignadaEn: null) de una solicitud en PREPARACION — por
           construcción, cada una está pendiente de cerrarse. No se deriva de
           una propiedad secundaria. */}
-      <span className="inline-flex items-center rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] font-medium text-tertiary">
+      <span className="pill pill-sm pill-neutral">
         Pendiente de cierre
       </span>
       <div className="flex items-center justify-between text-[11px] text-tertiary">
@@ -459,16 +458,12 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
             <p className="text-sm text-tertiary">Workspace del proyecto</p>
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${estadoBadgeStyle(proyecto.estadoProyecto)}`}
+                className={`pill pill-sm ${estadoBadgeStyle(proyecto.estadoProyecto)}`}
               >
                 {estadoBadgeLabel(proyecto.estadoProyecto)}
               </span>
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tipoBadgeStyle(proyecto.tipoProyecto)}`}
-              >
-                {tipoBadgeLabel(proyecto.tipoProyecto)}
-              </span>
-              <span className="inline-flex items-center rounded-full border border-outline-variant/30 px-2.5 py-0.5 text-[11px] font-medium text-on-surface-variant">
+              <TipoBadge tipo={proyecto.tipoProyecto} />
+              <span className="pill pill-sm pill-neutral">
                 {MODALIDAD_LABEL[proyecto.modalidadProyecto as keyof typeof MODALIDAD_LABEL] ??
                   proyecto.modalidadProyecto}
               </span>
@@ -556,7 +551,7 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
                 <h2 className="text-xl font-bold text-on-surface md:text-[22px]">
                   Mis responsabilidades para salida
                 </h2>
-                <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                <span className="pill pill-sm pill-green">
                   {summary.blockers.length}{' '}
                   {summary.blockers.length === 1 ? 'responsabilidad' : 'responsabilidades'}
                 </span>

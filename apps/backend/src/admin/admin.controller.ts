@@ -12,6 +12,8 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
@@ -20,7 +22,8 @@ import { UpdateAdminUserStatusDto } from './dto/update-admin-user-status.dto';
 import { securityRequestContext } from '../security-events/request-context';
 
 @Controller('admin')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('administrador')
 export class AdminController {
   constructor(private adminService: AdminService) {}
 
@@ -61,6 +64,29 @@ export class AdminController {
     @Req() req: Request,
   ) {
     return this.adminService.updateUsuarioEstado(user.userId, id, dto.estado, securityRequestContext(req));
+  }
+
+  @Get('cuentas-pendientes')
+  getCuentasPendientes(@CurrentUser() user: { userId: number }) {
+    return this.adminService.getCuentasPendientes(user.userId);
+  }
+
+  @Patch('cuentas-pendientes/:id/aprobar')
+  aprobarCuentaPendiente(
+    @CurrentUser() user: { userId: number },
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: Request,
+  ) {
+    return this.adminService.aprobarCuentaPendiente(user.userId, id, securityRequestContext(req));
+  }
+
+  @Patch('cuentas-pendientes/:id/rechazar')
+  rechazarCuentaPendiente(
+    @CurrentUser() user: { userId: number },
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: Request,
+  ) {
+    return this.adminService.rechazarCuentaPendiente(user.userId, id, securityRequestContext(req));
   }
 
   @Get('password-reset-requests')

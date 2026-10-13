@@ -362,6 +362,8 @@ async function seedSprint6Demo() {
   // mismo en todos los sprints cerrados de la demo.
   const s1 = await ensureSprintS6(p1.idProyecto, 1, EstadoSprint.CERRADO, {
     fechaInicio: ts(-70),
+    // Plan de dos semanas; el Sprint se cerró seis días después de lo previsto.
+    fechaFinPlaneada: dateOnly(-56),
     fechaCierre: ts(-50),
     cerradoPor: lider.idUsuario,
     tareasPlanificadasCierre: 3,
@@ -378,6 +380,7 @@ async function seedSprint6Demo() {
   });
   const s2 = await ensureSprintS6(p1.idProyecto, 2, EstadoSprint.CERRADO, {
     fechaInicio: ts(-49),
+    fechaFinPlaneada: dateOnly(-28),
     fechaCierre: ts(-25),
     cerradoPor: lider.idUsuario,
     tareasPlanificadasCierre: 3,
@@ -393,6 +396,8 @@ async function seedSprint6Demo() {
   });
   const s3 = await ensureSprintS6(p1.idProyecto, 3, EstadoSprint.ACTIVO, {
     fechaInicio: ts(-24),
+    // Sprint en curso con el plan todavía por delante.
+    fechaFinPlaneada: dateOnly(4),
   });
 
   // ── Tareas Sprint 1 (histórico CERRADO, 3 tareas, todas HECHO) ─────────
@@ -1429,8 +1434,13 @@ async function seedTutoringWorkspaceDemo() {
       : { idProyecto, estado: { in: ['ACTIVO', 'EN_FINALIZACION'] } },
   });
   if (!sprintEscenario) {
+    // El Sprint ACTIVO nuevo lleva su fecha esperada de finalización, como
+    // todo Sprint iniciado por la API; el CERRADO de un proyecto terminal es
+    // de compatibilidad y se queda sin plan.
     sprintEscenario = await prisma.sprint.create({
-      data: { idProyecto, numero: 1, estado: proyectoTerminal ? 'CERRADO' : 'ACTIVO' },
+      data: proyectoTerminal
+        ? { idProyecto, numero: 1, estado: 'CERRADO' }
+        : { idProyecto, numero: 1, estado: 'ACTIVO', fechaFinPlaneada: dateOnly(14) },
     });
   }
   console.log(`Sprint del escenario → #${sprintEscenario.idSprint} (estado=${sprintEscenario.estado})`);

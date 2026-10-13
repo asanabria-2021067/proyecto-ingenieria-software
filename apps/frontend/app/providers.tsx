@@ -1,5 +1,6 @@
 'use client';
 
+import { reintentarSiNoEsTerminal } from '@/lib/api/query-retry';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ThemeProvider, useTheme } from 'next-themes';
@@ -24,7 +25,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { staleTime: 60 * 1000 },
+          // GPI01-C05 (H-03): un 401/403/404 no cambia por repetirlo. Reintentarlo
+          // cuatro veces alargaba el skeleton antes de mostrar el estado terminal.
+          queries: { staleTime: 60 * 1000, retry: reintentarSiNoEsTerminal },
         },
       }),
   );

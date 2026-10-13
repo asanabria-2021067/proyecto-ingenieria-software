@@ -4,31 +4,15 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowLeft, Clock, CheckCircle, XCircle, User } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, User } from 'lucide-react';
+import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
+import { Tag } from '@/components/ui/tag';
 import { apiFetch } from '@/lib/api/client';
+import { getApiErrorStatus } from '@/components/projects/api-error';
+import { useRequireCan } from '@/hooks/use-can';
 import { projectAllPostulationsQueryKey } from '@/lib/query-keys/applications';
 import { EstadoPostulacion, PostulacionRecibida } from '@/types';
 
-const ESTADO_CONFIG: Record<
-  EstadoPostulacion,
-  { label: string; icon: React.ElementType; className: string }
-> = {
-  PENDIENTE: {
-    label: 'Pendiente',
-    icon: Clock,
-    className: 'bg-surface-container text-tertiary',
-  },
-  ACEPTADA: {
-    label: 'Aceptada',
-    icon: CheckCircle,
-    className: 'bg-secondary-container text-on-secondary-container',
-  },
-  RECHAZADA: {
-    label: 'Rechazada',
-    icon: XCircle,
-    className: 'bg-error-container text-error',
-  },
-};
 
 type ModalState = {
   open: boolean;
@@ -52,9 +36,15 @@ export default function PostulacionesProyectoPage() {
     data: postulaciones = [],
     isLoading,
     isError,
+    error,
   } = useQuery<PostulacionRecibida[]>({
     queryKey: projectAllPostulationsQueryKey(id),
     queryFn: () => apiFetch(`/proyectos/${id}/postulaciones`),
+  });
+
+  const { denegado } = useRequireCan('proyecto.postulaciones.resolver', {
+    esLider: getApiErrorStatus(error) !== 403,
+    listo: !isLoading,
   });
 
   const { mutate: resolverPostulacion, isPending } = useMutation({
@@ -94,6 +84,8 @@ export default function PostulacionesProyectoPage() {
     });
   }
 
+  if (denegado) return null;
+
   return (
     <>
       <div className="mx-auto max-w-[1400px] px-8 py-8">
@@ -132,7 +124,7 @@ export default function PostulacionesProyectoPage() {
 
         <div className="space-y-4">
           {postulaciones.map((p) => {
-            const config = ESTADO_CONFIG[p.estadoPostulacion];
+            const config = ESTADO_POSTULACION_STYLE[p.estadoPostulacion];
             const Icon = config.icon;
 
             return (
@@ -154,12 +146,10 @@ export default function PostulacionesProyectoPage() {
                     </div>
                   </div>
 
-                  <span
-                    className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${config.className}`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
+                  <Tag tone={config.tone} className="shrink-0">
+                    <Icon aria-hidden="true" />
                     {config.label}
-                  </span>
+                  </Tag>
                 </div>
 
                 {/* Rol */}

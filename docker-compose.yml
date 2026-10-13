@@ -66,6 +66,14 @@ services:
     build:
       context: ./apps/frontend
       dockerfile: Dockerfile
+      # GPI01-C01 (H-01): las NEXT_PUBLIC_* se hornean al compilar; definirlas
+      # solo en `environment`/.env no cambia el bundle. Sin este argumento la
+      # imagen local queda en la variante same-origin y el navegador abre
+      # Socket.IO contra :3000, donde esta pila no tiene nginx. Con `-` (no
+      # `:-`) una variable definida vacia sigue eligiendo same-origin. El
+      # deploy no compila con este archivo (`up --no-build`).
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL-http://localhost:3001}
     pull_policy: missing
     container_name: uvg-collab-frontend
     profiles:

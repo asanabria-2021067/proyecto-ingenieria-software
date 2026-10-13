@@ -1,5 +1,7 @@
 'use client';
 
+import { ESTADO_HITO_STYLE, ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
+
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -21,6 +23,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+} from '@/components/dashboard/data-table';
 import {
   Empty,
   EmptyContent,
@@ -65,30 +74,6 @@ function formatearFechaHora(iso: string): string {
 function formatearHoras(horas: number): string {
   return horas.toLocaleString('es-GT', { maximumFractionDigits: 2 });
 }
-
-/**
- * Estilos de estado de Sprint centralizados (mismo criterio que
- * `ESTADO_PARTICIPACION_STYLE`): un `span` con mapa de clases, no
- * `ui/badge`. Exhaustivo por diseño — un `EstadoSprint` nuevo rompe la
- * compilación en vez de caer silenciosamente en un estado incorrecto.
- */
-const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
-  ACTIVO: { label: 'Activo', className: 'bg-primary-container text-on-primary-container' },
-  EN_FINALIZACION: {
-    label: 'En finalización',
-    className: 'bg-status-warning text-on-status-warning',
-  },
-  CERRADO: { label: 'Cerrado', className: 'bg-surface-container-high text-tertiary' },
-};
-
-const ESTADO_HITO_STYLE: Record<EstadoHito, { label: string; className: string }> = {
-  PENDIENTE: { label: 'Pendiente', className: 'bg-surface-container-high text-tertiary' },
-  EN_PROGRESO: {
-    label: 'En progreso',
-    className: 'bg-status-warning text-on-status-warning',
-  },
-  COMPLETADO: { label: 'Completado', className: 'bg-primary-container text-on-primary-container' },
-};
 
 interface ParticipanteContribucion {
   usuario: SprintHistoryUsuarioDto;
@@ -139,9 +124,13 @@ function DetailSkeleton() {
   );
 }
 
+// Misma tabla que las bandejas administrativas (`data-table`).
+const TH = `h-auto whitespace-nowrap px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
+const TD = 'px-stack py-inline';
+
 function SeccionVacia({ icon: Icon, mensaje }: { icon: typeof Users; mensaje: string }) {
   return (
-    <Empty tone="muted" role="status" className="py-8">
+    <Empty role="status" className="py-8">
       <EmptyMedia variant="compact">
         <Icon aria-hidden="true" className="h-5 w-5" />
       </EmptyMedia>
@@ -159,9 +148,9 @@ function TareaRow({ tarea, tituloHito }: { tarea: SprintDetailTareaDto; tituloHi
   const tieneHorasReales = tarea.asignaciones.some((a) => a.horasReales !== null);
 
   return (
-    <TableRow className="border-outline-variant/40 align-top">
-      <TableCell className="whitespace-normal px-4 py-3">
-        <p className="text-sm font-semibold text-on-surface">{tarea.tituloTarea}</p>
+    <TableRow className={`${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER} align-top`}>
+      <TableCell className={`${TD} whitespace-normal`}>
+        <p className="type-body font-semibold text-text-primary">{tarea.tituloTarea}</p>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-tertiary">
           <span className={`inline-flex items-center gap-1 font-semibold ${PRIORIDAD_COLOR[tarea.prioridad]}`}>
             <PrioridadIcon className="size-3" aria-hidden="true" />
@@ -176,16 +165,16 @@ function TareaRow({ tarea, tituloHito }: { tarea: SprintDetailTareaDto; tituloHi
           )}
         </div>
       </TableCell>
-      <TableCell className="px-4 py-3">
+      <TableCell className={TD}>
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
           <span className={`inline-block size-2 rounded-full ${estilo.dot}`} aria-hidden="true" />
           {ESTADO_LABEL[tarea.estadoTarea]}
         </span>
       </TableCell>
-      <TableCell className="whitespace-normal px-4 py-3 text-sm text-on-surface-variant">
+      <TableCell className={`${TD} whitespace-normal type-body text-text-secondary`}>
         {tituloHito ?? 'Sin hito'}
       </TableCell>
-      <TableCell className="whitespace-normal px-4 py-3">
+      <TableCell className={`${TD} whitespace-normal`}>
         {tarea.asignaciones.length === 0 ? (
           <span className="text-sm text-tertiary">Sin asignaciones</span>
         ) : (
@@ -202,7 +191,7 @@ function TareaRow({ tarea, tituloHito }: { tarea: SprintDetailTareaDto; tituloHi
           </ul>
         )}
       </TableCell>
-      <TableCell className="whitespace-nowrap px-4 py-3 text-right text-sm">
+      <TableCell className={`${TD} whitespace-nowrap text-right text-sm`}>
         <p className="font-bold text-on-surface">
           {tieneHorasReales ? `${formatearHoras(horasReales)} h` : '— h'}
         </p>
@@ -218,22 +207,22 @@ function TareaRow({ tarea, tituloHito }: { tarea: SprintDetailTareaDto; tituloHi
 function ParticipanteRow({ participante }: { participante: ParticipanteContribucion }) {
   const { usuario } = participante;
   return (
-    <TableRow className="border-outline-variant/40">
-      <TableCell className="px-4 py-3">
-        <div className="flex items-center gap-3">
+    <TableRow className={`${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER}`}>
+      <TableCell className={TD}>
+        <div className="flex items-center gap-tight">
           <Avatar className="size-8 shrink-0">
             {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
-            <AvatarFallback className="bg-primary-container text-xs font-bold text-on-primary-container">
+            <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
               {getInitials(usuario.nombre, usuario.apellido)}
             </AvatarFallback>
           </Avatar>
-          <span className="whitespace-nowrap text-sm font-medium text-on-surface">
+          <span className="type-body whitespace-nowrap font-semibold text-text-primary">
             {usuario.nombre} {usuario.apellido}
           </span>
         </div>
       </TableCell>
-      <TableCell className="px-4 py-3 text-sm text-on-surface">{participante.idsTareas.size}</TableCell>
-      <TableCell className="whitespace-nowrap px-4 py-3 text-sm text-on-surface">
+      <TableCell className={`${TD} type-body tabular-nums text-text-primary`}>{participante.idsTareas.size}</TableCell>
+      <TableCell className={`${TD} whitespace-nowrap type-body tabular-nums text-text-primary`}>
         {formatearHoras(participante.horasRegistradas)} h
       </TableCell>
     </TableRow>
@@ -246,14 +235,14 @@ function HitoRow({ hito }: { hito: { idHito: number; tituloHito: string; estadoH
   return (
     <div
       key={hito.idHito}
-      className="flex flex-col gap-2 border-b border-outline-variant/40 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-4"
+      className="flex flex-col gap-2 border-b border-outline-variant/50 px-stack py-inline transition-colors last:border-b-0 hover:bg-surface-container-low sm:flex-row sm:items-center sm:gap-4"
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <Flag className="size-4 shrink-0 text-primary" aria-hidden="true" />
         <span className="truncate text-sm font-medium text-on-surface">{hito.tituloHito}</span>
       </div>
       <span
-        className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
+        className={`pill w-fit ${estilo.className}`}
       >
         {estilo.label}
       </span>
@@ -377,7 +366,7 @@ function SprintDetailContent({
       >
         <div className="mt-tight flex flex-wrap items-center gap-x-inline gap-y-micro">
           <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estiloEstado.className}`}
+            className={`pill ${estiloEstado.className}`}
           >
             {estiloEstado.label}
           </span>
@@ -426,23 +415,23 @@ function SprintDetailContent({
         {detail.tareas.length === 0 ? (
           <SeccionVacia icon={ListChecks} mensaje="Este Sprint no tiene tareas registradas." />
         ) : (
-          <div className="rounded-xl border border-outline-variant bg-surface-container-lowest">
+          <div className={DATA_TABLE_CARD}>
             <Table>
               <TableHeader>
-                <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
+                <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
+                  <TableHead scope="col" className={TH}>
                     Tarea
                   </TableHead>
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
+                  <TableHead scope="col" className={TH}>
                     Estado
                   </TableHead>
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
+                  <TableHead scope="col" className={TH}>
                     Hito
                   </TableHead>
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
+                  <TableHead scope="col" className={TH}>
                     Asignaciones
                   </TableHead>
-                  <TableHead className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-tertiary">
+                  <TableHead scope="col" className={`${TH} text-right`}>
                     Horas
                   </TableHead>
                 </TableRow>
@@ -470,17 +459,17 @@ function SprintDetailContent({
         {participantes.length === 0 ? (
           <SeccionVacia icon={Users} mensaje="No hay participantes registrados para este Sprint." />
         ) : (
-          <div className="rounded-xl border border-outline-variant bg-surface-container-lowest">
+          <div className={DATA_TABLE_CARD}>
             <Table>
               <TableHeader>
-                <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
+                <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
+                  <TableHead scope="col" className={TH}>
                     Integrante
                   </TableHead>
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
+                  <TableHead scope="col" className={TH}>
                     Tareas
                   </TableHead>
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
+                  <TableHead scope="col" className={TH}>
                     Horas registradas
                   </TableHead>
                 </TableRow>
@@ -504,7 +493,7 @@ function SprintDetailContent({
         {detail.hitos.length === 0 ? (
           <SeccionVacia icon={Flag} mensaje="Este Sprint no tiene hitos asociados." />
         ) : (
-          <div className="rounded-xl border border-outline-variant bg-surface-container-lowest">
+          <div className={DATA_TABLE_CARD}>
             {detail.hitos.map((hito) => (
               <HitoRow key={hito.idHito} hito={hito} />
             ))}

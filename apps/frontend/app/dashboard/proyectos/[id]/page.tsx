@@ -1,5 +1,8 @@
 'use client';
 
+import { ESTADO_REVISION_LABEL } from '@/components/projects/closure-review-status.utils';
+import type { EstadoRevisionCierre } from '@/lib/types/closure';
+
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -31,8 +34,6 @@ import {
   estadoBadgeStyle,
   formatFechaCorta,
   getIniciales,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -58,6 +59,7 @@ import { parseObjetivos } from '@/components/projects/detail/parse-objetivos';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useCan } from '@/hooks/use-can';
 import { useCurrentExitRequest } from '@/hooks/use-exit-request';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -65,13 +67,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ReadOnlyProjectBanner } from '@/components/projects/read-only-project-banner';
 import { ClosureDocumentViewer, formatearTamano } from '@/components/closure/closure-document-viewer';
 import { useHistoricalProject } from '@/hooks/use-historical-project';
+import { useProjectDetail } from '@/hooks/use-project-detail';
 import { getApiErrorStatus } from '@/components/projects/api-error';
 import uvgSwal from '@/lib/swal';
 import type { Rol } from '@/types';
 import type { HistoricalProjectView, HistoricalRevision } from '@/lib/services/historical';
 import { ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 
-const MODALIDAD_BADGE = 'bg-surface-container-high text-on-surface-variant';
+const MODALIDAD_BADGE = 'pill-neutral';
 
 const ESTADO_POSTULACION_LABEL: Record<string, string> = {
   PENDIENTE: 'Pendiente',
@@ -99,12 +103,19 @@ export default function ProyectoDetallePage() {
   const { id } = useParams<{ id: string }>();
   const projectId = Number(id);
 
-  const { data: proyecto, isLoading, isError, error, refetch } = useQuery<Proyecto>({
-    queryKey: ['proyecto', id],
-    queryFn: () => apiFetch(`/proyectos/${id}`),
-    retry: false,
-  });
-  const publicStatus = isError ? getApiErrorStatus(error) : undefined;
+  // GPI01-C04 (H-03): misma consulta que la navegación lateral (antes eran dos
+  // peticiones al GET público, una por cada clave). Si el público responde 404,
+  // `useProjectDetail` lee por la ruta autorizada. Esta página solo pinta el
+  // detalle público y el histórico de un CERRADO: una lectura autorizada de
+  // cualquier otro estado (borrador, en revisión…) sigue siendo «no encontrado»
+  // aquí, igual que antes.
+  const detalle = useProjectDetail(projectId);
+  const fueraDelDetallePublico =
+    detalle.data?.lecturaAutorizada === true && detalle.data.estadoProyecto !== 'CERRADO';
+  const proyecto = fueraDelDetallePublico ? undefined : (detalle.data as Proyecto | undefined);
+  const { isLoading, error, refetch } = detalle;
+  const isError = detalle.isError || fueraDelDetallePublico;
+  const publicStatus = fueraDelDetallePublico ? 404 : detalle.isError ? getApiErrorStatus(error) : undefined;
   const isNotFound = isError && publicStatus === 404;
 
   // S7 (VIEW-02): un proyecto CERRADO se lee como histórico completo. El GET
@@ -132,6 +143,7 @@ export default function ProyectoDetallePage() {
   const { data: currentUser, isLoading: isLoadingCurrentUser } = useCurrentUser();
   const { members, isLoading: isLoadingMembers } = useProjectMembers(projectId);
   const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
+  const puedePostular = useCan('proyecto.postular', { esLider: isLeader });
   const esParticipante =
     !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
   const { iniciarChatCon } = useChatDock();
@@ -380,7 +392,7 @@ export default function ProyectoDetallePage() {
                       >
                         Ver mi postulación
                       </Link>
-                    ) : (
+                    ) : !puedePostular ? null : (
                       <Link
                         href={`/dashboard/proyectos/${projectId}/postular/${rol.idRolProyecto}`}
                         aria-label={`Postularme al rol ${rol.nombreRol}`}
@@ -538,9 +550,9 @@ function ProyectoDetalleSkeleton() {
       <div className="space-y-4">
         <div className="rounded-card border border-outline-variant/40 bg-surface-container-lowest p-6">
           <div className="flex gap-2">
-            <Skeleton className="h-6.5 w-20 rounded-full" />
-            <Skeleton className="h-6.5 w-20 rounded-full" />
-            <Skeleton className="h-6.5 w-20 rounded-full" />
+            <Skeleton className="h-6.25 w-20 rounded-tag" />
+            <Skeleton className="h-6.25 w-20 rounded-tag" />
+            <Skeleton className="h-6.25 w-20 rounded-tag" />
           </div>
           <Skeleton className="mt-4 h-7 w-3/4" />
           <Skeleton className="mt-3 h-4 w-full" />
@@ -571,14 +583,6 @@ function ProyectoDetalleSkeleton() {
 const TAB_BASE =
   'relative flex shrink-0 items-center gap-1.5 border-b-2 px-1 pb-2.5 pt-1 text-[13px] font-bold whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
 const TAB_INACTIVE = `${TAB_BASE} border-transparent text-tertiary hover:border-outline-variant hover:text-on-surface`;
-
-const ESTADO_REVISION_LABEL: Record<string, { label: string; className: string }> = {
-  APROBADA: { label: 'Aprobado', className: 'bg-primary/10 text-primary' },
-  DEVUELTA_A_EJECUCION: { label: 'Devuelta a ejecución', className: 'bg-error/10 text-error' },
-  CORRECCION_DOCUMENTAL: { label: 'Corrección documental', className: 'bg-status-warning text-on-status-warning' },
-  ENVIADA: { label: 'Enviada', className: 'bg-surface-container-high text-on-surface-variant' },
-  BORRADOR: { label: 'Borrador', className: 'bg-surface-container-high text-on-surface-variant' },
-};
 
 /** Los importes llegan como string decimal: se formatean, nunca se operan en punto flotante. */
 function formatearDecimal(value: string | null | undefined): string {
@@ -661,14 +665,12 @@ function HistoricalProjectPage({
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px] lg:items-start">
         <CardShell className="p-6">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`inline-flex h-6.5 items-center rounded-full px-3 text-[12px] font-semibold whitespace-nowrap ${estadoBadgeStyle('CERRADO')}`}>
+            <span className={`pill ${estadoBadgeStyle('CERRADO')}`}>
               {estadoBadgeLabel('CERRADO')}
             </span>
-            <span className={`inline-flex h-6.5 items-center rounded-full px-3 text-[12px] font-semibold whitespace-nowrap ${tipoBadgeStyle(resumen.tipoProyecto)}`}>
-              {tipoBadgeLabel(resumen.tipoProyecto)}
-            </span>
+            <TipoBadge tipo={resumen.tipoProyecto} />
             {proyecto && (
-              <span className={`inline-flex h-6.5 items-center rounded-full px-3 text-[12px] font-semibold whitespace-nowrap ${MODALIDAD_BADGE}`}>
+              <span className={`pill ${MODALIDAD_BADGE}`}>
                 {MODALIDAD_LABEL[proyecto.modalidadProyecto]}
               </span>
             )}
@@ -784,7 +786,7 @@ function HistoricalProjectPage({
                         {m.usuario.nombre} {m.usuario.apellido}
                       </span>
                       <span className="hidden text-on-surface-variant sm:inline">{m.rol.nombreRol}</span>
-                      <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                      <span className="pill pill-sm pill-green">
                         {m.estadoParticipacion === 'ACTIVO' || m.estadoParticipacion === 'COMPLETADO' ? 'Participó' : m.estadoParticipacion}
                       </span>
                     </li>
@@ -811,7 +813,7 @@ function HistoricalProjectPage({
                       <span className="text-on-surface-variant">
                         {formatFechaCorta(sp.fechaInicio)}{sp.fechaCierre ? ` – ${formatFechaCorta(sp.fechaCierre)}` : ''}
                       </span>
-                      <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">Completado</span>
+                      <span className="pill pill-sm pill-green">Completado</span>
                     </li>
                   ))}
                 </ul>
@@ -852,12 +854,12 @@ function HistoricalProjectPage({
               ) : (
                 <ul className="divide-y divide-outline-variant/30" aria-label="Revisiones de cierre">
                   {revisiones.map((r) => {
-                    const estilo = ESTADO_REVISION_LABEL[r.estadoRevision] ?? { label: r.estadoRevision, className: 'bg-surface-container-high text-on-surface-variant' };
+                    const estilo = ESTADO_REVISION_LABEL[r.estadoRevision as EstadoRevisionCierre] ?? { label: r.estadoRevision, className: 'pill-neutral' };
                     return (
                       <li key={r.idRevisionCierre} className="grid grid-cols-1 gap-1 py-2 text-[13px] sm:grid-cols-[auto_auto_auto_1fr] sm:items-center sm:gap-3">
                         <span className="font-medium text-on-surface">Entrega #{r.numeroRevision}</span>
                         <span className="text-on-surface-variant">{formatFechaCorta(r.resueltaEn ?? r.enviadaEn ?? '') || '—'}</span>
-                        <span className={`w-fit rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${estilo.className}`}>{estilo.label}</span>
+                        <span className={`pill pill-sm w-fit ${estilo.className}`}>{estilo.label}</span>
                         <span className="text-on-surface-variant">{r.comentarioRevisor ?? ''}</span>
                       </li>
                     );

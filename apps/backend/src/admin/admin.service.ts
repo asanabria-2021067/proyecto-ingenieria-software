@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -19,6 +20,8 @@ import {
   TipoProyecto,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ADMIN_ACTIVE_PROJECT_STATES } from '../common/project-policy/admin-active-project-states';
 import { SecurityEventsService } from '../security-events/security-events.service';
 import { TipoEventoSeguridad } from '../security-events/tipos-evento-seguridad';
 import type { SecurityRequestContext } from '../security-events/request-context';
@@ -38,6 +41,7 @@ export class AdminService {
     private readonly securityEvents: SecurityEventsService = new SecurityEventsService(prisma),
     // G07: EventEmitter global de la app; ausente en instancias manuales (tests).
     @Optional() private readonly events?: EventEmitter2,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   // ─── Guards ──────────────────────────────────────────────────────────────────
@@ -79,7 +83,7 @@ export class AdminService {
     ] = await Promise.all([
       this.prisma.proyecto.count({
         where: {
-          estadoProyecto: { in: [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO] },
+          estadoProyecto: { in: [...ADMIN_ACTIVE_PROJECT_STATES] },
           eliminadoEn: null,
         },
       }),
@@ -112,6 +116,7 @@ export class AdminService {
       select: {
         idProyecto: true,
         tituloProyecto: true,
+        tipoProyecto: true,
         estadoProyecto: true,
         fechaActualizacion: true,
       },
@@ -128,30 +133,43 @@ export class AdminService {
       take: 20,
     });
 
-    const estudiantesConHoras = await Promise.all(
-      perfilesRiesgo.map(async (p) => {
-        const agg = await this.prisma.horasParticipacion.aggregate({
+    // T-291: una sola consulta para las horas de todos los perfiles en vez de
+    // un aggregate por estudiante; la suma se agrupa por usuario en memoria
+    // con Decimal para conservar el mismo resultado que el _sum anterior.
+    const horasAprobadas = perfilesRiesgo.length
+      ? await this.prisma.horasParticipacion.findMany({
           where: {
             participacion: {
-              idUsuario: p.idUsuario,
+              idUsuario: { in: perfilesRiesgo.map((p) => p.idUsuario) },
               rolProyecto: {
                 proyecto: { tipoProyecto: TipoProyecto.EXTRACURRICULAR_EXTENSION },
               },
             },
             estadoHoras: EstadoHoras.APROBADA,
           },
-          _sum: { horasAprobadas: true },
-        });
-        return {
-          idUsuario: p.idUsuario,
-          nombre: p.usuario.nombre,
-          apellido: p.usuario.apellido,
-          semestre: p.semestre,
-          horasExtension: Number(agg._sum.horasAprobadas ?? 0),
-          horasExtensionRequeridas: p.horasExtensionRequeridas ?? 100,
-        };
-      }),
-    );
+          select: {
+            horasAprobadas: true,
+            participacion: { select: { idUsuario: true } },
+          },
+        })
+      : [];
+
+    const horasPorUsuario = new Map<number, Prisma.Decimal>();
+    for (const registro of horasAprobadas) {
+      if (registro.horasAprobadas === null) continue;
+      const idUsuario = registro.participacion.idUsuario;
+      const acumulado = horasPorUsuario.get(idUsuario) ?? new Prisma.Decimal(0);
+      horasPorUsuario.set(idUsuario, acumulado.plus(registro.horasAprobadas));
+    }
+
+    const estudiantesConHoras = perfilesRiesgo.map((p) => ({
+      idUsuario: p.idUsuario,
+      nombre: p.usuario.nombre,
+      apellido: p.usuario.apellido,
+      semestre: p.semestre,
+      horasExtension: Number(horasPorUsuario.get(p.idUsuario) ?? 0),
+      horasExtensionRequeridas: p.horasExtensionRequeridas ?? 100,
+    }));
 
     estudiantesConHoras.sort((a, b) => a.horasExtension - b.horasExtension);
     const estudiantesEnRiesgo = estudiantesConHoras.slice(0, 5);
@@ -490,11 +508,7 @@ export class AdminService {
     return {
       proyectosDondeParticipa: proyectos.length,
       estudiantesMentorizados: 0, // fallback: no hay relación mentor-estudiante explícita en el schema
-      proyectosActivos: proyectos.filter((p) =>
-        ([EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO] as EstadoProyecto[]).includes(
-          p.estadoProyecto,
-        ),
-      ).length,
+      proyectosActivos: proyectos.filter((p) => ADMIN_ACTIVE_PROJECT_STATES.includes(p.estadoProyecto)).length,
       proyectosCerrados: proyectos.filter((p) => p.estadoProyecto === EstadoProyecto.CERRADO)
         .length,
       proyectosAsociados: proyectos.slice(0, 5).map((p) => ({
@@ -515,7 +529,7 @@ export class AdminService {
         this.prisma.proyecto.count({
           where: {
             creadoPor: userId,
-            estadoProyecto: { in: [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO] },
+            estadoProyecto: { in: [...ADMIN_ACTIVE_PROJECT_STATES] },
             eliminadoEn: null,
           },
         }),
@@ -612,11 +626,7 @@ export class AdminService {
 
     return {
       proyectosSupervisados: proyectos.length,
-      proyectosActivos: proyectos.filter((p) =>
-        ([EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO] as EstadoProyecto[]).includes(
-          p.estadoProyecto,
-        ),
-      ).length,
+      proyectosActivos: proyectos.filter((p) => ADMIN_ACTIVE_PROJECT_STATES.includes(p.estadoProyecto)).length,
       proyectosCerrados: proyectos.filter((p) => p.estadoProyecto === EstadoProyecto.CERRADO)
         .length,
       estudiantesVinculados,
@@ -657,6 +667,12 @@ export class AdminService {
     const esAdmin = user.rolesAcceso.some((r) => r.rolAcceso.nombrePerfil === 'administrador');
     if (esAdmin) {
       throw new ForbiddenException('No se puede cambiar el estado de un usuario administrador');
+    }
+
+    if (user.estado === EstadoUsuario.PENDIENTE_VERIFICACION) {
+      throw new ConflictException(
+        'La cuenta está pendiente de verificación: usa aprobar o rechazar en cuentas pendientes',
+      );
     }
 
     const updated = await this.prisma.usuario.update({
@@ -704,6 +720,96 @@ export class AdminService {
       estado: updated.estado,
       roles: updated.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil),
       fechaCreacion: updated.fechaCreacion.toISOString(),
+    };
+  }
+
+  async getCuentasPendientes(callerId: number) {
+    await this.requireAdmin(callerId);
+
+    const pendientes = await this.prisma.usuario.findMany({
+      where: { estado: EstadoUsuario.PENDIENTE_VERIFICACION },
+      orderBy: { fechaCreacion: 'asc' },
+      select: {
+        idUsuario: true,
+        nombre: true,
+        apellido: true,
+        correo: true,
+        fechaCreacion: true,
+        perfil: {
+          select: {
+            carne: true,
+            carrera: { select: { idCarrera: true, nombreCarrera: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      total: pendientes.length,
+      cuentas: pendientes.map((u) => ({
+        idUsuario: u.idUsuario,
+        nombre: u.nombre,
+        apellido: u.apellido,
+        correo: u.correo,
+        carne: u.perfil?.carne ?? null,
+        carrera: u.perfil?.carrera ?? null,
+        fechaRegistro: u.fechaCreacion.toISOString(),
+      })),
+    };
+  }
+
+  async aprobarCuentaPendiente(callerId: number, targetId: number, origen?: SecurityRequestContext) {
+    const cuenta = await this.resolverCuentaPendiente(callerId, targetId, EstadoUsuario.ACTIVO, origen);
+
+    await this.notifications?.notifyFromTemplate([cuenta.idUsuario], 'CUENTA_VERIFICADA', {
+      userName: cuenta.nombre,
+    });
+
+    return cuenta;
+  }
+
+  async rechazarCuentaPendiente(callerId: number, targetId: number, origen?: SecurityRequestContext) {
+    return this.resolverCuentaPendiente(callerId, targetId, EstadoUsuario.INACTIVO, origen);
+  }
+
+  private async resolverCuentaPendiente(
+    callerId: number,
+    targetId: number,
+    estadoNuevo: EstadoUsuario,
+    origen?: SecurityRequestContext,
+  ) {
+    await this.requireAdmin(callerId);
+
+    const user = await this.prisma.usuario.findUnique({
+      where: { idUsuario: targetId },
+      select: { idUsuario: true, nombre: true, apellido: true, correo: true, estado: true },
+    });
+
+    if (!user) throw new NotFoundException(`Usuario ${targetId} no encontrado`);
+
+    const resultado = await this.prisma.usuario.updateMany({
+      where: { idUsuario: targetId, estado: EstadoUsuario.PENDIENTE_VERIFICACION },
+      data: { estado: estadoNuevo },
+    });
+
+    if (resultado.count !== 1) {
+      throw new ConflictException('La cuenta ya no está pendiente de verificación');
+    }
+
+    await this.securityEvents.record({
+      tipo: TipoEventoSeguridad.USER_STATUS_CHANGED,
+      origen,
+      idActor: callerId,
+      idUsuarioAfectado: targetId,
+      detalle: { estadoAnterior: EstadoUsuario.PENDIENTE_VERIFICACION, estadoNuevo },
+    });
+
+    return {
+      idUsuario: user.idUsuario,
+      nombre: user.nombre,
+      apellido: user.apellido,
+      correo: user.correo,
+      estado: estadoNuevo,
     };
   }
 

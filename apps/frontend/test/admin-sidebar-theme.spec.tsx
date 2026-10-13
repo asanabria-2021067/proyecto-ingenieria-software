@@ -1,0 +1,355 @@
+import '@testing-library/jest-dom/vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { UserMenu } from '../components/dashboard/UserMenu';
+
+// Sidebar del administrador «Forest Graphite»: verde bosque institucional en
+// modo claro, grafito verdoso en modo oscuro y acento lima en ambos. La del
+// estudiante no cambia.
+
+const CSS = readFileSync(join(__dirname, '..', 'app/global.css'), 'utf-8');
+
+/** Bloque de reglas de un selector exacto (p. ej. `:root` del bloque admin). */
+function bloques(selector: string): string[] {
+  const escapado = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return [...CSS.matchAll(new RegExp(`(?:^|\\n)${escapado}\\s*\\{([^}]*)\\}`, 'g'))].map((m) => m[1]);
+}
+
+function token(nombre: string): string | undefined {
+  for (const cuerpo of bloques(':root')) {
+    const m = cuerpo.match(new RegExp(`${nombre}:\\s*([^;]+);`));
+    if (m) return m[1].trim();
+  }
+  return undefined;
+}
+
+/** Modo claro: verde bosque institucional. */
+export const PALETA_ADMIN = {
+  '--admin-graphite': '#103d30',
+  '--admin-graphite-surface': '#204b3b',
+  '--admin-graphite-hover': '#254f3e',
+  '--admin-graphite-active': '#295441',
+  '--admin-graphite-border': '#356050',
+  '--admin-ink': '#f7faf8',
+  '--admin-ink-muted': '#c0d8cc',
+  '--admin-ink-secondary': '#c0d8cc',
+  '--admin-icon': '#c0d8cc',
+  '--admin-green': '#007a3d',
+  '--admin-lime': '#a3e635',
+} as const;
+
+/** Modo oscuro: grafito verdoso. Solo redefine superficies y texto secundario. */
+export const PALETA_ADMIN_OSCURA = {
+  '--admin-graphite': '#192320',
+  '--admin-graphite-surface': '#242f2a',
+  '--admin-graphite-hover': '#2a3831',
+  '--admin-graphite-active': '#304239',
+  '--admin-graphite-border': '#34413b',
+  '--admin-ink-muted': '#b6c4bd',
+  '--admin-ink-secondary': '#b6c4bd',
+  '--admin-icon': '#b6c4bd',
+} as const;
+
+function tokenOscuro(nombre: string): string | undefined {
+  for (const cuerpo of bloques('.dark')) {
+    const m = cuerpo.match(new RegExp(`${nombre}:\\s*([^;]+);`));
+    if (m) return m[1].trim();
+  }
+  return undefined;
+}
+
+describe('Tokens del tema Forest Graphite del administrador', () => {
+  it.each(Object.entries(PALETA_ADMIN))('claro: %s vale %s', (nombre, valor) => {
+    expect(token(nombre)).toBe(valor);
+  });
+
+  it.each(Object.entries(PALETA_ADMIN_OSCURA))('oscuro: %s vale %s', (nombre, valor) => {
+    expect(tokenOscuro(nombre)).toBe(valor);
+  });
+
+  it('el modo oscuro no toca la tinta principal, el verde del avatar ni la barra lima', () => {
+    for (const nombre of ['--admin-ink', '--admin-green', '--admin-lime']) {
+      expect(tokenOscuro(nombre)).toBeUndefined();
+    }
+  });
+});
+
+describe('Superficie graphite de la sidebar', () => {
+  it('los tokens de superficie y texto apuntan a la paleta en ambos temas (el oscuro solo cambia sus valores)', () => {
+    expect(token('--admin-bg')).toBe('var(--admin-graphite)');
+    expect(token('--admin-border')).toBe('var(--admin-graphite-border)');
+    expect(token('--admin-text')).toBe('var(--admin-ink)');
+    expect(token('--admin-text-dim')).toBe('var(--admin-ink-muted)');
+    expect(token('--admin-text-muted')).toBe('var(--admin-ink-secondary)');
+    const oscuro = bloques('.dark').join('\n');
+    for (const nombre of ['--admin-bg', '--admin-border', '--admin-text', '--admin-text-dim', '--admin-text-muted']) {
+      expect(oscuro).not.toContain(`${nombre}:`);
+    }
+  });
+
+  it('`.admin-sidebar` pinta fondo, borde y texto por defecto; los iconos inactivos usan --admin-icon', () => {
+    const carcasa = bloques('.admin-sidebar')[0];
+    expect(carcasa).toContain('background-color: var(--admin-bg)');
+    expect(carcasa).toContain('border-right: 1px solid var(--admin-border)');
+    expect(carcasa).toContain('color: var(--admin-text-dim)');
+    expect(bloques('.admin-sidebar .admin-nav-inactive svg')[0]).toContain('color: var(--admin-icon)');
+  });
+});
+
+describe('Encabezado de marca', () => {
+  it('divisor con el borde graphite y nombre en tinta clara', () => {
+    expect(bloques('.admin-sidebar-brand')[0]).toContain('border-bottom: 1px solid var(--admin-border)');
+    expect(bloques('.admin-sidebar-brand-name')[0]).toContain('color: var(--admin-text)');
+  });
+});
+
+describe('Etiquetas de sección', () => {
+  it('usan el gris secundario, no el verde', () => {
+    expect(bloques('.admin-nav-section-label')[0]).toContain('color: var(--admin-text-muted)');
+  });
+});
+
+describe('Destinos raíz', () => {
+  it('`.admin-nav-item`: radio del sistema, texto neutro y alto mínimo común', () => {
+    const base = bloques('.admin-nav-item')[0];
+    expect(base).toContain('border-radius: var(--radius-control)');
+    expect(base).toContain('color: var(--admin-text-dim)');
+    expect(base).toContain('min-height: 2.5rem');
+    expect(base).toContain('gap: 0.75rem');
+  });
+
+  it('hover graphite con texto e icono en blanco', () => {
+    expect(bloques('.admin-sidebar .admin-nav-item:hover')[0]).toContain('background-color: var(--admin-graphite-hover)');
+    expect(bloques('.admin-sidebar .admin-nav-item:hover')[0]).toContain('color: var(--admin-ink)');
+    expect(bloques('.admin-sidebar .admin-nav-item:hover svg')[0]).toContain('color: var(--admin-ink)');
+  });
+});
+
+describe('Estado activo de los destinos raíz', () => {
+  const activo = () => bloques(".admin-sidebar .admin-nav-item[aria-current='page']")[0];
+
+  it('graphite elevado, blanco, semibold y barra lima de 3px (no un bloque lima/verde)', () => {
+    expect(activo()).toContain('background-color: var(--admin-graphite-active)');
+    expect(activo()).toContain('box-shadow: inset 3px 0 0 var(--admin-lime)');
+    expect(activo()).toContain('color: var(--admin-ink)');
+    expect(activo()).toContain('font-weight: 600');
+    expect(activo()).not.toMatch(/background-color: var\(--admin-(lime|green|selector-bg)\)/);
+    expect(bloques(".admin-sidebar .admin-nav-item[aria-current='page'] svg")[0]).toContain('color: var(--admin-ink)');
+  });
+
+  it('se declara después del hover para que el activo no cambie al pasar el cursor', () => {
+    expect(CSS.indexOf(".admin-sidebar .admin-nav-item[aria-current='page'] {")).toBeGreaterThan(
+      CSS.indexOf('.admin-sidebar .admin-nav-item:hover {'),
+    );
+  });
+});
+
+describe('Grupos desplegados', () => {
+  it('el padre abierto usa la superficie graphite y texto blanco, nunca verde', () => {
+    const abierto = bloques(".admin-sidebar .admin-nav-group[data-state='open']")[0];
+    expect(abierto).toContain('background-color: var(--admin-graphite-surface)');
+    expect(abierto).toContain('color: var(--admin-ink)');
+    expect(abierto).not.toMatch(/--admin-(green|lime|selector-bg)/);
+  });
+
+  it('chevron gris cerrado, blanco abierto; hover propio sobre el grupo abierto', () => {
+    expect(bloques('.admin-sidebar .admin-nav-group .admin-nav-chevron')[0]).toContain('color: var(--admin-text-muted)');
+    expect(CSS).toMatch(/\.admin-nav-group\[data-state='open'\] \.admin-nav-chevron \{\s*color: var\(--admin-ink\)/);
+    expect(bloques(".admin-sidebar .admin-nav-group[data-state='open']:hover")[0]).toContain(
+      'background-color: var(--admin-graphite-hover)',
+    );
+  });
+});
+
+describe('Destinos anidados', () => {
+  it('guía vertical con el borde graphite', () => {
+    expect(bloques('.admin-nav-children')[0]).toContain('border-left: 1px solid var(--admin-graphite-border)');
+  });
+
+  it('hover propio y activo con graphite elevado + barra lima, igual que la raíz', () => {
+    expect(bloques('.admin-sidebar .admin-nav-subitem:hover')[0]).toContain('background-color: var(--admin-graphite-hover)');
+    const activo = bloques(".admin-sidebar .admin-nav-subitem[aria-current='page']")[0];
+    expect(activo).toContain('background-color: var(--admin-graphite-active)');
+    expect(activo).toContain('box-shadow: inset 3px 0 0 var(--admin-lime)');
+    expect(activo).toContain('font-weight: 600');
+    expect(bloques('.admin-nav-subitem')[0]).toContain('border-radius: var(--radius-control)');
+  });
+});
+
+describe('Pie de cuenta del administrador', () => {
+  afterEach(() => cleanup());
+  const admin = { nombre: 'Admin', apellido: 'UVG', correo: 'admin@uvg.edu.gt', fotoUrl: null };
+
+  it('avatar verde institucional con iniciales blancas, nunca lima', () => {
+    expect(token('--admin-avatar-bg')).toBe('var(--admin-green)');
+    expect(token('--admin-avatar-fg')).toBe('var(--admin-ink)');
+    expect(bloques('.dark').join('\n')).not.toContain('--admin-avatar-bg:');
+    expect(bloques('.admin-account-avatar')[0]).toContain('background-color: var(--admin-avatar-bg)');
+  });
+
+  it('nombre blanco, correo gris secundario, borde superior sutil y hover graphite', () => {
+    expect(bloques('.admin-sidebar-footer')[0]).toContain('border-top: 1px solid var(--admin-border)');
+    expect(bloques('.admin-account-name')[0]).toContain('color: var(--admin-text)');
+    expect(CSS).toMatch(/\.admin-account-email,\s*\.admin-account-chevron \{\s*color: var\(--admin-text-muted\)/);
+    expect(bloques('.admin-sidebar .admin-account-trigger:hover')[0]).toContain('background-color: var(--admin-graphite-hover)');
+  });
+
+  it('el menú de cuenta admin conserva datos e interacción y ya no usa estilos en línea', () => {
+    const { container } = render(<UserMenu user={admin} onLogout={vi.fn()} variant="sidebar" theme="admin" />);
+    const trigger = screen.getByRole('button');
+    expect(trigger).toHaveClass('admin-account-trigger', 'rounded-control');
+    expect(screen.getByText('AU')).toHaveClass('admin-account-avatar', 'rounded-full');
+    expect(screen.getByText('Admin UVG')).toHaveClass('admin-account-name');
+    expect(screen.getByText('admin@uvg.edu.gt')).toHaveClass('admin-account-email');
+    expect(container.querySelector('[style]')).toBeNull();
+  });
+
+  it('el menú de cuenta del estudiante no cambia', () => {
+    render(<UserMenu user={admin} onLogout={vi.fn()} variant="sidebar" />);
+    expect(screen.getByRole('button')).toHaveClass('hover:bg-muted', 'rounded-control');
+    expect(screen.getByText('AU')).toHaveClass('bg-accent', 'text-on-accent');
+    expect(screen.getByText('AU')).not.toHaveClass('admin-account-avatar');
+  });
+});
+
+describe('Cuenta en la barra móvil (superficie clara)', () => {
+  afterEach(() => cleanup());
+
+  it('el disparador compacto del admin usa hover/foco de superficie clara y conserva el avatar verde', () => {
+    render(
+      <UserMenu
+        user={{ nombre: 'Admin', apellido: 'UVG', correo: 'admin@uvg.edu.gt' }}
+        onLogout={vi.fn()}
+        variant="compact"
+        theme="admin"
+      />,
+    );
+    const trigger = screen.getByRole('button', { name: 'Cuenta de Admin UVG' });
+    expect(trigger).toHaveClass('hover:bg-muted', 'focus-visible:ring-2');
+    expect(trigger).not.toHaveClass('admin-nav-inactive');
+    expect(screen.getByText('AU')).toHaveClass('admin-account-avatar');
+  });
+});
+
+describe('Foco y contraste (WCAG AA)', () => {
+  function luminancia(hex: string): number {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  }
+  function contraste(a: string, b: string): number {
+    const [l1, l2] = [luminancia(a), luminancia(b)].sort((x, y) => y - x);
+    return (l1 + 0.05) / (l2 + 0.05);
+  }
+  const TEMAS = {
+    claro: PALETA_ADMIN,
+    oscuro: { ...PALETA_ADMIN, ...PALETA_ADMIN_OSCURA },
+  } as const;
+
+  describe.each(Object.entries(TEMAS))('tema %s', (_tema, P) => {
+    it.each([
+      ['texto inactivo / fondo', P['--admin-ink-muted'], P['--admin-graphite'], 4.5],
+      ['etiqueta y correo / fondo', P['--admin-ink-secondary'], P['--admin-graphite'], 4.5],
+      ['texto inactivo / hover', P['--admin-ink-muted'], P['--admin-graphite-hover'], 4.5],
+      ['texto hover / hover', P['--admin-ink'], P['--admin-graphite-hover'], 4.5],
+      ['texto activo / activo', P['--admin-ink'], P['--admin-graphite-active'], 4.5],
+      ['grupo abierto / superficie', P['--admin-ink'], P['--admin-graphite-surface'], 4.5],
+      ['chevron cerrado / superficie', P['--admin-ink-secondary'], P['--admin-graphite-surface'], 3],
+      ['iniciales / avatar verde', P['--admin-ink'], P['--admin-green'], 4.5],
+      ['icono inactivo / fondo', P['--admin-icon'], P['--admin-graphite'], 3],
+      ['barra y foco lima / activo', P['--admin-lime'], P['--admin-graphite-active'], 3],
+      ['foco lima / fondo', P['--admin-lime'], P['--admin-graphite'], 3],
+    ])('%s cumple %s:1 o más', (_nombre, frente, fondo, minimo) => {
+      expect(contraste(frente, fondo)).toBeGreaterThanOrEqual(minimo as number);
+    });
+  });
+
+  it('items, subitems, cuenta y controles de colapsar tienen foco visible lima, distinto del hover', () => {
+    expect(CSS).toMatch(
+      /\.admin-sidebar \.admin-nav-item:focus-visible,\s*\.admin-sidebar \.admin-nav-subitem:focus-visible,\s*\.admin-sidebar \.admin-account-trigger:focus-visible,\s*\.admin-sidebar \.admin-collapse-toggle:focus-visible,\s*\.admin-sidebar \[data-slot='account-compact-trigger'\]:focus-visible \{\s*outline: 2px solid var\(--admin-lime\);/,
+    );
+    expect(bloques('.admin-sidebar .admin-nav-item:hover')[0]).not.toContain('outline');
+  });
+});
+
+describe('Menú desplegable de la cuenta del administrador', () => {
+  const admin = { nombre: 'Admin', apellido: 'UVG', correo: 'admin@uvg.edu.gt' };
+  const contenido = () => document.querySelector('[data-slot="dropdown-menu-content"]')!;
+  async function abrir(theme: 'admin' | 'default') {
+    render(<UserMenu user={admin} onLogout={vi.fn()} variant="sidebar" theme={theme} />);
+    fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' });
+    await screen.findByRole('menuitem', { name: 'Cerrar sesión' });
+  }
+
+  it('solo el menú del administrador lleva la paleta; conserva ancho, opciones y orden', async () => {
+    await abrir('admin');
+    expect(contenido()).toHaveClass('admin-account-menu', 'w-56');
+    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Mi perfil', 'Configuración', 'Cerrar sesión']);
+    expect(screen.getByRole('menuitem', { name: 'Mi perfil' })).toHaveAttribute('href', '/dashboard/perfil');
+    expect(screen.getByRole('menuitem', { name: 'Configuración' })).toHaveAttribute('href', '/dashboard/configuracion');
+  });
+
+  it('el menú del estudiante no cambia', async () => {
+    await abrir('default');
+    expect(contenido()).toHaveClass('w-56');
+    expect(contenido()).not.toHaveClass('admin-account-menu');
+  });
+
+  it('usa la superficie de grupo, el hover de selección y el coral de salida, sin lima', () => {
+    expect(bloques('.admin-account-menu')[0]).toContain('background-color: var(--admin-graphite-surface)');
+    expect(bloques('.admin-account-menu')[0]).toContain('border-color: var(--admin-menu-border)');
+    expect(token('--admin-menu-border')).toBe('#356050');
+    expect(tokenOscuro('--admin-menu-border')).toBe('#3d5548');
+    expect(token('--admin-menu-danger')).toBe('#ffada6');
+    const inicio = CSS.indexOf('.admin-account-menu {');
+    const reglasMenu = CSS.slice(inicio, CSS.indexOf('@media', inicio));
+    expect(reglasMenu).toContain('background-color: var(--admin-graphite-active)');
+    expect(reglasMenu).not.toContain('--admin-lime');
+  });
+
+  it.each([
+    ['claro', PALETA_ADMIN],
+    ['oscuro', { ...PALETA_ADMIN, ...PALETA_ADMIN_OSCURA }],
+  ] as const)('contraste AA en tema %s: texto, secundario y coral sobre el menú y su hover', (_tema, P) => {
+    const lum = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const ratio = (a: string, b: string) => {
+      const [l1, l2] = [lum(a), lum(b)].sort((x, y) => y - x);
+      return (l1 + 0.05) / (l2 + 0.05);
+    };
+    for (const fondo of [P['--admin-graphite-surface'], P['--admin-graphite-active']]) {
+      for (const texto of [P['--admin-ink'], P['--admin-ink-secondary'], '#ffada6']) {
+        expect(ratio(texto, fondo), `${texto} sobre ${fondo}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+});
+
+describe('Sin tokens heredados de la sidebar verde', () => {
+  it('ya no existen el selector verde ni el hover translúcido anteriores', () => {
+    expect(CSS).not.toMatch(/--admin-selector-(bg|fg)|--admin-hover-bg/);
+    expect(CSS).not.toContain('.admin-nav-inactive:hover');
+    expect(CSS).not.toContain('#5AB33E');
+    expect(CSS).not.toContain('#054526');
+  });
+});
+
+describe('Modo colapsado (CSS)', () => {
+  it('iconos en cuadros de 40px centrados y divisores graphite', () => {
+    const icono = bloques('.admin-nav-icon')[0];
+    expect(icono).toContain('width: 2.5rem');
+    expect(icono).toContain('justify-content: center');
+    expect(icono).toContain('padding: 0');
+    expect(bloques('.admin-nav-separator')[0]).toContain('background-color: var(--admin-border)');
+  });
+
+  it('el botón de colapsar y la cuenta compacta tienen hover graphite dentro de la sidebar', () => {
+    expect(CSS).toMatch(
+      /\.admin-sidebar \.admin-collapse-toggle:hover,\s*\.admin-sidebar \[data-slot='account-compact-trigger'\]:hover \{\s*background-color: var\(--admin-graphite-hover\);/,
+    );
+  });
+});

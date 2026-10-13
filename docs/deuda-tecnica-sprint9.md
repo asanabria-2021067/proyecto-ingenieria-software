@@ -24,3 +24,14 @@
   ni sirve por HTTPS, así que hoy viajan sin cifrar. `docs/seguridad/revision-auth.md` lo explica
   y lo justifica pero no lo registraba como deuda. Pendiente: TLS en el despliegue +
   `COOKIE_SECURE=true`.
+- **`rolesDestino` de los eventos de calendario (HU-169/HU-184, PR #262)**: contrato heredado sin
+  cerrar. La columna `evento_proyecto.roles_destino` (`Int[]`) y el campo `rolesDestino` de
+  `CreateEventDto`/`UpdateEventDto` se reciben y se guardan, pero ninguna lectura los aplica: la
+  visibilidad real de un evento la deciden `invitados` y la pertenencia al proyecto
+  (`filtroVisibilidadEvento` en `events.service.ts`), y el recordatorio usa la misma regla. El
+  diálogo rediseñado en HU-184 ya no edita el campo; solo lo conserva al guardar. Queda **fuera**
+  de la agenda compartida (`EVENT_SHARED_SELECT` no lo pide, G01). No se retira la columna ni se
+  reintroduce un filtro por rol sin decisión de producto (P-3, pendiente de Angel/PO): hacerlo
+  cambiaría quién ve eventos ya creados. Opciones a decidir: (a) retirar el campo del contrato y
+  de la BD con una migración, o (b) volver a exponerlo en el diálogo y aplicarlo en
+  `filtroVisibilidadEvento` y en el recordatorio.

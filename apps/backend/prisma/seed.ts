@@ -596,7 +596,13 @@ async function main() {
       where: { idProyecto, estado: { in: ['ACTIVO', 'EN_FINALIZACION'] } },
     });
     if (operable) return operable;
-    return prisma.sprint.create({ data: { idProyecto, numero, estado: 'ACTIVO' } });
+    // Un Sprint nuevo siempre nace con su fecha esperada de finalización,
+    // igual que al iniciarlo por la API (aquí, a dos semanas). El Sprint
+    // CERRADO de un proyecto terminal de arriba es de compatibilidad y se
+    // queda sin plan a propósito: no hay una planificación real que registrar.
+    return prisma.sprint.create({
+      data: { idProyecto, numero, estado: 'ACTIVO', fechaFinPlaneada: enDias(14) },
+    });
   }
 
   const [sprintTutorias, sprintAmbiental, sprintNeural, sprintEmpleo] = await Promise.all([
@@ -1801,10 +1807,15 @@ async function main() {
   // evento de calendario que crea la app en tiempo real pide nextval() = 1
   // y choca con las filas ya insertadas (mismo P2002 que documenta el reset
   // de más arriba, con estos tres en su lugar).
+  //
+  // GPI01-C15: actividad_proyecto (T-295) también se siembra con id explícito
+  // (1 y 2) y faltaba aquí: en un entorno sembrado las dos primeras
+  // actividades que creaba un líder respondían 500 por ese mismo P2002.
   for (const { table, column } of [
     { table: 'conversacion', column: 'id_conversacion' },
     { table: 'mensaje_chat', column: 'id_mensaje' },
     { table: 'evento_proyecto', column: 'id_evento' },
+    { table: 'actividad_proyecto', column: 'id_actividad' },
   ]) {
     await prisma.$executeRawUnsafe(
       `SELECT setval(pg_get_serial_sequence('${table}', '${column}'), COALESCE((SELECT MAX(${column}) FROM ${table}), 0) + 1, false)`,

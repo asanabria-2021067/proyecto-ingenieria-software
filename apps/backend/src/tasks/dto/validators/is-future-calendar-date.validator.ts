@@ -5,9 +5,9 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator';
+import { todayInGuatemala } from '../../../common/utils/guatemala-date';
 
 const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
-const GUATEMALA_TIME_ZONE = 'America/Guatemala';
 
 function isRealCalendarDate(year: number, month: number, day: number): boolean {
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -16,15 +16,6 @@ function isRealCalendarDate(year: number, month: number, day: number): boolean {
     date.getUTCMonth() === month - 1 &&
     date.getUTCDate() === day
   );
-}
-
-function todayInGuatemala(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: GUATEMALA_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
 }
 
 @ValidatorConstraint({ name: 'isFutureCalendarDate', async: false })

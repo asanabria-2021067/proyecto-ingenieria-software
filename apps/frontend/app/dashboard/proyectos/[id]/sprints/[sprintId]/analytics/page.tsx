@@ -1,8 +1,11 @@
 'use client';
 
+import { ESTADO_HITO_STYLE } from '@/components/projects/sprint-status.utils';
+
 import { useParams } from 'next/navigation';
 import { AlertCircle, BarChart3, CheckCircle2, Clock, Flag, ListChecks } from 'lucide-react';
 import { useSprintAnalytics, useSprintBurndown } from '@/hooks/use-project-sprints';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Empty,
@@ -19,25 +22,6 @@ import type { EstadoHito, SprintAnalyticsDto } from '@/lib/types/sprints';
 import type { EstadoTarea, Prioridad } from '@/lib/types/tasks';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
-
-/**
- * Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE`/`ESTADO_HITO_STYLE`
- * de las páginas hermanas de Sprints. `bar` usa el mismo tono que el badge:
- * gris, verde lima e institucional.
- */
-const ESTADO_HITO_STYLE: Record<EstadoHito, { label: string; className: string; bar: string }> = {
-  PENDIENTE: { label: 'Pendiente', className: 'bg-surface-container-high text-tertiary', bar: 'bg-outline' },
-  EN_PROGRESO: {
-    label: 'En progreso',
-    className: 'bg-status-warning text-on-status-warning',
-    bar: 'bg-accent',
-  },
-  COMPLETADO: {
-    label: 'Completado',
-    className: 'bg-primary-container text-on-primary-container',
-    bar: 'bg-primary',
-  },
-};
 
 /** Barras por prioridad: alta en rojo suave, media en lima, baja en gris. */
 const PRIORIDAD_BAR: Record<Prioridad, string> = {
@@ -109,8 +93,8 @@ function AnalyticsContent({ analytics }: { analytics: SprintAnalyticsDto }) {
       </div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
-          <h2 className="mb-4 text-sm font-bold text-on-surface">Distribución por estado</h2>
+        <div className="card-base">
+          <h2 className="type-subtitle mb-4">Distribución por estado</h2>
           <div className="space-y-3">
             {ORDEN_ESTADO.map((estado) => (
               <DistribucionBar
@@ -124,8 +108,8 @@ function AnalyticsContent({ analytics }: { analytics: SprintAnalyticsDto }) {
           </div>
         </div>
 
-        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
-          <h2 className="mb-4 text-sm font-bold text-on-surface">Distribución por prioridad</h2>
+        <div className="card-base">
+          <h2 className="type-subtitle mb-4">Distribución por prioridad</h2>
           <div className="space-y-3">
             {ORDEN_PRIORIDAD.map((prioridad) => (
               <DistribucionBar
@@ -140,8 +124,8 @@ function AnalyticsContent({ analytics }: { analytics: SprintAnalyticsDto }) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-on-surface">
+      <div className="card-base">
+        <h2 className="type-subtitle mb-4 flex items-center gap-2">
           <Flag className="size-4 text-primary" aria-hidden="true" />
           Hitos
         </h2>
@@ -168,7 +152,7 @@ function AnalyticsContent({ analytics }: { analytics: SprintAnalyticsDto }) {
                     </div>
                   </div>
                   <span
-                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
+                    className={`pill shrink-0 ${estilo.className}`}
                   >
                     {estilo.label} · {hito.porcentaje}%
                   </span>
@@ -208,13 +192,9 @@ function BurndownSection({ idProyecto, idSprint }: { idProyecto: number; idSprin
           </EmptyTitle>
         </EmptyHeader>
         <EmptyContent>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-          >
+          <Button type="button" onClick={() => refetch()}>
             Reintentar
-          </button>
+          </Button>
         </EmptyContent>
       </Empty>
     );
@@ -259,13 +239,9 @@ export default function SprintAnalyticsPage() {
             </EmptyTitle>
           </EmptyHeader>
           <EmptyContent>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-            >
+            <Button type="button" onClick={() => refetch()}>
               Reintentar
-            </button>
+            </Button>
           </EmptyContent>
         </Empty>
       )}

@@ -25,10 +25,9 @@ export class AuthController {
   // que login; sin él, registro solo quedaba bajo los buckets globales.
   @Throttle({ short: { limit: 5, ttl: 60000 } })
   @Post('register')
-  async register(@Body() registerDto: RegisterDto, @Res({ passthrough: true }) res: Response) {
-    const { accessToken, refreshToken } = await this.authService.register(registerDto);
-    setAuthCookies(res, accessToken, refreshToken);
-    return { mensaje: 'Cuenta creada' };
+  async register(@Body() registerDto: RegisterDto) {
+    await this.authService.register(registerDto);
+    return { mensaje: 'Cuenta creada. Queda pendiente de verificación por administración' };
   }
 
   @Throttle({ short: { limit: 5, ttl: 60000 } })

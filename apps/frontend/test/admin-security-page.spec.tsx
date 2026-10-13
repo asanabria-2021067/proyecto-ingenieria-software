@@ -1,0 +1,308 @@
+import '@testing-library/jest-dom/vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+
+vi.mock('../lib/services/admin-security', () => ({ getSecurityEvents: vi.fn() }));
+
+import { getSecurityEvents } from '../lib/services/admin-security';
+import { ADA, SEIS_TIPOS, base, pagina, renderPagina } from './helpers/admin-security';
+
+/** FG02 (T-310). Página del visor de eventos de seguridad sobre un servicio simulado. */
+
+/** Celdas de la fila n (0 = primer evento), en el orden de las columnas. */
+async function celdas(fila: number) {
+  const tabla = await screen.findByRole('table');
+  return within(within(tabla).getAllByRole('row')[fila + 1]).getAllByRole('cell');
+}
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+describe('FG02-C03: tabla del visor de eventos de seguridad', () => {
+  it('tiene título, miga de pan y una tabla con las seis columnas del visor', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(pagina(SEIS_TIPOS));
+    renderPagina();
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Eventos de seguridad' })).toBeInTheDocument();
+    const miga = within(screen.getByRole('navigation', { name: /breadcrumb/i }));
+    expect(miga.getByText('Eventos de seguridad')).toHaveAttribute('aria-current', 'page');
+    expect(miga.getByText('Verificación y seguridad')).toBeInTheDocument();
+
+    const tabla = await screen.findByRole('table', { name: /Eventos de seguridad/ });
+    expect(within(tabla).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+      'Fecha',
+      'Tipo',
+      'Actor',
+      'Cuenta',
+      'Origen',
+      'Detalle',
+    ]);
+    expect(within(tabla).getAllByRole('row')).toHaveLength(SEIS_TIPOS.length + 1);
+  });
+
+  it.each([
+    [0, 'Cambio de estado de cuenta', 'pill-slate', 'Activo → Bloqueado'],
+    [1, 'Contraseña restablecida', 'pill-turquoise', 'Solicitud n.º 77 · 2 sesiones revocadas'],
+    [2, 'Enlace de recuperación emitido', 'pill-blue', 'Solicitud n.º 77'],
+    [3, 'Bloqueo temporal', 'pill-red', 'Intentos fallidos repetidos'],
+    [4, 'Inicio de sesión', 'pill-success', 'Sesión iniciada'],
+    [5, 'Inicio de sesión fallido', 'pill-amber', 'Credenciales incorrectas · Cuenta inexistente'],
+  ])('la fila %i muestra «%s» con su etiqueta %s y el resumen «%s»', async (fila, etiqueta, clase, resumen) => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(pagina(SEIS_TIPOS));
+    renderPagina();
+    const [, tipo, , , , detalle] = await celdas(fila);
+    const tag = within(tipo).getByText(etiqueta);
+    expect(tag).toHaveClass('pill', 'pill-sm', clase);
+    expect(detalle).toHaveTextContent(resumen);
+  });
+
+  it('la fecha se muestra en hora de Guatemala y conserva el instante exacto en <time>', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(pagina([base({ id: 1, tipo: 'LOGIN_SUCCEEDED', fecha: '2026-10-11T03:30:05.000Z' })]));
+    renderPagina();
+    const [fecha] = await celdas(0);
+    const time = fecha.querySelector('time') as HTMLTimeElement;
+    expect(time).toHaveAttribute('datetime', '2026-10-11T03:30:05.000Z');
+    // 03:30 UTC del día 11 son las 21:30 del día 10 en Guatemala.
+    expect(time.textContent).toMatch(/^10 oct.* 2026.* 21:30:05$/);
+  });
+
+  it('actor y cuenta se identifican con nombre e ID, nunca con correo', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(pagina(SEIS_TIPOS));
+    renderPagina();
+    const [, , actor, cuenta] = await celdas(0);
+    expect(actor).toHaveTextContent('Ada Admin (ID 7)');
+    expect(cuenta).toHaveTextContent('Eva Estudiante (ID 8)');
+    expect(document.body.textContent).not.toContain('@');
+  });
+
+  it('los datos ausentes se leen como texto, no como celdas vacías ni «null»', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(
+      pagina([
+        base({ id: 2, tipo: 'USER_STATUS_CHANGED', actor: ADA, cuenta: { idUsuario: 99, nombre: null } }),
+        base({ id: 1, tipo: 'LOGIN_FAILED' }),
+      ]),
+    );
+    renderPagina();
+    const [, , , eliminada, , sinDetalle] = await celdas(0);
+    expect(eliminada).toHaveTextContent('Cuenta eliminada (ID 99)');
+    expect(sinDetalle).toHaveTextContent('Sin dato');
+
+    const [, , actor, cuenta, origen, detalle] = await celdas(1);
+    expect(actor).toHaveTextContent('Sin sesión');
+    expect(cuenta).toHaveTextContent('Sin cuenta asociada');
+    expect(origen).toHaveTextContent('Sin IP registrada');
+    expect(detalle).toHaveTextContent('Sin dato');
+    expect(document.body.textContent).not.toMatch(/null|undefined|\[object/);
+  });
+
+  it('una IP no confiable se rotula «IP no verificada»; solo la confirmada dice «IP verificada»', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(pagina(SEIS_TIPOS));
+    renderPagina();
+    const confirmada = (await celdas(0))[4];
+    expect(confirmada).toHaveTextContent('IP verificada');
+    expect(confirmada).toHaveTextContent('198.51.100.7');
+
+    const noVerificada = (await celdas(5))[4];
+    expect(noVerificada).toHaveTextContent('IP no verificada');
+    expect(noVerificada).toHaveTextContent('203.0.113.9');
+    expect(noVerificada).not.toHaveTextContent('IP verificada');
+  });
+
+  it('no pinta JSON crudo, claves internas ni valores que el detalle no reconoce', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(
+      pagina([
+        base({
+          id: 1,
+          tipo: 'LOGIN_FAILED',
+          detalle: { motivo: 'MOTIVO_NUEVO', cuentaRef: '0123456789abcdef', token: 'tok-secreto', extra: 'valor-inesperado' },
+        }),
+        base({ id: 2, tipo: 'USER_STATUS_CHANGED', detalle: { estadoAnterior: '<script>', estadoNuevo: 'tok-secreto' } }),
+      ]),
+    );
+    renderPagina();
+    await screen.findByRole('table');
+    const texto = document.body.textContent ?? '';
+    for (const prohibido of ['tok-secreto', 'valor-inesperado', 'MOTIVO_NUEVO', '0123456789abcdef', '<script>', '{', 'cuentaRef', 'motivo']) {
+      expect(texto).not.toContain(prohibido);
+    }
+  });
+
+  it('informa el total y pagina con el paginador del sistema de diseño', async () => {
+    vi.mocked(getSecurityEvents).mockImplementation(async (query) =>
+      pagina(SEIS_TIPOS.slice(0, 2), { total: 45, page: query?.page ?? 1, totalPages: 3 }),
+    );
+    renderPagina();
+
+    const paginador = await screen.findByRole('navigation', { name: 'Paginación de eventos de seguridad' });
+    expect(screen.getByText('Eventos encontrados:').parentElement).toHaveTextContent('Eventos encontrados: 45');
+    expect(within(paginador).getByText('Página 1 de 3')).toBeInTheDocument();
+    expect(within(paginador).getByRole('button', { name: 'Página anterior' })).toBeDisabled();
+
+    fireEvent.click(within(paginador).getByRole('button', { name: 'Página siguiente' }));
+    await waitFor(() => expect(screen.getByText('Página 2 de 3')).toBeInTheDocument());
+    expect(vi.mocked(getSecurityEvents).mock.calls.at(-1)?.[0]).toMatchObject({ page: 2, limit: 20 });
+  });
+
+  it('con una sola página no muestra el paginador', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(pagina(SEIS_TIPOS));
+    renderPagina();
+    await screen.findByRole('table');
+    expect(screen.queryByRole('navigation', { name: 'Paginación de eventos de seguridad' })).not.toBeInTheDocument();
+  });
+});
+
+describe('FG02-C06: estados de la consulta', () => {
+  const fallo = (statusCode?: number) => Object.assign(new Error('falló'), statusCode ? { statusCode } : {});
+  /** Promesa que el test resuelve a mano. */
+  function diferida<T>() {
+    let resolver!: (valor: T) => void;
+    const promesa = new Promise<T>((res) => {
+      resolver = res;
+    });
+    return { promesa, resolver };
+  }
+
+  it('mientras carga muestra un esqueleto anunciado, sin tabla, sin vacío y sin error', async () => {
+    const pendiente = diferida<ReturnType<typeof pagina>>();
+    vi.mocked(getSecurityEvents).mockReturnValue(pendiente.promesa);
+    renderPagina();
+
+    expect(screen.getByRole('status', { name: 'Cargando eventos de seguridad' })).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(/no hay eventos|Ningún evento/)).not.toBeInTheDocument();
+
+    pendiente.resolver(pagina(SEIS_TIPOS));
+    await screen.findByRole('table');
+    expect(screen.queryByRole('status', { name: 'Cargando eventos de seguridad' })).not.toBeInTheDocument();
+  });
+
+  it('sin eventos y sin filtros explica que todavía no hay registros, sin ofrecer quitar filtros', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(pagina([]));
+    renderPagina();
+    expect(await screen.findByText('Todavía no hay eventos de seguridad registrados.')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Quitar filtros' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('sin coincidencias con filtros lo dice y permite quitarlos', async () => {
+    vi.mocked(getSecurityEvents).mockImplementation(async (query) => pagina(query?.idUsuario ? [] : SEIS_TIPOS));
+    renderPagina();
+    await screen.findByRole('table');
+    fireEvent.change(screen.getByLabelText('ID de usuario'), { target: { value: '8' } });
+
+    expect(await screen.findByText('Ningún evento coincide con estos filtros.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+    await screen.findByRole('table');
+    expect(screen.getByLabelText('ID de usuario')).toHaveValue('');
+  });
+
+  it.each([
+    [403, 'No tienes permiso para consultar los eventos de seguridad.', null],
+    [401, 'Tu sesión expiró.', null],
+    [400, 'El servidor no aceptó estos filtros.', 'Quitar filtros'],
+    [429, 'Demasiadas consultas seguidas.', 'Reintentar'],
+    [500, 'El servidor no pudo entregar los eventos de seguridad.', 'Reintentar'],
+    [503, 'El servidor no pudo entregar los eventos de seguridad.', 'Reintentar'],
+    [undefined, 'No se pudo conectar con el servidor.', 'Reintentar'],
+  ])('un fallo %s se anuncia como «%s» con la acción %s', async (statusCode, titulo, accion) => {
+    vi.mocked(getSecurityEvents).mockRejectedValue(fallo(statusCode));
+    renderPagina();
+
+    const alerta = await screen.findByRole('alert');
+    expect(alerta).toHaveTextContent(titulo);
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Todavía no hay eventos|Ningún evento coincide/)).not.toBeInTheDocument();
+    const botones = within(alerta).queryAllByRole('button');
+    expect(botones.map((boton) => boton.textContent)).toEqual(accion ? [accion] : []);
+  });
+
+  it('un error nunca se confunde con una lista vacía ni muestra el mensaje interno del servidor', async () => {
+    vi.mocked(getSecurityEvents).mockRejectedValue(Object.assign(new Error('PrismaClientKnownRequestError P2024'), { statusCode: 500 }));
+    renderPagina();
+    await screen.findByRole('alert');
+    expect(document.body.textContent).not.toContain('Prisma');
+    expect(screen.queryByText(/Eventos encontrados/)).not.toBeInTheDocument();
+  });
+
+  it('«Reintentar» repite la misma consulta y recupera los resultados', async () => {
+    vi.mocked(getSecurityEvents).mockRejectedValueOnce(fallo(500)).mockResolvedValueOnce(pagina(SEIS_TIPOS));
+    renderPagina();
+    fireEvent.click(within(await screen.findByRole('alert')).getByRole('button', { name: 'Reintentar' }));
+
+    await screen.findByRole('table');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(vi.mocked(getSecurityEvents).mock.calls[1][0]).toEqual(vi.mocked(getSecurityEvents).mock.calls[0][0]);
+  });
+
+  // «Actualizar» vive en la barra superior del shell: invalida las consultas montadas.
+  const actualizarDesdeElShell = (queryClient: { invalidateQueries: () => Promise<void> }) => queryClient.invalidateQueries();
+
+  it('la vista no lleva un botón «Actualizar» propio: usa el del shell administrativo', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValue(pagina(SEIS_TIPOS));
+    renderPagina();
+    await screen.findByRole('table');
+    expect(screen.queryByRole('button', { name: /Actualiza/ })).not.toBeInTheDocument();
+  });
+
+  it('si la actualización del shell falla, retira los datos anteriores en vez de dejarlos como vigentes', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValueOnce(pagina(SEIS_TIPOS)).mockRejectedValueOnce(fallo(500));
+    const { queryClient } = renderPagina();
+    await screen.findByRole('table');
+
+    await actualizarDesdeElShell(queryClient);
+    expect(await screen.findByRole('alert')).toHaveTextContent('El servidor no pudo entregar los eventos de seguridad.');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('la actualización del shell vuelve a pedir la consulta actual y trae los eventos nuevos', async () => {
+    vi.mocked(getSecurityEvents).mockResolvedValueOnce(pagina(SEIS_TIPOS.slice(1))).mockResolvedValueOnce(pagina(SEIS_TIPOS));
+    const { queryClient } = renderPagina();
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(SEIS_TIPOS.length));
+
+    await actualizarDesdeElShell(queryClient);
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(SEIS_TIPOS.length + 1));
+    expect(getSecurityEvents).toHaveBeenCalledTimes(2);
+  });
+
+  it('al cambiar de página la anterior queda marcada como ocupada hasta que llega la nueva', async () => {
+    const segunda = diferida<ReturnType<typeof pagina>>();
+    vi.mocked(getSecurityEvents)
+      .mockResolvedValueOnce(pagina(SEIS_TIPOS, { total: 45, totalPages: 3 }))
+      .mockReturnValueOnce(segunda.promesa);
+    renderPagina();
+    const tabla = await screen.findByRole('table');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await waitFor(() => expect(screen.getByText('Cargando la página solicitada…')).toBeInTheDocument());
+    expect(tabla.closest('[aria-busy="true"]')).not.toBeNull();
+    expect(screen.queryByText(/Eventos encontrados/)).not.toBeInTheDocument();
+
+    segunda.resolver(pagina(SEIS_TIPOS.slice(0, 1), { total: 45, totalPages: 3, page: 2 }));
+    await waitFor(() => expect(screen.getByText(/Eventos encontrados/)).toBeInTheDocument());
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
+  it('una página que quedó fuera de rango ofrece volver a la primera', async () => {
+    vi.mocked(getSecurityEvents).mockImplementation(async (query) =>
+      query?.page === 2 ? pagina([], { total: 3, totalPages: 1, page: 2 }) : pagina(SEIS_TIPOS, { total: 45, totalPages: 3 }),
+    );
+    renderPagina();
+    await screen.findByRole('table');
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+
+    expect(await screen.findByText('Esta página no tiene eventos.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a la primera página' }));
+    await screen.findByRole('table');
+  });
+
+  it('los filtros siguen disponibles en carga, vacío y error', async () => {
+    vi.mocked(getSecurityEvents).mockRejectedValue(fallo(500));
+    renderPagina();
+    await screen.findByRole('alert');
+    expect(screen.getByRole('search', { name: 'Filtros de eventos de seguridad' })).toBeInTheDocument();
+  });
+});

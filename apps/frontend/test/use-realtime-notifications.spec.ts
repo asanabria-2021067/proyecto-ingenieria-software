@@ -292,3 +292,30 @@ describe('useRealtimeNotifications — sin listeners duplicados', () => {
     expect(socketA.close).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('useRealtimeNotifications — cuentas pendientes de verificación', () => {
+  it('una notificación de cuenta pendiente invalida la lista y el contador de administración', async () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    renderHook(() => useRealtimeNotifications(true), { wrapper });
+
+    act(() => {
+      socket.__emit('notification', { tipoNotificacion: 'X', tituloNotificacion: 'Hola' });
+    });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['admin', 'cuentas-pendientes'] });
+
+    act(() => {
+      socket.__emit('notification', {
+        tipoNotificacion: 'CUENTA_PENDIENTE_VERIFICACION',
+        tituloNotificacion: 'Cuenta nueva pendiente de verificación',
+      });
+    });
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['admin', 'cuentas-pendientes'] }),
+    );
+  });
+});

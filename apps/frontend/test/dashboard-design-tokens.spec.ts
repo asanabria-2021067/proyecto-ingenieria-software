@@ -21,8 +21,6 @@ const INLINE_HEX_STYLE = /(?:backgroundColor|color|borderColor|fill|stroke)\s*:\
 const MIGRATED_FILES = [
   'app/dashboard/page.tsx',
   'app/dashboard/admin/page.tsx',
-  'app/dashboard/projects/page.tsx',
-  'app/dashboard/projects/projects-list-client.tsx',
   'app/dashboard/projects/mine/[id]/my-project-view-client.tsx',
   'app/dashboard/projects/[id]/kanban/kanban-workspace-client.tsx',
   'app/dashboard/projects/[id]/kanban/tasks/[taskId]/task-detail-client.tsx',
@@ -67,6 +65,11 @@ const MIGRATED_FILES = [
   'components/hours/hours-kpi-card.tsx',
   'components/hours/my-hours-requirements.tsx',
   'components/hours/my-hours-project-list.tsx',
+  // Panel de administración: resumen de planificación de Sprints.
+  'components/calendar/mini-calendar.tsx',
+  'components/admin/dashboard/sprint-planning-widget.tsx',
+  'components/admin/dashboard/attention-queue.tsx',
+  'lib/admin/sprint-calendar.ts',
 ];
 
 describe('Tokens de color (HU-163)', () => {

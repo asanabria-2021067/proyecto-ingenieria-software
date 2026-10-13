@@ -1,6 +1,7 @@
 export type EstadoParticipacion = 'ACTIVO' | 'RETIRADO' | 'COMPLETADO';
 
 export interface EstadoParticipacionStyle {
+  /** Tono `pill-*` de app/global.css; la forma la pone `.pill`. */
   className: string;
   label: string;
 }
@@ -12,7 +13,7 @@ export interface EstadoParticipacionStyle {
  * proyecto (detalle de integrante, tabla de miembros).
  */
 export const ESTADO_PARTICIPACION_STYLE: Record<EstadoParticipacion, EstadoParticipacionStyle> = {
-  ACTIVO: { className: 'bg-primary-container text-on-primary-container', label: 'Activo' },
-  RETIRADO: { className: 'bg-surface-container-high text-tertiary', label: 'Retirado' },
-  COMPLETADO: { className: 'bg-secondary-container/30 text-secondary', label: 'Completado' },
+  ACTIVO: { className: 'pill-success', label: 'Activo' },
+  RETIRADO: { className: 'pill-neutral', label: 'Retirado' },
+  COMPLETADO: { className: 'pill-sage', label: 'Completado' },
 };

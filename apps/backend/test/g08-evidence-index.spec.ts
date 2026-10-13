@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readRepoFile } from './helpers/workflow-yaml';
-import { STATES, TRACE, citedSpecs, git, gitAvailable, historyCommitIds, specExists, tableRows } from './helpers/owasp-evidence';
+import { STATES, TRACE, citedSpecs, git, gitAvailable, historyCommitIds, phaseHead, shaInLineage, specExists, tableRows } from './helpers/owasp-evidence';
 
 /**
  * G08-C05 · OWASP25-C048 (A01–A10). Índice durable control → gate/commit →
@@ -97,13 +97,16 @@ describe('G08-C05: índice de evidencia', () => {
   it.runIf(gitAvailable())('cada SHA del índice es el del commit con ese ID en el historial local', () => {
     const history = historyCommitIds();
     for (const row of rows.filter((entry) => /^[0-9a-f]{8}$/.test(entry.sha))) {
-      expect(history.get(row.id)?.slice(0, 8), row.id).toBe(row.sha);
+      // El índice cita el hash de la rama auditada; en el linaje de `develop` se compara con su par verificado.
+      const expected = shaInLineage(row.sha);
+      expect(expected, row.id).toBeDefined();
+      expect(history.get(row.id)?.startsWith(expected as string), row.id).toBe(true);
     }
   });
 
   it.runIf(gitAvailable())('todo commit trazable de los gates indexados tiene fila (el commit actual de G08 puede ir como «este commit»)', () => {
     const history = historyCommitIds();
-    const headId = TRACE.exec(git('show', '-s', '--format=%B', 'HEAD'))?.[2];
+    const headId = TRACE.exec(git('show', '-s', '--format=%B', phaseHead()))?.[2];
     const indexed = new Map(rows.map((row) => [row.id, row]));
     const missing = [...history.keys()].filter((id) => INDEXED_GATES.includes(id.slice(0, 3)) && !indexed.has(id) && id !== headId);
     expect(missing).toEqual([]);

@@ -108,9 +108,11 @@ describe('ClosureDocumentsManager (VIEW-13 / F005)', () => {
     expect(onUpload).toHaveBeenCalledWith(file);
   });
 
-  it('muestra «Evidencias — n de 10» y pide confirmación antes de quitar', () => {
+  it('cuenta los adjuntos como «n archivos adjuntos · Máximo 10» y pide confirmación antes de quitar', () => {
     const { onDetach } = renderManager();
-    expect(screen.getByText(`1 de ${MAX_EVIDENCIAS}`)).toBeInTheDocument();
+    // El 10 es un tope de archivos, no una meta: nunca «1 de 10».
+    expect(screen.getByText(`1 archivo adjunto · Máximo ${MAX_EVIDENCIAS}`)).toBeInTheDocument();
+    expect(screen.queryByText(`1 de ${MAX_EVIDENCIAS}`)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Quitar captura.pdf' }));
     expect(onDetach).not.toHaveBeenCalled();
 

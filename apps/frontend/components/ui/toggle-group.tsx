@@ -70,4 +70,12 @@ function ToggleGroupItem({
   )
 }
 
-export { ToggleGroup, ToggleGroupItem }
+/**
+ * Opción de un selector segmentado de UVGenius (Semana/Mes, Story points/Número de tareas):
+ * más aire a los lados, la opción elegida en verde con texto blanco y, al pasar el cursor por
+ * la otra, el mismo realce verde que el botón «Ver perfil».
+ */
+const SEGMENTED_ITEM_CLASS =
+  'px-4 transition-colors hover:bg-primary hover:text-on-primary data-[state=on]:bg-primary data-[state=on]:text-on-primary'
+
+export { ToggleGroup, ToggleGroupItem, SEGMENTED_ITEM_CLASS }

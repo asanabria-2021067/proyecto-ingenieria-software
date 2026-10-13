@@ -34,9 +34,8 @@ vi.mock('../lib/api/client', () => ({
 }));
 
 import MyProjectsPage from '../app/dashboard/projects/mine/page';
-import { ProjectsListClient } from '../app/dashboard/projects/projects-list-client';
 import ProyectosPage from '../app/dashboard/proyectos/page';
-import type { MiProyectoListItemDTO, ProyectoListItemDTO } from '../lib/dto/project.dto';
+import type { MiProyectoListItemDTO } from '../lib/dto/project.dto';
 import type { ProyectoDisponibleResumen } from '../components/projects/available-project-card';
 
 function mio(overrides: Partial<MiProyectoListItemDTO> = {}): MiProyectoListItemDTO {
@@ -51,18 +50,6 @@ function mio(overrides: Partial<MiProyectoListItemDTO> = {}): MiProyectoListItem
     fechaActualizacion: '2026-08-01T12:00:00.000Z',
     revisiones: [],
     avanceProyecto: { sprintsCerrados: 3, sprintsTotales: 3, tareasCompletadas: 10, tareasTotales: 10, porcentaje: 100 } as any,
-    ...overrides,
-  };
-}
-
-function publico(overrides: Partial<ProyectoListItemDTO> = {}): ProyectoListItemDTO {
-  return {
-    idProyecto: 9,
-    tituloProyecto: 'Proyecto público cerrado',
-    tipoProyecto: 'ACADEMICO_EXPERIENCIA',
-    estadoProyecto: 'CERRADO',
-    modalidadProyecto: 'PRESENCIAL',
-    descripcionProyecto: 'Descripción',
     ...overrides,
   };
 }
@@ -156,17 +143,6 @@ describe('VIEW-09 — proyectos cerrados en los listados (F019)', () => {
 
     await waitFor(() => expect(mensajesMock.confirmar).toHaveBeenCalled());
     expect(deleteProjectMock).not.toHaveBeenCalled();
-  });
-
-  it('Listado público SSR: CERRADO se etiqueta legible, en tono neutro, y enlaza al histórico', () => {
-    render(createElement(ProjectsListClient, { initialData: [publico(), publico({ idProyecto: 10, estadoProyecto: 'PUBLICADO', tituloProyecto: 'Abierto' })], initialTotalPages: 1 }));
-
-    const enlace = screen.getByRole('link', { name: /Proyecto público cerrado/ });
-    expect(enlace).toHaveAttribute('href', '/dashboard/proyectos/9');
-    expect(within(enlace).getByText('Cerrado')).toBeInTheDocument();
-    expect(within(enlace).queryByText('CERRADO')).not.toBeInTheDocument();
-    expect(within(enlace).getByText('Solo consulta · histórico')).toBeInTheDocument();
-    expect(within(screen.getByRole('link', { name: /Abierto/ })).queryByText('Solo consulta · histórico')).not.toBeInTheDocument();
   });
 
   it('Explorar proyectos: un CERRADO va al final, no ofrece Postular y se anuncia como solo consulta', async () => {

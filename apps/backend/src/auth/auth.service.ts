@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -14,6 +15,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { correoCoincideConIdentidad, correoInstitucionalEsperado, normalizarCorreo } from "./correo-institucional.util";
 import { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL, REFRESH_TOKEN_MAX_AGE_MS } from "./cookie.util";
 import { getJwtSecret } from "../config/jwt-secret";
 import {
@@ -42,6 +44,8 @@ export const UNKNOWN_USER_PASSWORD_HASH = "$2b$10$aIZFrVp.yjl7jr05RXCHVeqgnl4MBv
 export function accountAttemptKey(correo: string): string {
   return correo.trim().toLowerCase();
 }
+
+export const MENSAJE_CUENTA_PENDIENTE = "Tu cuenta está pendiente de verificación por administración";
 
 interface ResetTokenPayload {
   tipo: string;
@@ -119,6 +123,8 @@ export class AuthService {
 
     // G04 (OWASP25-C023): una cuenta BLOQUEADO o INACTIVO no recibe tokens
     // aunque la contraseña sea correcta; la respuesta es la misma genérica.
+    const pendiente = usuario?.estado === EstadoUsuario.PENDIENTE_VERIFICACION;
+
     if (bloqueada || !usuario || !contrasenaValida || usuario.estado !== EstadoUsuario.ACTIVO) {
       // Cuenta inexistente o contraseña incorrecta suman al contador por igual.
       const bloqueoNuevo = !bloqueada && (!usuario || !contrasenaValida) && this.attempts.recordFailure(cuenta);
@@ -135,7 +141,9 @@ export class AuthService {
             ? "BLOQUEO_TEMPORAL"
             : !usuario || !contrasenaValida
               ? "CREDENCIALES"
-              : "CUENTA_NO_ACTIVA",
+              : pendiente
+                ? "CUENTA_PENDIENTE_VERIFICACION"
+                : "CUENTA_NO_ACTIVA",
           cuentaConocida: Boolean(usuario),
           ...cuentaRef,
         },
@@ -149,6 +157,9 @@ export class AuthService {
           idUsuarioAfectado: usuario?.idUsuario ?? null,
           detalle: { cuentaConocida: Boolean(usuario), ...cuentaRef },
         });
+      }
+      if (!bloqueada && pendiente) {
+        throw new ForbiddenException(MENSAJE_CUENTA_PENDIENTE);
       }
       throw new UnauthorizedException("Credenciales invalidas");
     }
@@ -173,8 +184,16 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
+    const correo = normalizarCorreo(registerDto.correo);
+    if (!correoCoincideConIdentidad(correo, registerDto.apellido, registerDto.carne)) {
+      const correoEsperado = correoInstitucionalEsperado(registerDto.apellido, registerDto.carne);
+      throw new BadRequestException(
+        `El correo no coincide con tu apellido y carné. Tu correo debería ser ${correoEsperado}`,
+      );
+    }
+
     const existente = await this.prisma.usuario.findUnique({
-      where: { correo: registerDto.correo },
+      where: { correo },
     });
 
     if (existente) {
@@ -186,10 +205,11 @@ export class AuthService {
     const usuario = await this.prisma.$transaction(async (tx) => {
       const user = await tx.usuario.create({
         data: {
-          correo: registerDto.correo,
+          correo,
           contrasena: contrasenaHash,
           nombre: registerDto.nombre,
           apellido: registerDto.apellido,
+          estado: EstadoUsuario.PENDIENTE_VERIFICACION,
         },
       });
 
@@ -205,7 +225,13 @@ export class AuthService {
       return user;
     });
 
-    return this.issueTokens(usuario);
+    await this.notificationsService.notifyAdminsFromTemplate("CUENTA_PENDIENTE_VERIFICACION", {
+      userName: `${registerDto.nombre} ${registerDto.apellido}`,
+      carne: registerDto.carne,
+      userId: usuario.idUsuario,
+    });
+
+    return { idUsuario: usuario.idUsuario, estado: EstadoUsuario.PENDIENTE_VERIFICACION };
   }
 
   async forgotPassword(carne: string, correo: string) {

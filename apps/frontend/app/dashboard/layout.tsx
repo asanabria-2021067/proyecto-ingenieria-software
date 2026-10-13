@@ -5,10 +5,6 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 
-// Rutas huérfanas que nunca tuvieron shell (sidebar/header): no están
-// enlazadas desde la navegación y usan su propio layout de página completa.
-const NO_SHELL_ROUTES = new Set(['/dashboard/mis-proyectos', '/dashboard/projects']);
-
 // Rutas exclusivas de administrador: siempre AdminLayout (que internamente
 // bloquea el acceso a usuarios no administradores).
 function isAdminOnlyRoute(pathname: string) {
@@ -21,7 +17,7 @@ function isAdminOnlyRoute(pathname: string) {
 }
 
 // Rutas compartidas: el shell cambia según el rol del usuario actual.
-const SHARED_ROLE_ROUTES = new Set(['/dashboard/perfil', '/dashboard/notificaciones']);
+const SHARED_ROLE_ROUTES = new Set(['/dashboard/perfil', '/dashboard/notificaciones', '/dashboard/configuracion']);
 
 // Rutas donde tanto estudiantes como administradores usan el shell de
 // estudiante (DashboardLayout allowAdmin).
@@ -36,10 +32,6 @@ function isAllowAdminRoute(pathname: string) {
 export default function DashboardRootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '';
   const { data: user, isLoading } = useCurrentUser();
-
-  if (NO_SHELL_ROUTES.has(pathname)) {
-    return <>{children}</>;
-  }
 
   if (isAdminOnlyRoute(pathname)) {
     return <AdminLayout>{children}</AdminLayout>;

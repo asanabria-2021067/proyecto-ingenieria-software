@@ -1,5 +1,15 @@
 'use client';
 
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+} from '@/components/dashboard/data-table';
+
+import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
+
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AlertCircle, Repeat } from 'lucide-react';
@@ -8,6 +18,7 @@ import { ProjectExportButtons } from '@/components/projects/project-export-butto
 import { BurndownChart } from '@/components/projects/burndown-chart';
 import { VelocityChart } from '@/components/projects/velocity-chart';
 import { ReportsDialogTrigger, SprintReportsDialog } from '@/components/projects/sprint-reports-dialog';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Empty,
@@ -31,15 +42,6 @@ function sprintMasReciente(sprints: SprintComparativeAnalyticsItemDto[]): Sprint
   return cerrados[0] ?? null;
 }
 
-/** Mismo criterio "exhaustivo por diseño" que `ESTADO_SPRINT_STYLE` en `sprints/page.tsx`/`sprints/[sprintId]/page.tsx`. */
-const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
-  ACTIVO: { label: 'Activo', className: 'bg-primary-container text-on-primary-container' },
-  EN_FINALIZACION: {
-    label: 'En finalización',
-    className: 'bg-status-warning text-on-status-warning',
-  },
-  CERRADO: { label: 'Cerrado', className: 'bg-surface-container-high text-tertiary' },
-};
 
 /**
  * Barra horizontal proporcional al máximo de `tareasCompletadas` entre los
@@ -75,9 +77,9 @@ function BarraTareasCompletadas({ sprint, maximo }: { sprint: SprintComparativeA
  */
 function SeccionVelocidad({ sprints }: { sprints: SprintComparativeAnalyticsItemDto[] }) {
   return (
-    <div className="mb-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
-      <h2 className="mb-1 text-sm font-bold text-on-surface">Velocidad (story points completados)</h2>
-      <p className="mb-4 text-xs text-tertiary">
+    <div className="card-base mb-6">
+      <h2 className="type-subtitle mb-1">Velocidad (story points completados)</h2>
+      <p className="type-meta mb-4">
         Story points completados por Sprint cerrado. El promedio es la referencia para comprometer el siguiente
         Sprint.
       </p>
@@ -89,10 +91,31 @@ function SeccionVelocidad({ sprints }: { sprints: SprintComparativeAnalyticsItem
 /** Vista previa del burndown del Sprint mas relevante, directo en la
  * comparativa — sin tener que exportar ni navegar a otra pantalla primero. */
 function SeccionBurndownPreview({ idProyecto, sprint }: { idProyecto: number; sprint: SprintComparativeAnalyticsItemDto }) {
-  const { burndown, isLoading, isError } = useSprintBurndown(idProyecto, sprint.idSprint);
+  const { burndown, isLoading, isError, error, refetch } = useSprintBurndown(idProyecto, sprint.idSprint);
 
   if (isLoading) return <Skeleton className="mb-6 h-[340px] w-full rounded-xl" />;
-  if (isError || !burndown) return null;
+  // Un fallo se dice y se puede reintentar; el resto de la comparativa sigue disponible.
+  if (isError) {
+    return (
+      <Empty tone="danger" role="alert" className="mb-6">
+        <EmptyMedia variant="icon">
+          <AlertCircle aria-hidden="true" className="h-7 w-7" />
+        </EmptyMedia>
+        <EmptyHeader>
+          <EmptyTitle>
+            {getApiErrorMessage(error, 'general', `No fue posible cargar el burndown del Sprint ${sprint.numero}.`)}
+          </EmptyTitle>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button type="button" onClick={() => refetch()}>
+            Reintentar
+          </Button>
+        </EmptyContent>
+      </Empty>
+    );
+  }
+  // Sin error y sin datos no hay vista previa que mostrar (la consulta está deshabilitada o aún no aplica).
+  if (!burndown) return null;
 
   return (
     <div className="mb-6">
@@ -110,9 +133,9 @@ function ComparativeContent({ idProyecto, sprints }: { idProyecto: number; sprin
       {sprintPreview && <SeccionBurndownPreview idProyecto={idProyecto} sprint={sprintPreview} />}
       <SeccionVelocidad sprints={sprints} />
 
-      <div className="mb-6 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 shadow-sm">
-        <h2 className="mb-1 text-sm font-bold text-on-surface">Tareas completadas por sprint</h2>
-        <p className="mb-4 text-xs text-tertiary">Vista alternativa por número de tareas, no la métrica principal.</p>
+      <div className="card-base mb-6">
+        <h2 className="type-subtitle mb-1">Tareas completadas por sprint</h2>
+        <p className="type-meta mb-4">Vista alternativa por número de tareas, no la métrica principal.</p>
         <div className="space-y-3">
           {sprints.map((sprint) => (
             <BarraTareasCompletadas key={sprint.idSprint} sprint={sprint} maximo={maximoTareasCompletadas} />
@@ -120,35 +143,35 @@ function ComparativeContent({ idProyecto, sprints }: { idProyecto: number; sprin
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface-container-lowest shadow-sm">
+      <div className={`${DATA_TABLE_CARD} overflow-x-auto`}>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-outline-variant text-left text-xs font-semibold text-tertiary">
-              <th className="px-4 py-3">Sprint</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Planificadas</th>
-              <th className="px-4 py-3">Completadas</th>
-              <th className="px-4 py-3">Cumplimiento</th>
-              <th className="px-4 py-3">Hitos (evolución)</th>
+            <tr className={`${DATA_TABLE_HEAD_ROW} text-left ${DATA_TABLE_HEAD_TEXT}`}>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Sprint</th>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Estado</th>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Planificadas</th>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Completadas</th>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Cumplimiento</th>
+              <th scope="col" className="whitespace-nowrap px-stack py-tight font-semibold">Hitos (evolución)</th>
             </tr>
           </thead>
           <tbody>
             {sprints.map((sprint) => {
               const estilo = ESTADO_SPRINT_STYLE[sprint.estado];
               return (
-                <tr key={sprint.idSprint} className="border-b border-outline-variant/50 last:border-0">
-                  <td className="px-4 py-3 font-semibold text-on-surface">Sprint {sprint.numero}</td>
-                  <td className="px-4 py-3">
+                <tr key={sprint.idSprint} className={`border-b ${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER} last:border-0`}>
+                  <td className="px-stack py-inline type-body font-semibold text-text-primary">Sprint {sprint.numero}</td>
+                  <td className="px-stack py-inline">
                     <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estilo.className}`}
+                      className={`pill ${estilo.className}`}
                     >
                       {estilo.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-on-surface">{sprint.tareasPlanificadas}</td>
-                  <td className="px-4 py-3 text-on-surface">{sprint.tareasCompletadas}</td>
-                  <td className="px-4 py-3 text-on-surface">{sprint.porcentajeCumplimiento}%</td>
-                  <td className="px-4 py-3 text-on-surface">
+                  <td className="px-stack py-inline type-body tabular-nums text-text-primary">{sprint.tareasPlanificadas}</td>
+                  <td className="px-stack py-inline type-body tabular-nums text-text-primary">{sprint.tareasCompletadas}</td>
+                  <td className="px-stack py-inline type-body tabular-nums text-text-primary">{sprint.porcentajeCumplimiento}%</td>
+                  <td className="px-stack py-inline type-body tabular-nums text-text-primary">
                     {sprint.hitosCompletados} / {sprint.hitosTotales}
                   </td>
                 </tr>
@@ -207,19 +230,15 @@ export default function SprintsAnalyticsPage() {
             </EmptyTitle>
           </EmptyHeader>
           <EmptyContent>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
-            >
+            <Button type="button" onClick={() => refetch()}>
               Reintentar
-            </button>
+            </Button>
           </EmptyContent>
         </Empty>
       )}
 
       {!isLoading && !isError && sprints.length === 0 && (
-        <Empty tone="muted" role="status">
+        <Empty role="status">
           <EmptyMedia variant="icon">
             <Repeat aria-hidden="true" className="h-7 w-7" />
           </EmptyMedia>

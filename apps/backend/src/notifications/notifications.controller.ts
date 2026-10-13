@@ -1,14 +1,19 @@
 import {
+  Body,
   Controller,
   Get,
+  Query,
   Patch,
   Param,
   ParseIntPipe,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
+import { UpdatePreferenciaNotificacionDto } from './dto/update-preferencia-notificacion.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
 
 @Controller('notificaciones')
 @UseGuards(JwtAuthGuard)
@@ -16,7 +21,10 @@ export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 
   @Get()
-  findAll(@CurrentUser() user: { userId: number }) {
+  findAll(@CurrentUser() user: { userId: number }, @Query() query: ListNotificationsQueryDto) {
+    if (query.page !== undefined) {
+      return this.notificationsService.findPage(user.userId, query.page, query.limit);
+    }
     return this.notificationsService.findAll(user.userId);
   }
 
@@ -28,6 +36,19 @@ export class NotificationsController {
   @Get('mias/conteo-no-leidas')
   getUnreadCount(@CurrentUser() user: { userId: number }) {
     return this.notificationsService.getUnreadCount(user.userId);
+  }
+
+  @Get('preferencias')
+  getPreferences(@CurrentUser() user: { userId: number }) {
+    return this.notificationsService.getPreferences(user.userId);
+  }
+
+  @Put('preferencias')
+  updatePreference(
+    @Body() dto: UpdatePreferenciaNotificacionDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.notificationsService.updatePreference(user.userId, dto.tipo, dto.activa);
   }
 
   @Patch('leer-todas')

@@ -11,6 +11,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
@@ -37,7 +39,8 @@ const LEADERSHIP_ADMIN_WRITE: ProjectWriteMetadata = {
 };
 
 @Controller('admin')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('administrador')
 export class LeadershipAdminController {
   constructor(
     private readonly leadershipRead: LeadershipReadService,
@@ -48,6 +51,21 @@ export class LeadershipAdminController {
   @Get('liderazgo/apelaciones')
   inbox(@CurrentUser() user: { userId: number }, @Query() query: ApelacionPageQueryDto) {
     return this.leadershipRead.adminInbox(undefined, { actorId: user.userId, query });
+  }
+
+  /**
+   * Contadores por estado para las pestañas de la bandeja. Se declara antes de
+   * `:appealId` para que «resumen» no se interprete como un id.
+   */
+  @Get('liderazgo/apelaciones/resumen')
+  inboxSummary(@CurrentUser() user: { userId: number }) {
+    return this.leadershipRead.adminInboxSummary(undefined, { actorId: user.userId });
+  }
+
+  /** Una apelación por id, para la vista administrativa de revisión y resolución. */
+  @Get('liderazgo/apelaciones/:appealId')
+  appeal(@CurrentUser() user: { userId: number }, @Param('appealId', ParseIntPipe) appealId: number) {
+    return this.leadershipRead.adminAppeal(undefined, { actorId: user.userId, appealId });
   }
 
   /** E100: aceptar la apelación por el MISMO motor que el cambio directo. */

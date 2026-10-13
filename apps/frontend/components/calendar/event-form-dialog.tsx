@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import dynamic from 'next/dynamic';
+import { useForm, type FieldErrors } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Trash2 } from 'lucide-react';
+import { CalendarCheck2, Link2, Loader2, MapPin, Plus, SlidersHorizontal, Trash2, Type, Video } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,19 +18,32 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getApiErrorMessage } from '@/components/projects/api-error';
-import { useProjectRoles } from '@/hooks/use-project-roles';
-import uvgSwal from '@/lib/swal';
-import { toast } from 'sonner';
+import { useCancelEvent } from '@/hooks/use-cancel-event';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { aviso } from '@/lib/mensajes';
+import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
+import { esProyectoAgendable } from '@/lib/calendar/proyectos-agendables';
+import { TIPO_EVENTO_ESTILO, TIPOS_EVENTO_EN_ORDEN, TONO_CLASES } from '@/lib/calendar/paleta';
+import { createEvent, updateEvent, type EventoProyectoDTO, type ModalidadEvento, type TipoEvento } from '@/lib/services/events';
+import { DatePicker } from './date-picker';
+import { enfocarDisparador, enfocarElemento } from './event-detail-dialog';
+import { InvitadosField } from './invitados-field';
 import {
-  createEvent,
-  deleteEvent,
-  updateEvent,
-  type EventoProyectoDTO,
-  type EventPayload,
-  type ModalidadEvento,
-} from '@/lib/services/events';
+  MODALIDAD_OPTIONS,
+  RECORDATORIO_OPTIONS,
+  buildEventFormSchema,
+  buildEventPayload,
+  duracionTexto,
+  emptyEventForm,
+  eventFormFromEvento,
+  requiereLink,
+  requiereUbicacion,
+  type EventFormValues,
+} from './event-form.schema';
 
 const EventLocationPicker = dynamic(() => import('./event-location-picker'), {
   ssr: false, // leaflet/react-leaflet usan `window`: no puede renderizarse en el servidor.
@@ -38,145 +53,53 @@ const EventLocationPicker = dynamic(() => import('./event-location-picker'), {
 export interface LedProjectOption {
   idProyecto: number;
   tituloProyecto: string;
+  /** Para la marca "Horas beca" junto al selector de proyecto. */
+  tipoProyecto?: string;
+  /** GPI01-C08: un proyecto CERRADO se lista deshabilitado; el backend rechaza eventos nuevos en él. */
+  estadoProyecto?: string;
 }
 
-const MODALIDAD_OPTIONS: { value: ModalidadEvento; label: string }[] = [
-  { value: 'PRESENCIAL', label: 'Presencial' },
-  { value: 'VIRTUAL', label: 'Virtual' },
-  { value: 'MIXTA', label: 'Mixta' },
-];
+const MODALIDAD_AYUDA: Record<ModalidadEvento, string> = {
+  PRESENCIAL: 'Presencial: requiere el lugar en el mapa',
+  VIRTUAL: 'Virtual: requiere el enlace de la sesión',
+  MIXTA: 'Híbrida: requiere enlace virtual y lugar físico',
+};
 
-interface FormState {
-  idProyecto: string;
-  tituloEvento: string;
-  descripcionEvento: string;
-  fechaInicio: string; // valor nativo de <input type="datetime-local">
-  fechaFin: string;
-  antelacionMinutos: string;
-  modalidad: ModalidadEvento;
-  ubicacionLat: number | null;
-  ubicacionLng: number | null;
-  ubicacionNombre: string;
-  linkSesion: string;
-  rolesDestino: number[];
+/**
+ * Un evento creado antes de HU-184 pudo guardar cualquier número de minutos:
+ * si no coincide con una opción fija, se agrega como opción propia para no
+ * cambiarlo sin que el usuario lo note.
+ */
+function opcionesRecordatorio(actual: number) {
+  if (RECORDATORIO_OPTIONS.some((opt) => opt.value === actual)) return RECORDATORIO_OPTIONS;
+  return [...RECORDATORIO_OPTIONS, { value: actual, label: `${actual} minutos antes` }].sort((a, b) => a.value - b.value);
 }
 
-function pad(n: number): string {
-  return String(n).padStart(2, '0');
+function hoyInicioDelDia(): Date {
+  const hoy = new Date();
+  return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
 }
 
-/** Fecha -> valor de <input type="datetime-local"> en hora LOCAL (no UTC). */
-function toDatetimeLocalValue(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function emptyForm(defaultProjectId?: number, initialDate?: Date): FormState {
-  const base = initialDate ? new Date(initialDate) : new Date();
-  base.setMinutes(0, 0, 0);
-  base.setHours(base.getHours() + 1);
-  const fin = new Date(base);
-  fin.setHours(fin.getHours() + 1);
-  return {
-    idProyecto: defaultProjectId ? String(defaultProjectId) : '',
-    tituloEvento: '',
-    descripcionEvento: '',
-    fechaInicio: toDatetimeLocalValue(base),
-    fechaFin: toDatetimeLocalValue(fin),
-    antelacionMinutos: '60',
-    modalidad: 'VIRTUAL',
-    ubicacionLat: null,
-    ubicacionLng: null,
-    ubicacionNombre: '',
-    linkSesion: '',
-    rolesDestino: [],
-  };
-}
-
-function formFromEvent(evento: EventoProyectoDTO): FormState {
-  return {
-    idProyecto: String(evento.idProyecto),
-    tituloEvento: evento.tituloEvento,
-    descripcionEvento: evento.descripcionEvento ?? '',
-    fechaInicio: toDatetimeLocalValue(new Date(evento.fechaInicio)),
-    fechaFin: toDatetimeLocalValue(new Date(evento.fechaFin)),
-    antelacionMinutos: String(evento.antelacionMinutos),
-    modalidad: evento.modalidad,
-    ubicacionLat: evento.ubicacionLat,
-    ubicacionLng: evento.ubicacionLng,
-    ubicacionNombre: evento.ubicacionNombre ?? '',
-    linkSesion: evento.linkSesion ?? '',
-    rolesDestino: evento.rolesDestino,
-  };
-}
-
-function isValidHttpUrl(value: string): boolean {
+function esLinkDeMeet(link: string): boolean {
   try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
+    return new URL(link.trim()).hostname === 'meet.google.com';
   } catch {
     return false;
   }
 }
 
-function requiereUbicacion(modalidad: ModalidadEvento): boolean {
-  return modalidad === 'PRESENCIAL' || modalidad === 'MIXTA';
-}
-
-function requiereLink(modalidad: ModalidadEvento): boolean {
-  return modalidad === 'VIRTUAL' || modalidad === 'MIXTA';
-}
-
-/** Requisito 5: fin > inicio, e inicio no puede quedar en el pasado si se está fijando/moviendo ahora. */
-function validarFechasYModalidad(
-  values: FormState,
-  isEditing: boolean,
-  editingEvent: EventoProyectoDTO | null | undefined,
-): string | null {
-  const inicio = new Date(values.fechaInicio).getTime();
-  const fin = new Date(values.fechaFin).getTime();
-  if (Number.isNaN(inicio) || Number.isNaN(fin)) {
-    return 'Selecciona una fecha y hora de inicio y fin válidas.';
-  }
-  if (fin <= inicio) {
-    return 'La fecha y hora de fin debe ser posterior a la de inicio.';
-  }
-  const inicioSinCambios = isEditing && editingEvent && inicio === new Date(editingEvent.fechaInicio).getTime();
-  if (!inicioSinCambios && inicio < Date.now()) {
-    return 'La fecha y hora de inicio no puede ser anterior al momento actual.';
-  }
-  if (requiereUbicacion(values.modalidad) && (values.ubicacionLat === null || values.ubicacionLng === null)) {
-    return 'Marca la ubicación de la sesión en el mapa.';
-  }
-  if (requiereLink(values.modalidad) && !isValidHttpUrl(values.linkSesion.trim())) {
-    return 'Ingresa un link de sesión válido (debe empezar con http:// o https://).';
-  }
-  return null;
-}
-
-function buildPayload(values: FormState, { keepEmptyDescripcion }: { keepEmptyDescripcion: boolean }): EventPayload {
-  const descripcion = values.descripcionEvento.trim();
-  const mostrarUbicacion = requiereUbicacion(values.modalidad);
-  const mostrarLink = requiereLink(values.modalidad);
-  return {
-    tituloEvento: values.tituloEvento.trim(),
-    descripcionEvento: keepEmptyDescripcion ? descripcion : descripcion || undefined,
-    fechaInicio: new Date(values.fechaInicio).toISOString(),
-    fechaFin: new Date(values.fechaFin).toISOString(),
-    antelacionMinutos: Number(values.antelacionMinutos) || 60,
-    modalidad: values.modalidad,
-    ubicacionLat: mostrarUbicacion && values.ubicacionLat !== null ? values.ubicacionLat : undefined,
-    ubicacionLng: mostrarUbicacion && values.ubicacionLng !== null ? values.ubicacionLng : undefined,
-    ubicacionNombre: mostrarUbicacion ? values.ubicacionNombre.trim() || undefined : undefined,
-    linkSesion: mostrarLink ? values.linkSesion.trim() || undefined : undefined,
-    rolesDestino: values.rolesDestino,
-  };
-}
+const LABEL_CLASS = 'flex items-center gap-1.5 text-sm font-medium text-on-surface';
+// G05-R05: `min-w-0` deja que el selector se encoja hasta su columna (el valor se trunca). Sin él, el
+// texto sin salto de línea fijaba el ancho mínimo y a 320 px el cuerpo del diálogo se desplazaba de lado.
+const SELECT_CLASS = 'h-10 w-full min-w-0 border-outline-variant bg-surface-container-low';
 
 /**
- * HU-169 (T-263/T-264): crear o editar un evento de calendario. Solo
- * accesible al líder de un proyecto (la lista `ledProjects` ya viene
- * filtrada por el caller a GET /proyectos/mine). Fecha/hora usa el input
- * nativo `datetime-local` (sin librería de date-picker).
+ * HU-169 (T-263/T-264), rediseñado en HU-184 (T-323) según la maqueta del
+ * equipo: qué (título y tipo), de qué proyecto, cuándo (una fecha, hora de
+ * inicio y fin con su duración), cómo (modalidad con su enlace y/o lugar en
+ * el mapa), para quién (invitados del proyecto) y si se envía recordatorio.
+ * Solo accesible al líder del proyecto (`ledProjects` viene de
+ * GET /proyectos/mine). Valida con `buildEventFormSchema` antes de enviar.
  */
 export function EventFormDialog({
   open,
@@ -185,6 +108,8 @@ export function EventFormDialog({
   editingEvent,
   defaultProjectId,
   initialDate,
+  restaurarFocoA = null,
+  restaurarFocoEn,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -193,353 +118,680 @@ export function EventFormDialog({
   editingEvent?: EventoProyectoDTO | null;
   defaultProjectId?: number;
   initialDate?: Date;
+  /**
+   * G03 (UI-10, D-17): al abrir desde el detalle, Radix difiere el retorno de
+   * foco del detalle (setTimeout) y este diálogo captura <body>; con la clave
+   * del bloque original, al cancelar o guardar el foco vuelve a él.
+   */
+  restaurarFocoA?: string | null;
+  /** G04-R01: control que abrió el diálogo cuando no fue un bloque del calendario (botón de la barra). */
+  restaurarFocoEn?: RefObject<HTMLElement | null>;
 }) {
   const isEditing = Boolean(editingEvent);
-  const [values, setValues] = useState<FormState>(() => emptyForm(defaultProjectId, initialDate));
-  const [error, setError] = useState<string | null>(null);
+  const [mostrarDescripcion, setMostrarDescripcion] = useState(false);
+  const ubicacionInputRef = useRef<HTMLInputElement>(null);
+  const errorServidorRef = useRef<HTMLParagraphElement>(null);
   const queryClient = useQueryClient();
+  const { data: usuario } = useCurrentUser();
+
+  const schema = useMemo(
+    () =>
+      buildEventFormSchema({
+        mode: isEditing ? 'edit' : 'create',
+        fechaInicioOriginal: editingEvent?.fechaInicio ?? null,
+      }),
+    // `ahora` se recalcula al abrir: un diálogo abierto mucho rato no debe
+    // quedarse con la hora en que se montó.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isEditing, editingEvent?.fechaInicio, open],
+  );
+
+  const form = useForm<EventFormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: emptyEventForm(defaultProjectId, initialDate),
+  });
 
   useEffect(() => {
     if (!open) return;
-    setError(null);
-    setValues(editingEvent ? formFromEvent(editingEvent) : emptyForm(defaultProjectId, initialDate));
+    form.reset(editingEvent ? eventFormFromEvento(editingEvent) : emptyEventForm(defaultProjectId, initialDate));
+    setMostrarDescripcion(Boolean(editingEvent?.descripcionEvento));
     // Solo al abrir: no queremos pisar lo que el usuario está escribiendo en cada render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingEvent?.idEvento]);
 
-  // Requisito 3: roles del proyecto activo (el que se está creando/editando), para el multi-select.
-  // Bloquea en el propio selector nativo (ademas de la validacion al enviar)
-  // fechas/horas ya pasadas para Inicio, y cualquier Fin anterior o igual a
-  // Inicio — si son las 4pm no deja elegir las 2pm de hoy.
-  const minInicio = toDatetimeLocalValue(new Date());
+  const modalidad = form.watch('modalidad');
+  const idProyectoForm = form.watch('idProyecto');
+  const linkSesion = form.watch('linkSesion');
+  const recordatorioActivo = form.watch('recordatorioActivo');
+  const terminaOtroDia = form.watch('terminaOtroDia');
+  const fecha = form.watch('fecha');
+  const duracion = duracionTexto({
+    fecha,
+    horaInicio: form.watch('horaInicio'),
+    horaFin: form.watch('horaFin'),
+    terminaOtroDia,
+    fechaFin: form.watch('fechaFin'),
+  });
 
-  const idProyectoActivo = isEditing ? (editingEvent?.idProyecto ?? 0) : Number(values.idProyecto) || 0;
-  const { roles } = useProjectRoles(idProyectoActivo, { enabled: open && idProyectoActivo > 0 });
+  const idProyectoActivo = isEditing ? (editingEvent?.idProyecto ?? 0) : Number(idProyectoForm) || 0;
+  const proyectoActivo = ledProjects.find((p) => p.idProyecto === idProyectoActivo);
+  // GPI01-C08 (H-06): sin ningún proyecto agendable no hay nada que crear.
+  const sinProyectoAgendable = !isEditing && !ledProjects.some((p) => esProyectoAgendable(p.estadoProyecto));
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['mis-eventos'] });
   };
 
+  // G03 (UI-07): el toast vive fuera del árbol del modal (Radix lo marca
+  // aria-hidden y en 375 px tapa la cabecera), así que la causa del rechazo
+  // también se escribe dentro del diálogo como error `root` del formulario.
+  const mostrarErrorServidor = (titulo: string, err: unknown) => {
+    const mensaje = getApiErrorMessage(err, 'calendar');
+    form.setError('root', { message: mensaje });
+    aviso.error(titulo, mensaje);
+  };
+
   const crear = useMutation({
-    mutationFn: (projectId: number) => createEvent(projectId, buildPayload(values, { keepEmptyDescripcion: false })),
+    mutationFn: (values: EventFormValues) =>
+      createEvent(Number(values.idProyecto), buildEventPayload(values, { keepEmptyDescripcion: false })),
     onSuccess: () => {
       invalidate();
-      toast.success('Evento creado');
+      aviso.exito('Evento agendado');
       onOpenChange(false);
     },
-    onError: (err) => setError(getApiErrorMessage(err, 'calendar')),
+    onError: (err) => mostrarErrorServidor('No se pudo agendar el evento', err),
   });
 
   const editar = useMutation({
-    mutationFn: () =>
-      updateEvent(editingEvent!.idProyecto, editingEvent!.idEvento, buildPayload(values, { keepEmptyDescripcion: true })),
+    mutationFn: (values: EventFormValues) =>
+      updateEvent(editingEvent!.idProyecto, editingEvent!.idEvento, buildEventPayload(values, { keepEmptyDescripcion: true })),
     onSuccess: () => {
       invalidate();
+      aviso.exito('Evento actualizado');
       onOpenChange(false);
     },
-    onError: (err) => setError(getApiErrorMessage(err, 'calendar')),
+    onError: (err) => mostrarErrorServidor('No se pudo guardar el evento', err),
   });
 
-  const cancelar = useMutation({
-    mutationFn: () => deleteEvent(editingEvent!.idProyecto, editingEvent!.idEvento),
-    onSuccess: () => {
-      invalidate();
-      onOpenChange(false);
-    },
-    onError: (err) => setError(getApiErrorMessage(err, 'calendar')),
-  });
+  const { cancelarEvento, isPending: isCancelling } = useCancelEvent();
 
-  const isPending = crear.isPending || editar.isPending || cancelar.isPending;
+  const errorServidor = form.formState.errors.root?.message;
+  useEffect(() => {
+    // Con el formulario largo el aviso queda al final del área con scroll: se trae a la vista.
+    if (errorServidor) errorServidorRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [errorServidor]);
 
-  const confirmarCancelacion = async () => {
-    const { isConfirmed } = await uvgSwal.fire({
-      icon: 'warning',
-      title: '¿Cancelar este evento?',
-      text: 'Se eliminará del calendario del proyecto. Esta acción no se puede deshacer.',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, cancelar',
-      cancelButtonText: 'Volver',
-    });
-    if (!isConfirmed) return;
-    cancelar.mutate();
+  const isPending = crear.isPending || editar.isPending || isCancelling;
+
+  const confirmarEliminacion = async () => {
+    if (!editingEvent) return;
+    if (await cancelarEvento(editingEvent)) onOpenChange(false);
   };
 
-  const toggleRol = (idRolProyecto: number) => {
-    setValues((c) => ({
-      ...c,
-      rolesDestino: c.rolesDestino.includes(idRolProyecto)
-        ? c.rolesDestino.filter((id) => id !== idRolProyecto)
-        : [...c.rolesDestino, idRolProyecto],
-    }));
+  // Con el formulario largo (sobre todo en móvil) el campo con error puede
+  // quedar fuera de vista: el aviso dice que hay algo que corregir.
+  // G02/G03 (UI-09): react-hook-form enfoca el primer campo inválido con ref
+  // registrada (inputs nativos y, desde G03-C14, los triggers de Select y
+  // DatePicker). La ubicación no tiene ref de formulario: si es lo único
+  // inválido, se enfoca su input a mano.
+  const onInvalid = (errores: FieldErrors<EventFormValues>) => {
+    aviso.advertencia('Revisa los campos marcados', 'Hay datos del evento que faltan o no son válidos.');
+    const claves = Object.keys(errores).filter((k) => k !== 'root');
+    const soloUbicacion = claves.length > 0 && claves.every((k) => k === 'ubicacionLat' || k === 'ubicacionNombre');
+    if (soloUbicacion) ubicacionInputRef.current?.focus();
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (values.tituloEvento.trim().length === 0) {
-      setError('El título no puede estar vacío.');
-      return;
-    }
-    if (!isEditing && !Number(values.idProyecto)) {
-      setError('Selecciona un proyecto.');
-      return;
-    }
-    const mensajeFechas = validarFechasYModalidad(values, isEditing, editingEvent);
-    if (mensajeFechas) {
-      setError(mensajeFechas);
-      return;
-    }
-    setError(null);
-
+  const onSubmit = (values: EventFormValues) => {
     if (isEditing) {
-      editar.mutate();
+      editar.mutate(values);
       return;
     }
-    crear.mutate(Number(values.idProyecto));
+    crear.mutate(values);
   };
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
-      <DialogContent className="flex max-h-[90vh] w-[96vw] max-w-[720px] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0">
-        <form onSubmit={handleSubmit} className="flex max-h-[90vh] min-h-0 flex-col">
-          <DialogHeader className="shrink-0 border-b border-outline-variant/35 px-6 pb-4 pt-5 text-left">
-            <DialogTitle className="text-xl font-bold text-on-surface">
-              {isEditing ? 'Editar evento' : 'Nuevo evento'}
-            </DialogTitle>
-            <DialogDescription className="text-sm text-on-surface-variant">
-              Reuniones, entregas u otras actividades del proyecto con fecha y hora.
-            </DialogDescription>
-          </DialogHeader>
+      <DialogContent
+        onCloseAutoFocus={(e) => (enfocarDisparador(restaurarFocoA) || enfocarElemento(restaurarFocoEn?.current)) && e.preventDefault()}
+        className="flex max-h-[92dvh] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-outline-variant bg-surface-container-lowest p-0 sm:max-w-[600px]"
+      >
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+            // Corregir cualquier campo retira el error del servidor (los errores por campo siguen).
+            onChange={() => errorServidor && form.clearErrors('root')}
+            noValidate
+            className="flex max-h-[92dvh] min-h-0 flex-col"
+          >
+            <DialogHeader className="shrink-0 flex-row items-start gap-3 space-y-0 px-4 pb-3 pt-5 pr-12 text-left sm:px-6">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary text-on-primary">
+                <CalendarCheck2 className="size-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                {/* G04 (UI-33): el título usa el `type-section` que ya trae DialogTitle. */}
+                <DialogTitle>
+                  {isEditing ? 'Editar evento' : 'Nuevo evento o sesión'}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-on-surface-variant sm:text-sm">
+                  Programa tutorías, reuniones, revisiones o entregas de tus proyectos.
+                </DialogDescription>
+              </div>
+            </DialogHeader>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {!isEditing && (
-                <div>
-                  <label htmlFor="evento-proyecto" className="text-xs font-semibold text-on-surface">
-                    Proyecto
-                  </label>
-                  <Select
-                    value={values.idProyecto}
-                    onValueChange={(v) => setValues((c) => ({ ...c, idProyecto: v, rolesDestino: [] }))}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger id="evento-proyecto" className="mt-1 h-10 w-full border-outline-variant">
-                      <SelectValue placeholder="Selecciona un proyecto que lideras" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ledProjects.map((p) => (
-                        <SelectItem key={p.idProyecto} value={String(p.idProyecto)}>
-                          {p.tituloProyecto}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pb-5 pt-2 sm:px-6">
+              <FormField
+                control={form.control}
+                name="tituloEvento"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className={LABEL_CLASS}>
+                      <Type className="size-3.5 text-primary" aria-hidden="true" />
+                      Título del evento o actividad
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        maxLength={200}
+                        aria-required
+                        disabled={isPending}
+                        placeholder="Ej. Tutoría de Algoritmos y Estructura de Datos"
+                        className="h-10 rounded-md border-outline-variant bg-surface-container-low text-sm"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {mostrarDescripcion ? (
+                <FormField
+                  control={form.control}
+                  name="descripcionEvento"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className={LABEL_CLASS}>Descripción (opcional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          rows={2}
+                          maxLength={5000}
+                          disabled={isPending}
+                          placeholder="Detalles del evento"
+                          className="rounded-md border-outline-variant text-sm"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMostrarDescripcion(true)}
+                  className="-mt-2 inline-flex min-h-6 items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  <Plus className="size-3.5" aria-hidden="true" />
+                  Agregar descripción
+                </button>
+              )}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="tipoEvento"
+                  render={({ field }) => (
+                    <FormItem className="min-w-0">
+                      <FormLabel className={LABEL_CLASS}>Tipo de actividad</FormLabel>
+                      <Select value={field.value} onValueChange={(v) => field.onChange(v as TipoEvento)} disabled={isPending}>
+                        <FormControl>
+                          {/* G03 (UI-09): con la ref del campo, react-hook-form puede enfocar el trigger si queda inválido. */}
+                          <SelectTrigger ref={field.ref} aria-required className={SELECT_CLASS}>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {TIPOS_EVENTO_EN_ORDEN.map((tipo) => {
+                            const estilo = TIPO_EVENTO_ESTILO[tipo];
+                            return (
+                              <SelectItem key={tipo} value={tipo}>
+                                <span className={`size-2 shrink-0 rounded-pill ${TONO_CLASES[estilo.tono].punto}`} aria-hidden="true" />
+                                {estilo.label}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="idProyecto"
+                  render={({ field }) => (
+                    <FormItem className="min-w-0">
+                      <div className="flex items-center justify-between gap-tight">
+                        <FormLabel className={LABEL_CLASS}>Proyecto</FormLabel>
+                        {proyectoActivo?.tipoProyecto === 'ACADEMICO_HORAS_BECA' && (
+                          <span className="text-xs font-semibold text-primary">+ Horas beca</span>
+                        )}
+                      </div>
+                      <Select
+                        value={isEditing ? String(editingEvent?.idProyecto ?? '') : field.value}
+                        onValueChange={(v) => {
+                          field.onChange(v);
+                          form.setValue('invitados', []);
+                        }}
+                        disabled={isPending || isEditing}
+                      >
+                        <FormControl>
+                          <SelectTrigger ref={field.ref} aria-required className={SELECT_CLASS}>
+                            <SelectValue placeholder="Selecciona un proyecto que lideras" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {ledProjects.map((p) => {
+                            const agendable = esProyectoAgendable(p.estadoProyecto);
+                            return (
+                              <SelectItem key={p.idProyecto} value={String(p.idProyecto)} disabled={!agendable}>
+                                {p.tituloProyecto}
+                                {!agendable && ' · Cerrado'}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      {sinProyectoAgendable && (
+                        <p role="status" className="type-meta">
+                          Ninguno de tus proyectos admite actividades nuevas: los proyectos cerrados son de solo lectura.
+                        </p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="rounded-card border border-outline-variant/60 bg-surface-container-low p-stack">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                  <FormField
+                    control={form.control}
+                    name="fecha"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2 min-w-0 sm:col-span-1">
+                        <FormLabel className="text-xs font-medium text-on-surface-variant">Fecha</FormLabel>
+                        <FormControl>
+                          <DatePicker
+                            ref={field.ref}
+                            value={field.value}
+                            onChange={(date) => {
+                              field.onChange(date);
+                              // G02 (UI-06): mover el inicio de un evento de varios días nunca lo
+                              // colapsa a un día; la fecha de fin se conserva y, si queda antes
+                              // del nuevo inicio, el error se muestra de inmediato.
+                              if (form.getValues('terminaOtroDia')) void form.trigger('fechaFin');
+                            }}
+                            disabledBefore={isEditing ? undefined : hoyInicioDelDia()}
+                            disabled={isPending}
+                            className="bg-surface-container-lowest"
+                          />
+                        </FormControl>
+                        {/* G04 (UI-30): el disparador es un <button>, que no admite aria-required
+                            (axe: aria-allowed-attr); la obligatoriedad va como descripción accesible. */}
+                        <FormDescription className="sr-only">Campo obligatorio</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="horaInicio"
+                    render={({ field }) => (
+                      <FormItem className="min-w-0">
+                        <FormLabel className="text-xs font-medium text-on-surface-variant">Hora de inicio</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="time"
+                            step={300}
+                            aria-required
+                            disabled={isPending}
+                            className="h-10 rounded-md border-outline-variant bg-surface-container-lowest text-sm"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="horaFin"
+                    render={({ field }) => (
+                      <FormItem className="min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <FormLabel className="text-xs font-medium text-on-surface-variant">Hora de fin</FormLabel>
+                          {duracion && (
+                            // G04 (UI-32): sin aria-label en un span genérico (no es válido ni fiable): texto oculto + valor.
+                            <span className="pill pill-success px-1.5 py-0 type-micro">
+                              <span className="sr-only">Duración </span>
+                              {duracion}
+                            </span>
+                          )}
+                        </div>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="time"
+                            step={300}
+                            aria-required
+                            disabled={isPending}
+                            className="h-10 rounded-md border-outline-variant bg-surface-container-lowest text-sm"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                {/* G02 (UI-06): "Termina otro día" es opcional; desmarcado, el evento termina en la misma fecha. */}
+                <div className="mt-tight flex flex-wrap items-start gap-x-4 gap-y-2">
+                  <FormField
+                    control={form.control}
+                    name="terminaOtroDia"
+                    render={({ field }) => (
+                      <FormItem className="flex h-10 items-center gap-2 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            disabled={isPending}
+                            onCheckedChange={(checked) => {
+                              field.onChange(checked === true);
+                              if (checked !== true) form.clearErrors('fechaFin');
+                            }}
+                          />
+                        </FormControl>
+                        <FormLabel className="text-xs font-normal text-on-surface">Termina otro día</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  {terminaOtroDia && (
+                    <FormField
+                      control={form.control}
+                      name="fechaFin"
+                      render={({ field }) => (
+                        // G04-R02: en móvil ocupa su propia fila; al lado de la casilla no cabía y se salía de la tarjeta.
+                        <FormItem className="min-w-0 flex-1 basis-full sm:max-w-[16rem] sm:basis-0">
+                          <FormLabel className="sr-only">Fecha de fin</FormLabel>
+                          <FormControl>
+                            <DatePicker
+                              ref={field.ref}
+                              value={field.value}
+                              onChange={field.onChange}
+                              disabledBefore={fecha}
+                              disabled={isPending}
+                              placeholder="Selecciona la fecha de fin"
+                              className="bg-surface-container-lowest"
+                            />
+                          </FormControl>
+                          <FormDescription className="sr-only">Campo obligatorio</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="modalidad"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex flex-wrap items-center justify-between gap-x-tight gap-y-1">
+                      {/* G03 (UI-08): el nombre del grupo lo da este span por aria-labelledby, no un FormLabel con htmlFor colgante. */}
+                      <span id="modalidad-sesion-label" className={LABEL_CLASS}>
+                        <SlidersHorizontal className="size-3.5 text-primary" aria-hidden="true" />
+                        Modalidad de la sesión
+                      </span>
+                      <span className="type-meta">{MODALIDAD_AYUDA[field.value]}</span>
+                    </div>
+                    {/* G03 (UI-08): RadioGroup de Radix (misma dependencia que components/ui/radio-group,
+                        sin su indicador circular para conservar los botones segmentados de la maqueta):
+                        un solo tab stop, ←/→ cambian la opción, aria-checked real. */}
+                    <RadioGroupPrimitive.Root
+                      value={field.value}
+                      onValueChange={(v) => field.onChange(v as ModalidadEvento)}
+                      disabled={isPending}
+                      aria-labelledby="modalidad-sesion-label"
+                      orientation="horizontal"
+                      loop
+                      // G05-R06: en móvil cada opción apila ícono y nombre y las columnas se reparten según
+                      // su contenido; con tres columnas iguales en fila «Presencial» quedaba en «Pres…».
+                      className="grid grid-cols-[repeat(3,auto)] gap-1 rounded-control bg-surface-container-low p-1 sm:grid-cols-3"
+                    >
+                      {MODALIDAD_OPTIONS.map((opt) => {
+                        const Icono = MODALIDAD_ESTILO[opt.value].icon;
+                        const activo = field.value === opt.value;
+                        return (
+                          <RadioGroupPrimitive.Item
+                            key={opt.value}
+                            value={opt.value}
+                            className={`flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-control px-1 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 sm:h-9 sm:flex-row sm:gap-1.5 sm:px-2 sm:text-sm ${
+                              activo
+                                ? 'border border-primary/60 bg-surface-container-lowest text-on-surface shadow-card'
+                                : 'text-on-surface-variant hover:text-on-surface'
+                            }`}
+                          >
+                            <Icono className="size-4 shrink-0" aria-hidden="true" />
+                            <span className="whitespace-nowrap">{opt.label}</span>
+                          </RadioGroupPrimitive.Item>
+                        );
+                      })}
+                    </RadioGroupPrimitive.Root>
+                  </FormItem>
+                )}
+              />
+
+              {(requiereLink(modalidad) || requiereUbicacion(modalidad)) && (
+                <div className="space-y-4 rounded-card border border-outline-variant/60 bg-surface-container-low p-stack">
+                  {requiereLink(modalidad) && (
+                    <FormField
+                      control={form.control}
+                      name="linkSesion"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center justify-between gap-tight">
+                            <FormLabel className={LABEL_CLASS}>
+                              <Link2 className="size-3.5 text-primary" aria-hidden="true" />
+                              Enlace de conexión virtual
+                            </FormLabel>
+                            {esLinkDeMeet(linkSesion) && <span className="pill pill-neutral">Google Meet</span>}
+                          </div>
+                          <div className="relative">
+                            <Video
+                              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-on-surface-variant"
+                              aria-hidden="true"
+                            />
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="url"
+                                inputMode="url"
+                                maxLength={500}
+                                aria-required
+                                disabled={isPending}
+                                placeholder="https://meet.google.com/..."
+                                className="h-10 rounded-md border-outline-variant bg-surface-container-lowest pl-9 text-sm"
+                              />
+                            </FormControl>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {requiereUbicacion(modalidad) && (
+                    <FormField
+                      control={form.control}
+                      name="ubicacionLat"
+                      render={() => (
+                        <FormItem>
+                          <div className="flex items-center justify-between gap-tight">
+                            <FormLabel className={LABEL_CLASS}>
+                              <MapPin className="size-3.5 text-primary" aria-hidden="true" />
+                              Ubicación presencial
+                            </FormLabel>
+                            {form.watch('ubicacionLat') !== null && (
+                              <span className="pill pill-success">Punto marcado</span>
+                            )}
+                          </div>
+                          {/* Nombre del lugar arriba y el mapa debajo, como pidió el equipo. */}
+                          <FormControl>
+                            <EventLocationPicker
+                              inputRef={ubicacionInputRef}
+                              aria-required
+                              lat={form.watch('ubicacionLat')}
+                              lng={form.watch('ubicacionLng')}
+                              nombre={form.watch('ubicacionNombre')}
+                              onNombreChange={(v) => form.setValue('ubicacionNombre', v, { shouldValidate: form.formState.isSubmitted })}
+                              onPositionChange={(lat, lng) => {
+                                form.setValue('ubicacionLng', lng);
+                                form.setValue('ubicacionLat', lat, { shouldValidate: form.formState.isSubmitted });
+                              }}
+                              disabled={isPending}
+                            />
+                          </FormControl>
+                          {/* G02 (UI-03): el tope de 255 del nombre también se muestra junto al campo. */}
+                          {form.formState.errors.ubicacionNombre?.message && (
+                            <p role="alert" className="text-sm text-destructive">
+                              {form.formState.errors.ubicacionNombre.message}
+                            </p>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
               )}
 
-              <div className={isEditing ? 'sm:col-span-2' : ''}>
-                <label htmlFor="evento-titulo" className="text-xs font-semibold text-on-surface">
-                  Título
-                </label>
-                <Input
-                  id="evento-titulo"
-                  value={values.tituloEvento}
-                  maxLength={200}
-                  disabled={isPending}
-                  onChange={(e) => setValues((c) => ({ ...c, tituloEvento: e.target.value }))}
-                  placeholder="Ej. Reunión de avance"
-                  className="mt-1 h-10 rounded-md border-outline-variant text-sm"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="evento-descripcion" className="text-xs font-semibold text-on-surface">
-                Descripción (opcional)
-              </label>
-              <Textarea
-                id="evento-descripcion"
-                rows={2}
-                value={values.descripcionEvento}
-                disabled={isPending}
-                onChange={(e) => setValues((c) => ({ ...c, descripcionEvento: e.target.value }))}
-                placeholder="Detalles del evento"
-                className="mt-1 rounded-md border-outline-variant text-sm"
+              <FormField
+                control={form.control}
+                name="invitados"
+                render={({ field }) => (
+                  <FormItem>
+                    <InvitadosField
+                      idProyecto={idProyectoActivo}
+                      value={field.value}
+                      onChange={field.onChange}
+                      lider={usuario ?? null}
+                      disabled={isPending}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label htmlFor="evento-inicio" className="text-xs font-semibold text-on-surface">
-                  Inicio
-                </label>
-                <Input
-                  id="evento-inicio"
-                  type="datetime-local"
-                  value={values.fechaInicio}
-                  min={isEditing ? undefined : minInicio}
-                  disabled={isPending}
-                  onChange={(e) => setValues((c) => ({ ...c, fechaInicio: e.target.value }))}
-                  className="mt-1 h-10 rounded-md border-outline-variant text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="evento-fin" className="text-xs font-semibold text-on-surface">
-                  Fin
-                </label>
-                <Input
-                  id="evento-fin"
-                  type="datetime-local"
-                  value={values.fechaFin}
-                  min={values.fechaInicio || undefined}
-                  disabled={isPending}
-                  onChange={(e) => setValues((c) => ({ ...c, fechaFin: e.target.value }))}
-                  className="mt-1 h-10 rounded-md border-outline-variant text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Requisito 1: el input de recordatorio comparte fila con Modalidad en vez de vivir solo (w-32 quedaba angosto). */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label htmlFor="evento-modalidad" className="text-xs font-semibold text-on-surface">
-                  Modalidad de la sesión
-                </label>
-                <Select
-                  value={values.modalidad}
-                  onValueChange={(v) => setValues((c) => ({ ...c, modalidad: v as ModalidadEvento }))}
-                  disabled={isPending}
+              {errorServidor && (
+                <p
+                  ref={errorServidorRef}
+                  role="alert"
+                  aria-live="assertive"
+                  className="rounded-control border border-status-error/40 bg-status-error/10 px-3 py-2 text-sm text-on-status-error"
                 >
-                  <SelectTrigger id="evento-modalidad" className="mt-1 h-10 w-full border-outline-variant">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MODALIDAD_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label htmlFor="evento-antelacion" className="text-xs font-semibold text-on-surface">
-                  Recordatorio (minutos antes)
-                </label>
-                <Input
-                  id="evento-antelacion"
-                  type="number"
-                  min={0}
-                  max={10080}
-                  value={values.antelacionMinutos}
-                  disabled={isPending}
-                  onChange={(e) => setValues((c) => ({ ...c, antelacionMinutos: e.target.value }))}
-                  className="mt-1 h-10 w-full rounded-md border-outline-variant text-sm"
-                />
-              </div>
+                  {errorServidor}
+                </p>
+              )}
             </div>
-            <p className="-mt-2 type-meta">Por defecto, 60 minutos antes del inicio.</p>
 
-            {requiereUbicacion(values.modalidad) && (
-              <div>
-                <label className="text-xs font-semibold text-on-surface">Ubicación de la sesión</label>
-                <div className="mt-1">
-                  <EventLocationPicker
-                    lat={values.ubicacionLat}
-                    lng={values.ubicacionLng}
-                    nombre={values.ubicacionNombre}
-                    onNombreChange={(v) => setValues((c) => ({ ...c, ubicacionNombre: v }))}
-                    onPositionChange={(lat, lng) => setValues((c) => ({ ...c, ubicacionLat: lat, ubicacionLng: lng }))}
-                    disabled={isPending}
+            <DialogFooter className="shrink-0 flex-col gap-3 border-t border-outline-variant/35 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <FormField
+                  control={form.control}
+                  name="recordatorioActivo"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          disabled={isPending}
+                          onCheckedChange={(checked) => field.onChange(checked === true)}
+                        />
+                      </FormControl>
+                      <FormLabel className="text-xs font-normal text-on-surface">Enviar recordatorio</FormLabel>
+                    </FormItem>
+                  )}
+                />
+                {recordatorioActivo && (
+                  <FormField
+                    control={form.control}
+                    name="antelacionMinutos"
+                    render={({ field }) => (
+                      <FormItem className="space-y-0">
+                        <Select value={String(field.value)} onValueChange={(v) => field.onChange(Number(v))} disabled={isPending}>
+                          <FormControl>
+                            <SelectTrigger aria-label="Cuándo enviar el recordatorio" className="h-8 w-auto border-outline-variant text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {opcionesRecordatorio(field.value).map((opt) => (
+                              <SelectItem key={opt.value} value={String(opt.value)}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
                   />
-                </div>
+                )}
               </div>
-            )}
 
-            {requiereLink(values.modalidad) && (
-              <div>
-                <label htmlFor="evento-link" className="text-xs font-semibold text-on-surface">
-                  Link de la sesión
-                </label>
-                <Input
-                  id="evento-link"
-                  type="url"
-                  value={values.linkSesion}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {isEditing && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={isPending}
+                    onClick={() => void confirmarEliminacion()}
+                    className="h-10 gap-1.5 rounded-pill text-xs font-bold text-on-status-error hover:text-on-status-error"
+                  >
+                    {isCancelling ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Trash2 className="size-3.5" aria-hidden="true" />
+                    )}
+                    Eliminar evento
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
                   disabled={isPending}
-                  onChange={(e) => setValues((c) => ({ ...c, linkSesion: e.target.value }))}
-                  placeholder="https://meet.google.com/..."
-                  className="mt-1 h-10 rounded-md border-outline-variant text-sm"
-                />
+                  onClick={() => onOpenChange(false)}
+                  className="h-10 rounded-pill text-xs font-bold"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isPending || sinProyectoAgendable}
+                  className="h-10 gap-1.5 rounded-pill bg-primary px-5 text-xs font-bold text-on-primary hover:bg-primary/90"
+                >
+                  {crear.isPending || editar.isPending ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <CalendarCheck2 className="size-4" aria-hidden="true" />
+                  )}
+                  {isEditing ? 'Guardar cambios' : 'Agendar evento'}
+                </Button>
               </div>
-            )}
-
-            {roles.length > 0 && (
-              <div>
-                <label className="text-xs font-semibold text-on-surface">Para qué roles es la sesión</label>
-                <p className="mt-1 type-meta">Vacío = visible para todos los participantes.</p>
-                <div className="mt-2 max-h-32 space-y-1.5 overflow-y-auto rounded-md border border-outline-variant p-2">
-                  {roles.map((rol) => (
-                    <label key={rol.idRolProyecto} className="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
-                      <Checkbox
-                        checked={values.rolesDestino.includes(rol.idRolProyecto)}
-                        disabled={isPending}
-                        onCheckedChange={() => toggleRol(rol.idRolProyecto)}
-                      />
-                      {rol.nombreRol}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <p role="alert" className="text-xs text-status-error">
-                {error}
-              </p>
-            )}
-          </div>
-
-          <DialogFooter className="shrink-0 gap-2 border-t border-outline-variant/35 px-6 py-4 sm:justify-between">
-            {isEditing ? (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isPending}
-                onClick={() => void confirmarCancelacion()}
-                className="h-10 gap-1.5 rounded-md border-outline-variant text-xs font-bold text-status-error"
-              >
-                {cancelar.isPending ? (
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Trash2 className="size-3.5" aria-hidden="true" />
-                )}
-                Cancelar evento
-              </Button>
-            ) : (
-              <span />
-            )}
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isPending}
-                onClick={() => onOpenChange(false)}
-                className="h-10 rounded-md border-outline-variant text-xs font-bold"
-              >
-                Cerrar
-              </Button>
-              <Button
-                type="submit"
-                disabled={isPending}
-                className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
-              >
-                {(crear.isPending || editar.isPending) && (
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                )}
-                {isEditing ? 'Guardar cambios' : 'Crear evento'}
-              </Button>
-            </div>
-          </DialogFooter>
-        </form>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -24,6 +25,7 @@ import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { GlobalSearchInput } from '@/components/layout/global-search-input';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import {
+  DashboardSidebarCollapseButton,
   SidebarNav,
   flattenNavEntries,
   type NavEntry,
@@ -36,9 +38,12 @@ import { ChatDockProvider } from '@/components/chat-dock/chat-dock-context';
 import { ChatDock } from '@/components/chat-dock/chat-dock';
 import { toast } from 'sonner';
 import logo from '@/public/logo.png';
-import OnboardingTour from '@/components/dashboard/OnboardingTour';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { FontScaleToggle } from '@/components/font-scale-toggle';
+
+// T-293: la guía solo se muestra a quien entra por primera vez, pero react-joyride viajaba en el
+// JS inicial de todas las rutas del estudiante. Se carga aparte; no pinta nada hasta arrancar.
+const OnboardingTour = dynamic(() => import('@/components/dashboard/OnboardingTour'), { ssr: false });
 
 const navEntries: NavEntry[] = [
   {
@@ -166,11 +171,16 @@ export default function DashboardLayout({
         >
           <Image src={logo} alt="UVGENIUS" className="h-10 w-auto shrink-0" />
           {!sidebarCollapsed && <span className="type-section text-text-primary">UVGenius</span>}
+          {!sidebarCollapsed && <DashboardSidebarCollapseButton />}
         </div>
 
         <SidebarNav entries={navEntries} idUsuario={user?.idUsuario ?? null} />
 
-        <div className={`border-t border-outline-variant py-stack ${sidebarCollapsed ? 'flex justify-center px-tight' : 'px-inline'}`}>
+        {/* Único acceso a la cuenta en escritorio y tableta; en móvil está en la barra inferior. */}
+        <div
+          id="dashboard-account-menu"
+          className={`border-t border-outline-variant py-stack ${sidebarCollapsed ? 'flex justify-center px-tight' : 'px-inline'}`}
+        >
           <UserMenu user={user} onLogout={handleLogout} variant={sidebarCollapsed ? 'compact' : 'sidebar'} />
         </div>
       </aside>
@@ -182,7 +192,10 @@ export default function DashboardLayout({
         className="flex min-w-0 flex-1 flex-col overflow-hidden bg-page focus:outline-none"
       >
         {/* Top Header Bar */}
-        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:grid md:grid-cols-[1fr_auto_1fr] md:px-section">
+        {/* H-08: la columna central tiene un ancho MÁXIMO (16rem, 24rem desde lg) y puede
+            encoger. Con `auto` el buscador exigía sus 16rem fijos y, a 768 px con la barra
+            lateral abierta, empujaba fuera de la ventana los últimos controles de la derecha. */}
+        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:grid md:grid-cols-[1fr_minmax(0,16rem)_1fr] md:px-section lg:grid-cols-[1fr_minmax(0,24rem)_1fr]">
           <div className="flex items-center gap-inline">
             {/* Mobile-only logo */}
             <div className="flex items-center gap-tight md:hidden">
@@ -202,8 +215,8 @@ export default function DashboardLayout({
               <FontScaleToggle />
             </div>
           </div>
-          <div className="hidden md:block">
-            <GlobalSearchInput className="w-64 lg:w-96" />
+          <div className="hidden min-w-0 md:block">
+            <GlobalSearchInput className="w-full" />
           </div>
           <div className="flex items-center gap-tight md:justify-self-end">
             {!!user && (
@@ -239,12 +252,6 @@ export default function DashboardLayout({
             </button>
             <div id="dashboard-theme-toggle">
               <ThemeToggle />
-            </div>
-            <div
-              id="dashboard-account-menu"
-              className="hidden border-l border-outline-variant pl-tight lg:block"
-            >
-              <UserMenu user={user} onLogout={handleLogout} variant="compact" />
             </div>
           </div>
         </header>

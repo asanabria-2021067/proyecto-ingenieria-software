@@ -86,7 +86,7 @@ export function SprintReportsDialog({ open, onOpenChange, idProyecto, idSprintBu
                 <h3 className="mb-1 text-sm font-bold text-on-surface">{reporte.titulo}</h3>
                 <p className="text-xs leading-relaxed text-tertiary">{reporte.descripcion}</p>
                 {!disponible && (
-                  <span className="mt-2 inline-flex w-fit items-center rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] font-bold text-tertiary">
+                  <span className="pill pill-sm pill-neutral mt-2 w-fit">
                     Próximamente
                   </span>
                 )}

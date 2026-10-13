@@ -1,530 +1,348 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { AlertCircle, Check, ChevronLeft, ChevronRight, Gavel, Loader2, X } from 'lucide-react';
-import { useAdminAppeals, useDenyAppeal, useLeadershipCandidates } from '@/hooks/use-leadership';
-import { acceptAppeal } from '@/lib/services/leadership';
-import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
-import { LeadershipChangeDialog } from '@/components/leadership/leadership-change-dialog';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { AlertCircle, ChevronRight, Gavel, SearchX } from 'lucide-react';
+import { useAdminAppeals, useAdminAppealsSummary } from '@/hooks/use-leadership';
+import { getApiErrorMessage } from '@/components/projects/api-error';
+import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
+import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+  DataTablePager,
+} from '@/components/dashboard/data-table';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
-import uvgSwal from '@/lib/swal';
-import {
-  MENSAJE_RESOLUCION_MAX,
-  motivoInelegibilidadLabel,
-  type ApelacionItemDto,
-  type TransferLeadershipInput,
-} from '@/lib/types/leadership';
+  ESTADO_APELACION_BADGE,
+  FILTROS_APELACION,
+  appealDetailHref,
+  appealsInboxHref,
+  coincideApelacion,
+  formatearFechaApelacion,
+  nombreCompleto,
+  parseFiltroApelacion,
+  type FiltroApelacion,
+} from '@/lib/admin/appeals';
+import type { ApelacionItemDto } from '@/lib/types/leadership';
+import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
-const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm';
+// Mismas clases de tabla que las bandejas de Proyectos (closed-projects-board).
+const TH = `h-auto whitespace-normal px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
+const TD = 'whitespace-normal px-stack py-inline align-middle';
+// Columnas que solo caben desde cierto ancho de la tarjeta; antes van como metadata bajo el asunto.
+const COL_PROYECTO = '@4xl/bandeja:table-cell';
+const META_PROYECTO = '@4xl/bandeja:hidden';
+const COL_PERSONAS = '@2xl/bandeja:table-cell';
+const META_PERSONAS = '@2xl/bandeja:hidden';
+const COL_FECHA = '@3xl/bandeja:table-cell';
+const META_FECHA = '@3xl/bandeja:hidden';
+const COL_ESTADO = '@xl/bandeja:table-cell';
+const META_ESTADO = '@xl/bandeja:hidden';
 
-const FILTROS = [
-  { value: 'PENDIENTE', label: 'Pendientes' },
-  { value: 'ACEPTADA', label: 'Aceptadas' },
-  { value: 'DENEGADA', label: 'Denegadas' },
-  { value: 'CANCELADA', label: 'Canceladas' },
-  { value: 'TODAS', label: 'Todas' },
-] as const;
-type Filtro = (typeof FILTROS)[number]['value'];
-
-const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
-  PENDIENTE: { label: 'Pendiente', className: 'bg-amber-400/15 text-amber-800 dark:text-amber-200' },
-  ACEPTADA: { label: 'Aceptada', className: 'bg-primary/10 text-primary' },
-  DENEGADA: { label: 'Denegada', className: 'bg-error/10 text-error' },
-  CANCELADA: { label: 'Cancelada', className: 'bg-surface-container-high text-on-surface-variant' },
+const VACIO_POR_FILTRO: Record<FiltroApelacion, string> = {
+  PENDIENTE: 'No hay apelaciones pendientes.',
+  ACEPTADA: 'No hay apelaciones aceptadas.',
+  DENEGADA: 'No hay apelaciones denegadas.',
+  CANCELADA: 'No hay apelaciones canceladas.',
+  TODAS: 'No hay apelaciones.',
 };
 
-function getInitials(nombre: string, apellido: string): string {
-  return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
-}
-
-function formatearFecha(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const fecha = new Date(iso);
-  if (Number.isNaN(fecha.getTime())) return '—';
-  return fecha.toLocaleDateString('es-GT', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function formatearDecimal(value: string): string {
-  const [entera, decimal = ''] = value.split('.');
-  const dec = decimal.replace(/0+$/, '');
-  return dec.length > 0 ? `${entera}.${dec}` : entera;
-}
-
-export function parseFiltro(value: string | null): Filtro {
-  return (FILTROS.some((f) => f.value === value) ? value : 'PENDIENTE') as Filtro;
-}
-
-function hrefFiltro(filtro: Filtro, page = 1): string {
-  const params = new URLSearchParams();
-  params.set('estado', filtro);
-  if (page > 1) params.set('page', String(page));
-  return `/dashboard/admin/apelaciones?${params.toString()}`;
-}
-
-// ─── Panel de una apelación ──────────────────────────────────────────────────
-function AppealPanel({
-  apelacion,
-  onAceptar,
-  onDenegar,
-}: {
-  apelacion: ApelacionItemDto;
-  onAceptar: () => void;
-  onDenegar: () => void;
-}) {
-  const pendiente = apelacion.estadoApelacion === 'PENDIENTE';
-  const candidatos = useLeadershipCandidates(apelacion.idProyecto, pendiente);
-  const candidato = candidatos.data?.candidatos.find((c) => c.idUsuario === apelacion.candidatoPropuesto.idUsuario) ?? null;
-  const estado = ESTADO_BADGE[apelacion.estadoApelacion] ?? { label: apelacion.estadoApelacion, className: 'bg-surface-container-high text-on-surface-variant' };
-
+function Persona({ persona }: { persona: { nombre: string; apellido: string } }) {
   return (
-    <section aria-label={`Apelación #${apelacion.idApelacion}`} className={`${CARD} space-y-4`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-widest text-tertiary">Apelación #{apelacion.idApelacion}</p>
-          <h2 className="mt-1 text-lg font-bold text-on-surface">{apelacion.asunto}</h2>
-          <p className="text-xs text-tertiary">
-            Proyecto{' '}
-            <Link href={`/dashboard/admin/proyectos/${apelacion.idProyecto}`} className="font-semibold text-primary hover:underline">
-              #{apelacion.idProyecto}
-            </Link>{' '}
-            · enviada el {formatearFecha(apelacion.creadaEn)}
-          </p>
-        </div>
-        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${estado.className}`}>{estado.label}</span>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border border-outline-variant/40 p-3">
-          <p className="text-[11px] text-tertiary">Líder solicitante</p>
-          <p className="text-sm font-semibold text-on-surface">
-            {apelacion.liderSolicitante.nombre} {apelacion.liderSolicitante.apellido}
-          </p>
-        </div>
-        <div className="rounded-lg border border-outline-variant/40 p-3">
-          <p className="text-[11px] text-tertiary">Candidato propuesto</p>
-          <p className="text-sm font-semibold text-on-surface">
-            {apelacion.candidatoPropuesto.nombre} {apelacion.candidatoPropuesto.apellido}
-          </p>
-          {pendiente && candidato && (
-            <p className="mt-1 text-[11px] text-on-surface-variant">
-              {candidato.rolesActivos.map((r) => r.nombreRol).join(', ') || 'Sin rol'} · {candidato.tareasDistintas}{' '}
-              {candidato.tareasDistintas === 1 ? 'tarea' : 'tareas'} · {formatearDecimal(candidato.horasReportadas)} h reportadas
-              {!candidato.seleccionable && (
-                <span className="block text-error">
-                  No elegible: {candidato.motivos.map(motivoInelegibilidadLabel).join('; ') || 'sin motivo'}
-                </span>
-              )}
-            </p>
-          )}
-          {pendiente && (
-            <p className="mt-1 text-[11px] text-tertiary">Es una propuesta: al aceptar puedes elegir otro candidato elegible.</p>
-          )}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-[11px] text-tertiary">Mensaje</p>
-        <p className="mt-1 whitespace-pre-wrap text-sm text-on-surface">{apelacion.mensaje}</p>
-      </div>
-
-      {!pendiente && (
-        <div className="rounded-lg bg-surface-container-low p-3 text-sm">
-          <p className="text-[11px] text-tertiary">Resolución</p>
-          <p className="text-on-surface">
-            {apelacion.adminResolutor
-              ? `${apelacion.adminResolutor.nombre} ${apelacion.adminResolutor.apellido}`
-              : 'Sin resolutor'}{' '}
-            · {formatearFecha(apelacion.resueltaEn)}
-          </p>
-          {apelacion.mensajeResolucion && <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{apelacion.mensajeResolucion}</p>}
-        </div>
-      )}
-
-      {pendiente && (
-        <div className="flex flex-col gap-2 border-t border-outline-variant/40 pt-4 sm:flex-row sm:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onDenegar}
-            className="h-10 w-full gap-1.5 rounded-lg border-error/40 text-sm font-semibold text-error hover:bg-error/10 hover:text-error sm:w-auto"
-          >
-            <X className="size-4" aria-hidden="true" />
-            Denegar
-          </Button>
-          <Button type="button" onClick={onAceptar} className="h-10 w-full gap-1.5 rounded-lg text-sm font-bold sm:w-auto">
-            <Check className="size-4" aria-hidden="true" />
-            Aceptar y transferir
-          </Button>
-        </div>
-      )}
-    </section>
+    <span className="inline-flex min-w-0 items-center gap-tight">
+      <Avatar className="size-7 shrink-0">
+        <AvatarFallback className="bg-primary/10 type-micro font-bold text-primary">
+          {`${persona.nombre.charAt(0)}${persona.apellido.charAt(0)}`.toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <span className="type-body truncate text-text-primary">{nombreCompleto(persona)}</span>
+    </span>
   );
 }
 
-// ─── Diálogo de denegación ───────────────────────────────────────────────────
-function DenyDialog({
-  apelacion,
-  open,
-  onOpenChange,
-}: {
-  apelacion: ApelacionItemDto | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const id = useId();
-  const [mensaje, setMensaje] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const deny = useDenyAppeal();
-  const valido = mensaje.trim().length > 0 && mensaje.length <= MENSAJE_RESOLUCION_MAX;
+function EstadoPill({ estado }: { estado: string }) {
+  const badge = ESTADO_APELACION_BADGE[estado] ?? { label: estado, className: 'pill-neutral' };
+  return <span className={`pill pill-sm ${badge.className}`}>{badge.label}</span>;
+}
 
-  const cerrar = (siguiente: boolean) => {
-    if (!siguiente) {
-      setMensaje('');
-      setError(null);
-      deny.reset();
-    }
-    onOpenChange(siguiente);
-  };
+/** Una resuelta se fecha por su resolución (o cancelación); una pendiente, por su solicitud. */
+function fechaRelevante(a: ApelacionItemDto): string {
+  return formatearFechaApelacion(a.estadoApelacion !== 'PENDIENTE' && a.resueltaEn ? a.resueltaEn : a.creadaEn);
+}
 
-  const confirmar = () => {
-    if (!apelacion || !valido || deny.isPending) return;
-    setError(null);
-    deny.mutate(
-      { idProyecto: apelacion.idProyecto, idApelacion: apelacion.idApelacion, input: { mensajeResolucion: mensaje.trim() } },
-      {
-        onSuccess: () => {
-          cerrar(false);
-          void uvgSwal.fire({ icon: 'success', title: 'Apelación denegada', timer: 2000, showConfirmButton: false });
-        },
-        onError: (err) => {
-          if (getApiErrorStatus(err) === 409) {
-            cerrar(false);
-            void uvgSwal.fire({ icon: 'info', title: 'La apelación ya fue resuelta', text: getApiErrorMessage(err, 'admin') });
-            return;
-          }
-          setError(getApiErrorMessage(err, 'admin'));
-        },
-      },
-    );
-  };
+function tituloProyecto(a: ApelacionItemDto): string {
+  return a.proyecto?.tituloProyecto ?? `Proyecto #${a.idProyecto}`;
+}
 
+function TablaSkeleton() {
   return (
-    <Dialog open={open} onOpenChange={cerrar}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader className="text-left">
-          <DialogTitle>Denegar apelación</DialogTitle>
-          <DialogDescription>
-            El liderazgo no cambia. El mensaje de resolución se muestra al líder solicitante.
-          </DialogDescription>
-        </DialogHeader>
-        <div>
-          <Label htmlFor={`${id}-mensaje`} className="text-xs font-semibold text-on-surface">
-            Mensaje de resolución <span aria-hidden="true">*</span>
-          </Label>
-          <Textarea
-            id={`${id}-mensaje`}
-            value={mensaje}
-            onChange={(e) => setMensaje(e.target.value)}
-            maxLength={MENSAJE_RESOLUCION_MAX}
-            required
-            aria-required="true"
-            rows={4}
-            autoFocus
-            placeholder="Explica por qué se deniega la apelación…"
-            className="mt-1 text-sm"
-          />
-          <p className="mt-1 text-right text-[11px] text-tertiary" aria-live="polite">
-            {mensaje.length}/{MENSAJE_RESOLUCION_MAX}
-          </p>
-          {error && (
-            <p role="alert" className="text-xs text-error">
-              {error}
-            </p>
-          )}
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => cerrar(false)} disabled={deny.isPending} className="rounded-lg">
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            onClick={confirmar}
-            disabled={!valido || deny.isPending}
-            className="gap-1.5 rounded-lg bg-error text-on-error hover:bg-error/90"
-          >
-            {deny.isPending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-            Denegar apelación
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando apelaciones">
+      <div className={`${DATA_TABLE_HEAD_ROW} px-stack py-tight`}>
+        <Skeleton className="h-4 w-40" />
+      </div>
+      <div className="divide-y divide-outline-variant/50">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center gap-stack px-stack py-inline">
+            <div className="min-w-0 flex-1 space-y-tight">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-3 w-1/3" />
+            </div>
+            <Skeleton className="hidden h-4 w-32 @2xl/bandeja:block" />
+            <Skeleton className="h-4 w-20" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
-// ─── Página ──────────────────────────────────────────────────────────────────
+function FilaApelacion({ apelacion: a, filtro, page }: { apelacion: ApelacionItemDto; filtro: FiltroApelacion; page: number }) {
+  const pendiente = a.estadoApelacion === 'PENDIENTE';
+  const accion = pendiente ? 'Revisar' : 'Ver resolución';
+
+  return (
+    <TableRow className={`${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER}`}>
+      <TableCell className={`${TD} min-w-0`}>
+        <p className="type-body break-words font-semibold text-text-primary">{a.asunto}</p>
+        <div className="mt-micro flex flex-wrap items-center gap-x-tight gap-y-micro">
+          <span className={META_ESTADO}>
+            <EstadoPill estado={a.estadoApelacion} />
+          </span>
+          <span className={`type-meta ${META_PROYECTO}`}>{tituloProyecto(a)}</span>
+          <span className={`type-meta tabular-nums ${META_FECHA}`}>· {fechaRelevante(a)}</span>
+          <span className={`type-meta ${META_PERSONAS}`}>
+            · {nombreCompleto(a.liderSolicitante)} → {nombreCompleto(a.candidatoPropuesto)}
+          </span>
+        </div>
+      </TableCell>
+      <TableCell className={`${TD} hidden ${COL_PROYECTO}`}>
+        <Link href={`/dashboard/admin/proyectos/${a.idProyecto}`} className="type-body font-medium text-primary hover:underline">
+          {tituloProyecto(a)}
+        </Link>
+      </TableCell>
+      <TableCell className={`${TD} hidden ${COL_PERSONAS}`}>
+        <Persona persona={a.liderSolicitante} />
+      </TableCell>
+      <TableCell className={`${TD} hidden ${COL_PERSONAS}`}>
+        <Persona persona={a.candidatoPropuesto} />
+      </TableCell>
+      <TableCell className={`${TD} hidden ${COL_FECHA}`}>
+        <span className="type-body whitespace-nowrap tabular-nums text-text-secondary">{fechaRelevante(a)}</span>
+      </TableCell>
+      <TableCell className={`${TD} hidden ${COL_ESTADO}`}>
+        <EstadoPill estado={a.estadoApelacion} />
+      </TableCell>
+      <TableCell className="whitespace-normal px-micro py-inline text-right align-middle @2xl/bandeja:px-stack">
+        <Link
+          href={appealDetailHref(a.idApelacion, filtro, page)}
+          aria-label={`${accion}: apelación #${a.idApelacion}, ${a.asunto}`}
+          className="ml-auto flex min-h-11 w-fit min-w-11 items-center justify-center gap-micro whitespace-nowrap rounded-control px-tight type-meta font-semibold text-primary hover:underline"
+        >
+          <span className="hidden @2xl/bandeja:inline">{accion}</span>
+          <ChevronRight className="size-4 @2xl/bandeja:size-3.5" aria-hidden="true" />
+        </Link>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 /**
- * VIEW-18 (F015) — bandeja administrativa de apelaciones de liderazgo. Solo
- * las PENDIENTES son resolubles: Aceptar reutiliza `LeadershipChangeDialog`
- * (mismo CAS `expectedLeaderId`, candidato precargado y editable) por el
- * endpoint de aceptación; Denegar exige `mensajeResolucion`.
+ * VIEW-18 (F015) — bandeja administrativa de apelaciones de liderazgo.
+ *
+ * Solo lista: revisar y resolver ocurre en `/dashboard/admin/apelaciones/[apelacionId]`.
+ * Las pestañas separan la bandeja de trabajo (Pendientes, la predeterminada)
+ * del historial (Aceptadas, Denegadas, Canceladas) y de «Todas»; el orden y la
+ * paginación son del backend (las resueltas, por fecha de resolución). La
+ * pestaña y la página viven en la URL; la búsqueda es local a la página cargada.
  */
 export default function AppealsInboxClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const filtro = parseFiltro(searchParams.get('estado'));
+  const filtro = parseFiltroApelacion(searchParams.get('estado'));
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const estado = filtro === 'TODAS' ? undefined : filtro;
 
   const { data, isPending, isError, error, refetch } = useAdminAppeals(estado, page);
-  const [seleccionadaId, setSeleccionadaId] = useState<number | null>(null);
-  const [aceptando, setAceptando] = useState<ApelacionItemDto | null>(null);
-  const [denegando, setDenegando] = useState<ApelacionItemDto | null>(null);
+  const resumen = useAdminAppealsSummary();
+  const [busqueda, setBusqueda] = useState('');
 
-  const items = data?.items ?? [];
-  const seleccionada = items.find((a) => a.idApelacion === seleccionadaId) ?? null;
+  const items = useMemo(() => data?.items ?? [], [data]);
+  const visibles = useMemo(() => items.filter((a) => coincideApelacion(a, busqueda)), [items, busqueda]);
   const total = data?.total ?? 0;
   const limit = data?.limit ?? 20;
   const totalPages = Math.max(1, Math.ceil(total / limit));
-
-  const submitAceptar = (apelacion: ApelacionItemDto) => (input: TransferLeadershipInput) =>
-    acceptAppeal(apelacion.idProyecto, apelacion.idApelacion, input);
+  const hayBusqueda = busqueda.trim() !== '';
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-8 md:px-8">
-      <Breadcrumb className="mb-4">
-        <BreadcrumbList className="text-[13px]">
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/dashboard/admin" className="text-tertiary hover:text-on-surface">
-                Gobernanza
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="font-medium text-on-surface">Apelaciones</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div className={ADMIN_PAGE}>
+      <AdminBreadcrumb seccion="Gobernanza" seccionHref="/dashboard/admin" pagina="Apelaciones" />
 
-      <section className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">Gobernanza</span>
-          <h1 className="flex items-center gap-2 font-headline text-3xl font-black tracking-tighter text-on-surface md:text-4xl">
-            <Gavel className="size-7 text-primary" aria-hidden="true" />
-            Apelaciones de liderazgo
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-tertiary">
-            Solicitudes de los líderes para transferir su liderazgo. La apelación es una solicitud, no una designación.
-          </p>
-        </div>
-        <nav aria-label="Filtrar por estado" className="overflow-x-auto">
-          <ul className="flex min-w-max items-center gap-1 rounded-lg border border-outline-variant/40 bg-surface-container-low p-1">
-            {FILTROS.map((f) => (
-              <li key={f.value}>
-                <Link
-                  href={hrefFiltro(f.value)}
-                  aria-current={f.value === filtro ? 'page' : undefined}
-                  className={`inline-flex items-center rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    f.value === filtro ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-high'
-                  }`}
-                >
-                  {f.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+      <section className="mb-6">
+        <h1 className={ADMIN_PAGE_TITLE}>Apelaciones de liderazgo</h1>
+        <p className={ADMIN_PAGE_LEAD}>
+          Solicitudes de los líderes para transferir su liderazgo. La apelación es una solicitud, no una designación.
+        </p>
       </section>
 
-      {/* El detalle va ARRIBA y la tabla debajo, a todo el ancho: en dos
-          columnas la tabla quedaba estrecha y sus siete columnas obligaban a
-          desplazarla en horizontal para leer asunto, fecha y estado. */}
-      <div className="space-y-4">
-        <div>
-          {seleccionada ? (
-            <AppealPanel apelacion={seleccionada} onAceptar={() => setAceptando(seleccionada)} onDenegar={() => setDenegando(seleccionada)} />
-          ) : (
-            <div className={`${CARD} text-sm text-tertiary`}>Selecciona una apelación para ver el mensaje completo y resolverla.</div>
-          )}
-        </div>
+      <div className="@container/bandeja flex flex-col gap-stack">
+        {/* La barra se desplaza en horizontal dentro de sí misma; la página nunca desborda.
+            `relative`: los textos `sr-only` (absolutos) quedan dentro del área desplazable. */}
+        <nav aria-label="Filtrar por estado" className="relative -mx-1 overflow-x-auto px-1 pb-1">
+          <ul className="flex min-w-max items-center gap-1 border-b border-outline-variant/50">
+            {FILTROS_APELACION.map((f) => {
+              const activo = f.value === filtro;
+              const cantidad = resumen.data?.[f.value];
+              return (
+                <li key={f.value}>
+                  <Link
+                    href={appealsInboxHref(f.value)}
+                    aria-current={activo ? 'page' : undefined}
+                    className={`-mb-px inline-flex items-center gap-tight border-b-2 px-3 py-2 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 ${
+                      activo
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-text-secondary hover:border-outline-variant hover:text-text-primary'
+                    }`}
+                  >
+                    {f.label}
+                    {cantidad != null && (
+                      <span className={`pill pill-sm tabular-nums ${activo ? 'pill-green' : 'pill-neutral'}`}>
+                        <span className="sr-only">: </span>
+                        {cantidad}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
 
-        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest">
-          {isError ? (
-            <Empty tone="danger" role="alert" className="border-0 shadow-none">
-              <EmptyMedia variant="icon">
-                <AlertCircle aria-hidden="true" className="h-7 w-7" />
-              </EmptyMedia>
-              <EmptyHeader>
-                <EmptyTitle>{getApiErrorMessage(error, 'admin')}</EmptyTitle>
-              </EmptyHeader>
-              <Button type="button" variant="outline" size="sm" onClick={() => refetch()} className="text-xs font-semibold">
+        <section aria-label="Buscar apelaciones" className="flex flex-col gap-inline @2xl/bandeja:flex-row @2xl/bandeja:items-center @2xl/bandeja:justify-between">
+          <DashboardSearchField
+            containerClassName="w-full @2xl/bandeja:max-w-md"
+            name="busqueda"
+            autoComplete="off"
+            spellCheck={false}
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por proyecto, asunto, solicitante o candidato…"
+            aria-label="Buscar apelaciones por proyecto, asunto, solicitante o candidato"
+          />
+          {!isPending && !isError && (
+            <p className="type-body text-text-secondary" role="status" aria-live="polite">
+              {hayBusqueda && (
+                <>
+                  <span className="font-semibold tabular-nums text-text-primary">{visibles.length}</span> de{' '}
+                </>
+              )}
+              <span className="font-semibold tabular-nums text-text-primary">{total}</span>{' '}
+              {total === 1 ? 'apelación' : 'apelaciones'}
+              {totalPages > 1 && <> · página {page} de {totalPages}</>}
+            </p>
+          )}
+        </section>
+
+        {isError ? (
+          <Empty tone="danger" role="alert">
+            <EmptyMedia variant="icon">
+              <AlertCircle aria-hidden="true" className="size-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>{getApiErrorMessage(error, 'admin')}</EmptyTitle>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button type="button" variant="outline" size="sm" onClick={() => refetch()}>
                 Reintentar
               </Button>
-            </Empty>
-          ) : isPending ? (
-            <div className="space-y-2 p-4" aria-label="Cargando apelaciones">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full rounded-lg" />
-              ))}
+            </EmptyContent>
+          </Empty>
+        ) : isPending ? (
+          <TablaSkeleton />
+        ) : items.length === 0 ? (
+          <Empty role="status">
+            <EmptyMedia variant="icon">
+              <Gavel aria-hidden="true" className="size-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>{VACIO_POR_FILTRO[filtro]}</EmptyTitle>
+              <EmptyDescription>
+                {filtro === 'PENDIENTE'
+                  ? 'Cuando un líder apele su liderazgo, aparecerá aquí. Las ya resueltas están en las demás pestañas.'
+                  : 'Cuando haya apelaciones en este estado, aparecerán aquí.'}
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : visibles.length === 0 ? (
+          <Empty role="status">
+            <EmptyMedia variant="icon">
+              <SearchX aria-hidden="true" className="size-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>No encontramos apelaciones que coincidan con “{busqueda.trim()}”.</EmptyTitle>
+              <EmptyDescription>La búsqueda cubre la página cargada: prueba con otro texto o cambia de página.</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button type="button" variant="outline" size="sm" onClick={() => setBusqueda('')}>
+                Limpiar búsqueda
+              </Button>
+            </EmptyContent>
+          </Empty>
+        ) : (
+          <>
+            <div className={DATA_TABLE_CARD}>
+              <Table>
+                <TableHeader>
+                  <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
+                    <TableHead scope="col" className={TH}>
+                      Asunto
+                    </TableHead>
+                    <TableHead scope="col" className={`${TH} hidden ${COL_PROYECTO}`}>
+                      Proyecto
+                    </TableHead>
+                    <TableHead scope="col" className={`${TH} hidden ${COL_PERSONAS}`}>
+                      Solicitante
+                    </TableHead>
+                    <TableHead scope="col" className={`${TH} hidden ${COL_PERSONAS}`}>
+                      Candidato
+                    </TableHead>
+                    <TableHead scope="col" className={`${TH} hidden ${COL_FECHA}`}>
+                      {filtro === 'PENDIENTE' || filtro === 'TODAS' ? 'Fecha' : 'Resuelta'}
+                    </TableHead>
+                    <TableHead scope="col" className={`${TH} hidden ${COL_ESTADO}`}>
+                      Estado
+                    </TableHead>
+                    <TableHead scope="col" className={`${TH} w-14 text-right @2xl/bandeja:w-40`}>
+                      <span className="sr-only">Acción</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visibles.map((a) => (
+                    <FilaApelacion key={a.idApelacion} apelacion={a} filtro={filtro} page={page} />
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-          ) : items.length === 0 ? (
-            <Empty tone="muted" role="status" className="border-0 shadow-none">
-              <EmptyMedia variant="icon">
-                <Gavel aria-hidden="true" className="h-7 w-7" />
-              </EmptyMedia>
-              <EmptyHeader>
-                <EmptyTitle>{filtro === 'PENDIENTE' ? 'No hay apelaciones pendientes.' : 'No hay apelaciones con este estado.'}</EmptyTitle>
-                <EmptyDescription>Cuando un líder apele su liderazgo, aparecerá aquí.</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Proyecto</TableHead>
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Líder solicitante</TableHead>
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Candidato propuesto</TableHead>
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Asunto</TableHead>
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Fecha</TableHead>
-                  <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">Estado</TableHead>
-                  <TableHead className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-tertiary">
-                    <span className="sr-only">Acciones</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((a) => {
-                  const badge = ESTADO_BADGE[a.estadoApelacion] ?? { label: a.estadoApelacion, className: 'bg-surface-container-high text-on-surface-variant' };
-                  const activa = a.idApelacion === seleccionadaId;
-                  return (
-                    <TableRow key={a.idApelacion} className={`border-outline-variant/40 ${activa ? 'bg-primary/5' : 'hover:bg-surface-container-low'}`}>
-                      <TableCell className="px-4 py-3">
-                        <Link href={`/dashboard/admin/proyectos/${a.idProyecto}`} className="text-sm font-semibold text-primary hover:underline">
-                          Proyecto #{a.idProyecto}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-sm text-on-surface">
-                        <span className="inline-flex items-center gap-2">
-                          <Avatar className="size-7">
-                            <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
-                              {getInitials(a.liderSolicitante.nombre, a.liderSolicitante.apellido)}
-                            </AvatarFallback>
-                          </Avatar>
-                          {a.liderSolicitante.nombre} {a.liderSolicitante.apellido}
-                        </span>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-sm text-on-surface">
-                        {a.candidatoPropuesto.nombre} {a.candidatoPropuesto.apellido}
-                      </TableCell>
-                      <TableCell className="max-w-[520px] truncate px-4 py-3 text-sm text-on-surface-variant" title={a.asunto}>
-                        {a.asunto}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap px-4 py-3 text-sm text-on-surface-variant">{formatearFecha(a.creadaEn)}</TableCell>
-                      <TableCell className="px-4 py-3">
-                        <Badge className={`border-transparent text-[11px] font-semibold ${badge.className}`}>{badge.label}</Badge>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-expanded={activa}
-                          aria-label={`Revisar apelación #${a.idApelacion}`}
-                          onClick={() => setSeleccionadaId(activa ? null : a.idApelacion)}
-                          className="h-8 gap-1 text-xs font-bold text-primary hover:text-primary"
-                        >
-                          {activa ? 'Ocultar' : 'Revisar'}
-                          <ChevronRight className={`size-3.5 transition-transform ${activa ? 'rotate-90' : ''}`} aria-hidden="true" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-
-          {!isPending && !isError && total > 0 && (
-            <div className="flex flex-col gap-2 border-t border-outline-variant/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-tertiary">
-                <span className="font-bold text-on-surface">{total}</span> {total === 1 ? 'apelación' : 'apelaciones'} · página {page} de {totalPages}
-              </p>
-              <nav aria-label="Paginación" className="flex items-center gap-1">
-                <Button asChild variant="outline" size="icon-sm" aria-label="Página anterior" className="rounded-lg">
-                  {page <= 1 ? (
-                    <span aria-disabled="true" className="opacity-40">
-                      <ChevronLeft className="size-4" />
-                    </span>
-                  ) : (
-                    <Link href={hrefFiltro(filtro, page - 1)}>
-                      <ChevronLeft className="size-4" />
-                    </Link>
-                  )}
-                </Button>
-                <Button asChild variant="outline" size="icon-sm" aria-label="Página siguiente" className="rounded-lg">
-                  {page >= totalPages ? (
-                    <span aria-disabled="true" className="opacity-40">
-                      <ChevronRight className="size-4" />
-                    </span>
-                  ) : (
-                    <Link href={hrefFiltro(filtro, page + 1)}>
-                      <ChevronRight className="size-4" />
-                    </Link>
-                  )}
-                </Button>
-              </nav>
-            </div>
-          )}
-        </div>
+            {totalPages > 1 && (
+              <DataTablePager
+                label="Paginación de apelaciones"
+                pagina={page}
+                totalPaginas={totalPages}
+                onPagina={(p) => router.push(appealsInboxHref(filtro, p))}
+              />
+            )}
+          </>
+        )}
       </div>
-
-      {aceptando && (
-        <LeadershipChangeDialog
-          projectId={aceptando.idProyecto}
-          open
-          onOpenChange={(open) => {
-            if (!open) setAceptando(null);
-          }}
-          presetCandidateId={aceptando.candidatoPropuesto.idUsuario}
-          submit={submitAceptar(aceptando)}
-          title="Aceptar apelación y transferir liderazgo"
-          confirmLabel="Aceptar y transferir"
-          onTransferred={() => setSeleccionadaId(null)}
-        />
-      )}
-
-      <DenyDialog
-        apelacion={denegando}
-        open={denegando != null}
-        onOpenChange={(open) => {
-          if (!open) setDenegando(null);
-        }}
-      />
     </div>
   );
 }

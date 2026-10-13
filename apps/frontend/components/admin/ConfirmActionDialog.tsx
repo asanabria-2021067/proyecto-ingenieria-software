@@ -24,11 +24,11 @@ interface ConfirmActionDialogProps {
 
 const actionClasses: Record<string, string> = {
   destructive:
-    'bg-error text-on-error hover:bg-error/90 rounded-xl px-4 py-2 text-sm font-bold transition-colors',
+    'bg-error text-on-error hover:bg-error/90 rounded-control px-4 py-2 text-sm font-bold transition-colors',
   warning:
-    'bg-amber-600 text-white hover:bg-amber-700 rounded-xl px-4 py-2 text-sm font-bold transition-colors',
+    'bg-amber-600 text-white hover:bg-amber-700 rounded-control px-4 py-2 text-sm font-bold transition-colors',
   default:
-    'bg-primary text-on-primary hover:bg-primary/90 rounded-xl px-4 py-2 text-sm font-bold transition-colors',
+    'bg-primary text-on-primary hover:bg-primary/90 rounded-control px-4 py-2 text-sm font-bold transition-colors',
 };
 
 export function ConfirmActionDialog({
@@ -43,7 +43,7 @@ export function ConfirmActionDialog({
 }: ConfirmActionDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={(v) => { if (!v) onCancel(); }}>
-      <AlertDialogContent className="bg-surface-container-lowest border-outline-variant rounded-xl">
+      <AlertDialogContent className="bg-surface-container-lowest border-outline-variant rounded-control">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-on-surface">{title}</AlertDialogTitle>
           <AlertDialogDescription className="text-tertiary">
@@ -53,7 +53,7 @@ export function ConfirmActionDialog({
         <AlertDialogFooter>
           <AlertDialogCancel
             onClick={onCancel}
-            className="rounded-xl border-outline-variant text-on-surface hover:bg-surface-container-high"
+            className="rounded-control border-outline-variant text-on-surface hover:bg-surface-container-high"
           >
             Cancelar
           </AlertDialogCancel>

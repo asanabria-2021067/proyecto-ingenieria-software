@@ -1,0 +1,612 @@
+{
+  "version": 1,
+  "description": "Correspondencia entre los dos linajes de la fase OWASP (Fase 2, Vernel). `develop` contiene la fase con los hashes de commit reescritos: cada commit tiene el mismo patch-id, autor, fecha de autor y mensaje que su par de `sprint8/vernel-owasp2025`, en el mismo orden, y los árboles de la base y del cierre son idénticos. Los documentos de evidencia siguen citando los hashes de la rama auditada; este archivo es su traducción verificable al linaje de `develop` (apps/backend/test/g08-phase-lineage.spec.ts).",
+  "branch": {
+    "base": "0a723a8d93b640f6077c801d9a0ad5a7b59cbef3",
+    "tip": "6c9574d1888422de75b39b2778bc5e38658005df"
+  },
+  "develop": {
+    "base": "23274e33da3b83f00651d2baa605b6e993e6c6a1",
+    "tip": "dd1a64f9c88e6fc349f34795e2e8d301e1db4d01"
+  },
+  "tree": {
+    "base": "92eeb60c2dfe1b198e9db6901be86e58852a9650",
+    "tip": "cdde642cccb8816bd6599814cc4db1d15fa6b5f6"
+  },
+  "commits": [
+    {
+      "id": "G01-C01",
+      "branch": "79230ea7d58c39f922dc3c5af5556f22166872d4",
+      "develop": "c6c8c2880a3ea379848fe6811f0d7f0b9c8634c2",
+      "patchId": "41a2f7c8921f9742e5e55e64b881e30872da15fa"
+    },
+    {
+      "id": "G01-C02",
+      "branch": "f5826dd690589afb88e34933473037acbb060e43",
+      "develop": "10aaad535f8a2ed341e028e4d758cf897ea34a4d",
+      "patchId": "3aea37b35170bf62bbfefef237469cd197923206"
+    },
+    {
+      "id": "G01-C03",
+      "branch": "f58300b72c8b126fa8537fc7a4147f709b6d7c94",
+      "develop": "52b5a918c1bcf3a11f967780af6e47af81105ca7",
+      "patchId": "ebc25d1de0beb241a2b4b714a265ec2d45f4fa49"
+    },
+    {
+      "id": "G01-C04",
+      "branch": "d312b5c0c13345d94c7fb0ad9fcfe35a9f424ff7",
+      "develop": "3233538a91f5481ede7253432354cd7c8ec941e7",
+      "patchId": "0479b4f454ec80239e49e65e1ebe4f3eaed7d125"
+    },
+    {
+      "id": "G01-C05",
+      "branch": "c15edfef0a62a56e79faeb9b28b236f9ad363ab8",
+      "develop": "56801984fc7d53231d399029a9def82c73581490",
+      "patchId": "dd0a924816e6947dbf17e613874fc3695cce2ed8"
+    },
+    {
+      "id": "G01-C06",
+      "branch": "5824450a9b599379b83a83fc357d395048aa6cfe",
+      "develop": "8daaf1d1fdf71e0c636d185d738f56a176947860",
+      "patchId": "75d409550d894c207c97fb898cd7c6db7ba7eebb"
+    },
+    {
+      "id": "G01-C07",
+      "branch": "90398db65fde3525bc55b8542a4722a3546e3d40",
+      "develop": "4403e96230469898473c95c3c4d13f0e823505ad",
+      "patchId": "da5095d37bc9c67d41027fc0a00ac142de03d433"
+    },
+    {
+      "id": "G01-C08",
+      "branch": "a5408ae31deed0d922232b757bc65c3536acb6ec",
+      "develop": "9614b7c52995acbe533078f638bb9260f5f61967",
+      "patchId": "ac4b0b37bcaa2081d636c9b4b04b5af3c3816260"
+    },
+    {
+      "id": "G01-C09",
+      "branch": "910308d8282f8fc76e5935f436ec21a9d426ae21",
+      "develop": "e201c3f0685dd4a9eecba43c1bb69657ae71ef09",
+      "patchId": "5de1aa3276136a2b5aca622bf18a5a83f2d8eae8"
+    },
+    {
+      "id": "G01-C10",
+      "branch": "b7ddad187ffcf46bdf6a2bb2c4a14044f3be8ed9",
+      "develop": "4455efe5f2a497cc6e7de4f599e67e2b31d592b3",
+      "patchId": "65a96ead063887b7cd37aa66260613c507e37af5"
+    },
+    {
+      "id": "G01-C11",
+      "branch": "6363063ac242988ad50b55040ce8808734365e82",
+      "develop": "954a3a008c288897c51f892c4e91166f8e0a7beb",
+      "patchId": "d32e73d473e785f762eebb01e487e74e36379aea"
+    },
+    {
+      "id": "G01-C12",
+      "branch": "1542a18d3b09caa1efb65d4105528553b17e8846",
+      "develop": "6b291a4616fb229b3b010b254c6a2307e4c497a9",
+      "patchId": "2e0875d396fb9ddf4c8abfd5bed695241e7d2e23"
+    },
+    {
+      "id": "G02-C01",
+      "branch": "3109334055a4d31c0b1f100fdf85c1c9eb0a459b",
+      "develop": "0936c9b791a2a58fd831061a55dbbf9234a494ed",
+      "patchId": "d6f5a28b4df12067097d6d8abc069e17fb1c9ec9"
+    },
+    {
+      "id": "G02-C02",
+      "branch": "615349a054a578bd7e41d58aeda0619f12afe41d",
+      "develop": "1bb1478cfdaa6e193d64a97bc0ff7e6111db11d7",
+      "patchId": "7f834a68e2f2d4816ef601a52fe4d89944a760c0"
+    },
+    {
+      "id": "G02-C04",
+      "branch": "3aac8d12c1c132c70e642a177b177a501edd0fff",
+      "develop": "4ef0f0879fd4046312320aa9890280e5743c499d",
+      "patchId": "a36b828503969983ccb30ec9a7733a5796ead9ff"
+    },
+    {
+      "id": "G02-C05",
+      "branch": "24d732fa20bc73fce0672ed7b932cfeb5b96152d",
+      "develop": "bfb2bb9caf55016cb8a9742cc12b83dd5f725c67",
+      "patchId": "4168f6a460c4bee1ac129c9fcace189c846512a3"
+    },
+    {
+      "id": "G02-C06",
+      "branch": "3acd03ec5f31e1fbeb898533efeda629eb41d855",
+      "develop": "4df9bf5c793f3698969eaf9e4d3c00289f22b0f1",
+      "patchId": "30a740d4e837bbbcf67ef5a785a90bb899891bf4"
+    },
+    {
+      "id": "G02-C07",
+      "branch": "3eef682a695cf4188da1b793d1fe735f7d875229",
+      "develop": "e7f13c1598d4621fa3b4f31a5bb7b1406fb67cae",
+      "patchId": "1e13bc48ce87bbfd5a6ba9c7830e15e506b3505b"
+    },
+    {
+      "id": "G02-C08",
+      "branch": "5339b893c9f5dc662116658d0d2c194c6598c4a3",
+      "develop": "eada4cbf8e6690aeede2f24fab79a30690005d95",
+      "patchId": "6ce586296fb7efd9428f505a62a8813758131240"
+    },
+    {
+      "id": "G02-C09",
+      "branch": "22a9da356ea1aa47f0ae4f51f40ee1744593ad24",
+      "develop": "72fb1d13ac1a5fdc67f0ad4d8cb6e0f900f5646e",
+      "patchId": "7d9cb7892543f05586a7f919d07ac56eb06e82ba"
+    },
+    {
+      "id": "G02-C10",
+      "branch": "dbec74188502ff223d85c2df39013dfdf02447ec",
+      "develop": "a86d64aeab6258a479d9967f4f3eb97d1cc64a26",
+      "patchId": "b036148cc1281b50cca22f3edab4bf0b16ef5e4d"
+    },
+    {
+      "id": "G02-C11",
+      "branch": "57e58a2aa9d76b035d1e2f95342325bcf1732777",
+      "develop": "06ee11b5c535c75b06f4125e476278ab67e6bd7e",
+      "patchId": "3fce25b6381a219178e073ce01b608c831f4c6b3"
+    },
+    {
+      "id": "G02-C12",
+      "branch": "d50349d1b24acb42762056d259d53840cd254426",
+      "develop": "4a4cf6f26ab2d9675d73386f91fbeeddd6d0aac3",
+      "patchId": "eb601a75cb834ead781351d649752254eb4975b9"
+    },
+    {
+      "id": "G02-C13",
+      "branch": "eed73d2bf01a280f4b876cc07e6594807f8e728e",
+      "develop": "ef06dcbd1ff0fcf5f4225276f133ec62d503dc8f",
+      "patchId": "22c3de6a4e8655a18cb720e0a20c8dc488709c1f"
+    },
+    {
+      "id": "G02-C14",
+      "branch": "f0df74453d700cedbb6613db208b417f0f89e24f",
+      "develop": "8d81fc561b16d64e36c104fdb5130e075c87f919",
+      "patchId": "2e9b8984599b916739f8c592b50273ae84882311"
+    },
+    {
+      "id": "G02-C15",
+      "branch": "ea72f90d38ee1926699681bfd0a04eac40f01460",
+      "develop": "f975c5a071f9d3b6b341cf76d2f5404366f9ce46",
+      "patchId": "31c7b6d82532031454db19584e0576374bd0e63b"
+    },
+    {
+      "id": "G02-C16",
+      "branch": "7d4a338ca68d9c5db8ddecf2ada2247734824bf9",
+      "develop": "3d4e05cb0ef289310ec1a493f37ec6c015257c9b",
+      "patchId": "396fddbebeec29fcde599b51c65abf612b83e64e"
+    },
+    {
+      "id": "G02-C17",
+      "branch": "4436aba6aeb114177eb348b56072305a45be3c0e",
+      "develop": "3458aadfdb88aa0b2bf6c949aabe95e0bf6d6075",
+      "patchId": "ad6fc1a25f18ab7b2b94a21c665cc97517803fec"
+    },
+    {
+      "id": "G02-C18",
+      "branch": "da63a766999b46e78d893d3b89d9dbcb3ce04293",
+      "develop": "a95c020e2a1ce5056b08b4753637ca2d74fcb63c",
+      "patchId": "fcf08717500e4af136970ab235f06a9610b34bb2"
+    },
+    {
+      "id": "G03-C01",
+      "branch": "dfbba55e2aafe8f91cd44a92bc68ab1a6dfb0d3b",
+      "develop": "65a0d2fcfecdf84b7040b078ee276c07a812df14",
+      "patchId": "cdb0e84bb247fc831b2a94bb8356f22f13818ac0"
+    },
+    {
+      "id": "G03-C02",
+      "branch": "6cf2dacc91624fc77467b0872acb6fc147eb4f28",
+      "develop": "0ade6d92771cf192f273cf0e957cf2b8516ff2e8",
+      "patchId": "eb5e7f8516dc2577c150712b5eea2abf8dd3291a"
+    },
+    {
+      "id": "G03-C03",
+      "branch": "7ab63779f13367710b83e614d16232ff07c4fa35",
+      "develop": "bb20e1f0f85637c0e38760b274d16cc282ca9bc4",
+      "patchId": "b41d0a2089c988df854bf97be83e3cd28ef68960"
+    },
+    {
+      "id": "G03-C04",
+      "branch": "db3c9370a15adc4e0b4cbce0e51272d9e51f6262",
+      "develop": "cd31181ed0c0c9b3d5369e65dacedd2b49cca8a6",
+      "patchId": "122eeeb25290a00a73b319ae14dbfbb7a1d4a010"
+    },
+    {
+      "id": "G03-C05",
+      "branch": "3a817f90e09d2b08f036ee60f31a987b2830ae39",
+      "develop": "62c2dd6dc888d63132f42b3ddd63315005aa27c9",
+      "patchId": "705862be614ab6c62bada6ca6edded7fc8bdd53a"
+    },
+    {
+      "id": "G03-C06",
+      "branch": "56d8b2b352b75f7c5016104b02faf94e1ef09258",
+      "develop": "e6e9c56cc952d63b36cf7530d7705f6a769ceaf0",
+      "patchId": "2e23b4bcf446402c3524d1452982591ae974789a"
+    },
+    {
+      "id": "G03-C07",
+      "branch": "c5527a00c02841e9ed1e85899b73514f4a67a93e",
+      "develop": "53d27fdb263dc8ceedd04cc2c7f334ff322498d6",
+      "patchId": "4644369bdebf426551fd808bb6c059b6a40830c8"
+    },
+    {
+      "id": "G03-C08",
+      "branch": "4ce5705b4a7a862e08bff747f34c1df8c41a0498",
+      "develop": "fe554085d78b21888cc50c3cd5f108fdc9db9d72",
+      "patchId": "4681e371b2c912589b041587963243f9d706f0d0"
+    },
+    {
+      "id": "G03-C09",
+      "branch": "7d8b8e75f992e740faa1acacc3e9407d83edabd8",
+      "develop": "49c429b19680f3c61d685f5e5d1fe8c23e140bc3",
+      "patchId": "dfc4c087587930c6ac15ee87a53a63457dedea2f"
+    },
+    {
+      "id": "G03-C10",
+      "branch": "7b3c8272241e96b73bcb171d491f78b42661ad7f",
+      "develop": "542985406dcd6c0f7051c3251bac202ce3303ecb",
+      "patchId": "30efd72056917fae2a5c7a3374c8da8bfe9d0de5"
+    },
+    {
+      "id": "G03-C11",
+      "branch": "f8094596b10d93a8b636987e6d2d2bd710deda4e",
+      "develop": "0752126f11841b23dba3426b7f612bcca32431e5",
+      "patchId": "b75f714a76edeefc240017b61f6886b0dc99fbf4"
+    },
+    {
+      "id": "G04-C01",
+      "branch": "58f9b311756a6efcfbaba4b80ca87e4795a48425",
+      "develop": "82b15f3ca55edbe6d58a822fbe1a3a5719d83985",
+      "patchId": "0a814779ab06fbd13f4c72e0482fc529555ae144"
+    },
+    {
+      "id": "G04-C02",
+      "branch": "a4a529ffbb5bbd3b74d8b71f25bf35b9fa16914a",
+      "develop": "da2a9fe3ad1b303d1a3de0a336a7556fe29b3a3a",
+      "patchId": "3462193d0e5a8390c5f05ff420201348c96718b4"
+    },
+    {
+      "id": "G04-C03",
+      "branch": "5266c165c9917f2911b40067dbff52bb235b4d6b",
+      "develop": "ca3bf67374b60986550543444bbe3ec5b78f4549",
+      "patchId": "36f88747a475651151679cdf0945f63245e4ad54"
+    },
+    {
+      "id": "G04-C04",
+      "branch": "db4c70d72637295704b80b55ec8ba847ebdd7f93",
+      "develop": "8e6cab64b8eb2679017b51bb03f9248a906737f9",
+      "patchId": "c3e0f952e92298f7ecdf6c1ff13c7bb6c2f061fe"
+    },
+    {
+      "id": "G04-C05",
+      "branch": "a7a5904e8711ec463259f5a91b58bc1992dbeaf3",
+      "develop": "14c5c9010a4f40b8c846a6689745dedfe979f569",
+      "patchId": "5e5c8a6804375375ea78f4e517f8b2379479bf23"
+    },
+    {
+      "id": "G04-C06",
+      "branch": "1ce3b370e3c49ad1319e688961728de39534d469",
+      "develop": "5a0fc5c63c5a3f793a791b85c3675c755bd4f4b8",
+      "patchId": "332a353c37a8095f39f2349a77c672a463427d6f"
+    },
+    {
+      "id": "G04-C07",
+      "branch": "f6354fbb7bc0c8087310932fa413940d3aecd1b1",
+      "develop": "0db60ee5b2fa7948c0a21279b672038397c9df07",
+      "patchId": "2ac450dfa9ced09443aeafd2b62a11559f2673bc"
+    },
+    {
+      "id": "G04-C08",
+      "branch": "5191aab5070687d3bbbb84791671d113c483e909",
+      "develop": "74512f2b05b8f64c9c767509d46ba366aa50c468",
+      "patchId": "cfe90def41169de3421e4192d7f7ee2a657ef7dd"
+    },
+    {
+      "id": "G04-C09",
+      "branch": "307fab6ee41462b9ee37bf7dc872ce293f3e13f4",
+      "develop": "e994d7c21d406d1e7af3e5aa5ec4eaae17165c1f",
+      "patchId": "daf3fd06d36055a6116c96f652ec66bb8decff6f"
+    },
+    {
+      "id": "G04-C10",
+      "branch": "890dd44e955a26597ee78ba36de64adca2d00ee8",
+      "develop": "539d8ab5ef2d7c85f5323431088535d1e95fa9f9",
+      "patchId": "38ca6cd7610839663242d78ce398f8d4574dcdec"
+    },
+    {
+      "id": "G04-C11",
+      "branch": "c2d054d58392e2b7f1cabcba386f7e1cb939873c",
+      "develop": "99bc52e2172eff13f03b8f3eb6cb8ff5bf538519",
+      "patchId": "e320d6d8337cbc08a86bda40dc8b87b68632d263"
+    },
+    {
+      "id": "G04-C12",
+      "branch": "61f6f339e0d3e7e4a3851d01817a9d777cc36233",
+      "develop": "020fd20e2155fe85a6a212f5e6c8bfaace9f8568",
+      "patchId": "b16d4e0d89d82b4f248321d986cfc55a705013ee"
+    },
+    {
+      "id": "G04-C13",
+      "branch": "31df22e320f01397269879a97bd37a17461ff87d",
+      "develop": "ca8dee94a4c79d534cfe2bcf63e818a01013a708",
+      "patchId": "edb3902eee9d55c072cf68247629dcbbf17e3263"
+    },
+    {
+      "id": "G04-C14",
+      "branch": "6c7a5351d436be9ef2bfd9d56fac021c89aff431",
+      "develop": "42baa7734f6d59fcbac81d80fe49fb84aae35cd6",
+      "patchId": "ec135cb3a65156336129b4a1674a4f3abf07b44e"
+    },
+    {
+      "id": "G06-C01",
+      "branch": "2152afe7a27aebd2bdccdc9adb71bf4a3cc76628",
+      "develop": "dabfff7b8b42620704aba576e5837004cb6a49ff",
+      "patchId": "7b4f1afd8a99eef65b095a67978b2bf84d709971"
+    },
+    {
+      "id": "G06-C02",
+      "branch": "b61adc6482b1b3485c9869bf2256e29fa5bbb1b4",
+      "develop": "2f1b3d1720e3dcf605a012d81b8240d0869e7bb7",
+      "patchId": "435069e139425320d7c47e65a73723aeb0a453dd"
+    },
+    {
+      "id": "G06-C03",
+      "branch": "4ed923efb93b442ec847e2a644eae0d9c5438c79",
+      "develop": "cb56acaefa3ac886cdca4c5b39ceb89f80df2f2d",
+      "patchId": "12c8e7ffaa6d74336b742ef5572980c4497333b7"
+    },
+    {
+      "id": "G06-C04",
+      "branch": "52a08abda96aeb5799cf7f0a347a3b1a45f6cd42",
+      "develop": "dcc7b20609e4933c369978107c180cf5afed399e",
+      "patchId": "fb358979490dac1491a967c7a0016ee1279f073a"
+    },
+    {
+      "id": "G06-C05",
+      "branch": "2416e7e3d72800b502c6f4f3aebf5b32b2850df3",
+      "develop": "67a2f876d80562f8f6967abe03271ed787872db2",
+      "patchId": "53a6ab9ddfbbdb80887cc9fbd71d01285687c0ed"
+    },
+    {
+      "id": "G06-C06",
+      "branch": "18f28ed847e396e897a27ea756656b3ab6530da6",
+      "develop": "1baa32fdcb2c1dba1ad8386521a7b21d53395ffd",
+      "patchId": "44d00bd59d7519371d1e48749d20ebe38b12d599"
+    },
+    {
+      "id": "G06-C07",
+      "branch": "9a2d8f662829c3e66c7f11e9819bbcfe3b12f2a4",
+      "develop": "253b91d410f3f1449f4dd4f5de8b6b8944aea00d",
+      "patchId": "2c1070e69137d0b8a9eea0c7c562e3eb2b6fc7e1"
+    },
+    {
+      "id": "G06-C08",
+      "branch": "f5bf56eccafcac3ac716bf3ee25be8a93b8dd416",
+      "develop": "1d38dca52d14949d14671e3a27596dcfd857d017",
+      "patchId": "caff85fe4af5f37209536a22163a987302646fdd"
+    },
+    {
+      "id": "G06-C09",
+      "branch": "b782af1a4b0063458abde278e895769744ec7376",
+      "develop": "1b535da4db4d93c94d8ee5be5c7966f3d5414993",
+      "patchId": "a8e90bf6a2dc7f2d2c02695d2c5f9f7aca7e4577"
+    },
+    {
+      "id": "G06-C10",
+      "branch": "c50eeac629c1faecb3fe5f4654a952719f88baea",
+      "develop": "1a2c40f0d6da4d2f4cefbda8100aa91e9683439e",
+      "patchId": "e40e353790317dc322b7b267c81166781524db03"
+    },
+    {
+      "id": "G05-C01",
+      "branch": "46400403a4ca1308180a3ca07b89b82916e3ed00",
+      "develop": "407e19ed635ccd0ea19aec19e17f0214c6357172",
+      "patchId": "1594bb15791a833fcc7d375aaa706071d2eb5ba6"
+    },
+    {
+      "id": "G05-C02",
+      "branch": "bda8512b5ef1c09b58f0fa839659787fb32bdf0c",
+      "develop": "a226822c65c5ec3cc632ad979b297c558c24e6d5",
+      "patchId": "ab8ad90a8c1d0783814b663c0bae6d8222973db7"
+    },
+    {
+      "id": "G05-C03",
+      "branch": "9b2a0b618cf4885d06e2984da8c513521151492a",
+      "develop": "c007d108b02cf8f4ec73451a0957acf4af591197",
+      "patchId": "cbd1b7cdf8547425a1fc8a257ce027abcdfe8efd"
+    },
+    {
+      "id": "G05-C04",
+      "branch": "fa6de0bbeb416a84f5992b1ca1dcee75338f26c9",
+      "develop": "0d1cd54105b196567e1b95fcdbe9746b0e995ea6",
+      "patchId": "3fb09ddb72b987c44248feca25693ec38296d735"
+    },
+    {
+      "id": "G05-C05",
+      "branch": "593b24819d62ddb088a8045e558be883b8c77a1a",
+      "develop": "ccdae2bd8847c3e50df1f3a208e85994509c7f14",
+      "patchId": "103e4a776b983245ba4f399fba89e3d01fe6d479"
+    },
+    {
+      "id": "G05-C06",
+      "branch": "f5f7641aa5b67af7315d7df61d230fc084ba6e78",
+      "develop": "d3d17a1acff4c3ad3f6452222850e2132822db0c",
+      "patchId": "ededa5d5c88569931999cf9aeb74cf4b618e4166"
+    },
+    {
+      "id": "G05-C07",
+      "branch": "d89c9ef2deb51eea917c20cf0412e5269eec1e31",
+      "develop": "345a86f9d1cdf4b4a1fd27d7bf745f5e371b43c9",
+      "patchId": "41c69420b9c8a78d1356aff8cf8d4da508a82643"
+    },
+    {
+      "id": "G05-C08",
+      "branch": "da773d4b5985e33858ac76ed834ee3a109066bf2",
+      "develop": "4bbb77631a22b5d80e900ca9fd81195f2e806591",
+      "patchId": "28a5a76ced5a35bf7f080e1b607471a8ae46551e"
+    },
+    {
+      "id": "G05-C09",
+      "branch": "113324fccdeba758d973219c692a3f53472da3b8",
+      "develop": "3ae6de212799c050dd48a7a907fb8429dd5ea826",
+      "patchId": "2413420c74d94bf9b0be27e7bc922eda1b38c1cc"
+    },
+    {
+      "id": "G05-C10",
+      "branch": "c52f326df7089183edd79d3d01dab4c284b15d8d",
+      "develop": "e64a6b532dc3a8341f7bbc818d2d4e4a2fa6a24b",
+      "patchId": "0e2548c4dc555a30c43b34977505bcaeefe3cfae"
+    },
+    {
+      "id": "G05-C11",
+      "branch": "108daaca56dea6e5a56a9929a2b3b3ae567d24ed",
+      "develop": "1439e01894841f54f76905c4162843e76213b256",
+      "patchId": "c45b84526a8d189e5fd88d49d4c246a1dacfb158"
+    },
+    {
+      "id": "G05-C12",
+      "branch": "1a876c8d80df1f0c47ceaef4ed67f08b8e72ee69",
+      "develop": "9920e24561f338b594e40f0f9087373c01875b38",
+      "patchId": "0ae91339cfcbcdce61b0da63a0e99797fb32ba22"
+    },
+    {
+      "id": "G05-C13",
+      "branch": "88add5ae28e66572ad25a50ffb313ef7cfa8046d",
+      "develop": "20315fdde75ba84bc88ea29aa07077e2ff951d85",
+      "patchId": "db5eaf442df2ac5c6462ad873df3994feca2e08d"
+    },
+    {
+      "id": "G07-C01",
+      "branch": "c4b189e628ed11f064d3e33152655532fddddd9b",
+      "develop": "0046a800118be7aff04dff5f18028acfe575bcd9",
+      "patchId": "1bd8f35819a86414acfcf5484366ac62f5a59bd5"
+    },
+    {
+      "id": "G07-C02",
+      "branch": "1995d3deeb38be030810ba2c00f5c68e728ee231",
+      "develop": "ec0a082540396b89d6dc9c8d547ec8d27f49ebd4",
+      "patchId": "ff3c6567585bbcf49178d0a5d8b6a8c549ef4b92"
+    },
+    {
+      "id": "G07-C03",
+      "branch": "2c2f6c1dd95bf76fd4af6d1af5293fd4363594b8",
+      "develop": "65accd66fbb23536f25f1b652949fe987031d712",
+      "patchId": "cfa8f4c6f74a98fc07cba4deba30cb78036b8f47"
+    },
+    {
+      "id": "G07-C04",
+      "branch": "1f298531a89849affb49482482360dcfcf43bbec",
+      "develop": "b98bb5d738c3c083cd50de277ecf869761ae0259",
+      "patchId": "f21d59595643526018f762d805b4eff16b3f93a1"
+    },
+    {
+      "id": "G07-C05",
+      "branch": "4a22c754427d85c56a5e0554fc3363c51e67b8a0",
+      "develop": "7433b9b7f9014444acfd1aeb059680649adae4dd",
+      "patchId": "2fd4947067fd48bd288b463290f49be365a1d632"
+    },
+    {
+      "id": "G07-C06",
+      "branch": "9db3206b2b985e162268275f494828636c7bb14f",
+      "develop": "5ec6f72d71bc5956279b6e0e2e7ad12495717d78",
+      "patchId": "3f7f81b2ba7b514f227d3e5e4c0e14b8600ad853"
+    },
+    {
+      "id": "G07-C07",
+      "branch": "b4ac8b3ae013db7f7784285d0a1c72e526c3bcef",
+      "develop": "59f278c5cdd21347a54e743b207e2812e90ae2ec",
+      "patchId": "501971a9702fff67fb737c8e3baefabdd18beed3"
+    },
+    {
+      "id": "G07-C08",
+      "branch": "d31e70850c0085766707184ffcd3be01e9cfaac8",
+      "develop": "770c01c16be7d288072e3a50dd370336e8777598",
+      "patchId": "f7d636b03f336cc990ea43cc7eeac0fa457a779b"
+    },
+    {
+      "id": "G07-C09",
+      "branch": "d70a4572ff1c68b7ee5ca74ba3421f5f88f68549",
+      "develop": "b07c88008456aae32d7ce01e06bd0383312c1549",
+      "patchId": "325c900143da9a5fbadcd5a39f7d3344ee08bdbb"
+    },
+    {
+      "id": "G07-C10",
+      "branch": "17949faf22591d99ddc9fc3416e31845dc436e03",
+      "develop": "7067eb6baff730851938d576e6d2d31b3b1f025a",
+      "patchId": "0037f4431daef00fa458aa5ce9e234155e4d398a"
+    },
+    {
+      "id": "G07-C11",
+      "branch": "206979ec938fd88ac5ec169300efb3bad875bd97",
+      "develop": "829335ad6ed1be3c2302aea47b6485c00374eb31",
+      "patchId": "6c19a4fe6c3ce21d9b74a3d98a0d5a5447529e06"
+    },
+    {
+      "id": "G07-C12",
+      "branch": "7a9ebc4eb1becd3485fe65c94ba7411dd56c4c70",
+      "develop": "e7592d9c9199372c11b317fdd92d968882cbeadf",
+      "patchId": "3066aef4d1da7cc2e1a8a79455bb31ff8b41991b"
+    },
+    {
+      "id": "G08-C01",
+      "branch": "506cd262aa494395e052a90fc626b56e54eb03ec",
+      "develop": "b0cfc39036c34b960707fb550eb6d97f2f07a5ec",
+      "patchId": "f0d767210e55a7c341d7ec62fd7b1df7dd2ec9b9"
+    },
+    {
+      "id": "G08-C02",
+      "branch": "fa14a36c51e007d448c8cf32a63f7ad0f599c943",
+      "develop": "490257d5d87e4758130290e3fe3370322ac9aff3",
+      "patchId": "0b43cda018eb340cd6e214c0acf7c11edcdeeff4"
+    },
+    {
+      "id": "G08-C03",
+      "branch": "3358ec48e9031af9d9ab2ec68fb458ac27c292c2",
+      "develop": "f71d8d237d1358b1fea9dc19518c87fd149a16cb",
+      "patchId": "cb6d6d0c31fe71b62192945e743d949d707420c5"
+    },
+    {
+      "id": "G08-C04",
+      "branch": "0bfddb577818ed1dd399ecf82ce15fc49f4a5418",
+      "develop": "ecba45ee9f3c8ee1a788583c5c6fe7d87d09b885",
+      "patchId": "68ddcbdeae7805071cd1456b498dfcbebde1240d"
+    },
+    {
+      "id": "G08-C05",
+      "branch": "2c31875a29bfa7adb4c848c2db603ac23e755d28",
+      "develop": "395cc068e07bb5c4ead56b05e92fecab293e4b5b",
+      "patchId": "a4d154d3c524e2ecc697a991fd2966e1dad7cb58"
+    },
+    {
+      "id": "G08-C06",
+      "branch": "7bebb3557732490a72fabdee304b35eb3166c80e",
+      "develop": "956c4721fb3d865b00ae2370bad3fbec81b73731",
+      "patchId": "cfdb8b5f170b63945dd938fdc2886606c9f05c12"
+    },
+    {
+      "id": "G08-C07",
+      "branch": "35cb9cd8133e92a447af92bf3ce53e8f6c2d588f",
+      "develop": "0c2cdd806ff3ff6ff91b2c24f8ff4ec68252c161",
+      "patchId": "64bd3d0aa6abb47476b63d86834c94e3551bb34f"
+    },
+    {
+      "id": "G08-C08",
+      "branch": "785ad9881a89b906831697f9dadf7187a1c063bc",
+      "develop": "9e7ec5c3d6960198b6f807546c05895bf809eb4d",
+      "patchId": "1c6b9f62feaddcde40787d615e9a3d91156d62d7"
+    },
+    {
+      "id": "G08-C09",
+      "branch": "93918a080773cff0527a93276339c265d49715ed",
+      "develop": "f9d95d11638398dcb59b3459d61c8a214844f90f",
+      "patchId": "cecfe266360fffe1dc87d4cb28b1cca900d98698"
+    },
+    {
+      "id": "G08-C10",
+      "branch": "6c9574d1888422de75b39b2778bc5e38658005df",
+      "develop": "dd1a64f9c88e6fc349f34795e2e8d301e1db4d01",
+      "patchId": "bcab5e796a3e8e8262b5d373930b5a1a638eef5b"
+    }
+  ]
+}

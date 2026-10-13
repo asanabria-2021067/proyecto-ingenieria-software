@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 /**
  * C121 (06 v2 §41/§46 `AdminProjects`): consulta de la bandeja administrativa
@@ -16,7 +16,11 @@ export const ADMIN_PROJECTS_DEFAULT_LIMIT = 20;
 export const ADMIN_PROJECTS_MAX_LIMIT = 50;
 
 export class AdminProjectsQueryDto {
-  @IsEnum(ADMIN_PROJECT_GROUPS)
+  // GPI01-C10 (H-07): `@IsEnum` sobre un arreglo valida bien pero arma su
+  // mensaje con las claves no numéricas del «enum», y un arreglo no tiene
+  // ninguna: el 400 llegaba sin valores. `@IsIn` usa la misma lista del
+  // contrato y el mensaje la enumera.
+  @IsIn(ADMIN_PROJECT_GROUPS, { message: `grupo debe ser uno de: ${ADMIN_PROJECT_GROUPS.join(', ')}` })
   grupo!: AdminProjectGroup;
 
   @IsOptional()

@@ -13,7 +13,7 @@ export function SocialProjectCard({ proyecto }: { proyecto: ProyectoFeedDto }) {
         <h3 className="font-headline text-sm font-semibold text-on-surface line-clamp-2">
           {proyecto.tituloProyecto}
         </h3>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
+        <span className={`pill pill-sm shrink-0 ${estadoBadgeStyle(proyecto.estadoProyecto)}`}>
           {estadoBadgeLabel(proyecto.estadoProyecto)}
         </span>
       </div>

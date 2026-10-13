@@ -20,6 +20,8 @@ import { UpdateEstadoProyectoDto } from './dto/update-estado-proyecto.dto';
 import { CreateHitoDto } from './dto/create-hito.dto';
 import { AssignHitoTasksDto } from './dto/assign-hito-tasks.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
@@ -111,7 +113,8 @@ export class ProjectsController {
   }
 
   @Get(':id/admin')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('administrador')
   findOneAdmin(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { userId: number },

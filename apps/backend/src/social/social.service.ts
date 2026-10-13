@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoAmistad, Prisma } from '@prisma/client';
+import { EstadoAmistad, EstadoUsuario, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { BuscarUsuariosQueryDto } from './dto/buscar-usuarios-query.dto';
@@ -361,6 +361,7 @@ export class SocialService {
       // El directorio de personas es entre estudiantes: los administradores
       // no aparecen como resultado de búsqueda ni como sugerencia.
       { rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } } },
+      { estado: { not: EstadoUsuario.PENDIENTE_VERIFICACION } },
     ];
 
     if (query) {

@@ -1,34 +1,33 @@
-﻿'use client';
+'use client';
+
+import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
 
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  AlertCircle,
-  AlertTriangle,
-  BarChart3,
-  ClipboardList,
-  Clock,
-  FileText,
-  Flag,
-  Loader2,
-} from 'lucide-react';
+import { AlertCircle, AlertTriangle, ChevronRight, Flag, Loader2 } from 'lucide-react';
 import { useCloseSprint, useProjectSprints, useSprintClosingSummary, useSprintDetail } from '@/hooks/use-project-sprints';
-import { useHourAdjustments } from '@/hooks/use-hour-adjustments';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { SprintCloseConfirmModal } from '@/components/projects/sprint-close-confirm-modal';
-import { HourAdjustmentRow, formatearDecimal } from '@/components/hours/hour-adjustment-row';
+import { formatearDecimal } from '@/components/hours/hour-adjustment-row';
+import { SIN_TOTALES, getInitials, sumarDecimales } from '@/components/hours/sprint-closing.shared';
 import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
 import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
-import { getApiErrorMessage, getApiErrorStatus, isProyectoOcupado } from '@/components/projects/api-error';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+} from '@/components/dashboard/data-table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Empty,
@@ -40,58 +39,22 @@ import {
 } from '@/components/ui/empty';
 import { aviso } from '@/lib/mensajes';
 import { sprintClosingSummaryQueryKey } from '@/lib/query-keys/sprints';
-import type {
-  SprintClosingMemberTotalsDto,
-  SprintClosingSummaryParticipantDto,
-  SprintClosingTramoDto,
-  UpsertHourAdjustmentInput,
-  DestinoArrastre,
-  EstadoSprint,
-} from '@/lib/types/sprints';
+import type { SprintClosingSummaryParticipantDto, DestinoArrastre, EstadoSprint } from '@/lib/types/sprints';
 
-/** Mismo pill de estado que el detalle y la lista de Sprints. */
-const ESTADO_SPRINT_STYLE: Record<EstadoSprint, { label: string; className: string }> = {
-  ACTIVO: { label: 'Activo', className: 'bg-primary-container text-on-primary-container' },
-  EN_FINALIZACION: { label: 'En finalización', className: 'bg-status-warning text-on-status-warning' },
-  CERRADO: { label: 'Cerrado', className: 'bg-surface-container-high text-tertiary' },
-};
 
 /**
- * Columnas de la revisión por integrante: el encabezado y cada fila usan la
+ * Columnas del listado de integrantes: el encabezado y cada fila usan la
  * misma rejilla, así Reportadas y Propuestas quedan alineadas entre filas.
  */
 const COLUMNAS_INTEGRANTE =
   'grid grid-cols-2 items-center gap-x-4 gap-y-2 @3xl/project:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_7rem_7rem]';
 
-/** Encabezado de columna, igual que las tablas de Miembros. */
-const COLUMNA_TITULO = 'text-[10px] font-black uppercase tracking-widest text-tertiary';
-
-function getInitials(nombre: string, apellido: string): string {
-  return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
-}
+/** Rótulo de columna de la tabla compartida (`data-table`), igual que Miembros y las bandejas. */
+const COLUMNA_TITULO = DATA_TABLE_HEAD_TEXT;
 
 function mensajeDeError(error: unknown): string {
   return getApiErrorMessage(error, 'general');
 }
-
-function sumarDecimales(valores: string[]): string {
-  const total = valores.reduce((acc, v) => acc + Math.round(Number(v) * 100), 0);
-  const signo = total < 0 ? '-' : '';
-  const abs = Math.abs(total);
-  return `${signo}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
-}
-
-const SIN_TOTALES: SprintClosingMemberTotalsDto = {
-  tareasDistintas: 0,
-  estimacionAsociada: null,
-  reportadas: '0.00',
-  legacy: '0.00',
-  exceso: '0.00',
-  propuestas: '0.00',
-  filasPendientes: 0,
-  filasConsumidas: 0,
-  tramos: [],
-};
 
 function ClosingSkeleton() {
   return (
@@ -107,69 +70,35 @@ function ClosingSkeleton() {
   );
 }
 
-function MemberItem({
-  participante,
-  readOnly,
-  pendingId,
-  errors,
-  onUpsert,
-  onRevert,
-  onLoadHistory,
-}: {
-  participante: SprintClosingSummaryParticipantDto;
-  readOnly: boolean;
-  pendingId: number | null;
-  errors: Record<number, string>;
-  onUpsert: (idAsignacion: number, input: UpsertHourAdjustmentInput) => void;
-  onRevert: (idAsignacion: number) => void;
-  onLoadHistory: (idAsignacion: number) => Promise<import('@/lib/types/sprints').AjusteHoraDTO[]>;
-}) {
+/**
+ * Fila compacta de un integrante: nombre, rol y sus dos totales del backend.
+ * Toda la fila lleva a la revisión de horas con ese integrante ya elegido; el
+ * desglose por tarea y tramo, los ajustes y el historial viven allí.
+ */
+function MemberRow({ participante, revisionHref }: { participante: SprintClosingSummaryParticipantDto; revisionHref: string }) {
   const totales = participante.totales ?? SIN_TOTALES;
-  const rolPorParticipacion = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const p of participante.participaciones) map.set(p.idParticipacion, p.nombreRol);
-    return map;
-  }, [participante.participaciones]);
-
-  const arbol = useMemo(() => {
-    const porRol = new Map<string, Map<number, { titulo: string; tramos: SprintClosingTramoDto[] }>>();
-    for (const tramo of totales.tramos) {
-      const rol =
-        (tramo.idParticipacion != null ? rolPorParticipacion.get(tramo.idParticipacion) : undefined) ??
-        'Sin rol vigente';
-      const tareas = porRol.get(rol) ?? new Map();
-      const entrada = tareas.get(tramo.idTarea) ?? { titulo: tramo.tituloTarea, tramos: [] };
-      entrada.tramos.push(tramo);
-      tareas.set(tramo.idTarea, entrada);
-      porRol.set(rol, tareas);
-    }
-    return porRol;
-  }, [totales.tramos, rolPorParticipacion]);
-
   const nombre = `${participante.nombre} ${participante.apellido}`;
 
   return (
-    <AccordionItem value={String(participante.idUsuario)} className="border-outline-variant/40">
-      <AccordionTrigger
-        className="items-center rounded-none px-4 py-3 transition-colors hover:bg-surface-container-low hover:no-underline"
-        aria-label={`Desglose de ${nombre}`}
+    <li className={`border-b ${DATA_TABLE_ROW_BORDER} last:border-b-0`}>
+      <Link
+        href={`${revisionHref}?integrante=${participante.idUsuario}`}
+        aria-label={`Revisar horas de ${nombre}`}
+        className={`flex items-center gap-4 px-stack py-inline outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 ${DATA_TABLE_ROW_HOVER}`}
       >
         <div className={`${COLUMNAS_INTEGRANTE} min-w-0 flex-1`}>
-          <span className="col-span-2 flex min-w-0 items-center gap-3 @3xl/project:col-span-1">
+          <span className="col-span-2 flex min-w-0 items-center gap-tight @3xl/project:col-span-1">
             <Avatar className="size-8 shrink-0">
               {participante.fotoUrl && <AvatarImage src={participante.fotoUrl} alt="" />}
-              <AvatarFallback className="bg-primary-container text-xs font-bold text-on-primary-container">
+              <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
                 {getInitials(participante.nombre, participante.apellido)}
               </AvatarFallback>
             </Avatar>
-            <span className="truncate text-sm font-medium text-on-surface">{nombre}</span>
+            <span className="type-body truncate font-semibold text-text-primary">{nombre}</span>
           </span>
           <span className="col-span-2 flex flex-wrap gap-1 @3xl/project:col-span-1">
             {participante.roles.map((rol) => (
-              <span
-                key={rol.idRolProyecto}
-                className="inline-flex items-center rounded-full bg-secondary-container/30 px-2 py-0.5 text-xs font-bold text-secondary"
-              >
+              <span key={rol.idRolProyecto} className="pill pill-sm pill-sage">
                 {rol.nombreRol}
               </span>
             ))}
@@ -177,58 +106,20 @@ function MemberItem({
           <span className="flex flex-col">
             {/* En escritorio el encabezado de la tabla ya nombra la columna. */}
             <span className={`${COLUMNA_TITULO} @3xl/project:hidden`}>Reportadas</span>
-            <span className="text-sm font-semibold tabular-nums text-on-surface">
+            <span className="type-body font-semibold tabular-nums text-text-primary">
               {formatearDecimal(totales.reportadas)} h
             </span>
           </span>
           <span className="flex flex-col">
             <span className={`${COLUMNA_TITULO} @3xl/project:hidden`}>Propuestas</span>
-            <span className="text-sm font-semibold tabular-nums text-primary">
+            <span className="type-body font-semibold tabular-nums text-primary">
               {formatearDecimal(totales.propuestas)} h
             </span>
           </span>
         </div>
-      </AccordionTrigger>
-      <AccordionContent className="px-4 pb-5 pt-1">
-        {totales.tramos.length === 0 ? (
-          <p className="text-sm italic text-tertiary">Este integrante no tiene tramos de horas en el Sprint.</p>
-        ) : (
-          <div className="space-y-4">
-            {[...arbol.entries()].map(([rol, tareas]) => (
-              <section key={rol} aria-label={`Rol ${rol}`} className="space-y-3">
-                <h3 className="flex items-center gap-2 rounded-lg bg-surface-container-low px-3 py-2 text-sm font-semibold text-primary">
-                  <FileText className="size-4" aria-hidden="true" />
-                  {rol}
-                </h3>
-                {[...tareas.entries()].map(([idTarea, tarea]) => (
-                  <div key={idTarea} className="space-y-2 pl-2 sm:pl-4">
-                    <h4 className="flex items-center gap-2 rounded-md border border-outline-variant/30 px-3 py-2 text-sm font-medium text-on-surface">
-                      <ClipboardList className="size-4 text-tertiary" aria-hidden="true" />
-                      Tarea: {tarea.titulo}
-                    </h4>
-                    <div className="space-y-2 pl-1 sm:pl-3">
-                      {tarea.tramos.map((tramo, index) => (
-                        <HourAdjustmentRow
-                          key={tramo.idAsignacion}
-                          tramo={tramo}
-                          indice={index + 1}
-                          disabled={readOnly}
-                          pending={pendingId === tramo.idAsignacion}
-                          error={errors[tramo.idAsignacion] ?? null}
-                          onUpsert={onUpsert}
-                          onRevert={onRevert}
-                          onLoadHistory={onLoadHistory}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </section>
-            ))}
-          </div>
-        )}
-      </AccordionContent>
-    </AccordionItem>
+        <ChevronRight className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
+      </Link>
+    </li>
   );
 }
 
@@ -244,12 +135,12 @@ export default function SprintClosingPage() {
   const closeSprint = useCloseSprint(idProyecto);
   const { detail: sprintDetail } = useSprintDetail(idProyecto, idSprint);
   const [showCloseModal, setShowCloseModal] = useState(false);
-  const { upsert, revert, history } = useHourAdjustments(idProyecto, idSprint);
 
   const { data: proyecto, isLoading: cargandoProyecto } = useProjectDetail(idProyecto);
   const { data: currentUser, isLoading: cargandoUsuario } = useCurrentUser();
   const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
   const volverHref = isLeader ? `/dashboard/projects/${id}` : `/dashboard/proyectos/${id}`;
+  const revisionHref = `/dashboard/proyectos/${id}/sprints/${sprintId}/finalizar/revision`;
 
   const sprint = sprints.find((s) => s.idSprint === idSprint) ?? null;
   const tareasPendientes = (sprintDetail?.tareas ?? []).filter((t) => t.estadoTarea !== 'HECHO');
@@ -257,9 +148,6 @@ export default function SprintClosingPage() {
   const readOnly = estadoSprint === 'CERRADO' || estadoSprint === 'ACTIVO';
   const blockers = summary?.blockers ?? [];
 
-  const [pendingId, setPendingId] = useState<number | null>(null);
-  const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
-  const [globalError, setGlobalError] = useState<{ message: string; conflict: boolean } | null>(null);
   const [closeError, setCloseError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
 
@@ -269,68 +157,13 @@ export default function SprintClosingPage() {
     const tareas = new Set<number>();
     for (const t of totales) for (const tramo of t.tramos) tareas.add(tramo.idTarea);
     return {
+      integrantes: participantes.length,
       tareasDistintas: tareas.size,
       reportadas: sumarDecimales(totales.map((t) => t.reportadas)),
       exceso: sumarDecimales(totales.map((t) => t.exceso)),
       propuestas: sumarDecimales(totales.map((t) => t.propuestas)),
     };
   }, [summary]);
-
-  const manejarErrorAjuste = (idAsignacion: number, err: unknown) => {
-    const status = getApiErrorStatus(err);
-    const message = getApiErrorMessage(err, 'hours');
-    if (status === 400) {
-      setRowErrors((prev) => ({ ...prev, [idAsignacion]: message }));
-      return;
-    }
-    if (status === 409) {
-      setGlobalError({
-        message: isProyectoOcupado(err)
-          ? 'El proyecto esta ocupado por otra operacion. Actualiza e intentalo de nuevo.'
-          : 'El resumen cambio mientras trabajabas. Actualiza para ver el estado actual.',
-        conflict: true,
-      });
-      return;
-    }
-    setGlobalError({ message, conflict: false });
-  };
-
-  const onUpsert = (idAsignacion: number, input: UpsertHourAdjustmentInput) => {
-    setRowErrors((prev) => {
-      const next = { ...prev };
-      delete next[idAsignacion];
-      return next;
-    });
-    setGlobalError(null);
-    setPendingId(idAsignacion);
-    upsert.mutate(
-      { idAsignacion, input },
-      {
-        onError: (err) => manejarErrorAjuste(idAsignacion, err),
-        onSettled: () => setPendingId(null),
-      },
-    );
-  };
-
-  const onRevert = (idAsignacion: number) => {
-    setGlobalError(null);
-    setPendingId(idAsignacion);
-    revert.mutate(
-      { idAsignacion },
-      {
-        onError: (err) => manejarErrorAjuste(idAsignacion, err),
-        onSettled: () => setPendingId(null),
-      },
-    );
-  };
-
-  const onLoadHistory = (idAsignacion: number) => history.mutateAsync({ idAsignacion });
-
-  const actualizar = () => {
-    setGlobalError(null);
-    setCloseError(null);
-    refetch();
-  };
 
   const ejecutarCierre = async (destino?: DestinoArrastre) => {
     setCloseError(null);
@@ -362,7 +195,8 @@ export default function SprintClosingPage() {
     void ejecutarCierre();
   };
 
-  const puedeCerrar = !readOnly && blockers.length === 0 && !closing && pendingId == null;
+  // Los ajustes de horas se hacen en la vista de revisión: aquí no puede haber uno en curso.
+  const puedeCerrar = !readOnly && blockers.length === 0 && !closing;
   const motivoNoCerrar = readOnly
     ? estadoSprint === 'CERRADO'
       ? 'Este Sprint ya esta cerrado.'
@@ -371,7 +205,7 @@ export default function SprintClosingPage() {
       ? `Hay ${blockers.length} ${blockers.length === 1 ? 'bloqueo' : 'bloqueos'} pendientes: ${blockers
           .map((b) => b.message)
           .join(' - ')}`
-      : 'Hay un ajuste en curso.';
+      : 'El cierre se está confirmando.';
 
   const botonCerrar = (
     <Button
@@ -413,7 +247,7 @@ export default function SprintClosingPage() {
         actions={
           estiloEstado && (
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${estiloEstado.className}`}
+              className={`pill ${estiloEstado.className}`}
             >
               {estiloEstado.label}
             </span>
@@ -443,26 +277,20 @@ export default function SprintClosingPage() {
         <>
           <div className="space-y-section">
             <div data-slot="closing-kpis" className="grid grid-cols-2 gap-4 @3xl/project:grid-cols-4">
-              <HoursKpiCard variante="en-linea" icon={ClipboardList} label="Tareas distintas" value={String(kpis.tareasDistintas)} />
               <HoursKpiCard
                 variante="en-linea"
-                icon={Clock}
-                label="Horas reportadas"
-                value={`${formatearDecimal(kpis.reportadas)} h`}
+                label="Integrantes"
+                value={String(kpis.integrantes)}
+                note={kpis.tareasDistintas === 1 ? '1 tarea distinta' : `${kpis.tareasDistintas} tareas distintas`}
               />
+              <HoursKpiCard variante="en-linea" label="Horas reportadas" value={`${formatearDecimal(kpis.reportadas)} h`} />
               <HoursKpiCard
                 variante="en-linea"
-                icon={AlertTriangle}
                 label="Exceso sobre estimación"
                 value={`${formatearDecimal(kpis.exceso)} h`}
                 tono={hayExceso ? 'atencion' : 'neutro'}
               />
-              <HoursKpiCard
-                variante="en-linea"
-                icon={BarChart3}
-                label="Horas propuestas"
-                value={`${formatearDecimal(kpis.propuestas)} h`}
-              />
+              <HoursKpiCard variante="en-linea" label="Horas propuestas" value={`${formatearDecimal(kpis.propuestas)} h`} />
             </div>
 
             {blockers.length > 0 && (
@@ -482,27 +310,25 @@ export default function SprintClosingPage() {
               </Alert>
             )}
 
-            {globalError && (
-              <p role="alert" className="text-sm font-medium text-error">
-                {globalError.message}{' '}
-                {globalError.conflict && (
-                  <button type="button" onClick={actualizar} className="font-bold underline underline-offset-2">
-                    Actualizar
-                  </button>
+            <section aria-labelledby="horas-integrantes">
+              <div className="mb-stack flex flex-col gap-inline @2xl/project:flex-row @2xl/project:items-end @2xl/project:justify-between">
+                <div className="min-w-0">
+                  <h2 id="horas-integrantes" className="type-section">
+                    Horas por integrante
+                  </h2>
+                  <p className="type-body mt-micro text-text-secondary">
+                    Totales reportados y propuestos. El desglose por tarea y tramo, los ajustes y el historial están en la revisión de horas.
+                  </p>
+                </div>
+                {summary.participantes.length > 0 && (
+                  <Button asChild variant="outline" size="sm" className="shrink-0 text-xs font-semibold">
+                    <Link href={revisionHref}>Revisar horas</Link>
+                  </Button>
                 )}
-              </p>
-            )}
-
-            <section aria-labelledby="revision-integrantes">
-              <h2 id="revision-integrantes" className="type-section">
-                Revisión por integrante
-              </h2>
-              <p className="type-body mt-micro mb-stack text-text-secondary">
-                Revisa las horas reportadas y propuestas de cada integrante antes de confirmar el cierre.
-              </p>
+              </div>
 
               {summary.participantes.length === 0 ? (
-                <Empty tone="muted" role="status">
+                <Empty role="status">
                   <EmptyMedia variant="icon">
                     <Flag aria-hidden="true" className="h-7 w-7" />
                   </EmptyMedia>
@@ -514,34 +340,22 @@ export default function SprintClosingPage() {
                   </EmptyHeader>
                 </Empty>
               ) : (
-                <div
-                  data-slot="revision-integrantes"
-                  className="overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest"
-                >
+                <div data-slot="horas-integrantes" className={DATA_TABLE_CARD}>
                   {/* pr-12: deja el hueco del chevron (gap-4 + size-4) de cada fila. */}
                   <div
                     aria-hidden="true"
-                    className={`${COLUMNAS_INTEGRANTE} hidden border-b border-outline-variant/40 bg-surface-container-low py-3 pl-4 pr-12 @3xl/project:grid`}
+                    className={`${COLUMNAS_INTEGRANTE} ${DATA_TABLE_HEAD_ROW} hidden py-tight pl-stack pr-12 @3xl/project:grid`}
                   >
                     <span className={COLUMNA_TITULO}>Integrante</span>
                     <span className={COLUMNA_TITULO}>Rol</span>
                     <span className={COLUMNA_TITULO}>Reportadas</span>
                     <span className={COLUMNA_TITULO}>Propuestas</span>
                   </div>
-                  <Accordion type="multiple">
+                  <ul>
                     {summary.participantes.map((participante) => (
-                      <MemberItem
-                        key={participante.idUsuario}
-                        participante={participante}
-                        readOnly={readOnly}
-                        pendingId={pendingId}
-                        errors={rowErrors}
-                        onUpsert={onUpsert}
-                        onRevert={onRevert}
-                        onLoadHistory={onLoadHistory}
-                      />
+                      <MemberRow key={participante.idUsuario} participante={participante} revisionHref={revisionHref} />
                     ))}
-                  </Accordion>
+                  </ul>
                 </div>
               )}
             </section>
@@ -555,7 +369,7 @@ export default function SprintClosingPage() {
 
           <div
             data-slot="closing-actions"
-            className="mt-section flex flex-col-reverse gap-2 border-t border-outline-variant/40 pt-card sm:flex-row sm:items-center sm:justify-between"
+            className="mb-16 mt-section flex flex-col-reverse gap-2 border-t border-outline-variant/40 pt-card sm:flex-row sm:items-center sm:justify-between"
           >
             <Button asChild variant="outline" className="h-10 w-full rounded-lg border-outline-variant text-sm font-semibold sm:w-auto">
               <Link href={volverHref}>Cancelar</Link>

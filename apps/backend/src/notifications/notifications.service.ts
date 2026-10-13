@@ -1,5 +1,5 @@
 import { Injectable, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LEADERSHIP_CHANGED, NotificationsGateway, SPRINT_HOURS_ADJUSTED } from './notifications.gateway';
 import {
@@ -9,6 +9,9 @@ import {
 } from './templates/notification.templates';
 
 type TxClient = Prisma.TransactionClient;
+
+/** T-292: tamaño de página por defecto de GET /notificaciones?page=N. */
+const NOTIFICATIONS_PAGE_SIZE = 20;
 
 /**
  * Sprint 7 (06 v2 §16/§40/§44/§45): efecto diferido al post-commit. Tipo
@@ -68,7 +71,7 @@ export class NotificationsService {
     payload: NotificationInput,
     effects?: PostCommitEffectSink,
   ): Promise<{ count: number }> {
-    const recipients = [...new Set(userIds)];
+    const recipients = await this.filterEnabledRecipients(tx, [...new Set(userIds)], payload.tipoNotificacion);
     if (recipients.length === 0) {
       return { count: 0 };
     }
@@ -196,6 +199,24 @@ export class NotificationsService {
     };
   }
 
+  /**
+   * HU-185 (T-327): descarta a quien desactivó este tipo, con una sola
+   * consulta para todos los destinatarios. Sin fila = habilitado.
+   */
+  private async filterEnabledRecipients(
+    db: TxClient | PrismaService,
+    userIds: number[],
+    tipo: NotificationInput['tipoNotificacion'],
+  ): Promise<number[]> {
+    if (userIds.length === 0) return userIds;
+    const bloqueados = await db.preferenciaNotificacion.findMany({
+      where: { idUsuario: { in: [...new Set(userIds)] }, tipoNotificacion: tipo, activa: false },
+      select: { idUsuario: true },
+    });
+    const ids = new Set(bloqueados.map((p) => p.idUsuario));
+    return userIds.filter((id) => !ids.has(id));
+  }
+
   private async emitNotification(userIds: number[], payload: NotificationInput): Promise<void> {
     if (this.gateway?.server) {
       await this.gateway.notifyUsers(userIds, payload);
@@ -208,6 +229,24 @@ export class NotificationsService {
       orderBy: { creadaEn: 'desc' },
       take: 100,
     });
+  }
+
+  /**
+   * T-292 (HU-176): página de notificaciones del usuario, de la más reciente a
+   * la más antigua. Misma forma que el listado paginado de proyectos.
+   */
+  async findPage(userId: number, page: number, limit = NOTIFICATIONS_PAGE_SIZE) {
+    const where = { idUsuario: userId };
+    const [data, total] = await Promise.all([
+      this.prisma.notificacion.findMany({
+        where,
+        orderBy: [{ creadaEn: 'desc' }, { idNotificacion: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.notificacion.count({ where }),
+    ]);
+    return { data, total, page, totalPages: Math.ceil(total / limit) };
   }
 
   async findUnreadForUser(userId: number) {
@@ -255,6 +294,28 @@ export class NotificationsService {
       data: { leidaEn: new Date() },
     });
     return { actualizadas: result.count };
+  }
+
+  /** HU-185 (T-326): un tipo sin fila guardada se reporta como activo. */
+  async getPreferences(userId: number): Promise<{ tipo: TipoNotificacion; activa: boolean }[]> {
+    const guardadas = await this.prisma.preferenciaNotificacion.findMany({
+      where: { idUsuario: userId },
+      select: { tipoNotificacion: true, activa: true },
+    });
+    const estado = new Map(guardadas.map((p) => [p.tipoNotificacion, p.activa]));
+    return Object.values(TipoNotificacion).map((tipo) => ({
+      tipo,
+      activa: estado.get(tipo) ?? true,
+    }));
+  }
+
+  async updatePreference(userId: number, tipo: TipoNotificacion, activa: boolean) {
+    await this.prisma.preferenciaNotificacion.upsert({
+      where: { idUsuario_tipoNotificacion: { idUsuario: userId, tipoNotificacion: tipo } },
+      update: { activa },
+      create: { idUsuario: userId, tipoNotificacion: tipo, activa },
+    });
+    return this.getPreferences(userId);
   }
 
   async isAdmin(userId: number, tx?: TxClient): Promise<boolean> {
@@ -327,8 +388,11 @@ export class NotificationsService {
     if (userIds.length === 0) return;
     const db = tx ?? this.prisma;
 
+    const recipients = await this.filterEnabledRecipients(db, userIds, payload.tipoNotificacion);
+    if (recipients.length === 0) return;
+
     const notifications = await db.notificacion.createMany({
-      data: userIds.map((idUsuario) => ({
+      data: recipients.map((idUsuario) => ({
         idUsuario,
         tipoNotificacion: payload.tipoNotificacion,
         tituloNotificacion: payload.tituloNotificacion,
@@ -339,7 +403,7 @@ export class NotificationsService {
     });
 
     if (this.gateway?.server) {
-      await this.gateway.notifyUsers(userIds, payload);
+      await this.gateway.notifyUsers(recipients, payload);
     }
 
     return notifications;

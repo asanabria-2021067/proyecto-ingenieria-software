@@ -1,8 +1,18 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, AlertCircle, Copy, Link2 } from 'lucide-react';
+import { AlertCircle, Copy, KeyRound, Link2 } from 'lucide-react';
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+} from '@/components/dashboard/data-table';
+import { Button } from '@/components/ui/button';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -19,6 +29,7 @@ import {
   generatePasswordResetLink,
   type AdminSolicitudRecuperacion,
 } from '@/lib/services/admin';
+import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
 function formatFecha(dateStr: string): string {
   try {
@@ -58,29 +69,36 @@ interface GeneratedLink {
   expiraEn: string;
 }
 
-function SkeletonRows() {
+// Misma tabla que las bandejas de Proyectos y Gestión de Usuarios (`data-table`).
+const TH = `h-auto whitespace-normal px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
+const TD = 'whitespace-normal px-stack py-inline align-middle';
+// Columnas que solo caben desde cierto ancho de la tarjeta; antes van como metadata bajo el nombre.
+const COL_CORREO = '@3xl/bandeja:table-cell';
+const META_CORREO = '@3xl/bandeja:hidden';
+const COL_CARNE = '@xl/bandeja:table-cell';
+const META_CARNE = '@xl/bandeja:hidden';
+const COL_FECHA = '@2xl/bandeja:table-cell';
+const META_FECHA = '@2xl/bandeja:hidden';
+
+function TablaSkeleton() {
   return (
-    <>
-      {Array.from({ length: 3 }).map((_, i) => (
-        <TableRow key={i} className="border-outline-variant/40">
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-40 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-24 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-44 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-32 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-8 w-28 rounded-lg bg-surface-container-high" />
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
+    <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando solicitudes de recuperación">
+      <div className={`${DATA_TABLE_HEAD_ROW} px-stack py-tight`}>
+        <Skeleton className="h-4 w-40" />
+      </div>
+      <div className="divide-y divide-outline-variant/50">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-stack px-stack py-inline">
+            <div className="min-w-0 flex-1 space-y-tight">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+            <Skeleton className="hidden h-4 w-32 @2xl/bandeja:block" />
+            <Skeleton className="h-8 w-28 rounded-tag" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -194,113 +212,116 @@ export default function AdminSolicitudesRecuperacionPage() {
   );
 
   return (
-      <div className="px-4 pb-12 pt-8 md:px-8">
+      <div className={ADMIN_PAGE}>
+        <AdminBreadcrumb seccion="Usuarios" pagina="Recuperación de contraseña" />
         {/* Header */}
         <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-primary">
-              Administración
-            </span>
-            <h1 className="font-headline text-4xl font-black tracking-tighter text-on-surface md:text-5xl">
+            <h1 className={ADMIN_PAGE_TITLE}>
               Recuperación de contraseña
             </h1>
-            <p className="mt-2 max-w-2xl text-base text-tertiary">
+            <p className={ADMIN_PAGE_LEAD}>
               Solicitudes de recuperación pendientes. Genera un enlace y envíalo manualmente
               al correo institucional del usuario.
             </p>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="flex shrink-0 items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary self-start"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Actualizar
-          </button>
         </section>
 
-        {/* Table card */}
-        <div className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
-          <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Usuario
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Carné
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Correo de referencia
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Solicitada
-                </TableHead>
-                <TableHead className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-tertiary">
-                  Acciones
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading && <SkeletonRows />}
+        <div className="@container/bandeja flex flex-col gap-stack">
+          {!isLoading && !isError && (
+            <p className="type-body text-text-secondary" role="status" aria-live="polite">
+              Total de solicitudes pendientes:{' '}
+              <span className="font-semibold tabular-nums text-text-primary">{pendientes.length}</span>
+            </p>
+          )}
 
-              {isError && (
-                <TableRow className="border-0 hover:bg-transparent">
-                  <TableCell colSpan={5} className="px-4 py-10 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <AlertCircle className="h-6 w-6 text-error" />
-                      <p className="text-sm font-medium text-on-surface">
-                        No se pudieron cargar las solicitudes.
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {!isLoading && !isError && pendientes.length === 0 && (
-                <TableRow className="border-0 hover:bg-transparent">
-                  <TableCell colSpan={5} className="px-4 py-10 text-center">
-                    <p className="text-sm text-tertiary">No hay solicitudes pendientes.</p>
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {!isLoading &&
-                !isError &&
-                pendientes.map((s) => (
-                  <TableRow
-                    key={s.idSolicitud}
-                    className="border-outline-variant/40 hover:bg-surface-container-low transition-colors"
-                  >
-                    <TableCell className="px-4 py-3">
-                      <span className="text-sm font-medium text-on-surface">
-                        {s.usuario.nombre} {s.usuario.apellido}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-4 py-3">
-                      <span className="text-sm text-tertiary">{s.carneReferencia}</span>
-                    </TableCell>
-                    <TableCell className="px-4 py-3">
-                      <span className="text-sm text-tertiary">{s.correoReferencia}</span>
-                    </TableCell>
-                    <TableCell className="px-4 py-3">
-                      <span className="text-sm text-tertiary">{formatFecha(s.creadaEn)}</span>
-                    </TableCell>
-                    <TableCell className="px-4 py-3">
-                      <button
-                        onClick={() => generateMutation.mutate(s.idSolicitud)}
-                        disabled={generateMutation.isPending}
-                        className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition-all hover:bg-primary/90 disabled:opacity-50"
-                      >
-                        <Link2 className="h-3.5 w-3.5" />
-                        Generar enlace
-                      </button>
-                    </TableCell>
+          {isError ? (
+            <Empty tone="danger" role="alert">
+              <EmptyMedia variant="icon">
+                <AlertCircle aria-hidden="true" className="size-7" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>No se pudieron cargar las solicitudes.</EmptyTitle>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+                  Reintentar
+                </Button>
+              </EmptyContent>
+            </Empty>
+          ) : isLoading ? (
+            <TablaSkeleton />
+          ) : pendientes.length === 0 ? (
+            <Empty tone="muted" role="status">
+              <EmptyMedia variant="icon">
+                <KeyRound aria-hidden="true" className="size-7" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>No hay solicitudes pendientes.</EmptyTitle>
+                <EmptyDescription>Cuando un usuario pida recuperar su contraseña, aparecerá aquí.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <div className={DATA_TABLE_CARD}>
+              <Table>
+                <TableHeader>
+                  <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
+                    <TableHead scope="col" className={TH}>
+                      Usuario
+                    </TableHead>
+                    <TableHead scope="col" className={`${TH} hidden ${COL_CARNE}`}>
+                      Carné
+                    </TableHead>
+                    <TableHead scope="col" className={`${TH} hidden ${COL_CORREO}`}>
+                      Correo de referencia
+                    </TableHead>
+                    <TableHead scope="col" className={`${TH} hidden ${COL_FECHA}`}>
+                      Solicitada
+                    </TableHead>
+                    <TableHead scope="col" className={`${TH} text-right`}>
+                      <span className="sr-only">Acciones</span>
+                    </TableHead>
                   </TableRow>
-                ))}
-            </TableBody>
-          </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {pendientes.map((s) => (
+                    <TableRow key={s.idSolicitud} className={`${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER}`}>
+                      <TableCell className={`${TD} min-w-0`}>
+                        <p className="type-body break-words font-semibold text-text-primary">
+                          {s.usuario.nombre} {s.usuario.apellido}
+                        </p>
+                        <p className={`type-meta break-all ${META_CORREO}`}>{s.correoReferencia}</p>
+                        <p className={`type-meta ${META_CARNE}`}>Carné {s.carneReferencia}</p>
+                        <p className={`type-meta ${META_FECHA}`}>{formatFecha(s.creadaEn)}</p>
+                      </TableCell>
+                      <TableCell className={`${TD} hidden ${COL_CARNE}`}>
+                        <span className="type-body tabular-nums text-text-secondary">{s.carneReferencia}</span>
+                      </TableCell>
+                      <TableCell className={`${TD} hidden ${COL_CORREO}`}>
+                        <span className="type-body break-all text-text-secondary">{s.correoReferencia}</span>
+                      </TableCell>
+                      <TableCell className={`${TD} hidden ${COL_FECHA}`}>
+                        <span className="type-body text-text-secondary">{formatFecha(s.creadaEn)}</span>
+                      </TableCell>
+                      <TableCell className={`${TD} text-right`}>
+                        <button
+                          type="button"
+                          onClick={() => generateMutation.mutate(s.idSolicitud)}
+                          disabled={generateMutation.isPending}
+                          aria-label={`Generar enlace para ${s.usuario.nombre} ${s.usuario.apellido}`}
+                          className="ml-auto flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-tag bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition-all hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          {/* En tarjetas estrechas queda solo el icono: el nombre accesible ya lo dice. */}
+                          <span className="hidden @xl/bandeja:inline">Generar enlace</span>
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </div>
 
         {/* Generated links (this session) */}
@@ -313,7 +334,7 @@ export default function AdminSolicitudesRecuperacionPage() {
               {generated.map((g) => (
                 <div
                   key={g.idSolicitud}
-                  className="rounded-xl border border-outline-variant bg-surface-container-lowest p-4"
+                  className="rounded-control border border-outline-variant bg-surface-container-lowest p-4"
                 >
                   <p className="mb-2 text-sm font-medium text-on-surface">
                     {g.usuario.nombre} {g.usuario.apellido}{' '}
@@ -338,7 +359,7 @@ export default function AdminSolicitudesRecuperacionPage() {
                       Copiar
                     </button>
                   </div>
-                  <p className="mt-2 text-[11px] text-tertiary">
+                  <p className="mt-2 type-micro text-tertiary">
                     {formatVigencia(g.expiraEn)}. Envíalo manualmente al correo institucional del usuario.
                   </p>
                 </div>

@@ -1,4 +1,4 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import type { JwtService } from '@nestjs/jwt';
 import type { PrismaService } from '../src/prisma/prisma.service';
@@ -53,7 +53,7 @@ describe('AuthService', () => {
     );
   });
 
-  it('register crea usuario y perfil y retorna token', async () => {
+  it('register crea usuario y perfil pendientes de verificación, sin tokens', async () => {
     const tx = {
       usuario: { create: vi.fn().mockResolvedValue({ idUsuario: 7, correo: 'n@uvg.edu' }) },
       perfilEstudiante: { create: vi.fn().mockResolvedValue({}) },
@@ -73,7 +73,7 @@ describe('AuthService', () => {
     );
 
     const result = await service.register({
-      correo: 'n@uvg.edu',
+      correo: 'use1@uvg.edu.gt',
       contrasena: '123',
       nombre: 'Nuevo',
       apellido: 'User',
@@ -82,9 +82,33 @@ describe('AuthService', () => {
       semestre: 4,
     });
 
-    expect(result).toEqual({ accessToken: 'token-register', refreshToken: 'token-register' });
+    expect(result).toEqual({ idUsuario: 7, estado: 'PENDIENTE_VERIFICACION' });
+    expect(jwtService.sign).not.toHaveBeenCalled();
     expect(tx.usuario.create).toHaveBeenCalled();
     expect(tx.perfilEstudiante.create).toHaveBeenCalled();
+  });
+
+  it('register responde 400 con el correo esperado si no coincide con apellido y carné', async () => {
+    const findUnique = vi.fn();
+    const service = new AuthService(
+      { usuario: { findUnique } } as unknown as PrismaService,
+      { sign: vi.fn() } as unknown as JwtService,
+      { notifyAdminsFromTemplate: vi.fn() } as unknown as NotificationsService,
+    );
+
+    const intento = service.register({
+      correo: 'mor24725@uvg.edu.gt',
+      contrasena: '12345678',
+      nombre: 'Angel Gabriel',
+      apellido: 'Sanabria Morales',
+      carne: '24725',
+      idCarrera: 1,
+      semestre: 1,
+    });
+
+    await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+    await expect(intento).rejects.toThrow('san24725@uvg.edu.gt');
+    expect(findUnique).not.toHaveBeenCalled();
   });
 
   it('register falla si correo ya existe', async () => {
@@ -96,7 +120,7 @@ describe('AuthService', () => {
 
     await expect(
       service.register({
-        correo: 'dup@uvg.edu',
+        correo: 'use1@uvg.edu.gt',
         contrasena: '123',
         nombre: 'Dup',
         apellido: 'User',

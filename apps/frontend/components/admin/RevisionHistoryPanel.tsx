@@ -11,7 +11,7 @@ interface Props {
   onClose: () => void;
 }
 
-const labelClass = 'block text-[10px] font-black uppercase tracking-widest text-tertiary mb-1.5';
+const labelClass = 'block type-micro font-black uppercase tracking-widest text-tertiary mb-1.5';
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -26,7 +26,7 @@ function ReadonlyField({ label, value }: { label: string; value: string | null |
   return (
     <div>
       <label className={labelClass}>{label}</label>
-      <div className={`w-full rounded-xl border px-4 py-3 text-sm whitespace-pre-wrap min-h-11 ${
+      <div className={`w-full rounded-control border px-4 py-3 text-sm whitespace-pre-wrap min-h-11 ${
         isEmpty
           ? 'border-outline-variant/20 bg-surface-container-lowest text-tertiary italic'
           : 'border-outline-variant/30 bg-surface-container-low/60 text-on-surface'
@@ -39,10 +39,10 @@ function ReadonlyField({ label, value }: { label: string; value: string | null |
 
 function CommentBlock({ text }: { text: string }) {
   return (
-    <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+    <div className="mt-6 rounded-control border border-review-soft/60 bg-review-soft/10 p-4">
       <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+        <MessageSquare className="h-3.5 w-3.5 text-review-ink dark:text-review-soft shrink-0" />
+        <span className="type-micro font-black uppercase tracking-widest text-review-ink dark:text-review-soft">
           Comentarios del revisor
         </span>
       </div>
@@ -73,14 +73,14 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
       <div className="shrink-0 flex items-center gap-4 border-b border-outline-variant/30 bg-surface px-6 py-4">
         <button
           onClick={onClose}
-          className="flex items-center gap-2 rounded-xl bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+          className="flex items-center gap-2 rounded-control bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver
         </button>
         <div className="h-5 w-px bg-outline-variant/40" />
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-widest text-primary">
+          <p className="type-micro font-black uppercase tracking-widest text-primary">
             Historial · Solo lectura · Revisión {revision.numeroEnvio}
           </p>
           <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
@@ -99,7 +99,7 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
         <div className="max-w-3xl mx-auto px-6 py-8 space-y-10">
 
           {!snap && (
-            <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low px-5 py-4 text-sm text-tertiary">
+            <div className="rounded-control border border-outline-variant/40 bg-surface-container-low px-5 py-4 text-sm text-tertiary">
               Los datos del formulario de esta revisión no están disponibles (fue enviada antes de que se habilitara el historial de cambios).
             </div>
           )}
@@ -107,7 +107,7 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
           {/* Información general */}
           {snap ? (
             <section>
-              <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
+              <h2 className="type-micro font-black uppercase tracking-widest text-primary mb-5">
                 Información general
               </h2>
               <div className="space-y-4">
@@ -132,7 +132,7 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
             </section>
           ) : c.general ? (
             <section>
-              <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">Información general</h2>
+              <h2 className="type-micro font-black uppercase tracking-widest text-primary mb-5">Información general</h2>
               <CommentBlock text={c.general} />
             </section>
           ) : null}
@@ -140,7 +140,7 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
           {/* Roles y habilidades */}
           {snap ? (
             <section>
-              <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">
+              <h2 className="type-micro font-black uppercase tracking-widest text-primary mb-5">
                 Roles y habilidades
               </h2>
               {snap.roles.length === 0 ? (
@@ -148,8 +148,8 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
               ) : (
                 <div className="space-y-4">
                   {snap.roles.map((rol, i) => (
-                    <div key={rol.idRolProyecto} className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 space-y-4">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Rol {i + 1}</p>
+                    <div key={rol.idRolProyecto} className="rounded-control border border-outline-variant/40 bg-surface-container-lowest p-5 space-y-4">
+                      <p className="type-micro font-black uppercase tracking-widest text-tertiary">Rol {i + 1}</p>
                       <div className="grid grid-cols-2 gap-4">
                         <ReadonlyField label="Nombre del rol" value={rol.nombreRol} />
                         <ReadonlyField label="Cupos" value={String(rol.cupos)} />
@@ -182,7 +182,7 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
             </section>
           ) : c.roles ? (
             <section>
-              <h2 className="text-[10px] font-black uppercase tracking-widest text-primary mb-5">Roles y habilidades</h2>
+              <h2 className="type-micro font-black uppercase tracking-widest text-primary mb-5">Roles y habilidades</h2>
               <CommentBlock text={c.roles} />
             </section>
           ) : null}
@@ -198,7 +198,7 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
         <div className="max-w-3xl mx-auto">
           <button
             onClick={onClose}
-            className="w-full rounded-xl bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+            className="w-full rounded-control bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
           >
             Cerrar
           </button>
