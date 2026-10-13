@@ -90,6 +90,11 @@ export function formatearInicio(inicio: string, periodo: AdminMetricasPeriodo): 
   return format(parseISO(inicio), periodo === 'semana' ? 'd MMM' : 'MMM yyyy', { locale: es });
 }
 
+/** Nombre completo de un periodo: «Semana del 5 oct» o «oct 2026». Lo comparten el tooltip y la tabla accesible. */
+function etiquetaPeriodo(inicio: string, periodo: AdminMetricasPeriodo): string {
+  return periodo === 'semana' ? `Semana del ${formatearInicio(inicio, periodo)}` : formatearInicio(inicio, periodo);
+}
+
 function formatearValor(valor: number, esHoras?: boolean): string {
   return esHoras ? formatearHoras(String(Math.round(valor * 100) / 100)) : String(valor);
 }
@@ -144,13 +149,35 @@ function MetricTrendCard({
           esHoras={config.esHoras}
           alto={amplia ? 'amplio' : 'compacto'}
           formatearEje={(inicio) => formatearInicio(inicio, periodo)}
-          formatearEtiqueta={(inicio) =>
-            periodo === 'semana' ? `Semana del ${formatearInicio(inicio, periodo)}` : formatearInicio(inicio, periodo)
-          }
+          formatearEtiqueta={(inicio) => etiquetaPeriodo(inicio, periodo)}
           formatearValor={(valor) => formatearValorConUnidad(valor, config)}
         />
       </div>
       <p className="type-meta">{config.descripcion}</p>
+      {/* Los mismos valores de la gráfica, periodo a periodo, para quien no puede leer el SVG. */}
+      <table className="sr-only">
+        <caption>
+          {config.label} por {periodo}, {textos.ventana.replace(/^en /, '')}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Periodo</th>
+            {/* «Valor» y no el nombre de la métrica: ya lo dice el título de la tabla. */}
+            <th scope="col">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {serie.map((punto, i) => (
+            <tr key={punto.inicio}>
+              <th scope="row">
+                {etiquetaPeriodo(punto.inicio, periodo)}
+                {i === serie.length - 1 ? ' (en curso)' : ''}
+              </th>
+              <td>{formatearValorConUnidad(punto[config.serie], config)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
