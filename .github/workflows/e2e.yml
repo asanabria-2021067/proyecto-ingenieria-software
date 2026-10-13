@@ -1,0 +1,234 @@
+name: E2E manual
+
+# Desde el 13/10 el E2E ya no corre en ci.yml ni en deploy.yml (consumo de
+# GitHub Actions). Este workflow solo se dispara a mano: Actions -> E2E
+# manual -> Run workflow. Tambien se puede correr en local (ver
+# docs/ci/e2e-local.md).
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-manual-${{ github.ref }}
+  cancel-in-progress: true
+
+# G02 (OWASP25-C044): solo lectura del repositorio; este workflow no publica
+# ni despliega nada.
+permissions:
+  contents: read
+
+jobs:
+  # La suite de humo se reparte en 3 shards que corren en paralelo, cada uno
+  # con su propio Postgres/Redis/backend/frontend efimeros (aislados entre
+  # si: un shard nunca ve los datos de otro). El nombre de ESTE job lleva el
+  # numero de shard porque GitHub le agrega el valor de la matriz al nombre
+  # visible; el job `e2e` de abajo (sin matriz) es el que conserva el nombre
+  # estable.
+  e2e-shard:
+    name: E2E - shard ${{ matrix.shardIndex }}/3 (Playwright)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2, 3]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: uvg_collab_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d uvg_collab_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/uvg_collab_e2e?schema=public
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/uvg_collab_e2e?schema=public
+      JWT_SECRET: e2e-ci-synthetic-jwt-secret-not-for-production
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      FRONTEND_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+      E2E_PRODUCTION_SERVER: '1'
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/backend/package-lock.json
+            apps/frontend/package-lock.json
+
+      - name: Instalar dependencias del backend
+        working-directory: apps/backend
+        run: npm ci
+
+      # G02 (OWASP25-C033): el esquema se crea con las migraciones reales
+      # (`migrate deploy`, lo mismo que corre produccion al arrancar), nunca
+      # con `db push`, que ignora el historial de migraciones. Base efimera
+      # del job.
+      - name: Preparar base de datos (migraciones + seed)
+        working-directory: apps/backend
+        run: |
+          npx prisma migrate deploy
+          npx prisma db seed
+
+      - name: Compilar y levantar el backend en segundo plano
+        working-directory: apps/backend
+        env:
+          PORT: 3001
+        run: |
+          npm run build
+          npm run start:prod &
+
+      - name: Esperar a que el backend responda
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001/api > /dev/null; then
+              echo "Backend listo"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "El backend no respondió a tiempo"
+          exit 1
+
+      - name: Instalar dependencias del frontend
+        working-directory: apps/frontend
+        run: npm ci
+
+      - name: Cache de build de Next.js
+        uses: actions/cache@v4
+        with:
+          path: apps/frontend/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('apps/frontend/package-lock.json') }}-${{ hashFiles('apps/frontend/**/*.[jt]s', 'apps/frontend/**/*.[jt]sx') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('apps/frontend/package-lock.json') }}-
+
+      # G02 (OWASP25-C033): el E2E navega el build de produccion (next build +
+      # next start via playwright.config.ts), no el dev server.
+      - name: Build de produccion del frontend para E2E
+        working-directory: apps/frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm run build
+
+      - name: Cache de navegadores de Playwright
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('apps/frontend/package-lock.json') }}
+
+      - name: Instalar navegador y dependencias de Playwright
+        working-directory: apps/frontend
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Instalar solo dependencias del sistema de Playwright (navegador ya en cache)
+        working-directory: apps/frontend
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # T-318: la comprobacion de accesibilidad con axe corre PRIMERO y en su
+      # propio paso, una sola vez (shard 1), para no repetir trabajo en los
+      # otros shards. Falla el job si axe encuentra una violacion `serious` o
+      # `critical` (WCAG 2.0/2.1 A y AA). Sin `continue-on-error`: bloqueante.
+      - name: Accesibilidad con axe (cinco pantallas, claro y oscuro)
+        id: a11y
+        if: matrix.shardIndex == 1
+        working-directory: apps/frontend
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-a11y
+        run: npm run test:e2e:a11y
+
+      - name: Subir evidencia de accesibilidad (axe)
+        if: always() && steps.a11y.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-axe-report
+          path: apps/frontend/playwright-report-a11y/
+          retention-days: 7
+          if-no-files-found: warn
+
+      # La suite completa (sin los dos specs de a11y, ya cubiertos arriba) se
+      # reparte en 3 shards con --shard. El reporte sale en formato `blob`
+      # (binario, por shard) para combinarse despues en un unico HTML en el
+      # job `e2e` (abajo).
+      - name: Ejecutar suite de humo E2E
+        working-directory: apps/frontend
+        run: npm run test:e2e:sin-a11y -- --reporter=blob --shard=${{ matrix.shardIndex }}/3
+
+      - name: Subir el reporte blob de este shard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-${{ matrix.shardIndex }}
+          path: apps/frontend/blob-report/
+          retention-days: 7
+
+  # Job SIN matriz que conserva el nombre estable (un job con `matrix`
+  # aparece en GitHub con el valor de la matriz pegado al nombre, por eso el
+  # merge vive aparte). Falla si algun shard fallo, aunque el merge de
+  # reportes en si haya salido bien.
+  e2e:
+    name: E2E - suite de humo (Playwright)
+    runs-on: ubuntu-latest
+    needs: e2e-shard
+    if: always()
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+
+      - name: Instalar dependencias del frontend
+        working-directory: apps/frontend
+        run: npm ci
+
+      - name: Descargar los reportes blob de los 3 shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: blob-report-*
+          path: apps/frontend/all-blob-reports
+          merge-multiple: true
+
+      - name: Combinar los reportes en un unico HTML
+        working-directory: apps/frontend
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
+
+      - name: Subir el reporte combinado de Playwright (solo si algun shard fallo)
+        if: needs.e2e-shard.result != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/frontend/playwright-report/
+          retention-days: 7
+
+      - name: Fallar si algun shard fallo
+        if: needs.e2e-shard.result != 'success'
+        run: |
+          echo "Al menos un shard de la suite de humo E2E termino en '${{ needs.e2e-shard.result }}'." >&2
+          exit 1
