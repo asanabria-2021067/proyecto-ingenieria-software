@@ -154,30 +154,33 @@ function MetricTrendCard({
         />
       </div>
       <p className="type-meta">{config.descripcion}</p>
-      {/* Los mismos valores de la gráfica, periodo a periodo, para quien no puede leer el SVG. */}
-      <table className="sr-only">
-        <caption>
-          {config.label} por {periodo}, {textos.ventana.replace(/^en /, '')}
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">Periodo</th>
-            {/* «Valor» y no el nombre de la métrica: ya lo dice el título de la tabla. */}
-            <th scope="col">Valor</th>
-          </tr>
-        </thead>
-        <tbody>
-          {serie.map((punto, i) => (
-            <tr key={punto.inicio}>
-              <th scope="row">
-                {etiquetaPeriodo(punto.inicio, periodo)}
-                {i === serie.length - 1 ? ' (en curso)' : ''}
-              </th>
-              <td>{formatearValorConUnidad(punto[config.serie], config)}</td>
+      {/* Los mismos valores de la gráfica, periodo a periodo, para quien no puede leer el SVG.
+          `sr-only` va en un contenedor: una tabla no se deja recortar y desbordaría la página. */}
+      <div className="sr-only">
+        <table>
+          <caption>
+            {config.label} por {periodo}, {textos.ventana.replace(/^en /, '')}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Periodo</th>
+              {/* «Valor» y no el nombre de la métrica: ya lo dice el título de la tabla. */}
+              <th scope="col">Valor</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {serie.map((punto, i) => (
+              <tr key={punto.inicio}>
+                <th scope="row">
+                  {etiquetaPeriodo(punto.inicio, periodo)}
+                  {i === serie.length - 1 ? ' (en curso)' : ''}
+                </th>
+                <td>{formatearValorConUnidad(punto[config.serie], config)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

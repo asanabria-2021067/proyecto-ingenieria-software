@@ -145,26 +145,29 @@ export function BurndownChart({ burndown }: BurndownChartProps) {
       <BurndownChartPlot serie={serie} etiquetaEje={etiquetaEje} formatearFecha={formatearFechaEje} />
 
       {/* Los mismos puntos de la gráfica, día a día, para quien no puede leer el SVG.
-          Un día sin instantánea se dice «Sin dato»: no es un cero. */}
-      <table className="sr-only">
-        <caption>Burndown del Sprint, en {etiquetaEje.toLowerCase()} pendientes por día</caption>
-        <thead>
-          <tr>
-            <th scope="col">Día</th>
-            <th scope="col">Ideal</th>
-            <th scope="col">Real</th>
-          </tr>
-        </thead>
-        <tbody>
-          {serie.map((punto) => (
-            <tr key={punto.fecha}>
-              <th scope="row">{formatearFechaEje(punto.fecha)}</th>
-              <td>{punto.ideal ?? 'Sin dato'}</td>
-              <td>{punto.real ?? 'Sin dato'}</td>
+          Un día sin instantánea se dice «Sin dato»: no es un cero. `sr-only` va en un
+          contenedor: una tabla no se deja recortar y desbordaría la página. */}
+      <div className="sr-only">
+        <table>
+          <caption>Burndown del Sprint, en {etiquetaEje.toLowerCase()} pendientes por día</caption>
+          <thead>
+            <tr>
+              <th scope="col">Día</th>
+              <th scope="col">Ideal</th>
+              <th scope="col">Real</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {serie.map((punto) => (
+              <tr key={punto.fecha}>
+                <th scope="row">{formatearFechaEje(punto.fecha)}</th>
+                <td>{punto.ideal ?? 'Sin dato'}</td>
+                <td>{punto.real ?? 'Sin dato'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

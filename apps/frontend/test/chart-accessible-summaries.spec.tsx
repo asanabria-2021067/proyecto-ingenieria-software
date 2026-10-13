@@ -89,6 +89,16 @@ describe('Tendencias de uso — valores por periodo', () => {
     expect(filas(tabla).map(([periodo]) => periodo)).toEqual(['sep 2026', 'sep 2026', 'oct 2026 (en curso)']);
   });
 
+  it('la tabla se oculta a la vista desde un contenedor: un `<table>` con `sr-only` no se recorta y desborda la página', async () => {
+    await renderSection();
+
+    for (const tabla of screen.getAllByRole('table')) {
+      expect(tabla).not.toHaveClass('sr-only');
+      expect(tabla.parentElement).toHaveClass('sr-only');
+      expect(tabla.parentElement?.tagName).toBe('DIV');
+    }
+  });
+
   it('las cabeceras de fila y columna están marcadas como tales', async () => {
     await renderSection();
 
@@ -116,6 +126,8 @@ describe('Burndown — valores por día', () => {
 
     const tabla = screen.getByRole('table', { name: 'Burndown del Sprint, en story points pendientes por día' });
     expect(within(tabla).getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Día', 'Ideal', 'Real']);
+    expect(tabla).not.toHaveClass('sr-only');
+    expect(tabla.parentElement).toHaveClass('sr-only');
     expect(filas(tabla)).toEqual([
       ['1 ene', '12', '12'],
       ['2 ene', '8', 'Sin dato'],
