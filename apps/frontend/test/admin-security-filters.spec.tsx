@@ -101,13 +101,17 @@ describe('Filtros con el aspecto del dashboard, sin cambiar lo que hacen', () =>
   it('el select usa la clase compartida de los filtros del dashboard y los tres campos igualan su alto y radio', async () => {
     const filtros = await montar();
     const tipo = filtros.getByRole('combobox', { name: 'Tipo de evento' });
-    // El alto `h-auto` y el radio de la clase compartida los resuelve la fusión de clases (gana el último).
-    const compartidas = DASHBOARD_FILTER_TRIGGER_CLASS.split(' ').filter((c) => c !== 'h-auto' && !c.startsWith('rounded-'));
-    expect(compartidas).toContain('bg-surface-container-lowest');
-    for (const clase of compartidas) expect(tipo, clase).toHaveClass(clase);
+    // `h-auto` lo descarta la fusión de clases (gana `h-11.5`, que va después en la clase compartida).
+    const compartidas = DASHBOARD_FILTER_TRIGGER_CLASS.split(' ').filter((c) => c !== 'h-auto');
+    expect(compartidas).toEqual(expect.arrayContaining(['h-11.5', 'rounded-lg', 'border-outline-variant', 'bg-surface-container-lowest']));
     for (const control of [tipo, filtros.getByLabelText('Desde'), filtros.getByLabelText('Hasta'), filtros.getByLabelText('ID de usuario')]) {
-      expect(control).toHaveClass('h-11.5', 'rounded-control');
+      for (const clase of compartidas) expect(control, clase).toHaveClass(clase);
+      // Ningún control conserva el radio por defecto de su primitiva.
+      expect(control).not.toHaveClass('rounded-md');
     }
+    // El alto del disparador vive en una variante que gana a una clase simple: se iguala con la misma variante.
+    expect(tipo).toHaveClass('data-[size=default]:h-11.5');
+    expect(tipo).not.toHaveClass('data-[size=default]:h-9');
   });
 
   it('las fechas siguen siendo campos nativos con rótulo visible: no se sustituyen por otro selector', async () => {

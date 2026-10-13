@@ -17,9 +17,12 @@ import { SECURITY_EVENT_TYPES, isSecurityEventType, type SecurityEventType } fro
 
 const TODOS = '__todos__';
 const CAMPO = 'flex min-w-0 flex-col gap-tight';
-// Mismo alto que el disparador de los selects de las barras de filtros del dashboard, con el
-// radio de control de las vistas administrativas (el mismo que usa «Gestión de Usuarios»).
-const CONTROL = 'h-11.5 rounded-control';
+// Los cuatro controles comparten la clase de los filtros del dashboard: 46 px de alto y el mismo
+// borde, radio, fondo y foco que el buscador y los selects de Mis Tareas o Mis Proyectos.
+const CONTROL = DASHBOARD_FILTER_TRIGGER_CLASS;
+// El disparador del select trae su alto en una variante (`data-[size=default]:h-9`) que gana a
+// una clase simple: se iguala con la misma variante.
+const SELECT = `w-full ${CONTROL} data-[size=default]:h-11.5`;
 const ERROR = 'type-meta text-error';
 
 /**
@@ -51,7 +54,7 @@ export function SecurityEventsFilters({
       <div className={CAMPO}>
         <Label htmlFor="filtro-tipo">Tipo de evento</Label>
         <Select value={value.tipo || TODOS} onValueChange={(tipo) => cambiar({ tipo: isSecurityEventType(tipo) ? tipo : '' })}>
-          <SelectTrigger id="filtro-tipo" className={`w-full ${DASHBOARD_FILTER_TRIGGER_CLASS} rounded-control`}>
+          <SelectTrigger id="filtro-tipo" className={SELECT}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
