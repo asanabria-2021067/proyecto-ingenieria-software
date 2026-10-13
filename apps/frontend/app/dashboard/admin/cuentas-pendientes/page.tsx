@@ -2,10 +2,19 @@
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Check, RefreshCw, X } from 'lucide-react';
+import { AlertCircle, Check, UserCheck, X } from 'lucide-react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
+import {
+  DATA_TABLE_CARD,
+  DATA_TABLE_HEAD_ROW,
+  DATA_TABLE_HEAD_TEXT,
+  DATA_TABLE_ROW_BORDER,
+  DATA_TABLE_ROW_HOVER,
+} from '@/components/dashboard/data-table';
+import { Button } from '@/components/ui/button';
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -32,7 +41,9 @@ interface AccionPendiente {
   cuenta: AdminCuentaPendiente;
 }
 
-const HEAD_CLASS = 'px-4 py-3 type-micro font-black uppercase tracking-widest text-tertiary';
+// Misma tabla que las demás bandejas administrativas (`data-table`).
+const TH = `h-auto whitespace-normal px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
+const TD = 'whitespace-normal px-stack py-inline align-middle';
 
 function formatFecha(dateStr: string): string {
   try {
@@ -48,32 +59,25 @@ function formatFecha(dateStr: string): string {
   }
 }
 
-function SkeletonRows() {
+function TablaSkeleton() {
   return (
-    <>
-      {Array.from({ length: 3 }).map((_, i) => (
-        <TableRow key={i} className="border-outline-variant/40">
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-40 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-44 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-24 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-36 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-4 w-32 rounded bg-surface-container-high" />
-          </TableCell>
-          <TableCell className="px-4 py-3">
-            <Skeleton className="h-8 w-40 rounded-lg bg-surface-container-high" />
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
+    <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando cuentas pendientes">
+      <div className={`${DATA_TABLE_HEAD_ROW} px-stack py-tight`}>
+        <Skeleton className="h-4 w-40" />
+      </div>
+      <div className="divide-y divide-outline-variant/50">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-stack px-stack py-inline">
+            <div className="min-w-0 flex-1 space-y-tight">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+            <Skeleton className="h-8 w-24 rounded-control" />
+            <Skeleton className="h-8 w-24 rounded-control" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -131,120 +135,116 @@ export default function AdminCuentasPendientesPage() {
   return (
     <div className={ADMIN_PAGE}>
       <AdminBreadcrumb seccion="Verificación y seguridad" pagina="Cuentas pendientes" />
-      <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className={ADMIN_PAGE_TITLE}>
-            Cuentas pendientes
-          </h1>
-          <p className={ADMIN_PAGE_LEAD}>
-            Cuentas nuevas que esperan verificación. Aprueba las que correspondan a la comunidad
-            UVG y rechaza las que no.
-          </p>
-        </div>
-        <button
-          onClick={() => refetch()}
-          className="flex shrink-0 items-center gap-2 rounded-control bg-surface-container-high px-4 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary self-start"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Actualizar
-        </button>
+      {/* Sin botón «Actualizar» propio: el de la barra superior del shell vuelve a pedir esta consulta. */}
+      <section className="mb-8">
+        <h1 className={ADMIN_PAGE_TITLE}>Cuentas pendientes</h1>
+        <p className={ADMIN_PAGE_LEAD}>
+          Cuentas nuevas que esperan verificación. Aprueba las que correspondan a la comunidad
+          UVG y rechaza las que no.
+        </p>
       </section>
 
-      <div className="rounded-control border border-outline-variant bg-surface-container-lowest overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
-                <TableHead className={HEAD_CLASS}>Nombre completo</TableHead>
-                <TableHead className={HEAD_CLASS}>Correo</TableHead>
-                <TableHead className={HEAD_CLASS}>Carné</TableHead>
-                <TableHead className={HEAD_CLASS}>Carrera</TableHead>
-                <TableHead className={HEAD_CLASS}>Fecha de registro</TableHead>
-                <TableHead className={HEAD_CLASS}>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading && <SkeletonRows />}
-
-              {isError && (
-                <TableRow className="border-0 hover:bg-transparent">
-                  <TableCell colSpan={6} className="px-4 py-10 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <AlertCircle className="h-6 w-6 text-error" />
-                      <p className="text-sm font-medium text-on-surface">
-                        No se pudieron cargar las cuentas pendientes.
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {!isLoading && !isError && cuentas.length === 0 && (
-                <TableRow className="border-0 hover:bg-transparent">
-                  <TableCell colSpan={6} className="px-4 py-10 text-center">
-                    <p className="text-sm text-tertiary">
-                      No hay cuentas pendientes de verificación
-                    </p>
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {!isLoading &&
-                !isError &&
-                cuentas.map((cuenta) => {
-                  const nombreCompleto = `${cuenta.nombre} ${cuenta.apellido}`;
-                  return (
-                    <TableRow
-                      key={cuenta.idUsuario}
-                      className="border-outline-variant/40 hover:bg-surface-container-low transition-colors"
-                    >
-                      <TableCell className="px-4 py-3">
-                        <span className="text-sm font-medium text-on-surface">{nombreCompleto}</span>
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <span className="text-sm text-tertiary">{cuenta.correo}</span>
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <span className="text-sm text-tertiary">{cuenta.carne ?? 'Sin carné'}</span>
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <span className="text-sm text-tertiary">
-                          {cuenta.carrera?.nombreCarrera ?? 'Sin carrera'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <span className="text-sm text-tertiary">
-                          {formatFecha(cuenta.fechaRegistro)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setAccion({ tipo: 'aprobar', cuenta })}
-                            disabled={procesando}
-                            aria-label={`Aprobar la cuenta de ${nombreCompleto}`}
-                            className="flex items-center gap-1.5 rounded-control bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition-all hover:bg-primary/90 disabled:opacity-50"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                            Aprobar
-                          </button>
-                          <button
-                            onClick={() => setAccion({ tipo: 'rechazar', cuenta })}
-                            disabled={procesando}
-                            aria-label={`Rechazar la cuenta de ${nombreCompleto}`}
-                            className="flex items-center gap-1.5 rounded-control bg-error px-3 py-1.5 text-xs font-bold text-on-error transition-all hover:bg-error/90 disabled:opacity-50"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                            Rechazar
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-            </TableBody>
-          </Table>
-        </div>
+      <div className="flex flex-col gap-stack">
+        {isError ? (
+          <Empty tone="danger" role="alert">
+            <EmptyMedia variant="icon">
+              <AlertCircle aria-hidden="true" className="size-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>No se pudieron cargar las cuentas pendientes.</EmptyTitle>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+                Reintentar
+              </Button>
+            </EmptyContent>
+          </Empty>
+        ) : isLoading ? (
+          <TablaSkeleton />
+        ) : cuentas.length === 0 ? (
+          <Empty tone="muted" role="status">
+            <EmptyMedia variant="icon">
+              <UserCheck aria-hidden="true" className="size-7" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>No hay cuentas pendientes de verificación</EmptyTitle>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <>
+            <p className="type-body text-text-secondary" role="status" aria-live="polite">
+              Cuentas pendientes: <span className="font-semibold tabular-nums text-text-primary">{cuentas.length}</span>
+            </p>
+            <div className={DATA_TABLE_CARD}>
+              <Table>
+                <caption className="sr-only">Cuentas que esperan verificación</caption>
+                <TableHeader>
+                  <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
+                    <TableHead scope="col" className={TH}>Nombre completo</TableHead>
+                    <TableHead scope="col" className={TH}>Correo</TableHead>
+                    <TableHead scope="col" className={TH}>Carné</TableHead>
+                    <TableHead scope="col" className={TH}>Carrera</TableHead>
+                    <TableHead scope="col" className={TH}>Fecha de registro</TableHead>
+                    <TableHead scope="col" className={TH}>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cuentas.map((cuenta) => {
+                    const nombreCompleto = `${cuenta.nombre} ${cuenta.apellido}`;
+                    return (
+                      <TableRow key={cuenta.idUsuario} className={`${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER}`}>
+                        <TableCell className={TD}>
+                          <span className="type-body break-words font-semibold text-text-primary">{nombreCompleto}</span>
+                        </TableCell>
+                        <TableCell className={TD}>
+                          <span className="type-body break-all text-text-secondary">{cuenta.correo}</span>
+                        </TableCell>
+                        <TableCell className={TD}>
+                          <span className="type-body tabular-nums text-text-secondary">{cuenta.carne ?? 'Sin carné'}</span>
+                        </TableCell>
+                        <TableCell className={TD}>
+                          <span className="type-body break-words text-text-secondary">
+                            {cuenta.carrera?.nombreCarrera ?? 'Sin carrera'}
+                          </span>
+                        </TableCell>
+                        <TableCell className={TD}>
+                          <span className="type-body text-text-secondary">{formatFecha(cuenta.fechaRegistro)}</span>
+                        </TableCell>
+                        <TableCell className={TD}>
+                          <div className="flex items-center gap-tight">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => setAccion({ tipo: 'aprobar', cuenta })}
+                              disabled={procesando}
+                              aria-label={`Aprobar la cuenta de ${nombreCompleto}`}
+                              className="rounded-control"
+                            >
+                              <Check aria-hidden="true" />
+                              Aprobar
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setAccion({ tipo: 'rechazar', cuenta })}
+                              disabled={procesando}
+                              aria-label={`Rechazar la cuenta de ${nombreCompleto}`}
+                              className="rounded-control"
+                            >
+                              <X aria-hidden="true" />
+                              Rechazar
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        )}
       </div>
 
       {accion && (

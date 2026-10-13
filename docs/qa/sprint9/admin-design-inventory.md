@@ -101,7 +101,7 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/usuarios` | sí | 0 | 0 | 2 | 0 |
 | `/dashboard/admin/solicitudes-recuperacion` | sí | 0 | 2 | 2 | 0 |
-| `/dashboard/admin/cuentas-pendientes` | sí | 0 | 1 | 3 | 0 |
+| `/dashboard/admin/cuentas-pendientes` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/etiquetas` | sí | 0 | 0 | 0 | 6 |
@@ -121,9 +121,9 @@ archivo 41: se creó después, sin literales, y no altera los totales:
 | Medida | Antes | Después |
 |---|---:|---:|
 | Tamaños literales | 47 | 2 |
-| Radios literales | 68 | 21 |
+| Radios literales | 68 | 20 |
 | Titulares fuera de la escala | 2 | 0 |
-| Archivos sin ningún literal de tamaño o radio | — | 29 de 41 |
+| Archivos sin ningún literal de tamaño o radio | — | 30 de 41 |
 
 Qué se hizo con cada diferencia de la sección 4:
 
@@ -144,7 +144,6 @@ actualizarla, hace fallar la prueba.
 
 | Archivo | Literales | Motivo |
 |---|---|---|
-| `app/dashboard/admin/cuentas-pendientes/page.tsx` | `rounded-lg` | Sin token de igual valor (esqueleto de carga de los botones de fila) |
 | `app/dashboard/admin/proyectos/[id]/admin-project-detail-client.tsx` | `rounded-lg`, `rounded-md` | Sin token de igual valor |
 | `app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx` | 4 × `rounded-lg`, `rounded-md`, `text-[13px]` | Sin token de igual valor; el texto de 13 px es el de los botones de acción en móvil, donde 14 px no cabe |
 | `app/dashboard/admin/proyectos/admin-projects-client.tsx` | `rounded-lg` | Sin token de igual valor |

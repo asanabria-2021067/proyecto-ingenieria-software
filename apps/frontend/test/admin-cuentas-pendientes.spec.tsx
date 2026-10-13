@@ -141,6 +141,44 @@ describe('AdminCuentasPendientesPage', () => {
     expect(await screen.findByText('No se pudieron cargar las cuentas pendientes.')).toBeInTheDocument();
   });
 
+  it('usa la tabla compartida de las bandejas: tarjeta, encabezado y contador de resultados', async () => {
+    renderPage();
+    await screen.findByText('Ana Perez');
+
+    const tabla = screen.getByRole('table', { name: 'Cuentas que esperan verificación' });
+    expect(tabla.closest('.card-base')).toHaveClass('overflow-hidden', 'p-0');
+    const encabezado = within(tabla).getAllByRole('row')[0];
+    expect(encabezado).toHaveClass('bg-surface-container-low');
+    // Rótulos en su caja normal, como el resto de tablas: sin mayúsculas forzadas.
+    for (const th of within(tabla).getAllByRole('columnheader')) {
+      expect(th).toHaveClass('text-xs', 'font-semibold', 'text-text-secondary');
+      expect(th).not.toHaveClass('uppercase');
+    }
+    expect(screen.getByRole('status')).toHaveTextContent('Cuentas pendientes: 1');
+  });
+
+  it('el estado vacío y el de error usan los estados compartidos; el error se anuncia y permite reintentar', async () => {
+    vi.mocked(getCuentasPendientes).mockResolvedValue({ total: 0, cuentas: [] });
+    renderPage();
+    const vacio = (await screen.findByText('No hay cuentas pendientes de verificación')).closest('[data-slot="empty"]');
+    expect(vacio).toHaveAttribute('role', 'status');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    cleanup();
+
+    vi.mocked(getCuentasPendientes).mockRejectedValueOnce(new Error('fallo')).mockResolvedValue({ total: 1, cuentas: [CUENTA] });
+    renderPage();
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar las cuentas pendientes.');
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByText('Ana Perez')).toBeInTheDocument();
+  });
+
+  it('no lleva su propio botón «Actualizar»: lo hace el de la barra superior', async () => {
+    renderPage();
+    await screen.findByText('Ana Perez');
+
+    expect(screen.queryByRole('button', { name: 'Actualizar' })).not.toBeInTheDocument();
+  });
+
   it('no aprueba hasta confirmar y cancelar no llama al servicio', async () => {
     renderPage();
 
