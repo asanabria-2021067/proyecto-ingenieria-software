@@ -6,7 +6,6 @@ import {
   DATA_TABLE_ROW_BORDER,
   DATA_TABLE_ROW_HOVER,
 } from '@/components/dashboard/data-table';
-import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tag } from '@/components/ui/tag';
 import {
@@ -40,6 +39,9 @@ const META_DETALLE = '@4xl/bandeja:hidden';
 const TEXTO_BOTON = '@3xl/bandeja:inline';
 const DETALLE_ANCHO = '@4xl/bandeja:w-auto';
 const FECHA_EN_LINEA = '@5xl/bandeja:inline';
+// Mismo botón compacto que «Ver perfil» en Gestión de Usuarios.
+const BOTON_DETALLE =
+  'flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-tag bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary';
 
 function Origen({ origen }: { origen: SecurityEvent['origen'] }) {
   const { etiqueta, ip } = originLabel(origen);
@@ -136,18 +138,16 @@ export function SecurityEventsTable({
                 <TableCell className={`${TD} w-px ${DETALLE_ANCHO}`}>
                   <span className={`type-body mb-tight hidden break-words text-text-secondary ${RESUMEN_DETALLE}`}>{resumen}</span>
                   {onSelect && (
-                    <Button
+                    <button
                       type="button"
-                      variant="outline"
-                      size="sm"
                       onClick={(click) => onSelect(event, click.currentTarget)}
                       aria-label={`Ver detalle: ${SECURITY_EVENT_LABEL[event.tipo]}, ${formatSecurityEventDate(event.fecha)}`}
-                      className="rounded-control whitespace-nowrap"
+                      className={BOTON_DETALLE}
                     >
-                      <Eye aria-hidden="true" />
+                      <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                       {/* En tarjetas estrechas queda solo el icono: el nombre accesible ya lo dice. */}
                       <span className={`hidden ${TEXTO_BOTON}`}>Ver detalle</span>
-                    </Button>
+                    </button>
                   )}
                 </TableCell>
               </TableRow>

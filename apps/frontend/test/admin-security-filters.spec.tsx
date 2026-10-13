@@ -130,6 +130,19 @@ describe('Filtros con el aspecto del dashboard, sin cambiar lo que hacen', () =>
     expect(formulario.firstElementChild).toHaveClass('justify-end', 'sm:col-span-2', 'xl:col-span-4');
   });
 
+  it('«Ver detalle» usa el mismo botón compacto que «Ver perfil» en Gestión de Usuarios', async () => {
+    await montar();
+    const verPerfil = readFileSync(join(__dirname, '../app/dashboard/admin/usuarios/page.tsx'), 'utf8').match(/className="([^"]*)"\s*aria-label=\{`Ver perfil de/)?.[1] ?? '';
+    expect(verPerfil).toContain('hover:bg-primary');
+
+    const botones = screen.getAllByRole('button', { name: /^Ver detalle:/ });
+    expect(botones).toHaveLength(SEIS_TIPOS.length);
+    for (const boton of botones) {
+      expect(boton).toHaveAttribute('type', 'button');
+      for (const clase of verPerfil.split(' ').filter(Boolean)) expect(boton, clase).toHaveClass(clase);
+    }
+  });
+
   it('las fechas siguen siendo campos nativos con rótulo visible: no se sustituyen por otro selector', async () => {
     const filtros = await montar();
     for (const [rotulo, id] of [['Tipo de evento', 'filtro-tipo'], ['Desde', 'filtro-desde'], ['Hasta', 'filtro-hasta'], ['ID de usuario', 'filtro-usuario']]) {
