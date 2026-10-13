@@ -13,7 +13,8 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:a11y": "playwright test e2e/accesibilidad.spec.ts e2e/a11y-gate-contract.spec.ts",
-    "test:e2e:sin-a11y": "playwright test --grep-invert '(?<![a-zA-Z-])accesibilidad\\.spec\\.ts|a11y-gate-contract\\.spec\\.ts'"
+    "test:e2e:sin-a11y": "playwright test --grep-invert '(?<![a-zA-Z-])accesibilidad\\.spec\\.ts|a11y-gate-contract\\.spec\\.ts'",
+    "test:e2e:local": "npm run test:e2e:a11y && npm run test:e2e:sin-a11y"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
