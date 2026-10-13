@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { useQuery } from '@tanstack/react-query';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AlertCircle, ChartLine } from 'lucide-react';
@@ -63,10 +63,27 @@ export const METRICAS: MetricaConfig[] = [
   { serie: 'horasConfirmadas', label: 'Horas confirmadas', descripcion: 'Horas aprobadas, por fecha de aprobación', esHoras: true },
 ];
 
-const PERIODO_TEXTO: Record<AdminMetricasPeriodo, { actual: string; ventana: string }> = {
-  semana: { actual: 'esta semana', ventana: 'en las últimas 8 semanas' },
-  mes: { actual: 'este mes', ventana: 'en los últimos 6 meses' },
+const PERIODO_TEXTO: Record<AdminMetricasPeriodo, { actual: string; ventana: string; explicacion: string; cargando: string }> = {
+  semana: {
+    actual: 'esta semana',
+    ventana: 'en las últimas 8 semanas',
+    explicacion:
+      'Cada punto es una semana, de lunes a domingo, en hora de Guatemala: las últimas 8, incluida la actual. La semana en curso todavía está incompleta, así que su valor no es comparable con el de las semanas cerradas.',
+    cargando: 'Cargando las tendencias por semana…',
+  },
+  mes: {
+    actual: 'este mes',
+    ventana: 'en los últimos 6 meses',
+    explicacion:
+      'Cada punto es un mes calendario, en hora de Guatemala: los últimos 6, incluido el actual. El mes en curso todavía está incompleto, así que su valor no es comparable con el de los meses cerrados.',
+    cargando: 'Cargando las tendencias por mes…',
+  },
 };
+
+/** Periodo pedido en la URL (`?periodo=`). Cualquier valor que no sea `mes` es `semana`: nunca se consulta uno inválido. */
+export function periodoDeLaUrl(valor: string | null | undefined): AdminMetricasPeriodo {
+  return valor === 'mes' ? 'mes' : 'semana';
+}
 
 /** `inicio` es una fecha calendario: parseISO la toma en hora local, sin corrimiento. */
 export function formatearInicio(inicio: string, periodo: AdminMetricasPeriodo): string {
@@ -115,7 +132,7 @@ function MetricTrendCard({
           {formatearValor(actual, config.esHoras)}
         </p>
         <p className="type-meta">
-          {textos.actual} · {formatearValor(total, config.esHoras)} {textos.ventana}
+          {textos.actual}, en curso · {formatearValor(total, config.esHoras)} {textos.ventana}
         </p>
       </div>
       {/* El alto mínimo reserva el sitio mientras llega el módulo de dibujo. */}
@@ -151,12 +168,27 @@ function MetricasSkeleton({ amplia }: { amplia: boolean }) {
 /**
  * `amplia`: la variante de la página de Tendencias (`/dashboard/admin/metricas`),
  * con gráficas más altas en dos columnas. El titular lo pone la página.
+ *
+ * El periodo vive en la URL (`?periodo=semana|mes`): se puede recargar y
+ * compartir. Al cambiarlo, las gráficas anteriores siguen a la vista,
+ * atenuadas y rotuladas con SU periodo, hasta que llegan las nuevas: nunca se
+ * presentan datos de un periodo con el nombre de otro.
  */
 export function AdminMetricsSection({ amplia = false }: { amplia?: boolean }) {
-  const [periodo, setPeriodo] = useState<AdminMetricasPeriodo>('semana');
-  const { data, isLoading, isError, isFetching, refetch } = useQuery<AdminMetricas>({
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const periodo = periodoDeLaUrl(searchParams?.get('periodo'));
+  const cambiarPeriodo = (valor: AdminMetricasPeriodo) => {
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    params.set('periodo', valor);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const { data, isLoading, isError, isFetching, isPlaceholderData, refetch } = useQuery<AdminMetricas>({
     queryKey: ['adminMetricas', periodo],
     queryFn: () => getAdminMetricas(periodo),
+    placeholderData: keepPreviousData,
   });
 
   let contenido: React.ReactNode;
@@ -187,7 +219,7 @@ export function AdminMetricsSection({ amplia = false }: { amplia?: boolean }) {
         <EmptyHeader>
           <EmptyTitle>Aún no hay actividad para mostrar tendencias.</EmptyTitle>
           <EmptyDescription>
-            No se registraron usuarios, proyectos, tareas ni horas {PERIODO_TEXTO[periodo].ventana}.
+            No se registraron usuarios, proyectos, tareas ni horas {PERIODO_TEXTO[data.periodo].ventana}.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -202,6 +234,9 @@ export function AdminMetricsSection({ amplia = false }: { amplia?: boolean }) {
     );
   }
 
+  // Lo que se ve mientras llega el periodo pedido es todavía el anterior.
+  const mostrado = data && !isError ? data.periodo : periodo;
+
   return (
     <section className="mb-10">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -211,14 +246,23 @@ export function AdminMetricsSection({ amplia = false }: { amplia?: boolean }) {
           variant="outline"
           size="sm"
           value={periodo}
-          onValueChange={(valor) => valor && setPeriodo(valor as AdminMetricasPeriodo)}
+          onValueChange={(valor) => valor && cambiarPeriodo(periodoDeLaUrl(valor))}
           aria-label="Periodo de las tendencias"
         >
           <ToggleGroupItem value="semana">Semana</ToggleGroupItem>
           <ToggleGroupItem value="mes">Mes</ToggleGroupItem>
         </ToggleGroup>
       </div>
-      {contenido}
+      <p className="type-meta mb-stack max-w-3xl">{PERIODO_TEXTO[mostrado].explicacion}</p>
+      {isPlaceholderData && (
+        <p className="type-meta mb-stack" role="status" aria-live="polite">
+          {PERIODO_TEXTO[periodo].cargando}
+        </p>
+      )}
+      {/* Mientras llega el otro periodo, el anterior queda atenuado y marcado como ocupado: no es el pedido. */}
+      <div aria-busy={isPlaceholderData || undefined} className={isPlaceholderData ? 'opacity-60' : undefined}>
+        {contenido}
+      </div>
     </section>
   );
 }

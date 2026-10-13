@@ -19,6 +19,12 @@ vi.mock('../components/admin/metric-trend-plot', () => ({
   },
 }));
 vi.mock('../lib/services/admin', () => ({ getAdminMetricas: vi.fn() }));
+const url = vi.hoisted(() => ({ search: '' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard/admin/metricas',
+  useSearchParams: () => new URLSearchParams(url.search),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}));
 
 import { AdminMetricsSection, formatearValorConUnidad, METRICAS } from '../components/admin/AdminMetricsSection';
 import { getAdminMetricas, type AdminMetricasPeriodo, type AdminMetricasPunto } from '../lib/services/admin';
@@ -31,6 +37,7 @@ const SERIE: AdminMetricasPunto[] = [
 ];
 
 async function renderSection(periodo: AdminMetricasPeriodo = 'semana') {
+  url.search = `periodo=${periodo}`;
   vi.mocked(getAdminMetricas).mockResolvedValue({ periodo, serie: SERIE });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client }, children);
