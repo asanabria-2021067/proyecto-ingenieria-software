@@ -12,7 +12,6 @@ import { findStep, loadWorkflow, parseWorkflow, readRepoFile, type Workflow, typ
 export const STABLE_JOB_NAMES: Record<string, string> = {
   backend: 'Backend - lint y pruebas',
   frontend: 'Frontend - lint y pruebas',
-  e2e: 'E2E - suite de humo (Playwright)',
 };
 
 /** Pasos o jobs cuyo fallo se convertiría en éxito. */

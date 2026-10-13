@@ -38,46 +38,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # FASE-CI01: decide si el E2E (10min+) hace falta en ESTE deploy, o si ya
-  # se demostro con el mismo arbol de archivos en el PR hacia main (push a
-  # main es casi siempre el merge de ese PR). Fail-closed: cualquier duda
-  # (sin PR asociado, API caida, arboles distintos, E2E sin success) corre
-  # el E2E igual. Con workflow_dispatch siempre corre, sin consultar nada.
-  # Solo lee: PRs, commits y check-runs via la API de GitHub con el token por
-  # defecto; no escribe nada ni toca la VM.
-  e2e-gate:
-    name: Decidir si el deploy necesita el E2E
-    # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-      checks: read
-    outputs:
-      e2e: ${{ steps.decide.outputs.e2e }}
-    steps:
-      - name: Checkout del repositorio
-        uses: actions/checkout@v4
-
-      - name: Decidir si se puede omitir el E2E
-        id: decide
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node .github/scripts/decide-e2e.mjs
-
   # Ejecuta la suite completa de pruebas antes de construir y desplegar.
   # Reutiliza el workflow ci.yml, el mismo que corre en cada pull request.
   test:
     name: Pruebas antes de desplegar
     # G02 (N-03/T23): ningun job de este workflow corre fuera de main.
     if: github.ref == 'refs/heads/main'
-    needs: e2e-gate
     uses: ./.github/workflows/ci.yml
-    # FASE-CI01: 'run' salvo que e2e-gate demuestre que este mismo arbol ya
-    # paso el E2E en el PR hacia main. Ver .github/scripts/decide-e2e.mjs.
+    # ci.yml no corre ningun E2E; este valor solo mantiene la deteccion de
+    # "esto es el workflow_call del deploy" que usan sus otros jobs (ver
+    # `inputs.e2e` en ci.yml).
     with:
-      e2e: ${{ needs.e2e-gate.outputs.e2e }}
+      e2e: skip
 
   # G02 (FASE2-N07): cada combinacion de configuracion publica de build del
   # frontend (NEXT_PUBLIC_*, horneada en el bundle) es una variante con tag
