@@ -162,16 +162,27 @@ export default function DashboardLayout({
         Saltar al contenido principal
       </a>
 
-      {/* Sidebar - Desktop Only */}
+      {/* Sidebar - Desktop Only. Misma barra que AdminLayout (`admin-sidebar`): superficie verde
+          bosque, marca sobre tarjeta marfil, grupos desplegables y transición de ancho al plegarla.
+          Conserva su ancho con escala de fuente (`sidebar-scale-lock*`). */}
       <aside
-        className={`${sidebarCollapsed ? 'sidebar-scale-lock-collapsed' : 'sidebar-scale-lock'} hidden h-full shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-card md:flex`}
+        data-slot="dashboard-sidebar"
+        data-collapsed={sidebarCollapsed || undefined}
+        className={`admin-sidebar ${sidebarCollapsed ? 'sidebar-scale-lock-collapsed' : 'sidebar-scale-lock'} hidden h-full shrink-0 flex-col overflow-y-auto overflow-x-hidden overscroll-contain transition-[width] duration-200 md:flex`}
       >
+        {/* h-16 = alto de la topbar: el divisor de la marca continúa su borde inferior. */}
         <div
-          className={`flex items-center gap-inline border-b border-outline-variant py-stack ${sidebarCollapsed ? 'justify-center px-tight' : 'px-card'}`}
+          className={`admin-sidebar-brand flex h-16 shrink-0 items-center gap-3 ${sidebarCollapsed ? 'justify-center px-2' : 'px-5'}`}
         >
-          <Image src={logo} alt="UVGENIUS" className="h-10 w-auto shrink-0" />
-          {!sidebarCollapsed && <span className="type-section text-text-primary">UVGenius</span>}
-          {!sidebarCollapsed && <DashboardSidebarCollapseButton />}
+          <span className="admin-brand-logo flex size-13 shrink-0 items-center justify-center rounded-lg border p-1.5">
+            <Image src={logo} alt="UVGENIUS" className="h-full w-auto object-contain" />
+          </span>
+          {!sidebarCollapsed && (
+            <>
+              <span className="admin-sidebar-brand-name font-headline text-xl font-bold tracking-tight">UVGenius</span>
+              <DashboardSidebarCollapseButton />
+            </>
+          )}
         </div>
 
         <SidebarNav entries={navEntries} idUsuario={user?.idUsuario ?? null} />
@@ -179,9 +190,9 @@ export default function DashboardLayout({
         {/* Único acceso a la cuenta en escritorio y tableta; en móvil está en la barra inferior. */}
         <div
           id="dashboard-account-menu"
-          className={`border-t border-outline-variant py-stack ${sidebarCollapsed ? 'flex justify-center px-tight' : 'px-inline'}`}
+          className={`admin-sidebar-footer py-4 ${sidebarCollapsed ? 'flex justify-center px-2' : 'px-3'}`}
         >
-          <UserMenu user={user} onLogout={handleLogout} variant={sidebarCollapsed ? 'compact' : 'sidebar'} />
+          <UserMenu user={user} onLogout={handleLogout} variant={sidebarCollapsed ? 'compact' : 'sidebar'} theme="admin" />
         </div>
       </aside>
 

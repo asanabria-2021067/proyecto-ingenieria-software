@@ -160,20 +160,61 @@ describe('DashboardLayout — navegación global del estudiante', () => {
     ['Chats archivados', '/dashboard/chats/archivados'],
   ] as const;
 
-  it('Dashboard y Personas sueltos; PROYECTOS y MI TRABAJO como secciones fijas sin desplegables', () => {
+  it('Dashboard y Personas sueltos; Proyectos y Mi trabajo como grupos desplegables, abiertos de entrada', () => {
     const { escritorio } = renderLayout('/dashboard');
 
     expect(escritorio).toHaveAttribute('aria-label', 'Navegación principal');
     expect(within(escritorio).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual(
       DESTINOS.map(([nombre, href]) => [nombre, href]),
     );
-    expect(escritorio.querySelectorAll('[aria-expanded]')).toHaveLength(0);
 
-    const proyectos = within(escritorio).getByRole('group', { name: 'Proyectos' });
-    expect(within(proyectos).getAllByRole('link').map((a) => a.textContent)).toEqual(['Explorar Proyectos', 'Mis Proyectos']);
-    const trabajo = within(escritorio).getByRole('group', { name: 'Mi trabajo' });
-    expect(within(trabajo).getAllByRole('link')).toHaveLength(5);
-    expect(escritorio.querySelector('#nav-group-proyectos-label')).toHaveClass('uppercase');
+    // Los grupos abren de entrada: la guía de bienvenida señala destinos que están dentro.
+    const proyectos = within(escritorio).getByRole('button', { name: /^Proyectos/ });
+    const trabajo = within(escritorio).getByRole('button', { name: /^Mi trabajo/ });
+    for (const grupo of [proyectos, trabajo]) {
+      expect(grupo).toHaveAttribute('aria-expanded', 'true');
+      expect(grupo).toHaveAttribute('data-state', 'open');
+    }
+    const hijosProyectos = escritorio.querySelector(`#${proyectos.getAttribute('aria-controls')}`) as HTMLElement;
+    expect(within(hijosProyectos).getAllByRole('link').map((a) => a.textContent)).toEqual(['Explorar Proyectos', 'Mis Proyectos']);
+    const hijosTrabajo = escritorio.querySelector(`#${trabajo.getAttribute('aria-controls')}`) as HTMLElement;
+    expect(within(hijosTrabajo).getAllByRole('link')).toHaveLength(5);
+  });
+
+  it('usa la misma barra que el administrador: superficie, marca, grupos con chevron y guía vertical', () => {
+    const { escritorio } = renderLayout('/dashboard/mis-horas');
+    const aside = escritorio.closest('aside') as HTMLElement;
+
+    expect(aside).toHaveClass('admin-sidebar', 'transition-[width]', 'duration-200');
+    expect(aside.querySelector('.admin-sidebar-brand .admin-brand-logo')).toBeInTheDocument();
+    expect(aside.querySelector('#dashboard-account-menu')).toHaveClass('admin-sidebar-footer');
+
+    const grupo = within(escritorio).getByRole('button', { name: /^Mi trabajo/ });
+    expect(grupo).toHaveClass('admin-nav-item', 'admin-nav-group');
+    expect(grupo.querySelector('.admin-nav-chevron')).toHaveClass('transition-transform', 'duration-200', 'rotate-180');
+    expect(escritorio.querySelector(`#${grupo.getAttribute('aria-controls')}`)).toHaveClass('admin-nav-children');
+
+    expect(within(escritorio).getByRole('link', { name: 'Dashboard' })).toHaveClass('admin-nav-item');
+    const activo = within(escritorio).getByRole('link', { name: 'Mis Horas' });
+    expect(activo).toHaveClass('admin-nav-subitem');
+    expect(activo).toHaveAttribute('aria-current', 'page');
+    expect(activo).not.toHaveClass('admin-nav-inactive');
+  });
+
+  it('un grupo se pliega y se vuelve a desplegar con su botón, como en la barra del administrador', () => {
+    const { escritorio } = renderLayout('/dashboard');
+    const proyectos = within(escritorio).getByRole('button', { name: /^Proyectos/ });
+
+    fireEvent.click(proyectos);
+    expect(proyectos).toHaveAttribute('aria-expanded', 'false');
+    expect(proyectos.querySelector('.admin-nav-chevron')).not.toHaveClass('rotate-180');
+    expect(within(escritorio).queryByRole('link', { name: 'Explorar Proyectos' })).not.toBeInTheDocument();
+    // El otro grupo no se ve afectado.
+    expect(within(escritorio).getByRole('link', { name: 'Mis Tareas' })).toBeInTheDocument();
+
+    fireEvent.click(proyectos);
+    expect(proyectos).toHaveAttribute('aria-expanded', 'true');
+    expect(within(escritorio).getByRole('link', { name: 'Explorar Proyectos' })).toHaveAttribute('id', 'nav-item-explorar-proyectos');
   });
 
   it.each(DESTINOS)('en %s solo ese destino queda activo', (nombre, href) => {
