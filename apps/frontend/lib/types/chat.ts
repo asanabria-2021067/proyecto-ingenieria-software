@@ -5,12 +5,27 @@ export interface ChatUsuario {
   fotoUrl: string | null;
 }
 
+export interface ChatReaccion {
+  emoji: string;
+  count: number;
+  reaccionadoPorMi: boolean;
+}
+
+/** Payload del evento `reactionUpdated`: incluye quienes reaccionaron para derivar `reaccionadoPorMi`. */
+export interface ChatReaccionSocket {
+  emoji: string;
+  count: number;
+  idsUsuarios: number[];
+}
+
 export interface ChatMensaje {
   idMensaje: number;
   idConversacion: number;
   contenido: string;
   enviadoEn: string;
   remitente: ChatUsuario;
+  /** Ausente en mensajes recien creados o en `ultimoMensaje`. */
+  reacciones?: ChatReaccion[];
 }
 
 export interface ChatConversacion {
