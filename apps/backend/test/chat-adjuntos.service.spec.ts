@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ChatService } from '../src/chat/chat.service';
 
@@ -116,6 +116,49 @@ describe('ChatService - adjuntos', () => {
       prisma.adjuntoMensajeChat.findFirst.mockResolvedValue(null);
       await expect(service.getAdjuntoUrl(10, 5, 3, 1)).rejects.toThrow(NotFoundException);
       expect(storage.signedUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAdjuntoImagen', () => {
+    const imagen = { claveAlmacenamiento: 'chat/5/a.png', mime: 'image/png', tamanoBytes: 3 };
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('descarga la imagen en el servidor y devuelve bytes y mime', async () => {
+      prisma.adjuntoMensajeChat.findFirst.mockResolvedValue(imagen);
+      const fetchMock = fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer });
+      vi.stubGlobal('fetch', fetchMock);
+      const res = await service.getAdjuntoImagen(10, 5, 3, 1);
+      expect(fetchMock).toHaveBeenCalledWith('https://firmada.example/x');
+      expect(res.mime).toBe('image/png');
+      expect([...res.datos]).toEqual([1, 2, 3]);
+    });
+
+    it('un no participante no descarga nada', async () => {
+      const fetchMock = fn();
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(service.getAdjuntoImagen(10, 5, 3, 99)).rejects.toThrow(ForbiddenException);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('404 si el adjunto no es de la conversacion', async () => {
+      prisma.adjuntoMensajeChat.findFirst.mockResolvedValue(null);
+      await expect(service.getAdjuntoImagen(10, 5, 3, 1)).rejects.toThrow(NotFoundException);
+    });
+
+    it('rechaza lo que no es imagen o supera 10 MB', async () => {
+      prisma.adjuntoMensajeChat.findFirst.mockResolvedValueOnce({ ...imagen, mime: 'application/pdf' });
+      await expect(service.getAdjuntoImagen(10, 5, 3, 1)).rejects.toThrow(BadRequestException);
+      prisma.adjuntoMensajeChat.findFirst.mockResolvedValueOnce({ ...imagen, tamanoBytes: 10 * 1024 * 1024 + 1 });
+      await expect(service.getAdjuntoImagen(10, 5, 3, 1)).rejects.toThrow(BadRequestException);
+      expect(storage.signedUrl).not.toHaveBeenCalled();
+    });
+
+    it('404 si el proveedor no responde bien y 400 si los bytes exceden el tope', async () => {
+      prisma.adjuntoMensajeChat.findFirst.mockResolvedValue(imagen);
+      vi.stubGlobal('fetch', fn().mockResolvedValue({ ok: false }));
+      await expect(service.getAdjuntoImagen(10, 5, 3, 1)).rejects.toThrow(NotFoundException);
+      vi.stubGlobal('fetch', fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(10 * 1024 * 1024 + 1) }));
+      await expect(service.getAdjuntoImagen(10, 5, 3, 1)).rejects.toThrow(BadRequestException);
     });
   });
 
