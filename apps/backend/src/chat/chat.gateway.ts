@@ -106,6 +106,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.broadcaster.messagesRead(idConversacion, idUsuario, ultimaLecturaEn);
   }
 
+  /** `reacciones` lleva los ids de quienes reaccionaron: cada cliente deriva su propio "reaccionadoPorMi". */
+  broadcastReactionUpdated(
+    idConversacion: number,
+    idMensaje: number,
+    reacciones: { emoji: string; count: number; idsUsuarios: number[] }[],
+  ) {
+    this.server.to(`conversation:${idConversacion}`).emit('reactionUpdated', { idConversacion, idMensaje, reacciones });
+  }
+
   /** Llamado por ChatService tras crear una conversación nueva. */
   notifyConversationCreated(idConversacion: number, destinatarios: number[]) {
     this.broadcaster.notifyConversationCreated(idConversacion, destinatarios);
