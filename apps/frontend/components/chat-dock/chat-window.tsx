@@ -387,7 +387,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     {m.remitente.fotoUrl && <AvatarImage src={m.remitente.fotoUrl} alt="" />}
                     <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
                   </Avatar>
-                  <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? 'bg-primary text-primary-foreground' : 'bg-surface-container-high text-on-surface'}`}>
+                  <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? claseBurbujaPropia(conversacion?.temaColor) : 'bg-surface-container-high text-on-surface'}`}>
                     {!propio && (
                       <p className="mb-0.5 text-[11px] font-semibold opacity-80" title={apodo ? nombreReal(m.remitente) : undefined}>
                         {apodo || m.remitente.nombre}
@@ -396,7 +396,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     {m.citado && <ChatCitaBloque cita={m.citado} propio={propio} onIrAlOriginal={irAlMensaje} />}
                     {m.adjunto && <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />}
                     {m.contenido && <p className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}>{m.contenido}</p>}
-                    <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
+                    <p className={`mt-0.5 text-[10px] ${propio ? '' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
                     <MessageReactions
                       reacciones={m.reacciones ?? []}
                       onToggle={(emoji) =>
