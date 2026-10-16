@@ -41,7 +41,7 @@ const FAMILIAS = [
   ['Tareas e hitos', 7],
   ['Postulaciones y equipo', 7],
   ['Proyectos', 17],
-  ['Horas y reconocimiento', 4],
+  ['Horas y reconocimiento', 5],
   ['Recordatorios y calendario', 2],
   ['Red de contactos', 3],
   ['Cuenta y seguridad', 4],
@@ -87,7 +87,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
 
     fireEvent.click(familia('Red de contactos'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getAllByRole('switch')).toHaveLength(4);
+    expect(screen.getAllByRole('switch')).toHaveLength(5);
   });
 
   it('el disparador es un botón dentro de un encabezado: se alcanza y se acciona con teclado', async () => {
