@@ -2,6 +2,7 @@ import { apiFetch } from '@/lib/api/client';
 import type {
   ChatConversacion,
   ChatConversacionGlobal,
+  ChatEnlacesPagina,
   ChatMensaje,
   CreateConversationPayload,
   ListArchivedConversationsFiltros,
@@ -30,6 +31,15 @@ export function getMessages(
 ): Promise<ChatMensaje[]> {
   const query = cursor ? `?cursor=${cursor}` : '';
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes${query}`);
+}
+
+export function getLinks(
+  idProyecto: number,
+  idConversacion: number,
+  cursor?: number,
+): Promise<ChatEnlacesPagina> {
+  const query = cursor ? `?cursor=${cursor}` : '';
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/enlaces${query}`);
 }
 
 export function sendMessage(

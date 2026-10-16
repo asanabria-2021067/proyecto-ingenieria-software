@@ -6,6 +6,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   createConversation,
   deleteConversation,
+  getLinks,
   getMessages,
   listAllConversations,
   listArchivedConversations,
@@ -16,6 +17,7 @@ import {
 import {
   allConversationsQueryKey,
   archivedConversationsQueryKey,
+  conversationLinksQueryKey,
   conversationMessagesQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
@@ -74,6 +76,25 @@ export function useMessages(idProyecto: number, idConversacion: number | null) {
     enabled: idConversacion != null,
   });
   return { messages: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
+}
+
+/** Galeria de enlaces compartidos: paginada por cursor, solo consulta si `enabled`. */
+export function useConversationLinks(idProyecto: number, idConversacion: number, enabled: boolean) {
+  const query = useInfiniteQuery({
+    queryKey: conversationLinksQueryKey(idProyecto, idConversacion),
+    queryFn: ({ pageParam }) => getLinks(idProyecto, idConversacion, pageParam),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
+  return {
+    enlaces: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
 }
 
 export function useSendMessage(idProyecto: number, idConversacion: number | null) {
