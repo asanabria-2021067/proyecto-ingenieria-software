@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { EstadoAmistad, EstadoUsuario, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { listarInsigniasUsuario } from '../insignias/insignias.service';
 import { BuscarUsuariosQueryDto } from './dto/buscar-usuarios-query.dto';
 
 const USUARIO_RESUMEN_SELECT = {
@@ -274,7 +275,7 @@ export class SocialService {
       throw new NotFoundException(`Usuario con id ${idUsuarioObjetivo} no encontrado`);
     }
 
-    const [relacion, siguiendo, idsMismaCarrera, idsAmigoActual, idsAmigoObjetivo, participaciones] =
+    const [relacion, siguiendo, idsMismaCarrera, idsAmigoActual, idsAmigoObjetivo, participaciones, insignias] =
       await Promise.all([
         this.prisma.amistad.findFirst({
           where: {
@@ -301,6 +302,7 @@ export class SocialService {
             },
           },
         }),
+        listarInsigniasUsuario(this.prisma, idUsuarioObjetivo, true),
       ]);
 
     let esAmigo = false;
@@ -341,6 +343,7 @@ export class SocialService {
       amigosEnComun,
       habilidades: usuario.habilidades.map((h) => h.habilidad.nombreHabilidad),
       intereses: usuario.intereses.map((i) => i.interes.nombreInteres),
+      insignias,
       proyectosActivos: participaciones.map((p) => ({
         idProyecto: p.rolProyecto.proyecto.idProyecto,
         tituloProyecto: p.rolProyecto.proyecto.tituloProyecto,
