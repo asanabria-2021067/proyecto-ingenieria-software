@@ -181,6 +181,7 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;
+    const typingTimers = typingTimersRef.current;
 
     const handleNewMessage = ({
       idConversacion,
@@ -223,9 +224,9 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
 
     const clearTyping = (idConversacion: number, idUsuario: number) => {
       const key = `${idConversacion}:${idUsuario}`;
-      const timer = typingTimersRef.current.get(key);
+      const timer = typingTimers.get(key);
       if (timer) clearTimeout(timer);
-      typingTimersRef.current.delete(key);
+      typingTimers.delete(key);
       setTypingByConversation((current) => {
         if (!current[idConversacion]?.includes(idUsuario)) return current;
         return { ...current, [idConversacion]: current[idConversacion].filter((id) => id !== idUsuario) };
@@ -234,9 +235,9 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
 
     const handleTyping = ({ idConversacion, idUsuario }: { idConversacion: number; idUsuario: number }) => {
       const key = `${idConversacion}:${idUsuario}`;
-      const previo = typingTimersRef.current.get(key);
+      const previo = typingTimers.get(key);
       if (previo) clearTimeout(previo);
-      typingTimersRef.current.set(key, setTimeout(() => clearTyping(idConversacion, idUsuario), TYPING_EXPIRY_MS));
+      typingTimers.set(key, setTimeout(() => clearTyping(idConversacion, idUsuario), TYPING_EXPIRY_MS));
       setTypingByConversation((current) => {
         const ids = current[idConversacion] ?? [];
         return ids.includes(idUsuario) ? current : { ...current, [idConversacion]: [...ids, idUsuario] };
@@ -293,8 +294,8 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       socket.off('conversationUpdated', handleConversationUpdated);
       socket.off('typing', handleTyping);
       socket.off('messagesRead', handleMessagesRead);
-      for (const timer of typingTimersRef.current.values()) clearTimeout(timer);
-      typingTimersRef.current.clear();
+      for (const timer of typingTimers.values()) clearTimeout(timer);
+      typingTimers.clear();
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.close();
