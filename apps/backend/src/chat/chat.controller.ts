@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -51,6 +52,16 @@ export class ChatController {
   ) {
     const cursorId = cursor && /^\d+$/.test(cursor) ? Number(cursor) : undefined;
     return this.chatService.getMessages(projectId, conversationId, user.userId, cursorId);
+  }
+
+  @Get(':conversationId/mensajes/buscar')
+  searchMessages(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Query() query: SearchMessagesQueryDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.searchMessages(projectId, conversationId, user.userId, query);
   }
 
   @Post(':conversationId/mensajes')
