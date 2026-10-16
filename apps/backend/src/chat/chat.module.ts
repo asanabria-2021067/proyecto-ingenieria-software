@@ -6,6 +6,8 @@ import { ChatArchivadoController } from './chat-archivado.controller';
 import { ChatService } from './chat.service';
 import { ChatEstadoController } from './chat-estado.controller';
 import { ChatEstadoService } from './chat-estado.service';
+import { MensajesProgramadosService } from './mensajes-programados.service';
+import { MensajesProgramadosController } from './mensajes-programados.controller';
 import { ChatGateway } from './chat.gateway';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
@@ -24,8 +26,8 @@ import { WsAuthService } from '../ws-auth/ws-auth.service';
       }),
     }),
   ],
-  controllers: [ChatController, ChatArchivadoController, ChatEstadoController],
+  controllers: [ChatController, ChatArchivadoController, ChatEstadoController, MensajesProgramadosController],
   // G07 (OWASP25-C025): política del handshake con el JwtService de este módulo.
-  providers: [ChatService, ChatEstadoService, ChatGateway, WsAuthService],
+  providers: [ChatService, ChatEstadoService, ChatGateway, WsAuthService, MensajesProgramadosService],
 })
 export class ChatModule {}
