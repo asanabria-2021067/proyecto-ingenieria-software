@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  activarSonidoConversation,
   createConversation,
   deleteConversation,
   getMessages,
@@ -12,6 +13,7 @@ import {
   listArchivedConversations,
   markConversationRead,
   sendMessage,
+  silenciarConversation,
   updateConversation,
 } from '@/lib/services/chat';
 import {
@@ -21,7 +23,7 @@ import {
   conversationReadsQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
-import type { ChatLectura, ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
+import type { ChatLectura, ChatMensaje, CreateConversationPayload, DuracionSilencio, UpdateConversationPayload } from '@/lib/types/chat';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -132,6 +134,18 @@ export function useUpdateConversation(idProyecto: number) {
   return useMutation({
     mutationFn: ({ idConversacion, payload }: { idConversacion: number; payload: UpdateConversationPayload }) =>
       updateConversation(idProyecto, idConversacion, payload),
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+/** Silencio por usuario: `duracion` null reactiva la conversacion. */
+export function useSilenciarConversation(idProyecto: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idConversacion, duracion }: { idConversacion: number; duracion: DuracionSilencio | null }) =>
+      duracion
+        ? silenciarConversation(idProyecto, idConversacion, duracion)
+        : activarSonidoConversation(idProyecto, idConversacion),
     onSuccess: () => invalidateChatLists(queryClient, idProyecto),
   });
 }
