@@ -46,6 +46,7 @@ const MENU: [string, [string, string, RegExp][]][] = [
   ],
   ['Gobernanza', [['Apelaciones', '/dashboard/admin/apelaciones', /Apelaciones de liderazgo/]]],
   ['Métricas', [['Tendencias de uso', '/dashboard/admin/metricas', /Tendencias de uso/]]],
+  ['Comunicación', [['Anuncios', '/dashboard/admin/anuncios', /^Anuncios$/]]],
   [
     'Verificación y seguridad',
     [
