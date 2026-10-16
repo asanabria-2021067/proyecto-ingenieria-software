@@ -78,6 +78,7 @@ import { MessageReactions } from './message-reactions';
 import { ChatThemeDialog } from '@/components/chat-dock/chat-theme-dialog';
 import { claseAcentoCabecera, claseBurbujaPropia } from '@/lib/chat-temas';
 import { ScheduleMessageButton, ScheduledMessagesList } from '@/components/chat-dock/scheduled-messages';
+import { LinkPreviewCard } from '@/components/chat-dock/link-preview-card';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useIrAlMensaje } from '@/hooks/use-ir-al-mensaje';
 import { ChatCitaBloque, ChatCitaVistaPrevia, extractoDe } from '@/components/chat-dock/chat-cita';
@@ -431,6 +432,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     {m.citado && <ChatCitaBloque cita={m.citado} propio={propio} onIrAlOriginal={irAlMensaje} />}
                     {m.adjunto && <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />}
                     {m.contenido && <p className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}>{m.contenido}</p>}
+                    <LinkPreviewCard idProyecto={idProyecto} idConversacion={idConversacion} contenido={m.contenido} />
                     <p className={`mt-0.5 text-[10px] ${propio ? '' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
                     <MessageReactions
                       reacciones={m.reacciones ?? []}
