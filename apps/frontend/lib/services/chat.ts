@@ -5,6 +5,7 @@ import type {
   ChatMensaje,
   CreateConversationPayload,
   ListArchivedConversationsFiltros,
+  LinkPreview,
   ListArchivedConversationsResultado,
   UpdateConversationPayload,
 } from '@/lib/types/chat';
@@ -40,6 +41,13 @@ export function sendMessage(
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes`, {
     method: 'POST',
     body: JSON.stringify({ contenido }),
+  });
+}
+
+export function getLinkPreview(idProyecto: number, idConversacion: number, url: string): Promise<LinkPreview> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/vista-previa`, {
+    method: 'POST',
+    body: JSON.stringify({ url }),
   });
 }
 
