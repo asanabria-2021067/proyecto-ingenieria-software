@@ -24,6 +24,7 @@ import { ADJUNTO_MAX_BYTES, type ArchivoSubido } from './chat-adjuntos';
 import { LinkPreviewDto } from './dto/link-preview.dto';
 import { LinkPreviewService } from './link-preview/link-preview.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { EditMessageDto } from './dto/edit-message.dto';
 import { ListLinksQueryDto } from './dto/list-links-query.dto';
 import { SendFileMessageDto } from './dto/send-file-message.dto';
 import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
@@ -188,6 +189,27 @@ export class ChatController {
   ) {
     await this.chatService.assertConversationParticipant(projectId, conversationId, user.userId);
     return this.linkPreviewService.preview(dto.url);
+  }
+
+  @Patch(':conversationId/mensajes/:messageId')
+  editMessage(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: EditMessageDto,
+  ) {
+    return this.chatService.editMessage(projectId, conversationId, messageId, user.userId, dto.contenido);
+  }
+
+  @Delete(':conversationId/mensajes/:messageId')
+  deleteMessage(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.deleteMessage(projectId, conversationId, messageId, user.userId);
   }
 
   @Patch(':conversationId')
