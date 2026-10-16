@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ChatService } from './chat.service';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
+import { ListSavedMessagesQueryDto } from './dto/list-saved-messages-query.dto';
 
 /** T-236: separado de ChatController (`proyectos/:projectId/conversaciones`)
  * porque esta lista cruza TODOS los proyectos del usuario — no tiene un
@@ -19,6 +20,15 @@ export class ChatArchivadoController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.chatService.listAllConversations(user.userId, q);
+  }
+
+  /** Mensajes guardados del usuario autenticado (privados, de cualquier proyecto). */
+  @Get('mensajes-guardados')
+  listGuardados(
+    @Query() query: ListSavedMessagesQueryDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.listSavedMessages(user.userId, query);
   }
 
   @Get('archivados')
