@@ -14,6 +14,7 @@ import {
   MoreVertical,
   Moon,
   Paperclip,
+  Palette,
   Pencil,
   Reply,
   Search,
@@ -57,6 +58,7 @@ import {
   useSendFileMessage,
   useToggleReaction,
   useUpdateConversation,
+  useUpdateChatTheme,
   useDeleteConversation,
   useAllConversations,
   useMarkConversationRead,
@@ -68,6 +70,8 @@ import { NoMolestarDialog } from '@/components/chat-dock/no-molestar-dialog';
 import { estaSilenciada } from '@/lib/chat-silencio';
 import { CHAT_ADJUNTO_ACCEPT, formatearTamano, validarArchivoChat } from '@/lib/chat-adjuntos';
 import { MessageReactions } from './message-reactions';
+import { ChatThemeDialog } from '@/components/chat-dock/chat-theme-dialog';
+import { claseAcentoCabecera, claseBurbujaPropia } from '@/lib/chat-temas';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useIrAlMensaje } from '@/hooks/use-ir-al-mensaje';
 import { ChatCitaBloque, ChatCitaVistaPrevia, extractoDe } from '@/components/chat-dock/chat-cita';
