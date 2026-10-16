@@ -10,14 +10,15 @@ import { SetEstadoChatDto } from './dto/set-estado-chat.dto';
 export class ChatEstadoController {
   constructor(private estadoService: ChatEstadoService) {}
 
+  // Envuelto en { estado }: un null suelto sale como cuerpo vacío y el cliente no puede parsearlo.
   @Get()
-  obtener(@CurrentUser() user: { userId: number }) {
-    return this.estadoService.obtener(user.userId);
+  async obtener(@CurrentUser() user: { userId: number }) {
+    return { estado: await this.estadoService.obtener(user.userId) };
   }
 
   @Put()
-  definir(@CurrentUser() user: { userId: number }, @Body() dto: SetEstadoChatDto) {
-    return this.estadoService.definir(user.userId, dto);
+  async definir(@CurrentUser() user: { userId: number }, @Body() dto: SetEstadoChatDto) {
+    return { estado: await this.estadoService.definir(user.userId, dto) };
   }
 
   @Delete()
