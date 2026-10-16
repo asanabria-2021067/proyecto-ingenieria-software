@@ -12,7 +12,10 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
+import { LinkPreviewDto } from './dto/link-preview.dto';
+import { LinkPreviewService } from './link-preview/link-preview.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
@@ -22,7 +25,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @Controller('proyectos/:projectId/conversaciones')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
-  constructor(private chatService: ChatService) {}
+  constructor(
+    private chatService: ChatService,
+    private linkPreviewService: LinkPreviewService,
+  ) {}
 
   @Get()
   findAll(
@@ -62,6 +68,20 @@ export class ChatController {
     @Body() dto: SendMessageDto,
   ) {
     return this.chatService.createMessage(projectId, conversationId, user.userId, dto.contenido);
+  }
+
+  // Solo participantes; consulta externa, por eso un limite propio mas estricto que el global.
+  @Post(':conversationId/vista-previa')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ medium: { limit: 20, ttl: 10000 } })
+  async linkPreview(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: LinkPreviewDto,
+  ) {
+    await this.chatService.assertConversationParticipant(projectId, conversationId, user.userId);
+    return this.linkPreviewService.preview(dto.url);
   }
 
   @Patch(':conversationId')
