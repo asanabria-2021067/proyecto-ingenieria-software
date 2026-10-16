@@ -3,6 +3,8 @@ export interface ChatUsuario {
   nombre: string;
   apellido: string;
   fotoUrl: string | null;
+  /** Apodo que el usuario autenticado puso a esta persona en la conversacion (privado). */
+  apodo?: string | null;
 }
 
 export interface ChatAdjunto {
@@ -42,6 +44,8 @@ export interface ChatMensaje {
   citado?: ChatCita | null;
   /** Ausente en mensajes recien creados o en `ultimoMensaje`. */
   reacciones?: ChatReaccion[];
+  /** Apodo del remitente segun el usuario autenticado, si lo definio. */
+  apodoRemitente?: string | null;
 }
 
 export interface ChatArchivo extends ChatAdjunto {
