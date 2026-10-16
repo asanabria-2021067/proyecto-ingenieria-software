@@ -4,7 +4,9 @@ import { ExternalLink, Loader2 } from 'lucide-react';
 import { SafeExternalLink } from '@/components/profile/safe-external-link';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useConversationLinks } from '@/hooks/use-chat';
+import { ChatFilesList } from './chat-files-list';
 
 interface ChatLinksDialogProps {
   open: boolean;
@@ -67,10 +69,21 @@ export function ChatLinksDialog({ open, onOpenChange, idProyecto, idConversacion
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex flex-col gap-3 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Enlaces compartidos</DialogTitle>
-          <DialogDescription>Enlaces que se han enviado en esta conversación, del más reciente al más antiguo.</DialogDescription>
+          <DialogTitle>Enlaces y archivos compartidos</DialogTitle>
+          <DialogDescription>Lo que se ha enviado en esta conversación, del más reciente al más antiguo.</DialogDescription>
         </DialogHeader>
-        <EnlacesLista idProyecto={idProyecto} idConversacion={idConversacion} />
+        <Tabs defaultValue="enlaces">
+          <TabsList>
+            <TabsTrigger value="enlaces">Enlaces</TabsTrigger>
+            <TabsTrigger value="archivos">Archivos</TabsTrigger>
+          </TabsList>
+          <TabsContent value="enlaces" className="flex flex-col gap-3">
+            <EnlacesLista idProyecto={idProyecto} idConversacion={idConversacion} />
+          </TabsContent>
+          <TabsContent value="archivos" className="flex flex-col gap-3">
+            <ChatFilesList idProyecto={idProyecto} idConversacion={idConversacion} />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
