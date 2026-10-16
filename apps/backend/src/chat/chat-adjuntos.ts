@@ -48,7 +48,8 @@ export function detectarMime(buf: Buffer): string | null {
 export function sanitizarNombre(original: string): string {
   // multer decodifica el nombre como latin1; se recupera el UTF-8 original.
   const utf8 = Buffer.from(original, 'latin1').toString('utf8');
-  const base = (utf8.includes('�') ? original : utf8)
+  const esLatin1 = ![...original].some((c) => c.charCodeAt(0) > 0xff);
+  const base = (esLatin1 && !utf8.includes('�') ? utf8 : original)
     .split(/[\\/]/)
     .pop()!
     // eslint-disable-next-line no-control-regex
