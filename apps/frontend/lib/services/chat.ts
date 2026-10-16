@@ -3,6 +3,7 @@ import type {
   ChatConversacion,
   ChatConversacionGlobal,
   ChatMensaje,
+  ChatReaccion,
   CreateConversationPayload,
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
@@ -40,6 +41,18 @@ export function sendMessage(
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes`, {
     method: 'POST',
     body: JSON.stringify({ contenido }),
+  });
+}
+
+export function toggleReaction(
+  idProyecto: number,
+  idConversacion: number,
+  idMensaje: number,
+  emoji: string,
+): Promise<ChatReaccion[]> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/${idMensaje}/reacciones`, {
+    method: 'POST',
+    body: JSON.stringify({ emoji }),
   });
 }
 
