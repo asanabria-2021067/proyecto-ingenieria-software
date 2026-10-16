@@ -31,7 +31,12 @@ vi.mock('socket.io-client', () => ({
   io: (...args: unknown[]) => mockIo(...args),
 }));
 
-import { useGlobalChatSocket } from '../hooks/use-chat';
+const mockToggleReaction = vi.fn();
+vi.mock('../lib/services/chat', () => ({
+  toggleReaction: (...args: unknown[]) => mockToggleReaction(...args),
+}));
+
+import { useGlobalChatSocket, useToggleReaction } from '../hooks/use-chat';
 import { conversationMessagesQueryKey } from '../lib/query-keys/chat';
 import type { ChatMensaje } from '../lib/types/chat';
 
@@ -187,5 +192,88 @@ describe('useGlobalChatSocket — conversationUpdated', () => {
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['chats-global'] }));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['proyecto-conversaciones'] });
+  });
+});
+
+describe('useGlobalChatSocket - reactionUpdated', () => {
+  it('reemplaza las reacciones del mensaje y deriva reaccionadoPorMi del usuario actual', async () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(['currentUser'], { idUsuario: 7 });
+    queryClient.setQueryData(conversationMessagesQueryKey(1, 5), [mensaje, { ...mensaje, idMensaje: 2 }]);
+
+    renderHook(() => useGlobalChatSocket([5]), { wrapper });
+
+    act(() => {
+      socket.__emit('reactionUpdated', {
+        idConversacion: 5,
+        idMensaje: 1,
+        reacciones: [{ emoji: 'X', count: 2, idsUsuarios: [7, 8] }],
+      });
+    });
+
+    await waitFor(() => {
+      const [primero, segundo] = queryClient.getQueryData(conversationMessagesQueryKey(1, 5)) as ChatMensaje[];
+      expect(primero.reacciones).toEqual([{ emoji: 'X', count: 2, reaccionadoPorMi: true }]);
+      expect(segundo.reacciones).toBeUndefined();
+    });
+  });
+
+  it('ignora el evento si la conversacion no esta en cache', () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+
+    renderHook(() => useGlobalChatSocket([]), { wrapper });
+    act(() => {
+      socket.__emit('reactionUpdated', { idConversacion: 9, idMensaje: 1, reacciones: [] });
+    });
+
+    expect(queryClient.getQueryData(conversationMessagesQueryKey(1, 9))).toBeUndefined();
+  });
+});
+
+describe('useToggleReaction', () => {
+  const clave = conversationMessagesQueryKey(1, 5);
+
+  it('aplica la reaccion de forma optimista y luego la reemplaza con la respuesta del servidor', async () => {
+    let resolver!: (v: unknown) => void;
+    mockToggleReaction.mockReturnValue(new Promise((r) => (resolver = r)));
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(clave, [mensaje]);
+
+    const { result } = renderHook(() => useToggleReaction(1, 5), { wrapper });
+    act(() => {
+      result.current.mutate({ idMensaje: 1, emoji: 'X' });
+    });
+
+    await waitFor(() =>
+      expect((queryClient.getQueryData(clave) as ChatMensaje[])[0].reacciones).toEqual([
+        { emoji: 'X', count: 1, reaccionadoPorMi: true },
+      ]),
+    );
+
+    resolver([{ emoji: 'X', count: 3, reaccionadoPorMi: true }]);
+    await waitFor(() =>
+      expect((queryClient.getQueryData(clave) as ChatMensaje[])[0].reacciones).toEqual([
+        { emoji: 'X', count: 3, reaccionadoPorMi: true },
+      ]),
+    );
+    expect(mockToggleReaction).toHaveBeenCalledWith(1, 5, 1, 'X');
+  });
+
+  it('si el servidor falla, revierte al estado previo', async () => {
+    mockToggleReaction.mockRejectedValue(new Error('403'));
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(clave, [mensaje]);
+
+    const { result } = renderHook(() => useToggleReaction(1, 5), { wrapper });
+    act(() => {
+      result.current.mutate({ idMensaje: 1, emoji: 'X' });
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(queryClient.getQueryData(clave)).toEqual([mensaje]);
   });
 });

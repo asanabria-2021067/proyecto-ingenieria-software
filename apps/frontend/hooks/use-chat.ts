@@ -11,6 +11,7 @@ import {
   listArchivedConversations,
   markConversationRead,
   sendMessage,
+  toggleReaction,
   updateConversation,
 } from '@/lib/services/chat';
 import {
@@ -19,7 +20,14 @@ import {
   conversationMessagesQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
-import type { ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
+import type {
+  ChatMensaje,
+  ChatReaccion,
+  ChatReaccionSocket,
+  CreateConversationPayload,
+  UpdateConversationPayload,
+} from '@/lib/types/chat';
+import { alternarReaccionLocal, reaccionesDesdeSocket } from '@/lib/chat-reacciones';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -86,6 +94,40 @@ export function useSendMessage(idProyecto: number, idConversacion: number | null
         (current) => (current ? [...current, mensaje] : [mensaje]),
       );
       invalidateChatLists(queryClient, idProyecto);
+    },
+  });
+}
+
+/** Reemplaza las reacciones de un mensaje en las caches de mensajes que cumplan `filters`. */
+function patchReacciones(
+  queryClient: ReturnType<typeof useQueryClient>,
+  filters: Parameters<typeof queryClient.setQueriesData>[0],
+  idMensaje: number,
+  actualizar: (reacciones: ChatReaccion[] | undefined) => ChatReaccion[],
+) {
+  queryClient.setQueriesData<ChatMensaje[]>(filters, (current) =>
+    current?.map((m) => (m.idMensaje === idMensaje ? { ...m, reacciones: actualizar(m.reacciones) } : m)),
+  );
+}
+
+/** Alterna una reaccion con actualizacion optimista; si el servidor falla, vuelve al estado previo. */
+export function useToggleReaction(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  const queryKey = conversationMessagesQueryKey(idProyecto, idConversacion);
+  return useMutation({
+    mutationFn: ({ idMensaje, emoji }: { idMensaje: number; emoji: string }) =>
+      toggleReaction(idProyecto, idConversacion, idMensaje, emoji),
+    onMutate: async ({ idMensaje, emoji }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previo = queryClient.getQueryData<ChatMensaje[]>(queryKey);
+      patchReacciones(queryClient, { queryKey }, idMensaje, (r) => alternarReaccionLocal(r, emoji));
+      return { previo };
+    },
+    onError: (_error, _vars, contexto) => {
+      if (contexto?.previo) queryClient.setQueryData(queryKey, contexto.previo);
+    },
+    onSuccess: (reacciones, { idMensaje }) => {
+      patchReacciones(queryClient, { queryKey }, idMensaje, () => reacciones);
     },
   });
 }
@@ -186,6 +228,24 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       queryClient.invalidateQueries({ queryKey: ['chats-global'] });
     };
 
+    const handleReactionUpdated = ({
+      idConversacion,
+      idMensaje,
+      reacciones,
+    }: {
+      idConversacion: number;
+      idMensaje: number;
+      reacciones: ChatReaccionSocket[];
+    }) => {
+      const yo = queryClient.getQueryData<{ idUsuario: number }>(['currentUser']);
+      patchReacciones(
+        queryClient,
+        { predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'mensajes' },
+        idMensaje,
+        () => reaccionesDesdeSocket(reacciones, yo?.idUsuario),
+      );
+    };
+
     const handleConversationUpdated = () => {
       queryClient.invalidateQueries({ queryKey: ['chats-global'] });
       queryClient.invalidateQueries({ queryKey: ['proyecto-conversaciones'] });
@@ -215,12 +275,14 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
     };
 
     socket.on('newMessage', handleNewMessage);
+    socket.on('reactionUpdated', handleReactionUpdated);
     socket.on('conversationUpdated', handleConversationUpdated);
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
 
     return () => {
       socket.off('newMessage', handleNewMessage);
+      socket.off('reactionUpdated', handleReactionUpdated);
       socket.off('conversationUpdated', handleConversationUpdated);
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
