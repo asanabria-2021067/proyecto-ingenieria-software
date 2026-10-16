@@ -10,6 +10,7 @@ import {
   listAllConversations,
   listArchivedConversations,
   markConversationRead,
+  searchMessages,
   sendMessage,
   updateConversation,
 } from '@/lib/services/chat';
@@ -18,8 +19,14 @@ import {
   archivedConversationsQueryKey,
   conversationMessagesQueryKey,
   projectConversationsQueryKey,
+  searchMessagesQueryKey,
 } from '@/lib/query-keys/chat';
-import type { ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
+import type {
+  BuscarMensajesFiltros,
+  ChatMensaje,
+  CreateConversationPayload,
+  UpdateConversationPayload,
+} from '@/lib/types/chat';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -74,6 +81,48 @@ export function useMessages(idProyecto: number, idConversacion: number | null) {
     enabled: idConversacion != null,
   });
   return { messages: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
+}
+
+/** Búsqueda dentro de una conversación; solo corre cuando `enabled` (hay filtros aplicados). */
+export function useSearchMessages(
+  idProyecto: number,
+  idConversacion: number,
+  filtros: Omit<BuscarMensajesFiltros, 'pagina'>,
+  enabled: boolean,
+) {
+  const query = useInfiniteQuery({
+    queryKey: searchMessagesQueryKey(idProyecto, idConversacion, filtros),
+    queryFn: ({ pageParam }) => searchMessages(idProyecto, idConversacion, { ...filtros, pagina: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.pagina + 1 : undefined),
+    enabled,
+  });
+  return {
+    resultados: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
+}
+
+/**
+ * Carga páginas anteriores del historial (cursor) hasta que `idMensaje` esté
+ * en la caché de mensajes, para poder saltar a un resultado antiguo.
+ */
+export function useLoadMessagesUntil(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return async (idMensaje: number) => {
+    const key = conversationMessagesQueryKey(idProyecto, idConversacion);
+    let actuales = queryClient.getQueryData<ChatMensaje[]>(key) ?? [];
+    while (actuales.length > 0 && idMensaje < actuales[0].idMensaje) {
+      const anteriores = await getMessages(idProyecto, idConversacion, actuales[0].idMensaje);
+      if (anteriores.length === 0) return;
+      actuales = [...anteriores, ...actuales];
+      queryClient.setQueryData(key, actuales);
+    }
+  };
 }
 
 export function useSendMessage(idProyecto: number, idConversacion: number | null) {

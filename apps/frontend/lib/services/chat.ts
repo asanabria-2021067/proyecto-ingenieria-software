@@ -1,5 +1,7 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
+  BuscarMensajesFiltros,
+  BuscarMensajesResultado,
   ChatConversacion,
   ChatConversacionGlobal,
   ChatMensaje,
@@ -30,6 +32,20 @@ export function getMessages(
 ): Promise<ChatMensaje[]> {
   const query = cursor ? `?cursor=${cursor}` : '';
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes${query}`);
+}
+
+export function searchMessages(
+  idProyecto: number,
+  idConversacion: number,
+  filtros: BuscarMensajesFiltros,
+): Promise<BuscarMensajesResultado> {
+  const params = new URLSearchParams();
+  if (filtros.q) params.set('q', filtros.q);
+  if (filtros.idAutor) params.set('idAutor', String(filtros.idAutor));
+  if (filtros.desde) params.set('desde', filtros.desde);
+  if (filtros.hasta) params.set('hasta', filtros.hasta);
+  if (filtros.pagina) params.set('pagina', String(filtros.pagina));
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/buscar?${params.toString()}`);
 }
 
 export function sendMessage(

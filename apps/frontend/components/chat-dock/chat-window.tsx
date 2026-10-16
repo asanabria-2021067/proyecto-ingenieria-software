@@ -12,6 +12,7 @@ import {
   Loader2,
   MoreVertical,
   Pencil,
+  Search,
   Send,
   Star,
   StarOff,
@@ -38,6 +39,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ChatSearchPanel } from './chat-search';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -76,11 +78,25 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
+  const [buscarAbierto, setBuscarAbierto] = useState(false);
+  const [saltarA, setSaltarA] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const saltarARef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!minimized) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+    if (!minimized && !saltarARef.current) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, minimized]);
+
+  // Salto desde la búsqueda: centra el mensaje, lo enfoca y quita el resalte a los 3 s.
+  useEffect(() => {
+    saltarARef.current = saltarA;
+    if (!saltarA) return;
+    const destino = listRef.current?.querySelector<HTMLElement>(`[data-mensaje="${saltarA}"]`);
+    destino?.scrollIntoView({ block: 'center' });
+    destino?.focus({ preventScroll: true });
+    const timer = setTimeout(() => setSaltarA(null), 3000);
+    return () => clearTimeout(timer);
+  }, [saltarA]);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -129,6 +145,16 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
           className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-on-surface"
         >
           {titulo}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setBuscarAbierto((abierto) => !abierto)}
+          aria-label="Buscar en la conversación"
+          aria-expanded={buscarAbierto}
+          className="rounded-control p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary"
+        >
+          <Search className="size-4" aria-hidden="true" />
         </button>
 
         <DropdownMenu>
@@ -189,6 +215,15 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
 
       {!minimized && (
         <>
+          {buscarAbierto && (
+            <ChatSearchPanel
+              idProyecto={idProyecto}
+              idConversacion={idConversacion}
+              participantes={conversacion?.participantes ?? []}
+              onJump={setSaltarA}
+              onClose={() => setBuscarAbierto(false)}
+            />
+          )}
           <div ref={listRef} className="h-[40rem] max-h-[60vh] min-h-0 space-y-3 overflow-y-auto px-3 py-3">
             {isLoading && <p className="text-xs text-tertiary">Cargando historial…</p>}
             {!isLoading && messages.length === 0 && (
@@ -197,7 +232,12 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             {messages.map((m) => {
               const propio = m.remitente.idUsuario === currentUserId;
               return (
-                <div key={m.idMensaje} className={`flex items-end gap-2 ${propio ? 'flex-row-reverse' : ''}`}>
+                <div
+                  key={m.idMensaje}
+                  data-mensaje={m.idMensaje}
+                  tabIndex={-1}
+                  className={`flex items-end gap-2 rounded-lg outline-none ${propio ? 'flex-row-reverse' : ''} ${saltarA === m.idMensaje ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                >
                   <Avatar className="size-6 shrink-0">
                     {m.remitente.fotoUrl && <AvatarImage src={m.remitente.fotoUrl} alt="" />}
                     <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
