@@ -39,7 +39,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
-import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
+import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations, useSilenciarConversation } from '@/hooks/use-chat';
+import { estaSilenciada } from '@/lib/chat-silencio';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
@@ -73,6 +74,8 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const enviar = useSendMessage(idProyecto, idConversacion);
   const actualizar = useUpdateConversation(idProyecto);
   const eliminar = useDeleteConversation(idProyecto);
+  const silenciar = useSilenciarConversation(idProyecto);
+  const silenciada = conversacion ? estaSilenciada(conversacion) : false;
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
@@ -130,6 +133,12 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
         >
           {titulo}
         </button>
+        {silenciada && (
+          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-text-secondary">
+            <BellOff className="size-3.5" aria-hidden="true" />
+            Silenciado
+          </span>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -159,12 +168,27 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             >
               {conversacion?.esPrioritaria ? 'Mover a Otros' : 'Mover a Prioritarios'}
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => actualizar.mutate({ idConversacion, payload: { silenciada: !conversacion?.silenciada } })}
-            >
-              {conversacion?.silenciada ? <Bell className="size-4" aria-hidden="true" /> : <BellOff className="size-4" aria-hidden="true" />}
-              {conversacion?.silenciada ? 'Activar notificaciones' : 'Silenciar'}
-            </DropdownMenuItem>
+            {silenciada ? (
+              <DropdownMenuItem onClick={() => silenciar.mutate({ idConversacion, duracion: null })}>
+                <Bell className="size-4" aria-hidden="true" />
+                Activar notificaciones
+              </DropdownMenuItem>
+            ) : (
+              <>
+                <DropdownMenuItem onClick={() => silenciar.mutate({ idConversacion, duracion: '1h' })}>
+                  <BellOff className="size-4" aria-hidden="true" />
+                  Silenciar 1 hora
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => silenciar.mutate({ idConversacion, duracion: '8h' })}>
+                  <BellOff className="size-4" aria-hidden="true" />
+                  Silenciar 8 horas
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => silenciar.mutate({ idConversacion, duracion: 'siempre' })}>
+                  <BellOff className="size-4" aria-hidden="true" />
+                  Silenciar siempre
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem
               onClick={() => actualizar.mutate({ idConversacion, payload: { archivada: !conversacion?.archivadaManual } })}
             >
