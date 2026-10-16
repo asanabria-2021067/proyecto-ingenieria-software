@@ -165,6 +165,9 @@ export class ChatService {
     if (!conversacion.participantes.some((p) => p.idUsuario === userId)) {
       throw new ForbiddenException('No participas en esta conversación');
     }
+    // Canales: además de la fila de participante, la membresía del proyecto
+    // debe seguir vigente (si salió del proyecto pierde acceso al instante).
+    if (conversacion.esCanal) await this.assertProjectMember(idProyecto, userId);
     return conversacion;
   }
 
@@ -206,6 +209,7 @@ export class ChatService {
           tipo: c.tipo,
           nombre: c.nombre,
           nombrePersonalizado: c.nombrePersonalizado,
+          esCanal: c.esCanal,
           participantes: participantesConApodo(c.participantes, c.apodos),
           ultimoMensaje: c.mensajes[0] ?? null,
           noLeidos,
@@ -599,7 +603,10 @@ export class ChatService {
     userId: number,
     dto: UpdateConversationDto,
   ) {
-    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    if (conversacion.esCanal && dto.nombrePersonalizado !== undefined) {
+      throw new ForbiddenException('Los canales no se pueden renombrar');
+    }
 
     const data: Prisma.ConversacionUpdateInput = {};
     if (dto.archivada !== undefined) data.archivadaEn = dto.archivada ? new Date() : null;
@@ -627,6 +634,7 @@ export class ChatService {
    * desaparezca de su lista sin que tengan que recargar. */
   async deleteConversation(idProyecto: number, idConversacion: number, userId: number) {
     const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    if (conversacion.esCanal) throw new ForbiddenException('Los canales no se pueden eliminar');
     await this.prisma.conversacion.update({
       where: { idConversacion },
       data: { eliminadaEn: new Date() },
@@ -649,6 +657,26 @@ export class ChatService {
         eliminadaEn: null,
         participantes: { some: { idUsuario: userId } },
         proyecto: { estadoProyecto: { not: EstadoProyecto.CERRADO } },
+        // Un canal solo se ve mientras la persona siga en el proyecto.
+        AND: [
+          {
+            OR: [
+              { esCanal: false },
+              {
+                proyecto: {
+                  OR: [
+                    { creadoPor: userId },
+                    {
+                      roles: {
+                        some: { participaciones: { some: { idUsuario: userId, estadoParticipacion: 'ACTIVO' } } },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
         ...(query
           ? {
               OR: [
@@ -707,6 +735,7 @@ export class ChatService {
           tipo: c.tipo,
           nombre: c.nombre,
           nombrePersonalizado: c.nombrePersonalizado,
+          esCanal: c.esCanal,
           participantes: participantesConApodo(c.participantes, c.apodos),
           ultimoMensaje: c.mensajes[0] ?? null,
           ultimoMensajeEsPropio: c.mensajes[0]?.remitente.idUsuario === userId,
