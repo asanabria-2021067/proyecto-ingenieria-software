@@ -5,8 +5,10 @@ import { io, Socket } from 'socket.io-client';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   activarSonidoConversation,
+  addChannelMembers,
   cancelScheduledMessage,
   clearMiEstado,
+  createChannel,
   createConversation,
   deleteConversation,
   getAttachmentThumbnail,
@@ -22,6 +24,7 @@ import {
   listScheduledMessages,
   markConversationRead,
   removeApodo,
+  removeChannelMember,
   scheduleMessage,
   searchMessages,
   sendFileMessage,
@@ -50,7 +53,7 @@ import {
   scheduledMessagesQueryKey,
   searchMessagesQueryKey,
 } from '@/lib/query-keys/chat';
-import type { BuscarMensajesFiltros, ChatLectura, ChatMensaje, ChatReaccion, ChatTemaColor, SetEstadoChatPayload, ChatReaccionSocket, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
+import type { BuscarMensajesFiltros, ChatLectura, ChatMensaje, ChatReaccion, ChatTemaColor, CreateChannelPayload, SetEstadoChatPayload, ChatReaccionSocket, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
 import { alternarReaccionLocal, reaccionesDesdeSocket } from '@/lib/chat-reacciones';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
@@ -101,6 +104,26 @@ export function useCreateConversation(idProyecto: number) {
   return useMutation({
     mutationFn: (payload: CreateConversationPayload) => createConversation(idProyecto, payload),
     onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+export function useCreateChannel(idProyecto: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateChannelPayload) => createChannel(idProyecto, payload),
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+/** Aplica el diff de miembros de un canal: primero agrega, luego quita. */
+export function useUpdateChannelMembers(idProyecto: number, idCanal: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ agregar, quitar }: { agregar: number[]; quitar: number[] }) => {
+      if (agregar.length > 0) await addChannelMembers(idProyecto, idCanal, agregar);
+      for (const idUsuario of quitar) await removeChannelMember(idProyecto, idCanal, idUsuario);
+    },
+    onSettled: () => invalidateChatLists(queryClient, idProyecto),
   });
 }
 
