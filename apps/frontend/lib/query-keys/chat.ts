@@ -10,3 +10,5 @@ export const archivedConversationsQueryKey = (q: string) =>
 /** Dock global de chat: cruza todos los proyectos del usuario. */
 export const allConversationsQueryKey = (q: string = '') =>
   ['chats-global', q] as const;
+
+export const noMolestarQueryKey = ['chat-no-molestar'] as const;

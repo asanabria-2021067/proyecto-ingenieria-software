@@ -7,6 +7,7 @@ import type {
   DuracionSilencio,
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
+  PreferenciaNoMolestar,
   UpdateConversationPayload,
 } from '@/lib/types/chat';
 
@@ -98,4 +99,12 @@ export function listArchivedConversations(
   if (filtros.q) params.set('q', filtros.q);
   if (filtros.page) params.set('page', String(filtros.page));
   return apiFetch(`/chats/archivados?${params.toString()}`);
+}
+
+export function getNoMolestar(): Promise<PreferenciaNoMolestar> {
+  return apiFetch('/chats/no-molestar');
+}
+
+export function updateNoMolestar(payload: PreferenciaNoMolestar): Promise<PreferenciaNoMolestar> {
+  return apiFetch('/chats/no-molestar', { method: 'PUT', body: JSON.stringify(payload) });
 }
