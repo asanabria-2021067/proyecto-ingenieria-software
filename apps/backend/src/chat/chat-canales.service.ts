@@ -146,6 +146,23 @@ export class ChatCanalesService {
     }
   }
 
+  /** Crea `#general` en los proyectos activos del usuario que aún no lo tienen (p. ej. proyectos nuevos). */
+  async asegurarGeneral(userId: number) {
+    const faltantes = await this.prisma.proyecto.findMany({
+      where: {
+        eliminadoEn: null,
+        estadoProyecto: { not: EstadoProyecto.CERRADO },
+        OR: [
+          { creadoPor: userId },
+          { roles: { some: { participaciones: { some: { idUsuario: userId, estadoParticipacion: 'ACTIVO' } } } } },
+        ],
+        conversaciones: { none: { esCanal: true, nombreCanal: CANAL_GENERAL } },
+      },
+      select: { idProyecto: true },
+    });
+    for (const { idProyecto } of faltantes) await this.sincronizarSinFallar(idProyecto);
+  }
+
   /** Canales del proyecto que integra el usuario (los demás no son visibles). */
   async listarCanales(idProyecto: number, userId: number) {
     const proyecto = await this.getProyecto(idProyecto);
