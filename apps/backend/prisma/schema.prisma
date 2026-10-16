@@ -379,6 +379,7 @@ model Usuario {
   mensajesChatEnviados             MensajeChat[]              @relation("MensajesChatEnviados")
   apodosDefinidos                  ApodoConversacion[]        @relation("ApodosDefinidos")
   apodosRecibidos                  ApodoConversacion[]        @relation("ApodosRecibidos")
+  mensajesProgramadosChat          MensajeProgramado[]        @relation("MensajesProgramadosChat")
   tokensRefresco                   TokenRefresco[]
   proyectosGuardados               ProyectoGuardado[]
   estadoChat                       EstadoChatUsuario?
@@ -1661,6 +1662,7 @@ model Conversacion {
   mensajes      MensajeChat[]
   adjuntos      AdjuntoMensajeChat[]
   apodos        ApodoConversacion[]
+  mensajesProgramados MensajeProgramado[]
 
   @@index([idProyecto])
   @@map("conversacion")
