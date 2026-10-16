@@ -5,6 +5,7 @@ import { io, Socket } from 'socket.io-client';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   activarSonidoConversation,
+  cancelScheduledMessage,
   clearMiEstado,
   createConversation,
   deleteConversation,
@@ -18,8 +19,10 @@ import {
   listAllConversations,
   listArchivedConversations,
   listSavedMessages,
+  listScheduledMessages,
   markConversationRead,
   removeApodo,
+  scheduleMessage,
   searchMessages,
   sendFileMessage,
   sendMessage,
@@ -44,6 +47,7 @@ import {
   noMolestarQueryKey,
   projectConversationsQueryKey,
   savedMessagesQueryKey,
+  scheduledMessagesQueryKey,
   searchMessagesQueryKey,
 } from '@/lib/query-keys/chat';
 import type { BuscarMensajesFiltros, ChatLectura, ChatMensaje, ChatReaccion, ChatTemaColor, SetEstadoChatPayload, ChatReaccionSocket, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
@@ -295,6 +299,36 @@ export function useToggleReaction(idProyecto: number, idConversacion: number) {
     onSuccess: (reacciones, { idMensaje }) => {
       patchReacciones(queryClient, { queryKey }, idMensaje, () => reacciones);
     },
+  });
+}
+
+export function useScheduledMessages(idProyecto: number, idConversacion: number) {
+  const query = useQuery({
+    queryKey: scheduledMessagesQueryKey(idProyecto, idConversacion),
+    queryFn: () => listScheduledMessages(idProyecto, idConversacion),
+    // El job los envía en el servidor: refresca para que dejen de figurar como pendientes.
+    refetchInterval: 30_000,
+  });
+  return { programados: query.data ?? [], isLoading: query.isLoading };
+}
+
+export function useScheduleMessage(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { contenido: string; enviarEn: string }) =>
+      scheduleMessage(idProyecto, idConversacion, payload),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: scheduledMessagesQueryKey(idProyecto, idConversacion) }),
+  });
+}
+
+export function useCancelScheduledMessage(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (idMensajeProgramado: number) =>
+      cancelScheduledMessage(idProyecto, idConversacion, idMensajeProgramado),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: scheduledMessagesQueryKey(idProyecto, idConversacion) }),
   });
 }
 
