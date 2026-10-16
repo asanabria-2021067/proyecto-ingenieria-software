@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
+import { ScheduleMessageButton, ScheduledMessagesList } from '@/components/chat-dock/scheduled-messages';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
@@ -212,6 +213,8 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             })}
           </div>
 
+          <ScheduledMessagesList idProyecto={idProyecto} idConversacion={idConversacion} />
+
           <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-outline-variant p-2">
             <Input
               value={texto}
@@ -220,6 +223,12 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               maxLength={4000}
               disabled={enviar.isPending}
               className="h-9 flex-1 rounded-full border-outline-variant text-sm"
+            />
+            <ScheduleMessageButton
+              idProyecto={idProyecto}
+              idConversacion={idConversacion}
+              texto={texto}
+              onScheduled={() => setTexto('')}
             />
             <Button
               type="submit"
