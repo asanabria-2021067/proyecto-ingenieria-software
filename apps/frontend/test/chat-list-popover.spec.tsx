@@ -34,6 +34,7 @@ function conversacion(overrides: Partial<ChatConversacionGlobal> = {}): ChatConv
     archivadaManual: false,
     silenciada: false,
     esPrioritaria: true,
+    temaColor: null,
     ...overrides,
   };
 }
