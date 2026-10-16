@@ -41,6 +41,10 @@ Correcto: `bg-cal-3 text-on-cal-3 border-l-cal-3-strong`, `bg-cal-1-strong` para
 
 Incorrecto: `text-cal-3-strong` como color de letra, `bg-cal-2` fuera del calendario.
 
+### Insignias (HU-190)
+
+Los anillos de las insignias usan `insignia-bronce`, `insignia-plata`, `insignia-oro` e `insignia-diamante` (claro y oscuro). Solo se aplican como borde del círculo (`border-insignia-oro`): el nombre del nivel siempre se escribe en texto y el color nunca es la única señal. Un contador `x2`, `x3` o `x4` marca Plata, Oro y Diamante; Bronce no lleva contador.
+
 ## Espaciado y superficies
 
 La escala permitida es 4, 8, 12, 16, 24, 32 y 48 px: `micro`, `tight`, `inline`, `stack`/`gap`, `card`/`grid`, `section`, `page`.
