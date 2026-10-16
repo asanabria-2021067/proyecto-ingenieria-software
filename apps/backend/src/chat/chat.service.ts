@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from './chat.gateway';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
+import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 
 /**
@@ -37,6 +38,11 @@ const MENSAJE_SELECT = {
 } as const;
 
 const ARCHIVADOS_PAGE_SIZE = 20;
+
+/** Escapa los comodines de LIKE (%, _, \) — mismo criterio que GlobalSearchService. */
+function likePattern(texto: string): string {
+  return `%${texto.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
 
 @Injectable()
 export class ChatService {
@@ -201,6 +207,43 @@ export class ChatService {
       select: MENSAJE_SELECT,
     });
     return mensajes.reverse();
+  }
+
+  /** Busca en una conversación por texto (parcial, sin acentos ni mayúsculas), autor y rango de fechas. */
+  async searchMessages(idProyecto: number, idConversacion: number, userId: number, filtros: SearchMessagesQueryDto) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    const { q, idAutor, desde, hasta, pagina = 1, limite = 20 } = filtros;
+    if (desde && hasta && new Date(desde) > new Date(hasta)) {
+      throw new BadRequestException('desde no puede ser posterior a hasta');
+    }
+
+    const condiciones = [Prisma.sql`id_conversacion = ${idConversacion}`];
+    if (q) {
+      condiciones.push(
+        Prisma.sql`immutable_unaccent(lower(contenido)) LIKE immutable_unaccent(lower(${likePattern(q)})) ESCAPE '\\'`,
+      );
+    }
+    if (idAutor) condiciones.push(Prisma.sql`id_remitente = ${idAutor}`);
+    if (desde) condiciones.push(Prisma.sql`enviado_en >= ${new Date(desde)}`);
+    if (hasta) condiciones.push(Prisma.sql`enviado_en <= ${new Date(hasta)}`);
+
+    // limite + 1 para saber si hay otra página sin un COUNT aparte.
+    const filas = await this.prisma.$queryRaw<{ id_mensaje: number }[]>(Prisma.sql`
+      SELECT id_mensaje FROM mensaje_chat
+      WHERE ${Prisma.join(condiciones, ' AND ')}
+      ORDER BY enviado_en DESC, id_mensaje DESC
+      LIMIT ${limite + 1} OFFSET ${(pagina - 1) * limite}
+    `);
+    const hasMore = filas.length > limite;
+    const ids = filas.slice(0, limite).map((f) => f.id_mensaje);
+
+    const mensajes = await this.prisma.mensajeChat.findMany({
+      where: { idMensaje: { in: ids }, idConversacion },
+      select: MENSAJE_SELECT,
+    });
+    mensajes.sort((a, b) => ids.indexOf(a.idMensaje) - ids.indexOf(b.idMensaje));
+
+    return { items: mensajes, hasMore, pagina, termino: q ?? null };
   }
 
   async createMessage(idProyecto: number, idConversacion: number, userId: number, contenido: string) {
