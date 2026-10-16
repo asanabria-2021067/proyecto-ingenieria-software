@@ -51,10 +51,11 @@ export function sendMessage(
   idProyecto: number,
   idConversacion: number,
   contenido: string,
+  idMensajeCitado?: number,
 ): Promise<ChatMensaje> {
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes`, {
     method: 'POST',
-    body: JSON.stringify({ contenido }),
+    body: JSON.stringify({ contenido, idMensajeCitado }),
   });
 }
 
