@@ -1,0 +1,10 @@
+{
+  "name": "proyecto-ingenieria-software",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo UVG Scholar (solo utilidades de raiz; las dependencias viven en apps/*)",
+  "scripts": {
+    "changelog": "node scripts/changelog.mjs",
+    "test:changelog": "node --test scripts/changelog.test.mjs"
+  }
+}
