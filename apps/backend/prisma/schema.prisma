@@ -1732,6 +1732,7 @@ model InsigniaUsuario {
 
   @@unique([idUsuario, idInsignia])
   @@map("insignia_usuario")
+}
 
 enum NivelAnuncio {
   INFO
