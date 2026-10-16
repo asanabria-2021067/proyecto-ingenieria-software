@@ -18,6 +18,7 @@ import type {
   CreateConversationPayload,
   DuracionSilencio,
   ListArchivedConversationsFiltros,
+  LinkPreview,
   ListArchivedConversationsResultado,
   ConfigNoMolestar,
   SetEstadoChatPayload,
@@ -161,6 +162,13 @@ export function cancelScheduledMessage(
 ): Promise<void> {
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/programados/${idMensajeProgramado}`, {
     method: 'DELETE',
+  });
+}
+
+export function getLinkPreview(idProyecto: number, idConversacion: number, url: string): Promise<LinkPreview> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/vista-previa`, {
+    method: 'POST',
+    body: JSON.stringify({ url }),
   });
 }
 
