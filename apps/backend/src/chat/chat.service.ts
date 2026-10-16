@@ -6,7 +6,8 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
 import { DuracionSilencio } from './dto/silenciar-conversation.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
-import { estaSilenciada } from './chat-silencio.util';
+import { estaEnNoMolestar, estaSilenciada } from './chat-silencio.util';
+import { UpdateNoMolestarDto } from './dto/update-no-molestar.dto';
 
 /**
  * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
@@ -390,6 +391,42 @@ export class ChatService {
       where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
       data: { silenciadaSiempre: false, silenciadaHasta: null },
     });
+  }
+
+  private async leerNoMolestar(userId: number) {
+    const pref = await this.prisma.preferenciaNoMolestar.findUnique({ where: { idUsuario: userId } });
+    return {
+      activo: pref?.activo ?? false,
+      horaInicio: pref?.horaInicio ?? '22:00',
+      horaFin: pref?.horaFin ?? '07:00',
+      diasSemana: pref?.diasSemana ?? [0, 1, 2, 3, 4, 5, 6],
+      zona: pref?.zona ?? 'America/Guatemala',
+    };
+  }
+
+  /** Modo no molestar del usuario (valores por defecto si nunca lo configuro). */
+  async getNoMolestar(userId: number) {
+    const pref = await this.leerNoMolestar(userId);
+    return { ...pref, enHorarioAhora: estaEnNoMolestar(pref) };
+  }
+
+  async updateNoMolestar(userId: number, dto: UpdateNoMolestarDto) {
+    if (dto.horaInicio === dto.horaFin) {
+      throw new BadRequestException('La hora de inicio y la de fin no pueden ser iguales');
+    }
+    const data = {
+      activo: dto.activo,
+      horaInicio: dto.horaInicio,
+      horaFin: dto.horaFin,
+      diasSemana: [...dto.diasSemana].sort((a, b) => a - b),
+      zona: dto.zona ?? 'America/Guatemala',
+    };
+    await this.prisma.preferenciaNoMolestar.upsert({
+      where: { idUsuario: userId },
+      create: { idUsuario: userId, ...data },
+      update: data,
+    });
+    return this.getNoMolestar(userId);
   }
 
   async markRead(idProyecto: number, idConversacion: number, userId: number) {
