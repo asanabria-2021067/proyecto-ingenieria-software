@@ -26,12 +26,12 @@ vi.mock('@/lib/services/chat', () => ({ getAttachmentUrl: (...a: unknown[]) => g
 const sendFileMutate = vi.fn();
 const sendMutate = vi.fn();
 let mensajes: unknown[] = [];
-let miniatura: { data?: { url: string } } = {};
+let miniatura: { data?: string } = {};
 vi.mock('@/hooks/use-chat', () => ({
   useMessages: () => ({ messages: mensajes, isLoading: false }),
   useSendMessage: () => ({ mutate: sendMutate, isPending: false }),
   useSendFileMessage: () => ({ mutate: sendFileMutate, isPending: false }),
-  useAttachmentUrl: () => miniatura,
+  useAttachmentThumbnail: () => miniatura,
   useUpdateConversation: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteConversation: () => ({ mutate: vi.fn(), isPending: false }),
   useAllConversations: () => ({ conversations: [] }),
@@ -160,11 +160,11 @@ describe('ChatWindow - adjuntos', () => {
     expect(screen.queryByRole('img')).toBeNull();
   });
 
-  it('muestra miniatura solo para imagenes con URL firmada', () => {
+  it('muestra miniatura solo para imagenes con miniatura blob', () => {
     mensajes = [mensaje(1, { adjunto: { idAdjunto: 8, nombreOriginal: 'foto.png', mime: 'image/png', tamanoBytes: 500 } })];
-    miniatura = { data: { url: 'https://api.cloudinary.com/firmada' } };
+    miniatura = { data: 'data:image/png;base64,AAAA' };
     abrir();
-    expect(screen.getByRole('img', { name: 'foto.png' })).toHaveAttribute('src', 'https://api.cloudinary.com/firmada');
+    expect(screen.getByRole('img', { name: 'foto.png' })).toHaveAttribute('src', 'data:image/png;base64,AAAA');
   });
 
   it('pide la URL firmada solo al hacer clic en descargar', async () => {

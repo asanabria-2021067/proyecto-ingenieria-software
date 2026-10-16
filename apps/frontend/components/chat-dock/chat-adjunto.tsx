@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Download, FileImage, FileSpreadsheet, FileText, Loader2, Presentation } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAttachmentUrl } from '@/hooks/use-chat';
+import { useAttachmentThumbnail } from '@/hooks/use-chat';
 import { categoriaAdjunto, formatearTamano, type CategoriaAdjunto } from '@/lib/chat-adjuntos';
 import { getAttachmentUrl } from '@/lib/services/chat';
 import type { ChatAdjunto } from '@/lib/types/chat';
@@ -58,7 +58,7 @@ interface ChatAdjuntoChipProps {
 export function ChatAdjuntoChip({ adjunto, idProyecto, idConversacion }: ChatAdjuntoChipProps) {
   const [descargando, setDescargando] = useState(false);
   const esImagen = categoriaAdjunto(adjunto.mime) === 'imagen';
-  const miniatura = useAttachmentUrl(idProyecto, idConversacion, adjunto.idAdjunto, esImagen);
+  const miniatura = useAttachmentThumbnail(idProyecto, idConversacion, adjunto.idAdjunto, esImagen);
 
   const descargar = async () => {
     setDescargando(true);
@@ -69,8 +69,8 @@ export function ChatAdjuntoChip({ adjunto, idProyecto, idConversacion }: ChatAdj
   return (
     <div className="space-y-1.5">
       {esImagen && miniatura.data && (
-        // eslint-disable-next-line @next/next/no-img-element -- URL firmada externa de vida corta
-        <img src={miniatura.data.url} alt={adjunto.nombreOriginal} loading="lazy" className="max-h-44 max-w-full rounded-lg object-cover" />
+        // eslint-disable-next-line @next/next/no-img-element -- data: local
+        <img src={miniatura.data} alt={adjunto.nombreOriginal} loading="lazy" className="max-h-44 max-w-full rounded-lg object-cover" />
       )}
       <div className="flex items-center gap-2 rounded-lg bg-surface-container-lowest p-2 text-on-surface">
         <AdjuntoIcono mime={adjunto.mime} className="size-5 shrink-0 text-primary" />
