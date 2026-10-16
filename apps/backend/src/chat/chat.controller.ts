@@ -24,6 +24,7 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListLinksQueryDto } from './dto/list-links-query.dto';
 import { SendFileMessageDto } from './dto/send-file-message.dto';
 import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
+import { SetApodoDto } from './dto/set-apodo.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { SilenciarConversationDto } from './dto/silenciar-conversation.dto';
 import { ToggleReactionDto } from './dto/toggle-reaction.dto';
@@ -215,5 +216,28 @@ export class ChatController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.chatService.activarSonido(projectId, conversationId, user.userId);
+  }
+
+  @Put(':conversationId/apodos/:targetUserId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  setApodo(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('targetUserId', ParseIntPipe) targetUserId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: SetApodoDto,
+  ) {
+    return this.chatService.setApodo(projectId, conversationId, user.userId, targetUserId, dto.apodo);
+  }
+
+  @Delete(':conversationId/apodos/:targetUserId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeApodo(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('targetUserId', ParseIntPipe) targetUserId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.removeApodo(projectId, conversationId, user.userId, targetUserId);
   }
 }
