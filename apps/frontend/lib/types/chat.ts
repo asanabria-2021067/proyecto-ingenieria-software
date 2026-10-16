@@ -5,12 +5,20 @@ export interface ChatUsuario {
   fotoUrl: string | null;
 }
 
+/** Resumen del mensaje citado; `null` si el original ya no existe. */
+export interface ChatCita {
+  idMensaje: number;
+  remitente: ChatUsuario;
+  extracto: string;
+}
+
 export interface ChatMensaje {
   idMensaje: number;
   idConversacion: number;
   contenido: string;
   enviadoEn: string;
   remitente: ChatUsuario;
+  citado?: ChatCita | null;
 }
 
 export interface ChatConversacion {
