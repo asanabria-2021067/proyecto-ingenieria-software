@@ -18,6 +18,7 @@ import type {
   ListArchivedConversationsResultado,
   ConfigNoMolestar,
   SetEstadoChatPayload,
+  ListSavedMessagesResultado,
   UpdateConversationPayload,
 } from '@/lib/types/chat';
 
@@ -249,4 +250,19 @@ export async function setMiEstado(payload: SetEstadoChatPayload): Promise<ChatEs
 
 export function clearMiEstado(): Promise<void> {
   return apiFetch('/chats/estado', { method: 'DELETE' });
+}
+
+/** Alterna el marcador personal de un mensaje. */
+export function toggleSavedMessage(
+  idProyecto: number,
+  idConversacion: number,
+  idMensaje: number,
+): Promise<{ guardado: boolean }> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/${idMensaje}/guardado`, {
+    method: 'POST',
+  });
+}
+
+export function listSavedMessages(page: number): Promise<ListSavedMessagesResultado> {
+  return apiFetch(`/chats/mensajes-guardados?page=${page}`);
 }
