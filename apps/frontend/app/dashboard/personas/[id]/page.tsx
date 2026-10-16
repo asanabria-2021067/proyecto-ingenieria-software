@@ -31,6 +31,7 @@ import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { useAccionesAmistad, usePerfilUsuario } from '@/hooks/use-social';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
 import { aviso } from '@/lib/mensajes';
+import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
 
 function compartirPerfil() {
   navigator.clipboard
@@ -187,6 +188,8 @@ export default function PerfilPersonaPage() {
               )}
             </section>
           )}
+
+          <InsigniasVitrina insignias={perfil.insignias} publica />
 
           {/* Proyectos activos */}
           <section className="card-base">
