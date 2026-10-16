@@ -21,6 +21,19 @@ export interface ChatLectura {
 
 export type DuracionSilencio = '1h' | '8h' | 'siempre';
 
+export interface ChatEnlace {
+  url: string;
+  dominio: string;
+  idMensaje: number;
+  remitente: ChatUsuario;
+  enviadoEn: string;
+}
+
+export interface ChatEnlacesPagina {
+  items: ChatEnlace[];
+  nextCursor: number | null;
+}
+
 export interface ChatConversacion {
   idConversacion: number;
   tipo: 'GRUPAL' | 'INDIVIDUAL';
