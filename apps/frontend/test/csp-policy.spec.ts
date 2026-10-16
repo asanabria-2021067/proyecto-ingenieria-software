@@ -46,7 +46,7 @@ const EXPECTED_WITHOUT_API: Array<[string, string[]]> = [
   ['default-src', ["'self'"]],
   ['script-src', ["'self'", "'unsafe-inline'"]],
   ['style-src', ["'self'", "'unsafe-inline'"]],
-  ['img-src', ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com', 'https://api.cloudinary.com']],
+  ['img-src', ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com']],
   ['font-src', ["'self'"]],
   ['connect-src', ["'self'", 'https://api.cloudinary.com']],
   ['frame-src', ['blob:']],
@@ -83,6 +83,12 @@ describe('G06-C04: CSP Report-Only con inventario explícito', () => {
 
   it('sin comodines amplios ni unsafe-eval; unsafe-inline solo en script/style', () => {
     expect(broadSourceFindings(buildContentSecurityPolicy('http://localhost:3001'))).toEqual([]);
+  });
+
+  it('img-src solo permite res.cloudinary.com como host externo (miniaturas de adjuntos van por blob:)', () => {
+    const imgSrc = parseCsp(buildContentSecurityPolicy(undefined)).get('img-src');
+    expect(imgSrc?.filter((source) => source.startsWith('https://'))).toEqual(['https://res.cloudinary.com']);
+    expect(imgSrc).not.toContain('https://api.cloudinary.com');
   });
 
   it('next.config: la política va en Report-Only y la CSP aplicada sigue siendo solo frame-ancestors', async () => {
