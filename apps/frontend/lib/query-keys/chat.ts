@@ -4,6 +4,9 @@ export const projectConversationsQueryKey = (idProyecto: number) =>
 export const conversationMessagesQueryKey = (idProyecto: number, idConversacion: number) =>
   ['proyecto-conversaciones', idProyecto, idConversacion, 'mensajes'] as const;
 
+export const conversationLinksQueryKey = (idProyecto: number, idConversacion: number) =>
+  ['proyecto-conversaciones', idProyecto, idConversacion, 'enlaces'] as const;
+
 export const archivedConversationsQueryKey = (q: string) =>
   ['chats-archivados', q] as const;
 
