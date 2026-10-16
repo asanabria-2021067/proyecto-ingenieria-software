@@ -16,9 +16,11 @@ import {
   listAllConversations,
   listArchivedConversations,
   markConversationRead,
+  removeApodo,
   searchMessages,
   sendFileMessage,
   sendMessage,
+  setApodo,
   silenciarConversation,
   toggleReaction,
   updateConversation,
@@ -346,6 +348,16 @@ export function useDeleteConversation(idProyecto: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (idConversacion: number) => deleteConversation(idProyecto, idConversacion),
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+/** Apodos privados por chat; invalida lista y mensajes para refrescar los nombres. */
+export function useSetApodo(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idObjetivo, apodo }: { idObjetivo: number; apodo: string | null }) =>
+      apodo ? setApodo(idProyecto, idConversacion, idObjetivo, apodo) : removeApodo(idProyecto, idConversacion, idObjetivo),
     onSuccess: () => invalidateChatLists(queryClient, idProyecto),
   });
 }
