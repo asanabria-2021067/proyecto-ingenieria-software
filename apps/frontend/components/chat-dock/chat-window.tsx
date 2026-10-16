@@ -15,6 +15,7 @@ import {
   Moon,
   Paperclip,
   Pencil,
+  Reply,
   Send,
   Star,
   StarOff,
@@ -45,6 +46,7 @@ import { ChatLinksDialog } from './chat-links-dialog';
 import { AdjuntoIcono, ChatAdjuntoChip } from './chat-adjunto';
 import { getIniciales } from '@/components/projects/available-project-card';
 import {
+  useLoadOlderMessages,
   useMessages,
   useSendMessage,
   useSendFileMessage,
@@ -60,9 +62,11 @@ import { NoMolestarDialog } from '@/components/chat-dock/no-molestar-dialog';
 import { estaSilenciada } from '@/lib/chat-silencio';
 import { CHAT_ADJUNTO_ACCEPT, formatearTamano, validarArchivoChat } from '@/lib/chat-adjuntos';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useIrAlMensaje } from '@/hooks/use-ir-al-mensaje';
+import { ChatCitaBloque, ChatCitaVistaPrevia, extractoDe } from '@/components/chat-dock/chat-cita';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
-import type { ChatConversacionGlobal } from '@/lib/types/chat';
+import type { ChatConversacionGlobal, ChatMensaje } from '@/lib/types/chat';
 
 function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId: number | null): string {
   if (conversacion.nombrePersonalizado) return conversacion.nombrePersonalizado;
@@ -108,18 +112,33 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const [archivo, setArchivo] = useState<File | null>(null);
   const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
   const archivoInputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
   const enviarArchivo = useSendFileMessage(idProyecto, idConversacion);
   const enviando = enviar.isPending || enviarArchivo.isPending;
+  const [citando, setCitando] = useState<ChatMensaje | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const cargarAnteriores = useLoadOlderMessages(idProyecto, idConversacion);
+  const { irAlMensaje } = useIrAlMensaje({
+    listRef,
+    messages,
+    cargarAnteriores,
+    onNoDisponible: () => toast.info('El mensaje original ya no está disponible'),
+  });
 
+  // Solo al llegar un mensaje nuevo: cargar páginas anteriores no debe mover la vista al final.
+  const ultimoId = messages[messages.length - 1]?.idMensaje;
   useEffect(() => {
     if (!minimized) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [messages, minimized]);
+  }, [ultimoId, minimized]);
+
+  const responder = (mensaje: ChatMensaje) => {
+    setCitando(mensaje);
+    inputRef.current?.focus();
+  };
 
   // Con la ventana abierta, lo recibido de otros cuenta como leído (alimenta "visto por" y los no leídos).
   const ultimoMensaje = messages[messages.length - 1];
   const ultimoEsAjeno = ultimoMensaje != null && ultimoMensaje.remitente.idUsuario !== currentUserId;
-  const ultimoId = ultimoMensaje?.idMensaje;
   const { mutate: marcarLeidoMutate } = marcarLeido;
   useEffect(() => {
     if (!minimized && ultimoEsAjeno) marcarLeidoMutate(idConversacion);
@@ -150,7 +169,8 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
     }
     if (!contenido) return;
     setTexto('');
-    enviar.mutate(contenido);
+    setCitando(null);
+    enviar.mutate({ contenido, idMensajeCitado: citando?.idMensaje });
   };
 
   const handleArchivo = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -299,17 +319,30 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               const propio = m.remitente.idUsuario === currentUserId;
               return (
                 <Fragment key={m.idMensaje}>
-                <div className={`flex items-end gap-2 ${propio ? 'flex-row-reverse' : ''}`}>
+                <div
+                  data-mensaje-id={m.idMensaje}
+                  tabIndex={-1}
+                  className={`group flex items-end gap-2 rounded-2xl outline-none ${propio ? 'flex-row-reverse' : ''} data-[resaltado]:ring-2 data-[resaltado]:ring-primary`}
+                >
                   <Avatar className="size-6 shrink-0">
                     {m.remitente.fotoUrl && <AvatarImage src={m.remitente.fotoUrl} alt="" />}
                     <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
                   </Avatar>
                   <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? 'bg-primary text-primary-foreground' : 'bg-surface-container-high text-on-surface'}`}>
                     {!propio && <p className="mb-0.5 text-[11px] font-semibold opacity-80">{m.remitente.nombre}</p>}
+                    {m.citado && <ChatCitaBloque cita={m.citado} propio={propio} onIrAlOriginal={irAlMensaje} />}
                     {m.adjunto && <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />}
                     {m.contenido && <p className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}>{m.contenido}</p>}
                     <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => responder(m)}
+                    aria-label={`Responder a ${m.remitente.nombre}`}
+                    className="rounded-control p-1 text-text-secondary opacity-0 hover:bg-on-surface/10 hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
+                  >
+                    <Reply className="size-4" aria-hidden="true" />
+                  </button>
                 </div>
                 {m === ultimoPropio && <SeenBy vieron={vieron} />}
                 </Fragment>
@@ -339,7 +372,24 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               {errorArchivo && <p role="alert" className="text-xs text-error">{errorArchivo}</p>}
             </div>
           )}
-          <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-outline-variant p-2">
+          {citando && (
+            <ChatCitaVistaPrevia
+              nombre={`${citando.remitente.nombre} ${citando.remitente.apellido}`.trim()}
+              extracto={extractoDe(citando.contenido)}
+              onCancelar={() => setCitando(null)}
+            />
+          )}
+
+          <form
+            onSubmit={handleSubmit}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && citando) {
+                event.stopPropagation();
+                setCitando(null);
+              }
+            }}
+            className={`flex items-center gap-2 p-2 ${citando ? '' : 'border-t border-outline-variant'}`}
+          >
             <input
               ref={archivoInputRef}
               type="file"
@@ -362,6 +412,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               <Paperclip className="size-4" aria-hidden="true" />
             </Button>
             <Input
+              ref={inputRef}
               value={texto}
               onChange={(event) => {
                 setTexto(event.target.value);
