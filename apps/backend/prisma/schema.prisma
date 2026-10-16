@@ -346,6 +346,7 @@ model Usuario {
   solicitudesRecuperacion          SolicitudRecuperacion[]    @relation("SolicitudRecuperacionUsuario")
   solicitudesRecuperacionAtendidas SolicitudRecuperacion[]    @relation("SolicitudRecuperacionAdmin")
   rolesAcceso                      UsuarioRolAcceso[]
+  anunciosCerrados                 AnuncioCierre[]
   auditorias                       BitacoraAuditoria[]
   configuracionesActualizadas      ConfiguracionSistema[]
   revisionesProyectoRealizadas     RevisionProyecto[]         @relation("RevisionesProyectoRealizadas")
@@ -1731,4 +1732,46 @@ model InsigniaUsuario {
 
   @@unique([idUsuario, idInsignia])
   @@map("insignia_usuario")
+}
+
+enum NivelAnuncio {
+  INFO
+  ADVERTENCIA
+  URGENTE
+}
+
+enum AudienciaAnuncio {
+  TODOS
+  ESTUDIANTES
+}
+
+model Anuncio {
+  idAnuncio     Int              @id @default(autoincrement()) @map("id_anuncio")
+  titulo        String           @db.VarChar(120)
+  mensaje       String           @db.Text
+  nivel         NivelAnuncio     @default(INFO)
+  audiencia     AudienciaAnuncio @default(TODOS)
+  fechaInicio   DateTime         @map("fecha_inicio")
+  fechaFin      DateTime         @map("fecha_fin")
+  activo        Boolean          @default(true)
+  fechaCreacion DateTime         @default(now()) @map("fecha_creacion")
+
+  cierres AnuncioCierre[]
+
+  @@index([activo, fechaInicio, fechaFin])
+  @@map("anuncio")
+}
+
+model AnuncioCierre {
+  idAnuncioCierre Int      @id @default(autoincrement()) @map("id_anuncio_cierre")
+  idAnuncio       Int      @map("id_anuncio")
+  idUsuario       Int      @map("id_usuario")
+  cerradoEn       DateTime @default(now()) @map("cerrado_en")
+
+  anuncio Anuncio @relation(fields: [idAnuncio], references: [idAnuncio], onDelete: Cascade)
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@unique([idAnuncio, idUsuario])
+  @@index([idUsuario])
+  @@map("anuncio_cierre")
 }
