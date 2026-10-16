@@ -6,6 +6,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   createConversation,
   deleteConversation,
+  getLinkPreview,
   getMessages,
   listAllConversations,
   listArchivedConversations,
@@ -17,6 +18,7 @@ import {
   allConversationsQueryKey,
   archivedConversationsQueryKey,
   conversationMessagesQueryKey,
+  linkPreviewQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
 import type { ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
@@ -74,6 +76,17 @@ export function useMessages(idProyecto: number, idConversacion: number | null) {
     enabled: idConversacion != null,
   });
   return { messages: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
+}
+
+/** Una consulta por URL; sin reintentos (el error es definitivo) y cacheada mientras dure la sesion. */
+export function useLinkPreview(idProyecto: number, idConversacion: number, url: string | null) {
+  return useQuery({
+    queryKey: linkPreviewQueryKey(idConversacion, url ?? ''),
+    queryFn: () => getLinkPreview(idProyecto, idConversacion, url as string),
+    enabled: url != null,
+    retry: false,
+    staleTime: Infinity,
+  });
 }
 
 export function useSendMessage(idProyecto: number, idConversacion: number | null) {
