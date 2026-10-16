@@ -27,12 +27,14 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
 vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 } }) }));
 
+let mensajesMock: unknown[] = [];
 const sendMutate = vi.fn();
 const updateMutate = vi.fn();
 const deleteMutate = vi.fn();
 vi.mock('@/hooks/use-chat', () => ({
-  useMessages: () => ({ messages: [], isLoading: false }),
+  useMessages: () => ({ messages: mensajesMock, isLoading: false }),
   useSendMessage: () => ({ mutate: sendMutate, isPending: false }),
+  useLoadOlderMessages: () => async () => [],
   useUpdateConversation: () => ({ mutate: updateMutate, isPending: false }),
   useDeleteConversation: () => ({ mutate: deleteMutate, isPending: false }),
   useAllConversations: () => ({
@@ -90,6 +92,7 @@ async function abrirMenu() {
 }
 
 afterEach(() => {
+  mensajesMock = [];
   cleanup();
   vi.clearAllMocks();
 });
@@ -106,7 +109,7 @@ describe('ChatWindow', () => {
     fireEvent.change(input, { target: { value: 'Hola' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
 
-    expect(sendMutate).toHaveBeenCalledWith('Hola');
+    expect(sendMutate).toHaveBeenCalledWith({ contenido: 'Hola', idMensajeCitado: undefined });
     expect(input).toHaveValue('');
   });
 
@@ -166,5 +169,49 @@ describe('ChatWindow', () => {
   it('minimizada, no muestra el historial ni el input', () => {
     renderWindow({ minimized: true });
     expect(screen.queryByPlaceholderText('Escribe un mensaje…')).not.toBeInTheDocument();
+  });
+});
+
+describe('ChatWindow - responder citando un mensaje', () => {
+  const rosa = { idUsuario: 2, nombre: 'Rosa', apellido: 'Fuentes', fotoUrl: null };
+  const base = { idConversacion: 5, enviadoEn: '2026-10-16T10:00:00Z', remitente: rosa };
+
+  it('Responder muestra la vista previa y el envio incluye idMensajeCitado', () => {
+    mensajesMock = [{ ...base, idMensaje: 7, contenido: 'Nos vemos a las 3' }];
+    renderWindow();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Responder a Rosa' }));
+    expect(screen.getByText('Respondiendo a Rosa Fuentes')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Escribe un mensaje…'), { target: { value: 'Va' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+
+    expect(sendMutate).toHaveBeenCalledWith({ contenido: 'Va', idMensajeCitado: 7 });
+    expect(screen.queryByText('Respondiendo a Rosa Fuentes')).not.toBeInTheDocument();
+  });
+
+  it('Esc y el boton cancelan la respuesta sin enviar nada', () => {
+    mensajesMock = [{ ...base, idMensaje: 7, contenido: 'Hola' }];
+    renderWindow();
+    const input = screen.getByPlaceholderText('Escribe un mensaje…');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Responder a Rosa' }));
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.queryByText('Respondiendo a Rosa Fuentes')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Responder a Rosa' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar respuesta' }));
+    expect(screen.queryByText('Respondiendo a Rosa Fuentes')).not.toBeInTheDocument();
+    expect(sendMutate).not.toHaveBeenCalled();
+  });
+
+  it('muestra la cita dentro de la burbuja', () => {
+    mensajesMock = [
+      { ...base, idMensaje: 8, contenido: 'Respuesta', citado: { idMensaje: 7, remitente: rosa, extracto: 'Original' } },
+    ];
+    renderWindow();
+
+    expect(screen.getByRole('button', { name: /Ir al mensaje original de Rosa Fuentes/ })).toBeInTheDocument();
+    expect(screen.getByText('Original')).toBeInTheDocument();
   });
 });
