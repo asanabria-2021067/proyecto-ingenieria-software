@@ -11,6 +11,7 @@ import { DuracionSilencio } from './dto/silenciar-conversation.dto';
 import { ListLinksQueryDto } from './dto/list-links-query.dto';
 import { extraerEnlaces } from './extract-links';
 import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
+import { ListSavedMessagesQueryDto } from './dto/list-saved-messages-query.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { estaEnNoMolestar, estaSilenciada } from './chat-silencio.util';
 import { UpdateNoMolestarDto } from './dto/update-no-molestar.dto';
@@ -100,6 +101,7 @@ function reaccionesParaUsuario(grupos: ReturnType<typeof agruparReacciones>, use
 }
 
 const ARCHIVADOS_PAGE_SIZE = 20;
+const GUARDADOS_PAGE_SIZE = 20;
 
 /** Escapa los comodines de LIKE (%, _, \) — mismo criterio que GlobalSearchService. */
 function likePattern(texto: string): string {
@@ -725,6 +727,81 @@ export class ChatService {
       if (a.esFavorita !== b.esFavorita) return a.esFavorita ? -1 : 1;
       return 0;
     });
+  }
+
+  /** Marcador personal: alterna guardado/no guardado. Solo participantes de la conversación. */
+  async toggleSavedMessage(idProyecto: number, idConversacion: number, idMensaje: number, userId: number) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    const mensaje = await this.prisma.mensajeChat.findFirst({
+      where: { idMensaje, idConversacion },
+      select: { idMensaje: true },
+    });
+    if (!mensaje) {
+      throw new NotFoundException(`Mensaje con id ${idMensaje} no encontrado`);
+    }
+
+    const { count } = await this.prisma.mensajeGuardado.deleteMany({ where: { idUsuario: userId, idMensaje } });
+    if (count > 0) return { guardado: false };
+    await this.prisma.mensajeGuardado.createMany({ data: [{ idUsuario: userId, idMensaje }], skipDuplicates: true });
+    return { guardado: true };
+  }
+
+  /**
+   * Guardados propios, más recientes primero. El filtro por participación
+   * ACTUAL va en el WHERE: si el usuario salió de la conversación (o esta se
+   * borró) su guardado sigue en la tabla pero ya no devuelve contenido.
+   */
+  async listSavedMessages(userId: number, filtros: ListSavedMessagesQueryDto = {}) {
+    const page = filtros.page ?? 1;
+    const guardados = await this.prisma.mensajeGuardado.findMany({
+      where: {
+        idUsuario: userId,
+        mensaje: { conversacion: { eliminadaEn: null, participantes: { some: { idUsuario: userId } } } },
+      },
+      orderBy: [{ guardadoEn: 'desc' }, { idMensaje: 'desc' }],
+      skip: (page - 1) * GUARDADOS_PAGE_SIZE,
+      take: GUARDADOS_PAGE_SIZE + 1,
+      select: {
+        guardadoEn: true,
+        mensaje: {
+          select: {
+            idMensaje: true,
+            contenido: true,
+            enviadoEn: true,
+            remitente: USUARIO_SELECT,
+            conversacion: {
+              select: {
+                idConversacion: true,
+                idProyecto: true,
+                tipo: true,
+                nombre: true,
+                nombrePersonalizado: true,
+                participantes: { select: { usuario: USUARIO_SELECT } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const hasMore = guardados.length > GUARDADOS_PAGE_SIZE;
+    const pagina = hasMore ? guardados.slice(0, GUARDADOS_PAGE_SIZE) : guardados;
+
+    return {
+      items: pagina.map(({ guardadoEn, mensaje: { conversacion: c, ...m } }) => ({
+        ...m,
+        guardadoEn,
+        conversacion: {
+          idConversacion: c.idConversacion,
+          idProyecto: c.idProyecto,
+          tipo: c.tipo,
+          nombre: c.nombre,
+          nombrePersonalizado: c.nombrePersonalizado,
+          participantes: c.participantes.map((p) => p.usuario),
+        },
+      })),
+      hasMore,
+    };
   }
 
   /** Silencio por usuario (no el campo global `silenciada`): 1 h, 8 h o siempre. */
