@@ -319,7 +319,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
             },
           },
         },
-        { mensajes: { some: { contenido: { contains: 'rosa', mode: 'insensitive' } } } },
+        { mensajes: { some: { eliminadoEn: null, contenido: { contains: 'rosa', mode: 'insensitive' } } } },
       ]);
     });
 
