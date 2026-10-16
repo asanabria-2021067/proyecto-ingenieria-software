@@ -20,6 +20,7 @@ import {
   Send,
   Star,
   StarOff,
+  Tag,
   Trash2,
   User,
   Users as UsersIcon,
@@ -46,6 +47,8 @@ import {
 import { ChatLinksDialog } from './chat-links-dialog';
 import { AdjuntoIcono, ChatAdjuntoChip } from './chat-adjunto';
 import { ChatSearchPanel } from './chat-search';
+import { ApodosDialog } from '@/components/chat-dock/apodos-dialog';
+import { nombreMostrado, nombreReal } from '@/lib/chat-apodos';
 import { getIniciales } from '@/components/projects/available-project-card';
 import {
   useLoadOlderMessages,
@@ -76,7 +79,7 @@ function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId:
   if (conversacion.nombrePersonalizado) return conversacion.nombrePersonalizado;
   if (conversacion.tipo === 'GRUPAL') return conversacion.nombre ?? 'Grupo';
   const otro = conversacion.participantes.find((p) => p.idUsuario !== currentUserId);
-  return otro ? `${otro.nombre} ${otro.apellido}` : 'Conversación';
+  return otro ? nombreMostrado(otro) : 'Conversación';
 }
 
 function formatHora(iso: string): string {
@@ -120,6 +123,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const enviarArchivo = useSendFileMessage(idProyecto, idConversacion);
   const enviando = enviar.isPending || enviarArchivo.isPending;
   const [citando, setCitando] = useState<ChatMensaje | null>(null);
+  const [apodosAbierto, setApodosAbierto] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cargarAnteriores = useLoadOlderMessages(idProyecto, idConversacion);
@@ -237,6 +241,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
         <button
           type="button"
           onClick={onMinimize}
+          title={otro && !conversacion?.nombrePersonalizado ? nombreReal(otro) : undefined}
           className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-on-surface"
         >
           {titulo}
@@ -274,6 +279,10 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             <DropdownMenuItem onClick={() => setRenombrarAbierto(true)}>
               <Pencil className="size-4" aria-hidden="true" />
               Renombrar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setApodosAbierto(true)}>
+              <Tag className="size-4" aria-hidden="true" />
+              Apodos
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => actualizar.mutate({ idConversacion, payload: { esFavorita: !conversacion?.esFavorita } })}
@@ -355,6 +364,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             )}
             {messages.map((m) => {
               const propio = m.remitente.idUsuario === currentUserId;
+              const apodo = m.apodoRemitente ?? conversacion?.participantes.find((p) => p.idUsuario === m.remitente.idUsuario)?.apodo;
               return (
                 <Fragment key={m.idMensaje}>
                 <div
@@ -368,7 +378,11 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
                   </Avatar>
                   <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? 'bg-primary text-primary-foreground' : 'bg-surface-container-high text-on-surface'}`}>
-                    {!propio && <p className="mb-0.5 text-[11px] font-semibold opacity-80">{m.remitente.nombre}</p>}
+                    {!propio && (
+                      <p className="mb-0.5 text-[11px] font-semibold opacity-80" title={apodo ? nombreReal(m.remitente) : undefined}>
+                        {apodo || m.remitente.nombre}
+                      </p>
+                    )}
                     {m.citado && <ChatCitaBloque cita={m.citado} propio={propio} onIrAlOriginal={irAlMensaje} />}
                     {m.adjunto && <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />}
                     {m.contenido && <p className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}>{m.contenido}</p>}
@@ -485,6 +499,16 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
       )}
 
       <ChatLinksDialog open={enlacesAbierto} onOpenChange={setEnlacesAbierto} idProyecto={idProyecto} idConversacion={idConversacion} />
+      {apodosAbierto && conversacion && (
+        <ApodosDialog
+          open
+          onOpenChange={setApodosAbierto}
+          idProyecto={idProyecto}
+          idConversacion={idConversacion}
+          participantes={conversacion.participantes.filter((p) => p.idUsuario !== currentUserId)}
+        />
+      )}
+
       <RenameConversationDialog
         open={renombrarAbierto}
         onOpenChange={setRenombrarAbierto}
