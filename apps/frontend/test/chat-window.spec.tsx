@@ -33,6 +33,7 @@ const deleteMutate = vi.fn();
 vi.mock('@/hooks/use-chat', () => ({
   useMessages: () => ({ messages: [], isLoading: false }),
   useSendMessage: () => ({ mutate: sendMutate, isPending: false }),
+  useToggleReaction: () => ({ mutate: vi.fn() }),
   useUpdateConversation: () => ({ mutate: updateMutate, isPending: false }),
   useDeleteConversation: () => ({ mutate: deleteMutate, isPending: false }),
   useAllConversations: () => ({
