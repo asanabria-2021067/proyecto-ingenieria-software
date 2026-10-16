@@ -20,7 +20,6 @@ export function cleanText(raw: string | undefined, max: number): string | null {
   if (!raw) return null;
   const text = decode(raw)
     .replace(/<[^>]*>/g, ' ')
-    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
