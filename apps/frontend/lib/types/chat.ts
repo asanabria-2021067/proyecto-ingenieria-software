@@ -13,6 +13,12 @@ export interface ChatMensaje {
   remitente: ChatUsuario;
 }
 
+/** "Visto por": hasta cuándo leyó la conversación otro participante. */
+export interface ChatLectura {
+  idUsuario: number;
+  ultimaLecturaEn: string | null;
+}
+
 export interface ChatConversacion {
   idConversacion: number;
   tipo: 'GRUPAL' | 'INDIVIDUAL';
