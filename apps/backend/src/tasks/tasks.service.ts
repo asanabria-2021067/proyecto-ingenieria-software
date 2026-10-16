@@ -1,4 +1,6 @@
 import { TimeRecordsService } from '../time-records/time-records.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { INSIGNIAS_EVENTO } from '../insignias/insignias.catalog';
 import {
   BadRequestException,
   ConflictException,
@@ -281,6 +283,8 @@ export class TasksService {
     // argumentos posicionales — en producción, TasksModule siempre lo provee
     // vía BitacoraModule. Cada llamada usa `?.` por el mismo motivo.
     private bitacoraEventos?: BitacoraEventosService,
+    // HU-190: opcional por la misma razón (suites con argumentos posicionales).
+    private events?: EventEmitter2,
   ) {}
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -783,6 +787,8 @@ export class TasksService {
     });
 
     const tareaConEstado = mapTarea(row);
+
+    if (dto.estadoTarea === EstadoTarea.HECHO) this.events?.emit(INSIGNIAS_EVENTO, { claves: ['tareas', 'sprints'], idTarea: taskId });
 
     // Tarea 34: el método actualmente ESCRIBE siempre (no hay atajo de
     // idempotencia para "mismo estado"; ver docstring de updateEstado), así
@@ -1306,6 +1312,8 @@ export class TasksService {
 
       return filaFinal;
     });
+
+    if (dto.marcarComoHecha === true) this.events?.emit(INSIGNIAS_EVENTO, { claves: ['tareas', 'sprints'], idTarea: taskId });
 
     return mapTarea(row);
   }

@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { INSIGNIAS_EVENTO } from '../insignias/insignias.catalog';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService, type PostCommitEffect } from '../notifications/notifications.service';
 import { ApplicationCreatedEvent } from '../notifications/events/application-created.event';
@@ -453,6 +454,8 @@ export class ApplicationsService {
     );
 
     await this.notificationsService.publishEffects(effects);
+
+    if (esAceptada) this.eventEmitter.emit(INSIGNIAS_EVENTO, { claves: ['postulaciones'], idUsuarios: [postulacion.idUsuarioPostulante] });
 
     return postulacionActualizada;
   }
