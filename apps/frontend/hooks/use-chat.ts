@@ -11,6 +11,7 @@ import {
   listArchivedConversations,
   markConversationRead,
   sendMessage,
+  updateChatTheme,
   updateConversation,
 } from '@/lib/services/chat';
 import {
@@ -19,7 +20,7 @@ import {
   conversationMessagesQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
-import type { ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
+import type { ChatMensaje, ChatTemaColor, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -115,6 +116,16 @@ export function useUpdateConversation(idProyecto: number) {
   return useMutation({
     mutationFn: ({ idConversacion, payload }: { idConversacion: number; payload: UpdateConversationPayload }) =>
       updateConversation(idProyecto, idConversacion, payload),
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+/** Tema de color propio de la conversación (null = por defecto). */
+export function useUpdateChatTheme(idProyecto: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idConversacion, temaColor }: { idConversacion: number; temaColor: ChatTemaColor | null }) =>
+      updateChatTheme(idProyecto, idConversacion, temaColor),
     onSuccess: () => invalidateChatLists(queryClient, idProyecto),
   });
 }
