@@ -52,7 +52,6 @@ export function sanitizarNombre(original: string): string {
   const base = (esLatin1 && !utf8.includes('�') ? utf8 : original)
     .split(/[\\/]/)
     .pop()!
-    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f\u0080-\u009f<>:"|?*‪-‮⁦-⁩]/g, '')
     .replace(/\s+/g, ' ')
     .replace(/^\.+/, '')
