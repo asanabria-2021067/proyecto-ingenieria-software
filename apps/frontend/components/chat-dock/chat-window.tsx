@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Archive,
@@ -39,7 +39,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
-import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
+import {
+  useMessages,
+  useSendMessage,
+  useUpdateConversation,
+  useDeleteConversation,
+  useAllConversations,
+  useMarkConversationRead,
+  useReadReceipts,
+} from '@/hooks/use-chat';
+import { quienesVieron, SeenBy, TypingIndicator } from '@/components/chat-dock/chat-indicators';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
@@ -62,14 +71,20 @@ interface ChatWindowProps {
   minimized: boolean;
   onMinimize: () => void;
   onClose: () => void;
+  /** Ids de quienes están escribiendo en esta conversación ahora mismo. */
+  typingUserIds?: number[];
+  /** Se llama al teclear; el socket lo limita (throttle). */
+  onTyping?: () => void;
 }
 
-export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, onClose }: ChatWindowProps) {
+export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, onClose, typingUserIds = [], onTyping }: ChatWindowProps) {
   const { data: user } = useCurrentUser();
   const currentUserId = user?.idUsuario ?? null;
   const { conversations } = useAllConversations();
   const conversacion = conversations.find((c) => c.idConversacion === idConversacion) ?? null;
   const { messages, isLoading } = useMessages(idProyecto, idConversacion);
+  const { lecturas } = useReadReceipts(idProyecto, idConversacion);
+  const marcarLeido = useMarkConversationRead(idProyecto);
   const enviar = useSendMessage(idProyecto, idConversacion);
   const actualizar = useUpdateConversation(idProyecto);
   const eliminar = useDeleteConversation(idProyecto);
@@ -81,6 +96,21 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   useEffect(() => {
     if (!minimized) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, minimized]);
+
+  // Con la ventana abierta, lo recibido de otros cuenta como leído (alimenta "visto por" y los no leídos).
+  const ultimoMensaje = messages[messages.length - 1];
+  const ultimoEsAjeno = ultimoMensaje != null && ultimoMensaje.remitente.idUsuario !== currentUserId;
+  const ultimoId = ultimoMensaje?.idMensaje;
+  const { mutate: marcarLeidoMutate } = marcarLeido;
+  useEffect(() => {
+    if (!minimized && ultimoEsAjeno) marcarLeidoMutate(idConversacion);
+  }, [minimized, ultimoEsAjeno, ultimoId, idConversacion, marcarLeidoMutate]);
+
+  const ultimoPropio = [...messages].reverse().find((m) => m.remitente.idUsuario === currentUserId);
+  const vieron = ultimoPropio && conversacion ? quienesVieron(lecturas, conversacion.participantes, ultimoPropio) : [];
+  const escribiendo = (conversacion?.participantes ?? [])
+    .filter((p) => typingUserIds.includes(p.idUsuario) && p.idUsuario !== currentUserId)
+    .map((p) => p.nombre);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -197,7 +227,8 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             {messages.map((m) => {
               const propio = m.remitente.idUsuario === currentUserId;
               return (
-                <div key={m.idMensaje} className={`flex items-end gap-2 ${propio ? 'flex-row-reverse' : ''}`}>
+                <Fragment key={m.idMensaje}>
+                <div className={`flex items-end gap-2 ${propio ? 'flex-row-reverse' : ''}`}>
                   <Avatar className="size-6 shrink-0">
                     {m.remitente.fotoUrl && <AvatarImage src={m.remitente.fotoUrl} alt="" />}
                     <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
@@ -208,14 +239,20 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
                   </div>
                 </div>
+                {m === ultimoPropio && <SeenBy vieron={vieron} />}
+                </Fragment>
               );
             })}
           </div>
 
+          <TypingIndicator nombres={escribiendo} />
           <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-outline-variant p-2">
             <Input
               value={texto}
-              onChange={(event) => setTexto(event.target.value)}
+              onChange={(event) => {
+                setTexto(event.target.value);
+                if (event.target.value.trim()) onTyping?.();
+              }}
               placeholder="Escribe un mensaje…"
               maxLength={4000}
               disabled={enviar.isPending}
