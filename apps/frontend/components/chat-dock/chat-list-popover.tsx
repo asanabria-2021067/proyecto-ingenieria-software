@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Search, SquarePen, Users as UsersIcon } from 'lucide-react';
+import { BellOff, Search, SquarePen, Users as UsersIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { getIniciales } from '@/components/projects/available-project-card';
@@ -9,6 +9,7 @@ import { useAllConversations } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { NewChatDialog } from '@/components/chat-dock/new-chat-dialog';
+import { estaSilenciada } from '@/lib/chat-silencio';
 import type { ChatConversacionGlobal } from '@/lib/types/chat';
 
 function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId: number | null): string {
@@ -127,10 +128,17 @@ export function ChatListPopover({ onClose }: ChatListPopoverProps) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-semibold text-on-surface">{nombreConversacion(c, currentUserId)}</span>
-                  {c.noLeidos > 0 && (
-                    <span className="inline-flex min-w-[18px] shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-on-primary">
-                      {c.noLeidos}
+                  {estaSilenciada(c) ? (
+                    <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium text-text-secondary">
+                      <BellOff className="size-3" aria-hidden="true" />
+                      Silenciado
                     </span>
+                  ) : (
+                    c.noLeidos > 0 && (
+                      <span className="inline-flex min-w-[18px] shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-on-primary">
+                        {c.noLeidos}
+                      </span>
+                    )
                   )}
                 </div>
                 <span className="mt-0.5 inline-block truncate rounded-full bg-surface-container-high px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
