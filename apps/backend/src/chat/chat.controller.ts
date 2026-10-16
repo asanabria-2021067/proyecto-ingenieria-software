@@ -16,6 +16,7 @@ import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
+import { UpdateChatThemeDto } from './dto/update-chat-theme.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -72,6 +73,16 @@ export class ChatController {
     @Body() dto: UpdateConversationDto,
   ) {
     return this.chatService.updateConversation(projectId, conversationId, user.userId, dto);
+  }
+
+  @Patch(':conversationId/tema')
+  updateTheme(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: UpdateChatThemeDto,
+  ) {
+    return this.chatService.updateTheme(projectId, conversationId, user.userId, dto);
   }
 
   @Delete(':conversationId')
