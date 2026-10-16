@@ -241,13 +241,13 @@ describe('LinkPreviewService.preview', () => {
   it('devuelve metadatos y guarda en cache con TTL', async () => {
     const { service, cache } = setup();
     const out = await service.preview('https://example.com/a');
-    expect(out).toEqual({ url: 'https://example.com/a', titulo: 'Hola', descripcion: 'Desc', imagen: null, sitio: 'example.com' });
+    expect(out).toEqual({ url: 'https://example.com/a', titulo: 'Hola', descripcion: 'Desc', sitio: 'example.com' });
     expect(cache.set).toHaveBeenCalledWith('link-preview:https://example.com/a', out, expect.any(Number));
   });
 
   it('sirve desde cache sin tocar la red', async () => {
     const { service, cache, resolver } = setup();
-    const cached = { url: 'https://example.com/a', titulo: 'C', descripcion: null, imagen: null, sitio: 'example.com' };
+    const cached = { url: 'https://example.com/a', titulo: 'C', descripcion: null, sitio: 'example.com' };
     cache.get.mockResolvedValue(cached);
     await expect(service.preview('https://example.com/a')).resolves.toBe(cached);
     expect(resolver).not.toHaveBeenCalled();
