@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render } from '@testing-library/react';
+import { act, cleanup, render } from '@testing-library/react';
 
 const useLinkPreview = vi.fn();
 vi.mock('@/hooks/use-chat', () => ({ useLinkPreview: (...args: unknown[]) => useLinkPreview(...args) }));
@@ -11,7 +11,6 @@ const DATA = {
   url: 'https://example.com/post',
   titulo: 'Titulo de prueba',
   descripcion: 'Descripcion de prueba',
-  imagen: 'https://cdn.example.com/i.png',
   sitio: 'example.com',
 };
 
@@ -46,9 +45,9 @@ describe('LinkPreviewCard', () => {
     expect(useLinkPreview).toHaveBeenCalledWith(1, 2, null);
   });
 
-  it('muestra la tarjeta como enlace seguro con imagen decorativa', () => {
+  it('muestra la tarjeta como enlace seguro sin imagen', () => {
     useLinkPreview.mockReturnValue({ data: DATA });
-    const { getByRole, container } = renderCard('ver https://example.com/post');
+    const { getByRole } = renderCard('ver https://example.com/post');
     expect(useLinkPreview).toHaveBeenCalledWith(1, 2, 'https://example.com/post');
     const link = getByRole('link');
     expect(link).toHaveAttribute('href', 'https://example.com/post');
@@ -57,24 +56,12 @@ describe('LinkPreviewCard', () => {
     expect(link).toHaveTextContent('Titulo de prueba');
     expect(link).toHaveTextContent('Descripcion de prueba');
     expect(link).toHaveTextContent('Abre en una pestaña nueva');
-    const img = container.querySelector('img')!;
-    expect(img).toHaveAttribute('alt', '');
-    expect(img).toHaveAttribute('referrerpolicy', 'no-referrer');
-    expect(img).toHaveAttribute('loading', 'lazy');
-  });
-
-  it('si la imagen falla, la oculta y deja el texto', () => {
-    useLinkPreview.mockReturnValue({ data: DATA });
-    const { container, getByRole } = renderCard('https://example.com/post');
-    fireEvent.error(container.querySelector('img')!);
-    expect(container.querySelector('img')).toBeNull();
-    expect(getByRole('link')).toHaveTextContent('Titulo de prueba');
+    expect(link.querySelector('img')).toBeNull();
   });
 
   it('muestra solo los campos presentes', () => {
-    useLinkPreview.mockReturnValue({ data: { ...DATA, imagen: null, descripcion: null, sitio: null } });
-    const { container, getByRole } = renderCard('https://example.com/post');
-    expect(container.querySelector('img')).toBeNull();
+    useLinkPreview.mockReturnValue({ data: { ...DATA, descripcion: null, sitio: null } });
+    const { getByRole } = renderCard('https://example.com/post');
     expect(getByRole('link')).toHaveTextContent('Titulo de prueba');
   });
 
@@ -86,7 +73,7 @@ describe('LinkPreviewCard', () => {
   });
 
   it('sin metadatos utiles no muestra tarjeta', () => {
-    useLinkPreview.mockReturnValue({ data: { ...DATA, titulo: null, descripcion: null, imagen: null } });
+    useLinkPreview.mockReturnValue({ data: { ...DATA, titulo: null, descripcion: null } });
     const { queryByRole } = renderCard('https://example.com/post');
     expect(queryByRole('link')).toBeNull();
   });
