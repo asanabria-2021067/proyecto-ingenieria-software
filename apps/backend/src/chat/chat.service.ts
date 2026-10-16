@@ -170,6 +170,7 @@ export class ChatService {
             ultimaLecturaEn: true,
             silenciadaHasta: true,
             silenciadaSiempre: true,
+            temaColor: true,
             usuario: USUARIO_SELECT,
           },
         },
@@ -204,6 +205,7 @@ export class ChatService {
           silenciadaHasta: propia?.silenciadaHasta ?? null,
           silenciadaSiempre: propia?.silenciadaSiempre ?? false,
           esPrioritaria: c.esPrioritaria,
+          temaColor: propia?.temaColor ?? null,
         };
       }),
     );
@@ -661,6 +663,7 @@ export class ChatService {
             ultimaLecturaEn: true,
             silenciadaHasta: true,
             silenciadaSiempre: true,
+            temaColor: true,
             usuario: USUARIO_SELECT,
           },
         },
@@ -697,6 +700,7 @@ export class ChatService {
           silenciadaHasta: propia?.silenciadaHasta ?? null,
           silenciadaSiempre: propia?.silenciadaSiempre ?? false,
           esPrioritaria: c.esPrioritaria,
+          temaColor: propia?.temaColor ?? null,
         };
       }),
     );
