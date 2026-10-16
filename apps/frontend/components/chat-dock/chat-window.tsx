@@ -76,9 +76,11 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const enviar = useSendMessage(idProyecto, idConversacion);
   const actualizar = useUpdateConversation(idProyecto);
   const eliminar = useDeleteConversation(idProyecto);
+  const cambiarTema = useUpdateChatTheme(idProyecto);
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
+  const [temaAbierto, setTemaAbierto] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -150,6 +152,10 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             <DropdownMenuItem onClick={() => setRenombrarAbierto(true)}>
               <Pencil className="size-4" aria-hidden="true" />
               Renombrar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTemaAbierto(true)}>
+              <Palette className="size-4" aria-hidden="true" />
+              Tema de color
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => actualizar.mutate({ idConversacion, payload: { esFavorita: !conversacion?.esFavorita } })}
@@ -236,6 +242,13 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
           </form>
         </>
       )}
+
+      <ChatThemeDialog
+        open={temaAbierto}
+        onOpenChange={setTemaAbierto}
+        value={conversacion?.temaColor ?? null}
+        onChange={(temaColor) => cambiarTema.mutate({ idConversacion, temaColor })}
+      />
 
       <RenameConversationDialog
         open={renombrarAbierto}
