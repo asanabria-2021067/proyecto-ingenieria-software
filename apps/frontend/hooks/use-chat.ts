@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createConversation,
   deleteConversation,
   getMessages,
+  getReadReceipts,
   listAllConversations,
   listArchivedConversations,
   markConversationRead,
@@ -17,9 +18,10 @@ import {
   allConversationsQueryKey,
   archivedConversationsQueryKey,
   conversationMessagesQueryKey,
+  conversationReadsQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
-import type { ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
+import type { ChatLectura, ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -74,6 +76,16 @@ export function useMessages(idProyecto: number, idConversacion: number | null) {
     enabled: idConversacion != null,
   });
   return { messages: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
+}
+
+/** "Visto por": lecturas de los demás participantes; el socket las mantiene al día (messagesRead). */
+export function useReadReceipts(idProyecto: number, idConversacion: number | null) {
+  const query = useQuery({
+    queryKey: conversationReadsQueryKey(idProyecto, idConversacion ?? 0),
+    queryFn: () => getReadReceipts(idProyecto, idConversacion as number),
+    enabled: idConversacion != null,
+  });
+  return { lecturas: query.data ?? [] };
 }
 
 export function useSendMessage(idProyecto: number, idConversacion: number | null) {
