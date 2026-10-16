@@ -209,4 +209,22 @@ describe('ChatGateway', () => {
       expect(emit).toHaveBeenCalledWith('messagesRead', { idConversacion: 3, idUsuario: 7, ultimaLecturaEn: fecha });
     });
   });
+
+  describe('removeFromConversation', () => {
+    it('saca los sockets del usuario de la room y le refresca la lista', () => {
+      const { gateway } = makeGateway();
+      const emit = vi.fn();
+      const to = vi.fn(() => ({ emit }));
+      const socketsLeave = vi.fn();
+      const inRoom = vi.fn(() => ({ socketsLeave }));
+      Reflect.set(gateway, 'server', { to, in: inRoom });
+
+      gateway.removeFromConversation(3, [5]);
+
+      expect(inRoom).toHaveBeenCalledWith('user:5');
+      expect(socketsLeave).toHaveBeenCalledWith('conversation:3');
+      expect(to).toHaveBeenCalledWith('user:5');
+      expect(emit).toHaveBeenCalledWith('conversationUpdated', { idConversacion: 3 });
+    });
+  });
 });
