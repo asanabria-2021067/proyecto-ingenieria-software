@@ -6,6 +6,7 @@ import type {
   CreateConversationPayload,
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
+  ListSavedMessagesResultado,
   UpdateConversationPayload,
 } from '@/lib/types/chat';
 
@@ -80,4 +81,19 @@ export function listArchivedConversations(
   if (filtros.q) params.set('q', filtros.q);
   if (filtros.page) params.set('page', String(filtros.page));
   return apiFetch(`/chats/archivados?${params.toString()}`);
+}
+
+/** Alterna el marcador personal de un mensaje. */
+export function toggleSavedMessage(
+  idProyecto: number,
+  idConversacion: number,
+  idMensaje: number,
+): Promise<{ guardado: boolean }> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/${idMensaje}/guardado`, {
+    method: 'POST',
+  });
+}
+
+export function listSavedMessages(page: number): Promise<ListSavedMessagesResultado> {
+  return apiFetch(`/chats/mensajes-guardados?page=${page}`);
 }
