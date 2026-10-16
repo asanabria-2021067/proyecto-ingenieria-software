@@ -1,8 +1,25 @@
+export type TipoEstadoChat = 'EN_CLASE' | 'OCUPADO' | 'DISPONIBLE' | 'PERSONALIZADO';
+
+/** Estado personalizado vigente; `venceEn` null = sin caducidad. */
+export interface ChatEstado {
+  tipo: TipoEstadoChat;
+  texto: string | null;
+  venceEn: string | null;
+}
+
+export interface SetEstadoChatPayload {
+  tipo: TipoEstadoChat;
+  texto?: string;
+  venceEn?: string | null;
+}
+
 export interface ChatUsuario {
   idUsuario: number;
   nombre: string;
   apellido: string;
   fotoUrl: string | null;
+  /** Solo viene en los listados de participantes de conversaciones. */
+  estado?: ChatEstado | null;
 }
 
 export interface ChatMensaje {
