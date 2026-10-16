@@ -159,6 +159,17 @@ export class ChatController {
     return this.chatService.toggleReaction(projectId, conversationId, messageId, user.userId, dto.emoji);
   }
 
+  @Post(':conversationId/mensajes/:messageId/guardado')
+  @HttpCode(HttpStatus.OK)
+  toggleSaved(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.toggleSavedMessage(projectId, conversationId, messageId, user.userId);
+  }
+
   @Patch(':conversationId')
   update(
     @Param('projectId', ParseIntPipe) projectId: number,
