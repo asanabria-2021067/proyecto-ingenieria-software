@@ -12,7 +12,6 @@ const PREVIEW = {
   url: URL_MENSAJE,
   titulo: 'Articulo de prueba',
   descripcion: 'Descripcion de la vista previa',
-  imagen: null,
   sitio: 'ejemplo.uvg.test',
 };
 
