@@ -13,6 +13,8 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { getFrontendUrl } from '../common/utils/cookie';
 import { WsAuthService } from '../ws-auth/ws-auth.service';
+import { ChatRoomsHandler } from './chat-rooms.handler';
+import { ChatBroadcaster } from './chat-broadcaster';
 import { ACCOUNT_ACCESS_REVOKED, type AccountAccessRevokedEvent } from '../ws-auth/account-access.events';
 
 @WebSocketGateway({
@@ -28,10 +30,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(ChatGateway.name);
 
+  private readonly rooms: ChatRoomsHandler;
+  private readonly broadcaster = new ChatBroadcaster(() => this.server);
+
   constructor(
     private readonly wsAuth: WsAuthService,
-    private prisma: PrismaService,
-  ) {}
+    prisma: PrismaService,
+  ) {
+    this.rooms = new ChatRoomsHandler(prisma);
+  }
 
   async handleConnection(client: Socket) {
     try {
