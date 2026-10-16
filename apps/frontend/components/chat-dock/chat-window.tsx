@@ -116,6 +116,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const eliminar = useDeleteConversation(idProyecto);
   const silenciar = useSilenciarConversation(idProyecto);
   const silenciada = conversacion ? estaSilenciada(conversacion) : false;
+  const cambiarTema = useUpdateChatTheme(idProyecto);
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
@@ -128,6 +129,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const enviando = enviar.isPending || enviarArchivo.isPending;
   const [citando, setCitando] = useState<ChatMensaje | null>(null);
   const [apodosAbierto, setApodosAbierto] = useState(false);
+  const [temaAbierto, setTemaAbierto] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cargarAnteriores = useLoadOlderMessages(idProyecto, idConversacion);
@@ -287,6 +289,10 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             <DropdownMenuItem onClick={() => setApodosAbierto(true)}>
               <Tag className="size-4" aria-hidden="true" />
               Apodos
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTemaAbierto(true)}>
+              <Palette className="size-4" aria-hidden="true" />
+              Tema de color
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => actualizar.mutate({ idConversacion, payload: { esFavorita: !conversacion?.esFavorita } })}
@@ -512,6 +518,12 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
           participantes={conversacion.participantes.filter((p) => p.idUsuario !== currentUserId)}
         />
       )}
+      <ChatThemeDialog
+        open={temaAbierto}
+        onOpenChange={setTemaAbierto}
+        value={conversacion?.temaColor ?? null}
+        onChange={(temaColor) => cambiarTema.mutate({ idConversacion, temaColor })}
+      />
 
       <RenameConversationDialog
         open={renombrarAbierto}
