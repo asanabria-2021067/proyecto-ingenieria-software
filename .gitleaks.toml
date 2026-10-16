@@ -1,0 +1,19 @@
+title = "UVG Scholar - gitleaks"
+
+# Reglas por defecto de gitleaks, extendidas con la allowlist de abajo.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fixtures, pruebas y plantillas de entorno sin secretos reales"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)[^/]*\.example\.(yml|yaml|json|env)$''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)test/''',
+  '''(^|/)e2e/''',
+  '''(^|/)e2e-harness/''',
+  '''\.(spec|test)\.[jt]sx?$''',
+  '''^docs/''',
+  '''^Scrum/''',
+]
