@@ -7,7 +7,7 @@ CREATE UNIQUE INDEX "conversacion_id_proyecto_nombre_canal_key" ON "conversacion
 
 -- Backfill: canal general para los proyectos existentes no cerrados (idempotente)
 INSERT INTO "conversacion" ("id_proyecto", "tipo", "nombre", "creada_por", "es_canal", "nombre_canal")
-SELECT p."id_proyecto", 'GRUPAL', 'general', p."creado_por", true, 'general'
+SELECT p."id_proyecto", 'GRUPAL'::"TipoConversacion", 'general', p."creado_por", true, 'general'
 FROM "proyecto" p
 WHERE p."eliminado_en" IS NULL
 	AND p."estado_proyecto" <> 'CERRADO'
