@@ -29,7 +29,7 @@ function resolveAll(hostname: string): Promise<Address[]> {
 }
 
 /** Una peticion GET conectada a la IP ya validada (la validacion y la conexion usan la misma IP). */
-function httpTransport(url: URL, target: Address, signal: AbortSignal): Promise<HopResponse> {
+export function httpTransport(url: URL, target: Address, signal: AbortSignal): Promise<HopResponse> {
   return new Promise((resolve, reject) => {
     const client = url.protocol === 'https:' ? https : http;
     const req = client.request(
