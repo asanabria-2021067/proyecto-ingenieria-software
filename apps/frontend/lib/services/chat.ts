@@ -3,6 +3,7 @@ import type {
   ChatConversacion,
   ChatConversacionGlobal,
   ChatMensaje,
+  ChatTemaColor,
   CreateConversationPayload,
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
@@ -51,6 +52,17 @@ export function updateConversation(
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
+  });
+}
+
+export function updateChatTheme(
+  idProyecto: number,
+  idConversacion: number,
+  temaColor: ChatTemaColor | null,
+): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/tema`, {
+    method: 'PATCH',
+    body: JSON.stringify({ temaColor }),
   });
 }
 
