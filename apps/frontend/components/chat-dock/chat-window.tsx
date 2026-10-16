@@ -11,6 +11,7 @@ import {
   ChevronUp,
   Loader2,
   MoreVertical,
+  Palette,
   Pencil,
   Send,
   Star,
@@ -39,7 +40,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
-import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
+import { useMessages, useSendMessage, useUpdateConversation, useUpdateChatTheme, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
+import { ChatThemeDialog } from '@/components/chat-dock/chat-theme-dialog';
+import { claseAcentoCabecera, claseBurbujaPropia } from '@/lib/chat-temas';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
