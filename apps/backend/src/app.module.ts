@@ -45,6 +45,7 @@ import { EventsModule } from './events/events.module';
 import { CalendarSharesModule } from './calendar-shares/calendar-shares.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { InsigniasModule } from './insignias/insignias.module';
+import { AnunciosModule } from './anuncios/anuncios.module';
 
 const skipThrottling = () => isThrottlerDisabled();
 
@@ -127,6 +128,7 @@ const skipThrottling = () => isThrottlerDisabled();
     CalendarSharesModule,
     AttendanceModule,
     InsigniasModule,
+    AnunciosModule,
   ],
   controllers: [AppController],
   providers: [
