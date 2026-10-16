@@ -376,6 +376,8 @@ model Usuario {
   conversacionesCreadas            Conversacion[]             @relation("ConversacionesCreadas")
   conversacionesParticipa          ConversacionParticipante[]
   mensajesChatEnviados             MensajeChat[]              @relation("MensajesChatEnviados")
+  apodosDefinidos                  ApodoConversacion[]        @relation("ApodosDefinidos")
+  apodosRecibidos                  ApodoConversacion[]        @relation("ApodosRecibidos")
   tokensRefresco                   TokenRefresco[]
   proyectosGuardados               ProyectoGuardado[]
   actividadesCreadas               ActividadProyecto[]
@@ -1653,6 +1655,7 @@ model Conversacion {
   creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario])
   participantes ConversacionParticipante[]
   mensajes      MensajeChat[]
+  apodos        ApodoConversacion[]
 
   @@index([idProyecto])
   @@map("conversacion")
@@ -1684,6 +1687,25 @@ model MensajeChat {
 
   @@index([idConversacion, enviadoEn])
   @@map("mensaje_chat")
+}
+
+// Apodos por chat: cada usuario define como ve a otro participante; es privado
+// (solo lo ve quien lo define).
+model ApodoConversacion {
+  idApodo           Int      @id @default(autoincrement()) @map("id_apodo")
+  idConversacion    Int      @map("id_conversacion")
+  idUsuarioDefine   Int      @map("id_usuario_define")
+  idUsuarioObjetivo Int      @map("id_usuario_objetivo")
+  apodo             String   @db.VarChar(40)
+  actualizadoEn     DateTime @updatedAt @map("actualizado_en")
+
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Cascade)
+  define       Usuario      @relation("ApodosDefinidos", fields: [idUsuarioDefine], references: [idUsuario])
+  objetivo     Usuario      @relation("ApodosRecibidos", fields: [idUsuarioObjetivo], references: [idUsuario])
+
+  @@unique([idConversacion, idUsuarioDefine, idUsuarioObjetivo])
+  @@index([idUsuarioDefine])
+  @@map("apodo_conversacion")
 }
 
 // HU-190 (T-346): niveles de una insignia. Sin nivel (null) = aún sin umbral alcanzado.
