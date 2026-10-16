@@ -2,10 +2,12 @@ import { apiFetch } from '@/lib/api/client';
 import type {
   ChatConversacion,
   ChatConversacionGlobal,
+  ChatEstado,
   ChatMensaje,
   CreateConversationPayload,
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
+  SetEstadoChatPayload,
   UpdateConversationPayload,
 } from '@/lib/types/chat';
 
@@ -80,4 +82,21 @@ export function listArchivedConversations(
   if (filtros.q) params.set('q', filtros.q);
   if (filtros.page) params.set('page', String(filtros.page));
   return apiFetch(`/chats/archivados?${params.toString()}`);
+}
+
+export async function getMiEstado(): Promise<ChatEstado | null> {
+  const { estado } = await apiFetch<{ estado: ChatEstado | null }>('/chats/estado');
+  return estado;
+}
+
+export async function setMiEstado(payload: SetEstadoChatPayload): Promise<ChatEstado | null> {
+  const { estado } = await apiFetch<{ estado: ChatEstado | null }>('/chats/estado', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  return estado;
+}
+
+export function clearMiEstado(): Promise<void> {
+  return apiFetch('/chats/estado', { method: 'DELETE' });
 }
