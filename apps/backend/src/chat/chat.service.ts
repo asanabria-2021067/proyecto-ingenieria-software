@@ -295,17 +295,23 @@ export class ChatService {
       where: { idConversacion, ...(cursorId ? { idMensaje: { lt: cursorId } } : {}) },
       orderBy: { idMensaje: 'desc' },
       take: 30,
-      select: { ...MENSAJE_CON_CITA_SELECT, reacciones: REACCIONES_SELECT },
+      select: {
+        ...MENSAJE_CON_CITA_SELECT,
+        reacciones: REACCIONES_SELECT,
+        guardadoPor: { where: { idUsuario: userId }, select: { idUsuario: true } },
+      },
     });
     const apodos = await this.prisma.apodoConversacion.findMany({
       where: { idConversacion, idUsuarioDefine: userId },
       select: { idUsuarioObjetivo: true, apodo: true },
     });
     const porUsuario = new Map(apodos.map((a) => [a.idUsuarioObjetivo, a.apodo]));
-    return mensajes.reverse().map(({ reacciones, ...m }) => ({
+    // `guardado` es solo del usuario autenticado: nunca se expone quién más guardó.
+    return mensajes.reverse().map(({ reacciones, guardadoPor, ...m }) => ({
       ...conResumenDeCita(m),
       reacciones: reaccionesParaUsuario(agruparReacciones(reacciones), userId),
       apodoRemitente: porUsuario.get(m.remitente.idUsuario) ?? null,
+      guardado: guardadoPor.length > 0,
     }));
   }
 
