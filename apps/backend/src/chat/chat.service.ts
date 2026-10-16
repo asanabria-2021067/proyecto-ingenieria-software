@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from './chat.gateway';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
+import { ListLinksQueryDto } from './dto/list-links-query.dto';
+import { extraerEnlaces } from './extract-links';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 
 /**
@@ -201,6 +203,42 @@ export class ChatService {
       select: MENSAJE_SELECT,
     });
     return mensajes.reverse();
+  }
+
+  /**
+   * Galeria de enlaces: se extraen del texto de los mensajes, sin tabla propia.
+   * ponytail: cada pagina escanea hasta `limite` mensajes que contienen "http"
+   * (no `limite` enlaces), asi que una pagina puede traer menos items; el cursor
+   * es el ultimo idMensaje escaneado. Si hay conversaciones con muchisimos
+   * mensajes, conviene una tabla `enlace_mensaje` indexada (idConversacion,
+   * idMensaje) poblada al crear el mensaje. Los duplicados se eliminan por
+   * mensaje y dentro de la pagina, no entre paginas.
+   */
+  async getLinks(idProyecto: number, idConversacion: number, userId: number, query: ListLinksQueryDto = {}) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    const limite = query.limite ?? 20;
+    const mensajes = await this.prisma.mensajeChat.findMany({
+      where: {
+        idConversacion,
+        contenido: { contains: 'http', mode: 'insensitive' },
+        ...(query.cursor ? { idMensaje: { lt: query.cursor } } : {}),
+      },
+      orderBy: { idMensaje: 'desc' },
+      take: limite,
+      select: { idMensaje: true, contenido: true, enviadoEn: true, remitente: USUARIO_SELECT },
+    });
+
+    const vistos = new Set<string>();
+    const items: { url: string; dominio: string; idMensaje: number; remitente: (typeof mensajes)[number]['remitente']; enviadoEn: Date }[] = [];
+    for (const m of mensajes) {
+      for (const url of extraerEnlaces(m.contenido)) {
+        if (vistos.has(url)) continue;
+        vistos.add(url);
+        items.push({ url, dominio: new URL(url).hostname, idMensaje: m.idMensaje, remitente: m.remitente, enviadoEn: m.enviadoEn });
+      }
+    }
+    const nextCursor = mensajes.length === limite ? mensajes[mensajes.length - 1].idMensaje : null;
+    return { items, nextCursor };
   }
 
   async createMessage(idProyecto: number, idConversacion: number, userId: number, contenido: string) {
