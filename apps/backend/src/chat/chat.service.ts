@@ -83,6 +83,10 @@ export class ChatService {
     return conversacion;
   }
 
+  async assertConversationParticipant(idProyecto: number, idConversacion: number, userId: number) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+  }
+
   async listConversations(idProyecto: number, userId: number) {
     const proyecto = await this.assertProjectMember(idProyecto, userId);
     const archivada = chatArchivado(proyecto.estadoProyecto);
