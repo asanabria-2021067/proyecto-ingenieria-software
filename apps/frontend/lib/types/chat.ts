@@ -93,6 +93,5 @@ export interface LinkPreview {
   url: string;
   titulo: string | null;
   descripcion: string | null;
-  imagen: string | null;
   sitio: string | null;
 }
