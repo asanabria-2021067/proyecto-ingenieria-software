@@ -33,8 +33,15 @@ const MENSAJE_SELECT = {
   idConversacion: true,
   contenido: true,
   enviadoEn: true,
+  editadoEn: true,
+  eliminadoEn: true,
   remitente: USUARIO_SELECT,
 } as const;
+
+/** El contenido de un mensaje eliminado nunca sale del servidor. */
+function ocultarEliminado<T extends { contenido: string; eliminadoEn: Date | null }>(mensaje: T): T {
+  return mensaje.eliminadoEn ? { ...mensaje, contenido: '' } : mensaje;
+}
 
 const ARCHIVADOS_PAGE_SIZE = 20;
 
