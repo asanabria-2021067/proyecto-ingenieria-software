@@ -12,6 +12,7 @@ import {
   Post,
   Put,
   Query,
+  StreamableFile,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -104,6 +105,17 @@ export class ChatController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.chatService.getAdjuntoUrl(projectId, conversationId, attachmentId, user.userId);
+  }
+
+  @Get(':conversationId/archivos/:attachmentId/miniatura')
+  async thumbnail(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    const { datos, mime } = await this.chatService.getAdjuntoImagen(projectId, conversationId, attachmentId, user.userId);
+    return new StreamableFile(datos, { type: mime, disposition: 'inline' });
   }
 
   /** Un archivo por mensaje, con o sin texto. El tamano se corta en multer. */
