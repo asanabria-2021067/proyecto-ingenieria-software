@@ -1808,6 +1808,33 @@ model MensajeGuardado {
   @@map("mensaje_guardado")
 }
 
+enum EstadoMensajeProgramado {
+  PENDIENTE
+  ENVIADO
+  CANCELADO
+  FALLIDO
+}
+
+// Mensaje de chat para enviar a una hora futura (job cada minuto).
+model MensajeProgramado {
+  idMensajeProgramado Int                     @id @default(autoincrement()) @map("id_mensaje_programado")
+  idConversacion      Int                     @map("id_conversacion")
+  idRemitente         Int                     @map("id_remitente")
+  contenido           String                  @db.Text
+  enviarEn            DateTime                @map("enviar_en")
+  estado              EstadoMensajeProgramado @default(PENDIENTE)
+  creadoEn            DateTime                @default(now()) @map("creado_en")
+  enviadoEn           DateTime?               @map("enviado_en")
+  idMensaje           Int?                    @map("id_mensaje")
+
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
+  remitente    Usuario      @relation("MensajesProgramadosChat", fields: [idRemitente], references: [idUsuario])
+
+  @@index([estado, enviarEn])
+  @@index([idConversacion, idRemitente])
+  @@map("mensaje_programado")
+}
+
 // HU-190 (T-346): niveles de una insignia. Sin nivel (null) = aún sin umbral alcanzado.
 enum NivelInsignia {
   BRONCE
