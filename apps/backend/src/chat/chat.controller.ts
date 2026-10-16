@@ -26,6 +26,7 @@ import { SendFileMessageDto } from './dto/send-file-message.dto';
 import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { SilenciarConversationDto } from './dto/silenciar-conversation.dto';
+import { ToggleReactionDto } from './dto/toggle-reaction.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -142,6 +143,18 @@ export class ChatController {
   ) {
     if (!file) throw new BadRequestException('No se recibió el archivo');
     return this.chatService.createMessage(projectId, conversationId, user.userId, dto.contenido ?? '', file);
+  }
+
+  @Post(':conversationId/mensajes/:messageId/reacciones')
+  @HttpCode(HttpStatus.OK)
+  toggleReaction(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: ToggleReactionDto,
+  ) {
+    return this.chatService.toggleReaction(projectId, conversationId, messageId, user.userId, dto.emoji);
   }
 
   @Patch(':conversationId')
