@@ -4,6 +4,7 @@ import type {
   ChatArchivosPagina,
   BuscarMensajesFiltros,
   BuscarMensajesResultado,
+  ChatCanalCreado,
   ChatConversacion,
   ChatConversacionGlobal,
   ChatLectura,
@@ -13,6 +14,7 @@ import type {
   ChatReaccion,
   ChatTemaColor,
   ChatMensajeProgramado,
+  CreateChannelPayload,
   CreateConversationPayload,
   DuracionSilencio,
   ListArchivedConversationsFiltros,
@@ -294,4 +296,24 @@ export function toggleSavedMessage(
 
 export function listSavedMessages(page: number): Promise<ListSavedMessagesResultado> {
   return apiFetch(`/chats/mensajes-guardados?page=${page}`);
+}
+
+export function createChannel(idProyecto: number, payload: CreateChannelPayload): Promise<ChatCanalCreado> {
+  return apiFetch(`/proyectos/${idProyecto}/canales`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function addChannelMembers(idProyecto: number, idCanal: number, idsUsuarios: number[]): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/canales/${idCanal}/miembros`, {
+    method: 'POST',
+    body: JSON.stringify({ idsUsuarios }),
+  });
+}
+
+export function removeChannelMember(idProyecto: number, idCanal: number, idUsuario: number): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/canales/${idCanal}/miembros/${idUsuario}`, {
+    method: 'DELETE',
+  });
 }
