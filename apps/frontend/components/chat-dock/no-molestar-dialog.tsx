@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -54,11 +54,10 @@ interface NoMolestarDialogProps {
 export function NoMolestarDialog({ open, onOpenChange }: NoMolestarDialogProps) {
   const { preferencia, isLoading } = useNoMolestar();
   const guardar = useUpdateNoMolestar();
-  const [form, setForm] = useState<PreferenciaNoMolestar>(POR_DEFECTO);
-
-  useEffect(() => {
-    if (preferencia) setForm(preferencia);
-  }, [preferencia]);
+  // Borrador local: hasta que el usuario edita, se muestra lo guardado.
+  const [borrador, setBorrador] = useState<PreferenciaNoMolestar | null>(null);
+  const form = borrador ?? preferencia ?? POR_DEFECTO;
+  const setForm = (cambio: (f: PreferenciaNoMolestar) => PreferenciaNoMolestar) => setBorrador(cambio(form));
 
   const invalido = form.horaInicio === form.horaFin || !form.horaInicio || !form.horaFin;
   const zonas = ZONAS.includes(form.zona) ? ZONAS : [form.zona, ...ZONAS];
