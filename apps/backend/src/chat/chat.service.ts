@@ -1,7 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { EstadoProyecto, Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { CHAT_STORAGE_PORT, type ChatStoragePort } from '../storage/chat-storage.port';
 import { ChatGateway } from './chat.gateway';
+import { validarAdjunto, type ArchivoSubido } from './chat-adjuntos';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
 import { ListLinksQueryDto } from './dto/list-links-query.dto';
@@ -36,7 +39,11 @@ const MENSAJE_SELECT = {
   contenido: true,
   enviadoEn: true,
   remitente: USUARIO_SELECT,
+  // Solo metadatos: la clave de almacenamiento y las URL nunca salen en el listado.
+  adjunto: { select: { idAdjunto: true, nombreOriginal: true, mime: true, tamanoBytes: true } },
 } as const;
+
+const URL_ADJUNTO_TTL_SEGUNDOS = 60;
 
 const ARCHIVADOS_PAGE_SIZE = 20;
 
@@ -45,6 +52,7 @@ export class ChatService {
   constructor(
     private prisma: PrismaService,
     private gateway: ChatGateway,
+    @Inject(CHAT_STORAGE_PORT) private storage: ChatStoragePort,
   ) {}
 
   /** Líder o participante con participación ACTIVO en algún rol del proyecto. */
@@ -241,7 +249,48 @@ export class ChatService {
     return { items, nextCursor };
   }
 
-  async createMessage(idProyecto: number, idConversacion: number, userId: number, contenido: string) {
+  /** Galeria de archivos compartidos, paginada por idAdjunto descendente. */
+  async getArchivos(idProyecto: number, idConversacion: number, userId: number, query: ListLinksQueryDto = {}) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    const limite = query.limite ?? 20;
+    const filas = await this.prisma.adjuntoMensajeChat.findMany({
+      where: { idConversacion, ...(query.cursor ? { idAdjunto: { lt: query.cursor } } : {}) },
+      orderBy: { idAdjunto: 'desc' },
+      take: limite,
+      select: {
+        idAdjunto: true,
+        idMensaje: true,
+        nombreOriginal: true,
+        mime: true,
+        tamanoBytes: true,
+        creadoEn: true,
+        mensaje: { select: { remitente: USUARIO_SELECT } },
+      },
+    });
+    const items = filas.map(({ mensaje, ...a }) => ({ ...a, remitente: mensaje.remitente }));
+    const nextCursor = filas.length === limite ? filas[filas.length - 1].idAdjunto : null;
+    return { items, nextCursor };
+  }
+
+  /** URL firmada de vida corta; solo participantes de la conversacion. */
+  async getAdjuntoUrl(idProyecto: number, idConversacion: number, idAdjunto: number, userId: number) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    const adjunto = await this.prisma.adjuntoMensajeChat.findFirst({
+      where: { idAdjunto, idConversacion },
+      select: { claveAlmacenamiento: true, nombreOriginal: true, mime: true },
+    });
+    if (!adjunto) throw new NotFoundException('Archivo no encontrado');
+    const url = await this.storage.signedUrl(adjunto.claveAlmacenamiento, URL_ADJUNTO_TTL_SEGUNDOS);
+    return { url, nombreOriginal: adjunto.nombreOriginal, mime: adjunto.mime, expiraEnSegundos: URL_ADJUNTO_TTL_SEGUNDOS };
+  }
+
+  async createMessage(
+    idProyecto: number,
+    idConversacion: number,
+    userId: number,
+    contenido: string,
+    archivo?: ArchivoSubido,
+  ) {
     const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     // T-234: único punto real de creación de mensajes (REST) — el gateway de
     // socket nunca crea mensajes por su cuenta, solo retransmite los que
@@ -255,10 +304,35 @@ export class ChatService {
       );
     }
 
-    const mensaje = await this.prisma.mensajeChat.create({
-      data: { idConversacion, idRemitente: userId, contenido: contenido.trim() },
-      select: MENSAJE_SELECT,
-    });
+    let adjunto: Prisma.AdjuntoMensajeChatCreateWithoutMensajeInput | undefined;
+    if (archivo) {
+      const { mime, nombre } = validarAdjunto(archivo);
+      const clave = `chat/${idConversacion}/${randomUUID()}.${nombre.split('.').pop()!.toLowerCase()}`;
+      await this.storage.upload(clave, archivo.buffer);
+      adjunto = {
+        conversacion: { connect: { idConversacion } },
+        nombreOriginal: nombre,
+        mime,
+        tamanoBytes: archivo.buffer.length,
+        claveAlmacenamiento: clave,
+      };
+    }
+
+    let mensaje;
+    try {
+      mensaje = await this.prisma.mensajeChat.create({
+        data: {
+          idConversacion,
+          idRemitente: userId,
+          contenido: contenido.trim(),
+          ...(adjunto ? { adjunto: { create: adjunto } } : {}),
+        },
+        select: MENSAJE_SELECT,
+      });
+    } catch (error) {
+      if (adjunto) await this.storage.destroy(adjunto.claveAlmacenamiento);
+      throw error;
+    }
 
     await this.prisma.conversacionParticipante.update({
       where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
