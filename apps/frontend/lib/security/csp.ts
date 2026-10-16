@@ -38,8 +38,7 @@ export function cspDirectives(apiUrl: string | undefined): Array<[string, string
     ['default-src', ["'self'"]],
     ['script-src', ["'self'", "'unsafe-inline'"]],
     ['style-src', ["'self'", "'unsafe-inline'"]],
-    // api.cloudinary.com: miniaturas de adjuntos del chat (URL firmada de vida corta).
-    ['img-src', ["'self'", 'data:', 'blob:', CLOUDINARY_DELIVERY_ORIGIN, CLOUDINARY_UPLOAD_ORIGIN]],
+    ['img-src', ["'self'", 'data:', 'blob:', CLOUDINARY_DELIVERY_ORIGIN]],
     ['font-src', ["'self'"]],
     ['connect-src', ["'self'", ...apiConnectSources(apiUrl), CLOUDINARY_UPLOAD_ORIGIN]],
     ['frame-src', ['blob:']],
