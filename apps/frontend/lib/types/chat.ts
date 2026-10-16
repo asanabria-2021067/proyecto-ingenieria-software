@@ -19,6 +19,8 @@ export interface ChatLectura {
   ultimaLecturaEn: string | null;
 }
 
+export type DuracionSilencio = '1h' | '8h' | 'siempre';
+
 export interface ChatConversacion {
   idConversacion: number;
   tipo: 'GRUPAL' | 'INDIVIDUAL';
@@ -34,6 +36,10 @@ export interface ChatConversacion {
   /** Archivado manual desde el menú de 3 puntos (distinto de `archivada`, que es por cierre de proyecto). */
   archivadaManual: boolean;
   silenciada: boolean;
+  /** Silencio del usuario actual (distinto del `silenciada` global). */
+  silenciadaPorMi: boolean;
+  silenciadaHasta: string | null;
+  silenciadaSiempre: boolean;
   esPrioritaria: boolean;
 }
 
@@ -54,6 +60,10 @@ export interface ChatConversacionGlobal {
   /** Archivado manual desde el menú del dock (proyectos cerrados no aparecen en esta lista). */
   archivadaManual: boolean;
   silenciada: boolean;
+  /** Silencio del usuario actual (distinto del `silenciada` global). */
+  silenciadaPorMi: boolean;
+  silenciadaHasta: string | null;
+  silenciadaSiempre: boolean;
   esPrioritaria: boolean;
 }
 
