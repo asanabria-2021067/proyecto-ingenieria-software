@@ -72,6 +72,10 @@ const confirmarMock = vi.fn();
 vi.mock('@/lib/mensajes', () => ({ confirmar: (...args: unknown[]) => confirmarMock(...args) }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
+vi.mock('@/components/chat-dock/no-molestar-dialog', () => ({
+  NoMolestarDialog: () => createElement('div', { role: 'dialog', 'aria-label': 'No molestar' }),
+}));
+
 import { ChatWindow } from '../components/chat-dock/chat-window';
 
 function renderWindow(overrides: Partial<Parameters<typeof ChatWindow>[0]> = {}) {
@@ -149,6 +153,15 @@ describe('ChatWindow', () => {
     fireEvent.click(screen.getByText('Activar notificaciones'));
 
     expect(silenciarMutate).toHaveBeenCalledWith({ idConversacion: 5, duracion: null });
+  });
+
+  it('No molestar por horario abre el dialogo de configuracion', async () => {
+    renderWindow();
+    expect(screen.queryByRole('dialog', { name: 'No molestar' })).not.toBeInTheDocument();
+    await abrirMenu();
+    fireEvent.click(screen.getByText('No molestar por horario'));
+
+    expect(await screen.findByRole('dialog', { name: 'No molestar' })).toBeInTheDocument();
   });
 
   it('mover a Otros llama a updateConversation con esPrioritaria: false', async () => {
