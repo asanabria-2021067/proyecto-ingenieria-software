@@ -13,10 +13,10 @@ beforeAll(() => {
 
 const guardarMutate = vi.fn();
 const estado = vi.hoisted(() => ({
-  preferencia: null as null | Record<string, unknown>,
+  config: null as null | Record<string, unknown>,
 }));
 vi.mock('@/hooks/use-chat', () => ({
-  useNoMolestar: () => ({ preferencia: estado.preferencia, isLoading: false }),
+  useNoMolestar: () => ({ config: estado.config, isLoading: false }),
   useUpdateNoMolestar: () => ({ mutate: guardarMutate, isPending: false }),
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -31,7 +31,7 @@ function abrir(onOpenChange = vi.fn()) {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  estado.preferencia = null;
+  estado.config = null;
 });
 
 describe('NoMolestarDialog', () => {
@@ -58,7 +58,7 @@ describe('NoMolestarDialog', () => {
   });
 
   it('carga la preferencia guardada, incluida una zona fuera de la lista', () => {
-    estado.preferencia = { activo: true, horaInicio: '20:00', horaFin: '06:00', diasSemana: [1], zona: 'Asia/Tokyo' };
+    estado.config = { activo: true, horaInicio: '20:00', horaFin: '06:00', diasSemana: [1], zona: 'Asia/Tokyo' };
     abrir();
     expect(screen.getByLabelText('Activar no molestar')).toBeChecked();
     expect(screen.getByLabelText('Zona horaria')).toHaveValue('Asia/Tokyo');

@@ -19,7 +19,7 @@ export function ChatDock() {
   const { windows, minimizedIds, cerrarChat, toggleMinimize } = useChatDock();
   const { conversations } = useAllConversations();
   const { isConnected: chatConnected } = useGlobalChatSocket(windows.map((w) => w.idConversacion));
-  const { preferencia: noMolestar } = useNoMolestar();
+  const { config: noMolestar } = useNoMolestar();
   const [ahora, setAhora] = useState(() => new Date());
   const listRef = useRef<HTMLDivElement>(null);
 

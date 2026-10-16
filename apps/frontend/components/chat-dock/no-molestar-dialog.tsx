@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useNoMolestar, useUpdateNoMolestar } from '@/hooks/use-chat';
-import type { PreferenciaNoMolestar } from '@/lib/types/chat';
+import type { ConfigNoMolestar } from '@/lib/types/chat';
 
 const DIAS = [
   { valor: 1, nombre: 'Lunes' },
@@ -38,7 +38,7 @@ const ZONAS = [
   'UTC',
 ];
 
-const POR_DEFECTO: PreferenciaNoMolestar = {
+const POR_DEFECTO: ConfigNoMolestar = {
   activo: false,
   horaInicio: '22:00',
   horaFin: '07:00',
@@ -52,12 +52,12 @@ interface NoMolestarDialogProps {
 }
 
 export function NoMolestarDialog({ open, onOpenChange }: NoMolestarDialogProps) {
-  const { preferencia, isLoading } = useNoMolestar();
+  const { config, isLoading } = useNoMolestar();
   const guardar = useUpdateNoMolestar();
   // Borrador local: hasta que el usuario edita, se muestra lo guardado.
-  const [borrador, setBorrador] = useState<PreferenciaNoMolestar | null>(null);
-  const form = borrador ?? preferencia ?? POR_DEFECTO;
-  const setForm = (cambio: (f: PreferenciaNoMolestar) => PreferenciaNoMolestar) => setBorrador(cambio(form));
+  const [borrador, setBorrador] = useState<ConfigNoMolestar | null>(null);
+  const form = borrador ?? config ?? POR_DEFECTO;
+  const setForm = (cambio: (f: ConfigNoMolestar) => ConfigNoMolestar) => setBorrador(cambio(form));
 
   const invalido = form.horaInicio === form.horaFin || !form.horaInicio || !form.horaFin;
   const zonas = ZONAS.includes(form.zona) ? ZONAS : [form.zona, ...ZONAS];
