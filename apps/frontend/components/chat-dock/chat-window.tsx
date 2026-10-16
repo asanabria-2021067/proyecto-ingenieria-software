@@ -39,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
+import { LinkPreviewCard } from '@/components/chat-dock/link-preview-card';
 import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
@@ -205,6 +206,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                   <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? 'bg-primary text-primary-foreground' : 'bg-surface-container-high text-on-surface'}`}>
                     {!propio && <p className="mb-0.5 text-[11px] font-semibold opacity-80">{m.remitente.nombre}</p>}
                     <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
+                    <LinkPreviewCard idProyecto={idProyecto} idConversacion={idConversacion} contenido={m.contenido} />
                     <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
                   </div>
                 </div>
