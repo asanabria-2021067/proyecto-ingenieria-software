@@ -22,7 +22,6 @@ Riesgo conocido de dependencias que **no** se remedia todavía, con dueño y cad
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | deepmerge-ts | backend | GHSA-ggr8-5vv4-36mx | high | produccion | 8.0.0 | Llega por `prisma` → `@prisma/config` (también se reportan esos dos por herencia). Lo usa el CLI de Prisma al cargar su propia configuración, no el servidor HTTP, y no recibe datos externos. El único «fix» de npm es bajar a prisma 6.12.0, un downgrade del ORM. Se revisa con el salto planificado a Prisma 7. | Vernel | 2026-12-31 |
 | @vitest/mocker | backend | GHSA-82fw-gwwq-j7x9 | moderate | desarrollo | 4.1.11 | Solo el runner de pruebas; no viaja en la imagen. El fix exige vitest 4 (major). | Vernel | 2026-12-31 |
-| @vitest/mocker | frontend | GHSA-82fw-gwwq-j7x9 | moderate | desarrollo | 4.1.11 | Solo el runner de pruebas; no viaja en el build. El fix exige vitest 4 (major). | Vernel | 2026-12-31 |
 <!-- exceptions:end -->
 
 ## Estado al cierre de G08 (2026-09-28)
