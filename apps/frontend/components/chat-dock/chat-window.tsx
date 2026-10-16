@@ -52,6 +52,7 @@ import {
   useMessages,
   useSendMessage,
   useSendFileMessage,
+  useToggleReaction,
   useUpdateConversation,
   useDeleteConversation,
   useAllConversations,
@@ -63,6 +64,7 @@ import { quienesVieron, SeenBy, TypingIndicator } from '@/components/chat-dock/c
 import { NoMolestarDialog } from '@/components/chat-dock/no-molestar-dialog';
 import { estaSilenciada } from '@/lib/chat-silencio';
 import { CHAT_ADJUNTO_ACCEPT, formatearTamano, validarArchivoChat } from '@/lib/chat-adjuntos';
+import { MessageReactions } from './message-reactions';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useIrAlMensaje } from '@/hooks/use-ir-al-mensaje';
 import { ChatCitaBloque, ChatCitaVistaPrevia, extractoDe } from '@/components/chat-dock/chat-cita';
@@ -102,6 +104,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const { lecturas } = useReadReceipts(idProyecto, idConversacion);
   const marcarLeido = useMarkConversationRead(idProyecto);
   const enviar = useSendMessage(idProyecto, idConversacion);
+  const reaccionar = useToggleReaction(idProyecto, idConversacion);
   const actualizar = useUpdateConversation(idProyecto);
   const eliminar = useDeleteConversation(idProyecto);
   const silenciar = useSilenciarConversation(idProyecto);
@@ -370,6 +373,15 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     {m.adjunto && <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />}
                     {m.contenido && <p className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}>{m.contenido}</p>}
                     <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
+                    <MessageReactions
+                      reacciones={m.reacciones ?? []}
+                      onToggle={(emoji) =>
+                        reaccionar.mutate(
+                          { idMensaje: m.idMensaje, emoji },
+                          { onError: () => toast.error('No se pudo reaccionar al mensaje') },
+                        )
+                      }
+                    />
                   </div>
                   <button
                     type="button"
