@@ -11,6 +11,7 @@ import {
   ChevronUp,
   Loader2,
   MoreVertical,
+  Moon,
   Pencil,
   Send,
   Star,
@@ -50,6 +51,7 @@ import {
   useSilenciarConversation,
 } from '@/hooks/use-chat';
 import { quienesVieron, SeenBy, TypingIndicator } from '@/components/chat-dock/chat-indicators';
+import { NoMolestarDialog } from '@/components/chat-dock/no-molestar-dialog';
 import { estaSilenciada } from '@/lib/chat-silencio';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
@@ -95,6 +97,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
+  const [noMolestarAbierto, setNoMolestarAbierto] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -220,6 +223,10 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                 </DropdownMenuItem>
               </>
             )}
+            <DropdownMenuItem onClick={() => setNoMolestarAbierto(true)}>
+              <Moon className="size-4" aria-hidden="true" />
+              No molestar por horario
+            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => actualizar.mutate({ idConversacion, payload: { archivada: !conversacion?.archivadaManual } })}
             >
@@ -303,6 +310,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
         idConversacion={idConversacion}
         valorInicial={conversacion?.nombrePersonalizado ?? ''}
       />
+      {noMolestarAbierto && <NoMolestarDialog open onOpenChange={setNoMolestarAbierto} />}
     </div>
   );
 }
