@@ -109,3 +109,50 @@ test('adjuntar un PDF, verlo en el mensaje, descargarlo y listarlo en la galeria
   await page.getByRole('tab', { name: 'Archivos' }).click();
   await expect(page.getByRole('dialog').getByText(adjunto.nombreOriginal)).toBeVisible();
 });
+
+// Miniatura de una imagen: el backend la sirve desde el mismo origen (/miniatura);
+// aqui se simula la respuesta para no depender de Cloudinary y se comprueba que
+// el chip la pinta como data: sin pedir nada a hosts externos.
+test('una imagen adjunta muestra su miniatura servida por el backend', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.addInitScript(() => {
+    const original = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key: string) {
+      if (typeof key === 'string' && key.startsWith('onboarding_seen_')) return 'true';
+      return original.call(this, key);
+    };
+  });
+
+  const adjunto = { idAdjunto: 902, nombreOriginal: 'foto-e2e.png', mime: 'image/png', tamanoBytes: 70 };
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  const hostsExternos: string[] = [];
+  page.on('request', (r) => {
+    const { hostname } = new URL(r.url());
+    if (/cloudinary\.com$/.test(hostname)) hostsExternos.push(hostname);
+  });
+
+  await login(page, CORREO_A);
+  await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
+  await abrirChatConMaria(page);
+
+  await simularEnvioArchivo(page, {
+    idMensaje: 900002,
+    idConversacion: 1,
+    contenido: 'Foto de prueba',
+    enviadoEn: new Date().toISOString(),
+    remitente: { idUsuario: 1, nombre: 'Carlos', apellido: 'Mendoza', fotoUrl: null },
+    adjunto,
+  });
+  await page.route('**/archivos/902/miniatura', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'image/png', body: png });
+  });
+
+  await page.getByTestId('adjunto-input').setInputFiles({ name: adjunto.nombreOriginal, mimeType: adjunto.mime, buffer: png });
+  await page.getByPlaceholder('Escribe un mensaje…').fill('Foto de prueba');
+  await page.getByRole('button', { name: 'Enviar mensaje' }).click();
+
+  const miniatura = page.getByRole('img', { name: adjunto.nombreOriginal }).first();
+  await expect(miniatura).toBeVisible();
+  await expect(miniatura).toHaveAttribute('src', /^data:image\/png;base64,/);
+  expect(hostsExternos).toEqual([]);
+});
