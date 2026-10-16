@@ -72,10 +72,10 @@ test('un usuario reacciona a un mensaje y el otro ve el conteo agrupado en vivo'
     // A suma la misma reaccion: ambos ven 2 agrupado en un solo chip.
     await chipA.click();
     await expect(pageA.getByRole('button', { name: /2 reacciones, incluyes la tuya/ })).toBeVisible();
-    await expect(pageB.getByRole('button', { name: /2 reacciones$/ })).toBeVisible();
+    await expect(pageB.getByRole('button', { name: /2 reacciones, incluyes la tuya/ })).toBeVisible();
 
     // B quita la suya: vuelve a 1.
-    await pageB.getByRole('button', { name: /2 reacciones$/ }).click();
+    await pageB.getByRole('button', { name: /2 reacciones, incluyes la tuya/ }).click();
     await expect(pageA.getByRole('button', { name: /1 reacción, incluyes la tuya/ })).toBeVisible();
   } finally {
     await contextA.close();
