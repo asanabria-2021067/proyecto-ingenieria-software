@@ -54,6 +54,8 @@ const MENSAJE_SELECT = {
   idConversacion: true,
   contenido: true,
   enviadoEn: true,
+  editadoEn: true,
+  eliminadoEn: true,
   remitente: USUARIO_SELECT,
   // Solo metadatos: la clave de almacenamiento y las URL nunca salen en el listado.
   adjunto: { select: { idAdjunto: true, nombreOriginal: true, mime: true, tamanoBytes: true } },
@@ -98,6 +100,11 @@ function reaccionesParaUsuario(grupos: ReturnType<typeof agruparReacciones>, use
     count,
     reaccionadoPorMi: idsUsuarios.includes(userId),
   }));
+}
+
+/** El contenido de un mensaje eliminado nunca sale del servidor. */
+function ocultarEliminado<T extends { contenido: string; eliminadoEn: Date | null }>(mensaje: T): T {
+  return mensaje.eliminadoEn ? { ...mensaje, contenido: '' } : mensaje;
 }
 
 const ARCHIVADOS_PAGE_SIZE = 20;
