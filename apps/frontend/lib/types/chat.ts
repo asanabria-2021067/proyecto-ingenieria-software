@@ -68,7 +68,7 @@ export interface ChatConversacionGlobal {
 }
 
 /** Modo no molestar del chat: 0 = domingo ... 6 = sabado, horas "HH:mm" en `zona`. */
-export interface PreferenciaNoMolestar {
+export interface ConfigNoMolestar {
   activo: boolean;
   horaInicio: string;
   horaFin: string;

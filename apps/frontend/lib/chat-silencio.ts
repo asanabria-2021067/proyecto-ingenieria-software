@@ -1,4 +1,4 @@
-import type { ChatConversacionGlobal, PreferenciaNoMolestar } from '@/lib/types/chat';
+import type { ChatConversacionGlobal, ConfigNoMolestar } from '@/lib/types/chat';
 
 type Silencio = Pick<ChatConversacionGlobal, 'silenciadaHasta' | 'silenciadaSiempre'>;
 
@@ -26,7 +26,7 @@ function relojEnZona(ahora: Date, zona: string): { dia: number; minutos: number 
 }
 
 /** Misma regla que el backend: `inicio <= hora < fin`; si el rango cruza la medianoche, la madrugada cuenta el dia en que empezo. */
-export function estaEnNoMolestar(pref: PreferenciaNoMolestar | null | undefined, ahora: Date = new Date()): boolean {
+export function estaEnNoMolestar(pref: ConfigNoMolestar | null | undefined, ahora: Date = new Date()): boolean {
   if (!pref?.activo) return false;
   const reloj = relojEnZona(ahora, pref.zona);
   if (!reloj) return false;
@@ -43,7 +43,7 @@ export function estaEnNoMolestar(pref: PreferenciaNoMolestar | null | undefined,
 export function estaSilenciada(
   c: Silencio,
   ahora: Date = new Date(),
-  noMolestar?: PreferenciaNoMolestar | null,
+  noMolestar?: ConfigNoMolestar | null,
 ): boolean {
   if (estaEnNoMolestar(noMolestar, ahora)) return true;
   if (c.silenciadaSiempre) return true;
@@ -54,7 +54,7 @@ export function estaSilenciada(
 export function totalNoLeidos(
   conversaciones: (Silencio & { noLeidos: number })[],
   ahora: Date = new Date(),
-  noMolestar?: PreferenciaNoMolestar | null,
+  noMolestar?: ConfigNoMolestar | null,
 ): number {
   return conversaciones.reduce((total, c) => total + (estaSilenciada(c, ahora, noMolestar) ? 0 : c.noLeidos), 0);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { estaEnNoMolestar, estaSilenciada, totalNoLeidos } from '../lib/chat-silencio';
-import type { PreferenciaNoMolestar } from '../lib/types/chat';
+import type { ConfigNoMolestar } from '../lib/types/chat';
 
 const ahora = new Date('2026-10-16T12:00:00.000Z');
 const sin = { silenciadaHasta: null, silenciadaSiempre: false };
@@ -44,7 +44,7 @@ describe('totalNoLeidos', () => {
 
 // Guatemala es UTC-6 todo el año. 2026-10-16 es viernes.
 const gt = (iso: string) => new Date(`${iso}-06:00`);
-const pref = (o: Partial<PreferenciaNoMolestar> = {}): PreferenciaNoMolestar => ({
+const pref = (o: Partial<ConfigNoMolestar> = {}): ConfigNoMolestar => ({
   activo: true,
   horaInicio: '22:00',
   horaFin: '07:00',
