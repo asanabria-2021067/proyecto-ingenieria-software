@@ -1,5 +1,7 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
+  ChatAdjuntoUrl,
+  ChatArchivosPagina,
   ChatConversacion,
   ChatConversacionGlobal,
   ChatLectura,
@@ -54,6 +56,40 @@ export function sendMessage(
     method: 'POST',
     body: JSON.stringify({ contenido }),
   });
+}
+
+/** Un archivo por mensaje, con o sin texto (multipart: apiFetch no fija Content-Type). */
+export function sendFileMessage(
+  idProyecto: number,
+  idConversacion: number,
+  contenido: string,
+  archivo: File,
+): Promise<ChatMensaje> {
+  const body = new FormData();
+  if (contenido) body.append('contenido', contenido);
+  body.append('file', archivo);
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/archivo`, {
+    method: 'POST',
+    body,
+  });
+}
+
+export function getFiles(
+  idProyecto: number,
+  idConversacion: number,
+  cursor?: number,
+): Promise<ChatArchivosPagina> {
+  const query = cursor ? `?cursor=${cursor}` : '';
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/archivos${query}`);
+}
+
+/** URL firmada de vida corta: se pide al usar el archivo, nunca se guarda. */
+export function getAttachmentUrl(
+  idProyecto: number,
+  idConversacion: number,
+  idAdjunto: number,
+): Promise<ChatAdjuntoUrl> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/archivos/${idAdjunto}/url`);
 }
 
 export function updateConversation(
