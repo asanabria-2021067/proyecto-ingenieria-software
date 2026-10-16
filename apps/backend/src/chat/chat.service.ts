@@ -198,9 +198,10 @@ export class ChatService {
       where: { idConversacion, ...(cursorId ? { idMensaje: { lt: cursorId } } : {}) },
       orderBy: { idMensaje: 'desc' },
       take: 30,
-      select: MENSAJE_SELECT,
+      select: { ...MENSAJE_SELECT, guardadoPor: { where: { idUsuario: userId }, select: { idUsuario: true } } },
     });
-    return mensajes.reverse();
+    // `guardado` es solo del usuario autenticado: nunca se expone quién más guardó.
+    return mensajes.reverse().map(({ guardadoPor, ...m }) => ({ ...m, guardado: guardadoPor.length > 0 }));
   }
 
   async createMessage(idProyecto: number, idConversacion: number, userId: number, contenido: string) {
