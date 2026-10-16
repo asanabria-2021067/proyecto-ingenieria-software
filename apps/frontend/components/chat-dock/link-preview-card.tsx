@@ -25,7 +25,6 @@ export function LinkPreviewCard({ idProyecto, idConversacion, contenido }: LinkP
   const url = firstUrl(contenido);
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(typeof IntersectionObserver === 'undefined');
-  const [imagenRota, setImagenRota] = useState(false);
   const { data } = useLinkPreview(idProyecto, idConversacion, url && visible ? url : null);
 
   useEffect(() => {
@@ -41,7 +40,7 @@ export function LinkPreviewCard({ idProyecto, idConversacion, contenido }: LinkP
   }, [url, visible]);
 
   if (!url) return null;
-  const hayContenido = data && (data.titulo || data.descripcion || data.imagen);
+  const hayContenido = data && (data.titulo || data.descripcion);
   if (!hayContenido) return <div ref={ref} aria-hidden="true" />;
 
   return (
@@ -49,17 +48,6 @@ export function LinkPreviewCard({ idProyecto, idConversacion, contenido }: LinkP
       url={data.url}
       className="mt-2 flex max-w-full items-stretch gap-2 overflow-hidden rounded-lg border border-outline-variant bg-surface text-on-surface no-underline transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:bg-surface-container-low"
     >
-      {data.imagen && !imagenRota && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={data.imagen}
-          alt=""
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => setImagenRota(true)}
-          className="size-16 shrink-0 object-cover"
-        />
-      )}
       <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-2 py-1.5">
         {data.sitio && <span className="truncate text-[10px] uppercase tracking-wide text-tertiary">{data.sitio}</span>}
         {data.titulo && <span className="line-clamp-2 break-words text-xs font-semibold">{data.titulo}</span>}
