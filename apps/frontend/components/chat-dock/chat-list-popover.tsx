@@ -66,8 +66,8 @@ export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) 
                 onOpenSaved();
                 onClose();
               }}
-              aria-label="Mensajes guardados"
-              title="Mensajes guardados"
+              aria-label="Ver mensajes guardados"
+              title="Ver mensajes guardados"
               className="flex size-7 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
             >
               <Bookmark className="size-4" aria-hidden="true" />
