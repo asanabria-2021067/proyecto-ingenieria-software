@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 beforeAll(() => {
   if (typeof (globalThis as any).ResizeObserver === 'undefined') {
@@ -30,10 +30,14 @@ vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { id
 const sendMutate = vi.fn();
 const updateMutate = vi.fn();
 const deleteMutate = vi.fn();
+const themeMutate = vi.fn();
+let temaActual: string | null = null;
+let mensajes: unknown[] = [];
 vi.mock('@/hooks/use-chat', () => ({
-  useMessages: () => ({ messages: [], isLoading: false }),
+  useMessages: () => ({ messages: mensajes, isLoading: false }),
   useSendMessage: () => ({ mutate: sendMutate, isPending: false }),
   useUpdateConversation: () => ({ mutate: updateMutate, isPending: false }),
+  useUpdateChatTheme: () => ({ mutate: themeMutate, isPending: false }),
   useDeleteConversation: () => ({ mutate: deleteMutate, isPending: false }),
   useAllConversations: () => ({
     conversations: [
@@ -55,6 +59,7 @@ vi.mock('@/hooks/use-chat', () => ({
         archivadaManual: false,
         silenciada: false,
         esPrioritaria: true,
+        temaColor: temaActual,
       },
     ],
   }),
@@ -90,6 +95,8 @@ async function abrirMenu() {
 }
 
 afterEach(() => {
+  temaActual = null;
+  mensajes = [];
   cleanup();
   vi.clearAllMocks();
 });
@@ -166,5 +173,73 @@ describe('ChatWindow', () => {
   it('minimizada, no muestra el historial ni el input', () => {
     renderWindow({ minimized: true });
     expect(screen.queryByPlaceholderText('Escribe un mensaje…')).not.toBeInTheDocument();
+  });
+
+  describe('tema de color', () => {
+    async function abrirSelector() {
+      await abrirMenu();
+      fireEvent.click(screen.getByText('Tema de color'));
+      return screen.findByRole('radiogroup', { name: 'Tema de color de la conversación' });
+    }
+
+    it('el selector es un radiogroup con el nombre textual de cada color', async () => {
+      renderWindow();
+      const grupo = await abrirSelector();
+
+      const nombres = within(grupo).getAllByRole('radio').map((r) => r.parentElement?.textContent);
+      expect(nombres).toEqual(['Predeterminado', 'Verde', 'Azul', 'Violeta', 'Naranja', 'Rosa', 'Gris']);
+      expect(within(grupo).getByRole('radio', { name: 'Predeterminado' })).toBeChecked();
+    });
+
+    it('elegir un color llama a la mutation con su clave', async () => {
+      renderWindow();
+      await abrirSelector();
+      fireEvent.click(screen.getByRole('radio', { name: 'Azul' }));
+
+      expect(themeMutate).toHaveBeenCalledWith({ idConversacion: 5, temaColor: 'azul' });
+    });
+
+    it('elegir Predeterminado limpia el tema con null', async () => {
+      temaActual = 'rosa';
+      renderWindow();
+      await abrirSelector();
+      expect(screen.getByRole('radio', { name: 'Rosa' })).toBeChecked();
+      fireEvent.click(screen.getByRole('radio', { name: 'Predeterminado' }));
+
+      expect(themeMutate).toHaveBeenCalledWith({ idConversacion: 5, temaColor: null });
+    });
+
+    it('se puede navegar con el teclado: flecha abajo mueve la selección', async () => {
+      renderWindow();
+      await abrirSelector();
+      const predeterminado = screen.getByRole('radio', { name: 'Predeterminado' });
+      predeterminado.focus();
+      fireEvent.keyDown(predeterminado, { key: 'ArrowDown' });
+
+      await waitFor(() => expect(screen.getByRole('radio', { name: 'Verde' })).toHaveFocus());
+      await waitFor(() => expect(themeMutate).toHaveBeenCalledWith({ idConversacion: 5, temaColor: 'verde' }));
+    });
+
+    it('la burbuja propia usa las clases del tema y la ajena no cambia', () => {
+      temaActual = 'verde';
+      const remitente = (idUsuario: number) => ({ idUsuario, nombre: 'N', apellido: 'A', fotoUrl: null });
+      mensajes = [
+        { idMensaje: 1, idConversacion: 5, contenido: 'mio', enviadoEn: '2026-01-01T10:00:00Z', remitente: remitente(1) },
+        { idMensaje: 2, idConversacion: 5, contenido: 'suyo', enviadoEn: '2026-01-01T10:01:00Z', remitente: remitente(2) },
+      ];
+      renderWindow();
+
+      expect(screen.getByText('mio').parentElement).toHaveClass('bg-green-700', 'text-white');
+      expect(screen.getByText('suyo').parentElement).not.toHaveClass('bg-green-700');
+    });
+
+    it('sin tema, la burbuja propia conserva el color por defecto', () => {
+      mensajes = [
+        { idMensaje: 1, idConversacion: 5, contenido: 'mio', enviadoEn: '2026-01-01T10:00:00Z', remitente: { idUsuario: 1, nombre: 'Yo', apellido: 'U', fotoUrl: null } },
+      ];
+      renderWindow();
+
+      expect(screen.getByText('mio').parentElement).toHaveClass('bg-primary');
+    });
   });
 });
