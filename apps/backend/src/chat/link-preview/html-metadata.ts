@@ -1,7 +1,6 @@
 export interface LinkMetadata {
   titulo: string | null;
   descripcion: string | null;
-  imagen: string | null;
   sitio: string | null;
 }
 
@@ -41,19 +40,6 @@ function metaTags(html: string): Map<string, string> {
   return metas;
 }
 
-/** La imagen solo se devuelve como URL http(s) absoluta; el servidor no la descarga. */
-function safeImage(raw: string | undefined, base: URL): string | null {
-  if (!raw || raw.length > 2048) return null;
-  try {
-    const url = new URL(decode(raw).trim(), base);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-    if (url.username || url.password) return null;
-    return url.href;
-  } catch {
-    return null;
-  }
-}
-
 export function parseMetadata(html: string, pageUrl: URL): LinkMetadata {
   // ponytail: regex sobre <meta>/<title>, sin parser HTML; suficiente para og:* y falla cerrado.
   const metas = metaTags(html);
@@ -64,7 +50,6 @@ export function parseMetadata(html: string, pageUrl: URL): LinkMetadata {
       metas.get('og:description') ?? metas.get('twitter:description') ?? metas.get('description'),
       300,
     ),
-    imagen: safeImage(metas.get('og:image') ?? metas.get('twitter:image'), pageUrl),
     sitio: cleanText(metas.get('og:site_name'), 100) ?? pageUrl.hostname,
   };
 }
