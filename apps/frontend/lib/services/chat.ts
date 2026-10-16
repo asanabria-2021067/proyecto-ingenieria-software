@@ -3,6 +3,7 @@ import type {
   ChatConversacion,
   ChatConversacionGlobal,
   ChatMensaje,
+  ChatMensajeProgramado,
   CreateConversationPayload,
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
@@ -40,6 +41,34 @@ export function sendMessage(
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes`, {
     method: 'POST',
     body: JSON.stringify({ contenido }),
+  });
+}
+
+export function listScheduledMessages(
+  idProyecto: number,
+  idConversacion: number,
+): Promise<ChatMensajeProgramado[]> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/programados`);
+}
+
+export function scheduleMessage(
+  idProyecto: number,
+  idConversacion: number,
+  payload: { contenido: string; enviarEn: string },
+): Promise<ChatMensajeProgramado> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/programados`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function cancelScheduledMessage(
+  idProyecto: number,
+  idConversacion: number,
+  idMensajeProgramado: number,
+): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/programados/${idMensajeProgramado}`, {
+    method: 'DELETE',
   });
 }
 
