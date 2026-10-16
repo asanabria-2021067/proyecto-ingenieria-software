@@ -271,6 +271,8 @@ enum TipoNotificacion {
   CALENDARIO_COMPARTIDO
   // HU-186 (T-330): recordatorio de una tarea próxima a vencer (24 h / 48 h).
   TAREA_POR_VENCER
+  // HU-190 (T-347): el usuario alcanzó un nuevo nivel de una insignia.
+  INSIGNIA_OBTENIDA
 }
 
 enum EstadoAmistad {
@@ -380,6 +382,7 @@ model Usuario {
   asistenciasConfirmadas           AsistenciaActividad[]      @relation("AsistenciaConfirmador")
   calendariosCompartidosPorMi      CalendarioCompartido[]     @relation("CalendarioPropietario")
   calendariosCompartidosConmigo    CalendarioCompartido[]     @relation("CalendarioInvitado")
+  insignias                        InsigniaUsuario[]
 
   @@index([estado, fechaCreacion])
   @@map("usuario")
@@ -1680,4 +1683,52 @@ model MensajeChat {
 
   @@index([idConversacion, enviadoEn])
   @@map("mensaje_chat")
+}
+
+// HU-190 (T-346): niveles de una insignia. Sin nivel (null) = aún sin umbral alcanzado.
+enum NivelInsignia {
+  BRONCE
+  PLATA
+  ORO
+  DIAMANTE
+}
+
+/// HU-190 (T-346): catálogo de logros. `metrica` identifica la regla de cálculo
+/// (ver InsigniasMetricsService); los umbrales son el valor mínimo de la métrica
+/// para cada nivel.
+model Insignia {
+  idInsignia     Int    @id @default(autoincrement()) @map("id_insignia")
+  clave          String @unique @db.VarChar(40)
+  nombre         String @db.VarChar(100)
+  descripcion    String @db.VarChar(255)
+  icono          String @db.VarChar(40)
+  metrica        String @db.VarChar(40)
+  umbralBronce   Int    @map("umbral_bronce")
+  umbralPlata    Int    @map("umbral_plata")
+  umbralOro      Int    @map("umbral_oro")
+  umbralDiamante Int    @map("umbral_diamante")
+
+  usuarios InsigniaUsuario[]
+
+  @@map("insignia")
+}
+
+/// HU-190 (T-346): progreso y nivel de un usuario en una insignia. `progreso` es
+/// el máximo histórico de la métrica: los niveles ya otorgados nunca bajan.
+model InsigniaUsuario {
+  idInsigniaUsuario Int            @id @default(autoincrement()) @map("id_insignia_usuario")
+  idUsuario         Int            @map("id_usuario")
+  idInsignia        Int            @map("id_insignia")
+  nivel             NivelInsignia?
+  progreso          Int            @default(0)
+  fechaBronce       DateTime?      @map("fecha_bronce")
+  fechaPlata        DateTime?      @map("fecha_plata")
+  fechaOro          DateTime?      @map("fecha_oro")
+  fechaDiamante     DateTime?      @map("fecha_diamante")
+
+  usuario  Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  insignia Insignia @relation(fields: [idInsignia], references: [idInsignia], onDelete: Cascade)
+
+  @@unique([idUsuario, idInsignia])
+  @@map("insignia_usuario")
 }

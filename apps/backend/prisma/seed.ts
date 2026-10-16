@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { hashSync } from 'bcryptjs';
+import { InsigniasService } from '../src/insignias/insignias.service';
+import type { PrismaService } from '../src/prisma/prisma.service';
 
 const prisma = new PrismaClient();
 
@@ -24,6 +26,9 @@ function enDiasHora(n: number, hora: number, minuto = 0): Date {
 
 async function main() {
   const PASSWORD_HASH = hashSync('Test1234!', 10);
+
+  // ─── Insignias (HU-190) ─────────────────────────────────
+  await new InsigniasService(prisma as unknown as PrismaService).sincronizarCatalogo();
 
   // ─── Carreras ───────────────────────────────────────────
   const carreras = await Promise.all([
