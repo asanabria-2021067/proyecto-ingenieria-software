@@ -6,6 +6,8 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   createConversation,
   deleteConversation,
+  deleteMessage,
+  editMessage,
   getMessages,
   listAllConversations,
   listArchivedConversations,
@@ -85,6 +87,37 @@ export function useSendMessage(idProyecto: number, idConversacion: number | null
         conversationMessagesQueryKey(idProyecto, idConversacion as number),
         (current) => (current ? [...current, mensaje] : [mensaje]),
       );
+      invalidateChatLists(queryClient, idProyecto);
+    },
+  });
+}
+
+/** Sustituye en la caché de mensajes el que cambió (editado o eliminado). */
+function reemplazarMensaje(queryClient: ReturnType<typeof useQueryClient>, mensaje: ChatMensaje) {
+  queryClient.setQueriesData<ChatMensaje[]>(
+    { predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === mensaje.idConversacion && query.queryKey[3] === 'mensajes' },
+    (current) => current?.map((m) => (m.idMensaje === mensaje.idMensaje ? mensaje : m)),
+  );
+}
+
+export function useEditMessage(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idMensaje, contenido }: { idMensaje: number; contenido: string }) =>
+      editMessage(idProyecto, idConversacion, idMensaje, contenido),
+    onSuccess: (mensaje) => {
+      reemplazarMensaje(queryClient, mensaje);
+      invalidateChatLists(queryClient, idProyecto);
+    },
+  });
+}
+
+export function useDeleteMessage(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (idMensaje: number) => deleteMessage(idProyecto, idConversacion, idMensaje),
+    onSuccess: (mensaje) => {
+      reemplazarMensaje(queryClient, mensaje);
       invalidateChatLists(queryClient, idProyecto);
     },
   });
@@ -186,6 +219,8 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       queryClient.invalidateQueries({ queryKey: ['chats-global'] });
     };
 
+    const handleMessageChanged = ({ mensaje }: { mensaje: ChatMensaje }) => reemplazarMensaje(queryClient, mensaje);
+
     const handleConversationUpdated = () => {
       queryClient.invalidateQueries({ queryKey: ['chats-global'] });
       queryClient.invalidateQueries({ queryKey: ['proyecto-conversaciones'] });
@@ -215,12 +250,16 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
     };
 
     socket.on('newMessage', handleNewMessage);
+    socket.on('messageUpdated', handleMessageChanged);
+    socket.on('messageDeleted', handleMessageChanged);
     socket.on('conversationUpdated', handleConversationUpdated);
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
 
     return () => {
       socket.off('newMessage', handleNewMessage);
+      socket.off('messageUpdated', handleMessageChanged);
+      socket.off('messageDeleted', handleMessageChanged);
       socket.off('conversationUpdated', handleConversationUpdated);
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
