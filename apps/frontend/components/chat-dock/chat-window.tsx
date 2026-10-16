@@ -15,6 +15,7 @@ import {
   Send,
   Star,
   StarOff,
+  Tag,
   Trash2,
   User,
   Users as UsersIcon,
@@ -38,6 +39,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ApodosDialog } from '@/components/chat-dock/apodos-dialog';
+import { nombreMostrado, nombreReal } from '@/lib/chat-apodos';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -49,7 +52,7 @@ function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId:
   if (conversacion.nombrePersonalizado) return conversacion.nombrePersonalizado;
   if (conversacion.tipo === 'GRUPAL') return conversacion.nombre ?? 'Grupo';
   const otro = conversacion.participantes.find((p) => p.idUsuario !== currentUserId);
-  return otro ? `${otro.nombre} ${otro.apellido}` : 'Conversación';
+  return otro ? nombreMostrado(otro) : 'Conversación';
 }
 
 function formatHora(iso: string): string {
@@ -76,6 +79,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
+  const [apodosAbierto, setApodosAbierto] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -126,6 +130,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
         <button
           type="button"
           onClick={onMinimize}
+          title={otro && !conversacion?.nombrePersonalizado ? nombreReal(otro) : undefined}
           className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-on-surface"
         >
           {titulo}
@@ -147,6 +152,10 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             <DropdownMenuItem onClick={() => setRenombrarAbierto(true)}>
               <Pencil className="size-4" aria-hidden="true" />
               Renombrar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setApodosAbierto(true)}>
+              <Tag className="size-4" aria-hidden="true" />
+              Apodos
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => actualizar.mutate({ idConversacion, payload: { esFavorita: !conversacion?.esFavorita } })}
@@ -196,6 +205,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             )}
             {messages.map((m) => {
               const propio = m.remitente.idUsuario === currentUserId;
+              const apodo = m.apodoRemitente ?? conversacion?.participantes.find((p) => p.idUsuario === m.remitente.idUsuario)?.apodo;
               return (
                 <div key={m.idMensaje} className={`flex items-end gap-2 ${propio ? 'flex-row-reverse' : ''}`}>
                   <Avatar className="size-6 shrink-0">
@@ -203,7 +213,11 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
                   </Avatar>
                   <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? 'bg-primary text-primary-foreground' : 'bg-surface-container-high text-on-surface'}`}>
-                    {!propio && <p className="mb-0.5 text-[11px] font-semibold opacity-80">{m.remitente.nombre}</p>}
+                    {!propio && (
+                      <p className="mb-0.5 text-[11px] font-semibold opacity-80" title={apodo ? nombreReal(m.remitente) : undefined}>
+                        {apodo || m.remitente.nombre}
+                      </p>
+                    )}
                     <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
                     <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
                   </div>
@@ -232,6 +246,16 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             </Button>
           </form>
         </>
+      )}
+
+      {apodosAbierto && conversacion && (
+        <ApodosDialog
+          open
+          onOpenChange={setApodosAbierto}
+          idProyecto={idProyecto}
+          idConversacion={idConversacion}
+          participantes={conversacion.participantes.filter((p) => p.idUsuario !== currentUserId)}
+        />
       )}
 
       <RenameConversationDialog
