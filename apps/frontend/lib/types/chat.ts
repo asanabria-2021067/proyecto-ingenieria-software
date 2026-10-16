@@ -5,12 +5,38 @@ export interface ChatUsuario {
   fotoUrl: string | null;
 }
 
+export interface ChatAdjunto {
+  idAdjunto: number;
+  nombreOriginal: string;
+  mime: string;
+  tamanoBytes: number;
+}
+
 export interface ChatMensaje {
   idMensaje: number;
   idConversacion: number;
   contenido: string;
   enviadoEn: string;
   remitente: ChatUsuario;
+  adjunto?: ChatAdjunto | null;
+}
+
+export interface ChatArchivo extends ChatAdjunto {
+  idMensaje: number;
+  creadoEn: string;
+  remitente: ChatUsuario;
+}
+
+export interface ChatArchivosPagina {
+  items: ChatArchivo[];
+  nextCursor: number | null;
+}
+
+export interface ChatAdjuntoUrl {
+  url: string;
+  nombreOriginal: string;
+  mime: string;
+  expiraEnSegundos: number;
 }
 
 export interface ChatEnlace {
