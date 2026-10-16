@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CHAT_STORAGE_PORT, type ChatStoragePort } from '../storage/chat-storage.port';
 import { ChatGateway } from './chat.gateway';
-import { validarAdjunto, type ArchivoSubido } from './chat-adjuntos';
+import { ADJUNTO_MAX_BYTES, validarAdjunto, type ArchivoSubido } from './chat-adjuntos';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
 import { ListLinksQueryDto } from './dto/list-links-query.dto';
@@ -282,6 +282,29 @@ export class ChatService {
     if (!adjunto) throw new NotFoundException('Archivo no encontrado');
     const url = await this.storage.signedUrl(adjunto.claveAlmacenamiento, URL_ADJUNTO_TTL_SEGUNDOS);
     return { url, nombreOriginal: adjunto.nombreOriginal, mime: adjunto.mime, expiraEnSegundos: URL_ADJUNTO_TTL_SEGUNDOS };
+  }
+
+  /**
+   * Bytes de una imagen adjunta para la miniatura. Se descargan en el servidor
+   * (URL firmada de uso unico) para que el navegador solo hable con el mismo
+   * origen; solo participantes, solo imagenes y con el tope de ADJUNTO_MAX_BYTES.
+   */
+  async getAdjuntoImagen(idProyecto: number, idConversacion: number, idAdjunto: number, userId: number) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    const adjunto = await this.prisma.adjuntoMensajeChat.findFirst({
+      where: { idAdjunto, idConversacion },
+      select: { claveAlmacenamiento: true, mime: true, tamanoBytes: true },
+    });
+    if (!adjunto) throw new NotFoundException('Archivo no encontrado');
+    if (!adjunto.mime.startsWith('image/') || adjunto.tamanoBytes > ADJUNTO_MAX_BYTES) {
+      throw new BadRequestException('El archivo no tiene miniatura');
+    }
+    const url = await this.storage.signedUrl(adjunto.claveAlmacenamiento, URL_ADJUNTO_TTL_SEGUNDOS);
+    const respuesta = await fetch(url);
+    if (!respuesta.ok) throw new NotFoundException('Archivo no disponible');
+    const datos = Buffer.from(await respuesta.arrayBuffer());
+    if (datos.length > ADJUNTO_MAX_BYTES) throw new BadRequestException('El archivo no tiene miniatura');
+    return { datos, mime: adjunto.mime };
   }
 
   async createMessage(
