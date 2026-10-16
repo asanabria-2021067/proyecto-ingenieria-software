@@ -41,14 +41,12 @@ export class CloudinaryChatStorageAdapter implements ChatStoragePort {
     }
   }
 
-  signedUrl(key: string, ttlSeconds: number): Promise<string> {
+  async signedUrl(key: string, ttlSeconds: number): Promise<string> {
     this.configure();
-    return Promise.resolve(
-      cloudinary.utils.private_download_url(key, '', {
-        ...OPTS,
-        expires_at: Math.floor(Date.now() / 1000) + ttlSeconds,
-      }),
-    );
+    return cloudinary.utils.private_download_url(key, '', {
+      ...OPTS,
+      expires_at: Math.floor(Date.now() / 1000) + ttlSeconds,
+    });
   }
 
   async destroy(key: string): Promise<void> {
