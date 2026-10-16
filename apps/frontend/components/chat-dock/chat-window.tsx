@@ -12,6 +12,7 @@ import {
   Loader2,
   MoreVertical,
   Pencil,
+  Reply,
   Send,
   Star,
   StarOff,
@@ -39,11 +40,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
-import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
+import { useLoadOlderMessages, useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useIrAlMensaje } from '@/hooks/use-ir-al-mensaje';
+import { ChatCitaBloque, ChatCitaVistaPrevia, extractoDe } from '@/components/chat-dock/chat-cita';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
-import type { ChatConversacionGlobal } from '@/lib/types/chat';
+import type { ChatConversacionGlobal, ChatMensaje } from '@/lib/types/chat';
 
 function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId: number | null): string {
   if (conversacion.nombrePersonalizado) return conversacion.nombrePersonalizado;
@@ -76,18 +79,35 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
+  const [citando, setCitando] = useState<ChatMensaje | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const cargarAnteriores = useLoadOlderMessages(idProyecto, idConversacion);
+  const { irAlMensaje } = useIrAlMensaje({
+    listRef,
+    messages,
+    cargarAnteriores,
+    onNoDisponible: () => toast.info('El mensaje original ya no está disponible'),
+  });
 
+  // Solo al llegar un mensaje nuevo: cargar páginas anteriores no debe mover la vista al final.
+  const ultimoId = messages[messages.length - 1]?.idMensaje;
   useEffect(() => {
     if (!minimized) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [messages, minimized]);
+  }, [ultimoId, minimized]);
+
+  const responder = (mensaje: ChatMensaje) => {
+    setCitando(mensaje);
+    inputRef.current?.focus();
+  };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const contenido = texto.trim();
     if (!contenido) return;
     setTexto('');
-    enviar.mutate(contenido);
+    setCitando(null);
+    enviar.mutate({ contenido, idMensajeCitado: citando?.idMensaje });
   };
 
   const handleBorrar = async () => {
@@ -197,23 +217,55 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             {messages.map((m) => {
               const propio = m.remitente.idUsuario === currentUserId;
               return (
-                <div key={m.idMensaje} className={`flex items-end gap-2 ${propio ? 'flex-row-reverse' : ''}`}>
+                <div
+                  key={m.idMensaje}
+                  data-mensaje-id={m.idMensaje}
+                  tabIndex={-1}
+                  className={`group flex items-end gap-2 rounded-2xl outline-none ${propio ? 'flex-row-reverse' : ''} data-[resaltado]:ring-2 data-[resaltado]:ring-primary`}
+                >
                   <Avatar className="size-6 shrink-0">
                     {m.remitente.fotoUrl && <AvatarImage src={m.remitente.fotoUrl} alt="" />}
                     <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
                   </Avatar>
                   <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? 'bg-primary text-primary-foreground' : 'bg-surface-container-high text-on-surface'}`}>
                     {!propio && <p className="mb-0.5 text-[11px] font-semibold opacity-80">{m.remitente.nombre}</p>}
+                    {m.citado && <ChatCitaBloque cita={m.citado} propio={propio} onIrAlOriginal={irAlMensaje} />}
                     <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
                     <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => responder(m)}
+                    aria-label={`Responder a ${m.remitente.nombre}`}
+                    className="rounded-control p-1 text-text-secondary opacity-0 hover:bg-on-surface/10 hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
+                  >
+                    <Reply className="size-4" aria-hidden="true" />
+                  </button>
                 </div>
               );
             })}
           </div>
 
-          <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-outline-variant p-2">
+          {citando && (
+            <ChatCitaVistaPrevia
+              nombre={`${citando.remitente.nombre} ${citando.remitente.apellido}`.trim()}
+              extracto={extractoDe(citando.contenido)}
+              onCancelar={() => setCitando(null)}
+            />
+          )}
+
+          <form
+            onSubmit={handleSubmit}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && citando) {
+                event.stopPropagation();
+                setCitando(null);
+              }
+            }}
+            className={`flex items-center gap-2 p-2 ${citando ? '' : 'border-t border-outline-variant'}`}
+          >
             <Input
+              ref={inputRef}
               value={texto}
               onChange={(event) => setTexto(event.target.value)}
               placeholder="Escribe un mensaje…"
