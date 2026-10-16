@@ -1,5 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DestinoArrastre, EstadoHito, EstadoSprint, EstadoTarea, Prioridad, Prisma, TipoNotificacion } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { INSIGNIAS_EVENTO } from '../insignias/insignias.catalog';
 import { PrismaService } from '../prisma/prisma.service';
 import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
@@ -81,6 +83,8 @@ export class SprintsService {
     // T-238 (HU-160): la instantánea diaria vive en su propio servicio;
     // Sprints solo decide quién puede pedir la regeneración manual de hoy.
     private readonly snapshots?: SprintSnapshotsService,
+    // HU-190: opcional (suites con argumentos posicionales).
+    private readonly events?: EventEmitter2,
   ) {}
 
   /**
@@ -1117,6 +1121,8 @@ export class SprintsService {
       projectId,
       sprintId,
     });
+
+    this.events?.emit(INSIGNIAS_EVENTO, { claves: ['sprints'], idProyecto: projectId });
 
     return sprintCerrado;
   }

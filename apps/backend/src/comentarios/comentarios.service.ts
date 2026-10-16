@@ -4,7 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EstadoProyecto, Prisma, TipoNotificacion } from '@prisma/client';
+import { INSIGNIAS_EVENTO } from '../insignias/insignias.catalog';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -37,6 +39,8 @@ export class ComentariosService {
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
     private readonly readPolicy: ProjectReadPolicyService,
+    // HU-190: opcional (suites con argumentos posicionales).
+    private readonly events?: EventEmitter2,
   ) {}
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -141,6 +145,8 @@ export class ComentariosService {
         return { tarea, comentario };
       },
     );
+
+    this.events?.emit(INSIGNIAS_EVENTO, { claves: ['comentarios'], idUsuarios: [userId] });
 
     const recipientIds = await this.getTaskCommentRecipientIds(taskId, tarea.creadaPor, userId);
     await this.notifications.notifyUsers(recipientIds, {

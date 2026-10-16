@@ -6,7 +6,9 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
+import { INSIGNIAS_EVENTO } from '../insignias/insignias.catalog';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -46,6 +48,8 @@ export class ProjectClosureReviewService {
     protected readonly notifications: NotificationsService,
     protected readonly report: ProjectClosureReportService,
     protected readonly documents: ProjectClosureDocumentsService,
+    // HU-190: opcional (suites con argumentos posicionales).
+    protected readonly events?: EventEmitter2,
   ) {}
 
   /** E114: corrección documental; el proyecto sigue en solicitud de cierre. */
@@ -201,7 +205,7 @@ export class ProjectClosureReviewService {
       });
       if (recorded.count !== 1) throw new ConflictException('La reserva oficial cambió');
     });
-    return this.projectTx.run(projectId, actorId, 'closure.approve.finalize', async ({ tx, project, effects }) => {
+    const resultado = await this.projectTx.run(projectId, actorId, 'closure.approve.finalize', async ({ tx, project, effects }) => {
       if (!project) throw new NotFoundException('Proyecto no encontrado');
       await this.policy.assertWriteTx(tx, project, 'CIERRE_VEREDICTO', actorId);
       const revision = await tx.revisionCierreProyecto.findFirst({
@@ -317,6 +321,8 @@ export class ProjectClosureReviewService {
         numeroRevision: revision.numeroRevision, fingerprintEntrega: revision.fingerprintEntrega,
         informeOficialId: phaseOne.documentId, cantidades: { horasAcreditadas: credited, participacionesCompletadas: completed.count } };
     }, { publish: (effects) => this.notifications.publishEffects(effects) });
+    this.events?.emit(INSIGNIAS_EVENTO, { claves: ['horas', 'cerrados', 'liderados'], idProyecto: projectId });
+    return resultado;
   }
 
   protected async beforeApprovalPhaseTwoCommit(): Promise<void> {}

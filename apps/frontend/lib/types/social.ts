@@ -1,3 +1,5 @@
+import type { InsigniaDto } from '@/lib/types/insignias';
+
 export interface UsuarioResumenDto {
   idUsuario: number;
   nombre: string;
@@ -57,6 +59,8 @@ export interface UsuarioPerfilDto extends UsuarioResumenDto {
   amigosEnComun: UsuarioResumenDto[];
   habilidades: string[];
   intereses: string[];
+  /** HU-190: solo las insignias obtenidas (sin toggle de privacidad). */
+  insignias: InsigniaDto[];
   proyectosActivos: ProyectoParticipacionResumenDto[];
 }
 

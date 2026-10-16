@@ -28,6 +28,8 @@ import { SafeExternalLink } from '@/components/profile/safe-external-link';
 import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { getAdminUserDetail, type AdminUserDetail } from '@/lib/services/admin';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
+import { useMisInsignias } from '@/hooks/use-insignias';
 
 function initials(nombre: string, apellido: string) {
   return `${nombre?.[0] ?? ''}${apellido?.[0] ?? ''}`.toUpperCase() || 'U';
@@ -79,6 +81,7 @@ export default function PerfilPage() {
   const [adminDetail, setAdminDetail] = useState<AdminUserDetail | null>(null);
 
   const isAdmin = !isLoading && isAdminUser(user);
+  const insignias = useMisInsignias(!isLoading && !isAdmin);
 
   useEffect(() => {
     if (!isLoading && !isAdmin) getDashboardStats().then(setStats).catch(() => {});
@@ -374,6 +377,15 @@ export default function PerfilPage() {
                   </div>
                 </div>
               </section>
+            )}
+
+            {/* Insignias - students only */}
+            {!isAdmin && (
+              <InsigniasVitrina
+                insignias={insignias.data ?? []}
+                isLoading={insignias.isLoading}
+                isError={insignias.isError}
+              />
             )}
 
             {/* Habilidades - students only */}

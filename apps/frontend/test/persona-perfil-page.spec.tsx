@@ -33,6 +33,7 @@ function perfil(overrides: Partial<UsuarioPerfilDto> = {}): UsuarioPerfilDto {
     amigosEnComun: [],
     habilidades: ['React'],
     intereses: [],
+    insignias: [],
     proyectosActivos: [],
     ...overrides,
   };
@@ -64,6 +65,36 @@ describe('PerfilPersonaPage', () => {
       'href',
       '/dashboard/personas',
     );
+  });
+
+  it('muestra las insignias obtenidas del perfil público (HU-190)', () => {
+    const sinFechas = { BRONCE: null, PLATA: null, ORO: null, DIAMANTE: null };
+    usePerfilUsuarioMock.mockReturnValue({
+      perfil: perfil({
+        insignias: [
+          {
+            clave: 'horas',
+            nombre: 'Horas acreditadas',
+            descripcion: 'd',
+            icono: 'Clock',
+            nivel: 'ORO',
+            progreso: 120,
+            umbrales: [5, 25, 100, 250],
+            siguienteUmbral: 250,
+            fechas: sinFechas,
+          },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    useAccionesAmistadMock.mockReturnValue(accionesDefault);
+
+    render(<PerfilPersonaPage />);
+
+    expect(screen.getByRole('heading', { name: 'Insignias' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Horas acreditadas, nivel Oro' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Bloqueadas' })).not.toBeInTheDocument();
   });
 
   it('renderiza nombre, carrera, semestre, habilidades y motivo de afinidad', () => {
