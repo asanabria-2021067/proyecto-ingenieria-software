@@ -39,7 +39,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
-import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
+import { useMessages, useSendMessage, useToggleReaction, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
+import { MessageReactions } from './message-reactions';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
@@ -71,6 +72,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const conversacion = conversations.find((c) => c.idConversacion === idConversacion) ?? null;
   const { messages, isLoading } = useMessages(idProyecto, idConversacion);
   const enviar = useSendMessage(idProyecto, idConversacion);
+  const reaccionar = useToggleReaction(idProyecto, idConversacion);
   const actualizar = useUpdateConversation(idProyecto);
   const eliminar = useDeleteConversation(idProyecto);
   const router = useRouter();
@@ -206,6 +208,15 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     {!propio && <p className="mb-0.5 text-[11px] font-semibold opacity-80">{m.remitente.nombre}</p>}
                     <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
                     <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
+                    <MessageReactions
+                      reacciones={m.reacciones ?? []}
+                      onToggle={(emoji) =>
+                        reaccionar.mutate(
+                          { idMensaje: m.idMensaje, emoji },
+                          { onError: () => toast.error('No se pudo reaccionar al mensaje') },
+                        )
+                      }
+                    />
                   </div>
                 </div>
               );
