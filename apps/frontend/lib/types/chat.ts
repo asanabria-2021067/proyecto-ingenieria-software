@@ -61,6 +61,15 @@ export interface ChatConversacionGlobal {
   esPrioritaria: boolean;
 }
 
+/** Modo no molestar del chat: 0 = domingo ... 6 = sabado, horas "HH:mm" en `zona`. */
+export interface PreferenciaNoMolestar {
+  activo: boolean;
+  horaInicio: string;
+  horaFin: string;
+  diasSemana: number[];
+  zona: string;
+}
+
 export interface CreateConversationPayload {
   tipo: 'GRUPAL' | 'INDIVIDUAL';
   nombre?: string;
