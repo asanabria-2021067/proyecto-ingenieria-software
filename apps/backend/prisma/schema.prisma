@@ -1673,14 +1673,17 @@ model ConversacionParticipante {
 }
 
 model MensajeChat {
-  idMensaje      Int      @id @default(autoincrement()) @map("id_mensaje")
-  idConversacion Int      @map("id_conversacion")
-  idRemitente    Int      @map("id_remitente")
-  contenido      String   @db.Text
-  enviadoEn      DateTime @default(now()) @map("enviado_en")
+  idMensaje       Int      @id @default(autoincrement()) @map("id_mensaje")
+  idConversacion  Int      @map("id_conversacion")
+  idRemitente     Int      @map("id_remitente")
+  contenido       String   @db.Text
+  enviadoEn       DateTime @default(now()) @map("enviado_en")
+  idMensajeCitado Int?     @map("id_mensaje_citado")
 
-  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
-  remitente    Usuario      @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario])
+  conversacion Conversacion  @relation(fields: [idConversacion], references: [idConversacion])
+  remitente    Usuario       @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario])
+  citado       MensajeChat?  @relation("MensajeCitado", fields: [idMensajeCitado], references: [idMensaje], onDelete: SetNull)
+  respuestas   MensajeChat[] @relation("MensajeCitado")
 
   @@index([idConversacion, enviadoEn])
   @@map("mensaje_chat")
