@@ -33,6 +33,7 @@ function makePrisma() {
     participacionProyecto: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    insignia: { findMany: vi.fn().mockResolvedValue([]) },
     $queryRaw: vi.fn().mockResolvedValue([]),
   };
 }
@@ -537,6 +538,45 @@ describe('SocialService — obtenerPerfilPublico', () => {
     expect(prisma.usuario.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { idUsuario: { in: [3] } } }),
     );
+  });
+
+  it('incluye solo las insignias obtenidas del usuario consultado (sin las bloqueadas ni las de otros) (HU-190)', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findUnique.mockResolvedValue({
+      idUsuario: 2,
+      nombre: 'Carla',
+      apellido: 'Ruiz',
+      fotoUrl: null,
+      correo: 'carla@uvg.edu.gt',
+      perfil: null,
+      habilidades: [],
+      intereses: [],
+    });
+    prisma.amistad.findFirst.mockResolvedValue(null);
+    prisma.seguimiento.findUnique.mockResolvedValue(null);
+    prisma.perfilEstudiante.findUnique.mockResolvedValue(null);
+    prisma.amistad.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const fila = (clave: string, nivel: string | null) => ({
+      idInsignia: 1,
+      clave,
+      nombre: clave,
+      descripcion: 'd',
+      icono: 'Clock',
+      umbralBronce: 1,
+      umbralPlata: 2,
+      umbralOro: 3,
+      umbralDiamante: 4,
+      usuarios: nivel ? [{ nivel, progreso: 2, fechaBronce: new Date('2026-01-01T00:00:00Z'), fechaPlata: null, fechaOro: null, fechaDiamante: null }] : [],
+    });
+    prisma.insignia.findMany.mockResolvedValue([fila('horas', 'BRONCE'), fila('tareas', null)]);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.obtenerPerfilPublico(1, 2);
+
+    expect(prisma.insignia.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ include: { usuarios: { where: { idUsuario: 2 } } } }),
+    );
+    expect(resultado.insignias.map((i) => [i.clave, i.nivel])).toEqual([['horas', 'BRONCE']]);
   });
 
   it('sin amigos en común no consulta usuario.findMany para armar la lista', async () => {
