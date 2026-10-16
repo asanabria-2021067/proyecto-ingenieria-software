@@ -56,6 +56,9 @@ export interface ChatMensaje {
   idConversacion: number;
   contenido: string;
   enviadoEn: string;
+  editadoEn?: string | null;
+  /** Mensaje eliminado: el backend manda `contenido` vacío. */
+  eliminadoEn?: string | null;
   remitente: ChatUsuario;
   adjunto?: ChatAdjunto | null;
   citado?: ChatCita | null;
