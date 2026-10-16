@@ -12,6 +12,7 @@ import type {
   ChatMensaje,
   ChatReaccion,
   ChatTemaColor,
+  ChatMensajeProgramado,
   CreateConversationPayload,
   DuracionSilencio,
   ListArchivedConversationsFiltros,
@@ -130,6 +131,34 @@ export function toggleReaction(
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/${idMensaje}/reacciones`, {
     method: 'POST',
     body: JSON.stringify({ emoji }),
+  });
+}
+
+export function listScheduledMessages(
+  idProyecto: number,
+  idConversacion: number,
+): Promise<ChatMensajeProgramado[]> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/programados`);
+}
+
+export function scheduleMessage(
+  idProyecto: number,
+  idConversacion: number,
+  payload: { contenido: string; enviarEn: string },
+): Promise<ChatMensajeProgramado> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/programados`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function cancelScheduledMessage(
+  idProyecto: number,
+  idConversacion: number,
+  idMensajeProgramado: number,
+): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/programados/${idMensajeProgramado}`, {
+    method: 'DELETE',
   });
 }
 
