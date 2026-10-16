@@ -9,6 +9,7 @@ import type {
   ChatLectura,
   ChatEnlacesPagina,
   ChatMensaje,
+  ChatReaccion,
   CreateConversationPayload,
   DuracionSilencio,
   ListArchivedConversationsFiltros,
@@ -113,6 +114,18 @@ export function getAttachmentUrl(
 export function getAttachmentThumbnail(idProyecto: number, idConversacion: number, idAdjunto: number): Promise<Blob> {
   return apiFetchBlob(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/archivos/${idAdjunto}/miniatura`, {
     headers: { Accept: 'image/*' },
+  });
+}
+
+export function toggleReaction(
+  idProyecto: number,
+  idConversacion: number,
+  idMensaje: number,
+  emoji: string,
+): Promise<ChatReaccion[]> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/${idMensaje}/reacciones`, {
+    method: 'POST',
+    body: JSON.stringify({ emoji }),
   });
 }
 
