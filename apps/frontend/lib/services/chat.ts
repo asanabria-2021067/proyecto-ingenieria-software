@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/api/client';
+import { apiFetch, apiFetchBlob } from '@/lib/api/client';
 import type {
   ChatAdjuntoUrl,
   ChatArchivosPagina,
@@ -90,6 +90,13 @@ export function getAttachmentUrl(
   idAdjunto: number,
 ): Promise<ChatAdjuntoUrl> {
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/archivos/${idAdjunto}/url`);
+}
+
+/** Bytes de la miniatura de una imagen, servidos por el backend (mismo origen). */
+export function getAttachmentThumbnail(idProyecto: number, idConversacion: number, idAdjunto: number): Promise<Blob> {
+  return apiFetchBlob(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/archivos/${idAdjunto}/miniatura`, {
+    headers: { Accept: 'image/*' },
+  });
 }
 
 export function updateConversation(

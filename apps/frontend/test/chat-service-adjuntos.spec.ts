@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const apiFetch = vi.fn();
-vi.mock('@/lib/api/client', () => ({ apiFetch: (...a: unknown[]) => apiFetch(...a) }));
+const apiFetchBlob = vi.fn();
+vi.mock('@/lib/api/client', () => ({
+  apiFetch: (...a: unknown[]) => apiFetch(...a),
+  apiFetchBlob: (...a: unknown[]) => apiFetchBlob(...a),
+}));
 
-import { getAttachmentUrl, getFiles, sendFileMessage } from '../lib/services/chat';
+import { getAttachmentThumbnail, getAttachmentUrl, getFiles, sendFileMessage } from '../lib/services/chat';
 
 afterEach(() => vi.clearAllMocks());
 
@@ -34,5 +38,12 @@ describe('servicios de adjuntos del chat', () => {
       '/proyectos/10/conversaciones/5/archivos?cursor=9',
       '/proyectos/10/conversaciones/5/archivos/7/url',
     ]);
+  });
+
+  it('getAttachmentThumbnail pide la miniatura al backend como imagen', () => {
+    getAttachmentThumbnail(10, 5, 7);
+    expect(apiFetchBlob).toHaveBeenCalledWith('/proyectos/10/conversaciones/5/archivos/7/miniatura', {
+      headers: { Accept: 'image/*' },
+    });
   });
 });
