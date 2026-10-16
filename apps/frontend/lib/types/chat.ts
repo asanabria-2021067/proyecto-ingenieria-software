@@ -87,3 +87,20 @@ export interface ListArchivedConversationsResultado {
   items: ArchivedConversacion[];
   hasMore: boolean;
 }
+
+export interface BuscarMensajesFiltros {
+  q?: string;
+  idAutor?: number;
+  /** ISO 8601 */
+  desde?: string;
+  /** ISO 8601 */
+  hasta?: string;
+  pagina?: number;
+}
+
+export interface BuscarMensajesResultado {
+  items: ChatMensaje[];
+  hasMore: boolean;
+  pagina: number;
+  termino: string | null;
+}
