@@ -28,11 +28,14 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 } }) }));
 
 const sendMutate = vi.fn();
+const sendFileMutate = vi.fn();
 const updateMutate = vi.fn();
 const deleteMutate = vi.fn();
 vi.mock('@/hooks/use-chat', () => ({
   useMessages: () => ({ messages: [], isLoading: false }),
   useSendMessage: () => ({ mutate: sendMutate, isPending: false }),
+  useSendFileMessage: () => ({ mutate: sendFileMutate, isPending: false }),
+  useAttachmentUrl: () => ({ data: undefined }),
   useUpdateConversation: () => ({ mutate: updateMutate, isPending: false }),
   useDeleteConversation: () => ({ mutate: deleteMutate, isPending: false }),
   useAllConversations: () => ({
