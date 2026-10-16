@@ -6,7 +6,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   createConversation,
   deleteConversation,
-  getAttachmentUrl,
+  getAttachmentThumbnail,
   getFiles,
   getLinks,
   getMessages,
@@ -20,7 +20,7 @@ import {
 import {
   allConversationsQueryKey,
   archivedConversationsQueryKey,
-  attachmentUrlQueryKey,
+  attachmentThumbnailQueryKey,
   conversationFilesQueryKey,
   conversationLinksQueryKey,
   conversationMessagesQueryKey,
@@ -121,13 +121,21 @@ export function useConversationFiles(idProyecto: number, idConversacion: number,
   };
 }
 
-/** URL firmada para la miniatura de una imagen; la URL expira en ~60 s. */
-export function useAttachmentUrl(idProyecto: number, idConversacion: number, idAdjunto: number, enabled: boolean) {
+/** Miniatura de una imagen como URL data: (ya permitida en img-src), pedida con sesion al backend. */
+export function useAttachmentThumbnail(idProyecto: number, idConversacion: number, idAdjunto: number, enabled: boolean) {
   return useQuery({
-    queryKey: attachmentUrlQueryKey(idProyecto, idConversacion, idAdjunto),
-    queryFn: () => getAttachmentUrl(idProyecto, idConversacion, idAdjunto),
+    queryKey: attachmentThumbnailQueryKey(idProyecto, idConversacion, idAdjunto),
+    queryFn: async () => {
+      const blob = await getAttachmentThumbnail(idProyecto, idConversacion, idAdjunto);
+      return new Promise<string>((resolve, reject) => {
+        const lector = new FileReader();
+        lector.onload = () => resolve(lector.result as string);
+        lector.onerror = () => reject(lector.error);
+        lector.readAsDataURL(blob);
+      });
+    },
     enabled,
-    staleTime: 45_000,
+    staleTime: Infinity,
     retry: false,
   });
 }
