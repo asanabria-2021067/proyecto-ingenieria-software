@@ -103,4 +103,24 @@ describe('ChatListPopover', () => {
     expect(abrirChat).toHaveBeenCalledWith(7, 42);
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('el boton de mensajes guardados abre el dialogo y cierra el popover', async () => {
+    const onClose = vi.fn();
+    const onOpenSaved = vi.fn();
+    listAllConversationsMock.mockResolvedValue([]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client }, createElement(ChatListPopover, { onClose, onOpenSaved })));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mensajes guardados' }));
+
+    expect(onOpenSaved).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('sin onOpenSaved no muestra el boton de guardados', async () => {
+    listAllConversationsMock.mockResolvedValue([]);
+    renderPopover();
+
+    expect(screen.queryByRole('button', { name: 'Mensajes guardados' })).not.toBeInTheDocument();
+  });
 });
