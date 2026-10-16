@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ChatCanalesService } from './chat-canales.service';
 import { ChatService } from './chat.service';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
 import { UpdateNoMolestarDto } from './dto/update-no-molestar.dto';
@@ -12,14 +13,18 @@ import { ListSavedMessagesQueryDto } from './dto/list-saved-messages-query.dto';
 @Controller('chats')
 @UseGuards(JwtAuthGuard)
 export class ChatArchivadoController {
-  constructor(private chatService: ChatService) {}
+  constructor(
+    private chatService: ChatService,
+    private canales: ChatCanalesService,
+  ) {}
 
   /** Dock global de chat: todas las conversaciones activas del usuario, de cualquier proyecto. */
   @Get()
-  listTodas(
+  async listTodas(
     @Query('q') q: string | undefined,
     @CurrentUser() user: { userId: number },
   ) {
+    await this.canales.asegurarGeneral(user.userId);
     return this.chatService.listAllConversations(user.userId, q);
   }
 
