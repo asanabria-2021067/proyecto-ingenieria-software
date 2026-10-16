@@ -91,7 +91,7 @@ export class ChatService {
     const conversaciones = await this.prisma.conversacion.findMany({
       where: { idProyecto, eliminadaEn: null, participantes: { some: { idUsuario: userId } } },
       include: {
-        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
+        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, temaColor: true, usuario: USUARIO_SELECT } },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
@@ -120,6 +120,7 @@ export class ChatService {
           archivadaManual: c.archivadaEn !== null,
           silenciada: c.silenciada,
           esPrioritaria: c.esPrioritaria,
+          temaColor: propia?.temaColor ?? null,
         };
       }),
     );
@@ -316,7 +317,7 @@ export class ChatService {
       },
       include: {
         proyecto: { select: { idProyecto: true, tituloProyecto: true } },
-        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
+        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, temaColor: true, usuario: USUARIO_SELECT } },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
@@ -347,6 +348,7 @@ export class ChatService {
           archivadaManual: c.archivadaEn !== null,
           silenciada: c.silenciada,
           esPrioritaria: c.esPrioritaria,
+          temaColor: propia?.temaColor ?? null,
         };
       }),
     );
