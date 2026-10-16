@@ -38,3 +38,6 @@ export const noMolestarQueryKey = ['chat-no-molestar'] as const;
 
 /** Mensajes guardados del usuario (marcadores privados). */
 export const savedMessagesQueryKey = () => ['chats-guardados'] as const;
+
+export const linkPreviewQueryKey = (idConversacion: number, url: string) =>
+  ['chat-link-preview', idConversacion, url] as const;
