@@ -384,6 +384,7 @@ model Usuario {
   calendariosCompartidosPorMi      CalendarioCompartido[]     @relation("CalendarioPropietario")
   calendariosCompartidosConmigo    CalendarioCompartido[]     @relation("CalendarioInvitado")
   insignias                        InsigniaUsuario[]
+  mensajesGuardados                MensajeGuardado[]
 
   @@index([estado, fechaCreacion])
   @@map("usuario")
@@ -1681,9 +1682,24 @@ model MensajeChat {
 
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
   remitente    Usuario      @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario])
+  guardadoPor  MensajeGuardado[]
 
   @@index([idConversacion, enviadoEn])
   @@map("mensaje_chat")
+}
+
+/// Marcador personal de un mensaje de chat: privado, solo lo ve quien guarda.
+model MensajeGuardado {
+  idUsuario  Int      @map("id_usuario")
+  idMensaje  Int      @map("id_mensaje")
+  guardadoEn DateTime @default(now()) @map("guardado_en")
+
+  usuario Usuario     @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  mensaje MensajeChat @relation(fields: [idMensaje], references: [idMensaje], onDelete: Cascade)
+
+  @@id([idUsuario, idMensaje])
+  @@index([idUsuario, guardadoEn])
+  @@map("mensaje_guardado")
 }
 
 // HU-190 (T-346): niveles de una insignia. Sin nivel (null) = aún sin umbral alcanzado.
