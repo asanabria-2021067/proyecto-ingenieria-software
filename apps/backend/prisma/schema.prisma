@@ -1672,6 +1672,7 @@ model ConversacionParticipante {
   // Silencio por usuario: hasta una fecha, o siempre.
   silenciadaHasta   DateTime? @map("silenciada_hasta")
   silenciadaSiempre Boolean   @default(false) @map("silenciada_siempre")
+  temaColor       String?   @map("tema_color") @db.VarChar(20)
 
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
   usuario      Usuario      @relation(fields: [idUsuario], references: [idUsuario])
