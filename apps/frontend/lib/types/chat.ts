@@ -3,6 +3,8 @@ export interface ChatUsuario {
   nombre: string;
   apellido: string;
   fotoUrl: string | null;
+  /** Apodo que el usuario autenticado puso a esta persona en la conversacion (privado). */
+  apodo?: string | null;
 }
 
 export interface ChatMensaje {
@@ -11,6 +13,8 @@ export interface ChatMensaje {
   contenido: string;
   enviadoEn: string;
   remitente: ChatUsuario;
+  /** Apodo del remitente segun el usuario autenticado, si lo definio. */
+  apodoRemitente?: string | null;
 }
 
 export interface ChatConversacion {

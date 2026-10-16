@@ -9,11 +9,13 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { SetApodoDto } from './dto/set-apodo.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -92,5 +94,28 @@ export class ChatController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.chatService.markRead(projectId, conversationId, user.userId);
+  }
+
+  @Put(':conversationId/apodos/:targetUserId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  setApodo(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('targetUserId', ParseIntPipe) targetUserId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: SetApodoDto,
+  ) {
+    return this.chatService.setApodo(projectId, conversationId, user.userId, targetUserId, dto.apodo);
+  }
+
+  @Delete(':conversationId/apodos/:targetUserId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeApodo(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('targetUserId', ParseIntPipe) targetUserId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.removeApodo(projectId, conversationId, user.userId, targetUserId);
   }
 }

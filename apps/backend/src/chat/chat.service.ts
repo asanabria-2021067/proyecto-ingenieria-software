@@ -38,6 +38,20 @@ const MENSAJE_SELECT = {
 
 const ARCHIVADOS_PAGE_SIZE = 20;
 
+/** Apodos privados: solo se leen los que definió el usuario autenticado. */
+const apodosPropios = (userId: number) => ({
+  where: { idUsuarioDefine: userId },
+  select: { idUsuarioObjetivo: true, apodo: true },
+});
+
+function participantesConApodo(
+  participantes: { idUsuario: number; usuario: { idUsuario: number; nombre: string; apellido: string; fotoUrl: string | null } }[],
+  apodos: { idUsuarioObjetivo: number; apodo: string }[],
+) {
+  const porUsuario = new Map(apodos.map((a) => [a.idUsuarioObjetivo, a.apodo]));
+  return participantes.map((p) => ({ ...p.usuario, apodo: porUsuario.get(p.idUsuario) ?? null }));
+}
+
 @Injectable()
 export class ChatService {
   constructor(
@@ -90,6 +104,7 @@ export class ChatService {
     const conversaciones = await this.prisma.conversacion.findMany({
       where: { idProyecto, eliminadaEn: null, participantes: { some: { idUsuario: userId } } },
       include: {
+        apodos: apodosPropios(userId),
         participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
@@ -111,7 +126,7 @@ export class ChatService {
           tipo: c.tipo,
           nombre: c.nombre,
           nombrePersonalizado: c.nombrePersonalizado,
-          participantes: c.participantes.map((p) => p.usuario),
+          participantes: participantesConApodo(c.participantes, c.apodos),
           ultimoMensaje: c.mensajes[0] ?? null,
           noLeidos,
           archivada,
@@ -200,7 +215,45 @@ export class ChatService {
       take: 30,
       select: MENSAJE_SELECT,
     });
-    return mensajes.reverse();
+    const apodos = await this.prisma.apodoConversacion.findMany({
+      where: { idConversacion, idUsuarioDefine: userId },
+      select: { idUsuarioObjetivo: true, apodo: true },
+    });
+    const porUsuario = new Map(apodos.map((a) => [a.idUsuarioObjetivo, a.apodo]));
+    return mensajes
+      .reverse()
+      .map((m) => ({ ...m, apodoRemitente: porUsuario.get(m.remitente.idUsuario) ?? null }));
+  }
+
+  /** Define o actualiza como ve `idObjetivo` el usuario autenticado (privado). */
+  async setApodo(idProyecto: number, idConversacion: number, userId: number, idObjetivo: number, apodo: string) {
+    await this.assertApodoTarget(idProyecto, idConversacion, userId, idObjetivo);
+    await this.prisma.apodoConversacion.upsert({
+      where: {
+        idConversacion_idUsuarioDefine_idUsuarioObjetivo: {
+          idConversacion,
+          idUsuarioDefine: userId,
+          idUsuarioObjetivo: idObjetivo,
+        },
+      },
+      create: { idConversacion, idUsuarioDefine: userId, idUsuarioObjetivo: idObjetivo, apodo },
+      update: { apodo },
+    });
+  }
+
+  async removeApodo(idProyecto: number, idConversacion: number, userId: number, idObjetivo: number) {
+    await this.assertApodoTarget(idProyecto, idConversacion, userId, idObjetivo);
+    await this.prisma.apodoConversacion.deleteMany({
+      where: { idConversacion, idUsuarioDefine: userId, idUsuarioObjetivo: idObjetivo },
+    });
+  }
+
+  /** Quien define y el objetivo deben ser participantes de la conversación. */
+  private async assertApodoTarget(idProyecto: number, idConversacion: number, userId: number, idObjetivo: number) {
+    const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    if (!conversacion.participantes.some((p) => p.idUsuario === idObjetivo)) {
+      throw new BadRequestException('El usuario no participa en esta conversación');
+    }
   }
 
   async createMessage(idProyecto: number, idConversacion: number, userId: number, contenido: string) {
@@ -306,6 +359,7 @@ export class ChatService {
       },
       include: {
         proyecto: { select: { idProyecto: true, tituloProyecto: true } },
+        apodos: apodosPropios(userId),
         participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
@@ -329,7 +383,7 @@ export class ChatService {
           tipo: c.tipo,
           nombre: c.nombre,
           nombrePersonalizado: c.nombrePersonalizado,
-          participantes: c.participantes.map((p) => p.usuario),
+          participantes: participantesConApodo(c.participantes, c.apodos),
           ultimoMensaje: c.mensajes[0] ?? null,
           ultimoMensajeEsPropio: c.mensajes[0]?.remitente.idUsuario === userId,
           noLeidos,
