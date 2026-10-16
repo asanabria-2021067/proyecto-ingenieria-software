@@ -8,20 +8,23 @@ import {
   createConversation,
   deleteConversation,
   getMessages,
+  getNoMolestar,
   listAllConversations,
   listArchivedConversations,
   markConversationRead,
   sendMessage,
   silenciarConversation,
   updateConversation,
+  updateNoMolestar,
 } from '@/lib/services/chat';
 import {
   allConversationsQueryKey,
   archivedConversationsQueryKey,
   conversationMessagesQueryKey,
+  noMolestarQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
-import type { ChatMensaje, CreateConversationPayload, DuracionSilencio, UpdateConversationPayload } from '@/lib/types/chat';
+import type { ChatMensaje, CreateConversationPayload, DuracionSilencio, PreferenciaNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -130,6 +133,19 @@ export function useSilenciarConversation(idProyecto: number) {
         ? silenciarConversation(idProyecto, idConversacion, duracion)
         : activarSonidoConversation(idProyecto, idConversacion),
     onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+export function useNoMolestar() {
+  const query = useQuery({ queryKey: noMolestarQueryKey, queryFn: getNoMolestar });
+  return { preferencia: query.data ?? null, isLoading: query.isLoading, isError: query.isError };
+}
+
+export function useUpdateNoMolestar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: PreferenciaNoMolestar) => updateNoMolestar(payload),
+    onSuccess: (guardada) => queryClient.setQueryData(noMolestarQueryKey, guardada),
   });
 }
 
