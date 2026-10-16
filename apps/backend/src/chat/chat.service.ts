@@ -222,7 +222,7 @@ export class ChatService {
           nombrePersonalizado: c.nombrePersonalizado,
           esCanal: c.esCanal,
           participantes: participantesConApodo(c.participantes, c.apodos),
-          ultimoMensaje: c.mensajes[0] ?? null,
+          ultimoMensaje: c.mensajes[0] ? ocultarEliminado(c.mensajes[0]) : null,
           noLeidos,
           archivada,
           esFavorita: c.esFavorita,
@@ -325,7 +325,7 @@ export class ChatService {
     const porUsuario = new Map(apodos.map((a) => [a.idUsuarioObjetivo, a.apodo]));
     // `guardado` es solo del usuario autenticado: nunca se expone quién más guardó.
     return mensajes.reverse().map(({ reacciones, guardadoPor, ...m }) => ({
-      ...conResumenDeCita(m),
+      ...ocultarEliminado(conResumenDeCita(m)),
       reacciones: reaccionesParaUsuario(agruparReacciones(reacciones), userId),
       apodoRemitente: porUsuario.get(m.remitente.idUsuario) ?? null,
       guardado: guardadoPor.length > 0,
@@ -415,6 +415,7 @@ export class ChatService {
     const mensajes = await this.prisma.mensajeChat.findMany({
       where: {
         idConversacion,
+        eliminadoEn: null,
         contenido: { contains: 'http', mode: 'insensitive' },
         ...(query.cursor ? { idMensaje: { lt: query.cursor } } : {}),
       },
@@ -502,7 +503,7 @@ export class ChatService {
       throw new BadRequestException('desde no puede ser posterior a hasta');
     }
 
-    const condiciones = [Prisma.sql`id_conversacion = ${idConversacion}`];
+    const condiciones = [Prisma.sql`id_conversacion = ${idConversacion}`, Prisma.sql`eliminado_en IS NULL`];
     if (q) {
       condiciones.push(
         Prisma.sql`immutable_unaccent(lower(contenido)) LIKE immutable_unaccent(lower(${likePattern(q)})) ESCAPE '\\'`,
@@ -607,6 +608,65 @@ export class ChatService {
     return mensaje;
   }
 
+  /** Solo el remitente toca su mensaje; un mensaje eliminado ya no se edita ni se vuelve a eliminar. */
+  private async getOwnMessageOrThrow(
+    idProyecto: number,
+    idConversacion: number,
+    idMensaje: number,
+    userId: number,
+  ) {
+    const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    if (chatArchivado(conversacion.proyecto.estadoProyecto)) {
+      throw new ForbiddenException('Esta conversación está archivada: no se pueden modificar mensajes.');
+    }
+    const mensaje = await this.prisma.mensajeChat.findFirst({
+      where: { idMensaje, idConversacion },
+      select: { idRemitente: true, eliminadoEn: true },
+    });
+    if (!mensaje) throw new NotFoundException(`Mensaje con id ${idMensaje} no encontrado`);
+    if (mensaje.idRemitente !== userId) {
+      throw new ForbiddenException('Solo puedes modificar tus propios mensajes');
+    }
+    if (mensaje.eliminadoEn) throw new BadRequestException('El mensaje ya fue eliminado');
+    return conversacion;
+  }
+
+  async editMessage(
+    idProyecto: number,
+    idConversacion: number,
+    idMensaje: number,
+    userId: number,
+    contenido: string,
+  ) {
+    const conversacion = await this.getOwnMessageOrThrow(idProyecto, idConversacion, idMensaje, userId);
+    const mensaje = conResumenDeCita(
+      await this.prisma.mensajeChat.update({
+        where: { idMensaje },
+        data: { contenido: contenido.trim(), editadoEn: new Date() },
+        select: MENSAJE_CON_CITA_SELECT,
+      }),
+    );
+    const destinatarios = conversacion.participantes.map((p) => p.idUsuario).filter((id) => id !== userId);
+    this.gateway.broadcastMessageChange('messageUpdated', idConversacion, destinatarios, mensaje);
+    return mensaje;
+  }
+
+  async deleteMessage(idProyecto: number, idConversacion: number, idMensaje: number, userId: number) {
+    const conversacion = await this.getOwnMessageOrThrow(idProyecto, idConversacion, idMensaje, userId);
+    const mensaje = ocultarEliminado(
+      conResumenDeCita(
+        await this.prisma.mensajeChat.update({
+          where: { idMensaje },
+          data: { eliminadoEn: new Date() },
+          select: MENSAJE_CON_CITA_SELECT,
+        }),
+      ),
+    );
+    const destinatarios = conversacion.participantes.map((p) => p.idUsuario).filter((id) => id !== userId);
+    this.gateway.broadcastMessageChange('messageDeleted', idConversacion, destinatarios, mensaje);
+    return mensaje;
+  }
+
   /** Menú de 3 puntos: archivar/desarchivar, renombrar o (des)marcar favorita. */
   async updateConversation(
     idProyecto: number,
@@ -706,7 +766,7 @@ export class ChatService {
                     },
                   },
                 },
-                { mensajes: { some: { contenido: { contains: query, mode: 'insensitive' } } } },
+                { mensajes: { some: { eliminadoEn: null, contenido: { contains: query, mode: 'insensitive' } } } },
               ],
             }
           : {}),
@@ -748,7 +808,7 @@ export class ChatService {
           nombrePersonalizado: c.nombrePersonalizado,
           esCanal: c.esCanal,
           participantes: participantesConApodo(c.participantes, c.apodos),
-          ultimoMensaje: c.mensajes[0] ?? null,
+          ultimoMensaje: c.mensajes[0] ? ocultarEliminado(c.mensajes[0]) : null,
           ultimoMensajeEsPropio: c.mensajes[0]?.remitente.idUsuario === userId,
           noLeidos,
           esFavorita: c.esFavorita,
@@ -979,7 +1039,7 @@ export class ChatService {
         nombre: c.nombre,
         proyecto: c.proyecto,
         participantes: c.participantes.map((p) => p.usuario),
-        ultimoMensaje: c.mensajes[0] ?? null,
+        ultimoMensaje: c.mensajes[0] ? ocultarEliminado(c.mensajes[0]) : null,
         archivada: true as const,
       })),
       hasMore,
