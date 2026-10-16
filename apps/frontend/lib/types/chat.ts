@@ -267,3 +267,12 @@ export interface ListSavedMessagesResultado {
   items: MensajeGuardadoItem[];
   hasMore: boolean;
 }
+
+/** Vista previa de un link de un mensaje (la arma el backend con proteccion SSRF). */
+export interface LinkPreview {
+  url: string;
+  titulo: string | null;
+  descripcion: string | null;
+  imagen: string | null;
+  sitio: string | null;
+}
