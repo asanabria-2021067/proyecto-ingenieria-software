@@ -9,6 +9,7 @@ import {
   BellOff,
   ChevronDown,
   ChevronUp,
+  Link2,
   Loader2,
   MoreVertical,
   Pencil,
@@ -38,6 +39,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ChatLinksDialog } from './chat-links-dialog';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -76,6 +78,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
+  const [enlacesAbierto, setEnlacesAbierto] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -171,6 +174,10 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               {conversacion?.archivadaManual ? <ArchiveRestore className="size-4" aria-hidden="true" /> : <Archive className="size-4" aria-hidden="true" />}
               {conversacion?.archivadaManual ? 'Desarchivar' : 'Archivar'}
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setEnlacesAbierto(true)}>
+              <Link2 className="size-4" aria-hidden="true" />
+              Enlaces compartidos
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={handleBorrar}>
               <Trash2 className="size-4" aria-hidden="true" />
@@ -234,6 +241,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
         </>
       )}
 
+      <ChatLinksDialog open={enlacesAbierto} onOpenChange={setEnlacesAbierto} idProyecto={idProyecto} idConversacion={idConversacion} />
       <RenameConversationDialog
         open={renombrarAbierto}
         onOpenChange={setRenombrarAbierto}
