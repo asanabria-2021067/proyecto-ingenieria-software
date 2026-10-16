@@ -349,9 +349,20 @@ export class ChatService {
 
   async markRead(idProyecto: number, idConversacion: number, userId: number) {
     await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    const leidoEn = new Date();
     await this.prisma.conversacionParticipante.update({
       where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
-      data: { ultimaLecturaEn: new Date() },
+      data: { ultimaLecturaEn: leidoEn },
+    });
+    this.gateway.notifyMessagesRead(idConversacion, userId, leidoEn);
+  }
+
+  /** "Visto por": hasta cuándo leyó la conversación cada uno de los demás participantes. */
+  async getReadReceipts(idProyecto: number, idConversacion: number, userId: number) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    return this.prisma.conversacionParticipante.findMany({
+      where: { idConversacion, idUsuario: { not: userId } },
+      select: { idUsuario: true, ultimaLecturaEn: true },
     });
   }
 

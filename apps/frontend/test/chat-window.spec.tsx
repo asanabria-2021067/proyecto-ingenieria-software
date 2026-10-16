@@ -27,11 +27,16 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
 vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 } }) }));
 
+const markReadMutate = vi.fn();
+let mensajesMock: any[] = [];
+let lecturasMock: any[] = [];
 const sendMutate = vi.fn();
 const updateMutate = vi.fn();
 const deleteMutate = vi.fn();
 vi.mock('@/hooks/use-chat', () => ({
-  useMessages: () => ({ messages: [], isLoading: false }),
+  useMessages: () => ({ messages: mensajesMock, isLoading: false }),
+  useReadReceipts: () => ({ lecturas: lecturasMock }),
+  useMarkConversationRead: () => ({ mutate: markReadMutate }),
   useSendMessage: () => ({ mutate: sendMutate, isPending: false }),
   useUpdateConversation: () => ({ mutate: updateMutate, isPending: false }),
   useDeleteConversation: () => ({ mutate: deleteMutate, isPending: false }),
@@ -92,6 +97,8 @@ async function abrirMenu() {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mensajesMock = [];
+  lecturasMock = [];
 });
 
 describe('ChatWindow', () => {
@@ -166,5 +173,63 @@ describe('ChatWindow', () => {
   it('minimizada, no muestra el historial ni el input', () => {
     renderWindow({ minimized: true });
     expect(screen.queryByPlaceholderText('Escribe un mensaje…')).not.toBeInTheDocument();
+  });
+  describe('escribiendo, visto por y leido', () => {
+    const mensaje = (idMensaje: number, idRemitente: number, enviadoEn: string) => ({
+      idMensaje,
+      idConversacion: 5,
+      contenido: `msg ${idMensaje}`,
+      enviadoEn,
+      remitente: { idUsuario: idRemitente, nombre: idRemitente === 1 ? 'Yo' : 'Rosa', apellido: 'X', fotoUrl: null },
+    });
+
+    it('muestra "escribiendo" de la otra persona en una region en vivo', () => {
+      renderWindow({ typingUserIds: [2] });
+      expect(screen.getByRole('status')).toHaveTextContent('Rosa está escribiendo…');
+    });
+
+    it('ignora typing propio y deja la region vacia', () => {
+      renderWindow({ typingUserIds: [1] });
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    });
+
+    it('al teclear llama onTyping; con el campo vacio no', () => {
+      const onTyping = vi.fn();
+      renderWindow({ onTyping });
+      const input = screen.getByPlaceholderText('Escribe un mensaje…');
+      fireEvent.change(input, { target: { value: '  ' } });
+      expect(onTyping).not.toHaveBeenCalled();
+      fireEvent.change(input, { target: { value: 'ho' } });
+      expect(onTyping).toHaveBeenCalledTimes(1);
+    });
+
+    it('muestra "Visto por" bajo el ultimo mensaje propio cuando la otra persona lo leyo', () => {
+      mensajesMock = [mensaje(1, 1, '2026-10-16T10:00:00Z')];
+      lecturasMock = [{ idUsuario: 2, ultimaLecturaEn: '2026-10-16T10:01:00Z' }];
+      renderWindow();
+      expect(screen.getByTestId('chat-visto-por')).toHaveTextContent('Visto por Rosa');
+    });
+
+    it('no muestra "Visto por" si la lectura es anterior al mensaje', () => {
+      mensajesMock = [mensaje(1, 1, '2026-10-16T10:00:00Z')];
+      lecturasMock = [{ idUsuario: 2, ultimaLecturaEn: '2026-10-16T09:59:00Z' }];
+      renderWindow();
+      expect(screen.queryByTestId('chat-visto-por')).not.toBeInTheDocument();
+    });
+
+    it('marca como leido cuando el ultimo mensaje es ajeno y la ventana esta abierta', () => {
+      mensajesMock = [mensaje(1, 2, '2026-10-16T10:00:00Z')];
+      renderWindow();
+      expect(markReadMutate).toHaveBeenCalledWith(5);
+    });
+
+    it('no marca leido si esta minimizada o el ultimo mensaje es propio', () => {
+      mensajesMock = [mensaje(1, 2, '2026-10-16T10:00:00Z')];
+      renderWindow({ minimized: true });
+      cleanup();
+      mensajesMock = [mensaje(2, 1, '2026-10-16T10:00:00Z')];
+      renderWindow();
+      expect(markReadMutate).not.toHaveBeenCalled();
+    });
   });
 });

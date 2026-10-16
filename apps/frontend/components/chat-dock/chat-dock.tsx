@@ -17,7 +17,7 @@ export function ChatDock() {
   const [listOpen, setListOpen] = useState(false);
   const { windows, minimizedIds, cerrarChat, toggleMinimize } = useChatDock();
   const { conversations } = useAllConversations();
-  const { isConnected: chatConnected } = useGlobalChatSocket(windows.map((w) => w.idConversacion));
+  const { isConnected: chatConnected, typingByConversation, emitTyping } = useGlobalChatSocket(windows.map((w) => w.idConversacion));
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,6 +44,8 @@ export function ChatDock() {
             minimized={minimizedIds.has(w.idConversacion)}
             onMinimize={() => toggleMinimize(w.idConversacion)}
             onClose={() => cerrarChat(w.idConversacion)}
+            typingUserIds={typingByConversation[w.idConversacion]}
+            onTyping={() => emitTyping(w.idConversacion)}
           />
         ))}
       </div>

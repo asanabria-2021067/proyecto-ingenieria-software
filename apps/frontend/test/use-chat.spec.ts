@@ -31,8 +31,8 @@ vi.mock('socket.io-client', () => ({
   io: (...args: unknown[]) => mockIo(...args),
 }));
 
-import { useGlobalChatSocket } from '../hooks/use-chat';
-import { conversationMessagesQueryKey } from '../lib/query-keys/chat';
+import { TYPING_EXPIRY_MS, TYPING_THROTTLE_MS, useGlobalChatSocket } from '../hooks/use-chat';
+import { conversationMessagesQueryKey, conversationReadsQueryKey } from '../lib/query-keys/chat';
 import type { ChatMensaje } from '../lib/types/chat';
 
 function createWrapper() {
@@ -187,5 +187,112 @@ describe('useGlobalChatSocket — conversationUpdated', () => {
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['chats-global'] }));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['proyecto-conversaciones'] });
+  });
+});
+
+describe('useGlobalChatSocket - escribiendo y visto por', () => {
+  it('typing: marca a la persona como escribiendo y expira solo a los 4 s', () => {
+    vi.useFakeTimers();
+    try {
+      const socket = createMockSocket();
+      mockIo.mockReturnValue(socket);
+      const { wrapper } = createWrapper();
+      const { result } = renderHook(() => useGlobalChatSocket([]), { wrapper });
+
+      act(() => socket.__emit('typing', { idConversacion: 5, idUsuario: 2 }));
+      expect(result.current.typingByConversation[5]).toEqual([2]);
+
+      act(() => vi.advanceTimersByTime(TYPING_EXPIRY_MS - 1));
+      expect(result.current.typingByConversation[5]).toEqual([2]);
+      act(() => vi.advanceTimersByTime(1));
+      expect(result.current.typingByConversation[5]).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('typing repetido reinicia la expiracion y no duplica a la persona', () => {
+    vi.useFakeTimers();
+    try {
+      const socket = createMockSocket();
+      mockIo.mockReturnValue(socket);
+      const { wrapper } = createWrapper();
+      const { result } = renderHook(() => useGlobalChatSocket([]), { wrapper });
+
+      act(() => socket.__emit('typing', { idConversacion: 5, idUsuario: 2 }));
+      act(() => vi.advanceTimersByTime(3000));
+      act(() => socket.__emit('typing', { idConversacion: 5, idUsuario: 2 }));
+      act(() => vi.advanceTimersByTime(3000));
+      expect(result.current.typingByConversation[5]).toEqual([2]);
+      act(() => vi.advanceTimersByTime(1000));
+      expect(result.current.typingByConversation[5]).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('newMessage del que escribia limpia el indicador de inmediato', () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useGlobalChatSocket([]), { wrapper });
+
+    act(() => socket.__emit('typing', { idConversacion: 5, idUsuario: 2 }));
+    act(() => socket.__emit('newMessage', { idConversacion: 5, mensaje }));
+
+    expect(result.current.typingByConversation[5]).toEqual([]);
+  });
+
+  it('emitTyping respeta el throttle por conversacion', () => {
+    const now = vi.spyOn(Date, 'now');
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useGlobalChatSocket([]), { wrapper });
+
+    now.mockReturnValue(100000);
+    result.current.emitTyping(5);
+    now.mockReturnValue(100000 + TYPING_THROTTLE_MS - 1);
+    result.current.emitTyping(5);
+    result.current.emitTyping(6);
+    now.mockReturnValue(100000 + TYPING_THROTTLE_MS);
+    result.current.emitTyping(5);
+    now.mockRestore();
+
+    const typingEmits = socket.emit.mock.calls.filter(([evento]) => evento === 'typing');
+    expect(typingEmits).toEqual([
+      ['typing', { idConversacion: 5 }],
+      ['typing', { idConversacion: 6 }],
+      ['typing', { idConversacion: 5 }],
+    ]);
+  });
+
+  it('messagesRead actualiza la lectura de esa persona en la cache de lecturas', () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(conversationReadsQueryKey(10, 5), [
+      { idUsuario: 2, ultimaLecturaEn: null },
+      { idUsuario: 3, ultimaLecturaEn: '2026-10-16T09:00:00Z' },
+    ]);
+    renderHook(() => useGlobalChatSocket([]), { wrapper });
+
+    act(() => socket.__emit('messagesRead', { idConversacion: 5, idUsuario: 2, ultimaLecturaEn: '2026-10-16T10:00:00Z' }));
+
+    expect(queryClient.getQueryData(conversationReadsQueryKey(10, 5))).toEqual([
+      { idUsuario: 3, ultimaLecturaEn: '2026-10-16T09:00:00Z' },
+      { idUsuario: 2, ultimaLecturaEn: '2026-10-16T10:00:00Z' },
+    ]);
+  });
+
+  it('messagesRead sin cache de lecturas no crea nada', () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+    renderHook(() => useGlobalChatSocket([]), { wrapper });
+
+    act(() => socket.__emit('messagesRead', { idConversacion: 5, idUsuario: 2, ultimaLecturaEn: '2026-10-16T10:00:00Z' }));
+
+    expect(queryClient.getQueryData(conversationReadsQueryKey(10, 5))).toBeUndefined();
   });
 });
