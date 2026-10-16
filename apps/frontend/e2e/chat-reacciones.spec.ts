@@ -60,23 +60,24 @@ test('un usuario reacciona a un mensaje y el otro ve el conteo agrupado en vivo'
 
     // B abre el selector con el teclado y elige el pulgar arriba.
     const mensajeB = pageB.locator('div', { hasText: mensaje }).last();
+    const mensajeA = pageA.locator('div', { hasText: mensaje }).last();
     await mensajeB.getByRole('button', { name: 'Reaccionar al mensaje' }).press('Enter');
     await pageB.getByRole('button', { name: /^Reaccionar con / }).first().click();
 
     // B ve su chip marcado y A lo ve sin recargar (evento reactionUpdated).
-    await expect(pageB.getByRole('button', { name: /1 reacción, incluyes la tuya/ })).toHaveAttribute('aria-pressed', 'true');
-    const chipA = pageA.getByRole('button', { name: /1 reacción$/ });
+    await expect(mensajeB.getByRole('button', { name: /1 reacción, incluyes la tuya/ })).toHaveAttribute('aria-pressed', 'true');
+    const chipA = mensajeA.getByRole('button', { name: /1 reacción$/ });
     await expect(chipA).toBeVisible();
     await expect(chipA).toHaveAttribute('aria-pressed', 'false');
 
     // A suma la misma reaccion: ambos ven 2 agrupado en un solo chip.
     await chipA.click();
-    await expect(pageA.getByRole('button', { name: /2 reacciones, incluyes la tuya/ })).toBeVisible();
-    await expect(pageB.getByRole('button', { name: /2 reacciones, incluyes la tuya/ })).toBeVisible();
+    await expect(mensajeA.getByRole('button', { name: /2 reacciones, incluyes la tuya/ })).toBeVisible();
+    await expect(mensajeB.getByRole('button', { name: /2 reacciones, incluyes la tuya/ })).toBeVisible();
 
     // B quita la suya: vuelve a 1.
-    await pageB.getByRole('button', { name: /2 reacciones, incluyes la tuya/ }).click();
-    await expect(pageA.getByRole('button', { name: /1 reacción, incluyes la tuya/ })).toBeVisible();
+    await mensajeB.getByRole('button', { name: /2 reacciones, incluyes la tuya/ }).click();
+    await expect(mensajeA.getByRole('button', { name: /1 reacción, incluyes la tuya/ })).toBeVisible();
   } finally {
     await contextA.close();
     await contextB.close();
