@@ -111,7 +111,7 @@ describe('ChatListPopover', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(createElement(QueryClientProvider, { client }, createElement(ChatListPopover, { onClose, onOpenSaved })));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mensajes guardados' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver mensajes guardados' }));
 
     expect(onOpenSaved).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
@@ -121,6 +121,6 @@ describe('ChatListPopover', () => {
     listAllConversationsMock.mockResolvedValue([]);
     renderPopover();
 
-    expect(screen.queryByRole('button', { name: 'Mensajes guardados' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ver mensajes guardados' })).not.toBeInTheDocument();
   });
 });
