@@ -27,6 +27,7 @@ comprobación en cada endpoint administrativo. Ninguna ruta de este inventario e
 | `/dashboard/admin/solicitudes-recuperacion` | Recuperación de contraseña | HU-14 | — |
 | `/dashboard/admin/cuentas-pendientes` | Cuentas pendientes | HU-179 (PR #270); colocada en la estructura por T-321 | `GET /admin/cuentas-pendientes` |
 | `/dashboard/admin/seguridad` | Eventos de seguridad | Sprint 9 · T-310 (Vernel) | `GET /admin/eventos-seguridad` |
+| `/dashboard/admin/anuncios` | Anuncios | Sprint 9 · HU-191 · T-352 | `GET/POST/PATCH /admin/anuncios` |
 
 Las tres entradas de `/dashboard/admin/proyectos` son la misma página con un `?grupo=` distinto; el backend solo
 conoce esos grupos y no existe uno «todos».
@@ -41,6 +42,7 @@ El menú se agrupa por tema de trabajo. «Panel Admin» va suelto arriba y los g
 | Proyectos | Activos · Solicitudes de publicación · Solicitudes de cierre · Cerrados · Calendario de Sprints | El ciclo de vida de un proyecto, de la publicación al cierre, más la supervisión de sus Sprints. |
 | Gobernanza | Apelaciones | Decisiones sobre el liderazgo de un proyecto, que resuelve la administración. |
 | Métricas | Tendencias de uso | Las métricas de uso de la plataforma (HU-178), en su propia página. |
+| Comunicación | Anuncios | Avisos que la administración publica como banner en el dashboard (HU-191): crear, editar y despublicar. |
 | Verificación y seguridad | Cuentas pendientes · Eventos de seguridad | Supervisión de accesos y cuentas: la bandeja de cuentas que esperan verificación (HU-179), con su contador, y el visor de eventos. |
 
 Antes de Sprint 9 existía un grupo genérico «Administración» que mezclaba cuentas, seguridad y la página temporal
@@ -89,7 +91,7 @@ usa los mismos nombres que el menú. La pantalla no se rehízo.
 En pantallas menores de `md` la barra lateral no se muestra y la navegación es `adminNavItemsMobile`: una lista
 **curada** de cuatro destinos (Panel Admin, Proyectos, Apelaciones, Gestión de Usuarios) más el menú de la cuenta.
 Aplanar todo el menú daría más de diez iconos y la saturaría. El resto de los destinos (Calendario de Sprints,
-Recuperación de contraseña, Tendencias de uso, Cuentas pendientes, Eventos de seguridad) no tienen acceso directo en móvil: se alcanzan por su
+Recuperación de contraseña, Tendencias de uso, Cuentas pendientes, Eventos de seguridad, Anuncios) no tienen acceso directo en móvil: se alcanzan por su
 URL o desde los enlaces del panel. «Tendencias de uso» tiene el suyo: el resumen del Panel Admin enlaza a la página
 con «Ver tendencias de uso». Ampliar la navegación móvil es una decisión de producto que este inventario deja
 registrada, no resuelta.

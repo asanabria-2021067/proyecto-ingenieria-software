@@ -13,6 +13,8 @@ import {
   FileSearch,
   FolderKanban,
   FolderOpen,
+  BellRing,
+  Megaphone,
   Gavel,
   KeyRound,
   LayoutDashboard,
@@ -99,6 +101,12 @@ export const adminNavEntries: NavEntry[] = [
       // HU-178: las métricas de uso tienen página propia; el Panel Admin solo conserva un resumen.
       { href: ADMIN_METRICS_ROUTE, label: 'Tendencias de uso', icon: TrendingUp },
     ],
+  },
+  {
+    type: 'group',
+    label: 'Comunicación',
+    icon: Megaphone,
+    items: [{ href: '/dashboard/admin/anuncios', label: 'Anuncios', icon: BellRing }],
   },
   {
     type: 'group',
