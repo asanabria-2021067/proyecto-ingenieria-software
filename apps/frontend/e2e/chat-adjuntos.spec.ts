@@ -1,8 +1,23 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
 
 const PROYECTO_ID = 1;
 const CORREO_A = 'carlos.mendoza@uvg.edu.gt';
+
+// "Nuevo chat" aparece dos veces (lista del proyecto e icono del dock): exact evita la ambiguedad.
+async function abrirChatConMaria(page: Page) {
+  await page.getByRole('button', { name: /^mensajes/i }).click();
+  const existente = page.getByRole('button', { name: /María/ });
+  if (await existente.count()) {
+    await existente.first().click();
+  } else {
+    await page.getByRole('button', { name: 'Nuevo chat', exact: true }).click();
+    await page.getByRole('button', { name: 'Individual' }).click();
+    await page.getByRole('checkbox', { name: /María/ }).click();
+    await page.getByRole('button', { name: 'Crear chat' }).click();
+  }
+}
 
 // Cloudinary no esta disponible en local: el POST de subida y las URL firmadas
 // se simulan con page.route; lo demas (chat, mensajes, sesion) va al backend real.
@@ -22,16 +37,7 @@ test('adjuntar un PDF, verlo en el mensaje, descargarlo y listarlo en la galeria
   await login(page, CORREO_A);
   await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
 
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  const existente = page.getByRole('button', { name: /María/ });
-  if (await existente.count()) {
-    await existente.first().click();
-  } else {
-    await page.getByRole('button', { name: /nuevo chat/i }).click();
-    await page.getByRole('button', { name: 'Individual' }).click();
-    await page.getByRole('checkbox', { name: /María/ }).click();
-    await page.getByRole('button', { name: 'Crear chat' }).click();
-  }
+  await abrirChatConMaria(page);
 
   await page.route('**/mensajes/archivo', async (route) => {
     await route.fulfill({
