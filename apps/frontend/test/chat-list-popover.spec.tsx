@@ -23,6 +23,7 @@ function conversacion(overrides: Partial<ChatConversacionGlobal> = {}): ChatConv
     tipo: 'INDIVIDUAL',
     nombre: null,
     nombrePersonalizado: null,
+    esCanal: false,
     participantes: [
       { idUsuario: 1, nombre: 'Yo', apellido: 'Usuario', fotoUrl: null },
       { idUsuario: 2, nombre: 'Rosa', apellido: 'Fuentes', fotoUrl: null },
