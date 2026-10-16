@@ -178,10 +178,26 @@ export function useSendFileMessage(idProyecto: number, idConversacion: number | 
   });
 }
 
+/** Antepone al caché la página de mensajes anteriores al más viejo cargado; devuelve lo que trajo. */
+export function useLoadOlderMessages(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return async (): Promise<ChatMensaje[]> => {
+    const key = conversationMessagesQueryKey(idProyecto, idConversacion);
+    const actuales = queryClient.getQueryData<ChatMensaje[]>(key) ?? [];
+    if (actuales.length === 0) return [];
+    const previos = await getMessages(idProyecto, idConversacion, actuales[0].idMensaje);
+    if (previos.length > 0) {
+      queryClient.setQueryData<ChatMensaje[]>(key, (current) => [...previos, ...(current ?? [])]);
+    }
+    return previos;
+  };
+}
+
 export function useSendMessage(idProyecto: number, idConversacion: number | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (contenido: string) => sendMessage(idProyecto, idConversacion as number, contenido),
+    mutationFn: ({ contenido, idMensajeCitado }: { contenido: string; idMensajeCitado?: number }) =>
+      sendMessage(idProyecto, idConversacion as number, contenido, idMensajeCitado),
     onSuccess: (mensaje) => {
       queryClient.setQueryData<ChatMensaje[]>(
         conversationMessagesQueryKey(idProyecto, idConversacion as number),
