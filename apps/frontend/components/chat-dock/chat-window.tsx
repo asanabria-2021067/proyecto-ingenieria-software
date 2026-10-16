@@ -233,7 +233,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
 
   return (
     <div className="flex w-[36rem] shrink-0 flex-col rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest shadow-raised max-w-[calc(100vw-2rem)]">
-      <div className="flex shrink-0 items-center gap-2 rounded-t-xl border-b border-outline-variant bg-surface-container px-3 py-2">
+      <div className={`flex shrink-0 items-center gap-2 rounded-t-xl border-b border-outline-variant bg-surface-container px-3 py-2 ${claseAcentoCabecera(conversacion?.temaColor)}`}>
         {conversacion?.tipo === 'GRUPAL' ? (
           <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
             <UsersIcon className="size-3.5" aria-hidden="true" />
