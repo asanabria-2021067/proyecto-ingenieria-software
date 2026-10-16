@@ -110,3 +110,13 @@ Closure cleanup no disponible: motivosCleanup=[...]
 
 Un arranque con esos avisos es válido para desarrollo, pero **no** para operar
 el cierre de proyectos.
+
+## Backfill de insignias en producción
+
+El script compilado queda en `dist/scripts/insignias-backfill.js` (no requiere `tsx`). Es idempotente y no crea notificaciones. Después del deploy, en la VM (servicio `backend`, perfil `app`):
+
+```bash
+docker compose --profile app exec backend node dist/scripts/insignias-backfill.js
+```
+
+Fuera de Docker, con el backend compilado: `npm run insignias:backfill`. En desarrollo: `npm run insignias:backfill:dev`.

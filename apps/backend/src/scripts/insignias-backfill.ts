@@ -4,11 +4,12 @@
  * construye el servicio sin NotificationsService y además el backfill pasa
  * `notificar = false`, así que nunca crea notificaciones.
  *
- * Uso (después del deploy): npm run insignias:backfill
+ * Uso en producción (imagen compilada): npm run insignias:backfill
+ * Uso en desarrollo: npm run insignias:backfill:dev
  */
 import { PrismaClient } from '@prisma/client';
-import { InsigniasService } from '../src/insignias/insignias.service';
-import type { PrismaService } from '../src/prisma/prisma.service';
+import { InsigniasService } from '../insignias/insignias.service';
+import type { PrismaService } from '../prisma/prisma.service';
 
 async function main(): Promise<void> {
   const prisma = new PrismaClient();
@@ -20,7 +21,10 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+// Solo corre como entrypoint; importarlo desde la app Nest no ejecuta nada.
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

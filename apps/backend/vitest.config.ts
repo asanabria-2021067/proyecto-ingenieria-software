@@ -25,6 +25,7 @@ export default defineConfig({
         '**/*.dto.ts',
         '**/*.module.ts',
         'src/main.ts',
+        'src/scripts/**',
         'prisma/**',
       ],
       // El Sprint 7 trajo un volumen grande de código nuevo (project-closure,
