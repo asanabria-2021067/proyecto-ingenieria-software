@@ -1697,7 +1697,6 @@ model ApodoConversacion {
   idUsuarioDefine   Int      @map("id_usuario_define")
   idUsuarioObjetivo Int      @map("id_usuario_objetivo")
   apodo             String   @db.VarChar(40)
-  actualizadoEn     DateTime @updatedAt @map("actualizado_en")
 
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Cascade)
   define       Usuario      @relation("ApodosDefinidos", fields: [idUsuarioDefine], references: [idUsuario])
