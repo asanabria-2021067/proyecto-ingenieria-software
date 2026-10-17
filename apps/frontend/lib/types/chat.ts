@@ -19,6 +19,8 @@ export interface ChatConversacion {
   nombre: string | null;
   /** Menú de 3 puntos: sobrescribe el nombre mostrado si existe. */
   nombrePersonalizado: string | null;
+  /** Canal del proyecto (#general o creado por el líder): `nombre` es el nombre sin #. */
+  esCanal: boolean;
   participantes: ChatUsuario[];
   ultimoMensaje: ChatMensaje | null;
   noLeidos: number;
@@ -40,6 +42,7 @@ export interface ChatConversacionGlobal {
   tipo: 'GRUPAL' | 'INDIVIDUAL';
   nombre: string | null;
   nombrePersonalizado: string | null;
+  esCanal: boolean;
   participantes: ChatUsuario[];
   ultimoMensaje: ChatMensaje | null;
   ultimoMensajeEsPropio: boolean;
@@ -55,6 +58,18 @@ export interface CreateConversationPayload {
   tipo: 'GRUPAL' | 'INDIVIDUAL';
   nombre?: string;
   idsParticipantes: number[];
+}
+
+export interface CreateChannelPayload {
+  nombre: string;
+  idsMiembros?: number[];
+}
+
+export interface ChatCanalCreado {
+  idConversacion: number;
+  idProyecto: number;
+  nombre: string;
+  esGeneral: boolean;
 }
 
 /** Menú de 3 puntos: cada acción manda un único campo a la vez. */

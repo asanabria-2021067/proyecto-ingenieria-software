@@ -9,6 +9,7 @@ import {
   BellOff,
   ChevronDown,
   ChevronUp,
+  Hash,
   Loader2,
   MoreVertical,
   Pencil,
@@ -46,6 +47,7 @@ import { toast } from 'sonner';
 import type { ChatConversacionGlobal } from '@/lib/types/chat';
 
 function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId: number | null): string {
+  if (conversacion.esCanal) return `#${conversacion.nombre ?? 'canal'}`;
   if (conversacion.nombrePersonalizado) return conversacion.nombrePersonalizado;
   if (conversacion.tipo === 'GRUPAL') return conversacion.nombre ?? 'Grupo';
   const otro = conversacion.participantes.find((p) => p.idUsuario !== currentUserId);
@@ -115,7 +117,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
       <div className="flex shrink-0 items-center gap-2 rounded-t-xl border-b border-outline-variant bg-surface-container px-3 py-2">
         {conversacion?.tipo === 'GRUPAL' ? (
           <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
-            <UsersIcon className="size-3.5" aria-hidden="true" />
+            {conversacion.esCanal ? <Hash className="size-3.5" aria-hidden="true" /> : <UsersIcon className="size-3.5" aria-hidden="true" />}
           </span>
         ) : (
           <Avatar className="size-7 shrink-0">
@@ -144,10 +146,12 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                 Ver perfil
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => setRenombrarAbierto(true)}>
-              <Pencil className="size-4" aria-hidden="true" />
-              Renombrar
-            </DropdownMenuItem>
+            {!conversacion?.esCanal && (
+              <DropdownMenuItem onClick={() => setRenombrarAbierto(true)}>
+                <Pencil className="size-4" aria-hidden="true" />
+                Renombrar
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               onClick={() => actualizar.mutate({ idConversacion, payload: { esFavorita: !conversacion?.esFavorita } })}
             >
@@ -171,11 +175,15 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               {conversacion?.archivadaManual ? <ArchiveRestore className="size-4" aria-hidden="true" /> : <Archive className="size-4" aria-hidden="true" />}
               {conversacion?.archivadaManual ? 'Desarchivar' : 'Archivar'}
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={handleBorrar}>
-              <Trash2 className="size-4" aria-hidden="true" />
-              Borrar conversación
-            </DropdownMenuItem>
+            {!conversacion?.esCanal && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onClick={handleBorrar}>
+                  <Trash2 className="size-4" aria-hidden="true" />
+                  Borrar conversación
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

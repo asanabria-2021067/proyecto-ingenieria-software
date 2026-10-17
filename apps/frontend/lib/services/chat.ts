@@ -1,8 +1,10 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
+  ChatCanalCreado,
   ChatConversacion,
   ChatConversacionGlobal,
   ChatMensaje,
+  CreateChannelPayload,
   CreateConversationPayload,
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
@@ -80,4 +82,24 @@ export function listArchivedConversations(
   if (filtros.q) params.set('q', filtros.q);
   if (filtros.page) params.set('page', String(filtros.page));
   return apiFetch(`/chats/archivados?${params.toString()}`);
+}
+
+export function createChannel(idProyecto: number, payload: CreateChannelPayload): Promise<ChatCanalCreado> {
+  return apiFetch(`/proyectos/${idProyecto}/canales`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function addChannelMembers(idProyecto: number, idCanal: number, idsUsuarios: number[]): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/canales/${idCanal}/miembros`, {
+    method: 'POST',
+    body: JSON.stringify({ idsUsuarios }),
+  });
+}
+
+export function removeChannelMember(idProyecto: number, idCanal: number, idUsuario: number): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/canales/${idCanal}/miembros/${idUsuario}`, {
+    method: 'DELETE',
+  });
 }

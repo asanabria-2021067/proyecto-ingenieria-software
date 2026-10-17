@@ -1648,12 +1648,18 @@ model Conversacion {
   silenciada    Boolean   @default(false) @map("silenciada")
   esPrioritaria Boolean   @default(true) @map("es_prioritaria")
   eliminadaEn   DateTime? @map("eliminada_en")
+  // Canales del proyecto (#general + los que crea el líder). `nombreCanal` es
+  // el nombre normalizado (minúsculas, sin #); NULL en chats que no son canal,
+  // así el unique solo aplica a canales.
+  esCanal     Boolean @default(false) @map("es_canal")
+  nombreCanal String? @map("nombre_canal") @db.VarChar(40)
 
   proyecto      Proyecto                   @relation(fields: [idProyecto], references: [idProyecto])
   creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario])
   participantes ConversacionParticipante[]
   mensajes      MensajeChat[]
 
+  @@unique([idProyecto, nombreCanal])
   @@index([idProyecto])
   @@map("conversacion")
 }
