@@ -7,6 +7,8 @@ function makeService() {
     create: vi.fn(),
     findByProyecto: vi.fn(),
     findByHito: vi.fn(),
+    findMencionables: vi.fn(),
+    countByHitosDelProyecto: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
   };
@@ -64,5 +66,38 @@ describe('ComentariosController - lectura', () => {
   it('Tarea 28.C: ya no existe un handler findByTarea en el controller genérico', () => {
     const controller = makeController(makeService());
     expect((controller as unknown as Record<string, unknown>).findByTarea).toBeUndefined();
+  });
+});
+
+describe('ComentariosController - menciones (HU-200)', () => {
+  it('findMencionables delega con el idProyecto de la ruta y el usuario de la sesión', async () => {
+    const service = makeService();
+    service.findMencionables.mockResolvedValue([{ idUsuario: 4 }]);
+    const controller = makeController(service);
+
+    const result = await controller.findMencionables(10, { userId: 7 });
+
+    expect(service.findMencionables).toHaveBeenCalledWith(10, 7);
+    expect(result).toEqual([{ idUsuario: 4 }]);
+  });
+
+  it('countByHitos delega en countByHitosDelProyecto', async () => {
+    const service = makeService();
+    service.countByHitosDelProyecto.mockResolvedValue([{ idHito: 1, cantidad: 2 }]);
+    const controller = makeController(service);
+
+    const result = await controller.countByHitos(10, { userId: 7 });
+
+    expect(service.countByHitosDelProyecto).toHaveBeenCalledWith(10, 7);
+    expect(result).toEqual([{ idHito: 1, cantidad: 2 }]);
+  });
+
+  it('un rechazo de autorización del servicio se propaga sin transformarse', async () => {
+    const service = makeService();
+    const forbidden = new Error('sin acceso');
+    service.findMencionables.mockRejectedValue(forbidden);
+    const controller = makeController(service);
+
+    await expect(controller.findMencionables(10, { userId: 99 })).rejects.toBe(forbidden);
   });
 });
