@@ -1678,6 +1678,8 @@ model MensajeChat {
   idRemitente    Int      @map("id_remitente")
   contenido      String   @db.Text
   enviadoEn      DateTime @default(now()) @map("enviado_en")
+  editadoEn      DateTime? @map("editado_en")
+  eliminadoEn    DateTime? @map("eliminado_en")
 
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
   remitente    Usuario      @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario])

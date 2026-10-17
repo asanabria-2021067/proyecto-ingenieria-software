@@ -39,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
+import { ChatMessageItem } from './chat-message-item';
 import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
@@ -50,10 +51,6 @@ function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId:
   if (conversacion.tipo === 'GRUPAL') return conversacion.nombre ?? 'Grupo';
   const otro = conversacion.participantes.find((p) => p.idUsuario !== currentUserId);
   return otro ? `${otro.nombre} ${otro.apellido}` : 'Conversación';
-}
-
-function formatHora(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
 }
 
 interface ChatWindowProps {
@@ -194,22 +191,15 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             {!isLoading && messages.length === 0 && (
               <p className="text-xs text-tertiary">Todavía no hay mensajes. Sé el primero en escribir.</p>
             )}
-            {messages.map((m) => {
-              const propio = m.remitente.idUsuario === currentUserId;
-              return (
-                <div key={m.idMensaje} className={`flex items-end gap-2 ${propio ? 'flex-row-reverse' : ''}`}>
-                  <Avatar className="size-6 shrink-0">
-                    {m.remitente.fotoUrl && <AvatarImage src={m.remitente.fotoUrl} alt="" />}
-                    <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
-                  </Avatar>
-                  <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? 'bg-primary text-primary-foreground' : 'bg-surface-container-high text-on-surface'}`}>
-                    {!propio && <p className="mb-0.5 text-[11px] font-semibold opacity-80">{m.remitente.nombre}</p>}
-                    <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
-                    <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
-                  </div>
-                </div>
-              );
-            })}
+            {messages.map((m) => (
+              <ChatMessageItem
+                key={m.idMensaje}
+                mensaje={m}
+                propio={m.remitente.idUsuario === currentUserId}
+                idProyecto={idProyecto}
+                idConversacion={idConversacion}
+              />
+            ))}
           </div>
 
           <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-outline-variant p-2">

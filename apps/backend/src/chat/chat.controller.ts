@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { EditMessageDto } from './dto/edit-message.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -62,6 +63,27 @@ export class ChatController {
     @Body() dto: SendMessageDto,
   ) {
     return this.chatService.createMessage(projectId, conversationId, user.userId, dto.contenido);
+  }
+
+  @Patch(':conversationId/mensajes/:messageId')
+  editMessage(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: EditMessageDto,
+  ) {
+    return this.chatService.editMessage(projectId, conversationId, messageId, user.userId, dto.contenido);
+  }
+
+  @Delete(':conversationId/mensajes/:messageId')
+  deleteMessage(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.deleteMessage(projectId, conversationId, messageId, user.userId);
   }
 
   @Patch(':conversationId')

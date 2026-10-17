@@ -43,6 +43,28 @@ export function sendMessage(
   });
 }
 
+export function editMessage(
+  idProyecto: number,
+  idConversacion: number,
+  idMensaje: number,
+  contenido: string,
+): Promise<ChatMensaje> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/${idMensaje}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ contenido }),
+  });
+}
+
+export function deleteMessage(
+  idProyecto: number,
+  idConversacion: number,
+  idMensaje: number,
+): Promise<ChatMensaje> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/${idMensaje}`, {
+    method: 'DELETE',
+  });
+}
+
 export function updateConversation(
   idProyecto: number,
   idConversacion: number,
