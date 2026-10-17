@@ -114,3 +114,23 @@ describe('ScheduledMessagesList', () => {
     expect(cancelMutate).toHaveBeenCalledWith(7, expect.any(Object));
   });
 });
+
+describe('ScheduleMessageButton dentro del formulario del input', () => {
+  // El popover va en un portal, pero los eventos de React burbujean por el arbol: sin stopPropagation,
+  // programar tambien disparaba el envio normal del formulario padre (el mensaje salia al instante).
+  it('programar no dispara el submit del formulario padre', () => {
+    const envioPadre = vi.fn((e: { preventDefault: () => void }) => e.preventDefault());
+    render(
+      createElement(
+        'form',
+        { onSubmit: envioPadre },
+        createElement(ScheduleMessageButton, { idProyecto: 10, idConversacion: 5, onScheduled: vi.fn(), texto: 'hola' }),
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Programar envío' }));
+    fireEvent.change(screen.getByLabelText('Enviar el'), { target: { value: aLocal(10 * 60_000) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Programar' }));
+    expect(scheduleMutate).toHaveBeenCalledTimes(1);
+    expect(envioPadre).not.toHaveBeenCalled();
+  });
+});
