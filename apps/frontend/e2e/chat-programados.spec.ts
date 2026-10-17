@@ -97,6 +97,10 @@ test('un mensaje programado llega por socket al otro usuario al vencer', async (
     const mensaje = `Llega solo ${Math.random().toString(36).slice(2)}`;
     await programar(pageA, mensaje, 2);
 
+    // Antes de la hora no debe llegar: programar no puede enviar el mensaje al instante.
+    await pageB.waitForTimeout(3_000);
+    await expect(pageB.getByText(mensaje)).toHaveCount(0);
+
     await expect(pageB.getByText(mensaje).first()).toBeVisible({ timeout: 180_000 });
   } finally {
     await contextA.close();
