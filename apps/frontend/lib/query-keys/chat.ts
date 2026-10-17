@@ -10,3 +10,6 @@ export const archivedConversationsQueryKey = (q: string) =>
 /** Dock global de chat: cruza todos los proyectos del usuario. */
 export const allConversationsQueryKey = (q: string = '') =>
   ['chats-global', q] as const;
+
+/** Mensajes guardados del usuario (marcadores privados). */
+export const savedMessagesQueryKey = () => ['chats-guardados'] as const;

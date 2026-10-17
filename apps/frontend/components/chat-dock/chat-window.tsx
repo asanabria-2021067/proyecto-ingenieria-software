@@ -7,6 +7,8 @@ import {
   ArchiveRestore,
   Bell,
   BellOff,
+  Bookmark,
+  BookmarkCheck,
   ChevronDown,
   ChevronUp,
   Loader2,
@@ -39,7 +41,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
-import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
+import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations, useToggleSavedMessage } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
@@ -54,6 +56,25 @@ function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId:
 
 function formatHora(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Marcador personal: visible al pasar el cursor o enfocar con teclado; fijo si el mensaje ya está guardado. */
+function SaveMessageButton({ idProyecto, idConversacion, idMensaje, guardado }: { idProyecto: number; idConversacion: number; idMensaje: number; guardado: boolean }) {
+  const alternar = useToggleSavedMessage(idProyecto, idConversacion);
+  const texto = guardado ? 'Quitar de guardados' : 'Guardar mensaje';
+  const Icono = guardado ? BookmarkCheck : Bookmark;
+  return (
+    <button
+      type="button"
+      aria-pressed={guardado}
+      disabled={alternar.isPending}
+      onClick={() => alternar.mutate(idMensaje, { onError: () => toast.error('No se pudo actualizar el mensaje guardado') })}
+      className={`shrink-0 rounded-control p-1 text-text-secondary transition-opacity hover:bg-on-surface/10 hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100 ${guardado ? 'opacity-100' : 'opacity-0'}`}
+    >
+      <Icono className="size-3.5" aria-hidden="true" />
+      <span className="sr-only">{texto}</span>
+    </button>
+  );
 }
 
 interface ChatWindowProps {
@@ -197,7 +218,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             {messages.map((m) => {
               const propio = m.remitente.idUsuario === currentUserId;
               return (
-                <div key={m.idMensaje} className={`flex items-end gap-2 ${propio ? 'flex-row-reverse' : ''}`}>
+                <div key={m.idMensaje} className={`group flex items-end gap-2 ${propio ? 'flex-row-reverse' : ''}`}>
                   <Avatar className="size-6 shrink-0">
                     {m.remitente.fotoUrl && <AvatarImage src={m.remitente.fotoUrl} alt="" />}
                     <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
@@ -207,6 +228,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
                     <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
                   </div>
+                  <SaveMessageButton idProyecto={idProyecto} idConversacion={idConversacion} idMensaje={m.idMensaje} guardado={m.guardado === true} />
                 </div>
               );
             })}

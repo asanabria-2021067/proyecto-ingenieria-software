@@ -31,7 +31,14 @@ vi.mock('socket.io-client', () => ({
   io: (...args: unknown[]) => mockIo(...args),
 }));
 
-import { useGlobalChatSocket } from '../hooks/use-chat';
+const toggleSavedMock = vi.hoisted(() => vi.fn());
+const listSavedMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/services/chat', () => ({
+  toggleSavedMessage: (...args: unknown[]) => toggleSavedMock(...args),
+  listSavedMessages: (...args: unknown[]) => listSavedMock(...args),
+}));
+
+import { useGlobalChatSocket, useSavedMessages, useToggleSavedMessage } from '../hooks/use-chat';
 import { conversationMessagesQueryKey } from '../lib/query-keys/chat';
 import type { ChatMensaje } from '../lib/types/chat';
 
@@ -187,5 +194,58 @@ describe('useGlobalChatSocket — conversationUpdated', () => {
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['chats-global'] }));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['proyecto-conversaciones'] });
+  });
+});
+
+describe('mensajes guardados', () => {
+  it('useToggleSavedMessage actualiza guardado en la cache del historial e invalida la lista de guardados', async () => {
+    toggleSavedMock.mockResolvedValue({ guardado: true });
+    const { queryClient, wrapper } = createWrapper();
+    const key = conversationMessagesQueryKey(10, 5);
+    queryClient.setQueryData<ChatMensaje[]>(key, [mensaje, { ...mensaje, idMensaje: 2 }]);
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useToggleSavedMessage(10, 5), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync(1);
+    });
+
+    expect(toggleSavedMock).toHaveBeenCalledWith(10, 5, 1);
+    expect(queryClient.getQueryData<ChatMensaje[]>(key)?.map((m) => m.guardado)).toEqual([true, undefined]);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['chats-guardados'] });
+  });
+
+  it('useToggleSavedMessage sin cache del historial no revienta', async () => {
+    toggleSavedMock.mockResolvedValue({ guardado: false });
+    const { wrapper } = createWrapper();
+
+    const { result } = renderHook(() => useToggleSavedMessage(10, 5), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync(1);
+    });
+
+    expect(toggleSavedMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('useSavedMessages pagina con hasMore y no consulta si esta deshabilitado', async () => {
+    const item = { idMensaje: 1, contenido: 'x' };
+    listSavedMock.mockResolvedValueOnce({ items: [item], hasMore: true }).mockResolvedValueOnce({ items: [{ ...item, idMensaje: 2 }], hasMore: false });
+    const { wrapper } = createWrapper();
+
+    const apagado = renderHook(() => useSavedMessages(false), { wrapper });
+    expect(apagado.result.current.guardados).toEqual([]);
+    expect(listSavedMock).not.toHaveBeenCalled();
+    apagado.unmount();
+
+    const { result } = renderHook(() => useSavedMessages(true), { wrapper });
+    await waitFor(() => expect(result.current.guardados).toHaveLength(1));
+    expect(result.current.hasMore).toBe(true);
+
+    await act(async () => {
+      await result.current.cargarMas();
+    });
+    await waitFor(() => expect(result.current.guardados).toHaveLength(2));
+    expect(listSavedMock).toHaveBeenLastCalledWith(2);
+    expect(result.current.hasMore).toBe(false);
   });
 });

@@ -5,7 +5,9 @@ import { MessageCircle } from 'lucide-react';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { ChatListPopover } from '@/components/chat-dock/chat-list-popover';
 import { ChatWindow } from '@/components/chat-dock/chat-window';
+import { SavedMessagesDialog } from '@/components/chat-dock/saved-messages-dialog';
 import { useAllConversations, useGlobalChatSocket } from '@/hooks/use-chat';
+import { useCurrentUser } from '@/hooks/use-current-user';
 
 /**
  * Dock global de chat (estilo LinkedIn): fijo abajo a la derecha en
@@ -15,6 +17,8 @@ import { useAllConversations, useGlobalChatSocket } from '@/hooks/use-chat';
  */
 export function ChatDock() {
   const [listOpen, setListOpen] = useState(false);
+  const [savedOpen, setSavedOpen] = useState(false);
+  const { data: user } = useCurrentUser();
   const { windows, minimizedIds, cerrarChat, toggleMinimize } = useChatDock();
   const { conversations } = useAllConversations();
   const { isConnected: chatConnected } = useGlobalChatSocket(windows.map((w) => w.idConversacion));
@@ -51,7 +55,7 @@ export function ChatDock() {
       <div ref={listRef} className="pointer-events-auto relative shrink-0">
         {listOpen && (
           <div className="absolute bottom-full right-0 mb-2">
-            <ChatListPopover onClose={() => setListOpen(false)} />
+            <ChatListPopover onClose={() => setListOpen(false)} onOpenSaved={() => setSavedOpen(true)} />
           </div>
         )}
         <button
@@ -80,6 +84,8 @@ export function ChatDock() {
           />
         </button>
       </div>
+
+      <SavedMessagesDialog open={savedOpen} onOpenChange={setSavedOpen} currentUserId={user?.idUsuario ?? null} />
     </div>
   );
 }
