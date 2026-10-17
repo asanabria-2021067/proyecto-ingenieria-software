@@ -50,7 +50,7 @@ import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectBitacora } from '@/hooks/use-project-bitacora';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Empty,
   EmptyContent,
@@ -536,11 +536,11 @@ export default function BitacoraPage() {
           )}
 
           {cargando && (
-            <div className="space-y-stack">
+            <SkeletonRegion label="Cargando bitácora" className="space-y-stack">
               <BitacoraItemSkeleton />
               <BitacoraItemSkeleton />
               <BitacoraItemSkeleton />
-            </div>
+            </SkeletonRegion>
           )}
 
           {!cargando && isError && (

@@ -112,3 +112,31 @@ Prioridad: A = vista principal o de uso frecuente, M = media, B = baja.
 | Detalle público de proyecto | `/dashboard/proyectos/[id]` | Detalle |
 | Perfil | `/dashboard/perfil` | Detalle |
 | Usuarios (admin) | `/dashboard/admin/usuarios` | Tabla |
+
+## 5. Estado tras T-391
+
+Componente: `components/ui/skeleton.tsx` (`Skeleton`, `SkeletonRegion`, `SkeletonList` con `cards`/`rows`/`plain`, `SkeletonCard`, `SkeletonTable`, `SkeletonDetail`) y `components/layout/shell-skeleton.tsx`.
+Toda carga inicial se anuncia una sola vez con `SkeletonRegion` (`role="status"`, `aria-busy`, `aria-label` y texto `sr-only`); los bloques son `aria-hidden`.
+
+| Vista o sección | Cambio aplicado |
+|---|---|
+| Shell estudiante y admin | Spinner → `ShellSkeleton` (barra lateral, barra superior y detalle) |
+| Inicio | `react-loading-skeleton` → región + `SkeletonCard` |
+| Personas, perfil de persona, chats archivados | `react-loading-skeleton` → `SkeletonList` / región; dependencia retirada |
+| Mis postulaciones, postulaciones del proyecto | Texto → `SkeletonList` |
+| Notificaciones | Skeleton local → `SkeletonList` |
+| Perfil | Spinner → `SkeletonDetail`; estadísticas en `SkeletonCard` mientras llegan (ya no muestran «0 / N/A») |
+| Insignias | Texto → región con círculos |
+| Editar perfil, postular a rol, Mi proyecto (dueño), `ProjectReviewSheet`, `ProjectFeedbackSheet` | Spinner, texto o barras genéricas → `SkeletonDetail` (y `SkeletonCard` para la validación de postulaciones) |
+| Formulario de proyecto | Texto en modal → mismo modal con campos en esqueleto |
+| Revisión de publicaciones (admin) | Spinner → región con KPI y filas |
+| Mis proyectos | Nueva región para «Proyectos donde participo» mientras carga |
+| Comentarios y horas de la tarea, chat dock | Texto → `SkeletonList` `plain` |
+| Detalle público, kanban, detalle de tarea, sprint, salida, asistencia, bitácora, miembros, analíticas, burndown, velocidad, liderazgo, documentos y verificación de cierre, detalle admin | Forma propia conservada; se añade `SkeletonRegion` |
+| Vistas que ya tenían `role="status"` o `aria-busy` (Mis tareas, Proyectos, admin…) | Contenedor → `SkeletonRegion`, misma etiqueta |
+
+Se conservan a propósito:
+
+- **Calendario:** la rejilla sigue visible y marcada `aria-busy` con su aviso de carga previo (G03, UI-39); solo se añade un esqueleto decorativo en la agenda del mes.
+- **Indicadores locales:** botones, exportaciones, calendarios compartidos en la lateral, historial de ajustes de horas, diálogo de compartir calendario, selects y combobox con texto «Cargando…».
+- **Valor de las tarjetas KPI de horas** (`hours-kpi-card`): es decorativo dentro de una tarjeta ya rotulada.

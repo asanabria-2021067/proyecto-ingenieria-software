@@ -161,7 +161,7 @@ describe('InsigniasVitrina (HU-190, T-348)', () => {
 
   it('muestra estado de carga y de error accesibles', () => {
     const { rerender } = render(<InsigniasVitrina insignias={[]} isLoading />);
-    expect(screen.getByText('Cargando insignias...')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Cargando insignias' })).toHaveAttribute('aria-busy', 'true');
 
     rerender(<InsigniasVitrina insignias={[]} isError />);
     expect(screen.getByRole('alert')).toHaveTextContent('No se pudieron cargar las insignias.');

@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
+import { ShellSkeleton } from '@/components/layout/shell-skeleton';
 
 // Rutas exclusivas de administrador: siempre AdminLayout (que internamente
 // bloquea el acceso a usuarios no administradores).
@@ -39,11 +40,7 @@ export default function DashboardRootLayout({ children }: { children: React.Reac
 
   if (SHARED_ROLE_ROUTES.has(pathname)) {
     if (isLoading) {
-      return (
-        <div className="h-screen bg-surface flex items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
-      );
+      return <ShellSkeleton />;
     }
     return isAdminUser(user) ? (
       <AdminLayout>{children}</AdminLayout>

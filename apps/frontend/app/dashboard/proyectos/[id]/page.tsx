@@ -35,7 +35,7 @@ import {
   formatFechaCorta,
   getIniciales,
 } from '@/components/projects/available-project-card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Empty,
   EmptyContent,
@@ -546,7 +546,7 @@ function DetalleRow({
 
 function ProyectoDetalleSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
+    <SkeletonRegion label="Cargando proyecto" className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
       <div className="space-y-4">
         <div className="rounded-card border border-outline-variant/40 bg-surface-container-lowest p-6">
           <div className="flex gap-2">
@@ -573,7 +573,7 @@ function ProyectoDetalleSkeleton() {
           <Skeleton key={i} className="h-32 rounded-card" />
         ))}
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 

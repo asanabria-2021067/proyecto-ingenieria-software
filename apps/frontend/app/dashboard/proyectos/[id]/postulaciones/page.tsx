@@ -12,6 +12,7 @@ import { getApiErrorStatus } from '@/components/projects/api-error';
 import { useRequireCan } from '@/hooks/use-can';
 import { projectAllPostulationsQueryKey } from '@/lib/query-keys/applications';
 import { EstadoPostulacion, PostulacionRecibida } from '@/types';
+import { SkeletonList } from '@/components/ui/skeleton';
 
 
 type ModalState = {
@@ -107,7 +108,7 @@ export default function PostulacionesProyectoPage() {
         </div>
 
         {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm">Cargando postulaciones...</div>
+          <SkeletonList label="Cargando postulaciones" count={3} lines={2} avatar="circle" trailing={1} />
         )}
 
         {isError && (

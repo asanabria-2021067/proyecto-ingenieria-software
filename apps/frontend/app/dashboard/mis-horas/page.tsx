@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { AlertCircle, CheckCircle2, Clock, Hourglass, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Empty,
   EmptyContent,
@@ -34,7 +34,7 @@ function Encabezado() {
 
 function MisHorasSkeleton() {
   return (
-    <div aria-busy="true" aria-label="Cargando tus horas" className="flex flex-col gap-section">
+    <SkeletonRegion label="Cargando tus horas" className="flex flex-col gap-section">
       <div className="grid gap-grid @2xl/mis-horas:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} className="h-32 rounded-card" />
@@ -46,7 +46,7 @@ function MisHorasSkeleton() {
           <Skeleton key={i} className="h-20 rounded-card" />
         ))}
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 

@@ -42,7 +42,7 @@ const MIS_PROYECTOS_HREF = '/dashboard/projects/mine';
 // contenedor) para que no haya salto al terminar de cargar.
 function ProjectDetailSkeleton() {
   return (
-    <ProjectContentGrid aria-busy="true" aria-label="Cargando proyecto">
+    <ProjectContentGrid role="status" aria-busy="true" aria-label="Cargando proyecto">
       <ProjectGridFull>
         <Skeleton className="h-4 w-56" />
         <Skeleton className="h-44 w-full rounded-card" />

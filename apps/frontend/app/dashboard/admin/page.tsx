@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { AdminAttentionQueue } from '@/components/admin/dashboard/attention-queue';
 import { adminProjectHref } from '@/lib/admin/sprint-calendar';
 import { AdminSprintPlanningWidget } from '@/components/admin/dashboard/sprint-planning-widget';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   ADMIN_METRICS_ANCHOR,
   ADMIN_METRICS_ROUTE,
@@ -174,7 +174,7 @@ const SPRINTS_STICKY = 'xl:sticky xl:top-0 xl:flex xl:h-[calc(100dvh-4rem)] xl:o
 
 function AdminStatsSkeleton() {
   return (
-    <div className={PAGE_CLASS} role="status" aria-label="Cargando el panel de administración">
+    <SkeletonRegion className={PAGE_CLASS} label="Cargando el panel de administración">
       <div className={PANEL_GRID}>
         <div className={COL_PRINCIPAL}>
           <Skeleton className="mb-tight h-3 w-28 rounded" />
@@ -212,7 +212,7 @@ function AdminStatsSkeleton() {
           </div>
         </div>
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -372,11 +372,11 @@ function ResumenTendencias() {
   return (
     <>
       {isLoading ? (
-        <div className="grid grid-cols-1 gap-grid sm:grid-cols-3" role="status" aria-label="Cargando las tendencias de uso">
+        <SkeletonRegion className="grid grid-cols-1 gap-grid sm:grid-cols-3" label="Cargando las tendencias de uso">
           {RESUMEN_TENDENCIAS.map((m) => (
             <Skeleton key={m.serie} className="h-36 rounded-card" />
           ))}
-        </div>
+        </SkeletonRegion>
       ) : isError || !data ? (
         <p role="alert" className="card-base type-body text-text-secondary">
           No se pudo cargar el resumen de tendencias.

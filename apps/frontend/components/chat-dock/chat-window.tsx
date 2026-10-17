@@ -44,6 +44,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
 import type { ChatConversacionGlobal } from '@/lib/types/chat';
+import { SkeletonList } from '@/components/ui/skeleton';
 
 function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId: number | null): string {
   if (conversacion.nombrePersonalizado) return conversacion.nombrePersonalizado;
@@ -190,7 +191,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
       {!minimized && (
         <>
           <div ref={listRef} className="h-[40rem] max-h-[60vh] min-h-0 space-y-3 overflow-y-auto px-3 py-3">
-            {isLoading && <p className="text-xs text-tertiary">Cargando historial…</p>}
+            {isLoading && <SkeletonList label="Cargando historial" count={3} lines={1} avatar="circle" layout="plain" />}
             {!isLoading && messages.length === 0 && (
               <p className="text-xs text-tertiary">Todavía no hay mensajes. Sé el primero en escribir.</p>
             )}

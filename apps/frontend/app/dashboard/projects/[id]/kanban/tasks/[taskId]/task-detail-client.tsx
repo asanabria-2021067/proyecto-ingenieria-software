@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,7 +117,7 @@ function DatoOrganizacion({
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 function TaskDetailSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-360 px-6 pb-12 pt-5 md:px-7">
+    <SkeletonRegion label="Cargando tarea" className="mx-auto w-full max-w-360 px-6 pb-12 pt-5 md:px-7">
       <Skeleton className="mb-4 h-4 w-80" />
       <Skeleton className="mb-4 h-28 w-full rounded-[11px]" />
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.8fr)_minmax(340px,1fr)]">
@@ -129,7 +129,7 @@ function TaskDetailSkeleton() {
         </div>
         <Skeleton className="h-130 w-full rounded-[11px]" />
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 

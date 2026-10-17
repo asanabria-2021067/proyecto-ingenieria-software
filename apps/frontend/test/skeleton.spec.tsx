@@ -80,6 +80,13 @@ describe('SkeletonList', () => {
     expect(container.firstElementChild).toHaveClass('card-base', 'divide-y');
     expect(container.querySelectorAll('[data-slot="skeleton-list-item"].card-base')).toHaveLength(0);
   });
+
+  it('`plain` deja filas sueltas, sin tarjeta propia ni contenedora', () => {
+    const { container } = render(<SkeletonList count={2} layout="plain" />);
+    expect(container.firstElementChild).not.toHaveClass('card-base');
+    expect(container.querySelectorAll('.card-base')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-slot="skeleton-list-item"]')).toHaveLength(2);
+  });
 });
 
 describe('SkeletonCard', () => {

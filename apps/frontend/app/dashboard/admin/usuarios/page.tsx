@@ -19,7 +19,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { UserDetailSheet } from '@/components/admin/UserDetailSheet';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Table,
   TableHeader,
@@ -110,7 +110,7 @@ interface PendingAction {
 
 function TablaSkeleton() {
   return (
-    <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando usuarios">
+    <SkeletonRegion className={DATA_TABLE_CARD} label="Cargando usuarios">
       <div className={`${DATA_TABLE_HEAD_ROW} px-stack py-tight`}>
         <Skeleton className="h-4 w-40" />
       </div>
@@ -127,7 +127,7 @@ function TablaSkeleton() {
           </div>
         ))}
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 

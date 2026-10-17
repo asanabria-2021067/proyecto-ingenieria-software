@@ -10,6 +10,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { NewChatDialog } from '@/components/chat-dock/new-chat-dialog';
 import type { ChatConversacionGlobal } from '@/lib/types/chat';
+import { SkeletonList } from '@/components/ui/skeleton';
 
 function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId: number | null): string {
   if (conversacion.nombrePersonalizado) return conversacion.nombrePersonalizado;
@@ -95,7 +96,9 @@ export function ChatListPopover({ onClose }: ChatListPopoverProps) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {isLoading && <p className="px-4 py-6 text-center text-xs text-tertiary">Cargando chats…</p>}
+        {isLoading && (
+          <SkeletonList label="Cargando chats" count={4} lines={2} avatar="circle" layout="plain" className="px-4 py-stack" />
+        )}
         {!isLoading && filtradas.length === 0 && (
           <p className="px-4 py-6 text-center text-xs text-tertiary">
             {debouncedQuery ? 'Sin resultados para esa búsqueda.' : 'No tienes chats aquí todavía.'}

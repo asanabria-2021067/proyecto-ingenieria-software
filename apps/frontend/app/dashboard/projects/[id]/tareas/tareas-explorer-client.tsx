@@ -7,7 +7,7 @@ import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -292,7 +292,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
 
         {/* loading — skeleton con forma de fila (título + meta + pastillas), nunca spinner */}
         {isLoading && (
-          <div className="space-y-inline p-card" role="status" aria-label="Cargando tareas">
+          <SkeletonRegion className="space-y-inline p-card" label="Cargando tareas">
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
@@ -306,7 +306,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
                 <Skeleton className="h-6 w-20 shrink-0 rounded-control" />
               </div>
             ))}
-          </div>
+          </SkeletonRegion>
         )}
 
         {/* error */}

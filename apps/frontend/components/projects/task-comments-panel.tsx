@@ -16,6 +16,7 @@ import {
 } from '@/lib/services/task-comments';
 import { projectTasksQueryKey, taskCommentsQueryKey } from '@/lib/query-keys/tasks';
 import uvgSwal from '@/lib/swal';
+import { SkeletonList } from '@/components/ui/skeleton';
 
 interface TaskCommentsPanelProps {
   idProyecto: number;
@@ -101,7 +102,7 @@ export function TaskCommentsPanel({ idProyecto, idTarea, enabled, scroll = true 
 
   const lista = (
     <>
-      {isLoading && <p className="text-sm text-tertiary text-center py-6">Cargando comentarios...</p>}
+      {isLoading && <SkeletonList label="Cargando comentarios" count={3} lines={2} avatar="circle" layout="plain" />}
 
       {isError && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400 text-center py-6">

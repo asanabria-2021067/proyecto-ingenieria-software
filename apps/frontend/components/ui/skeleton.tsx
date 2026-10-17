@@ -98,8 +98,11 @@ interface SkeletonListProps {
   avatar?: 'circle' | 'square'
   /** Etiquetas o acciones al final de cada fila. */
   trailing?: number
-  /** `cards`: una tarjeta por elemento. `rows`: filas divididas en una sola tarjeta. */
-  layout?: 'cards' | 'rows'
+  /**
+   * `cards`: una tarjeta por elemento. `rows`: filas divididas en una sola
+   * tarjeta. `plain`: filas sueltas dentro de un panel que ya es superficie.
+   */
+  layout?: 'cards' | 'rows' | 'plain'
 }
 
 function SkeletonList({
@@ -117,7 +120,8 @@ function SkeletonList({
       data-slot="skeleton-list-item"
       className={cn(
         'flex items-center gap-stack',
-        layout === 'cards' ? 'card-base' : 'px-card py-inline',
+        layout === 'cards' && 'card-base',
+        layout === 'rows' && 'px-card py-inline',
       )}
     >
       {avatar && (
@@ -139,7 +143,7 @@ function SkeletonList({
     <SkeletonRoot
       label={label}
       className={cn(
-        layout === 'cards' ? 'flex flex-col gap-stack' : cn(DATA_TABLE_CARD, DATA_TABLE_ROWS),
+        layout === 'rows' ? cn(DATA_TABLE_CARD, DATA_TABLE_ROWS) : 'flex flex-col gap-stack',
         className,
       )}
     >
