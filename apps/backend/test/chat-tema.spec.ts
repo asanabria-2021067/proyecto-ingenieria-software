@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { ArgumentMetadata, BadRequestException, ForbiddenException, ValidationPipe } from '@nestjs/common';
+import { ChatController } from '../src/chat/chat.controller';
 import { ChatService } from '../src/chat/chat.service';
 import { UpdateChatThemeDto, CHAT_TEMA_COLORES } from '../src/chat/dto/update-chat-theme.dto';
 
@@ -126,5 +127,12 @@ describe('ChatService - tema de color por usuario', () => {
     const [conv] = await service.listAllConversations(1);
 
     expect(conv.temaColor).toBeNull();
+  });
+});
+
+describe('PATCH :conversationId/tema', () => {
+  // El cliente (apiFetch) solo tolera un cuerpo vacio con 204; con 200 vacio res.json() falla y la UI no se refresca.
+  it('responde 204 porque no devuelve cuerpo', () => {
+    expect(Reflect.getMetadata('__httpCode__', ChatController.prototype.updateTheme)).toBe(204);
   });
 });
