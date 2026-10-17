@@ -13,6 +13,15 @@ export interface ChatMensaje {
   remitente: ChatUsuario;
 }
 
+export interface ChatMensajeProgramado {
+  idMensajeProgramado: number;
+  idConversacion: number;
+  contenido: string;
+  enviarEn: string;
+  estado: 'PENDIENTE' | 'ENVIADO' | 'CANCELADO' | 'FALLIDO';
+  creadoEn: string;
+}
+
 export interface ChatConversacion {
   idConversacion: number;
   tipo: 'GRUPAL' | 'INDIVIDUAL';
