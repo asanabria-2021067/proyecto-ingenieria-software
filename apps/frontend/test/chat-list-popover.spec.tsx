@@ -10,7 +10,10 @@ const abrirChat = vi.fn();
 vi.mock('@/components/chat-dock/chat-dock-context', () => ({ useChatDock: () => ({ abrirChat }) }));
 
 const listAllConversationsMock = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/services/chat', () => ({ listAllConversations: (...args: unknown[]) => listAllConversationsMock(...args) }));
+vi.mock('@/lib/services/chat', () => ({
+  listAllConversations: (...args: unknown[]) => listAllConversationsMock(...args),
+  getMiEstado: () => Promise.resolve(null),
+}));
 
 import { ChatListPopover } from '../components/chat-dock/chat-list-popover';
 import type { ChatConversacionGlobal } from '../lib/types/chat';
@@ -57,6 +60,24 @@ describe('ChatListPopover', () => {
 
     expect(await screen.findByText('Rosa Fuentes')).toBeInTheDocument();
     expect(screen.getByText('Feria de Ciencias')).toBeInTheDocument();
+  });
+
+  it('muestra el estado vigente de la otra persona y no el vencido', async () => {
+    const participantes = (estado: ChatConversacionGlobal['participantes'][number]['estado']) => [
+      { idUsuario: 1, nombre: 'Yo', apellido: 'Usuario', fotoUrl: null },
+      { idUsuario: 2, nombre: 'Rosa', apellido: 'Fuentes', fotoUrl: null, estado },
+    ];
+    listAllConversationsMock.mockResolvedValue([
+      conversacion({ participantes: participantes({ tipo: 'EN_CLASE', texto: null, venceEn: null }) }),
+      conversacion({
+        idConversacion: 2,
+        participantes: participantes({ tipo: 'OCUPADO', texto: null, venceEn: new Date(Date.now() - 1000).toISOString() }),
+      }),
+    ]);
+    renderPopover();
+
+    expect(await screen.findByText('En clase')).toBeInTheDocument();
+    expect(screen.queryByText('Ocupado')).not.toBeInTheDocument();
   });
 
   it('la pestaña Otros filtra por esPrioritaria: false', async () => {

@@ -38,6 +38,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { EstadoIndicador } from '@/components/chat-dock/estado-chat';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -123,13 +124,16 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             <AvatarFallback className="text-[10px]">{getIniciales(otro?.nombre ?? '?', otro?.apellido ?? '')}</AvatarFallback>
           </Avatar>
         )}
-        <button
-          type="button"
-          onClick={onMinimize}
-          className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-on-surface"
-        >
-          {titulo}
-        </button>
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={onMinimize}
+            className="block w-full truncate text-left text-sm font-semibold text-on-surface"
+          >
+            {titulo}
+          </button>
+          {otro && <EstadoIndicador estado={otro.estado} />}
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

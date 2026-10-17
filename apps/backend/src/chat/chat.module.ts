@@ -4,6 +4,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { ChatController } from './chat.controller';
 import { ChatArchivadoController } from './chat-archivado.controller';
 import { ChatService } from './chat.service';
+import { ChatEstadoController } from './chat-estado.controller';
+import { ChatEstadoService } from './chat-estado.service';
 import { ChatGateway } from './chat.gateway';
 import { PrismaModule } from '../prisma/prisma.module';
 import { getJwtSecretFromConfig } from '../config/jwt-secret';
@@ -20,8 +22,8 @@ import { WsAuthService } from '../ws-auth/ws-auth.service';
       }),
     }),
   ],
-  controllers: [ChatController, ChatArchivadoController],
+  controllers: [ChatController, ChatArchivadoController, ChatEstadoController],
   // G07 (OWASP25-C025): política del handshake con el JwtService de este módulo.
-  providers: [ChatService, ChatGateway, WsAuthService],
+  providers: [ChatService, ChatEstadoService, ChatGateway, WsAuthService],
 })
 export class ChatModule {}

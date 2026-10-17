@@ -5,21 +5,25 @@ import { io, Socket } from 'socket.io-client';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createConversation,
+  clearMiEstado,
   deleteConversation,
   getMessages,
+  getMiEstado,
   listAllConversations,
   listArchivedConversations,
   markConversationRead,
   sendMessage,
+  setMiEstado,
   updateConversation,
 } from '@/lib/services/chat';
 import {
   allConversationsQueryKey,
   archivedConversationsQueryKey,
   conversationMessagesQueryKey,
+  miEstadoChatQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
-import type { ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
+import type { ChatMensaje, CreateConversationPayload, SetEstadoChatPayload, UpdateConversationPayload } from '@/lib/types/chat';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -132,6 +136,39 @@ export function useMarkConversationRead(idProyecto: number) {
   return useMutation({
     mutationFn: (idConversacion: number) => markConversationRead(idProyecto, idConversacion),
     onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+/** Estado personalizado propio del chat; al cambiarlo se refrescan las listas donde otros lo ven. */
+export function useMiEstado() {
+  const query = useQuery({ queryKey: miEstadoChatQueryKey, queryFn: getMiEstado });
+  return { estado: query.data ?? null, isLoading: query.isLoading };
+}
+
+function refrescarListasPorEstado(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['chats-global'] });
+  queryClient.invalidateQueries({ queryKey: ['proyecto-conversaciones'] });
+}
+
+export function useSetMiEstado() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: SetEstadoChatPayload) => setMiEstado(payload),
+    onSuccess: (estado) => {
+      queryClient.setQueryData(miEstadoChatQueryKey, estado);
+      refrescarListasPorEstado(queryClient);
+    },
+  });
+}
+
+export function useClearMiEstado() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => clearMiEstado(),
+    onSuccess: () => {
+      queryClient.setQueryData(miEstadoChatQueryKey, null);
+      refrescarListasPorEstado(queryClient);
+    },
   });
 }
 

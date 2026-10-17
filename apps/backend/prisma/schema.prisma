@@ -378,6 +378,7 @@ model Usuario {
   mensajesChatEnviados             MensajeChat[]              @relation("MensajesChatEnviados")
   tokensRefresco                   TokenRefresco[]
   proyectosGuardados               ProyectoGuardado[]
+  estadoChat                       EstadoChatUsuario?
   actividadesCreadas               ActividadProyecto[]
   asistencias                      AsistenciaActividad[]      @relation("AsistenciaUsuario")
   asistenciasConfirmadas           AsistenciaActividad[]      @relation("AsistenciaConfirmador")
@@ -1684,6 +1685,26 @@ model MensajeChat {
 
   @@index([idConversacion, enviadoEn])
   @@map("mensaje_chat")
+}
+
+// Estado personalizado del usuario en el chat. Vencido (venceEn <= ahora) se trata
+// como inexistente al leer; no hay job de limpieza.
+enum TipoEstadoChat {
+  EN_CLASE
+  OCUPADO
+  DISPONIBLE
+  PERSONALIZADO
+}
+
+model EstadoChatUsuario {
+  idUsuario Int           @id @map("id_usuario")
+  tipo      TipoEstadoChat
+  texto     String?       @db.VarChar(60)
+  venceEn   DateTime?     @map("vence_en")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@map("estado_chat_usuario")
 }
 
 // HU-190 (T-346): niveles de una insignia. Sin nivel (null) = aún sin umbral alcanzado.

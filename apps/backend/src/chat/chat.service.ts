@@ -5,6 +5,7 @@ import { ChatGateway } from './chat.gateway';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
+import { ESTADO_CHAT_SELECT, estadoVigente } from './chat-estado.service';
 
 /**
  * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
@@ -27,6 +28,15 @@ function chatArchivado(estadoProyecto: EstadoProyecto): boolean {
 const USUARIO_SELECT = {
   select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
 } as const;
+
+// Solo en los listados de participantes de conversaciones del usuario (privacidad del estado).
+const PARTICIPANTE_USUARIO = {
+  select: { ...USUARIO_SELECT.select, estadoChat: ESTADO_CHAT_SELECT },
+} as const;
+
+function conEstado<T extends { estadoChat: Parameters<typeof estadoVigente>[0] }>({ estadoChat, ...usuario }: T) {
+  return { ...usuario, estado: estadoVigente(estadoChat) };
+}
 
 const MENSAJE_SELECT = {
   idMensaje: true,
@@ -90,7 +100,7 @@ export class ChatService {
     const conversaciones = await this.prisma.conversacion.findMany({
       where: { idProyecto, eliminadaEn: null, participantes: { some: { idUsuario: userId } } },
       include: {
-        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
+        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: PARTICIPANTE_USUARIO } },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
@@ -111,7 +121,7 @@ export class ChatService {
           tipo: c.tipo,
           nombre: c.nombre,
           nombrePersonalizado: c.nombrePersonalizado,
-          participantes: c.participantes.map((p) => p.usuario),
+          participantes: c.participantes.map((p) => conEstado(p.usuario)),
           ultimoMensaje: c.mensajes[0] ?? null,
           noLeidos,
           archivada,
@@ -306,7 +316,7 @@ export class ChatService {
       },
       include: {
         proyecto: { select: { idProyecto: true, tituloProyecto: true } },
-        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
+        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: PARTICIPANTE_USUARIO } },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
@@ -329,7 +339,7 @@ export class ChatService {
           tipo: c.tipo,
           nombre: c.nombre,
           nombrePersonalizado: c.nombrePersonalizado,
-          participantes: c.participantes.map((p) => p.usuario),
+          participantes: c.participantes.map((p) => conEstado(p.usuario)),
           ultimoMensaje: c.mensajes[0] ?? null,
           ultimoMensajeEsPropio: c.mensajes[0]?.remitente.idUsuario === userId,
           noLeidos,
