@@ -111,5 +111,10 @@ export function getNoMolestar(): Promise<ConfigNoMolestar> {
 }
 
 export function updateNoMolestar(payload: ConfigNoMolestar): Promise<ConfigNoMolestar> {
-  return apiFetch('/chats/no-molestar', { method: 'PUT', body: JSON.stringify(payload) });
+  // El GET trae campos de solo lectura (enHorarioAhora) que el DTO rechaza: se envian solo los escribibles.
+  const { activo, horaInicio, horaFin, diasSemana, zona } = payload;
+  return apiFetch('/chats/no-molestar', {
+    method: 'PUT',
+    body: JSON.stringify({ activo, horaInicio, horaFin, diasSemana, zona }),
+  });
 }
