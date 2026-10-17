@@ -431,6 +431,10 @@ export class NotificationsService {
     );
   }
 
+  /**
+   * HU-200: `excluirIds` deja fuera, además del autor, a quien ya recibe un
+   * aviso más específico del mismo evento (p. ej. una mención en el comentario).
+   */
   async notifyProjectActiveParticipants(
     idProyecto: number,
     autorId: number,
@@ -441,12 +445,13 @@ export class NotificationsService {
       datosJson?: Prisma.InputJsonValue;
     },
     tx?: TxClient,
+    excluirIds: number[] = [],
   ) {
     const db = tx ?? this.prisma;
     const participaciones = await db.participacionProyecto.findMany({
       where: {
         estadoParticipacion: 'ACTIVO',
-        idUsuario: { not: autorId },
+        idUsuario: excluirIds.length > 0 ? { notIn: [autorId, ...excluirIds] } : { not: autorId },
         rolProyecto: { idProyecto },
       },
       distinct: ['idUsuario'],

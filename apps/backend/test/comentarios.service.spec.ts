@@ -18,6 +18,8 @@ function makePrisma() {
     hito: { findUnique: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
     asignacionTarea: { findFirst: vi.fn() },
+    // HU-200: editar sincroniza las menciones del comentario.
+    mencionComentario: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn(), createMany: vi.fn() },
   };
 }
 
