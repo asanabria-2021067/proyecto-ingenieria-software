@@ -33,6 +33,7 @@ import {
 import { useDashboardSidebarCollapsed } from '@/components/dashboard/use-dashboard-sidebar-collapsed';
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
+import { resolveCommentNotificationLink } from '@/components/notifications/comment-notification-link';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
 import { AnuncioBanner } from '@/components/anuncios/anuncio-banner';
 import { ChatDockProvider } from '@/components/chat-dock/chat-dock-context';
@@ -140,7 +141,8 @@ export default function DashboardLayout({
     queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
     queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
 
-    const href = getNotificationLink(latestNotification);
+    // HU-200: una mención o un comentario nuevo enlazan al comentario desde el aviso en vivo.
+    const href = getNotificationLink(latestNotification) ?? resolveCommentNotificationLink(latestNotification);
     toast(latestNotification.tituloNotificacion, {
       description: latestNotification.mensajeNotificacion,
       duration: 6000,

@@ -3,6 +3,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
+  AtSign,
   Award,
   Bell,
   BellOff,
@@ -42,12 +43,15 @@ import {
   type Notificacion,
 } from '@/lib/services/notifications';
 import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
+import { resolveCommentNotificationLink } from '@/components/notifications/comment-notification-link';
 import { useConteoNoLeidas } from '@/hooks/use-notifications';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 
 /** Heurística por palabra clave del tipo (30+ valores en TipoNotificacion):
  * evita mantener un mapa exhaustivo que se desactualiza con cada tipo nuevo. */
 const TYPE_ICON_RULES: Array<[string, typeof Bell]> = [
+  // HU-200: antes que 'COMENTARIO', que también coincide con MENCION_COMENTARIO.
+  ['MENCION', AtSign],
   ['POSTULACION', UserCheck],
   ['TAREA', ClipboardList],
   ['HITO', Flag],
@@ -257,7 +261,7 @@ export default function NotificacionesPage() {
 
               <div className="flex flex-col gap-tight">
                 {notifs.map((n) => {
-                  const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n);
+                  const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n) ?? resolveCommentNotificationLink(n);
                   const Icon = getNotifIcon(n.tipoNotificacion);
                   const cardClassName = `card-base flex items-start gap-stack transition-all ${
                     n.leidaEn ? '' : 'border-primary/30 bg-primary-container/5 shadow-sm'
