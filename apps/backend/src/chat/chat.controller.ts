@@ -170,6 +170,7 @@ export class ChatController {
   }
 
   @Patch(':conversationId/tema')
+  @HttpCode(HttpStatus.NO_CONTENT)
   updateTheme(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('conversationId', ParseIntPipe) conversationId: number,
