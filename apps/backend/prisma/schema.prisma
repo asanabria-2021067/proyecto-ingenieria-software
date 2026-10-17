@@ -1663,6 +1663,7 @@ model ConversacionParticipante {
   idUsuario       Int       @map("id_usuario")
   agregadoEn      DateTime  @default(now()) @map("agregado_en")
   ultimaLecturaEn DateTime? @map("ultima_lectura_en")
+  temaColor       String?   @map("tema_color") @db.VarChar(20)
 
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
   usuario      Usuario      @relation(fields: [idUsuario], references: [idUsuario])

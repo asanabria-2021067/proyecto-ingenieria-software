@@ -11,6 +11,7 @@ import {
   ChevronUp,
   Loader2,
   MoreVertical,
+  Palette,
   Pencil,
   Send,
   Star,
@@ -39,7 +40,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
-import { useMessages, useSendMessage, useUpdateConversation, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
+import { useMessages, useSendMessage, useUpdateConversation, useUpdateChatTheme, useDeleteConversation, useAllConversations } from '@/hooks/use-chat';
+import { ChatThemeDialog } from '@/components/chat-dock/chat-theme-dialog';
+import { claseAcentoCabecera, claseBurbujaPropia } from '@/lib/chat-temas';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
@@ -73,9 +76,11 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const enviar = useSendMessage(idProyecto, idConversacion);
   const actualizar = useUpdateConversation(idProyecto);
   const eliminar = useDeleteConversation(idProyecto);
+  const cambiarTema = useUpdateChatTheme(idProyecto);
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
+  const [temaAbierto, setTemaAbierto] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -112,7 +117,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
 
   return (
     <div className="flex w-[36rem] shrink-0 flex-col rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest shadow-raised max-w-[calc(100vw-2rem)]">
-      <div className="flex shrink-0 items-center gap-2 rounded-t-xl border-b border-outline-variant bg-surface-container px-3 py-2">
+      <div className={`flex shrink-0 items-center gap-2 rounded-t-xl border-b border-outline-variant bg-surface-container px-3 py-2 ${claseAcentoCabecera(conversacion?.temaColor)}`}>
         {conversacion?.tipo === 'GRUPAL' ? (
           <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
             <UsersIcon className="size-3.5" aria-hidden="true" />
@@ -147,6 +152,10 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             <DropdownMenuItem onClick={() => setRenombrarAbierto(true)}>
               <Pencil className="size-4" aria-hidden="true" />
               Renombrar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTemaAbierto(true)}>
+              <Palette className="size-4" aria-hidden="true" />
+              Tema de color
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => actualizar.mutate({ idConversacion, payload: { esFavorita: !conversacion?.esFavorita } })}
@@ -202,10 +211,10 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     {m.remitente.fotoUrl && <AvatarImage src={m.remitente.fotoUrl} alt="" />}
                     <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
                   </Avatar>
-                  <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? 'bg-primary text-primary-foreground' : 'bg-surface-container-high text-on-surface'}`}>
+                  <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? claseBurbujaPropia(conversacion?.temaColor) : 'bg-surface-container-high text-on-surface'}`}>
                     {!propio && <p className="mb-0.5 text-[11px] font-semibold opacity-80">{m.remitente.nombre}</p>}
                     <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
-                    <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
+                    <p className={`mt-0.5 text-[10px] ${propio ? '' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
                   </div>
                 </div>
               );
@@ -233,6 +242,13 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
           </form>
         </>
       )}
+
+      <ChatThemeDialog
+        open={temaAbierto}
+        onOpenChange={setTemaAbierto}
+        value={conversacion?.temaColor ?? null}
+        onChange={(temaColor) => cambiarTema.mutate({ idConversacion, temaColor })}
+      />
 
       <RenameConversationDialog
         open={renombrarAbierto}

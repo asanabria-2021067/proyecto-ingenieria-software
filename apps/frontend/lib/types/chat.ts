@@ -13,6 +13,9 @@ export interface ChatMensaje {
   remitente: ChatUsuario;
 }
 
+/** Lista cerrada de temas de color (misma lista que valida el backend). */
+export type ChatTemaColor = 'verde' | 'azul' | 'violeta' | 'naranja' | 'rosa' | 'gris';
+
 export interface ChatConversacion {
   idConversacion: number;
   tipo: 'GRUPAL' | 'INDIVIDUAL';
@@ -29,6 +32,8 @@ export interface ChatConversacion {
   archivadaManual: boolean;
   silenciada: boolean;
   esPrioritaria: boolean;
+  /** Tema elegido por el usuario autenticado; null = color por defecto. */
+  temaColor: ChatTemaColor | null;
 }
 
 /** Dock global de chat: cruza todos los proyectos del usuario (a diferencia
@@ -49,6 +54,8 @@ export interface ChatConversacionGlobal {
   archivadaManual: boolean;
   silenciada: boolean;
   esPrioritaria: boolean;
+  /** Tema elegido por el usuario autenticado; null = color por defecto. */
+  temaColor: ChatTemaColor | null;
 }
 
 export interface CreateConversationPayload {

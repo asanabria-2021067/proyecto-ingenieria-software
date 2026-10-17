@@ -5,6 +5,7 @@ import { ChatGateway } from './chat.gateway';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
+import { UpdateChatThemeDto } from './dto/update-chat-theme.dto';
 
 /**
  * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
@@ -90,7 +91,7 @@ export class ChatService {
     const conversaciones = await this.prisma.conversacion.findMany({
       where: { idProyecto, eliminadaEn: null, participantes: { some: { idUsuario: userId } } },
       include: {
-        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
+        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, temaColor: true, usuario: USUARIO_SELECT } },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
@@ -119,6 +120,7 @@ export class ChatService {
           archivadaManual: c.archivadaEn !== null,
           silenciada: c.silenciada,
           esPrioritaria: c.esPrioritaria,
+          temaColor: propia?.temaColor ?? null,
         };
       }),
     );
@@ -254,6 +256,15 @@ export class ChatService {
     await this.prisma.conversacion.update({ where: { idConversacion }, data });
   }
 
+  /** Tema de color propio: solo toca la fila del participante autenticado. */
+  async updateTheme(idProyecto: number, idConversacion: number, userId: number, dto: UpdateChatThemeDto) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    await this.prisma.conversacionParticipante.update({
+      where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
+      data: { temaColor: dto.temaColor },
+    });
+  }
+
   /** Borrar conversación desde el dock de chat: soft-delete (mismo patrón que
    * archivadaEn), notifica en vivo al resto de participantes para que
    * desaparezca de su lista sin que tengan que recargar. */
@@ -306,7 +317,7 @@ export class ChatService {
       },
       include: {
         proyecto: { select: { idProyecto: true, tituloProyecto: true } },
-        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
+        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, temaColor: true, usuario: USUARIO_SELECT } },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
@@ -337,6 +348,7 @@ export class ChatService {
           archivadaManual: c.archivadaEn !== null,
           silenciada: c.silenciada,
           esPrioritaria: c.esPrioritaria,
+          temaColor: propia?.temaColor ?? null,
         };
       }),
     );
