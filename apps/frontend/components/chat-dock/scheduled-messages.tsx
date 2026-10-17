@@ -52,6 +52,9 @@ export function ScheduleMessageButton({ idProyecto, idConversacion, texto, onSch
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // El popover va en un portal: sin esto el submit burbujea por el arbol de React hasta el formulario
+    // del input y el mensaje se enviaria al instante ademas de programarse.
+    event.stopPropagation();
     const mensajeError = validarEnvio(valor);
     setError(mensajeError);
     if (mensajeError) return;
