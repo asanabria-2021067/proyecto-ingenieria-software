@@ -6,9 +6,31 @@ import type { HitoDTO } from '../lib/dto/project.dto';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 
 const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }));
+const searchParamsMock = vi.hoisted(() => ({ value: new URLSearchParams() }));
 vi.mock('next/navigation', () => ({
   useRouter: () => routerMock,
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParamsMock.value,
+}));
+
+// HU-200: los comentarios del hito tienen su propia prueba
+// (milestone-comments.spec.tsx); aquí se sustituyen para no arrastrar
+// QueryClient ni red, igual que TaskCommentsDialog en task-board.spec.ts.
+vi.mock('../components/projects/milestone-comments', () => ({
+  useMilestoneCommentCounts: () => new Map([[1, 3]]),
+  MilestoneCommentsSheet: ({
+    hito,
+    comentarioDestacado,
+  }: {
+    hito: { tituloHito: string } | null;
+    comentarioDestacado?: number | null;
+  }) =>
+    hito
+      ? createElement(
+          'div',
+          { 'data-testid': 'panel-comentarios-hito', 'data-destacado': String(comentarioDestacado ?? '') },
+          hito.tituloHito,
+        )
+      : null,
 }));
 
 // Mismo mock que create-milestone-dialog.spec.ts/task-form-dialog.spec.ts:
@@ -86,6 +108,38 @@ describe('HitosSection', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    searchParamsMock.value = new URLSearchParams();
+  });
+
+  describe('comentarios del hito (HU-200)', () => {
+    it('cada tarjeta muestra el contador de comentarios del hito y abre su panel', () => {
+      const hitos = [hito({ idHito: 1, tituloHito: 'Entrega 1' }), hito({ idHito: 2, tituloHito: 'Entrega 2', orden: 1 })];
+      render(createElement(HitosSection, { hitos, tareas: [], idProyecto: 10 }));
+
+      expect(screen.getByRole('button', { name: 'Comentarios del hito Entrega 1 (3)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Comentarios del hito Entrega 2 (0)' })).toBeInTheDocument();
+      expect(screen.queryByTestId('panel-comentarios-hito')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Comentarios del hito Entrega 2 (0)' }));
+
+      expect(screen.getByTestId('panel-comentarios-hito')).toHaveTextContent('Entrega 2');
+    });
+
+    it('con ?hito=N&comment=M (enlace de una notificación) abre el panel y destaca el comentario', () => {
+      searchParamsMock.value = new URLSearchParams('tab=hitos&hito=1&comment=55');
+      render(createElement(HitosSection, { hitos: [hito({ idHito: 1, tituloHito: 'Entrega 1' })], tareas: [], idProyecto: 10 }));
+
+      const panel = screen.getByTestId('panel-comentarios-hito');
+      expect(panel).toHaveTextContent('Entrega 1');
+      expect(panel).toHaveAttribute('data-destacado', '55');
+    });
+
+    it('un ?hito= que no es de este proyecto no abre nada', () => {
+      searchParamsMock.value = new URLSearchParams('hito=999&comment=55');
+      render(createElement(HitosSection, { hitos: [hito({ idHito: 1 })], tareas: [], idProyecto: 10 }));
+
+      expect(screen.queryByTestId('panel-comentarios-hito')).not.toBeInTheDocument();
+    });
   });
 
   it('agrupa una tarea con idHito válido bajo su hito', () => {

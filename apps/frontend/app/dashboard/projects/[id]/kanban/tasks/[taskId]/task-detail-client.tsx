@@ -146,6 +146,9 @@ function TaskDetailView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const enfocarComentarios = searchParams.get('section') === 'comments';
+  // HU-200 (T-377): ?comment=N llega desde una notificación de comentario o mención.
+  const comentarioParam = searchParams.get('comment');
+  const comentarioDestacado = comentarioParam && /^\d+$/.test(comentarioParam) ? Number(comentarioParam) : null;
 
   const { data: currentUser } = useCurrentUser();
   const { cambiarEstadoTarea, eliminarTarea, crearTarea, editarTarea, asignarTarea, desasignarTarea } =
@@ -590,6 +593,7 @@ function TaskDetailView({
               idTarea={tarea.idTarea}
               enabled
               scroll
+              comentarioDestacado={comentarioDestacado}
             />
           </section>
         </div>

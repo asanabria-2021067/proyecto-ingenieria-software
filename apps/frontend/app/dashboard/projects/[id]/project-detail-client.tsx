@@ -30,6 +30,7 @@ import { useCloseReadiness, useClosureRevisions } from '@/hooks/use-closure';
 import { countPassedChecks, TOTAL_CLOSURE_CHECKS } from '@/components/closure/closure-readiness-panel';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 import { ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+import { ProjectCommentsCard } from '@/components/projects/detail/project-comments-card';
 
 interface Props {
   id: number;
@@ -252,6 +253,11 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           setRolesSheetAbierto={setRolesSheetAbierto}
           rolesSheetIntent={rolesSheetIntent}
         />
+
+        {/* HU-200: conversación del proyecto, solo para quien puede leerla. */}
+        {(isLeader || esParticipante) && (
+          <ProjectCommentsCard idProyecto={idProyecto} puedeComentar={!proyectoCerrado} />
+        )}
       </ProjectGridMain>
 
       <ProjectGridAside aria-label="Información del proyecto">
