@@ -33,6 +33,9 @@ function conversacion(overrides: Partial<ChatConversacionGlobal> = {}): ChatConv
     esFavorita: false,
     archivadaManual: false,
     silenciada: false,
+    silenciadaPorMi: false,
+    silenciadaHasta: null,
+    silenciadaSiempre: false,
     esPrioritaria: true,
     ...overrides,
   };
@@ -51,6 +54,24 @@ afterEach(() => {
 });
 
 describe('ChatListPopover', () => {
+  it('un chat silenciado muestra el indicador y oculta el contador de no leidos', async () => {
+    listAllConversationsMock.mockResolvedValue([conversacion({ noLeidos: 4, silenciadaSiempre: true })]);
+    renderPopover();
+
+    expect(await screen.findByText('Silenciado')).toBeInTheDocument();
+    expect(screen.queryByText('4')).not.toBeInTheDocument();
+  });
+
+  it('un silencio vencido vuelve a mostrar el contador', async () => {
+    listAllConversationsMock.mockResolvedValue([
+      conversacion({ noLeidos: 4, silenciadaHasta: new Date(Date.now() - 1000).toISOString() }),
+    ]);
+    renderPopover();
+
+    expect(await screen.findByText('4')).toBeInTheDocument();
+    expect(screen.queryByText('Silenciado')).not.toBeInTheDocument();
+  });
+
   it('lista los chats prioritarios por defecto y muestra el badge de proyecto', async () => {
     listAllConversationsMock.mockResolvedValue([conversacion()]);
     renderPopover();

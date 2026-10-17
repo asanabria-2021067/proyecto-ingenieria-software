@@ -30,11 +30,14 @@ vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { id
 const sendMutate = vi.fn();
 const updateMutate = vi.fn();
 const deleteMutate = vi.fn();
+const silenciarMutate = vi.fn();
+const silencio = vi.hoisted(() => ({ siempre: false }));
 vi.mock('@/hooks/use-chat', () => ({
   useMessages: () => ({ messages: [], isLoading: false }),
   useSendMessage: () => ({ mutate: sendMutate, isPending: false }),
   useUpdateConversation: () => ({ mutate: updateMutate, isPending: false }),
   useDeleteConversation: () => ({ mutate: deleteMutate, isPending: false }),
+  useSilenciarConversation: () => ({ mutate: silenciarMutate, isPending: false }),
   useAllConversations: () => ({
     conversations: [
       {
@@ -54,6 +57,11 @@ vi.mock('@/hooks/use-chat', () => ({
         esFavorita: false,
         archivadaManual: false,
         silenciada: false,
+        silenciadaPorMi: false,
+        silenciadaHasta: null,
+        get silenciadaSiempre() {
+          return silencio.siempre;
+        },
         esPrioritaria: true,
       },
     ],
@@ -63,6 +71,10 @@ vi.mock('@/hooks/use-chat', () => ({
 const confirmarMock = vi.fn();
 vi.mock('@/lib/mensajes', () => ({ confirmar: (...args: unknown[]) => confirmarMock(...args) }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+vi.mock('@/components/chat-dock/no-molestar-dialog', () => ({
+  NoMolestarDialog: () => createElement('div', { role: 'dialog', 'aria-label': 'No molestar' }),
+}));
 
 import { ChatWindow } from '../components/chat-dock/chat-window';
 
@@ -90,6 +102,7 @@ async function abrirMenu() {
 }
 
 afterEach(() => {
+  silencio.siempre = false;
   cleanup();
   vi.clearAllMocks();
 });
@@ -118,12 +131,37 @@ describe('ChatWindow', () => {
     expect(updateMutate).toHaveBeenCalledWith({ idConversacion: 5, payload: { esFavorita: true } });
   });
 
-  it('silenciar llama a updateConversation con silenciada: true', async () => {
+  it.each([
+    ['Silenciar 1 hora', '1h'],
+    ['Silenciar 8 horas', '8h'],
+    ['Silenciar siempre', 'siempre'],
+  ])('%s llama a la mutation de silencio con %s', async (texto, duracion) => {
     renderWindow();
     await abrirMenu();
-    fireEvent.click(screen.getByText('Silenciar'));
+    fireEvent.click(screen.getByText(texto));
 
-    expect(updateMutate).toHaveBeenCalledWith({ idConversacion: 5, payload: { silenciada: true } });
+    expect(silenciarMutate).toHaveBeenCalledWith({ idConversacion: 5, duracion });
+    expect(updateMutate).not.toHaveBeenCalled();
+  });
+
+  it('con el chat silenciado muestra el indicador y permite activar notificaciones', async () => {
+    silencio.siempre = true;
+    renderWindow();
+    expect(screen.getByText('Silenciado')).toBeInTheDocument();
+    await abrirMenu();
+    expect(screen.queryByText('Silenciar 1 hora')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Activar notificaciones'));
+
+    expect(silenciarMutate).toHaveBeenCalledWith({ idConversacion: 5, duracion: null });
+  });
+
+  it('No molestar por horario abre el dialogo de configuracion', async () => {
+    renderWindow();
+    expect(screen.queryByRole('dialog', { name: 'No molestar' })).not.toBeInTheDocument();
+    await abrirMenu();
+    fireEvent.click(screen.getByText('No molestar por horario'));
+
+    expect(await screen.findByRole('dialog', { name: 'No molestar' })).toBeInTheDocument();
   });
 
   it('mover a Otros llama a updateConversation con esPrioritaria: false', async () => {

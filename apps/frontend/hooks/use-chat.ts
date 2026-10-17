@@ -4,22 +4,27 @@ import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  activarSonidoConversation,
   createConversation,
   deleteConversation,
   getMessages,
+  getNoMolestar,
   listAllConversations,
   listArchivedConversations,
   markConversationRead,
   sendMessage,
+  silenciarConversation,
   updateConversation,
+  updateNoMolestar,
 } from '@/lib/services/chat';
 import {
   allConversationsQueryKey,
   archivedConversationsQueryKey,
   conversationMessagesQueryKey,
+  noMolestarQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
-import type { ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
+import type { ChatMensaje, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -116,6 +121,31 @@ export function useUpdateConversation(idProyecto: number) {
     mutationFn: ({ idConversacion, payload }: { idConversacion: number; payload: UpdateConversationPayload }) =>
       updateConversation(idProyecto, idConversacion, payload),
     onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+/** Silencio por usuario: `duracion` null reactiva la conversacion. */
+export function useSilenciarConversation(idProyecto: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idConversacion, duracion }: { idConversacion: number; duracion: DuracionSilencio | null }) =>
+      duracion
+        ? silenciarConversation(idProyecto, idConversacion, duracion)
+        : activarSonidoConversation(idProyecto, idConversacion),
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+export function useNoMolestar() {
+  const query = useQuery({ queryKey: noMolestarQueryKey, queryFn: getNoMolestar });
+  return { config: query.data ?? null, isLoading: query.isLoading, isError: query.isError };
+}
+
+export function useUpdateNoMolestar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ConfigNoMolestar) => updateNoMolestar(payload),
+    onSuccess: (guardada) => queryClient.setQueryData(noMolestarQueryKey, guardada),
   });
 }
 

@@ -4,7 +4,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from './chat.gateway';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
+import { DuracionSilencio } from './dto/silenciar-conversation.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
+import { estaEnNoMolestar, estaSilenciada } from './chat-silencio.util';
+import { UpdateNoMolestarDto } from './dto/update-no-molestar.dto';
 
 /**
  * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
@@ -90,7 +93,15 @@ export class ChatService {
     const conversaciones = await this.prisma.conversacion.findMany({
       where: { idProyecto, eliminadaEn: null, participantes: { some: { idUsuario: userId } } },
       include: {
-        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
+        participantes: {
+          select: {
+            idUsuario: true,
+            ultimaLecturaEn: true,
+            silenciadaHasta: true,
+            silenciadaSiempre: true,
+            usuario: USUARIO_SELECT,
+          },
+        },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
@@ -118,6 +129,9 @@ export class ChatService {
           esFavorita: c.esFavorita,
           archivadaManual: c.archivadaEn !== null,
           silenciada: c.silenciada,
+          silenciadaPorMi: estaSilenciada(propia),
+          silenciadaHasta: propia?.silenciadaHasta ?? null,
+          silenciadaSiempre: propia?.silenciadaSiempre ?? false,
           esPrioritaria: c.esPrioritaria,
         };
       }),
@@ -306,7 +320,15 @@ export class ChatService {
       },
       include: {
         proyecto: { select: { idProyecto: true, tituloProyecto: true } },
-        participantes: { select: { idUsuario: true, ultimaLecturaEn: true, usuario: USUARIO_SELECT } },
+        participantes: {
+          select: {
+            idUsuario: true,
+            ultimaLecturaEn: true,
+            silenciadaHasta: true,
+            silenciadaSiempre: true,
+            usuario: USUARIO_SELECT,
+          },
+        },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
@@ -336,6 +358,9 @@ export class ChatService {
           esFavorita: c.esFavorita,
           archivadaManual: c.archivadaEn !== null,
           silenciada: c.silenciada,
+          silenciadaPorMi: estaSilenciada(propia),
+          silenciadaHasta: propia?.silenciadaHasta ?? null,
+          silenciadaSiempre: propia?.silenciadaSiempre ?? false,
           esPrioritaria: c.esPrioritaria,
         };
       }),
@@ -345,6 +370,63 @@ export class ChatService {
       if (a.esFavorita !== b.esFavorita) return a.esFavorita ? -1 : 1;
       return 0;
     });
+  }
+
+  /** Silencio por usuario (no el campo global `silenciada`): 1 h, 8 h o siempre. */
+  async silenciar(idProyecto: number, idConversacion: number, userId: number, duracion: DuracionSilencio) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    const horas = duracion === '1h' ? 1 : duracion === '8h' ? 8 : 0;
+    await this.prisma.conversacionParticipante.update({
+      where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
+      data: {
+        silenciadaSiempre: duracion === 'siempre',
+        silenciadaHasta: horas ? new Date(Date.now() + horas * 3_600_000) : null,
+      },
+    });
+  }
+
+  async activarSonido(idProyecto: number, idConversacion: number, userId: number) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    await this.prisma.conversacionParticipante.update({
+      where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
+      data: { silenciadaSiempre: false, silenciadaHasta: null },
+    });
+  }
+
+  private async leerNoMolestar(userId: number) {
+    const pref = await this.prisma.preferenciaNoMolestar.findUnique({ where: { idUsuario: userId } });
+    return {
+      activo: pref?.activo ?? false,
+      horaInicio: pref?.horaInicio ?? '22:00',
+      horaFin: pref?.horaFin ?? '07:00',
+      diasSemana: pref?.diasSemana ?? [0, 1, 2, 3, 4, 5, 6],
+      zona: pref?.zona ?? 'America/Guatemala',
+    };
+  }
+
+  /** Modo no molestar del usuario (valores por defecto si nunca lo configuro). */
+  async getNoMolestar(userId: number) {
+    const pref = await this.leerNoMolestar(userId);
+    return { ...pref, enHorarioAhora: estaEnNoMolestar(pref) };
+  }
+
+  async updateNoMolestar(userId: number, dto: UpdateNoMolestarDto) {
+    if (dto.horaInicio === dto.horaFin) {
+      throw new BadRequestException('La hora de inicio y la de fin no pueden ser iguales');
+    }
+    const data = {
+      activo: dto.activo,
+      horaInicio: dto.horaInicio,
+      horaFin: dto.horaFin,
+      diasSemana: [...dto.diasSemana].sort((a, b) => a - b),
+      zona: dto.zona ?? 'America/Guatemala',
+    };
+    await this.prisma.preferenciaNoMolestar.upsert({
+      where: { idUsuario: userId },
+      create: { idUsuario: userId, ...data },
+      update: data,
+    });
+    return this.getNoMolestar(userId);
   }
 
   async markRead(idProyecto: number, idConversacion: number, userId: number) {

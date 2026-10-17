@@ -13,6 +13,8 @@ export interface ChatMensaje {
   remitente: ChatUsuario;
 }
 
+export type DuracionSilencio = '1h' | '8h' | 'siempre';
+
 export interface ChatConversacion {
   idConversacion: number;
   tipo: 'GRUPAL' | 'INDIVIDUAL';
@@ -28,6 +30,10 @@ export interface ChatConversacion {
   /** Archivado manual desde el menú de 3 puntos (distinto de `archivada`, que es por cierre de proyecto). */
   archivadaManual: boolean;
   silenciada: boolean;
+  /** Silencio del usuario actual (distinto del `silenciada` global). */
+  silenciadaPorMi: boolean;
+  silenciadaHasta: string | null;
+  silenciadaSiempre: boolean;
   esPrioritaria: boolean;
 }
 
@@ -48,7 +54,20 @@ export interface ChatConversacionGlobal {
   /** Archivado manual desde el menú del dock (proyectos cerrados no aparecen en esta lista). */
   archivadaManual: boolean;
   silenciada: boolean;
+  /** Silencio del usuario actual (distinto del `silenciada` global). */
+  silenciadaPorMi: boolean;
+  silenciadaHasta: string | null;
+  silenciadaSiempre: boolean;
   esPrioritaria: boolean;
+}
+
+/** Modo no molestar del chat: 0 = domingo ... 6 = sabado, horas "HH:mm" en `zona`. */
+export interface ConfigNoMolestar {
+  activo: boolean;
+  horaInicio: string;
+  horaFin: string;
+  diasSemana: number[];
+  zona: string;
 }
 
 export interface CreateConversationPayload {

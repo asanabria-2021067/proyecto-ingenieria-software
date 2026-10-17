@@ -4,8 +4,10 @@ import type {
   ChatConversacionGlobal,
   ChatMensaje,
   CreateConversationPayload,
+  DuracionSilencio,
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
+  ConfigNoMolestar,
   UpdateConversationPayload,
 } from '@/lib/types/chat';
 
@@ -54,6 +56,23 @@ export function updateConversation(
   });
 }
 
+export function silenciarConversation(
+  idProyecto: number,
+  idConversacion: number,
+  duracion: DuracionSilencio,
+): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/silencio`, {
+    method: 'PUT',
+    body: JSON.stringify({ duracion }),
+  });
+}
+
+export function activarSonidoConversation(idProyecto: number, idConversacion: number): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/silencio`, {
+    method: 'DELETE',
+  });
+}
+
 export function markConversationRead(idProyecto: number, idConversacion: number): Promise<void> {
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/leido`, {
     method: 'POST',
@@ -80,4 +99,17 @@ export function listArchivedConversations(
   if (filtros.q) params.set('q', filtros.q);
   if (filtros.page) params.set('page', String(filtros.page));
   return apiFetch(`/chats/archivados?${params.toString()}`);
+}
+
+export function getNoMolestar(): Promise<ConfigNoMolestar> {
+  return apiFetch('/chats/no-molestar');
+}
+
+export function updateNoMolestar(payload: ConfigNoMolestar): Promise<ConfigNoMolestar> {
+  // El GET trae campos de solo lectura (enHorarioAhora) que el DTO rechaza: se envian solo los escribibles.
+  const { activo, horaInicio, horaFin, diasSemana, zona } = payload;
+  return apiFetch('/chats/no-molestar', {
+    method: 'PUT',
+    body: JSON.stringify({ activo, horaInicio, horaFin, diasSemana, zona }),
+  });
 }
