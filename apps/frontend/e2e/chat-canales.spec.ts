@@ -41,7 +41,8 @@ test('el lider crea un canal con una integrante: ella lo ve junto a #general y p
     await paginaLider.getByRole('button', { name: 'Crear canal' }).click();
     const dialogo = paginaLider.getByRole('dialog');
     await dialogo.getByLabel('Proyecto').click();
-    await paginaLider.getByRole('option').first().click();
+    // El lider tiene varios proyectos: se elige el del seed donde Maria es integrante.
+    await paginaLider.getByRole('option', { name: 'Plataforma de Tutorías UVG' }).click();
     await dialogo.getByLabel('Nombre del canal').fill(canal);
     await dialogo.getByRole('checkbox', { name: /María/ }).click();
     await dialogo.getByRole('button', { name: 'Crear canal' }).click();
