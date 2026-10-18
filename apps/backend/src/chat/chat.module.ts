@@ -6,12 +6,14 @@ import { ChatArchivadoController } from './chat-archivado.controller';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { PrismaModule } from '../prisma/prisma.module';
+import { StorageModule } from '../storage/storage.module';
 import { getJwtSecretFromConfig } from '../config/jwt-secret';
 import { WsAuthService } from '../ws-auth/ws-auth.service';
 
 @Module({
   imports: [
     PrismaModule,
+    StorageModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

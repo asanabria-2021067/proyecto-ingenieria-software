@@ -13,6 +13,7 @@ import {
   Loader2,
   MoreVertical,
   Moon,
+  Paperclip,
   Pencil,
   Send,
   Star,
@@ -41,10 +42,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ChatLinksDialog } from './chat-links-dialog';
+import { AdjuntoIcono, ChatAdjuntoChip } from './chat-adjunto';
 import { getIniciales } from '@/components/projects/available-project-card';
 import {
   useMessages,
   useSendMessage,
+  useSendFileMessage,
   useUpdateConversation,
   useDeleteConversation,
   useAllConversations,
@@ -55,6 +58,7 @@ import {
 import { quienesVieron, SeenBy, TypingIndicator } from '@/components/chat-dock/chat-indicators';
 import { NoMolestarDialog } from '@/components/chat-dock/no-molestar-dialog';
 import { estaSilenciada } from '@/lib/chat-silencio';
+import { CHAT_ADJUNTO_ACCEPT, formatearTamano, validarArchivoChat } from '@/lib/chat-adjuntos';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
@@ -101,7 +105,12 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
   const [noMolestarAbierto, setNoMolestarAbierto] = useState(false);
   const [enlacesAbierto, setEnlacesAbierto] = useState(false);
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
+  const archivoInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const enviarArchivo = useSendFileMessage(idProyecto, idConversacion);
+  const enviando = enviar.isPending || enviarArchivo.isPending;
 
   useEffect(() => {
     if (!minimized) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -125,9 +134,32 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const contenido = texto.trim();
+    if (archivo) {
+      setErrorArchivo(null);
+      enviarArchivo.mutate(
+        { contenido, archivo },
+        {
+          onSuccess: () => {
+            setArchivo(null);
+            setTexto('');
+          },
+          onError: (error) => setErrorArchivo(error.message || 'No se pudo enviar el archivo.'),
+        },
+      );
+      return;
+    }
     if (!contenido) return;
     setTexto('');
     enviar.mutate(contenido);
+  };
+
+  const handleArchivo = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const elegido = event.target.files?.[0];
+    event.target.value = '';
+    if (!elegido) return;
+    const error = validarArchivoChat(elegido);
+    setErrorArchivo(error);
+    setArchivo(error ? null : elegido);
   };
 
   const handleBorrar = async () => {
@@ -274,7 +306,8 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                   </Avatar>
                   <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? 'bg-primary text-primary-foreground' : 'bg-surface-container-high text-on-surface'}`}>
                     {!propio && <p className="mb-0.5 text-[11px] font-semibold opacity-80">{m.remitente.nombre}</p>}
-                    <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
+                    {m.adjunto && <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />}
+                    {m.contenido && <p className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}>{m.contenido}</p>}
                     <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
                   </div>
                 </div>
@@ -285,7 +318,49 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
           </div>
 
           <TypingIndicator nombres={escribiendo} />
+
+          {(archivo || errorArchivo) && (
+            <div className="space-y-1 border-t border-outline-variant px-2 pt-2">
+              {archivo && (
+                <div className="flex items-center gap-2 rounded-lg bg-surface-container p-2 text-xs text-on-surface" data-testid="adjunto-previa">
+                  <AdjuntoIcono mime={archivo.type} className="size-4 shrink-0 text-primary" />
+                  <span className="min-w-0 flex-1 truncate font-semibold" title={archivo.name}>{archivo.name}</span>
+                  <span className="shrink-0 text-tertiary">{formatearTamano(archivo.size)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setArchivo(null)}
+                    aria-label={`Quitar ${archivo.name}`}
+                    className="rounded-control p-0.5 text-text-secondary hover:bg-on-surface/10"
+                  >
+                    <X className="size-3.5" aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+              {errorArchivo && <p role="alert" className="text-xs text-error">{errorArchivo}</p>}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-outline-variant p-2">
+            <input
+              ref={archivoInputRef}
+              type="file"
+              accept={CHAT_ADJUNTO_ACCEPT}
+              onChange={handleArchivo}
+              aria-label="Seleccionar archivo para adjuntar"
+              tabIndex={-1}
+              className="hidden"
+              data-testid="adjunto-input"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => archivoInputRef.current?.click()}
+              disabled={enviando}
+              className="size-9 shrink-0 rounded-full"
+              aria-label="Adjuntar archivo"
+            >
+              <Paperclip className="size-4" aria-hidden="true" />
+            </Button>
             <Input
               value={texto}
               onChange={(event) => {
@@ -294,13 +369,13 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               }}
               placeholder="Escribe un mensaje…"
               maxLength={4000}
-              disabled={enviar.isPending}
+              disabled={enviando}
               className="h-9 flex-1 rounded-full border-outline-variant text-sm"
             />
             <Button
               type="submit"
               size="icon"
-              disabled={enviar.isPending || texto.trim().length === 0}
+              disabled={enviando || (texto.trim().length === 0 && !archivo)}
               className="size-9 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
               aria-label="Enviar mensaje"
             >

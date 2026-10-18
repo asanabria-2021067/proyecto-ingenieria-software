@@ -7,6 +7,8 @@ import {
   activarSonidoConversation,
   createConversation,
   deleteConversation,
+  getAttachmentThumbnail,
+  getFiles,
   getLinks,
   getMessages,
   getNoMolestar,
@@ -14,6 +16,7 @@ import {
   listAllConversations,
   listArchivedConversations,
   markConversationRead,
+  sendFileMessage,
   sendMessage,
   silenciarConversation,
   updateConversation,
@@ -22,6 +25,8 @@ import {
 import {
   allConversationsQueryKey,
   archivedConversationsQueryKey,
+  attachmentThumbnailQueryKey,
+  conversationFilesQueryKey,
   conversationLinksQueryKey,
   conversationMessagesQueryKey,
   conversationReadsQueryKey,
@@ -117,6 +122,60 @@ export function useConversationLinks(idProyecto: number, idConversacion: number,
     cargarMas: () => query.fetchNextPage(),
     cargandoMas: query.isFetchingNextPage,
   };
+}
+
+/** Galeria de archivos compartidos: paginada por cursor, solo consulta si `enabled`. */
+export function useConversationFiles(idProyecto: number, idConversacion: number, enabled: boolean) {
+  const query = useInfiniteQuery({
+    queryKey: conversationFilesQueryKey(idProyecto, idConversacion),
+    queryFn: ({ pageParam }) => getFiles(idProyecto, idConversacion, pageParam),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
+  return {
+    archivos: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
+}
+
+/** Miniatura de una imagen como URL data: (ya permitida en img-src), pedida con sesion al backend. */
+export function useAttachmentThumbnail(idProyecto: number, idConversacion: number, idAdjunto: number, enabled: boolean) {
+  return useQuery({
+    queryKey: attachmentThumbnailQueryKey(idProyecto, idConversacion, idAdjunto),
+    queryFn: async () => {
+      const blob = await getAttachmentThumbnail(idProyecto, idConversacion, idAdjunto);
+      return new Promise<string>((resolve, reject) => {
+        const lector = new FileReader();
+        lector.onload = () => resolve(lector.result as string);
+        lector.onerror = () => reject(lector.error);
+        lector.readAsDataURL(blob);
+      });
+    },
+    enabled,
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
+export function useSendFileMessage(idProyecto: number, idConversacion: number | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ contenido, archivo }: { contenido: string; archivo: File }) =>
+      sendFileMessage(idProyecto, idConversacion as number, contenido, archivo),
+    onSuccess: (mensaje) => {
+      queryClient.setQueryData<ChatMensaje[]>(
+        conversationMessagesQueryKey(idProyecto, idConversacion as number),
+        (current) => (current ? [...current, mensaje] : [mensaje]),
+      );
+      queryClient.invalidateQueries({ queryKey: conversationFilesQueryKey(idProyecto, idConversacion as number) });
+      invalidateChatLists(queryClient, idProyecto);
+    },
+  });
 }
 
 export function useSendMessage(idProyecto: number, idConversacion: number | null) {
@@ -254,6 +313,11 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       if (!huboCache) {
         queryClient.invalidateQueries({
           predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'mensajes',
+        });
+      }
+      if (mensaje.adjunto) {
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'archivos',
         });
       }
       queryClient.invalidateQueries({ queryKey: ['chats-global'] });

@@ -14,7 +14,7 @@ describe('ChatService - getLinks', () => {
 
   beforeEach(() => {
     prisma = { conversacion: { findFirst: vi.fn() }, mensajeChat: { findMany: vi.fn() } };
-    service = new ChatService(prisma as any, {} as any);
+    service = new ChatService(prisma as any, {} as any, {} as any);
   });
 
   it('rechaza a quien no participa sin consultar mensajes', async () => {

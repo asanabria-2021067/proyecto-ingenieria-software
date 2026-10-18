@@ -51,7 +51,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
   beforeEach(() => {
     prisma = makePrisma();
     gateway = makeGateway();
-    service = new ChatService(prisma as any, gateway as any);
+    service = new ChatService(prisma as any, gateway as any, {} as any);
   });
 
   describe('createMessage', () => {

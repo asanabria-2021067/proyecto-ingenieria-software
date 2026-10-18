@@ -1654,6 +1654,7 @@ model Conversacion {
   creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario])
   participantes ConversacionParticipante[]
   mensajes      MensajeChat[]
+  adjuntos      AdjuntoMensajeChat[]
 
   @@index([idProyecto])
   @@map("conversacion")
@@ -1702,9 +1703,29 @@ model MensajeChat {
 
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
   remitente    Usuario      @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario])
+  adjunto      AdjuntoMensajeChat?
 
   @@index([idConversacion, enviadoEn])
   @@map("mensaje_chat")
+}
+
+/// Archivo adjunto de un mensaje del chat (uno por mensaje). El binario vive en
+/// Cloudinary en modo autenticado; aqui solo hay metadatos y la clave remota.
+model AdjuntoMensajeChat {
+  idAdjunto           Int      @id @default(autoincrement()) @map("id_adjunto")
+  idMensaje           Int      @unique @map("id_mensaje")
+  idConversacion      Int      @map("id_conversacion")
+  nombreOriginal      String   @map("nombre_original") @db.VarChar(255)
+  mime                String   @db.VarChar(100)
+  tamanoBytes         Int      @map("tamano_bytes")
+  claveAlmacenamiento String   @map("clave_almacenamiento") @db.VarChar(255)
+  creadoEn            DateTime @default(now()) @map("creado_en")
+
+  mensaje      MensajeChat  @relation(fields: [idMensaje], references: [idMensaje])
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
+
+  @@index([idConversacion, idMensaje])
+  @@map("adjunto_mensaje_chat")
 }
 
 // HU-190 (T-346): niveles de una insignia. Sin nivel (null) = aún sin umbral alcanzado.
