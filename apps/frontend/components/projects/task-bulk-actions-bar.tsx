@@ -45,7 +45,6 @@ interface TextosAccion {
   titulo: string;
   descripcion: string;
   textoAccion: string;
-  destructiva?: boolean;
   tituloExito: string;
   /** Participio para el aviso: «movidas», «asignadas»… */
   verbo: string;
@@ -114,7 +113,6 @@ export function TaskBulkActionsBar({ tareas, members, labels, accionMasiva, onLi
       titulo: textos.titulo,
       descripcion: textos.descripcion,
       textoAccion: textos.textoAccion,
-      destructiva: textos.destructiva,
     });
     if (!confirmado) return;
     accionMasiva.mutate(input, {
@@ -159,7 +157,6 @@ export function TaskBulkActionsBar({ tareas, members, labels, accionMasiva, onLi
         titulo: `¿Quitar la asignación de ${textoTareas(cantidad)}?`,
         descripcion: 'Las tareas quedarán sin asignar. Las horas ya registradas se conservan.',
         textoAccion: 'Quitar asignación',
-        destructiva: true,
         tituloExito: 'Asignación retirada',
         verbo: cantidad === 1 ? 'quedó sin asignar' : 'quedaron sin asignar',
       },
@@ -186,7 +183,6 @@ export function TaskBulkActionsBar({ tareas, members, labels, accionMasiva, onLi
             titulo: `¿Quitar ${nombres} de ${textoTareas(cantidad)}?`,
             descripcion: 'Solo se quitan las etiquetas elegidas; las demás se conservan.',
             textoAccion: 'Quitar etiquetas',
-            destructiva: true,
             tituloExito: 'Etiquetas quitadas',
             verbo: cantidad === 1 ? 'actualizada' : 'actualizadas',
           },
