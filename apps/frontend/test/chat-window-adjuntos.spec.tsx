@@ -35,6 +35,9 @@ vi.mock('@/hooks/use-chat', () => ({
   useUpdateConversation: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteConversation: () => ({ mutate: vi.fn(), isPending: false }),
   useAllConversations: () => ({ conversations: [] }),
+  useReadReceipts: () => ({ lecturas: [] }),
+  useMarkConversationRead: () => ({ mutate: vi.fn() }),
+  useSilenciarConversation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 import { ChatWindow } from '../components/chat-dock/chat-window';
