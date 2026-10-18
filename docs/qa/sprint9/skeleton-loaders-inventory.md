@@ -140,3 +140,23 @@ Se conservan a propósito:
 - **Calendario:** la rejilla sigue visible y marcada `aria-busy` con su aviso de carga previo (G03, UI-39); solo se añade un esqueleto decorativo en la agenda del mes.
 - **Indicadores locales:** botones, exportaciones, calendarios compartidos en la lateral, historial de ajustes de horas, diálogo de compartir calendario, selects y combobox con texto «Cargando…».
 - **Valor de las tarjetas KPI de horas** (`hours-kpi-card`): es decorativo dentro de una tarjeta ya rotulada.
+
+## 6. Pruebas E2E (T-392)
+
+Spec: `apps/frontend/e2e/estados-carga.spec.ts` (Playwright, contra la pila aislada `scripts/e2e/isolated-stack.sh`).
+La petición principal de cada vista se retiene con `page.route` y se suelta contra el backend real (sin esperas fijas); el contenido esperado se lee antes por la API. Vacío y error se inducen respondiendo en lugar del backend. No escribe datos.
+
+| Vista | Ruta | Skeleton → contenido | Vacío | Error | Otros |
+|---|---|---|---|---|---|
+| Shell | `/dashboard/*` | Sí (`/usuarios/me` retenido) | — | — | — |
+| Inicio | `/dashboard` | Sí | — | Sí (no queda el skeleton) | — |
+| Proyectos disponibles | `/dashboard/proyectos` | Sí | Sí | Sí | Filtro por organización |
+| Mis postulaciones | `/dashboard/mis-postulaciones` | Sí | Sí | Sí | — |
+| Notificaciones | `/dashboard/notificaciones` | Sí | Sí | Sí | — |
+| Mis tareas | `/dashboard/mis-tareas` | Sí | Sí | Sí | — |
+| Detalle público de proyecto | `/dashboard/proyectos/[id]` | Sí | — | Sí | — |
+| Perfil (horas) | `/dashboard/perfil` | Sí | — | Sí (no queda el skeleton) | Sin «0 / N/A» durante la carga |
+| Usuarios (admin) | `/dashboard/admin/usuarios` | Sí | Sí | Sí | — |
+
+En cada caso se comprueba: una sola región `role="status"` con el nombre de la vista, `aria-busy="true"`, bloques `aria-hidden` y que la región desaparece al terminar.
+«—» indica que la vista no tiene ese estado propio (Inicio y Perfil muestran su contenido aunque falle una petición; el detalle no tiene estado vacío).
