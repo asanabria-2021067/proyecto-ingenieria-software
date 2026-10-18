@@ -14,10 +14,12 @@ import { TaskLabelChip } from '@/components/projects/task-label-chip';
 import { taskDragId, type TaskDragData } from '@/components/projects/task-board-dnd';
 import {
   PRIORIDAD_COLOR,
+  PRIORIDAD_FRANJA,
   PRIORIDAD_ICON,
   PRIORIDAD_LABEL,
   estaVencida,
   formatearFechaLimite,
+  prioridadTextoAccesible,
 } from '@/components/projects/task-board.utils';
 import type { TareaPublicaDTO } from '@/lib/types/tasks';
 
@@ -96,14 +98,23 @@ export function TaskCard({
         onRegistrarCardRef?.(tarea.idTarea, el);
       }}
       style={dragStyle}
+      data-prioridad={tarea.prioridad}
       aria-busy={estadoPending}
       aria-describedby={resaltada ? `tarea-resaltada-${tarea.idTarea}` : undefined}
-      className={`space-y-2 rounded-lg border bg-surface-container-lowest p-3 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-outline-variant/60 hover:shadow-md ${
+      className={`relative space-y-2 overflow-hidden rounded-lg border bg-surface-container-lowest p-3 pl-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-outline-variant/60 hover:shadow-md ${
         resaltada
           ? 'border-primary bg-primary/5 ring-2 ring-primary/50'
           : 'border-outline-variant/30'
       } ${isDragging ? 'opacity-40' : ''}`}
     >
+      {/* Franja de prioridad (HU-201/T-380): refuerzo visual; el texto
+          accesible va en la fila de prioridad, no depende de este color. */}
+      <span
+        aria-hidden="true"
+        data-slot="prioridad-franja"
+        className={`pointer-events-none absolute inset-y-0 left-0 w-[3px] ${PRIORIDAD_FRANJA[tarea.prioridad]}`}
+      />
+
       {resaltada && (
         <p id={`tarea-resaltada-${tarea.idTarea}`} className="sr-only">
           Tarea indicada desde una notificación.
@@ -148,9 +159,15 @@ export function TaskCard({
 
       {/* Segunda fila: prioridad + rol (Sección 39-40) */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <span className={`inline-flex items-center gap-1 font-semibold ${PRIORIDAD_COLOR[tarea.prioridad]}`}>
+        <span
+          data-slot="prioridad-indicador"
+          className={`inline-flex items-center gap-1 font-semibold ${PRIORIDAD_COLOR[tarea.prioridad]}`}
+        >
           <PrioridadIcon className="size-3.5" aria-hidden="true" />
-          {PRIORIDAD_LABEL[tarea.prioridad]}
+          {/* El lector de pantalla lee «Prioridad alta»; la palabra visible
+              sola («Alta») queda oculta para no leerla dos veces. */}
+          <span aria-hidden="true">{PRIORIDAD_LABEL[tarea.prioridad]}</span>
+          <span className="sr-only">{prioridadTextoAccesible(tarea.prioridad)}</span>
         </span>
         {tarea.rolProyecto && (
           <span className="inline-flex max-w-40 items-center truncate rounded-md bg-secondary-container px-2 py-0.5 font-medium text-on-secondary-container">
