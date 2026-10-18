@@ -6,6 +6,7 @@ import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { ChatListPopover } from '@/components/chat-dock/chat-list-popover';
 import { ChatWindow } from '@/components/chat-dock/chat-window';
 import { useAllConversations, useGlobalChatSocket } from '@/hooks/use-chat';
+import { totalNoLeidos as contarNoLeidos } from '@/lib/chat-silencio';
 
 /**
  * Dock global de chat (estilo LinkedIn): fijo abajo a la derecha en
@@ -29,7 +30,7 @@ export function ChatDock() {
     return () => document.removeEventListener('mousedown', cerrarSiEsAfuera);
   }, [listOpen]);
 
-  const totalNoLeidos = conversations.reduce((total, c) => total + c.noLeidos, 0);
+  const totalNoLeidos = contarNoLeidos(conversations);
 
   return (
     // Solo desktop: en mobile, la barra de navegación inferior ya ocupa ese

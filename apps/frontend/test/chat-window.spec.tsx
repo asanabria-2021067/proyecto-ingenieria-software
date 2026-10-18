@@ -33,6 +33,8 @@ let lecturasMock: any[] = [];
 const sendMutate = vi.fn();
 const updateMutate = vi.fn();
 const deleteMutate = vi.fn();
+const silenciarMutate = vi.fn();
+const silencio = vi.hoisted(() => ({ siempre: false }));
 vi.mock('@/hooks/use-chat', () => ({
   useMessages: () => ({ messages: mensajesMock, isLoading: false }),
   useReadReceipts: () => ({ lecturas: lecturasMock }),
@@ -40,6 +42,7 @@ vi.mock('@/hooks/use-chat', () => ({
   useSendMessage: () => ({ mutate: sendMutate, isPending: false }),
   useUpdateConversation: () => ({ mutate: updateMutate, isPending: false }),
   useDeleteConversation: () => ({ mutate: deleteMutate, isPending: false }),
+  useSilenciarConversation: () => ({ mutate: silenciarMutate, isPending: false }),
   useAllConversations: () => ({
     conversations: [
       {
@@ -59,6 +62,11 @@ vi.mock('@/hooks/use-chat', () => ({
         esFavorita: false,
         archivadaManual: false,
         silenciada: false,
+        silenciadaPorMi: false,
+        silenciadaHasta: null,
+        get silenciadaSiempre() {
+          return silencio.siempre;
+        },
         esPrioritaria: true,
       },
     ],
@@ -95,6 +103,7 @@ async function abrirMenu() {
 }
 
 afterEach(() => {
+  silencio.siempre = false;
   cleanup();
   vi.clearAllMocks();
   mensajesMock = [];
@@ -125,12 +134,28 @@ describe('ChatWindow', () => {
     expect(updateMutate).toHaveBeenCalledWith({ idConversacion: 5, payload: { esFavorita: true } });
   });
 
-  it('silenciar llama a updateConversation con silenciada: true', async () => {
+  it.each([
+    ['Silenciar 1 hora', '1h'],
+    ['Silenciar 8 horas', '8h'],
+    ['Silenciar siempre', 'siempre'],
+  ])('%s llama a la mutation de silencio con %s', async (texto, duracion) => {
     renderWindow();
     await abrirMenu();
-    fireEvent.click(screen.getByText('Silenciar'));
+    fireEvent.click(screen.getByText(texto));
 
-    expect(updateMutate).toHaveBeenCalledWith({ idConversacion: 5, payload: { silenciada: true } });
+    expect(silenciarMutate).toHaveBeenCalledWith({ idConversacion: 5, duracion });
+    expect(updateMutate).not.toHaveBeenCalled();
+  });
+
+  it('con el chat silenciado muestra el indicador y permite activar notificaciones', async () => {
+    silencio.siempre = true;
+    renderWindow();
+    expect(screen.getByText('Silenciado')).toBeInTheDocument();
+    await abrirMenu();
+    expect(screen.queryByText('Silenciar 1 hora')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Activar notificaciones'));
+
+    expect(silenciarMutate).toHaveBeenCalledWith({ idConversacion: 5, duracion: null });
   });
 
   it('mover a Otros llama a updateConversation con esPrioritaria: false', async () => {

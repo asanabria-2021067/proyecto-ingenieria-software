@@ -9,12 +9,14 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { SilenciarConversationDto } from './dto/silenciar-conversation.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -101,5 +103,26 @@ export class ChatController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.chatService.markRead(projectId, conversationId, user.userId);
+  }
+
+  @Put(':conversationId/silencio')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  silenciar(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: SilenciarConversationDto,
+  ) {
+    return this.chatService.silenciar(projectId, conversationId, user.userId, dto.duracion);
+  }
+
+  @Delete(':conversationId/silencio')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  activarSonido(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.activarSonido(projectId, conversationId, user.userId);
   }
 }

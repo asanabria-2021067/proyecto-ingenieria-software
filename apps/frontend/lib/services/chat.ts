@@ -5,6 +5,7 @@ import type {
   ChatLectura,
   ChatMensaje,
   CreateConversationPayload,
+  DuracionSilencio,
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
   UpdateConversationPayload,
@@ -52,6 +53,23 @@ export function updateConversation(
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
+  });
+}
+
+export function silenciarConversation(
+  idProyecto: number,
+  idConversacion: number,
+  duracion: DuracionSilencio,
+): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/silencio`, {
+    method: 'PUT',
+    body: JSON.stringify({ duracion }),
+  });
+}
+
+export function activarSonidoConversation(idProyecto: number, idConversacion: number): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/silencio`, {
+    method: 'DELETE',
   });
 }
 
