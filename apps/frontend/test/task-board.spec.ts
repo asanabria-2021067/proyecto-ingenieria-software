@@ -113,6 +113,29 @@ describe('TaskBoard', () => {
     routerMock.back.mockClear();
   });
 
+  it('sin control de selección no hay casillas (integrantes que no son líderes)', () => {
+    renderBoard({ tasks: [tarea()] });
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('Shift+clic pasa el orden visible de la columna de la tarjeta (HU-202/T-382)', () => {
+    const seleccion = { activa: false, estaSeleccionada: vi.fn(() => false), alternar: vi.fn() };
+    renderBoard({
+      seleccion,
+      tasks: [
+        tarea({ idTarea: 1, tituloTarea: 'Baja', prioridad: 'BAJA', estadoTarea: 'POR_HACER' }),
+        tarea({ idTarea: 2, tituloTarea: 'Alta', prioridad: 'ALTA', estadoTarea: 'POR_HACER' }),
+        tarea({ idTarea: 3, tituloTarea: 'Otra columna', estadoTarea: 'HECHO' }),
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir detalles de "Baja"' }), { shiftKey: true });
+    expect(seleccion.alternar).toHaveBeenCalledWith(1, { rango: true, orden: [2, 1] });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar "Otra columna"' }));
+    expect(seleccion.alternar).toHaveBeenCalledWith(3, { rango: false, orden: [3] });
+  });
+
   it('renderiza exactamente cuatro columnas en el orden correcto', () => {
     renderBoard({ tasks: [tarea()] });
     const encabezados = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
