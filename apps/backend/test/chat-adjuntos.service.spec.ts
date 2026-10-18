@@ -51,8 +51,9 @@ describe('ChatService - adjuntos', () => {
         tamanoBytes: PDF_BYTES.length,
         claveAlmacenamiento: clave,
       });
-      expect(gateway.broadcastMessage).toHaveBeenCalledWith(5, [2], mensaje);
-      expect(res).toBe(mensaje);
+      const esperado = { ...mensaje, citado: null };
+      expect(gateway.broadcastMessage).toHaveBeenCalledWith(5, [2], esperado);
+      expect(res).toEqual(esperado);
     });
 
     it('no sube nada si el contenido no coincide con el tipo declarado', async () => {

@@ -34,7 +34,7 @@ describe('ChatService - respuestas citando un mensaje', () => {
   it('rechaza citar un mensaje de otra conversacion o inexistente (se busca acotado a la conversacion)', async () => {
     ctx.prisma.mensajeChat.findFirst.mockResolvedValue(null);
 
-    await expect(ctx.service.createMessage(10, 5, 1, 'ok', 77)).rejects.toThrow(BadRequestException);
+    await expect(ctx.service.createMessage(10, 5, 1, 'ok', undefined, 77)).rejects.toThrow(BadRequestException);
 
     expect(ctx.prisma.mensajeChat.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { idMensaje: 77, idConversacion: 5 } }),
@@ -47,7 +47,7 @@ describe('ChatService - respuestas citando un mensaje', () => {
     ctx.prisma.mensajeChat.findFirst.mockResolvedValue({ idMensaje: 3 });
     ctx.prisma.mensajeChat.create.mockResolvedValue(fila({ idMensaje: 3, contenido: 'texto original', remitente: USUARIO }));
 
-    const res = await ctx.service.createMessage(10, 5, 1, 'ok', 3);
+    const res = await ctx.service.createMessage(10, 5, 1, 'ok', undefined, 3);
 
     expect(ctx.prisma.mensajeChat.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ idMensajeCitado: 3 }) }),
