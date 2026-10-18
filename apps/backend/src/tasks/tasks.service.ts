@@ -1452,10 +1452,17 @@ export class TasksService {
         );
       }
 
-      // Misma política que la acción individual, una vez por Sprint distinto
-      // (normalmente uno solo): cada tarea debe pertenecer a un Sprint ACTIVO.
+      // Misma política que la acción individual, partida en dos: la del
+      // proyecto (estado P/E, Sprint ambiente ACTIVO) una sola vez, y la de
+      // la entidad una vez por Sprint distinto (normalmente uno solo), con los
+      // títulos de sus tareas en el error: desde la Lista de tareas se pueden
+      // seleccionar tareas de un Sprint ya cerrado.
+      await this.policy.assertWriteTx(tx, proyecto, familia, userId);
       for (const sprintId of new Set(tareas.map((tarea) => tarea.idSprint))) {
-        await this.policy.assertWriteTx(tx, proyecto, familia, userId, { sprintId });
+        if (sprintId === null) continue;
+        const titulos = tareas.filter((tarea) => tarea.idSprint === sprintId).map((tarea) => tarea.tituloTarea);
+        // TAREA_WRITE y TAREA_ASIGNACION exigen la entidad en un Sprint ACTIVO.
+        await this.conTituloDeTarea(titulos, () => this.policy.assertEntitySprintTx(tx, sprintId, 'ACTIVO'));
       }
 
       const asignadosPrevios = new Map<number, number>();
@@ -1735,23 +1742,28 @@ export class TasksService {
   }
 
   /**
-   * Antepone el título de la tarea al mensaje de un error HTTP (mismo status
-   * y mismo cuerpo, p. ej. `code`), para que el líder sepa qué tarea impidió
-   * la acción masiva. Cualquier otro error se relanza sin cambios.
+   * Antepone el título de la(s) tarea(s) al mensaje de un error HTTP (mismo
+   * status y mismo cuerpo, p. ej. `code`), para que el líder sepa qué tarea
+   * impidió la acción masiva. Cualquier otro error se relanza sin cambios.
    */
-  private async conTituloDeTarea<T>(tituloTarea: string, operacion: () => Promise<T>): Promise<T> {
+  private async conTituloDeTarea<T>(titulos: string | string[], operacion: () => Promise<T>): Promise<T> {
     try {
       return await operacion();
     } catch (error) {
       if (!(error instanceof HttpException)) {
         throw error;
       }
+      const lista = Array.isArray(titulos) ? titulos : [titulos];
+      const nombrados = lista.slice(0, 3).map((titulo) => `"${titulo}"`).join(', ');
+      const resto = lista.length > 3 ? ` y ${lista.length - 3} más` : '';
+      const prefijo = `${lista.length === 1 ? 'Tarea' : 'Tareas'} ${nombrados}${resto}`;
+
       const respuesta = error.getResponse();
       const esObjeto = typeof respuesta === 'object' && respuesta !== null;
       const original = esObjeto ? (respuesta as { message?: unknown }).message : respuesta;
       const texto = Array.isArray(original) ? original.join(', ') : String(original ?? error.message);
       const cuerpo = esObjeto ? respuesta : { statusCode: error.getStatus() };
-      throw new HttpException({ ...cuerpo, message: `Tarea "${tituloTarea}": ${texto}` }, error.getStatus());
+      throw new HttpException({ ...cuerpo, message: `${prefijo}: ${texto}` }, error.getStatus());
     }
   }
 
