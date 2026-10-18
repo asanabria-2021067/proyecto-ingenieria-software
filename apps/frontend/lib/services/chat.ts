@@ -8,6 +8,7 @@ import type {
   DuracionSilencio,
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
+  ConfigNoMolestar,
   UpdateConversationPayload,
 } from '@/lib/types/chat';
 
@@ -103,4 +104,17 @@ export function listArchivedConversations(
   if (filtros.q) params.set('q', filtros.q);
   if (filtros.page) params.set('page', String(filtros.page));
   return apiFetch(`/chats/archivados?${params.toString()}`);
+}
+
+export function getNoMolestar(): Promise<ConfigNoMolestar> {
+  return apiFetch('/chats/no-molestar');
+}
+
+export function updateNoMolestar(payload: ConfigNoMolestar): Promise<ConfigNoMolestar> {
+  // El GET trae campos de solo lectura (enHorarioAhora) que el DTO rechaza: se envian solo los escribibles.
+  const { activo, horaInicio, horaFin, diasSemana, zona } = payload;
+  return apiFetch('/chats/no-molestar', {
+    method: 'PUT',
+    body: JSON.stringify({ activo, horaInicio, horaFin, diasSemana, zona }),
+  });
 }

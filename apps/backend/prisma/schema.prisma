@@ -322,6 +322,7 @@ model Usuario {
   fechaUltimaSesion DateTime?     @map("fecha_ultima_sesion")
 
   telefonos                        UsuarioTelefono[]
+  preferenciaNoMolestar            PreferenciaNoMolestar?
   perfil                           PerfilEstudiante?
   habilidades                      UsuarioHabilidad[]
   intereses                        UsuarioInteres[]
@@ -1673,6 +1674,23 @@ model ConversacionParticipante {
   @@id([idConversacion, idUsuario])
   @@index([idUsuario])
   @@map("conversacion_participante")
+}
+
+// Modo no molestar del chat, por horario y por usuario. dias_semana usa 0 = domingo ... 6 = sabado
+// y se interpreta en la zona horaria indicada; el rango puede cruzar la medianoche.
+model PreferenciaNoMolestar {
+  idPreferencia Int      @id @default(autoincrement()) @map("id_preferencia")
+  idUsuario     Int      @unique @map("id_usuario")
+  activo        Boolean  @default(false)
+  horaInicio    String   @default("22:00") @map("hora_inicio") @db.VarChar(5)
+  horaFin       String   @default("07:00") @map("hora_fin") @db.VarChar(5)
+  diasSemana    Int[]    @default([0, 1, 2, 3, 4, 5, 6]) @map("dias_semana")
+  zona          String   @default("America/Guatemala") @db.VarChar(64)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@map("preferencia_no_molestar")
 }
 
 model MensajeChat {

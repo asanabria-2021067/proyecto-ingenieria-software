@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { BellOff, MessageCircle } from 'lucide-react';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { ChatListPopover } from '@/components/chat-dock/chat-list-popover';
 import { ChatWindow } from '@/components/chat-dock/chat-window';
-import { useAllConversations, useGlobalChatSocket } from '@/hooks/use-chat';
-import { totalNoLeidos as contarNoLeidos } from '@/lib/chat-silencio';
+import { useAllConversations, useGlobalChatSocket, useNoMolestar } from '@/hooks/use-chat';
+import { estaEnNoMolestar, totalNoLeidos as contarNoLeidos } from '@/lib/chat-silencio';
 
 /**
  * Dock global de chat (estilo LinkedIn): fijo abajo a la derecha en
@@ -19,7 +19,16 @@ export function ChatDock() {
   const { windows, minimizedIds, cerrarChat, toggleMinimize } = useChatDock();
   const { conversations } = useAllConversations();
   const { isConnected: chatConnected, typingByConversation, emitTyping } = useGlobalChatSocket(windows.map((w) => w.idConversacion));
+  const { config: noMolestar } = useNoMolestar();
+  const [ahora, setAhora] = useState(() => new Date());
   const listRef = useRef<HTMLDivElement>(null);
+
+  // El horario de no molestar entra y sale solo: se reevalua cada minuto.
+  useEffect(() => {
+    if (!noMolestar?.activo) return;
+    const timer = setInterval(() => setAhora(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, [noMolestar?.activo]);
 
   useEffect(() => {
     if (!listOpen) return;
@@ -30,7 +39,8 @@ export function ChatDock() {
     return () => document.removeEventListener('mousedown', cerrarSiEsAfuera);
   }, [listOpen]);
 
-  const totalNoLeidos = contarNoLeidos(conversations);
+  const enNoMolestar = estaEnNoMolestar(noMolestar, ahora);
+  const totalNoLeidos = contarNoLeidos(conversations, ahora, noMolestar);
 
   return (
     // Solo desktop: en mobile, la barra de navegación inferior ya ocupa ese
@@ -60,7 +70,7 @@ export function ChatDock() {
         <button
           type="button"
           onClick={() => setListOpen((open) => !open)}
-          aria-label={totalNoLeidos > 0 ? `Mensajes, ${totalNoLeidos} sin leer` : 'Mensajes'}
+          aria-label={`Mensajes${enNoMolestar ? ', no molestar activo' : ''}${totalNoLeidos > 0 ? `, ${totalNoLeidos} sin leer` : ''}`}
           aria-expanded={listOpen}
           className="flex h-12 w-72 items-center gap-2 rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest px-5 text-sm font-semibold text-on-surface shadow-raised transition-colors hover:bg-surface-container-high"
         >
@@ -73,6 +83,12 @@ export function ChatDock() {
             )}
           </span>
           Mensajes
+          {enNoMolestar && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary">
+              <BellOff className="size-3" aria-hidden="true" />
+              No molestar
+            </span>
+          )}
           <span
             role="status"
             title={chatConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo…'}
