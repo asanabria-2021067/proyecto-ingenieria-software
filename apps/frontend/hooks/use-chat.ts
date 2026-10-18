@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createConversation,
   deleteConversation,
   getMessages,
+  getReadReceipts,
   listAllConversations,
   listArchivedConversations,
   markConversationRead,
@@ -17,9 +18,10 @@ import {
   allConversationsQueryKey,
   archivedConversationsQueryKey,
   conversationMessagesQueryKey,
+  conversationReadsQueryKey,
   projectConversationsQueryKey,
 } from '@/lib/query-keys/chat';
-import type { ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
+import type { ChatLectura, ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -44,6 +46,11 @@ async function joinConversationReliably(
     if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 300));
   }
 }
+
+/** El indicador "escribiendo…" expira solo si no llega otro `typing` en este lapso. */
+export const TYPING_EXPIRY_MS = 4000;
+/** Como mucho un `typing` por conversación en este lapso mientras la persona teclea. */
+export const TYPING_THROTTLE_MS = 2500;
 
 /** Dock global de chat: todas las conversaciones activas del usuario, de cualquier proyecto. */
 export function useAllConversations(q: string = '') {
@@ -74,6 +81,16 @@ export function useMessages(idProyecto: number, idConversacion: number | null) {
     enabled: idConversacion != null,
   });
   return { messages: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
+}
+
+/** "Visto por": lecturas de los demás participantes; el socket las mantiene al día (messagesRead). */
+export function useReadReceipts(idProyecto: number, idConversacion: number | null) {
+  const query = useQuery({
+    queryKey: conversationReadsQueryKey(idProyecto, idConversacion ?? 0),
+    queryFn: () => getReadReceipts(idProyecto, idConversacion as number),
+    enabled: idConversacion != null,
+  });
+  return { lecturas: query.data ?? [] };
 }
 
 export function useSendMessage(idProyecto: number, idConversacion: number | null) {
@@ -148,6 +165,10 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
   const socketRef = useRef<Socket | null>(null);
   const openIdsRef = useRef<number[]>(openConversationIds);
   const [isConnected, setIsConnected] = useState(false);
+  // conversación -> ids de quienes están escribiendo ahora (efímero, nunca se persiste)
+  const [typingByConversation, setTypingByConversation] = useState<Record<number, number[]>>({});
+  const typingTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const lastTypingEmitRef = useRef(new Map<number, number>());
 
   useEffect(() => {
     openIdsRef.current = openConversationIds;
@@ -160,6 +181,7 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;
+    const typingTimers = typingTimersRef.current;
 
     const handleNewMessage = ({
       idConversacion,
@@ -184,7 +206,53 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
         });
       }
       queryClient.invalidateQueries({ queryKey: ['chats-global'] });
+      // Quien envía ya leyó hasta su propio mensaje, y deja de "escribir".
+      updateRead(idConversacion, mensaje.remitente.idUsuario, mensaje.enviadoEn);
+      clearTyping(idConversacion, mensaje.remitente.idUsuario);
     };
+
+    const updateRead = (idConversacion: number, idUsuario: number, ultimaLecturaEn: string) => {
+      queryClient.setQueriesData<ChatLectura[]>(
+        { predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'lecturas' },
+        (current) => {
+          if (!current) return current;
+          const resto = current.filter((l) => l.idUsuario !== idUsuario);
+          return [...resto, { idUsuario, ultimaLecturaEn }];
+        },
+      );
+    };
+
+    const clearTyping = (idConversacion: number, idUsuario: number) => {
+      const key = `${idConversacion}:${idUsuario}`;
+      const timer = typingTimers.get(key);
+      if (timer) clearTimeout(timer);
+      typingTimers.delete(key);
+      setTypingByConversation((current) => {
+        if (!current[idConversacion]?.includes(idUsuario)) return current;
+        return { ...current, [idConversacion]: current[idConversacion].filter((id) => id !== idUsuario) };
+      });
+    };
+
+    const handleTyping = ({ idConversacion, idUsuario }: { idConversacion: number; idUsuario: number }) => {
+      const key = `${idConversacion}:${idUsuario}`;
+      const previo = typingTimers.get(key);
+      if (previo) clearTimeout(previo);
+      typingTimers.set(key, setTimeout(() => clearTyping(idConversacion, idUsuario), TYPING_EXPIRY_MS));
+      setTypingByConversation((current) => {
+        const ids = current[idConversacion] ?? [];
+        return ids.includes(idUsuario) ? current : { ...current, [idConversacion]: [...ids, idUsuario] };
+      });
+    };
+
+    const handleMessagesRead = ({
+      idConversacion,
+      idUsuario,
+      ultimaLecturaEn,
+    }: {
+      idConversacion: number;
+      idUsuario: number;
+      ultimaLecturaEn: string;
+    }) => updateRead(idConversacion, idUsuario, ultimaLecturaEn);
 
     const handleConversationUpdated = () => {
       queryClient.invalidateQueries({ queryKey: ['chats-global'] });
@@ -216,12 +284,18 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
 
     socket.on('newMessage', handleNewMessage);
     socket.on('conversationUpdated', handleConversationUpdated);
+    socket.on('typing', handleTyping);
+    socket.on('messagesRead', handleMessagesRead);
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
 
     return () => {
       socket.off('newMessage', handleNewMessage);
       socket.off('conversationUpdated', handleConversationUpdated);
+      socket.off('typing', handleTyping);
+      socket.off('messagesRead', handleMessagesRead);
+      for (const timer of typingTimers.values()) clearTimeout(timer);
+      typingTimers.clear();
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.close();
@@ -248,5 +322,14 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
     };
   }, [idsKey]);
 
-  return { isConnected };
+  // Avisa que la persona está escribiendo, como mucho una vez por TYPING_THROTTLE_MS.
+  const emitTyping = useCallback((idConversacion: number) => {
+    const socket = socketRef.current;
+    const ahora = Date.now();
+    if (!socket || ahora - (lastTypingEmitRef.current.get(idConversacion) ?? 0) < TYPING_THROTTLE_MS) return;
+    lastTypingEmitRef.current.set(idConversacion, ahora);
+    socket.emit('typing', { idConversacion });
+  }, []);
+
+  return { isConnected, typingByConversation, emitTyping };
 }

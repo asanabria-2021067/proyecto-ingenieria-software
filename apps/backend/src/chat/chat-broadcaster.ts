@@ -12,6 +12,11 @@ export class ChatBroadcaster {
     }
   }
 
+  /** Avisa a la room que `idUsuario` leyó la conversación hasta `ultimaLecturaEn`. */
+  messagesRead(idConversacion: number, idUsuario: number, ultimaLecturaEn: Date) {
+    this.getServer().to(`conversation:${idConversacion}`).emit('messagesRead', { idConversacion, idUsuario, ultimaLecturaEn });
+  }
+
   /**
    * Sin esto, el resto de participantes no se enteran de que una conversación
    * nueva existe hasta recargar. Reutiliza `conversationUpdated`.

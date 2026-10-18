@@ -14,6 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { getFrontendUrl } from '../common/utils/cookie';
 import { WsAuthService } from '../ws-auth/ws-auth.service';
 import { ChatRoomsHandler } from './chat-rooms.handler';
+import { ChatIndicatorsHandler } from './chat-indicators.handler';
 import { ChatBroadcaster } from './chat-broadcaster';
 import { ACCOUNT_ACCESS_REVOKED, type AccountAccessRevokedEvent } from '../ws-auth/account-access.events';
 
@@ -31,6 +32,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(ChatGateway.name);
 
   private readonly rooms: ChatRoomsHandler;
+  private readonly indicators: ChatIndicatorsHandler;
   private readonly broadcaster = new ChatBroadcaster(() => this.server);
 
   constructor(
@@ -38,6 +40,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     prisma: PrismaService,
   ) {
     this.rooms = new ChatRoomsHandler(prisma);
+    this.indicators = new ChatIndicatorsHandler(prisma);
   }
 
   async handleConnection(client: Socket) {
@@ -88,9 +91,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.rooms.leave(client, data);
   }
 
+  @SubscribeMessage('typing')
+  typing(@ConnectedSocket() client: Socket, @MessageBody() data: { idConversacion: number }) {
+    return this.indicators.typing(client, data);
+  }
+
   /** Llamado por ChatService tras persistir un mensaje (nunca al revés, para evitar dependencia circular). */
   broadcastMessage(idConversacion: number, destinatarios: number[], mensaje: unknown) {
     this.broadcaster.broadcastMessage(idConversacion, destinatarios, mensaje);
+  }
+
+  /** Llamado por ChatService tras marcar una conversación como leída. */
+  notifyMessagesRead(idConversacion: number, idUsuario: number, ultimaLecturaEn: Date) {
+    this.broadcaster.messagesRead(idConversacion, idUsuario, ultimaLecturaEn);
   }
 
   /** Llamado por ChatService tras crear una conversación nueva. */

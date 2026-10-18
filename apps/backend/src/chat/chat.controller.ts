@@ -84,6 +84,15 @@ export class ChatController {
     return this.chatService.deleteConversation(projectId, conversationId, user.userId);
   }
 
+  @Get(':conversationId/lecturas')
+  readReceipts(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.getReadReceipts(projectId, conversationId, user.userId);
+  }
+
   @Post(':conversationId/leido')
   @HttpCode(HttpStatus.OK)
   markRead(

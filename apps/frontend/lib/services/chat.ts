@@ -2,6 +2,7 @@ import { apiFetch } from '@/lib/api/client';
 import type {
   ChatConversacion,
   ChatConversacionGlobal,
+  ChatLectura,
   ChatMensaje,
   CreateConversationPayload,
   ListArchivedConversationsFiltros,
@@ -58,6 +59,10 @@ export function markConversationRead(idProyecto: number, idConversacion: number)
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/leido`, {
     method: 'POST',
   });
+}
+
+export function getReadReceipts(idProyecto: number, idConversacion: number): Promise<ChatLectura[]> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/lecturas`);
 }
 
 export function deleteConversation(idProyecto: number, idConversacion: number): Promise<void> {

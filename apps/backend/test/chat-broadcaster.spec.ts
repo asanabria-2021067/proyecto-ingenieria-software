@@ -28,3 +28,15 @@ describe('ChatBroadcaster', () => {
     expect(emit).toHaveBeenCalledWith('conversationUpdated', { idConversacion: 8 });
   });
 });
+
+describe('ChatBroadcaster.messagesRead', () => {
+  it('emite messagesRead solo a la room de la conversacion', () => {
+    const { broadcaster, to, emit } = makeBroadcaster();
+    const fecha = new Date('2026-10-16T12:00:00Z');
+
+    broadcaster.messagesRead(3, 7, fecha);
+
+    expect(to.mock.calls.map(([room]) => room)).toEqual(['conversation:3']);
+    expect(emit).toHaveBeenCalledWith('messagesRead', { idConversacion: 3, idUsuario: 7, ultimaLecturaEn: fecha });
+  });
+});
