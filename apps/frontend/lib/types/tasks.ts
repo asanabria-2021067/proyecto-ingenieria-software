@@ -105,6 +105,25 @@ export interface AssignTaskInput {
 }
 
 /**
+ * HU-202/T-383: body de `POST /proyectos/:projectId/tareas/acciones-masivas`
+ * — equivalente a `BulkTaskActionDto`. Cada acción lleva solo su campo.
+ */
+export type BulkTaskActionInput =
+  | { idsTareas: number[]; accion: 'MOVER'; estadoTarea: EstadoTarea }
+  | { idsTareas: number[]; accion: 'ASIGNAR'; idUsuario: number }
+  | { idsTareas: number[]; accion: 'DESASIGNAR' }
+  | { idsTareas: number[]; accion: 'AGREGAR_ETIQUETAS' | 'QUITAR_ETIQUETAS'; idsEtiquetas: number[] };
+
+export type AccionMasivaTarea = BulkTaskActionInput['accion'];
+
+/** Respuesta de la acción masiva: todas las tareas pedidas y las que de verdad cambiaron. */
+export interface BulkTaskActionResultDTO {
+  accion: AccionMasivaTarea;
+  tareas: TareaPublicaDTO[];
+  idsActualizadas: number[];
+}
+
+/**
  * Body de `POST /proyectos/:projectId/tareas/:taskId/asignaciones/:assignmentId/cerrar`
  * (B2) — equivalente a `CloseAssignmentDto`. `contenidoAvance` viaja ya
  * recortado (mismo `@Transform` que el backend aplica antes de validar los
