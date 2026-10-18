@@ -84,7 +84,7 @@ export class ChatController {
     @CurrentUser() user: { userId: number },
     @Body() dto: SendMessageDto,
   ) {
-    return this.chatService.createMessage(projectId, conversationId, user.userId, dto.contenido);
+    return this.chatService.createMessage(projectId, conversationId, user.userId, dto.contenido, undefined, dto.idMensajeCitado);
   }
 
   @Get(':conversationId/archivos')

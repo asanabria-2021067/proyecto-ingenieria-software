@@ -48,6 +48,25 @@ const MENSAJE_SELECT = {
 
 const URL_ADJUNTO_TTL_SEGUNDOS = 60;
 
+const MENSAJE_CON_CITA_SELECT = {
+  ...MENSAJE_SELECT,
+  idMensajeCitado: true,
+  citado: { select: { idMensaje: true, contenido: true, remitente: USUARIO_SELECT } },
+} as const;
+
+const EXTRACTO_CITA_MAX = 120;
+
+/** Reemplaza el mensaje citado completo por un resumen (id, remitente, extracto). */
+function conResumenDeCita<T extends { citado: { idMensaje: number; contenido: string; remitente: unknown } | null }>(
+  mensaje: T,
+) {
+  const { citado, ...resto } = mensaje;
+  if (!citado) return { ...resto, citado: null };
+  const texto = citado.contenido.replace(/\s+/g, ' ').trim();
+  const extracto = texto.length > EXTRACTO_CITA_MAX ? `${texto.slice(0, EXTRACTO_CITA_MAX)}…` : texto;
+  return { ...resto, citado: { idMensaje: citado.idMensaje, remitente: citado.remitente, extracto } };
+}
+
 const ARCHIVADOS_PAGE_SIZE = 20;
 
 @Injectable()
@@ -222,9 +241,9 @@ export class ChatService {
       where: { idConversacion, ...(cursorId ? { idMensaje: { lt: cursorId } } : {}) },
       orderBy: { idMensaje: 'desc' },
       take: 30,
-      select: MENSAJE_SELECT,
+      select: MENSAJE_CON_CITA_SELECT,
     });
-    return mensajes.reverse();
+    return mensajes.reverse().map(conResumenDeCita);
   }
 
   /**
@@ -327,6 +346,7 @@ export class ChatService {
     userId: number,
     contenido: string,
     archivo?: ArchivoSubido,
+    idMensajeCitado?: number,
   ) {
     const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     // T-234: único punto real de creación de mensajes (REST) — el gateway de
@@ -339,6 +359,17 @@ export class ChatService {
       throw new ForbiddenException(
         'Esta conversación está archivada: el proyecto ya cerró y no se pueden enviar mensajes nuevos.',
       );
+    }
+
+    if (idMensajeCitado !== undefined) {
+      // Filtrar por idConversacion impide citar un mensaje de otra conversación.
+      const citado = await this.prisma.mensajeChat.findFirst({
+        where: { idMensaje: idMensajeCitado, idConversacion },
+        select: { idMensaje: true },
+      });
+      if (!citado) {
+        throw new BadRequestException('El mensaje citado no existe en esta conversación');
+      }
     }
 
     let adjunto: Prisma.AdjuntoMensajeChatCreateWithoutMensajeInput | undefined;
@@ -357,15 +388,18 @@ export class ChatService {
 
     let mensaje;
     try {
-      mensaje = await this.prisma.mensajeChat.create({
-        data: {
-          idConversacion,
-          idRemitente: userId,
-          contenido: contenido.trim(),
-          ...(adjunto ? { adjunto: { create: adjunto } } : {}),
-        },
-        select: MENSAJE_SELECT,
-      });
+      mensaje = conResumenDeCita(
+        await this.prisma.mensajeChat.create({
+          data: {
+            idConversacion,
+            idRemitente: userId,
+            contenido: contenido.trim(),
+            idMensajeCitado,
+            ...(adjunto ? { adjunto: { create: adjunto } } : {}),
+          },
+          select: MENSAJE_CON_CITA_SELECT,
+        }),
+      );
     } catch (error) {
       if (adjunto) await this.storage.destroy(adjunto.claveAlmacenamiento);
       throw error;

@@ -12,6 +12,13 @@ export interface ChatAdjunto {
   tamanoBytes: number;
 }
 
+/** Resumen del mensaje citado; `null` si el original ya no existe. */
+export interface ChatCita {
+  idMensaje: number;
+  remitente: ChatUsuario;
+  extracto: string;
+}
+
 export interface ChatMensaje {
   idMensaje: number;
   idConversacion: number;
@@ -19,6 +26,7 @@ export interface ChatMensaje {
   enviadoEn: string;
   remitente: ChatUsuario;
   adjunto?: ChatAdjunto | null;
+  citado?: ChatCita | null;
 }
 
 export interface ChatArchivo extends ChatAdjunto {

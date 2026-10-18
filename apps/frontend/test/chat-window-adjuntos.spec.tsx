@@ -36,6 +36,7 @@ vi.mock('@/hooks/use-chat', () => ({
   useDeleteConversation: () => ({ mutate: vi.fn(), isPending: false }),
   useAllConversations: () => ({ conversations: [] }),
   useReadReceipts: () => ({ lecturas: [] }),
+  useLoadOlderMessages: () => async () => [],
   useMarkConversationRead: () => ({ mutate: vi.fn() }),
   useSilenciarConversation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -148,7 +149,7 @@ describe('ChatWindow - adjuntos', () => {
     abrir();
     fireEvent.change(screen.getByPlaceholderText('Escribe un mensaje…'), { target: { value: 'hola' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
-    expect(sendMutate).toHaveBeenCalledWith('hola');
+    expect(sendMutate).toHaveBeenCalledWith({ contenido: 'hola' });
     expect(sendFileMutate).not.toHaveBeenCalled();
   });
 
