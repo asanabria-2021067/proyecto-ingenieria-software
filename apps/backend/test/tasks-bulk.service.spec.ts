@@ -157,25 +157,50 @@ describe('TasksService.bulkAction (HU-202/T-383)', () => {
       expect(tx.tarea.updateMany).not.toHaveBeenCalled();
     });
 
-    it('exige la política de escritura una vez por Sprint distinto, con la familia de cada acción', async () => {
+    it('exige la política del proyecto una vez, con la familia de cada acción, y la del Sprint por grupo', async () => {
       const mover = makeService({ antes: [{ idTarea: 1, idSprint: 3 }, { idTarea: 2, idSprint: 3 }, { idTarea: 3, idSprint: 4 }] });
       await mover.service.bulkAction(PROYECTO, LIDER, dto({ idsTareas: [1, 2, 3], accion: 'MOVER', estadoTarea: EstadoTarea.HECHO }));
-      expect(mover.policy.assertWriteTx).toHaveBeenCalledTimes(2);
-      expect(mover.policy.assertWriteTx).toHaveBeenCalledWith(mover.tx, expect.anything(), 'TAREA_WRITE', LIDER, { sprintId: 3 });
-      expect(mover.policy.assertWriteTx).toHaveBeenCalledWith(mover.tx, expect.anything(), 'TAREA_WRITE', LIDER, { sprintId: 4 });
+      expect(mover.policy.assertWriteTx).toHaveBeenCalledOnce();
+      expect(mover.policy.assertWriteTx).toHaveBeenCalledWith(mover.tx, expect.anything(), 'TAREA_WRITE', LIDER);
+      expect(mover.policy.assertEntitySprintTx).toHaveBeenCalledTimes(2);
+      expect(mover.policy.assertEntitySprintTx).toHaveBeenCalledWith(mover.tx, 3, 'ACTIVO');
+      expect(mover.policy.assertEntitySprintTx).toHaveBeenCalledWith(mover.tx, 4, 'ACTIVO');
 
       const asignar = makeService({ antes: [{ idTarea: 1 }] });
       await asignar.service.bulkAction(PROYECTO, LIDER, dto({ idsTareas: [1], accion: 'DESASIGNAR' }));
-      expect(asignar.policy.assertWriteTx).toHaveBeenCalledWith(asignar.tx, expect.anything(), 'TAREA_ASIGNACION', LIDER, { sprintId: 3 });
+      expect(asignar.policy.assertWriteTx).toHaveBeenCalledWith(asignar.tx, expect.anything(), 'TAREA_ASIGNACION', LIDER);
     });
 
-    it('un Sprint no ACTIVO rechaza toda la operación antes de escribir', async () => {
+    it('un proyecto que no admite escritura rechaza toda la operación antes de escribir', async () => {
       const { service, policy, tx } = makeService({ antes: [{ idTarea: 1 }] });
-      policy.assertWriteTx.mockRejectedValue(new HttpException('Sprint cerrado', 409));
+      policy.assertWriteTx.mockRejectedValue(new HttpException('Proyecto en cierre', 409));
 
       await expect(
         service.bulkAction(PROYECTO, LIDER, dto({ idsTareas: [1], accion: 'MOVER', estadoTarea: EstadoTarea.HECHO })),
       ).rejects.toBeInstanceOf(HttpException);
+      expect(tx.tarea.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('tareas de un Sprint ya no ACTIVO: 409 que nombra esas tareas y nada se escribe', async () => {
+      const { service, policy, tx } = makeService({
+        antes: [
+          { idTarea: 1, idSprint: 3, tituloTarea: 'Vigente' },
+          { idTarea: 2, idSprint: 2, tituloTarea: 'Vieja A' },
+          { idTarea: 3, idSprint: 2, tituloTarea: 'Vieja B' },
+        ],
+      });
+      policy.assertEntitySprintTx.mockImplementation(async (_tx: unknown, sprintId: number) => {
+        if (sprintId === 2) throw new HttpException('La tarea pertenece a un Sprint que no está activo', 409);
+      });
+
+      const error = await service
+        .bulkAction(PROYECTO, LIDER, dto({ idsTareas: [1, 2, 3], accion: 'MOVER', estadoTarea: EstadoTarea.HECHO }))
+        .catch((e: unknown) => e);
+
+      expect((error as HttpException).getStatus()).toBe(409);
+      expect((error as HttpException).message).toBe(
+        'Tareas "Vieja A", "Vieja B": La tarea pertenece a un Sprint que no está activo',
+      );
       expect(tx.tarea.updateMany).not.toHaveBeenCalled();
     });
   });
