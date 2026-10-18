@@ -9,6 +9,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
 import { taskDragId, type TaskDragData } from '@/components/projects/task-board-dnd';
@@ -50,6 +51,14 @@ export interface TaskCardProps {
   /** Registro de refs por tarea para scroll/foco (notificación y post-drag). */
   onRegistrarCardRef?: (idTarea: number, el: HTMLElement | null) => void;
   onRegistrarHandleRef?: (idTarea: number, el: HTMLButtonElement | null) => void;
+  /**
+   * Selección múltiple (HU-202/T-382, solo líder). Con `onAlternarSeleccion`
+   * la tarjeta muestra su casilla; `rango` es true con Shift+clic.
+   */
+  onAlternarSeleccion?: (rango: boolean) => void;
+  seleccionada?: boolean;
+  /** Hay al menos una tarea seleccionada: las casillas quedan siempre visibles. */
+  modoSeleccion?: boolean;
 }
 
 export function TaskCard({
@@ -61,7 +70,11 @@ export function TaskCard({
   resaltada = false,
   onRegistrarCardRef,
   onRegistrarHandleRef,
+  onAlternarSeleccion,
+  seleccionada = false,
+  modoSeleccion = false,
 }: TaskCardProps) {
+  const seleccionable = onAlternarSeleccion !== undefined;
   const PrioridadIcon = PRIORIDAD_ICON[tarea.prioridad];
   const vencida = estaVencida(tarea);
   const asignado = tarea.asignacionActiva?.usuario ?? null;
@@ -99,12 +112,36 @@ export function TaskCard({
       }}
       style={dragStyle}
       data-prioridad={tarea.prioridad}
+      data-seleccionada={seleccionable ? seleccionada : undefined}
       aria-busy={estadoPending}
       aria-describedby={resaltada ? `tarea-resaltada-${tarea.idTarea}` : undefined}
-      className={`relative space-y-2 overflow-hidden rounded-lg border bg-surface-container-lowest p-3 pl-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-outline-variant/60 hover:shadow-md ${
-        resaltada
-          ? 'border-primary bg-primary/5 ring-2 ring-primary/50'
-          : 'border-outline-variant/30'
+      // Shift+clic en cualquier punto de la tarjeta selecciona (como en otras
+      // apps de tableros) en vez de abrir el detalle; en captura, para que no
+      // llegue al título. El mousedown evita que Shift extienda la selección
+      // de texto del navegador.
+      onClickCapture={
+        seleccionable
+          ? (event) => {
+              if (!event.shiftKey) return;
+              event.preventDefault();
+              event.stopPropagation();
+              onAlternarSeleccion(true);
+            }
+          : undefined
+      }
+      onMouseDown={
+        seleccionable
+          ? (event) => {
+              if (event.shiftKey) event.preventDefault();
+            }
+          : undefined
+      }
+      className={`group relative space-y-2 overflow-hidden rounded-lg border bg-surface-container-lowest p-3 pl-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-outline-variant/60 hover:shadow-md ${
+        seleccionada
+          ? 'border-primary bg-primary/5 ring-2 ring-primary/40'
+          : resaltada
+            ? 'border-primary bg-primary/5 ring-2 ring-primary/50'
+            : 'border-outline-variant/30'
       } ${isDragging ? 'opacity-40' : ''}`}
     >
       {/* Franja de prioridad (HU-201/T-380): refuerzo visual; el texto
@@ -121,8 +158,22 @@ export function TaskCard({
         </p>
       )}
 
-      {/* Fila superior: handle + título + menú (Sección 36) */}
+      {/* Fila superior: casilla + handle + título (Sección 36) */}
       <div className="flex items-start gap-1.5">
+        {seleccionable && (
+          // La casilla aparece al pasar el mouse o al enfocarla; en pantallas
+          // táctiles (sin hover) y con alguna tarea ya marcada, siempre.
+          <Checkbox
+            checked={seleccionada}
+            onClick={() => onAlternarSeleccion(false)}
+            aria-label={`Seleccionar "${tarea.tituloTarea}"`}
+            className={`mt-0.5 bg-surface-container-lowest transition-opacity duration-150 ${
+              modoSeleccion || seleccionada
+                ? 'opacity-100'
+                : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100'
+            }`}
+          />
+        )}
         {puedeArrastrar && (
           <Tooltip>
             <TooltipTrigger asChild>
