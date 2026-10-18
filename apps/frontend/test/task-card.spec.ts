@@ -79,6 +79,22 @@ describe('TaskCard (compacta, Secciones 33-46)', () => {
     expect(screen.getByText('Alta')).toBeInTheDocument();
   });
 
+  it.each([
+    ['ALTA', 'Prioridad alta', 'bg-destructive'],
+    ['MEDIA', 'Prioridad media', 'bg-accent'],
+    ['BAJA', 'Prioridad baja', 'bg-outline-variant'],
+  ] as const)(
+    'prioridad %s: franja de color y texto accesible "%s" (HU-201)',
+    (prioridad, textoAccesible, claseFranja) => {
+      const { container } = renderCard({ tarea: tarea({ prioridad }) });
+      expect(container.querySelector('article')).toHaveAttribute('data-prioridad', prioridad);
+      const franja = container.querySelector('[data-slot="prioridad-franja"]');
+      expect(franja).toHaveClass(claseFranja);
+      expect(franja).toHaveAttribute('aria-hidden', 'true');
+      expect(screen.getByText(textoAccesible)).toHaveClass('sr-only');
+    },
+  );
+
   it('muestra el rol cuando existe', () => {
     renderCard({ tarea: tarea({ rolProyecto: { idRolProyecto: 1, nombreRol: 'Backend' } }) });
     expect(screen.getByText('Backend')).toBeInTheDocument();
