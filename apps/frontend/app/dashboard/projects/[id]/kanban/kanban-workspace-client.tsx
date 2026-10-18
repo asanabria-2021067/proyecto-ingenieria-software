@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Kanban, Plus, Tags } from 'lucide-react';
+import { Kanban, MousePointerClick, Plus, Tags } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { useProjectLabels } from '@/hooks/use-project-labels';
@@ -12,7 +12,9 @@ import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectAvance } from '@/hooks/use-project-avance';
 import { useProjectSprints } from '@/hooks/use-project-sprints';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useTaskSelection } from '@/hooks/use-task-selection';
 import { Button } from '@/components/ui/button';
+import { Kbd } from '@/components/ui/kbd';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Empty,
@@ -29,6 +31,7 @@ import { HitosSection } from '@/components/projects/hitos-section';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
 import { CreateMilestoneDialog } from '@/components/projects/create-milestone-dialog';
 import { TaskFormDialog } from '@/components/projects/task-form-dialog';
+import { TaskBulkActionsBar } from '@/components/projects/task-bulk-actions-bar';
 import {
   Select,
   SelectContent,
@@ -46,6 +49,7 @@ import {
   computeTaskProgress,
   derivarOpcionesHito,
   derivarOpcionesRol,
+  filtrarTareas,
   getProgressVisualState,
 } from '@/components/projects/task-board.utils';
 import { MODALIDAD_LABEL } from '@/types';
@@ -234,6 +238,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     editarTarea,
     asignarTarea,
     desasignarTarea,
+    accionMasiva,
   } = useProjectTasks(idProyecto);
   const {
     labels,
@@ -256,6 +261,20 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     setFiltroRol(FILTRO_TODOS);
     setFiltroHito(FILTRO_TODOS);
   };
+
+  // Selección múltiple (HU-202/T-382): solo el líder, solo en la pestaña
+  // Tablero y sobre las tareas que los filtros dejan ver. Fuera de eso la
+  // lista de visibles queda vacía y la selección se limpia sola.
+  const puedeSeleccionar = isLeader && activeTab === 'tablero' && haySprintDeTrabajo;
+  const idsVisibles = useMemo(
+    () => (puedeSeleccionar ? filtrarTareas(tasks, filtroRol, filtroHito).map((t) => t.idTarea) : []),
+    [puedeSeleccionar, tasks, filtroRol, filtroHito],
+  );
+  const seleccion = useTaskSelection(idsVisibles);
+  const tareasSeleccionadas = useMemo(
+    () => tasks.filter((t) => seleccion.seleccionadas.has(t.idTarea)),
+    [tasks, seleccion.seleccionadas],
+  );
 
   // Chips de rol(es) del usuario en el proyecto (Sección 28): deduplicados y
   // resueltos contra los nombres reales de `proyecto.roles`.
@@ -447,6 +466,20 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             </div>
           </div>
 
+          {puedeSeleccionar && tasks.length > 0 && (
+            <p
+              data-slot="ayuda-seleccion"
+              className="-mt-2 mb-5 flex items-start gap-1.5 text-xs text-text-secondary"
+            >
+              <MousePointerClick className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+              <span className="hidden md:inline">
+                Marca las casillas de las tarjetas para seleccionar varias tareas; mantén <Kbd>Shift</Kbd> al
+                hacer clic para seleccionar un rango. <Kbd>Esc</Kbd> limpia la selección.
+              </span>
+              <span className="md:hidden">Toca las casillas de las tarjetas para seleccionar varias tareas.</span>
+            </p>
+          )}
+
           <TabsContent value="tablero" className="mt-0 min-h-0">
             {isLoadingSprints ? (
               <div className="space-y-3">
@@ -498,6 +531,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 onFiltroRolChange={setFiltroRol}
                 onFiltroHitoChange={setFiltroHito}
                 mostrarToolbar={false}
+                seleccion={puedeSeleccionar ? seleccion.control : undefined}
               />
             ) : proyectoEnCierre ? (
               /* S7: en cierre no se abre trabajo nuevo. Ofrecer «Iniciar
@@ -593,6 +627,15 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             open={crearHitoAbierto}
             onOpenChange={setCrearHitoAbierto}
             crearHito={crearHito}
+          />
+        )}
+        {puedeSeleccionar && (
+          <TaskBulkActionsBar
+            tareas={tareasSeleccionadas}
+            members={members}
+            labels={labels}
+            accionMasiva={accionMasiva}
+            onLimpiar={seleccion.limpiar}
           />
         )}
         {isLeader && (
