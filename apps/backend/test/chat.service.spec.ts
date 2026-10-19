@@ -16,6 +16,7 @@ function makePrisma() {
     conversacionParticipante: { update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
     mensajeChat: { create: vi.fn(), count: vi.fn(), findMany: vi.fn() },
+    apodoConversacion: { findMany: vi.fn().mockResolvedValue([]) },
   };
 }
 
@@ -104,6 +105,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
           tipo: 'INDIVIDUAL',
           nombre: null,
           participantes: [{ idUsuario: 1, ultimaLecturaEn: null, usuario: USUARIO }],
+          apodos: [],
           mensajes: [],
         },
       ]);
@@ -123,6 +125,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
           tipo: 'INDIVIDUAL',
           nombre: null,
           participantes: [{ idUsuario: 1, ultimaLecturaEn: null, usuario: USUARIO }],
+          apodos: [],
           mensajes: [],
         },
       ]);
@@ -147,7 +150,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
 
       const resultado = await service.getMessages(10, 5, 1);
 
-      expect(resultado).toEqual(historial.map((m) => ({ ...m, citado: null, reacciones: [] })));
+      expect(resultado).toEqual(historial.map((m) => ({ ...m, citado: null, reacciones: [], apodoRemitente: null })));
     });
   });
 
@@ -279,6 +282,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
           { idUsuario: 1, ultimaLecturaEn: null, usuario: USUARIO },
           { idUsuario: 2, ultimaLecturaEn: null, usuario: { idUsuario: 2, nombre: 'Rosa', apellido: 'Fuentes', fotoUrl: null } },
         ],
+        apodos: [],
         mensajes: [],
         esFavorita: overrides.esFavorita ?? false,
         archivadaEn: null,

@@ -15,6 +15,7 @@ function makeService() {
     },
     conversacionParticipante: { update: vi.fn() },
     mensajeChat: { create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
+    apodoConversacion: { findMany: vi.fn().mockResolvedValue([]) },
   };
   const gateway = { broadcastMessage: vi.fn() };
   return { prisma, gateway, service: new ChatService(prisma as any, gateway as any) };

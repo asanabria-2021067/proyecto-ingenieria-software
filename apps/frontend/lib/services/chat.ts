@@ -157,6 +157,24 @@ export function activarSonidoConversation(idProyecto: number, idConversacion: nu
   });
 }
 
+export function setApodo(
+  idProyecto: number,
+  idConversacion: number,
+  idObjetivo: number,
+  apodo: string,
+): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/apodos/${idObjetivo}`, {
+    method: 'PUT',
+    body: JSON.stringify({ apodo }),
+  });
+}
+
+export function removeApodo(idProyecto: number, idConversacion: number, idObjetivo: number): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/apodos/${idObjetivo}`, {
+    method: 'DELETE',
+  });
+}
+
 export function markConversationRead(idProyecto: number, idConversacion: number): Promise<void> {
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/leido`, {
     method: 'POST',

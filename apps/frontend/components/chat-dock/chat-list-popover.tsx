@@ -5,6 +5,7 @@ import { BellOff, Search, SquarePen, Users as UsersIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { getIniciales } from '@/components/projects/available-project-card';
+import { nombreMostrado, nombreReal } from '@/lib/chat-apodos';
 import { useAllConversations } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
@@ -16,7 +17,7 @@ function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId:
   if (conversacion.nombrePersonalizado) return conversacion.nombrePersonalizado;
   if (conversacion.tipo === 'GRUPAL') return conversacion.nombre ?? 'Grupo';
   const otro = conversacion.participantes.find((p) => p.idUsuario !== currentUserId);
-  return otro ? `${otro.nombre} ${otro.apellido}` : 'Conversación';
+  return otro ? nombreMostrado(otro) : 'Conversación';
 }
 
 function estadoUltimoMensaje(conversacion: ChatConversacionGlobal): string | null {
@@ -127,7 +128,7 @@ export function ChatListPopover({ onClose }: ChatListPopoverProps) {
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold text-on-surface">{nombreConversacion(c, currentUserId)}</span>
+                  <span className="truncate text-sm font-semibold text-on-surface" title={otro?.apodo ? nombreReal(otro) : undefined}>{nombreConversacion(c, currentUserId)}</span>
                   {estaSilenciada(c) ? (
                     <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium text-text-secondary">
                       <BellOff className="size-3" aria-hidden="true" />

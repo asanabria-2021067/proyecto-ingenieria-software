@@ -116,7 +116,7 @@ describe('ChatService silencio por usuario', () => {
     prisma.conversacion.findMany = vi.fn().mockResolvedValue([
       {
         idConversacion: 5, tipo: 'INDIVIDUAL', nombre: null, nombrePersonalizado: null, esFavorita: false,
-        archivadaEn: null, silenciada: false, esPrioritaria: true, mensajes: [],
+        archivadaEn: null, silenciada: false, esPrioritaria: true, mensajes: [], apodos: [],
         participantes: [
           { idUsuario: 1, ultimaLecturaEn: null, silenciadaHasta: hasta, silenciadaSiempre: false, usuario },
           { idUsuario: 2, ultimaLecturaEn: null, silenciadaHasta: null, silenciadaSiempre: false, usuario },
