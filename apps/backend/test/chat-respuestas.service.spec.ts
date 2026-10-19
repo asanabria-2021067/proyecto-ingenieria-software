@@ -21,7 +21,7 @@ function makeService() {
 }
 
 function fila(citado: unknown) {
-  return { idMensaje: 9, idConversacion: 5, contenido: 'ok', enviadoEn: new Date(), remitente: USUARIO, citado };
+  return { idMensaje: 9, idConversacion: 5, contenido: 'ok', enviadoEn: new Date(), remitente: USUARIO, citado, reacciones: [] };
 }
 
 describe('ChatService - respuestas citando un mensaje', () => {
