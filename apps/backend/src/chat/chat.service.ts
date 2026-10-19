@@ -66,20 +66,30 @@ const URL_ADJUNTO_TTL_SEGUNDOS = 60;
 const MENSAJE_CON_CITA_SELECT = {
   ...MENSAJE_SELECT,
   idMensajeCitado: true,
-  citado: { select: { idMensaje: true, contenido: true, remitente: USUARIO_SELECT } },
+  citado: { select: { idMensaje: true, contenido: true, eliminadoEn: true, remitente: USUARIO_SELECT } },
 } as const;
 
 const EXTRACTO_CITA_MAX = 120;
 
 /** Reemplaza el mensaje citado completo por un resumen (id, remitente, extracto). */
-function conResumenDeCita<T extends { citado: { idMensaje: number; contenido: string; remitente: unknown } | null }>(
+function conResumenDeCita<
+  T extends { citado: { idMensaje: number; contenido: string; eliminadoEn: Date | null; remitente: unknown } | null },
+>(
   mensaje: T,
 ) {
   const { citado, ...resto } = mensaje;
   if (!citado) return { ...resto, citado: null };
-  const texto = citado.contenido.replace(/\s+/g, ' ').trim();
+  const texto = ocultarEliminado(citado).contenido.replace(/\s+/g, ' ').trim();
   const extracto = texto.length > EXTRACTO_CITA_MAX ? `${texto.slice(0, EXTRACTO_CITA_MAX)}…` : texto;
-  return { ...resto, citado: { idMensaje: citado.idMensaje, remitente: citado.remitente, extracto } };
+  return {
+    ...resto,
+    citado: {
+      idMensaje: citado.idMensaje,
+      remitente: citado.remitente,
+      extracto,
+      ...(citado.eliminadoEn ? { eliminado: true } : {}),
+    },
+  };
 }
 
 const REACCIONES_SELECT = {

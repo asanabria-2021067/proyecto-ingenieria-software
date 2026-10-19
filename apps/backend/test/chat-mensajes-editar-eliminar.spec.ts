@@ -18,6 +18,9 @@ function mensajeRow(overrides: Record<string, unknown> = {}) {
     editadoEn: null,
     eliminadoEn: null,
     remitente: USUARIO,
+    citado: null,
+    reacciones: [],
+    guardadoPor: [],
     ...overrides,
   };
 }
@@ -44,9 +47,10 @@ describe('ChatService - editar y eliminar mensajes propios', () => {
         findMany: vi.fn(),
         update: vi.fn(),
       },
+      apodoConversacion: { findMany: vi.fn().mockResolvedValue([]) },
     };
     gateway = { broadcastMessageChange: vi.fn() };
-    service = new ChatService(prisma, gateway as unknown as ChatGateway);
+    service = new ChatService(prisma, gateway as unknown as ChatGateway, {} as never);
   });
 
   describe('editMessage', () => {
@@ -59,8 +63,8 @@ describe('ChatService - editar y eliminar mensajes propios', () => {
       const { data } = prisma.mensajeChat.update.mock.calls[0][0];
       expect(data.contenido).toBe('nuevo');
       expect(data.editadoEn).toBeInstanceOf(Date);
-      expect(resultado).toBe(editado);
-      expect(gateway.broadcastMessageChange).toHaveBeenCalledWith('messageUpdated', 5, [2], editado);
+      expect(resultado).toEqual({ ...editado, citado: null });
+      expect(gateway.broadcastMessageChange).toHaveBeenCalledWith('messageUpdated', 5, [2], resultado);
     });
 
     it('rechaza si quien edita no es el remitente', async () => {
@@ -109,6 +113,15 @@ describe('ChatService - editar y eliminar mensajes propios', () => {
       expect(gateway.broadcastMessageChange.mock.calls[0][3].contenido).toBe('');
     });
 
+    it('al eliminar, quien lo citaba deja de ver su contenido: la cita lleva eliminado y extracto vacio', async () => {
+      const citado = { idMensaje: 3, contenido: 'secreto', eliminadoEn: new Date(), remitente: USUARIO };
+      prisma.mensajeChat.update.mockResolvedValue(mensajeRow({ eliminadoEn: new Date(), citado }));
+
+      const resultado = await service.deleteMessage(10, 5, 7, 1);
+
+      expect(resultado.citado).toEqual({ idMensaje: 3, remitente: USUARIO, extracto: '', eliminado: true });
+    });
+
     it('rechaza si quien elimina no es el remitente', async () => {
       prisma.mensajeChat.findFirst.mockResolvedValue({ idRemitente: 2, eliminadoEn: null });
 
@@ -134,6 +147,21 @@ describe('ChatService - editar y eliminar mensajes propios', () => {
       const resultado = await service.getMessages(10, 5, 1);
 
       expect(resultado.map((m) => m.contenido)).toEqual(['visible', '']);
+    });
+
+    it('si el mensaje citado fue eliminado, la cita no trae su contenido y se marca eliminado', async () => {
+      const citadoEliminado = { idMensaje: 3, contenido: 'secreto', eliminadoEn: new Date(), remitente: USUARIO };
+      const citadoVisible = { idMensaje: 4, contenido: 'visible', eliminadoEn: null, remitente: USUARIO };
+      prisma.mensajeChat.findMany.mockResolvedValue([
+        mensajeRow({ idMensaje: 9, citado: citadoVisible }),
+        mensajeRow({ idMensaje: 8, citado: citadoEliminado }),
+      ]);
+
+      const [eliminado, visible] = await service.getMessages(10, 5, 1);
+
+      expect(eliminado.citado).toEqual({ idMensaje: 3, remitente: USUARIO, extracto: '', eliminado: true });
+      expect(JSON.stringify(eliminado)).not.toContain('secreto');
+      expect(visible.citado).toEqual({ idMensaje: 4, remitente: USUARIO, extracto: 'visible' });
     });
   });
 });

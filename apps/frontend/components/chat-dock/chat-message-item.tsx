@@ -20,7 +20,7 @@ import { nombreReal } from '@/lib/chat-apodos';
 import { claseBurbujaPropia } from '@/lib/chat-temas';
 import { useDeleteMessage, useEditMessage, useToggleSavedMessage } from '@/hooks/use-chat';
 import { confirmar } from '@/lib/mensajes';
-import type { ChatMensaje } from '@/lib/types/chat';
+import type { ChatMensaje, ChatTemaColor } from '@/lib/types/chat';
 
 function formatHora(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
@@ -52,7 +52,7 @@ interface ChatMessageItemProps {
   idConversacion: number;
   /** Apodo privado del remitente; el nombre real queda en el tooltip. */
   apodo?: string | null;
-  temaColor?: string | null;
+  temaColor?: ChatTemaColor | null;
   /** Resalte del mensaje al que se saltó desde la búsqueda o una cita. */
   resaltado?: boolean;
   onResponder: (mensaje: ChatMensaje) => void;

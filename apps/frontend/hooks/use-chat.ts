@@ -310,7 +310,15 @@ export function useSendMessage(idProyecto: number, idConversacion: number | null
 function reemplazarMensaje(queryClient: ReturnType<typeof useQueryClient>, mensaje: ChatMensaje) {
   queryClient.setQueriesData<ChatMensaje[]>(
     { predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === mensaje.idConversacion && query.queryKey[3] === 'mensajes' },
-    (current) => current?.map((m) => (m.idMensaje === mensaje.idMensaje ? { ...m, ...mensaje } : m)),
+    (current) =>
+      current?.map((m) => {
+        if (m.idMensaje === mensaje.idMensaje) return { ...m, ...mensaje };
+        // Quien cita un mensaje que acaba de eliminarse deja de ver su contenido.
+        if (mensaje.eliminadoEn && m.citado?.idMensaje === mensaje.idMensaje) {
+          return { ...m, citado: { ...m.citado, extracto: '', eliminado: true } };
+        }
+        return m;
+      }),
   );
 }
 

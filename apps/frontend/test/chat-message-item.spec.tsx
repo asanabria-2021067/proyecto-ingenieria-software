@@ -13,6 +13,9 @@ const deleteMutate = vi.fn();
 vi.mock('@/hooks/use-chat', () => ({
   useEditMessage: () => ({ mutate: editMutate, isPending: false }),
   useDeleteMessage: () => ({ mutate: deleteMutate, isPending: false }),
+  useToggleSavedMessage: () => ({ mutate: vi.fn(), isPending: false }),
+  useAttachmentThumbnail: () => ({ data: undefined }),
+  useLinkPreview: () => ({ data: undefined }),
 }));
 
 const confirmarMock = vi.fn();
@@ -33,8 +36,23 @@ const base: ChatMensaje = {
   remitente: { idUsuario: 1, nombre: 'Ana', apellido: 'Perez', fotoUrl: null },
 };
 
-function renderItem(mensaje: Partial<ChatMensaje> = {}, propio = true) {
-  render(createElement(ChatMessageItem, { mensaje: { ...base, ...mensaje }, propio, idProyecto: 10, idConversacion: 5 }));
+const onResponder = vi.fn();
+const onIrAlOriginal = vi.fn();
+const onReaccionar = vi.fn();
+
+function renderItem(mensaje: Partial<ChatMensaje> = {}, propio = true, extra: Record<string, unknown> = {}) {
+  render(
+    createElement(ChatMessageItem, {
+      mensaje: { ...base, ...mensaje },
+      propio,
+      idProyecto: 10,
+      idConversacion: 5,
+      onResponder,
+      onIrAlOriginal,
+      onReaccionar,
+      ...extra,
+    }),
+  );
 }
 
 async function abrirMenu() {
@@ -150,5 +168,61 @@ describe('ChatMessageItem', () => {
 
     deleteMutate.mock.calls[0][1].onError();
     expect(toastError).toHaveBeenCalledWith('No se pudo eliminar el mensaje');
+  });
+
+  it('expone los atributos de salto y el resalte para la busqueda', () => {
+    const { container } = render(
+      createElement(ChatMessageItem, { mensaje: base, propio: true, idProyecto: 10, idConversacion: 5, resaltado: true, onResponder, onIrAlOriginal, onReaccionar }),
+    );
+    const raiz = container.firstElementChild as HTMLElement;
+    expect(raiz).toHaveAttribute('data-mensaje-id', '7');
+    expect(raiz).toHaveAttribute('data-mensaje', '7');
+    expect(raiz.className).toContain('ring-primary');
+  });
+
+  it('muestra el apodo del remitente con el nombre real de tooltip', () => {
+    renderItem({}, false, { apodo: 'Jefa' });
+    expect(screen.getByText('Jefa')).toHaveAttribute('title', 'Ana Perez');
+  });
+
+  it('la cita salta al original y Responder avisa con el mensaje', () => {
+    renderItem({
+      citado: { idMensaje: 3, remitente: { idUsuario: 2, nombre: 'Luis', apellido: 'Gomez', fotoUrl: null }, extracto: 'texto original' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Ir al mensaje original de Luis Gomez/ }));
+    expect(onIrAlOriginal).toHaveBeenCalledWith(3);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Responder a Ana' }));
+    expect(onResponder).toHaveBeenCalledWith(expect.objectContaining({ idMensaje: 7 }));
+  });
+
+  it('si el mensaje citado fue eliminado la cita muestra "Mensaje eliminado" y no el contenido', () => {
+    renderItem({
+      citado: { idMensaje: 3, remitente: { idUsuario: 2, nombre: 'Luis', apellido: 'Gomez', fotoUrl: null }, extracto: '', eliminado: true },
+    });
+    expect(screen.getByRole('button', { name: /Ir al mensaje original de Luis Gomez: Mensaje eliminado/ })).toBeInTheDocument();
+  });
+
+  it('muestra el chip del adjunto y las reacciones, y reaccionar avisa con el emoji', () => {
+    renderItem({
+      adjunto: { idAdjunto: 9, nombreOriginal: 'hoja.pdf', mime: 'application/pdf', tamanoBytes: 2048 },
+      reacciones: [{ emoji: '👍', count: 2, reaccionadoPorMi: false }],
+    });
+    expect(screen.getByText('hoja.pdf')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /👍 2 reacciones/ }));
+    expect(onReaccionar).toHaveBeenCalledWith(7, '👍');
+  });
+
+  it('un mensaje eliminado no muestra adjunto, reacciones ni acciones de responder o guardar', () => {
+    renderItem({
+      contenido: '',
+      eliminadoEn: '2026-10-16T10:10:00.000Z',
+      adjunto: { idAdjunto: 9, nombreOriginal: 'hoja.pdf', mime: 'application/pdf', tamanoBytes: 2048 },
+      reacciones: [{ emoji: '👍', count: 2, reaccionadoPorMi: false }],
+    });
+    expect(screen.queryByText('hoja.pdf')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /👍/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Responder a/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Guardar mensaje')).not.toBeInTheDocument();
   });
 });

@@ -22,7 +22,7 @@ export function ChatCitaBloque({ cita, propio, onIrAlOriginal }: ChatCitaBloqueP
     <button
       type="button"
       onClick={() => onIrAlOriginal(cita.idMensaje)}
-      aria-label={`Ir al mensaje original de ${nombre}: ${cita.extracto}`}
+      aria-label={`Ir al mensaje original de ${nombre}: ${cita.eliminado ? 'Mensaje eliminado' : cita.extracto}`}
       className={`mb-1 block w-full rounded-md border-l-4 px-2 py-1 text-left text-xs ${
         propio
           ? 'border-primary-foreground/60 bg-primary-foreground/15 text-primary-foreground'
@@ -30,7 +30,9 @@ export function ChatCitaBloque({ cita, propio, onIrAlOriginal }: ChatCitaBloqueP
       }`}
     >
       <span className="block font-semibold">{nombre}</span>
-      <span className="line-clamp-2 break-words opacity-90">{cita.extracto}</span>
+      <span className={`line-clamp-2 break-words opacity-90 ${cita.eliminado ? 'italic' : ''}`}>
+        {cita.eliminado ? 'Mensaje eliminado' : cita.extracto}
+      </span>
     </button>
   );
 }
