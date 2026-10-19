@@ -50,6 +50,7 @@ import { AdjuntoIcono, ChatAdjuntoChip } from './chat-adjunto';
 import { ChatSearchPanel } from './chat-search';
 import { ApodosDialog } from '@/components/chat-dock/apodos-dialog';
 import { nombreMostrado, nombreReal } from '@/lib/chat-apodos';
+import { EstadoIndicador } from '@/components/chat-dock/estado-chat';
 import { getIniciales } from '@/components/projects/available-project-card';
 import {
   useLoadOlderMessages,
@@ -244,14 +245,17 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             <AvatarFallback className="text-[10px]">{getIniciales(otro?.nombre ?? '?', otro?.apellido ?? '')}</AvatarFallback>
           </Avatar>
         )}
-        <button
-          type="button"
-          onClick={onMinimize}
-          title={otro && !conversacion?.nombrePersonalizado ? nombreReal(otro) : undefined}
-          className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-on-surface"
-        >
-          {titulo}
-        </button>
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={onMinimize}
+            title={otro && !conversacion?.nombrePersonalizado ? nombreReal(otro) : undefined}
+            className="block w-full truncate text-left text-sm font-semibold text-on-surface"
+          >
+            {titulo}
+          </button>
+          {otro && <EstadoIndicador estado={otro.estado} />}
+        </div>
         {silenciada && (
           <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-text-secondary">
             <BellOff className="size-3.5" aria-hidden="true" />

@@ -22,6 +22,8 @@ export const searchMessagesQueryKey = (
   filtros: { q?: string; idAutor?: number; desde?: string; hasta?: string },
 ) => ['proyecto-conversaciones', idProyecto, idConversacion, 'busqueda', filtros] as const;
 
+export const miEstadoChatQueryKey = ['chat-estado'] as const;
+
 export const archivedConversationsQueryKey = (q: string) =>
   ['chats-archivados', q] as const;
 

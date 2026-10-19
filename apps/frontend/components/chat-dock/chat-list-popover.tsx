@@ -11,6 +11,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { NewChatDialog } from '@/components/chat-dock/new-chat-dialog';
 import { estaSilenciada } from '@/lib/chat-silencio';
+import { EstadoIndicador, MiEstadoBoton } from '@/components/chat-dock/estado-chat';
 import type { ChatConversacionGlobal } from '@/lib/types/chat';
 
 function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId: number | null): string {
@@ -58,15 +59,18 @@ export function ChatListPopover({ onClose }: ChatListPopoverProps) {
       <div className="shrink-0 border-b border-outline-variant px-3 pb-2 pt-3">
         <div className="flex items-center justify-between px-1 pb-2">
           <p className="text-sm font-bold text-on-surface">Mensajes</p>
-          <button
-            type="button"
-            onClick={() => setNuevoChatAbierto(true)}
-            aria-label="Nuevo chat"
-            title="Nuevo chat"
-            className="flex size-7 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
-          >
-            <SquarePen className="size-4" aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-1">
+            <MiEstadoBoton />
+            <button
+              type="button"
+              onClick={() => setNuevoChatAbierto(true)}
+              aria-label="Nuevo chat"
+              title="Nuevo chat"
+              className="flex size-7 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
+            >
+              <SquarePen className="size-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" aria-hidden="true" />
@@ -145,6 +149,7 @@ export function ChatListPopover({ onClose }: ChatListPopoverProps) {
                 <span className="mt-0.5 inline-block truncate rounded-full bg-surface-container-high px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
                   {c.proyecto.tituloProyecto}
                 </span>
+                {otro && <EstadoIndicador estado={otro.estado} />}
                 <p className="mt-0.5 truncate text-xs text-tertiary">
                   {c.ultimoMensaje ? c.ultimoMensaje.contenido : 'Sin mensajes todavía'}
                   {estado ? ` · ${estado}` : ''}

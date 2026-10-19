@@ -15,6 +15,7 @@ import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { estaEnNoMolestar, estaSilenciada } from './chat-silencio.util';
 import { UpdateNoMolestarDto } from './dto/update-no-molestar.dto';
 import { UpdateChatThemeDto } from './dto/update-chat-theme.dto';
+import { ESTADO_CHAT_SELECT, estadoVigente } from './chat-estado.service';
 
 /**
  * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
@@ -37,6 +38,15 @@ function chatArchivado(estadoProyecto: EstadoProyecto): boolean {
 const USUARIO_SELECT = {
   select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
 } as const;
+
+// Solo en los listados de participantes de conversaciones del usuario (privacidad del estado).
+const PARTICIPANTE_USUARIO = {
+  select: { ...USUARIO_SELECT.select, estadoChat: ESTADO_CHAT_SELECT },
+} as const;
+
+function conEstado<T extends { estadoChat: Parameters<typeof estadoVigente>[0] }>({ estadoChat, ...usuario }: T) {
+  return { ...usuario, estado: estadoVigente(estadoChat) };
+}
 
 const MENSAJE_SELECT = {
   idMensaje: true,
@@ -102,12 +112,12 @@ const apodosPropios = (userId: number) => ({
   select: { idUsuarioObjetivo: true, apodo: true },
 });
 
-function participantesConApodo(
-  participantes: { idUsuario: number; usuario: { idUsuario: number; nombre: string; apellido: string; fotoUrl: string | null } }[],
+function participantesConApodo<U extends { estadoChat: Parameters<typeof estadoVigente>[0] }>(
+  participantes: { idUsuario: number; usuario: U }[],
   apodos: { idUsuarioObjetivo: number; apodo: string }[],
 ) {
   const porUsuario = new Map(apodos.map((a) => [a.idUsuarioObjetivo, a.apodo]));
-  return participantes.map((p) => ({ ...p.usuario, apodo: porUsuario.get(p.idUsuario) ?? null }));
+  return participantes.map((p) => ({ ...conEstado(p.usuario), apodo: porUsuario.get(p.idUsuario) ?? null }));
 }
 
 @Injectable()
@@ -171,7 +181,7 @@ export class ChatService {
             silenciadaHasta: true,
             silenciadaSiempre: true,
             temaColor: true,
-            usuario: USUARIO_SELECT,
+            usuario: PARTICIPANTE_USUARIO,
           },
         },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
@@ -664,7 +674,7 @@ export class ChatService {
             silenciadaHasta: true,
             silenciadaSiempre: true,
             temaColor: true,
-            usuario: USUARIO_SELECT,
+            usuario: PARTICIPANTE_USUARIO,
           },
         },
         mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },

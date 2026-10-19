@@ -8,6 +8,7 @@ import type {
   ChatConversacionGlobal,
   ChatLectura,
   ChatEnlacesPagina,
+  ChatEstado,
   ChatMensaje,
   ChatReaccion,
   ChatTemaColor,
@@ -16,6 +17,7 @@ import type {
   ListArchivedConversationsFiltros,
   ListArchivedConversationsResultado,
   ConfigNoMolestar,
+  SetEstadoChatPayload,
   UpdateConversationPayload,
 } from '@/lib/types/chat';
 
@@ -230,4 +232,21 @@ export function updateNoMolestar(payload: ConfigNoMolestar): Promise<ConfigNoMol
     method: 'PUT',
     body: JSON.stringify({ activo, horaInicio, horaFin, diasSemana, zona }),
   });
+}
+
+export async function getMiEstado(): Promise<ChatEstado | null> {
+  const { estado } = await apiFetch<{ estado: ChatEstado | null }>('/chats/estado');
+  return estado;
+}
+
+export async function setMiEstado(payload: SetEstadoChatPayload): Promise<ChatEstado | null> {
+  const { estado } = await apiFetch<{ estado: ChatEstado | null }>('/chats/estado', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  return estado;
+}
+
+export function clearMiEstado(): Promise<void> {
+  return apiFetch('/chats/estado', { method: 'DELETE' });
 }
