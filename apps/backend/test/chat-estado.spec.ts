@@ -151,6 +151,7 @@ describe('ChatService - estado de participantes', () => {
     silenciada: false,
     esPrioritaria: true,
     mensajes: [],
+    apodos: [],
     participantes: [
       { idUsuario: 1, ultimaLecturaEn: null, usuario: { ...usuario, idUsuario: 1, estadoChat: null } },
       { idUsuario: 2, ultimaLecturaEn: null, usuario: { ...usuario, estadoChat } },
