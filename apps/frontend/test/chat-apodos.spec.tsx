@@ -42,6 +42,8 @@ vi.mock('@/hooks/use-chat', () => ({
   useAttachmentThumbnail: () => ({ data: undefined }),
   useLoadOlderMessages: () => async () => [],
   useToggleReaction: () => ({ mutate: vi.fn() }),
+  useEditMessage: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteMessage: () => ({ mutate: vi.fn(), isPending: false }),
   useLinkPreview: () => ({ data: undefined }),
   useUpdateChatTheme: () => ({ mutate: vi.fn(), isPending: false }),
   useToggleSavedMessage: () => ({ mutate: vi.fn(), isPending: false }),
