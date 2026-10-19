@@ -7,8 +7,6 @@ import {
   ArchiveRestore,
   Bell,
   BellOff,
-  Bookmark,
-  BookmarkCheck,
   ChevronDown,
   ChevronUp,
   Link2,
@@ -19,7 +17,6 @@ import {
   Paperclip,
   Palette,
   Pencil,
-  Reply,
   Search,
   Send,
   Star,
@@ -49,7 +46,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ChatLinksDialog } from './chat-links-dialog';
-import { AdjuntoIcono, ChatAdjuntoChip } from './chat-adjunto';
+import { AdjuntoIcono } from './chat-adjunto';
+import { ChatMessageItem } from './chat-message-item';
 import { ChatSearchPanel } from './chat-search';
 import { ApodosDialog } from '@/components/chat-dock/apodos-dialog';
 import { nombreMostrado, nombreReal } from '@/lib/chat-apodos';
@@ -68,20 +66,17 @@ import {
   useMarkConversationRead,
   useReadReceipts,
   useSilenciarConversation,
-  useToggleSavedMessage,
 } from '@/hooks/use-chat';
 import { quienesVieron, SeenBy, TypingIndicator } from '@/components/chat-dock/chat-indicators';
 import { NoMolestarDialog } from '@/components/chat-dock/no-molestar-dialog';
 import { estaSilenciada } from '@/lib/chat-silencio';
 import { CHAT_ADJUNTO_ACCEPT, formatearTamano, validarArchivoChat } from '@/lib/chat-adjuntos';
-import { MessageReactions } from './message-reactions';
 import { ChatThemeDialog } from '@/components/chat-dock/chat-theme-dialog';
-import { claseAcentoCabecera, claseBurbujaPropia } from '@/lib/chat-temas';
+import { claseAcentoCabecera } from '@/lib/chat-temas';
 import { ScheduleMessageButton, ScheduledMessagesList } from '@/components/chat-dock/scheduled-messages';
-import { LinkPreviewCard } from '@/components/chat-dock/link-preview-card';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useIrAlMensaje } from '@/hooks/use-ir-al-mensaje';
-import { ChatCitaBloque, ChatCitaVistaPrevia, extractoDe } from '@/components/chat-dock/chat-cita';
+import { ChatCitaVistaPrevia, extractoDe } from '@/components/chat-dock/chat-cita';
 import { confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
 import type { ChatConversacionGlobal, ChatMensaje } from '@/lib/types/chat';
@@ -92,29 +87,6 @@ function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId:
   if (conversacion.tipo === 'GRUPAL') return conversacion.nombre ?? 'Grupo';
   const otro = conversacion.participantes.find((p) => p.idUsuario !== currentUserId);
   return otro ? nombreMostrado(otro) : 'Conversación';
-}
-
-function formatHora(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
-}
-
-/** Marcador personal: visible al pasar el cursor o enfocar con teclado; fijo si el mensaje ya está guardado. */
-function SaveMessageButton({ idProyecto, idConversacion, idMensaje, guardado }: { idProyecto: number; idConversacion: number; idMensaje: number; guardado: boolean }) {
-  const alternar = useToggleSavedMessage(idProyecto, idConversacion);
-  const texto = guardado ? 'Quitar de guardados' : 'Guardar mensaje';
-  const Icono = guardado ? BookmarkCheck : Bookmark;
-  return (
-    <button
-      type="button"
-      aria-pressed={guardado}
-      disabled={alternar.isPending}
-      onClick={() => alternar.mutate(idMensaje, { onError: () => toast.error('No se pudo actualizar el mensaje guardado') })}
-      className={`shrink-0 rounded-control p-1 text-text-secondary transition-opacity hover:bg-on-surface/10 hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100 ${guardado ? 'opacity-100' : 'opacity-0'}`}
-    >
-      <Icono className="size-3.5" aria-hidden="true" />
-      <span className="sr-only">{texto}</span>
-    </button>
-  );
 }
 
 interface ChatWindowProps {
@@ -408,56 +380,25 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             {!isLoading && messages.length === 0 && (
               <p className="text-xs text-tertiary">Todavía no hay mensajes. Sé el primero en escribir.</p>
             )}
-            {messages.map((m) => {
-              const propio = m.remitente.idUsuario === currentUserId;
-              const apodo = m.apodoRemitente ?? conversacion?.participantes.find((p) => p.idUsuario === m.remitente.idUsuario)?.apodo;
-              return (
-                <Fragment key={m.idMensaje}>
-                <div
-                  data-mensaje-id={m.idMensaje}
-                  data-mensaje={m.idMensaje}
-                  tabIndex={-1}
-                  className={`group flex items-end gap-2 rounded-2xl outline-none ${propio ? 'flex-row-reverse' : ''} data-[resaltado]:ring-2 data-[resaltado]:ring-primary ${saltarA === m.idMensaje ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                >
-                  <Avatar className="size-6 shrink-0">
-                    {m.remitente.fotoUrl && <AvatarImage src={m.remitente.fotoUrl} alt="" />}
-                    <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
-                  </Avatar>
-                  <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? claseBurbujaPropia(conversacion?.temaColor) : 'bg-surface-container-high text-on-surface'}`}>
-                    {!propio && (
-                      <p className="mb-0.5 text-[11px] font-semibold opacity-80" title={apodo ? nombreReal(m.remitente) : undefined}>
-                        {apodo || m.remitente.nombre}
-                      </p>
-                    )}
-                    {m.citado && <ChatCitaBloque cita={m.citado} propio={propio} onIrAlOriginal={irAlMensaje} />}
-                    {m.adjunto && <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />}
-                    {m.contenido && <p className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}>{m.contenido}</p>}
-                    <LinkPreviewCard idProyecto={idProyecto} idConversacion={idConversacion} contenido={m.contenido} />
-                    <p className={`mt-0.5 text-[10px] ${propio ? '' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
-                    <MessageReactions
-                      reacciones={m.reacciones ?? []}
-                      onToggle={(emoji) =>
-                        reaccionar.mutate(
-                          { idMensaje: m.idMensaje, emoji },
-                          { onError: () => toast.error('No se pudo reaccionar al mensaje') },
-                        )
-                      }
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => responder(m)}
-                    aria-label={`Responder a ${m.remitente.nombre}`}
-                    className="rounded-control p-1 text-text-secondary opacity-0 hover:bg-on-surface/10 hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
-                  >
-                    <Reply className="size-4" aria-hidden="true" />
-                  </button>
-                  <SaveMessageButton idProyecto={idProyecto} idConversacion={idConversacion} idMensaje={m.idMensaje} guardado={m.guardado === true} />
-                </div>
+            {messages.map((m) => (
+              <Fragment key={m.idMensaje}>
+                <ChatMessageItem
+                  mensaje={m}
+                  propio={m.remitente.idUsuario === currentUserId}
+                  idProyecto={idProyecto}
+                  idConversacion={idConversacion}
+                  apodo={m.apodoRemitente ?? conversacion?.participantes.find((p) => p.idUsuario === m.remitente.idUsuario)?.apodo}
+                  temaColor={conversacion?.temaColor}
+                  resaltado={saltarA === m.idMensaje}
+                  onResponder={responder}
+                  onIrAlOriginal={irAlMensaje}
+                  onReaccionar={(idMensaje, emoji) =>
+                    reaccionar.mutate({ idMensaje, emoji }, { onError: () => toast.error('No se pudo reaccionar al mensaje') })
+                  }
+                />
                 {m === ultimoPropio && <SeenBy vieron={vieron} />}
-                </Fragment>
-              );
-            })}
+              </Fragment>
+            ))}
           </div>
 
           <TypingIndicator nombres={escribiendo} />

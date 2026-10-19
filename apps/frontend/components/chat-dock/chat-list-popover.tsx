@@ -234,7 +234,7 @@ export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) 
                 </span>
                 {otro && <EstadoIndicador estado={otro.estado} />}
                 <p className="mt-0.5 truncate text-xs text-tertiary">
-                  {c.ultimoMensaje ? c.ultimoMensaje.contenido : 'Sin mensajes todavía'}
+                  {c.ultimoMensaje ? (c.ultimoMensaje.eliminadoEn ? 'Mensaje eliminado' : c.ultimoMensaje.contenido) : 'Sin mensajes todavía'}
                   {estado ? ` · ${estado}` : ''}
                 </p>
               </div>

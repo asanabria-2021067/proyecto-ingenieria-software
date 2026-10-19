@@ -36,6 +36,8 @@ export interface ChatCita {
   idMensaje: number;
   remitente: ChatUsuario;
   extracto: string;
+  /** El mensaje citado fue eliminado: el extracto llega vacío. */
+  eliminado?: boolean;
 }
 
 export interface ChatReaccion {
@@ -56,6 +58,9 @@ export interface ChatMensaje {
   idConversacion: number;
   contenido: string;
   enviadoEn: string;
+  editadoEn?: string | null;
+  /** Mensaje eliminado: el backend manda `contenido` vacío. */
+  eliminadoEn?: string | null;
   remitente: ChatUsuario;
   adjunto?: ChatAdjunto | null;
   citado?: ChatCita | null;

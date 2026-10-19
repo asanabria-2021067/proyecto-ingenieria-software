@@ -123,6 +123,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /** Edición o eliminación de un mensaje; `conversationUpdated` refresca el resumen (último mensaje) de la lista. */
+  broadcastMessageChange(
+    evento: 'messageUpdated' | 'messageDeleted',
+    idConversacion: number,
+    destinatarios: number[],
+    mensaje: unknown,
+  ) {
+    this.server.to(`conversation:${idConversacion}`).emit(evento, { idConversacion, mensaje });
+    for (const idUsuario of destinatarios) {
+      this.server.to(`user:${idUsuario}`).emit('conversationUpdated', { idConversacion });
+    }
+  }
+
   /** Llamado por ChatService tras crear una conversación nueva. */
   notifyConversationCreated(idConversacion: number, destinatarios: number[]) {
     this.broadcaster.notifyConversationCreated(idConversacion, destinatarios);
