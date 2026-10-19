@@ -14,6 +14,7 @@ import {
   MoreVertical,
   Moon,
   Paperclip,
+  Palette,
   Pencil,
   Reply,
   Search,
@@ -57,6 +58,7 @@ import {
   useSendFileMessage,
   useToggleReaction,
   useUpdateConversation,
+  useUpdateChatTheme,
   useDeleteConversation,
   useAllConversations,
   useMarkConversationRead,
@@ -68,6 +70,8 @@ import { NoMolestarDialog } from '@/components/chat-dock/no-molestar-dialog';
 import { estaSilenciada } from '@/lib/chat-silencio';
 import { CHAT_ADJUNTO_ACCEPT, formatearTamano, validarArchivoChat } from '@/lib/chat-adjuntos';
 import { MessageReactions } from './message-reactions';
+import { ChatThemeDialog } from '@/components/chat-dock/chat-theme-dialog';
+import { claseAcentoCabecera, claseBurbujaPropia } from '@/lib/chat-temas';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useIrAlMensaje } from '@/hooks/use-ir-al-mensaje';
 import { ChatCitaBloque, ChatCitaVistaPrevia, extractoDe } from '@/components/chat-dock/chat-cita';
@@ -112,6 +116,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const eliminar = useDeleteConversation(idProyecto);
   const silenciar = useSilenciarConversation(idProyecto);
   const silenciada = conversacion ? estaSilenciada(conversacion) : false;
+  const cambiarTema = useUpdateChatTheme(idProyecto);
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
@@ -124,6 +129,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const enviando = enviar.isPending || enviarArchivo.isPending;
   const [citando, setCitando] = useState<ChatMensaje | null>(null);
   const [apodosAbierto, setApodosAbierto] = useState(false);
+  const [temaAbierto, setTemaAbierto] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cargarAnteriores = useLoadOlderMessages(idProyecto, idConversacion);
@@ -227,7 +233,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
 
   return (
     <div className="flex w-[36rem] shrink-0 flex-col rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest shadow-raised max-w-[calc(100vw-2rem)]">
-      <div className="flex shrink-0 items-center gap-2 rounded-t-xl border-b border-outline-variant bg-surface-container px-3 py-2">
+      <div className={`flex shrink-0 items-center gap-2 rounded-t-xl border-b border-outline-variant bg-surface-container px-3 py-2 ${claseAcentoCabecera(conversacion?.temaColor)}`}>
         {conversacion?.tipo === 'GRUPAL' ? (
           <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
             <UsersIcon className="size-3.5" aria-hidden="true" />
@@ -283,6 +289,10 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             <DropdownMenuItem onClick={() => setApodosAbierto(true)}>
               <Tag className="size-4" aria-hidden="true" />
               Apodos
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTemaAbierto(true)}>
+              <Palette className="size-4" aria-hidden="true" />
+              Tema de color
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => actualizar.mutate({ idConversacion, payload: { esFavorita: !conversacion?.esFavorita } })}
@@ -377,7 +387,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     {m.remitente.fotoUrl && <AvatarImage src={m.remitente.fotoUrl} alt="" />}
                     <AvatarFallback className="text-[10px]">{getIniciales(m.remitente.nombre, m.remitente.apellido)}</AvatarFallback>
                   </Avatar>
-                  <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? 'bg-primary text-primary-foreground' : 'bg-surface-container-high text-on-surface'}`}>
+                  <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${propio ? claseBurbujaPropia(conversacion?.temaColor) : 'bg-surface-container-high text-on-surface'}`}>
                     {!propio && (
                       <p className="mb-0.5 text-[11px] font-semibold opacity-80" title={apodo ? nombreReal(m.remitente) : undefined}>
                         {apodo || m.remitente.nombre}
@@ -386,7 +396,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                     {m.citado && <ChatCitaBloque cita={m.citado} propio={propio} onIrAlOriginal={irAlMensaje} />}
                     {m.adjunto && <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />}
                     {m.contenido && <p className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}>{m.contenido}</p>}
-                    <p className={`mt-0.5 text-[10px] ${propio ? 'text-primary-foreground/70' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
+                    <p className={`mt-0.5 text-[10px] ${propio ? '' : 'text-tertiary'}`}>{formatHora(m.enviadoEn)}</p>
                     <MessageReactions
                       reacciones={m.reacciones ?? []}
                       onToggle={(emoji) =>
@@ -508,6 +518,12 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
           participantes={conversacion.participantes.filter((p) => p.idUsuario !== currentUserId)}
         />
       )}
+      <ChatThemeDialog
+        open={temaAbierto}
+        onOpenChange={setTemaAbierto}
+        value={conversacion?.temaColor ?? null}
+        onChange={(temaColor) => cambiarTema.mutate({ idConversacion, temaColor })}
+      />
 
       <RenameConversationDialog
         open={renombrarAbierto}

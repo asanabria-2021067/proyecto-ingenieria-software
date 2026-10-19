@@ -37,6 +37,7 @@ function conversacion(overrides: Partial<ChatConversacionGlobal> = {}): ChatConv
     silenciadaHasta: null,
     silenciadaSiempre: false,
     esPrioritaria: true,
+    temaColor: null,
     ...overrides,
   };
 }

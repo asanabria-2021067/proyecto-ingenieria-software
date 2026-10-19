@@ -38,6 +38,7 @@ vi.mock('@/hooks/use-chat', () => ({
   useReadReceipts: () => ({ lecturas: [] }),
   useLoadOlderMessages: () => async () => [],
   useToggleReaction: () => ({ mutate: vi.fn() }),
+  useUpdateChatTheme: () => ({ mutate: vi.fn(), isPending: false }),
   useMarkConversationRead: () => ({ mutate: vi.fn() }),
   useSilenciarConversation: () => ({ mutate: vi.fn(), isPending: false }),
 }));

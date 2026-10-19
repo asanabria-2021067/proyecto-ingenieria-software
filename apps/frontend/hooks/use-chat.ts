@@ -23,6 +23,7 @@ import {
   setApodo,
   silenciarConversation,
   toggleReaction,
+  updateChatTheme,
   updateConversation,
   updateNoMolestar,
 } from '@/lib/services/chat';
@@ -38,7 +39,7 @@ import {
   projectConversationsQueryKey,
   searchMessagesQueryKey,
 } from '@/lib/query-keys/chat';
-import type { BuscarMensajesFiltros, ChatLectura, ChatMensaje, ChatReaccion, ChatReaccionSocket, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
+import type { BuscarMensajesFiltros, ChatLectura, ChatMensaje, ChatReaccion, ChatTemaColor, ChatReaccionSocket, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
 import { alternarReaccionLocal, reaccionesDesdeSocket } from '@/lib/chat-reacciones';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
@@ -341,6 +342,16 @@ export function useUpdateNoMolestar() {
   return useMutation({
     mutationFn: (payload: ConfigNoMolestar) => updateNoMolestar(payload),
     onSuccess: (guardada) => queryClient.setQueryData(noMolestarQueryKey, guardada),
+  });
+}
+
+/** Tema de color propio de la conversación (null = por defecto). */
+export function useUpdateChatTheme(idProyecto: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idConversacion, temaColor }: { idConversacion: number; temaColor: ChatTemaColor | null }) =>
+      updateChatTheme(idProyecto, idConversacion, temaColor),
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
   });
 }
 

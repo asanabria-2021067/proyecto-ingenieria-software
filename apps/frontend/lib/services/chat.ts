@@ -10,6 +10,7 @@ import type {
   ChatEnlacesPagina,
   ChatMensaje,
   ChatReaccion,
+  ChatTemaColor,
   CreateConversationPayload,
   DuracionSilencio,
   ListArchivedConversationsFiltros,
@@ -172,6 +173,17 @@ export function setApodo(
 export function removeApodo(idProyecto: number, idConversacion: number, idObjetivo: number): Promise<void> {
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/apodos/${idObjetivo}`, {
     method: 'DELETE',
+  });
+}
+
+export function updateChatTheme(
+  idProyecto: number,
+  idConversacion: number,
+  temaColor: ChatTemaColor | null,
+): Promise<void> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/tema`, {
+    method: 'PATCH',
+    body: JSON.stringify({ temaColor }),
   });
 }
 

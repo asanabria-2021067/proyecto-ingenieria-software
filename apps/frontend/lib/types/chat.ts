@@ -87,6 +87,9 @@ export interface ChatEnlacesPagina {
   nextCursor: number | null;
 }
 
+/** Lista cerrada de temas de color (misma lista que valida el backend). */
+export type ChatTemaColor = 'verde' | 'azul' | 'violeta' | 'naranja' | 'rosa' | 'gris';
+
 export interface ChatConversacion {
   idConversacion: number;
   tipo: 'GRUPAL' | 'INDIVIDUAL';
@@ -107,6 +110,8 @@ export interface ChatConversacion {
   silenciadaHasta: string | null;
   silenciadaSiempre: boolean;
   esPrioritaria: boolean;
+  /** Tema elegido por el usuario autenticado; null = color por defecto. */
+  temaColor: ChatTemaColor | null;
 }
 
 /** Dock global de chat: cruza todos los proyectos del usuario (a diferencia
@@ -131,6 +136,8 @@ export interface ChatConversacionGlobal {
   silenciadaHasta: string | null;
   silenciadaSiempre: boolean;
   esPrioritaria: boolean;
+  /** Tema elegido por el usuario autenticado; null = color por defecto. */
+  temaColor: ChatTemaColor | null;
 }
 
 /** Modo no molestar del chat: 0 = domingo ... 6 = sabado, horas "HH:mm" en `zona`. */

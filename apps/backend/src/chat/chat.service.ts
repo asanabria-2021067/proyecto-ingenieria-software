@@ -14,6 +14,7 @@ import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { estaEnNoMolestar, estaSilenciada } from './chat-silencio.util';
 import { UpdateNoMolestarDto } from './dto/update-no-molestar.dto';
+import { UpdateChatThemeDto } from './dto/update-chat-theme.dto';
 
 /**
  * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
@@ -169,6 +170,7 @@ export class ChatService {
             ultimaLecturaEn: true,
             silenciadaHasta: true,
             silenciadaSiempre: true,
+            temaColor: true,
             usuario: USUARIO_SELECT,
           },
         },
@@ -203,6 +205,7 @@ export class ChatService {
           silenciadaHasta: propia?.silenciadaHasta ?? null,
           silenciadaSiempre: propia?.silenciadaSiempre ?? false,
           esPrioritaria: c.esPrioritaria,
+          temaColor: propia?.temaColor ?? null,
         };
       }),
     );
@@ -592,6 +595,15 @@ export class ChatService {
     await this.prisma.conversacion.update({ where: { idConversacion }, data });
   }
 
+  /** Tema de color propio: solo toca la fila del participante autenticado. */
+  async updateTheme(idProyecto: number, idConversacion: number, userId: number, dto: UpdateChatThemeDto) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    await this.prisma.conversacionParticipante.update({
+      where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
+      data: { temaColor: dto.temaColor },
+    });
+  }
+
   /** Borrar conversación desde el dock de chat: soft-delete (mismo patrón que
    * archivadaEn), notifica en vivo al resto de participantes para que
    * desaparezca de su lista sin que tengan que recargar. */
@@ -651,6 +663,7 @@ export class ChatService {
             ultimaLecturaEn: true,
             silenciadaHasta: true,
             silenciadaSiempre: true,
+            temaColor: true,
             usuario: USUARIO_SELECT,
           },
         },
@@ -687,6 +700,7 @@ export class ChatService {
           silenciadaHasta: propia?.silenciadaHasta ?? null,
           silenciadaSiempre: propia?.silenciadaSiempre ?? false,
           esPrioritaria: c.esPrioritaria,
+          temaColor: propia?.temaColor ?? null,
         };
       }),
     );
