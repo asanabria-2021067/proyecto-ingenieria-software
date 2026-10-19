@@ -14,6 +14,7 @@ import {
   getAttachmentThumbnail,
   getFiles,
   getLinks,
+  getLinkPreview,
   getMessages,
   getMiEstado,
   getNoMolestar,
@@ -47,6 +48,7 @@ import {
   conversationMessagesQueryKey,
   miEstadoChatQueryKey,
   conversationReadsQueryKey,
+  linkPreviewQueryKey,
   noMolestarQueryKey,
   projectConversationsQueryKey,
   savedMessagesQueryKey,
@@ -274,6 +276,17 @@ export function useLoadOlderMessages(idProyecto: number, idConversacion: number)
     }
     return previos;
   };
+}
+
+/** Una consulta por URL; sin reintentos (el error es definitivo) y cacheada mientras dure la sesion. */
+export function useLinkPreview(idProyecto: number, idConversacion: number, url: string | null) {
+  return useQuery({
+    queryKey: linkPreviewQueryKey(idConversacion, url ?? ''),
+    queryFn: () => getLinkPreview(idProyecto, idConversacion, url as string),
+    enabled: url != null,
+    retry: false,
+    staleTime: Infinity,
+  });
 }
 
 export function useSendMessage(idProyecto: number, idConversacion: number | null) {

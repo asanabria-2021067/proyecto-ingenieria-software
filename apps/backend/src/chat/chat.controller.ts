@@ -18,8 +18,11 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
 import { ADJUNTO_MAX_BYTES, type ArchivoSubido } from './chat-adjuntos';
+import { LinkPreviewDto } from './dto/link-preview.dto';
+import { LinkPreviewService } from './link-preview/link-preview.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListLinksQueryDto } from './dto/list-links-query.dto';
 import { SendFileMessageDto } from './dto/send-file-message.dto';
@@ -39,7 +42,10 @@ export const CHAT_UPLOAD_LIMITS = { files: 1, fields: 1, parts: 3, fileSize: ADJ
 @Controller('proyectos/:projectId/conversaciones')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
-  constructor(private chatService: ChatService) {}
+  constructor(
+    private chatService: ChatService,
+    private linkPreviewService: LinkPreviewService,
+  ) {}
 
   @Get()
   findAll(
@@ -168,6 +174,20 @@ export class ChatController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.chatService.toggleSavedMessage(projectId, conversationId, messageId, user.userId);
+  }
+
+  // Solo participantes; consulta externa, por eso un limite propio mas estricto que el global.
+  @Post(':conversationId/vista-previa')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ medium: { limit: 20, ttl: 10000 } })
+  async linkPreview(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: LinkPreviewDto,
+  ) {
+    await this.chatService.assertConversationParticipant(projectId, conversationId, user.userId);
+    return this.linkPreviewService.preview(dto.url);
   }
 
   @Patch(':conversationId')

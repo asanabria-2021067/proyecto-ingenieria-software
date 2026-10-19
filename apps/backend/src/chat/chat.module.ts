@@ -11,6 +11,7 @@ import { ChatEstadoService } from './chat-estado.service';
 import { MensajesProgramadosService } from './mensajes-programados.service';
 import { MensajesProgramadosController } from './mensajes-programados.controller';
 import { ChatGateway } from './chat.gateway';
+import { LinkPreviewService } from './link-preview/link-preview.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 import { getJwtSecretFromConfig } from '../config/jwt-secret';
@@ -30,7 +31,7 @@ import { WsAuthService } from '../ws-auth/ws-auth.service';
   ],
   controllers: [ChatController, ChatArchivadoController, ChatEstadoController, MensajesProgramadosController, ChatCanalesController],
   // G07 (OWASP25-C025): política del handshake con el JwtService de este módulo.
-  providers: [ChatService, ChatCanalesService, ChatEstadoService, ChatGateway, WsAuthService, MensajesProgramadosService],
+  providers: [ChatService, ChatCanalesService, ChatEstadoService, ChatGateway, WsAuthService, MensajesProgramadosService, LinkPreviewService],
   exports: [ChatCanalesService],
 })
 export class ChatModule {}
