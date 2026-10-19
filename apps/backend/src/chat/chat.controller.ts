@@ -23,6 +23,7 @@ import { ADJUNTO_MAX_BYTES, type ArchivoSubido } from './chat-adjuntos';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListLinksQueryDto } from './dto/list-links-query.dto';
 import { SendFileMessageDto } from './dto/send-file-message.dto';
+import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { SilenciarConversationDto } from './dto/silenciar-conversation.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
@@ -74,6 +75,16 @@ export class ChatController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.chatService.getLinks(projectId, conversationId, user.userId, query);
+  }
+
+  @Get(':conversationId/mensajes/buscar')
+  searchMessages(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Query() query: SearchMessagesQueryDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.searchMessages(projectId, conversationId, user.userId, query);
   }
 
   @Post(':conversationId/mensajes')

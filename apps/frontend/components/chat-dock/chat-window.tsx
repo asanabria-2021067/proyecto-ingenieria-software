@@ -16,6 +16,7 @@ import {
   Paperclip,
   Pencil,
   Reply,
+  Search,
   Send,
   Star,
   StarOff,
@@ -44,6 +45,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ChatLinksDialog } from './chat-links-dialog';
 import { AdjuntoIcono, ChatAdjuntoChip } from './chat-adjunto';
+import { ChatSearchPanel } from './chat-search';
 import { getIniciales } from '@/components/projects/available-project-card';
 import {
   useLoadOlderMessages,
@@ -124,11 +126,14 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
     cargarAnteriores,
     onNoDisponible: () => toast.info('El mensaje original ya no está disponible'),
   });
+  const [buscarAbierto, setBuscarAbierto] = useState(false);
+  const [saltarA, setSaltarA] = useState<number | null>(null);
+  const saltarARef = useRef<number | null>(null);
 
   // Solo al llegar un mensaje nuevo: cargar páginas anteriores no debe mover la vista al final.
   const ultimoId = messages[messages.length - 1]?.idMensaje;
   useEffect(() => {
-    if (!minimized) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+    if (!minimized && !saltarARef.current) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [ultimoId, minimized]);
 
   const responder = (mensaje: ChatMensaje) => {
@@ -149,6 +154,17 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const escribiendo = (conversacion?.participantes ?? [])
     .filter((p) => typingUserIds.includes(p.idUsuario) && p.idUsuario !== currentUserId)
     .map((p) => p.nombre);
+
+  // Salto desde la búsqueda: centra el mensaje, lo enfoca y quita el resalte a los 3 s.
+  useEffect(() => {
+    saltarARef.current = saltarA;
+    if (!saltarA) return;
+    const destino = listRef.current?.querySelector<HTMLElement>(`[data-mensaje="${saltarA}"]`);
+    destino?.scrollIntoView({ block: 'center' });
+    destino?.focus({ preventScroll: true });
+    const timer = setTimeout(() => setSaltarA(null), 3000);
+    return () => clearTimeout(timer);
+  }, [saltarA]);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -228,6 +244,16 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             Silenciado
           </span>
         )}
+
+        <button
+          type="button"
+          onClick={() => setBuscarAbierto((abierto) => !abierto)}
+          aria-label="Buscar en la conversación"
+          aria-expanded={buscarAbierto}
+          className="rounded-control p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary"
+        >
+          <Search className="size-4" aria-hidden="true" />
+        </button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -310,6 +336,15 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
 
       {!minimized && (
         <>
+          {buscarAbierto && (
+            <ChatSearchPanel
+              idProyecto={idProyecto}
+              idConversacion={idConversacion}
+              participantes={conversacion?.participantes ?? []}
+              onJump={setSaltarA}
+              onClose={() => setBuscarAbierto(false)}
+            />
+          )}
           <div ref={listRef} className="h-[40rem] max-h-[60vh] min-h-0 space-y-3 overflow-y-auto px-3 py-3">
             {isLoading && <p className="text-xs text-tertiary">Cargando historial…</p>}
             {!isLoading && messages.length === 0 && (
@@ -321,8 +356,9 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                 <Fragment key={m.idMensaje}>
                 <div
                   data-mensaje-id={m.idMensaje}
+                  data-mensaje={m.idMensaje}
                   tabIndex={-1}
-                  className={`group flex items-end gap-2 rounded-2xl outline-none ${propio ? 'flex-row-reverse' : ''} data-[resaltado]:ring-2 data-[resaltado]:ring-primary`}
+                  className={`group flex items-end gap-2 rounded-2xl outline-none ${propio ? 'flex-row-reverse' : ''} data-[resaltado]:ring-2 data-[resaltado]:ring-primary ${saltarA === m.idMensaje ? 'ring-2 ring-primary ring-offset-2' : ''}`}
                 >
                   <Avatar className="size-6 shrink-0">
                     {m.remitente.fotoUrl && <AvatarImage src={m.remitente.fotoUrl} alt="" />}

@@ -2,6 +2,8 @@ import { apiFetch, apiFetchBlob } from '@/lib/api/client';
 import type {
   ChatAdjuntoUrl,
   ChatArchivosPagina,
+  BuscarMensajesFiltros,
+  BuscarMensajesResultado,
   ChatConversacion,
   ChatConversacionGlobal,
   ChatLectura,
@@ -45,6 +47,20 @@ export function getLinks(
 ): Promise<ChatEnlacesPagina> {
   const query = cursor ? `?cursor=${cursor}` : '';
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/enlaces${query}`);
+}
+
+export function searchMessages(
+  idProyecto: number,
+  idConversacion: number,
+  filtros: BuscarMensajesFiltros,
+): Promise<BuscarMensajesResultado> {
+  const params = new URLSearchParams();
+  if (filtros.q) params.set('q', filtros.q);
+  if (filtros.idAutor) params.set('idAutor', String(filtros.idAutor));
+  if (filtros.desde) params.set('desde', filtros.desde);
+  if (filtros.hasta) params.set('hasta', filtros.hasta);
+  if (filtros.pagina) params.set('pagina', String(filtros.pagina));
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/buscar?${params.toString()}`);
 }
 
 export function sendMessage(

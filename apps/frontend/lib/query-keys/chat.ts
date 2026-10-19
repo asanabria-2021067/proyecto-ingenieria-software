@@ -16,6 +16,12 @@ export const conversationFilesQueryKey = (idProyecto: number, idConversacion: nu
 export const attachmentThumbnailQueryKey = (idProyecto: number, idConversacion: number, idAdjunto: number) =>
   ['chat-adjunto-miniatura', idProyecto, idConversacion, idAdjunto] as const;
 
+export const searchMessagesQueryKey = (
+  idProyecto: number,
+  idConversacion: number,
+  filtros: { q?: string; idAutor?: number; desde?: string; hasta?: string },
+) => ['proyecto-conversaciones', idProyecto, idConversacion, 'busqueda', filtros] as const;
+
 export const archivedConversationsQueryKey = (q: string) =>
   ['chats-archivados', q] as const;
 
