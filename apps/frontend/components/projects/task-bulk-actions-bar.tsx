@@ -79,7 +79,7 @@ function descripcionResultado(total: number, actualizadas: number, verbo: string
 }
 
 const BOTON_BARRA =
-  'h-9 gap-1.5 rounded-control px-3 text-xs font-semibold text-on-action hover:bg-on-action/10 hover:text-on-action dark:hover:bg-on-action/10 focus-visible:ring-2 focus-visible:ring-on-action/40 disabled:opacity-50';
+  'h-9 gap-1.5 rounded-control px-3 text-xs font-semibold text-on-bulk-bar hover:bg-on-bulk-bar/10 hover:text-on-bulk-bar dark:hover:bg-on-bulk-bar/10 focus-visible:ring-2 focus-visible:ring-on-bulk-bar/40 disabled:opacity-50';
 
 /**
  * HU-202/T-384: barra contextual de acciones masivas. Aparece abajo al
@@ -204,20 +204,20 @@ export function TaskBulkActionsBar({ tareas, members, labels, accionMasiva, onLi
         role="toolbar"
         aria-label="Acciones masivas"
         data-slot="task-bulk-actions-bar"
-        className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-card bg-action p-1.5 text-on-action shadow-raised motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-4 motion-safe:duration-200"
+        className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-card border border-bulk-bar-border bg-bulk-bar p-1.5 text-on-bulk-bar shadow-raised motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-4 motion-safe:duration-200"
       >
         <span className="flex shrink-0 items-center gap-2 py-1 pr-2 pl-2.5 text-xs font-semibold" aria-live="polite">
           {ocupada ? (
             <Spinner className="size-4" aria-label="Aplicando la acción" />
           ) : (
-            <span className="pill pill-sm min-w-6 justify-center bg-accent font-bold tabular-nums text-on-accent">
+            <span className="pill pill-sm min-w-6 justify-center bg-bulk-bar-accent font-bold tabular-nums text-on-bulk-bar-accent">
               {cantidad}
             </span>
           )}
           <span>{cantidad === 1 ? 'seleccionada' : 'seleccionadas'}</span>
         </span>
 
-        <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-on-action/20" />
+        <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-on-bulk-bar/20" />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -342,7 +342,7 @@ export function TaskBulkActionsBar({ tareas, members, labels, accionMasiva, onLi
           </PopoverContent>
         </Popover>
 
-        <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-on-action/20" />
+        <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-on-bulk-bar/20" />
 
         <Button
           type="button"
@@ -354,7 +354,7 @@ export function TaskBulkActionsBar({ tareas, members, labels, accionMasiva, onLi
           className={`${BOTON_BARRA} px-2.5`}
         >
           <X className="size-3.5" aria-hidden="true" />
-          <Kbd className="hidden bg-on-action/15 text-on-action md:inline-flex">Esc</Kbd>
+          <Kbd className="hidden bg-on-bulk-bar/15 text-on-bulk-bar md:inline-flex">Esc</Kbd>
         </Button>
       </div>
     </div>
