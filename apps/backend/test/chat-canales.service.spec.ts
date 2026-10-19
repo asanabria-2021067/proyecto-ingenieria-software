@@ -330,6 +330,7 @@ describe('ChatService - acceso a canales', () => {
     prisma = {
       ...makePrisma(),
       mensajeChat: { create: vi.fn(), count: vi.fn(), findMany: vi.fn() },
+      apodoConversacion: { findMany: vi.fn().mockResolvedValue([]) },
     };
     service = new ChatService(prisma as any, makeGateway() as any);
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 10, creadoPor: LIDER, estadoProyecto: 'EN_PROGRESO' });

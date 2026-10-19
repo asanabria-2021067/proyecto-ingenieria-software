@@ -22,7 +22,10 @@ const abrirChat = vi.hoisted(() => vi.fn());
 vi.mock('@/components/chat-dock/chat-dock-context', () => ({ useChatDock: () => ({ abrirChat }) }));
 
 const listAllConversationsMock = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/services/chat', () => ({ listAllConversations: (...args: unknown[]) => listAllConversationsMock(...args) }));
+vi.mock('@/lib/services/chat', () => ({
+  listAllConversations: (...args: unknown[]) => listAllConversationsMock(...args),
+  getMiEstado: vi.fn().mockResolvedValue(null),
+}));
 
 const getMyProjectsMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/services/projects', () => ({
@@ -68,7 +71,11 @@ function conversacion(overrides: Partial<ChatConversacionGlobal> = {}): ChatConv
     esFavorita: false,
     archivadaManual: false,
     silenciada: false,
+    silenciadaPorMi: false,
+    silenciadaHasta: null,
+    silenciadaSiempre: false,
     esPrioritaria: true,
+    temaColor: null,
     ...overrides,
   };
 }

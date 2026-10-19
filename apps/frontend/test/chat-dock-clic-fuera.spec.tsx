@@ -9,7 +9,10 @@ vi.mock('@/components/chat-dock/chat-dock-context', () => ({
 vi.mock('@/hooks/use-chat', () => ({
   useAllConversations: () => ({ conversations: [] }),
   useGlobalChatSocket: () => ({ isConnected: true }),
+  useNoMolestar: () => ({ config: undefined }),
 }));
+vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: undefined }) }));
+vi.mock('@/components/chat-dock/saved-messages-dialog', () => ({ SavedMessagesDialog: () => null }));
 vi.mock('@/components/chat-dock/chat-list-popover', () => ({
   ChatListPopover: () => createElement('div', { 'data-testid': 'lista' }, 'lista'),
 }));
