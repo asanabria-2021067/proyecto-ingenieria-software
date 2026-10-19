@@ -13,6 +13,7 @@ function makePrisma() {
     conversacion: { findFirst: vi.fn() },
     mensajeChat: { findFirst: vi.fn(), findMany: vi.fn() },
     reaccionMensajeChat: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), findMany: vi.fn() },
+    apodoConversacion: { findMany: vi.fn().mockResolvedValue([]) },
   };
 }
 

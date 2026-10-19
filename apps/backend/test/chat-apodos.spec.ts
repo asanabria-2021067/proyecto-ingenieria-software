@@ -78,8 +78,8 @@ describe('ChatService - apodos por chat', () => {
   describe('privacidad por usuario', () => {
     it('getMessages solo consulta los apodos definidos por el usuario autenticado y los aplica', async () => {
       prisma.mensajeChat.findMany.mockResolvedValue([
-        { idMensaje: 2, remitente: u(2, 'Rosa') },
-        { idMensaje: 1, remitente: u(1, 'Yo') },
+        { idMensaje: 2, remitente: u(2, 'Rosa'), reacciones: [] },
+        { idMensaje: 1, remitente: u(1, 'Yo'), reacciones: [] },
       ]);
       prisma.apodoConversacion.findMany.mockResolvedValue([{ idUsuarioObjetivo: 2, apodo: 'Rosita' }]);
 
