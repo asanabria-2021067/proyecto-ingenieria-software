@@ -92,7 +92,7 @@ describe('ChatService - reacciones', () => {
   });
 
   it('getMessages devuelve las reacciones agrupadas por emoji segun el usuario que consulta', async () => {
-    const base = { idConversacion: 5, contenido: 'hola', enviadoEn: new Date(), remitente: {} };
+    const base = { idConversacion: 5, contenido: 'hola', enviadoEn: new Date(), remitente: {}, guardadoPor: [] };
     const filas = () => [
       {
         ...base,

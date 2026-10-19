@@ -37,11 +37,13 @@ const deleteMutate = vi.fn();
 const themeMutate = vi.fn();
 let temaActual: string | null = null;
 const silenciarMutate = vi.fn();
+const toggleSavedMutate = vi.fn();
 const silencio = vi.hoisted(() => ({ siempre: false }));
 vi.mock('@/hooks/use-chat', () => ({
   useMessages: () => ({ messages: mensajesMock, isLoading: false }),
   useReadReceipts: () => ({ lecturas: lecturasMock }),
   useMarkConversationRead: () => ({ mutate: markReadMutate }),
+  useToggleSavedMessage: () => ({ mutate: toggleSavedMutate, isPending: false }),
   useSendMessage: () => ({ mutate: sendMutate, isPending: false }),
   useSendFileMessage: () => ({ mutate: sendFileMutate, isPending: false }),
   useAttachmentThumbnail: () => ({ data: undefined }),
@@ -216,6 +218,38 @@ describe('ChatWindow', () => {
 
     await waitFor(() => expect(deleteMutate).toHaveBeenCalled());
     expect(onClose).toHaveBeenCalled();
+  });
+
+  describe('guardar mensajes', () => {
+    const remitente = { idUsuario: 2, nombre: 'Rosa', apellido: 'Fuentes', fotoUrl: null };
+    const mensaje = (idMensaje: number, guardado?: boolean) => ({
+      idMensaje,
+      idConversacion: 5,
+      contenido: `mensaje ${idMensaje}`,
+      enviadoEn: new Date().toISOString(),
+      remitente,
+      guardado,
+    });
+
+    it('un mensaje sin guardar ofrece "Guardar mensaje" con aria-pressed=false y lo guarda al activarlo', () => {
+      mensajesMock = [mensaje(7, false)];
+      renderWindow();
+
+      const boton = screen.getByRole('button', { name: 'Guardar mensaje' });
+      expect(boton).toHaveAttribute('aria-pressed', 'false');
+      fireEvent.click(boton);
+
+      expect(toggleSavedMutate).toHaveBeenCalledWith(7, expect.any(Object));
+    });
+
+    it('un mensaje guardado ofrece "Quitar de guardados" con aria-pressed=true', () => {
+      mensajesMock = [mensaje(8, true), mensaje(9)];
+      renderWindow();
+
+      expect(screen.getByRole('button', { name: 'Quitar de guardados' })).toHaveAttribute('aria-pressed', 'true');
+      // `guardado` ausente (mensaje llegado por socket) cuenta como no guardado.
+      expect(screen.getByRole('button', { name: 'Guardar mensaje' })).toHaveAttribute('aria-pressed', 'false');
+    });
   });
 
   it('minimizada, no muestra el historial ni el input', () => {

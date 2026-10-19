@@ -7,6 +7,8 @@ import {
   ArchiveRestore,
   Bell,
   BellOff,
+  Bookmark,
+  BookmarkCheck,
   ChevronDown,
   ChevronUp,
   Link2,
@@ -65,6 +67,7 @@ import {
   useMarkConversationRead,
   useReadReceipts,
   useSilenciarConversation,
+  useToggleSavedMessage,
 } from '@/hooks/use-chat';
 import { quienesVieron, SeenBy, TypingIndicator } from '@/components/chat-dock/chat-indicators';
 import { NoMolestarDialog } from '@/components/chat-dock/no-molestar-dialog';
@@ -89,6 +92,25 @@ function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId:
 
 function formatHora(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Marcador personal: visible al pasar el cursor o enfocar con teclado; fijo si el mensaje ya está guardado. */
+function SaveMessageButton({ idProyecto, idConversacion, idMensaje, guardado }: { idProyecto: number; idConversacion: number; idMensaje: number; guardado: boolean }) {
+  const alternar = useToggleSavedMessage(idProyecto, idConversacion);
+  const texto = guardado ? 'Quitar de guardados' : 'Guardar mensaje';
+  const Icono = guardado ? BookmarkCheck : Bookmark;
+  return (
+    <button
+      type="button"
+      aria-pressed={guardado}
+      disabled={alternar.isPending}
+      onClick={() => alternar.mutate(idMensaje, { onError: () => toast.error('No se pudo actualizar el mensaje guardado') })}
+      className={`shrink-0 rounded-control p-1 text-text-secondary transition-opacity hover:bg-on-surface/10 hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100 ${guardado ? 'opacity-100' : 'opacity-0'}`}
+    >
+      <Icono className="size-3.5" aria-hidden="true" />
+      <span className="sr-only">{texto}</span>
+    </button>
+  );
 }
 
 interface ChatWindowProps {
@@ -419,6 +441,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                   >
                     <Reply className="size-4" aria-hidden="true" />
                   </button>
+                  <SaveMessageButton idProyecto={idProyecto} idConversacion={idConversacion} idMensaje={m.idMensaje} guardado={m.guardado === true} />
                 </div>
                 {m === ultimoPropio && <SeenBy vieron={vieron} />}
                 </Fragment>

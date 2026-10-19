@@ -17,6 +17,7 @@ import {
   getReadReceipts,
   listAllConversations,
   listArchivedConversations,
+  listSavedMessages,
   markConversationRead,
   removeApodo,
   searchMessages,
@@ -26,6 +27,7 @@ import {
   setMiEstado,
   silenciarConversation,
   toggleReaction,
+  toggleSavedMessage,
   updateChatTheme,
   updateConversation,
   updateNoMolestar,
@@ -41,6 +43,7 @@ import {
   conversationReadsQueryKey,
   noMolestarQueryKey,
   projectConversationsQueryKey,
+  savedMessagesQueryKey,
   searchMessagesQueryKey,
 } from '@/lib/query-keys/chat';
 import type { BuscarMensajesFiltros, ChatLectura, ChatMensaje, ChatReaccion, ChatTemaColor, SetEstadoChatPayload, ChatReaccionSocket, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
@@ -306,6 +309,40 @@ export function useArchivedConversations(q: string) {
   });
   return {
     conversaciones: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
+}
+
+/** Alterna el marcador personal de un mensaje y refleja el resultado en la caché del historial. */
+export function useToggleSavedMessage(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (idMensaje: number) => toggleSavedMessage(idProyecto, idConversacion, idMensaje),
+    onSuccess: ({ guardado }, idMensaje) => {
+      queryClient.setQueryData<ChatMensaje[]>(
+        conversationMessagesQueryKey(idProyecto, idConversacion),
+        (current) => current?.map((m) => (m.idMensaje === idMensaje ? { ...m, guardado } : m)),
+      );
+      queryClient.invalidateQueries({ queryKey: savedMessagesQueryKey() });
+    },
+  });
+}
+
+/** Vista "Mensajes guardados": paginada, solo se pide mientras el diálogo está abierto. */
+export function useSavedMessages(enabled: boolean) {
+  const query = useInfiniteQuery({
+    queryKey: savedMessagesQueryKey(),
+    queryFn: ({ pageParam }) => listSavedMessages(pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length + 1 : undefined),
+    enabled,
+  });
+  return {
+    guardados: query.data?.pages.flatMap((p) => p.items) ?? [],
     hasMore: Boolean(query.hasNextPage),
     isLoading: query.isLoading,
     isError: query.isError,

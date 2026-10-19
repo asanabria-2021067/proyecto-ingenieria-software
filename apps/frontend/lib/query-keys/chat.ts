@@ -32,3 +32,6 @@ export const allConversationsQueryKey = (q: string = '') =>
   ['chats-global', q] as const;
 
 export const noMolestarQueryKey = ['chat-no-molestar'] as const;
+
+/** Mensajes guardados del usuario (marcadores privados). */
+export const savedMessagesQueryKey = () => ['chats-guardados'] as const;

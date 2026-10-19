@@ -63,6 +63,8 @@ export interface ChatMensaje {
   reacciones?: ChatReaccion[];
   /** Apodo del remitente segun el usuario autenticado, si lo definio. */
   apodoRemitente?: string | null;
+  /** Marcador personal del usuario autenticado; ausente en mensajes que llegan por socket. */
+  guardado?: boolean;
 }
 
 export interface ChatArchivo extends ChatAdjunto {
@@ -218,4 +220,26 @@ export interface BuscarMensajesResultado {
   hasMore: boolean;
   pagina: number;
   termino: string | null;
+}
+
+/** Mensaje guardado (marcador privado) con los datos mínimos para listarlo y saltar a su conversación. */
+export interface MensajeGuardadoItem {
+  idMensaje: number;
+  contenido: string;
+  enviadoEn: string;
+  guardadoEn: string;
+  remitente: ChatUsuario;
+  conversacion: {
+    idConversacion: number;
+    idProyecto: number;
+    tipo: 'GRUPAL' | 'INDIVIDUAL';
+    nombre: string | null;
+    nombrePersonalizado: string | null;
+    participantes: ChatUsuario[];
+  };
+}
+
+export interface ListSavedMessagesResultado {
+  items: MensajeGuardadoItem[];
+  hasMore: boolean;
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { BellOff, Search, SquarePen, Users as UsersIcon } from 'lucide-react';
+import { BellOff, Bookmark, Search, SquarePen, Users as UsersIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { getIniciales } from '@/components/projects/available-project-card';
@@ -31,9 +31,11 @@ function estadoUltimoMensaje(conversacion: ChatConversacionGlobal): string | nul
 
 interface ChatListPopoverProps {
   onClose: () => void;
+  /** Abre el diálogo de mensajes guardados (vive en ChatDock para sobrevivir al cierre de este popover). */
+  onOpenSaved?: () => void;
 }
 
-export function ChatListPopover({ onClose }: ChatListPopoverProps) {
+export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) {
   const { data: user } = useCurrentUser();
   const currentUserId = user?.idUsuario ?? null;
   const { abrirChat } = useChatDock();
@@ -61,6 +63,20 @@ export function ChatListPopover({ onClose }: ChatListPopoverProps) {
           <p className="text-sm font-bold text-on-surface">Mensajes</p>
           <div className="flex items-center gap-1">
             <MiEstadoBoton />
+            {onOpenSaved && (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenSaved();
+                  onClose();
+                }}
+                aria-label="Ver mensajes guardados"
+                title="Ver mensajes guardados"
+                className="flex size-7 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
+              >
+                <Bookmark className="size-4" aria-hidden="true" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setNuevoChatAbierto(true)}
