@@ -109,6 +109,15 @@ export interface ChatEnlacesPagina {
 /** Lista cerrada de temas de color (misma lista que valida el backend). */
 export type ChatTemaColor = 'verde' | 'azul' | 'violeta' | 'naranja' | 'rosa' | 'gris';
 
+export interface ChatMensajeProgramado {
+  idMensajeProgramado: number;
+  idConversacion: number;
+  contenido: string;
+  enviarEn: string;
+  estado: 'PENDIENTE' | 'ENVIADO' | 'CANCELADO' | 'FALLIDO';
+  creadoEn: string;
+}
+
 export interface ChatConversacion {
   idConversacion: number;
   tipo: 'GRUPAL' | 'INDIVIDUAL';

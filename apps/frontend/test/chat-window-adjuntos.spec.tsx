@@ -40,6 +40,9 @@ vi.mock('@/hooks/use-chat', () => ({
   useToggleReaction: () => ({ mutate: vi.fn() }),
   useUpdateChatTheme: () => ({ mutate: vi.fn(), isPending: false }),
   useToggleSavedMessage: () => ({ mutate: vi.fn(), isPending: false }),
+  useScheduledMessages: () => ({ programados: [], isLoading: false }),
+  useScheduleMessage: () => ({ mutate: vi.fn(), isPending: false }),
+  useCancelScheduledMessage: () => ({ mutate: vi.fn(), isPending: false }),
   useMarkConversationRead: () => ({ mutate: vi.fn() }),
   useSilenciarConversation: () => ({ mutate: vi.fn(), isPending: false }),
 }));

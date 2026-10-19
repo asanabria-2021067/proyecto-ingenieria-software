@@ -76,6 +76,7 @@ import { CHAT_ADJUNTO_ACCEPT, formatearTamano, validarArchivoChat } from '@/lib/
 import { MessageReactions } from './message-reactions';
 import { ChatThemeDialog } from '@/components/chat-dock/chat-theme-dialog';
 import { claseAcentoCabecera, claseBurbujaPropia } from '@/lib/chat-temas';
+import { ScheduleMessageButton, ScheduledMessagesList } from '@/components/chat-dock/scheduled-messages';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useIrAlMensaje } from '@/hooks/use-ir-al-mensaje';
 import { ChatCitaBloque, ChatCitaVistaPrevia, extractoDe } from '@/components/chat-dock/chat-cita';
@@ -479,6 +480,8 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             />
           )}
 
+          <ScheduledMessagesList idProyecto={idProyecto} idConversacion={idConversacion} />
+
           <form
             onSubmit={handleSubmit}
             onKeyDown={(event) => {
@@ -521,6 +524,12 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               maxLength={4000}
               disabled={enviando}
               className="h-9 flex-1 rounded-full border-outline-variant text-sm"
+            />
+            <ScheduleMessageButton
+              idProyecto={idProyecto}
+              idConversacion={idConversacion}
+              texto={texto}
+              onScheduled={() => setTexto('')}
             />
             <Button
               type="submit"
