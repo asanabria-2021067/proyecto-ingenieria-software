@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { BellOff, Bookmark, Search, SquarePen, Users as UsersIcon } from 'lucide-react';
+import { BellOff, Bookmark, Hash, Search, SquarePen, Users as UsersIcon, UserCog } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { getIniciales } from '@/components/projects/available-project-card';
@@ -12,9 +12,11 @@ import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { NewChatDialog } from '@/components/chat-dock/new-chat-dialog';
 import { estaSilenciada } from '@/lib/chat-silencio';
 import { EstadoIndicador, MiEstadoBoton } from '@/components/chat-dock/estado-chat';
+import { ChannelDialog, useProyectosQueLidero } from '@/components/chat-dock/channel-dialog';
 import type { ChatConversacionGlobal } from '@/lib/types/chat';
 
 function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId: number | null): string {
+  if (conversacion.esCanal) return `#${conversacion.nombre ?? 'canal'}`;
   if (conversacion.nombrePersonalizado) return conversacion.nombrePersonalizado;
   if (conversacion.tipo === 'GRUPAL') return conversacion.nombre ?? 'Grupo';
   const otro = conversacion.participantes.find((p) => p.idUsuario !== currentUserId);
@@ -43,6 +45,10 @@ export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) 
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [tab, setTab] = useState<'prioritarios' | 'otros'>('prioritarios');
   const [nuevoChatAbierto, setNuevoChatAbierto] = useState(false);
+  // undefined = cerrado; null = crear canal; conversación = gestionar sus miembros.
+  const [canalDialogo, setCanalDialogo] = useState<ChatConversacionGlobal | null | undefined>(undefined);
+  const { data: proyectosLiderados } = useProyectosQueLidero(true);
+  const idsLiderados = useMemo(() => new Set((proyectosLiderados ?? []).map((p) => p.idProyecto)), [proyectosLiderados]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 300);
@@ -51,8 +57,10 @@ export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) 
 
   const { conversations, isLoading } = useAllConversations(debouncedQuery);
 
+  // Los canales viven en su propia sección, fuera de las pestañas Prioritarios/Otros.
+  const canales = useMemo(() => conversations.filter((c) => c.esCanal), [conversations]);
   const filtradas = useMemo(
-    () => conversations.filter((c) => (tab === 'prioritarios' ? c.esPrioritaria : !c.esPrioritaria)),
+    () => conversations.filter((c) => !c.esCanal && (tab === 'prioritarios' ? c.esPrioritaria : !c.esPrioritaria)),
     [conversations, tab],
   );
 
@@ -86,6 +94,17 @@ export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) 
             >
               <SquarePen className="size-4" aria-hidden="true" />
             </button>
+            {idsLiderados.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setCanalDialogo(null)}
+                aria-label="Crear canal"
+                title="Crear canal"
+                className="flex size-7 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
+              >
+                <Hash className="size-4" aria-hidden="true" />
+              </button>
+            )}
           </div>
         </div>
         <div className="relative">
@@ -117,6 +136,54 @@ export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) 
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {canales.length > 0 && (
+          <section aria-labelledby="chat-canales-titulo" className="border-b border-outline-variant">
+            <h3 id="chat-canales-titulo" className="px-3 pb-1 pt-2.5 text-[11px] font-bold uppercase tracking-wide text-text-secondary">
+              Canales
+            </h3>
+            <ul>
+              {canales.map((c) => (
+                <li key={c.idConversacion} className="flex items-center hover:bg-surface-container-high">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      abrirChat(c.idProyecto, c.idConversacion);
+                      onClose();
+                    }}
+                    className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left"
+                  >
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary-container text-on-secondary-container">
+                      <Hash className="size-3.5" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-on-surface">
+                        <span className="sr-only">Canal </span>
+                        {nombreConversacion(c, currentUserId)}
+                      </span>
+                      <span className="block truncate text-[10px] text-text-secondary">{c.proyecto.tituloProyecto}</span>
+                    </span>
+                    {c.noLeidos > 0 && (
+                      <span className="inline-flex min-w-[18px] shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-on-primary">
+                        {c.noLeidos}
+                      </span>
+                    )}
+                  </button>
+                  {idsLiderados.has(c.idProyecto) && (
+                    <button
+                      type="button"
+                      onClick={() => setCanalDialogo(c)}
+                      aria-label={`Gestionar miembros de ${nombreConversacion(c, currentUserId)}`}
+                      title="Gestionar miembros"
+                      className="mr-2 flex size-7 shrink-0 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
+                    >
+                      <UserCog className="size-4" aria-hidden="true" />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {isLoading && <p className="px-4 py-6 text-center text-xs text-tertiary">Cargando chats…</p>}
         {!isLoading && filtradas.length === 0 && (
           <p className="px-4 py-6 text-center text-xs text-tertiary">
@@ -177,6 +244,14 @@ export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) 
       </div>
 
       <NewChatDialog open={nuevoChatAbierto} onOpenChange={setNuevoChatAbierto} currentUserId={currentUserId} />
+      {canalDialogo !== undefined && (
+        <ChannelDialog
+          key={canalDialogo?.idConversacion ?? 'nuevo'}
+          canal={canalDialogo ?? undefined}
+          currentUserId={currentUserId}
+          onOpenChange={(open) => !open && setCanalDialogo(undefined)}
+        />
+      )}
     </div>
   );
 }

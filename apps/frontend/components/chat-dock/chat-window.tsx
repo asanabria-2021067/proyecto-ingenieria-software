@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
   Link2,
+  Hash,
   Loader2,
   MoreVertical,
   Moon,
@@ -85,6 +86,7 @@ import { toast } from 'sonner';
 import type { ChatConversacionGlobal, ChatMensaje } from '@/lib/types/chat';
 
 function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId: number | null): string {
+  if (conversacion.esCanal) return `#${conversacion.nombre ?? 'canal'}`;
   if (conversacion.nombrePersonalizado) return conversacion.nombrePersonalizado;
   if (conversacion.tipo === 'GRUPAL') return conversacion.nombre ?? 'Grupo';
   const otro = conversacion.participantes.find((p) => p.idUsuario !== currentUserId);
@@ -260,7 +262,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
       <div className={`flex shrink-0 items-center gap-2 rounded-t-xl border-b border-outline-variant bg-surface-container px-3 py-2 ${claseAcentoCabecera(conversacion?.temaColor)}`}>
         {conversacion?.tipo === 'GRUPAL' ? (
           <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
-            <UsersIcon className="size-3.5" aria-hidden="true" />
+            {conversacion.esCanal ? <Hash className="size-3.5" aria-hidden="true" /> : <UsersIcon className="size-3.5" aria-hidden="true" />}
           </span>
         ) : (
           <Avatar className="size-7 shrink-0">
@@ -309,10 +311,12 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                 Ver perfil
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => setRenombrarAbierto(true)}>
-              <Pencil className="size-4" aria-hidden="true" />
-              Renombrar
-            </DropdownMenuItem>
+            {!conversacion?.esCanal && (
+              <DropdownMenuItem onClick={() => setRenombrarAbierto(true)}>
+                <Pencil className="size-4" aria-hidden="true" />
+                Renombrar
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => setApodosAbierto(true)}>
               <Tag className="size-4" aria-hidden="true" />
               Apodos
@@ -367,11 +371,15 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               <Link2 className="size-4" aria-hidden="true" />
               Enlaces compartidos
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={handleBorrar}>
-              <Trash2 className="size-4" aria-hidden="true" />
-              Borrar conversación
-            </DropdownMenuItem>
+            {!conversacion?.esCanal && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onClick={handleBorrar}>
+                  <Trash2 className="size-4" aria-hidden="true" />
+                  Borrar conversación
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

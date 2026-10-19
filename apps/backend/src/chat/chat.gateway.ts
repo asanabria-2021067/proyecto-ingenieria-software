@@ -115,6 +115,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`conversation:${idConversacion}`).emit('reactionUpdated', { idConversacion, idMensaje, reacciones });
   }
 
+  /** Saca a los usuarios de la room (sockets ya unidos) y les refresca la lista de chats. */
+  removeFromConversation(idConversacion: number, usuarios: number[]) {
+    for (const idUsuario of usuarios) {
+      this.server.in(`user:${idUsuario}`).socketsLeave(`conversation:${idConversacion}`);
+      this.server.to(`user:${idUsuario}`).emit('conversationUpdated', { idConversacion });
+    }
+  }
+
   /** Llamado por ChatService tras crear una conversación nueva. */
   notifyConversationCreated(idConversacion: number, destinatarios: number[]) {
     this.broadcaster.notifyConversationCreated(idConversacion, destinatarios);

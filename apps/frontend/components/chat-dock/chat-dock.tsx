@@ -37,8 +37,8 @@ export function ChatDock() {
   useEffect(() => {
     if (!listOpen) return;
     const cerrarSiEsAfuera = (event: MouseEvent) => {
-      // Los diálogos (nuevo chat, mi estado) van en un portal: no cuentan como "afuera".
-      if ((event.target as Element).closest?.('[role="dialog"]')) return;
+      // Los diálogos (nuevo chat, mi estado) y sus listas desplegables (Select) van en portales: no cuentan como "afuera".
+      if ((event.target as Element).closest?.('[role="dialog"], [role="listbox"]')) return;
       if (!listRef.current?.contains(event.target as Node)) setListOpen(false);
     };
     document.addEventListener('mousedown', cerrarSiEsAfuera);
