@@ -22,7 +22,7 @@ function makeService() {
 }
 
 function fila(citado: unknown) {
-  return { idMensaje: 9, idConversacion: 5, contenido: 'ok', enviadoEn: new Date(), remitente: USUARIO, citado, reacciones: [] };
+  return { idMensaje: 9, idConversacion: 5, contenido: 'ok', enviadoEn: new Date(), remitente: USUARIO, citado, reacciones: [], guardadoPor: [] };
 }
 
 describe('ChatService - respuestas citando un mensaje', () => {

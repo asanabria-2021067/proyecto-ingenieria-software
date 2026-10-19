@@ -43,6 +43,7 @@ vi.mock('@/hooks/use-chat', () => ({
   useLoadOlderMessages: () => async () => [],
   useToggleReaction: () => ({ mutate: vi.fn() }),
   useUpdateChatTheme: () => ({ mutate: vi.fn(), isPending: false }),
+  useToggleSavedMessage: () => ({ mutate: vi.fn(), isPending: false }),
   useSilenciarConversation: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateConversation: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteConversation: () => ({ mutate: vi.fn(), isPending: false }),
