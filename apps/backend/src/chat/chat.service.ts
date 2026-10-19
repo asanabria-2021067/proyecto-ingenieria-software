@@ -68,6 +68,26 @@ function conResumenDeCita<T extends { citado: { idMensaje: number; contenido: st
   return { ...resto, citado: { idMensaje: citado.idMensaje, remitente: citado.remitente, extracto } };
 }
 
+const REACCIONES_SELECT = {
+  select: { emoji: true, idUsuario: true },
+  orderBy: { idReaccion: 'asc' },
+} as const;
+
+/** Agrupa por emoji, en el orden de la primera reacción de cada uno. */
+export function agruparReacciones(filas: { emoji: string; idUsuario: number }[]) {
+  const grupos = new Map<string, number[]>();
+  for (const { emoji, idUsuario } of filas) grupos.set(emoji, [...(grupos.get(emoji) ?? []), idUsuario]);
+  return [...grupos].map(([emoji, idsUsuarios]) => ({ emoji, count: idsUsuarios.length, idsUsuarios }));
+}
+
+function reaccionesParaUsuario(grupos: ReturnType<typeof agruparReacciones>, userId: number) {
+  return grupos.map(({ emoji, count, idsUsuarios }) => ({
+    emoji,
+    count,
+    reaccionadoPorMi: idsUsuarios.includes(userId),
+  }));
+}
+
 const ARCHIVADOS_PAGE_SIZE = 20;
 
 /** Escapa los comodines de LIKE (%, _, \) — mismo criterio que GlobalSearchService. */
@@ -247,9 +267,49 @@ export class ChatService {
       where: { idConversacion, ...(cursorId ? { idMensaje: { lt: cursorId } } : {}) },
       orderBy: { idMensaje: 'desc' },
       take: 30,
-      select: MENSAJE_CON_CITA_SELECT,
+      select: { ...MENSAJE_CON_CITA_SELECT, reacciones: REACCIONES_SELECT },
     });
-    return mensajes.reverse().map(conResumenDeCita);
+    return mensajes.reverse().map(({ reacciones, ...m }) => ({
+      ...conResumenDeCita(m),
+      reacciones: reaccionesParaUsuario(agruparReacciones(reacciones), userId),
+    }));
+  }
+
+  /** Alterna la reacción del usuario: la crea si no existe y la quita si ya estaba. */
+  async toggleReaction(
+    idProyecto: number,
+    idConversacion: number,
+    idMensaje: number,
+    userId: number,
+    emoji: string,
+  ) {
+    const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    if (chatArchivado(conversacion.proyecto.estadoProyecto)) {
+      throw new ForbiddenException('Esta conversación está archivada: no se puede reaccionar.');
+    }
+    const mensaje = await this.prisma.mensajeChat.findFirst({
+      where: { idMensaje, idConversacion },
+      select: { idMensaje: true },
+    });
+    if (!mensaje) {
+      throw new NotFoundException(`Mensaje con id ${idMensaje} no encontrado`);
+    }
+
+    const clave = { idMensaje, idUsuario: userId, emoji };
+    const existente = await this.prisma.reaccionMensajeChat.findUnique({
+      where: { idMensaje_idUsuario_emoji: clave },
+      select: { idReaccion: true },
+    });
+    if (existente) {
+      await this.prisma.reaccionMensajeChat.delete({ where: { idReaccion: existente.idReaccion } });
+    } else {
+      await this.prisma.reaccionMensajeChat.create({ data: clave });
+    }
+
+    const filas = await this.prisma.reaccionMensajeChat.findMany({ where: { idMensaje }, ...REACCIONES_SELECT });
+    const grupos = agruparReacciones(filas);
+    this.gateway.broadcastReactionUpdated(idConversacion, idMensaje, grupos);
+    return reaccionesParaUsuario(grupos, userId);
   }
 
   /**

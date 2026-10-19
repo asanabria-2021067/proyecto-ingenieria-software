@@ -385,6 +385,7 @@ model Usuario {
   calendariosCompartidosPorMi      CalendarioCompartido[]     @relation("CalendarioPropietario")
   calendariosCompartidosConmigo    CalendarioCompartido[]     @relation("CalendarioInvitado")
   insignias                        InsigniaUsuario[]
+  reaccionesChat                   ReaccionMensajeChat[]
 
   @@index([estado, fechaCreacion])
   @@map("usuario")
@@ -1707,6 +1708,7 @@ model MensajeChat {
   adjunto      AdjuntoMensajeChat?
   citado       MensajeChat?       @relation("MensajeCitado", fields: [idMensajeCitado], references: [idMensaje], onDelete: SetNull)
   respuestas   MensajeChat[]      @relation("MensajeCitado")
+  reacciones   ReaccionMensajeChat[]
 
   @@index([idConversacion, enviadoEn])
   @@map("mensaje_chat")
@@ -1729,6 +1731,22 @@ model AdjuntoMensajeChat {
 
   @@index([idConversacion, idMensaje])
   @@map("adjunto_mensaje_chat")
+}
+
+/// Reacción con emoji de un usuario a un mensaje del chat (una por mensaje+usuario+emoji).
+model ReaccionMensajeChat {
+  idReaccion Int      @id @default(autoincrement()) @map("id_reaccion")
+  idMensaje  Int      @map("id_mensaje")
+  idUsuario  Int      @map("id_usuario")
+  emoji      String   @db.VarChar(16)
+  creadaEn   DateTime @default(now()) @map("creada_en")
+
+  mensaje MensajeChat @relation(fields: [idMensaje], references: [idMensaje], onDelete: Cascade)
+  usuario Usuario     @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@unique([idMensaje, idUsuario, emoji])
+  @@index([idMensaje])
+  @@map("reaccion_mensaje_chat")
 }
 
 // HU-190 (T-346): niveles de una insignia. Sin nivel (null) = aún sin umbral alcanzado.

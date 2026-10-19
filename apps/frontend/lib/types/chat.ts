@@ -19,6 +19,19 @@ export interface ChatCita {
   extracto: string;
 }
 
+export interface ChatReaccion {
+  emoji: string;
+  count: number;
+  reaccionadoPorMi: boolean;
+}
+
+/** Payload del evento `reactionUpdated`: incluye quienes reaccionaron para derivar `reaccionadoPorMi`. */
+export interface ChatReaccionSocket {
+  emoji: string;
+  count: number;
+  idsUsuarios: number[];
+}
+
 export interface ChatMensaje {
   idMensaje: number;
   idConversacion: number;
@@ -27,6 +40,8 @@ export interface ChatMensaje {
   remitente: ChatUsuario;
   adjunto?: ChatAdjunto | null;
   citado?: ChatCita | null;
+  /** Ausente en mensajes recien creados o en `ultimoMensaje`. */
+  reacciones?: ChatReaccion[];
 }
 
 export interface ChatArchivo extends ChatAdjunto {

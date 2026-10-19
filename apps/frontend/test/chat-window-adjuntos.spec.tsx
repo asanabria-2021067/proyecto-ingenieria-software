@@ -37,6 +37,7 @@ vi.mock('@/hooks/use-chat', () => ({
   useAllConversations: () => ({ conversations: [] }),
   useReadReceipts: () => ({ lecturas: [] }),
   useLoadOlderMessages: () => async () => [],
+  useToggleReaction: () => ({ mutate: vi.fn() }),
   useMarkConversationRead: () => ({ mutate: vi.fn() }),
   useSilenciarConversation: () => ({ mutate: vi.fn(), isPending: false }),
 }));

@@ -44,6 +44,7 @@ vi.mock('@/hooks/use-chat', () => ({
   useSendFileMessage: () => ({ mutate: sendFileMutate, isPending: false }),
   useAttachmentThumbnail: () => ({ data: undefined }),
   useLoadOlderMessages: () => async () => [],
+  useToggleReaction: () => ({ mutate: vi.fn() }),
   useUpdateConversation: () => ({ mutate: updateMutate, isPending: false }),
   useDeleteConversation: () => ({ mutate: deleteMutate, isPending: false }),
   useSilenciarConversation: () => ({ mutate: silenciarMutate, isPending: false }),

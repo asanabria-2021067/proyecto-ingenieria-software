@@ -143,11 +143,11 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       ];
       // El service pide orderBy idMensaje desc y hace .reverse(); se devuelve
       // ya en orden desc desde el mock para que el resultado final quede asc.
-      prisma.mensajeChat.findMany.mockResolvedValue([...historial].reverse());
+      prisma.mensajeChat.findMany.mockResolvedValue(historial.map((m) => ({ ...m, reacciones: [] })).reverse());
 
       const resultado = await service.getMessages(10, 5, 1);
 
-      expect(resultado).toEqual(historial.map((m) => ({ ...m, citado: null })));
+      expect(resultado).toEqual(historial.map((m) => ({ ...m, citado: null, reacciones: [] })));
     });
   });
 
