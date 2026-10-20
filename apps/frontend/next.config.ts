@@ -32,8 +32,6 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   // G06 (OWASP25-C039): sin `X-Powered-By: Next.js` (divulgación del framework).
   poweredByHeader: false,
-  // `next dev` no escribe AGENTS.md ni CLAUDE.md en apps/frontend: las instrucciones para
-  // agentes viven en la carpeta .claude/ de la raíz del repositorio.
   agentRules: false,
   async headers() {
     return [{ source: FRONTEND_ROUTES, headers: [...BASELINE_SECURITY_HEADERS, ...CSP_HEADERS] }];
