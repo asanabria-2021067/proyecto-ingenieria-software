@@ -162,13 +162,13 @@ export default function DashboardLayout({
         Saltar al contenido principal
       </a>
 
-      {/* Sidebar - Desktop Only. Misma barra que AdminLayout (`admin-sidebar`): superficie verde
-          bosque, marca sobre tarjeta marfil, grupos desplegables y transición de ancho al plegarla.
+      {/* Sidebar - Desktop Only. Misma barra que AdminLayout (`admin-sidebar`) con la paleta salvia del
+          estudiante (`student-sidebar`): marca sobre tarjeta marfil, grupos desplegables y transición de ancho al plegarla.
           Conserva su ancho con escala de fuente (`sidebar-scale-lock*`). */}
       <aside
         data-slot="dashboard-sidebar"
         data-collapsed={sidebarCollapsed || undefined}
-        className={`admin-sidebar ${sidebarCollapsed ? 'sidebar-scale-lock-collapsed' : 'sidebar-scale-lock'} hidden h-full shrink-0 flex-col overflow-y-auto overflow-x-hidden overscroll-contain transition-[width] duration-200 md:flex`}
+        className={`admin-sidebar student-sidebar ${sidebarCollapsed ? 'sidebar-scale-lock-collapsed' : 'sidebar-scale-lock'} hidden h-full shrink-0 flex-col overflow-y-auto overflow-x-hidden overscroll-contain transition-[width] duration-200 md:flex`}
       >
         {/* h-16 = alto de la topbar: el divisor de la marca continúa su borde inferior. */}
         <div
@@ -192,7 +192,7 @@ export default function DashboardLayout({
           id="dashboard-account-menu"
           className={`admin-sidebar-footer py-4 ${sidebarCollapsed ? 'flex justify-center px-2' : 'px-3'}`}
         >
-          <UserMenu user={user} onLogout={handleLogout} variant={sidebarCollapsed ? 'compact' : 'sidebar'} theme="admin" />
+          <UserMenu user={user} onLogout={handleLogout} variant={sidebarCollapsed ? 'compact' : 'sidebar'} theme="admin" menuClassName="student-account-menu" />
         </div>
       </aside>
 

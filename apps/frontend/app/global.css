@@ -135,6 +135,25 @@
   /* G04 (UI-14): #2a9d9d daba 3.28:1 sobre blanco y 2.83:1 sobre cal-6; #1f8585 da 4.42 y 3.82. */
   --color-cal-6-strong: #1f8585;
 
+  /* Salvia del estudiante: sidebar y tarjeta de bienvenida del Dashboard (no se usa en
+     las vistas del administrador). Contraste AA medido para texto, iconos y barras. */
+  --color-sage-surface: #ebf1e7;
+  --color-sage-hover: #dbe7d5;
+  --color-sage-open: #e2ecdd;
+  --color-sage-active: #c8dec4;
+  --color-sage-border: #d2dfcc;
+  --color-sage-accent: #388a5d;
+  --color-sage-ink: #263d30;
+  --color-sage-ink-soft: #3d5a48;
+  --color-sage-ink-muted: #4a6858;
+  --color-sage-avatar: #2f7550;
+  --color-sage-on-avatar: #ffffff;
+  --color-sage-danger: #b3261e;
+  --color-sage-welcome: #dfebd9;
+  --color-sage-kpi: #f7faf5;
+  --color-sage-kpi-border: #cddcc6;
+  --color-sage-track: #e6efe2;
+
   --font-family-headline: var(--font-manrope, 'Manrope'), sans-serif;
   --font-family-body: var(--font-inter, 'Inter'), sans-serif;
 }
@@ -148,6 +167,24 @@
 }
 
 .dark {
+  /* Salvia del estudiante en modo oscuro: verde bosque desaturado con acentos salvia luminosos. */
+  --color-sage-surface: #212f29;
+  --color-sage-hover: #2b3d34;
+  --color-sage-open: #273830;
+  --color-sage-active: #3c5b46;
+  --color-sage-border: #33473b;
+  --color-sage-accent: #aadb91;
+  --color-sage-ink: #ecf6ec;
+  --color-sage-ink-soft: #d0e2d1;
+  --color-sage-ink-muted: #a9c2ae;
+  --color-sage-avatar: #aadb91;
+  --color-sage-on-avatar: #172a1e;
+  --color-sage-danger: #ffada6;
+  --color-sage-welcome: #18241f;
+  --color-sage-kpi: #22342b;
+  --color-sage-kpi-border: #34493d;
+  --color-sage-track: #34493d;
+
   /* Sobre el salvia de revisión: texto blanco en claro, negro en oscuro. */
   --color-on-review: #000000;
   --color-primary: #72dc93;
@@ -1042,6 +1079,36 @@ button:disabled {
 .admin-sidebar [data-slot='account-compact-trigger']:focus-visible {
   outline: 2px solid var(--admin-lime);
   outline-offset: 2px;
+}
+
+/* Sidebar del estudiante: la misma carcasa que la del administrador (`.admin-sidebar`) con la
+   paleta salvia. Solo redefine los tokens `--admin-*` dentro de su sidebar y de su menú de
+   cuenta (que se pinta en un portal); la del administrador no cambia. */
+.student-sidebar,
+.student-account-menu {
+  --admin-bg: var(--color-sage-surface);
+  --admin-border: var(--color-sage-border);
+  --admin-text: var(--color-sage-ink);
+  --admin-text-muted: var(--color-sage-ink-muted);
+  --admin-text-dim: var(--color-sage-ink-soft);
+  --admin-ink: var(--color-sage-ink);
+  --admin-ink-muted: var(--color-sage-ink-soft);
+  --admin-ink-secondary: var(--color-sage-ink-muted);
+  --admin-icon: var(--color-sage-accent);
+  --admin-graphite-surface: var(--color-sage-open);
+  --admin-graphite-hover: var(--color-sage-hover);
+  --admin-graphite-active: var(--color-sage-active);
+  --admin-graphite-border: var(--color-sage-active);
+  --admin-lime: var(--color-sage-accent);
+  --admin-avatar-bg: var(--color-sage-avatar);
+  --admin-avatar-fg: var(--color-sage-on-avatar);
+  --admin-menu-border: var(--color-sage-border);
+  --admin-menu-danger: var(--color-sage-danger);
+}
+
+/* El menú de cuenta del estudiante va sobre una superficie clara en modo claro: sombra más suave. */
+.admin-account-menu.student-account-menu {
+  box-shadow: 0 10px 28px rgb(38 61 48 / 0.16);
 }
 
 /* Menú desplegable de la cuenta del administrador: misma paleta que la

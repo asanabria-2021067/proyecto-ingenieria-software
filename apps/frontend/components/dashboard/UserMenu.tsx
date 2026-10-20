@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 
 interface UserMenuUser {
   nombre: string;
@@ -28,6 +29,8 @@ interface UserMenuProps {
   variant?: 'sidebar' | 'compact';
   /** `admin`: usa los tokens `--admin-*` para calzar con el sidebar oscuro de AdminLayout. */
   theme?: 'default' | 'admin';
+  /** Clase extra del menú desplegable (se pinta en un portal): p. ej. la paleta salvia del estudiante. */
+  menuClassName?: string;
 }
 
 function UserAvatar({ user, theme }: { user: UserMenuUser | null | undefined; theme: 'default' | 'admin' }) {
@@ -66,16 +69,18 @@ function UserMenuContent({
   user,
   onLogout,
   theme,
+  menuClassName,
 }: {
   user: UserMenuUser | null | undefined;
   onLogout: () => void;
   theme: 'default' | 'admin';
+  menuClassName?: string;
 }) {
   const pathname = usePathname();
   return (
     // `admin-account-menu` solo cambia colores (paleta Forest Graphite); el
     // menú se pinta en un portal, fuera de `.admin-sidebar`.
-    <DropdownMenuContent align="end" side="top" className={theme === 'admin' ? 'admin-account-menu w-56' : 'w-56'}>
+    <DropdownMenuContent align="end" side="top" className={cn(theme === 'admin' ? 'admin-account-menu w-56' : 'w-56', menuClassName)}>
       {user && (
         <>
           <DropdownMenuLabel className="font-normal">
@@ -123,7 +128,7 @@ function UserMenuContent({
  *  (avatar/nombre del usuario), reutilizado por DashboardLayout y AdminLayout tanto en
  *  el pie del sidebar de escritorio como en la barra inferior móvil. Es el único acceso a la
  *  cuenta en cada ancho: la barra superior no lo repite. */
-export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default' }: UserMenuProps) {
+export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default', menuClassName }: UserMenuProps) {
   const isAdmin = theme === 'admin';
 
   if (variant === 'compact') {
@@ -142,7 +147,7 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
             <UserAvatar user={user} theme={theme} />
           </button>
         </DropdownMenuTrigger>
-        <UserMenuContent user={user} onLogout={onLogout} theme={theme} />
+        <UserMenuContent user={user} onLogout={onLogout} theme={theme} menuClassName={menuClassName} />
       </DropdownMenu>
     );
   }
@@ -175,7 +180,7 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
           />
         </button>
       </DropdownMenuTrigger>
-      <UserMenuContent user={user} onLogout={onLogout} theme={theme} />
+      <UserMenuContent user={user} onLogout={onLogout} theme={theme} menuClassName={menuClassName} />
     </DropdownMenu>
   );
 }
