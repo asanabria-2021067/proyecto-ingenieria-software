@@ -150,7 +150,7 @@ function makeBitacora() {
 
 function buildService(
   tx: ReturnType<typeof makeTx>['tx'],
-  options: { project?: null; bitacora?: ReturnType<typeof makeBitacora> } = {},
+  options: { project?: null; bitacora?: ReturnType<typeof makeBitacora>; events?: { emit: ReturnType<typeof vi.fn> } } = {},
 ) {
   const policy = makeProjectPolicyDouble();
   const service = new AttendanceService(
@@ -162,6 +162,7 @@ function buildService(
     policy,
     makeProjectReadPolicyDouble(),
     options.bitacora as unknown as ConstructorParameters<typeof AttendanceService>[4],
+    options.events as unknown as ConstructorParameters<typeof AttendanceService>[5],
   );
   return { service, policy };
 }
@@ -487,6 +488,30 @@ describe('AttendanceService — horas por asistencia (HU-177, T-297)', () => {
 
       await expect(marcar(service, true, EXTERNO_ID)).rejects.toBeInstanceOf(BadRequestException);
       expect(bitacora.registrarEvento).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('insignias (HU-190)', () => {
+    it('emite el recálculo de horas del integrante al confirmar asistencia, después del commit', async () => {
+      const fake = makeTx();
+      const events = { emit: vi.fn() };
+      const { service } = buildService(fake.tx, { events });
+
+      await marcar(service, true);
+
+      expect(events.emit).toHaveBeenCalledTimes(1);
+      expect(events.emit).toHaveBeenCalledWith('insignias.recalcular', { claves: ['horas'], idUsuarios: [STUDENT_ID] });
+    });
+
+    it('no emite al quitar la asistencia ni si la validación falla', async () => {
+      const fake = makeTx();
+      const events = { emit: vi.fn() };
+      const { service } = buildService(fake.tx, { events });
+
+      await marcar(service, false);
+      await expect(marcar(service, true, EXTERNO_ID)).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(events.emit).not.toHaveBeenCalled();
     });
   });
 

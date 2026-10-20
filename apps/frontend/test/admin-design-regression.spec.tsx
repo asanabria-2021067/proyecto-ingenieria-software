@@ -51,11 +51,11 @@ describe('FG07-C04: regresión del diseño administrativo', () => {
     expect([...valores].sort()).toEqual(['rounded-lg', 'rounded-md', 'text-[13px]', 'text-[15px]']);
   });
 
-  it('29 de los 40 archivos del árbol quedan sin ningún literal', () => {
+  it('30 de los 41 archivos del árbol quedan sin ningún literal', () => {
     // 40 al cerrar T-320; entró la página propia de «Tendencias de uso» y salió el catálogo temporal de
-    // etiquetas, ninguna de las dos con literales.
-    expect(ARBOL).toHaveLength(40);
-    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(29);
+    // etiquetas, ninguna de las dos con literales; después entró la pantalla de anuncios (HU-191), tampoco con literales.
+    expect(ARBOL).toHaveLength(41);
+    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(30);
   });
 });
 

@@ -34,6 +34,7 @@ import { useDashboardSidebarCollapsed } from '@/components/dashboard/use-dashboa
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
+import { AnuncioBanner } from '@/components/anuncios/anuncio-banner';
 import { ChatDockProvider } from '@/components/chat-dock/chat-dock-context';
 import { ChatDock } from '@/components/chat-dock/chat-dock';
 import { toast } from 'sonner';
@@ -283,6 +284,7 @@ export default function DashboardLayout({
             mismo si la ruta actual es project-scoped, sin duplicarse por
             página. */}
         <ProjectFinalizationBannerHost />
+        <AnuncioBanner />
 
         {/* Scrollable page body */}
         <div className="min-h-0 flex-1 overflow-auto overscroll-contain pb-20 md:pb-0">

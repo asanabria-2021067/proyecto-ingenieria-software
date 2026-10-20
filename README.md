@@ -325,6 +325,13 @@ docker compose restart backend
 docker compose restart redis
 ```
 
+### Changelog
+
+```bash
+# Regenera CHANGELOG.md completo desde git (usa gh si esta disponible)
+npm run changelog
+```
+
 ---
 
 ## Usuarios Seed de Prueba

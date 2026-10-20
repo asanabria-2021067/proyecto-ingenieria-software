@@ -24,6 +24,7 @@ function makePrisma() {
 function makeService(
   prisma: ReturnType<typeof makePrisma>,
   notifications: Partial<NotificationsService> = {},
+  events?: { emit: ReturnType<typeof vi.fn> },
 ) {
   // C036: el canal A corre sobre el protocolo; el doble entrega el mismo mock como `tx`.
   return new ComentariosService(
@@ -32,6 +33,7 @@ function makeService(
     makeProjectTransactionDouble({ tx: prisma }),
     makeProjectPolicyDouble(),
     makeProjectReadPolicyDouble(),
+    events as never,
   );
 }
 
@@ -74,6 +76,32 @@ describe('ComentariosService', () => {
       where: { idTarea: 7, idProyecto: 1, eliminadoEn: null, proyecto: { eliminadoEn: null } },
       select: { idTarea: true, idProyecto: true, creadaPor: true, idSprint: true },
     });
+  });
+
+  it('createForTask emite el recálculo de insignias de comentarios del autor tras crear (HU-190)', async () => {
+    const prisma = makePrisma();
+    prisma.tarea.findFirst.mockResolvedValue({ idTarea: 7, idProyecto: 1, creadaPor: 2 });
+    prisma.proyecto.findUnique.mockResolvedValueOnce({ estadoProyecto: EstadoProyecto.PUBLICADO, creadoPor: 2 });
+    prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+    prisma.asignacionTarea.findFirst.mockResolvedValue(null);
+    prisma.comentario.create.mockResolvedValue({ idComentario: 9 });
+    const events = { emit: vi.fn() };
+    const service = makeService(prisma, { notifyUsers: vi.fn() }, events);
+
+    await service.createForTask(1, 7, 2, 'Hola');
+
+    expect(events.emit).toHaveBeenCalledWith('insignias.recalcular', { claves: ['comentarios'], idUsuarios: [2] });
+  });
+
+  it('createForTask fallido no emite el recálculo (HU-190)', async () => {
+    const prisma = makePrisma();
+    prisma.tarea.findFirst.mockResolvedValue(null);
+    const events = { emit: vi.fn() };
+    const service = makeService(prisma, { notifyUsers: vi.fn() }, events);
+
+    await expect(service.createForTask(1, 7, 2, 'x')).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(events.emit).not.toHaveBeenCalled();
   });
 
   it('createForTask con tarea eliminada (o de otro proyecto): NotFoundException, no crea el comentario (Tarea 28)', async () => {

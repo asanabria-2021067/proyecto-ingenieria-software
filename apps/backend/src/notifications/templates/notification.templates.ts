@@ -270,6 +270,14 @@ export interface NotificationTemplateData {
     /** fechaLimite ya formateada por el emisor (es-GT), lista para mostrar. */
     fechaLimiteTexto: string;
   };
+  // HU-190 (T-347): subida de nivel de una insignia. `nivel` es el valor del enum
+  // (el front lo usa para el color) y `nivelNombre` el texto legible.
+  INSIGNIA_OBTENIDA: {
+    insigniaClave: string;
+    insigniaNombre: string;
+    nivel: string;
+    nivelNombre: string;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -510,6 +518,12 @@ export const NOTIFICATION_TEMPLATES = {
     message: (data: NotificationTemplateData['TAREA_POR_VENCER']) =>
       `La tarea "${data.taskTitle}" del proyecto "${data.projectTitle}" vence el ${data.fechaLimiteTexto}. ` +
       `Este es tu recordatorio de ${data.horasAntes} horas.`,
+  },
+
+  INSIGNIA_OBTENIDA: {
+    title: 'Nueva insignia',
+    message: (data: NotificationTemplateData['INSIGNIA_OBTENIDA']) =>
+      `Obtuviste la insignia "${data.insigniaNombre}" nivel ${data.nivelNombre}.`,
   },
 } as const;
 

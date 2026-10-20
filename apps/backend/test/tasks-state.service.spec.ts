@@ -81,6 +81,7 @@ function makeService(opts: {
   prisma?: ReturnType<typeof makePrisma>;
   auth?: ReturnType<typeof makeAuthorization>;
   notifications?: ReturnType<typeof makeNotifications>;
+  events?: { emit: ReturnType<typeof vi.fn> };
 } = {}) {
   const tx = makeTx();
   const prisma = opts.prisma ?? makePrisma(tx);
@@ -90,7 +91,7 @@ function makeService(opts: {
   const notifications = opts.notifications ?? makeNotifications();
   const contextLiteral = { getActiveAssignment: vi.fn() };
   const context = contextLiteral as typeof contextLiteral & TasksContextService;
-  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble(), undefined, opts.events as never);
   return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
 }
 
@@ -608,5 +609,44 @@ describe('TasksService.updateEstado', () => {
       expect(result.estadoTarea).toBe('EN_PROGRESO');
       expect(tx.tarea.findMany).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('TasksService.updateEstado - insignias (HU-190)', () => {
+  it('al pasar a HECHO emite el recálculo de las insignias de la tarea, ya fuera de la transacción', async () => {
+    const events = { emit: vi.fn() };
+    const { tx, prisma, service } = makeService({ events });
+    tx.tarea.findFirst.mockResolvedValue(tareaRow({ estadoTarea: 'HECHO' }));
+    prisma.$transaction.mockImplementation(async (callback: (t: typeof tx) => unknown) => {
+      const r = await callback(tx);
+      expect(events.emit).not.toHaveBeenCalled(); // nunca dentro del callback de la transacción
+      return r;
+    });
+
+    await service.updateEstado(5, 42, 1, estadoDto('HECHO'));
+
+    expect(events.emit).toHaveBeenCalledTimes(1);
+    expect(events.emit).toHaveBeenCalledWith('insignias.recalcular', { claves: ['tareas', 'sprints'], idTarea: 42 });
+  });
+
+  it.each(['POR_HACER', 'EN_PROGRESO', 'EN_REVISION'])('al pasar a %s no emite', async (estado) => {
+    const events = { emit: vi.fn() };
+    const { tx, service } = makeService({ events });
+    tx.tarea.findFirst.mockResolvedValue(tareaRow({ estadoTarea: estado }));
+
+    await service.updateEstado(5, 42, 1, estadoDto(estado));
+
+    expect(events.emit).not.toHaveBeenCalled();
+  });
+
+  it('si la transacción falla (rollback) no emite', async () => {
+    const events = { emit: vi.fn() };
+    const { tx, auth, service } = makeService({ events });
+    tx.tarea.findFirst.mockResolvedValue(tareaRow({ estadoTarea: 'HECHO' }));
+    auth.assertCanChangeTaskState.mockRejectedValue(new ForbiddenException());
+
+    await expect(service.updateEstado(5, 42, 1, estadoDto('HECHO'))).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(events.emit).not.toHaveBeenCalled();
   });
 });

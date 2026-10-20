@@ -154,6 +154,13 @@
   --color-sage-kpi-border: #cddcc6;
   --color-sage-track: #e6efe2;
 
+  /* HU-190: anillo de nivel de las insignias. Solo gráfico: el nombre del nivel
+     siempre va también en texto. Ver docs/design-system.md. */
+  --color-insignia-bronce: #cd7f32;
+  --color-insignia-plata: #7f8c9b;
+  --color-insignia-oro: #e0a800;
+  --color-insignia-diamante: #14a9c9;
+
   --font-family-headline: var(--font-manrope, 'Manrope'), sans-serif;
   --font-family-body: var(--font-inter, 'Inter'), sans-serif;
 }
@@ -282,6 +289,11 @@
   --color-cal-6: #183535;
   --color-on-cal-6: #c6efef;
   --color-cal-6-strong: #57c3c3;
+  /* HU-190: anillos de insignia en oscuro (más claros para conservar contraste con el fondo). */
+  --color-insignia-bronce: #e0954f;
+  --color-insignia-plata: #a9b5c4;
+  --color-insignia-oro: #f2c230;
+  --color-insignia-diamante: #4fd1ea;
 
   --gradient-color: #224a33;
   --sparkles-color: #72dc93;

@@ -85,6 +85,12 @@ describe('G06-C04: CSP Report-Only con inventario explícito', () => {
     expect(broadSourceFindings(buildContentSecurityPolicy('http://localhost:3001'))).toEqual([]);
   });
 
+  it('img-src solo permite res.cloudinary.com como host externo (miniaturas de adjuntos van por el backend como data:)', () => {
+    const imgSrc = parseCsp(buildContentSecurityPolicy(undefined)).get('img-src');
+    expect(imgSrc?.filter((source) => source.startsWith('https://'))).toEqual(['https://res.cloudinary.com']);
+    expect(imgSrc).not.toContain('https://api.cloudinary.com');
+  });
+
   it('next.config: la política va en Report-Only y la CSP aplicada sigue siendo solo frame-ancestors', async () => {
     const headers = await headersFor(nextConfig, '/dashboard');
     expect(headers['content-security-policy-report-only']).toBe(buildContentSecurityPolicy(process.env.NEXT_PUBLIC_API_URL));

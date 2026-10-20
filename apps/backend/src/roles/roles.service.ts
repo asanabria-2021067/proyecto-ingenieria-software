@@ -19,6 +19,7 @@ import {
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { CreateRoleDto, RoleRequisitoDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { ChatCanalesService } from '../chat/chat-canales.service';
 
 type TxClient = Prisma.TransactionClient;
 
@@ -48,6 +49,7 @@ export class RolesService {
     // C086: opcional por el mismo motivo posicional que en el resto del
     // dominio; en producción RolesModule siempre lo provee.
     private readonly eligibility?: ProjectEligibilityService,
+    private readonly chatCanales?: ChatCanalesService,
   ) {}
 
   // ───────────────────────── helpers ─────────────────────────
@@ -446,6 +448,8 @@ export class RolesService {
       };
     }
 
+    await this.chatCanales?.sincronizarSinFallar(projectId);
+
     // Notificación post-commit. El actor (líder) siempre se excluye
     // (notifyRoleMembers excluye al actor), por lo que solo se informa a otros
     // miembros activos del rol; puede resultar en cero destinatarios.
@@ -559,6 +563,9 @@ export class RolesService {
       },
       { isolation: 'Serializable' },
     );
+
+    // Si era su último rol activo, sale también de todos los canales.
+    await this.chatCanales?.sincronizarSinFallar(projectId);
 
     // Notificaciones post-commit (Sección 18A): líder + miembros activos del
     // rol afectado, excluyendo al actor, deduplicados. Una sola notificación

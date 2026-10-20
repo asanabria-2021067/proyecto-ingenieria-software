@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { EstadoParticipacion, Prisma, TipoActividad } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { INSIGNIAS_EVENTO } from '../insignias/insignias.catalog';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ProjectTransactionService,
@@ -99,6 +101,8 @@ export class AttendanceService {
     // Opcional por el mismo motivo que en TimeRecordsService: las suites
     // unitarias instancian el servicio con argumentos posicionales.
     private readonly bitacoraEventos?: BitacoraEventosService,
+    // HU-190: opcional (suites con argumentos posicionales).
+    private readonly events?: EventEmitter2,
   ) {}
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -211,7 +215,7 @@ export class AttendanceService {
     targetUserId: number,
     dto: MarkAttendanceDto,
   ): Promise<AsistenciaPublica> {
-    return this.projectTx.run(projectId, leaderId, 'attendance.marcarAsistencia', async (ctx) => {
+    const resultado = await this.projectTx.run(projectId, leaderId, 'attendance.marcarAsistencia', async (ctx) => {
       const { tx } = ctx;
       const project = this.lockedProject(ctx);
       await this.policy.assertWriteTx(tx, project, 'ACTIVIDAD_ASISTENCIA', leaderId);
@@ -254,6 +258,10 @@ export class AttendanceService {
 
       return resultado;
     });
+
+    if (dto.asistio) this.events?.emit(INSIGNIAS_EVENTO, { claves: ['horas'], idUsuarios: [targetUserId] });
+
+    return resultado;
   }
 
   /**

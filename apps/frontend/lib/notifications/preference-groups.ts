@@ -110,6 +110,7 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   HORAS_CONSOLIDADAS: { grupo: 'horas', etiqueta: 'Horas consolidadas', descripcion: 'Se consolidan tus horas de un Sprint.' },
   HORAS_ACREDITADAS: { grupo: 'horas', etiqueta: 'Horas acreditadas', descripcion: 'Se acreditan tus horas al cerrar un proyecto.' },
   CERTIFICADO_EMITIDO: { grupo: 'horas', etiqueta: 'Certificado emitido', descripcion: 'Se emite un certificado a tu nombre.' },
+  INSIGNIA_OBTENIDA: { grupo: 'horas', etiqueta: 'Insignia obtenida', descripcion: 'Subes de nivel en una insignia.' },
 
   RECORDATORIO_EVENTO: { grupo: 'recordatorios', etiqueta: 'Recordatorio de evento', descripcion: 'Un evento de tu calendario está por empezar.' },
   CALENDARIO_COMPARTIDO: { grupo: 'recordatorios', etiqueta: 'Calendario compartido', descripcion: 'Alguien comparte su calendario contigo.' },

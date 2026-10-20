@@ -39,8 +39,8 @@ describe('FG07-C02: primitivas de página', () => {
     // Incluye la vista de cuentas pendientes (HU-179, PR #270), migrada a las primitivas al integrarla,
     // y la página propia de «Tendencias de uso». El catálogo temporal de etiquetas, que también usaba
     // el titular, se retiró del proyecto.
-    expect(conTitular).toHaveLength(10);
-    expect(conEntrada).toHaveLength(9);
+    expect(conTitular).toHaveLength(11);
+    expect(conEntrada).toHaveLength(10);
     for (const archivo of Object.values(VISTAS_ADMIN)) {
       expect(leer(archivo), archivo).not.toContain('className="type-display text-balance"');
       expect(leer(archivo), archivo).not.toMatch(/className="mt-(2|tight) max-w-2xl text-base text-tertiary"/);
