@@ -17,8 +17,10 @@ import {
   Megaphone,
   Gavel,
   KeyRound,
+  MousePointerClick,
   LayoutDashboard,
   ScrollText,
+  Settings2,
   ShieldAlert,
   ShieldCheck,
   UserCheck,
@@ -117,6 +119,15 @@ export const adminNavEntries: NavEntry[] = [
       { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
       // T-310: visor de solo lectura de los eventos de seguridad que ya se registran.
       { href: '/dashboard/admin/seguridad', label: 'Eventos de seguridad', icon: ScrollText },
+    ],
+  },
+  {
+    type: 'group',
+    label: 'Diagnóstico',
+    icon: Settings2,
+    items: [
+      // TEMPORAL: catálogo de botones para revisión de diseño; quitar junto con su página.
+      { href: '/dashboard/admin/botones', label: 'Botones (temporal)', icon: MousePointerClick },
     ],
   },
 ];

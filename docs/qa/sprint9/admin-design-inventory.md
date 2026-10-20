@@ -42,6 +42,7 @@ motivo de comentario» de `docs/design-system.md`.
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/metricas/page.tsx` |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/seguridad/page.tsx` |
 | `/dashboard/admin/anuncios` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/anuncios/page.tsx` |
+| `/dashboard/admin/botones` | sí | 0 | 0 | 1 | 0 | `app/dashboard/admin/botones/page.tsx` |
 | `/dashboard/admin/etiquetas` | sí | 0 | 0 | 0 | 6 | `app/dashboard/admin/etiquetas/page.tsx` |
 | `/dashboard/admin/apelaciones` | sí | 1 | 0 | 0 | 0 | `app/dashboard/admin/apelaciones/appeals-inbox-client.tsx` |
 | `/dashboard/admin/apelaciones/[apelacionId]` | sí | 1 | 0 | 0 | 0 | `app/dashboard/admin/apelaciones/[apelacionId]/appeal-review-client.tsx` |
@@ -106,6 +107,7 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/anuncios` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/botones` | sí | 0 | 0 | 1 | 0 |
 | `/dashboard/admin/apelaciones` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/apelaciones/[apelacionId]` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/proyectos` | sí | 0 | 1 | 0 | 0 |
@@ -118,15 +120,17 @@ Medido sobre el mismo código con la misma herramienta.
 incluye la vista de cuentas pendientes del PR #270 y `metric-trend-plot.tsx`, que T-293 separó de
 `AdminMetricsSection`). La página propia de «Tendencias de uso» (`app/dashboard/admin/metricas/page.tsx`) es el
 archivo 41: se creó después, sin literales, y no altera los totales. Al retirarse el catálogo temporal de
-etiquetas (`app/dashboard/admin/etiquetas/page.tsx`, que tampoco tenía literales de tamaño o radio) el árbol vuelve
-a 40 archivos:
+etiquetas (`app/dashboard/admin/etiquetas/page.tsx`, que tampoco tenía literales de tamaño o radio) el árbol volvió
+a 40 archivos. Después entraron la pantalla de anuncios (HU-191) y el catálogo temporal de botones
+(`app/dashboard/admin/botones/page.tsx`, con un solo `<button>` propio para pintar las muestras), los dos sin
+literales: el árbol queda en 42 archivos.
 
 | Medida | Antes | Después |
 |---|---:|---:|
 | Tamaños literales | 47 | 2 |
 | Radios literales | 68 | 20 |
 | Titulares fuera de la escala | 2 | 0 |
-| Archivos sin ningún literal de tamaño o radio | — | 29 de 40 |
+| Archivos sin ningún literal de tamaño o radio | — | 31 de 42 |
 
 Qué se hizo con cada diferencia de la sección 4:
 

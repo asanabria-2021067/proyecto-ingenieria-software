@@ -28,6 +28,7 @@ comprobación en cada endpoint administrativo. Ninguna ruta de este inventario e
 | `/dashboard/admin/cuentas-pendientes` | Cuentas pendientes | HU-179 (PR #270); colocada en la estructura por T-321 | `GET /admin/cuentas-pendientes` |
 | `/dashboard/admin/seguridad` | Eventos de seguridad | Sprint 9 · T-310 (Vernel) | `GET /admin/eventos-seguridad` |
 | `/dashboard/admin/anuncios` | Anuncios | Sprint 9 · HU-191 · T-352 | `GET/POST/PATCH /admin/anuncios` |
+| `/dashboard/admin/botones` | Botones (temporal) | Página de diagnóstico: catálogo de las familias de botones | — |
 
 Las tres entradas de `/dashboard/admin/proyectos` son la misma página con un `?grupo=` distinto; el backend solo
 conoce esos grupos y no existe uno «todos».
@@ -44,10 +45,11 @@ El menú se agrupa por tema de trabajo. «Panel Admin» va suelto arriba y los g
 | Métricas | Tendencias de uso | Las métricas de uso de la plataforma (HU-178), en su propia página. |
 | Comunicación | Anuncios | Avisos que la administración publica como banner en el dashboard (HU-191): crear, editar y despublicar. |
 | Verificación y seguridad | Cuentas pendientes · Eventos de seguridad | Supervisión de accesos y cuentas: la bandeja de cuentas que esperan verificación (HU-179), con su contador, y el visor de eventos. |
+| Diagnóstico | Botones (temporal) | Herramientas internas que no son parte del trabajo diario. |
 
 Antes de Sprint 9 existía un grupo genérico «Administración» que mezclaba cuentas, seguridad y la página temporal
 de etiquetas; se repartió entre «Usuarios», «Verificación y seguridad» y «Diagnóstico». Ninguna ruta cambió: solo
-el grupo en que aparece. El grupo «Diagnóstico» desapareció después, al retirarse su único destino (sección 9). El rótulo «Administración» que encabeza la barra lateral es el título del menú, no un grupo.
+el grupo en que aparece. El grupo «Diagnóstico» desapareció después, al retirarse su único destino (sección 9), y volvió con el catálogo temporal de botones (sección 10). El rótulo «Administración» que encabeza la barra lateral es el título del menú, no un grupo.
 
 «Métricas» enlaza una página propia (`/dashboard/admin/metricas`): al entrar en ella, también por la URL o al
 recargar, el grupo se abre solo y «Tendencias de uso» es el destino marcado como actual. Ningún destino del menú
@@ -91,7 +93,7 @@ usa los mismos nombres que el menú. La pantalla no se rehízo.
 En pantallas menores de `md` la barra lateral no se muestra y la navegación es `adminNavItemsMobile`: una lista
 **curada** de cuatro destinos (Panel Admin, Proyectos, Apelaciones, Gestión de Usuarios) más el menú de la cuenta.
 Aplanar todo el menú daría más de diez iconos y la saturaría. El resto de los destinos (Calendario de Sprints,
-Recuperación de contraseña, Tendencias de uso, Cuentas pendientes, Eventos de seguridad, Anuncios) no tienen acceso directo en móvil: se alcanzan por su
+Recuperación de contraseña, Tendencias de uso, Cuentas pendientes, Eventos de seguridad, Anuncios, Botones) no tienen acceso directo en móvil: se alcanzan por su
 URL o desde los enlaces del panel. «Tendencias de uso» tiene el suyo: el resumen del Panel Admin enlaza a la página
 con «Ver tendencias de uso». Ampliar la navegación móvil es una decisión de producto que este inventario deja
 registrada, no resuelta.
@@ -143,3 +145,11 @@ revisión de diseño, no parte del producto. Se retiró del proyecto al cierre d
 menú y el grupo «Diagnóstico», que solo la contenía a ella. La página y su prueba se conservan fuera del
 repositorio como paquete «etiquetas temporal legacy», con un parche para restaurarlas si vuelve a hacer falta el
 catálogo. Los componentes y tonos de etiqueta que mostraba siguen en el proyecto: no se tocaron.
+
+## 10. Página temporal de botones
+
+`/dashboard/admin/botones` no es parte del producto: es el catálogo de diagnóstico de las familias de botones, con
+la misma organización que tenía el de etiquetas. Las familias compartidas importan el componente o la constante
+real; las escritas en línea copian sus clases en `apps/frontend/lib/admin/button-catalog.ts`, y
+`test/button-catalog.spec.ts` comprueba que cada clase sigue, literal, en su archivo. Cuando se retire, se quitan
+juntas la página, su módulo de datos, su prueba y su entrada del menú.
