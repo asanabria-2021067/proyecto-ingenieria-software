@@ -15,6 +15,7 @@ import {
   Flag,
   FolderKanban,
   KeyRound,
+  LifeBuoy,
   MessageSquare,
   ShieldAlert,
   UserCheck,
@@ -65,6 +66,7 @@ const TYPE_ICON_RULES: Array<[string, typeof Bell]> = [
   ['ALERTA_SEGURIDAD', ShieldAlert],
   ['RECUPERACION', KeyRound],
   ['EVENTO', CalendarClock],
+  ['CONTACTO', LifeBuoy],
 ];
 
 function getNotifIcon(tipo: string): typeof Bell {
@@ -294,7 +296,7 @@ export default function NotificacionesPage() {
                           </span>
                         </div>
                         {n.mensajeNotificacion && (
-                          <p className="type-body mt-micro">{n.mensajeNotificacion}</p>
+                          <p className="type-body mt-micro whitespace-pre-line break-words">{n.mensajeNotificacion}</p>
                         )}
                       </div>
 

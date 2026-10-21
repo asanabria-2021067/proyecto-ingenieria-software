@@ -163,7 +163,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
                         {n.tituloNotificacion}
                       </p>
                       {n.mensajeNotificacion && (
-                        <p className="text-xs text-tertiary mt-0.5 line-clamp-2">
+                        <p className="text-xs text-tertiary mt-0.5 line-clamp-2 break-words">
                           {n.mensajeNotificacion}
                         </p>
                       )}

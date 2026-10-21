@@ -273,6 +273,7 @@ enum TipoNotificacion {
   TAREA_POR_VENCER
   // HU-190 (T-347): el usuario alcanzó un nuevo nivel de una insignia.
   INSIGNIA_OBTENIDA
+  SOLICITUD_CONTACTO
 }
 
 enum EstadoAmistad {

@@ -278,6 +278,14 @@ export interface NotificationTemplateData {
     nivel: string;
     nivelNombre: string;
   };
+
+  SOLICITUD_CONTACTO: {
+    nombre: string;
+    correo: string;
+    asunto: string;
+    mensaje: string;
+    idUsuario: number | null;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -524,6 +532,12 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Nueva insignia',
     message: (data: NotificationTemplateData['INSIGNIA_OBTENIDA']) =>
       `Obtuviste la insignia "${data.insigniaNombre}" nivel ${data.nivelNombre}.`,
+  },
+
+  SOLICITUD_CONTACTO: {
+    title: 'Nueva solicitud de contacto',
+    message: (data: NotificationTemplateData['SOLICITUD_CONTACTO']) =>
+      `${data.nombre} (${data.correo}) escribió sobre "${data.asunto}": ${data.mensaje}`,
   },
 } as const;
 
