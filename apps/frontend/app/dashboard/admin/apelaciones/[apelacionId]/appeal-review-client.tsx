@@ -14,7 +14,7 @@ import { AppealDenyDialog } from '@/components/leadership/appeal-deny-dialog';
 import { LeadershipChangeDialog } from '@/components/leadership/leadership-change-dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
   ESTADO_APELACION_BADGE,
@@ -61,11 +61,11 @@ function Dato({ rotulo, children }: { rotulo: string; children: React.ReactNode 
 
 function ReviewSkeleton() {
   return (
-    <div className="flex flex-col gap-stack" role="status" aria-label="Cargando apelación">
+    <SkeletonRegion className="flex flex-col gap-stack" label="Cargando apelación">
       <Skeleton className="h-10 w-2/3" />
       <Skeleton className="h-40 w-full rounded-card" />
       <Skeleton className="h-56 w-full rounded-card" />
-    </div>
+    </SkeletonRegion>
   );
 }
 

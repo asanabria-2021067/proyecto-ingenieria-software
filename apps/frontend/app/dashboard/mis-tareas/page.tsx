@@ -7,7 +7,7 @@ import { AlertCircle, ClipboardList, SearchX } from 'lucide-react';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -501,7 +501,7 @@ export default function MisTareasPage() {
 
         {/* loading — skeleton con forma de grupo y filas, nunca spinner */}
         {isLoading && (
-          <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando tus tareas">
+          <SkeletonRegion className={DATA_TABLE_CARD} label="Cargando tus tareas">
             <div className="border-b border-outline-variant/50 px-card py-stack">
               <Skeleton className="h-5 w-32" />
             </div>
@@ -517,7 +517,7 @@ export default function MisTareasPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </SkeletonRegion>
         )}
 
         {/* error */}

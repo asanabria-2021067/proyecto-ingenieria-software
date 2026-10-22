@@ -93,7 +93,8 @@ describe('T-293: secciones secundarias diferidas', () => {
 
   it('el hueco de la página de Tendencias reserva el sitio de las cinco tarjetas y se anuncia como carga', () => {
     const loading = metricasPage.slice(metricasPage.indexOf('loading: () => ('), metricasPage.indexOf('/**'));
-    expect(loading).toContain('role="status"');
+    // SkeletonRegion (HU-204) pinta role="status" con su etiqueta.
+    expect(loading).toMatch(/role="status"|<SkeletonRegion[^>]*label="Cargando/);
     expect(loading).toContain('length: 5');
     expect(loading).toContain('h-96');
   });

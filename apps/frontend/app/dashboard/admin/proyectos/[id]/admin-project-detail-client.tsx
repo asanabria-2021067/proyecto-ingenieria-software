@@ -16,7 +16,7 @@ import { LeadershipChangeDialog } from '@/components/leadership/leadership-chang
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -144,12 +144,12 @@ function toVista(detail: AdminProjectDetail | HistoricalProjectView): VistaAdmin
 
 function DetailSkeleton() {
   return (
-    <div className={ADMIN_PAGE} aria-busy="true">
+    <SkeletonRegion label="Cargando proyecto" className={ADMIN_PAGE}>
       <Skeleton className="mb-4 h-4 w-72" />
       <Skeleton className="mb-4 h-44 w-full rounded-control" />
       <Skeleton className="mb-4 h-10 w-96" />
       <Skeleton className="h-72 w-full rounded-control" />
-    </div>
+    </SkeletonRegion>
   );
 }
 

@@ -30,6 +30,7 @@ import { getAdminUserDetail, type AdminUserDetail } from '@/lib/services/admin';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
 import { useMisInsignias } from '@/hooks/use-insignias';
+import { SkeletonCard, SkeletonDetail } from '@/components/ui/skeleton';
 
 function initials(nombre: string, apellido: string) {
   return `${nombre?.[0] ?? ''}${apellido?.[0] ?? ''}`.toUpperCase() || 'U';
@@ -78,13 +79,19 @@ export default function PerfilPage() {
   const router = useRouter();
   const { data: user, isLoading } = useCurrentUser();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [statsCargando, setStatsCargando] = useState(true);
   const [adminDetail, setAdminDetail] = useState<AdminUserDetail | null>(null);
 
   const isAdmin = !isLoading && isAdminUser(user);
   const insignias = useMisInsignias(!isLoading && !isAdmin);
 
   useEffect(() => {
-    if (!isLoading && !isAdmin) getDashboardStats().then(setStats).catch(() => {});
+    if (!isLoading && !isAdmin) {
+      getDashboardStats()
+        .then(setStats)
+        .catch(() => {})
+        .finally(() => setStatsCargando(false));
+    }
   }, [isLoading, isAdmin]);
 
   useEffect(() => {
@@ -99,11 +106,7 @@ export default function PerfilPage() {
   }, [user]);
 
   if (isLoading) {
-    return (
-      <div className="h-screen bg-surface flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <SkeletonDetail label="Cargando perfil" sections={2} aside={2} className={dashboardPage('py-8')} />;
   }
 
   return (
@@ -186,7 +189,17 @@ export default function PerfilPage() {
         <div className="grid grid-cols-12 gap-8">
           <div className="col-span-12 lg:col-span-8 space-y-8">
             {/* Stats cards - students only */}
-            {!isAdmin && (
+            {!isAdmin && statsCargando && (
+              <SkeletonCard
+                label="Cargando tus horas"
+                count={2}
+                lines={0}
+                media
+                mediaClassName="h-12 w-32"
+                className="gap-6 md:grid-cols-2 lg:grid-cols-2"
+              />
+            )}
+            {!isAdmin && !statsCargando && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <article className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
                   <div className="flex items-center justify-between">

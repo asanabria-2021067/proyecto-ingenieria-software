@@ -43,6 +43,7 @@ import {
 import { useAdminSidebarCollapsed } from '@/components/dashboard/use-dashboard-sidebar-collapsed';
 import { ThemeToggle } from '@/components/theme-toggle';
 import logo from '@/public/logo.png';
+import { ShellSkeleton } from '@/components/layout/shell-skeleton';
 
 export const ADMIN_CUENTAS_PENDIENTES_HREF = '/dashboard/admin/cuentas-pendientes';
 
@@ -194,11 +195,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [isLoading, isError, esAdmin, router]);
 
   if (isLoading || isError || !esAdmin) {
-    return (
-      <div className="h-screen bg-surface flex items-center justify-center">
-        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
+    return <ShellSkeleton />;
   }
 
   return (

@@ -19,7 +19,7 @@ import { BurndownChart } from '@/components/projects/burndown-chart';
 import { VelocityChart } from '@/components/projects/velocity-chart';
 import { ReportsDialogTrigger, SprintReportsDialog } from '@/components/projects/sprint-reports-dialog';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Empty,
   EmptyContent,
@@ -93,7 +93,13 @@ function SeccionVelocidad({ sprints }: { sprints: SprintComparativeAnalyticsItem
 function SeccionBurndownPreview({ idProyecto, sprint }: { idProyecto: number; sprint: SprintComparativeAnalyticsItemDto }) {
   const { burndown, isLoading, isError, error, refetch } = useSprintBurndown(idProyecto, sprint.idSprint);
 
-  if (isLoading) return <Skeleton className="mb-6 h-[340px] w-full rounded-xl" />;
+  if (isLoading) {
+    return (
+      <SkeletonRegion label="Cargando burndown" className="mb-6">
+        <Skeleton className="h-[340px] w-full rounded-xl" />
+      </SkeletonRegion>
+    );
+  }
   // Un fallo se dice y se puede reintentar; el resto de la comparativa sigue disponible.
   if (isError) {
     return (
@@ -213,10 +219,10 @@ export default function SprintsAnalyticsPage() {
       />
 
       {isLoading && (
-        <div className="space-y-4">
+        <SkeletonRegion label="Cargando analíticas de sprints" className="space-y-4">
           <Skeleton className="h-40 w-full rounded-xl" />
           <Skeleton className="h-56 w-full rounded-xl" />
-        </div>
+        </SkeletonRegion>
       )}
 
       {!isLoading && isError && (

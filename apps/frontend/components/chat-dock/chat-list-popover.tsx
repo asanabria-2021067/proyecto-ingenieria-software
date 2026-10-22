@@ -14,6 +14,7 @@ import { estaSilenciada } from '@/lib/chat-silencio';
 import { EstadoIndicador, MiEstadoBoton } from '@/components/chat-dock/estado-chat';
 import { ChannelDialog, useProyectosQueLidero } from '@/components/chat-dock/channel-dialog';
 import type { ChatConversacionGlobal } from '@/lib/types/chat';
+import { SkeletonList } from '@/components/ui/skeleton';
 
 function nombreConversacion(conversacion: ChatConversacionGlobal, currentUserId: number | null): string {
   if (conversacion.esCanal) return `#${conversacion.nombre ?? 'canal'}`;
@@ -184,7 +185,9 @@ export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) 
             </ul>
           </section>
         )}
-        {isLoading && <p className="px-4 py-6 text-center text-xs text-tertiary">Cargando chats…</p>}
+        {isLoading && (
+          <SkeletonList label="Cargando chats" count={4} lines={2} avatar="circle" layout="plain" className="px-4 py-stack" />
+        )}
         {!isLoading && filtradas.length === 0 && (
           <p className="px-4 py-6 text-center text-xs text-tertiary">
             {debouncedQuery ? 'Sin resultados para esa búsqueda.' : 'No tienes chats aquí todavía.'}

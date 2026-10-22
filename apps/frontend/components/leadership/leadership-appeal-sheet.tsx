@@ -21,7 +21,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { useLeadershipAppealMutations, useLeadershipCandidates } from '@/hooks/use-leadership';
@@ -171,7 +171,9 @@ export function LeadershipAppealSheet({ projectId, open, onOpenChange, onSubmitt
           }}
         >
           {candidatesQuery.isPending ? (
-            <Skeleton className="h-16 w-full rounded-xl" />
+            <SkeletonRegion label="Cargando candidatos">
+              <Skeleton className="h-16 w-full rounded-xl" />
+            </SkeletonRegion>
           ) : advertencia ? (
             <div
               role="note"
