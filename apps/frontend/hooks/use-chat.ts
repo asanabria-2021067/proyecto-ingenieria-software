@@ -1,25 +1,64 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  activarSonidoConversation,
+  addChannelMembers,
+  cancelScheduledMessage,
+  clearMiEstado,
+  createChannel,
   createConversation,
   deleteConversation,
+  deleteMessage,
+  editMessage,
+  getAttachmentThumbnail,
+  getFiles,
+  getLinks,
+  getLinkPreview,
   getMessages,
+  getMiEstado,
+  getNoMolestar,
+  getReadReceipts,
   listAllConversations,
   listArchivedConversations,
+  listSavedMessages,
+  listScheduledMessages,
   markConversationRead,
+  removeApodo,
+  removeChannelMember,
+  scheduleMessage,
+  searchMessages,
+  sendFileMessage,
   sendMessage,
+  setApodo,
+  setMiEstado,
+  silenciarConversation,
+  toggleReaction,
+  toggleSavedMessage,
+  updateChatTheme,
   updateConversation,
+  updateNoMolestar,
 } from '@/lib/services/chat';
 import {
   allConversationsQueryKey,
   archivedConversationsQueryKey,
+  attachmentThumbnailQueryKey,
+  conversationFilesQueryKey,
+  conversationLinksQueryKey,
   conversationMessagesQueryKey,
+  miEstadoChatQueryKey,
+  conversationReadsQueryKey,
+  linkPreviewQueryKey,
+  noMolestarQueryKey,
   projectConversationsQueryKey,
+  savedMessagesQueryKey,
+  scheduledMessagesQueryKey,
+  searchMessagesQueryKey,
 } from '@/lib/query-keys/chat';
-import type { ChatMensaje, CreateConversationPayload, UpdateConversationPayload } from '@/lib/types/chat';
+import type { BuscarMensajesFiltros, ChatLectura, ChatMensaje, ChatReaccion, ChatTemaColor, CreateChannelPayload, SetEstadoChatPayload, ChatReaccionSocket, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
+import { alternarReaccionLocal, reaccionesDesdeSocket } from '@/lib/chat-reacciones';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -45,6 +84,11 @@ async function joinConversationReliably(
   }
 }
 
+/** El indicador "escribiendo…" expira solo si no llega otro `typing` en este lapso. */
+export const TYPING_EXPIRY_MS = 4000;
+/** Como mucho un `typing` por conversación en este lapso mientras la persona teclea. */
+export const TYPING_THROTTLE_MS = 2500;
+
 /** Dock global de chat: todas las conversaciones activas del usuario, de cualquier proyecto. */
 export function useAllConversations(q: string = '') {
   const query = useQuery({
@@ -67,6 +111,26 @@ export function useCreateConversation(idProyecto: number) {
   });
 }
 
+export function useCreateChannel(idProyecto: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateChannelPayload) => createChannel(idProyecto, payload),
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+/** Aplica el diff de miembros de un canal: primero agrega, luego quita. */
+export function useUpdateChannelMembers(idProyecto: number, idCanal: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ agregar, quitar }: { agregar: number[]; quitar: number[] }) => {
+      if (agregar.length > 0) await addChannelMembers(idProyecto, idCanal, agregar);
+      for (const idUsuario of quitar) await removeChannelMember(idProyecto, idCanal, idUsuario);
+    },
+    onSettled: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
 export function useMessages(idProyecto: number, idConversacion: number | null) {
   const query = useQuery({
     queryKey: conversationMessagesQueryKey(idProyecto, idConversacion ?? 0),
@@ -76,10 +140,162 @@ export function useMessages(idProyecto: number, idConversacion: number | null) {
   return { messages: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
 }
 
+/** Búsqueda dentro de una conversación; solo corre cuando `enabled` (hay filtros aplicados). */
+export function useSearchMessages(
+  idProyecto: number,
+  idConversacion: number,
+  filtros: Omit<BuscarMensajesFiltros, 'pagina'>,
+  enabled: boolean,
+) {
+  const query = useInfiniteQuery({
+    queryKey: searchMessagesQueryKey(idProyecto, idConversacion, filtros),
+    queryFn: ({ pageParam }) => searchMessages(idProyecto, idConversacion, { ...filtros, pagina: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.pagina + 1 : undefined),
+    enabled,
+  });
+  return {
+    resultados: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
+}
+
+/**
+ * Carga páginas anteriores del historial (cursor) hasta que `idMensaje` esté
+ * en la caché de mensajes, para poder saltar a un resultado antiguo.
+ */
+export function useLoadMessagesUntil(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return async (idMensaje: number) => {
+    const key = conversationMessagesQueryKey(idProyecto, idConversacion);
+    let actuales = queryClient.getQueryData<ChatMensaje[]>(key) ?? [];
+    while (actuales.length > 0 && idMensaje < actuales[0].idMensaje) {
+      const anteriores = await getMessages(idProyecto, idConversacion, actuales[0].idMensaje);
+      if (anteriores.length === 0) return;
+      actuales = [...anteriores, ...actuales];
+      queryClient.setQueryData(key, actuales);
+    }
+  };
+}
+
+/** "Visto por": lecturas de los demás participantes; el socket las mantiene al día (messagesRead). */
+export function useReadReceipts(idProyecto: number, idConversacion: number | null) {
+  const query = useQuery({
+    queryKey: conversationReadsQueryKey(idProyecto, idConversacion ?? 0),
+    queryFn: () => getReadReceipts(idProyecto, idConversacion as number),
+    enabled: idConversacion != null,
+  });
+  return { lecturas: query.data ?? [] };
+}
+
+/** Galeria de enlaces compartidos: paginada por cursor, solo consulta si `enabled`. */
+export function useConversationLinks(idProyecto: number, idConversacion: number, enabled: boolean) {
+  const query = useInfiniteQuery({
+    queryKey: conversationLinksQueryKey(idProyecto, idConversacion),
+    queryFn: ({ pageParam }) => getLinks(idProyecto, idConversacion, pageParam),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
+  return {
+    enlaces: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
+}
+
+/** Galeria de archivos compartidos: paginada por cursor, solo consulta si `enabled`. */
+export function useConversationFiles(idProyecto: number, idConversacion: number, enabled: boolean) {
+  const query = useInfiniteQuery({
+    queryKey: conversationFilesQueryKey(idProyecto, idConversacion),
+    queryFn: ({ pageParam }) => getFiles(idProyecto, idConversacion, pageParam),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled,
+  });
+  return {
+    archivos: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
+}
+
+/** Miniatura de una imagen como URL data: (ya permitida en img-src), pedida con sesion al backend. */
+export function useAttachmentThumbnail(idProyecto: number, idConversacion: number, idAdjunto: number, enabled: boolean) {
+  return useQuery({
+    queryKey: attachmentThumbnailQueryKey(idProyecto, idConversacion, idAdjunto),
+    queryFn: async () => {
+      const blob = await getAttachmentThumbnail(idProyecto, idConversacion, idAdjunto);
+      return new Promise<string>((resolve, reject) => {
+        const lector = new FileReader();
+        lector.onload = () => resolve(lector.result as string);
+        lector.onerror = () => reject(lector.error);
+        lector.readAsDataURL(blob);
+      });
+    },
+    enabled,
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
+export function useSendFileMessage(idProyecto: number, idConversacion: number | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ contenido, archivo }: { contenido: string; archivo: File }) =>
+      sendFileMessage(idProyecto, idConversacion as number, contenido, archivo),
+    onSuccess: (mensaje) => {
+      queryClient.setQueryData<ChatMensaje[]>(
+        conversationMessagesQueryKey(idProyecto, idConversacion as number),
+        (current) => (current ? [...current, mensaje] : [mensaje]),
+      );
+      queryClient.invalidateQueries({ queryKey: conversationFilesQueryKey(idProyecto, idConversacion as number) });
+      invalidateChatLists(queryClient, idProyecto);
+    },
+  });
+}
+
+/** Antepone al caché la página de mensajes anteriores al más viejo cargado; devuelve lo que trajo. */
+export function useLoadOlderMessages(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return async (): Promise<ChatMensaje[]> => {
+    const key = conversationMessagesQueryKey(idProyecto, idConversacion);
+    const actuales = queryClient.getQueryData<ChatMensaje[]>(key) ?? [];
+    if (actuales.length === 0) return [];
+    const previos = await getMessages(idProyecto, idConversacion, actuales[0].idMensaje);
+    if (previos.length > 0) {
+      queryClient.setQueryData<ChatMensaje[]>(key, (current) => [...previos, ...(current ?? [])]);
+    }
+    return previos;
+  };
+}
+
+/** Una consulta por URL; sin reintentos (el error es definitivo) y cacheada mientras dure la sesion. */
+export function useLinkPreview(idProyecto: number, idConversacion: number, url: string | null) {
+  return useQuery({
+    queryKey: linkPreviewQueryKey(idConversacion, url ?? ''),
+    queryFn: () => getLinkPreview(idProyecto, idConversacion, url as string),
+    enabled: url != null,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
 export function useSendMessage(idProyecto: number, idConversacion: number | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (contenido: string) => sendMessage(idProyecto, idConversacion as number, contenido),
+    mutationFn: ({ contenido, idMensajeCitado }: { contenido: string; idMensajeCitado?: number }) =>
+      sendMessage(idProyecto, idConversacion as number, contenido, idMensajeCitado),
     onSuccess: (mensaje) => {
       queryClient.setQueryData<ChatMensaje[]>(
         conversationMessagesQueryKey(idProyecto, idConversacion as number),
@@ -87,6 +303,109 @@ export function useSendMessage(idProyecto: number, idConversacion: number | null
       );
       invalidateChatLists(queryClient, idProyecto);
     },
+  });
+}
+
+/** Sustituye en la caché el mensaje que cambió (editado o eliminado), conservando lo que el servidor no envía (reacciones, guardado, apodo). */
+function reemplazarMensaje(queryClient: ReturnType<typeof useQueryClient>, mensaje: ChatMensaje) {
+  queryClient.setQueriesData<ChatMensaje[]>(
+    { predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === mensaje.idConversacion && query.queryKey[3] === 'mensajes' },
+    (current) =>
+      current?.map((m) => {
+        if (m.idMensaje === mensaje.idMensaje) return { ...m, ...mensaje };
+        // Quien cita un mensaje que acaba de eliminarse deja de ver su contenido.
+        if (mensaje.eliminadoEn && m.citado?.idMensaje === mensaje.idMensaje) {
+          return { ...m, citado: { ...m.citado, extracto: '', eliminado: true } };
+        }
+        return m;
+      }),
+  );
+}
+
+export function useEditMessage(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idMensaje, contenido }: { idMensaje: number; contenido: string }) =>
+      editMessage(idProyecto, idConversacion, idMensaje, contenido),
+    onSuccess: (mensaje) => {
+      reemplazarMensaje(queryClient, mensaje);
+      invalidateChatLists(queryClient, idProyecto);
+    },
+  });
+}
+
+export function useDeleteMessage(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (idMensaje: number) => deleteMessage(idProyecto, idConversacion, idMensaje),
+    onSuccess: (mensaje) => {
+      reemplazarMensaje(queryClient, mensaje);
+      invalidateChatLists(queryClient, idProyecto);
+    },
+  });
+}
+
+/** Reemplaza las reacciones de un mensaje en las caches de mensajes que cumplan `filters`. */
+function patchReacciones(
+  queryClient: ReturnType<typeof useQueryClient>,
+  filters: Parameters<typeof queryClient.setQueriesData>[0],
+  idMensaje: number,
+  actualizar: (reacciones: ChatReaccion[] | undefined) => ChatReaccion[],
+) {
+  queryClient.setQueriesData<ChatMensaje[]>(filters, (current) =>
+    current?.map((m) => (m.idMensaje === idMensaje ? { ...m, reacciones: actualizar(m.reacciones) } : m)),
+  );
+}
+
+/** Alterna una reaccion con actualizacion optimista; si el servidor falla, vuelve al estado previo. */
+export function useToggleReaction(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  const queryKey = conversationMessagesQueryKey(idProyecto, idConversacion);
+  return useMutation({
+    mutationFn: ({ idMensaje, emoji }: { idMensaje: number; emoji: string }) =>
+      toggleReaction(idProyecto, idConversacion, idMensaje, emoji),
+    onMutate: async ({ idMensaje, emoji }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previo = queryClient.getQueryData<ChatMensaje[]>(queryKey);
+      patchReacciones(queryClient, { queryKey }, idMensaje, (r) => alternarReaccionLocal(r, emoji));
+      return { previo };
+    },
+    onError: (_error, _vars, contexto) => {
+      if (contexto?.previo) queryClient.setQueryData(queryKey, contexto.previo);
+    },
+    onSuccess: (reacciones, { idMensaje }) => {
+      patchReacciones(queryClient, { queryKey }, idMensaje, () => reacciones);
+    },
+  });
+}
+
+export function useScheduledMessages(idProyecto: number, idConversacion: number) {
+  const query = useQuery({
+    queryKey: scheduledMessagesQueryKey(idProyecto, idConversacion),
+    queryFn: () => listScheduledMessages(idProyecto, idConversacion),
+    // El job los envía en el servidor: refresca para que dejen de figurar como pendientes.
+    refetchInterval: 30_000,
+  });
+  return { programados: query.data ?? [], isLoading: query.isLoading };
+}
+
+export function useScheduleMessage(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { contenido: string; enviarEn: string }) =>
+      scheduleMessage(idProyecto, idConversacion, payload),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: scheduledMessagesQueryKey(idProyecto, idConversacion) }),
+  });
+}
+
+export function useCancelScheduledMessage(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (idMensajeProgramado: number) =>
+      cancelScheduledMessage(idProyecto, idConversacion, idMensajeProgramado),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: scheduledMessagesQueryKey(idProyecto, idConversacion) }),
   });
 }
 
@@ -109,12 +428,81 @@ export function useArchivedConversations(q: string) {
   };
 }
 
+/** Alterna el marcador personal de un mensaje y refleja el resultado en la caché del historial. */
+export function useToggleSavedMessage(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (idMensaje: number) => toggleSavedMessage(idProyecto, idConversacion, idMensaje),
+    onSuccess: ({ guardado }, idMensaje) => {
+      queryClient.setQueryData<ChatMensaje[]>(
+        conversationMessagesQueryKey(idProyecto, idConversacion),
+        (current) => current?.map((m) => (m.idMensaje === idMensaje ? { ...m, guardado } : m)),
+      );
+      queryClient.invalidateQueries({ queryKey: savedMessagesQueryKey() });
+    },
+  });
+}
+
+/** Vista "Mensajes guardados": paginada, solo se pide mientras el diálogo está abierto. */
+export function useSavedMessages(enabled: boolean) {
+  const query = useInfiniteQuery({
+    queryKey: savedMessagesQueryKey(),
+    queryFn: ({ pageParam }) => listSavedMessages(pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length + 1 : undefined),
+    enabled,
+  });
+  return {
+    guardados: query.data?.pages.flatMap((p) => p.items) ?? [],
+    hasMore: Boolean(query.hasNextPage),
+    isLoading: query.isLoading,
+    isError: query.isError,
+    cargarMas: () => query.fetchNextPage(),
+    cargandoMas: query.isFetchingNextPage,
+  };
+}
+
 /** Menú del dock de chat: archivar, renombrar, favorito, silenciar o prioridad. */
 export function useUpdateConversation(idProyecto: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ idConversacion, payload }: { idConversacion: number; payload: UpdateConversationPayload }) =>
       updateConversation(idProyecto, idConversacion, payload),
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+/** Silencio por usuario: `duracion` null reactiva la conversacion. */
+export function useSilenciarConversation(idProyecto: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idConversacion, duracion }: { idConversacion: number; duracion: DuracionSilencio | null }) =>
+      duracion
+        ? silenciarConversation(idProyecto, idConversacion, duracion)
+        : activarSonidoConversation(idProyecto, idConversacion),
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+export function useNoMolestar() {
+  const query = useQuery({ queryKey: noMolestarQueryKey, queryFn: getNoMolestar });
+  return { config: query.data ?? null, isLoading: query.isLoading, isError: query.isError };
+}
+
+export function useUpdateNoMolestar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ConfigNoMolestar) => updateNoMolestar(payload),
+    onSuccess: (guardada) => queryClient.setQueryData(noMolestarQueryKey, guardada),
+  });
+}
+
+/** Tema de color propio de la conversación (null = por defecto). */
+export function useUpdateChatTheme(idProyecto: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idConversacion, temaColor }: { idConversacion: number; temaColor: ChatTemaColor | null }) =>
+      updateChatTheme(idProyecto, idConversacion, temaColor),
     onSuccess: () => invalidateChatLists(queryClient, idProyecto),
   });
 }
@@ -127,11 +515,54 @@ export function useDeleteConversation(idProyecto: number) {
   });
 }
 
+/** Apodos privados por chat; invalida lista y mensajes para refrescar los nombres. */
+export function useSetApodo(idProyecto: number, idConversacion: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idObjetivo, apodo }: { idObjetivo: number; apodo: string | null }) =>
+      apodo ? setApodo(idProyecto, idConversacion, idObjetivo, apodo) : removeApodo(idProyecto, idConversacion, idObjetivo),
+    onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
 export function useMarkConversationRead(idProyecto: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (idConversacion: number) => markConversationRead(idProyecto, idConversacion),
     onSuccess: () => invalidateChatLists(queryClient, idProyecto),
+  });
+}
+
+/** Estado personalizado propio del chat; al cambiarlo se refrescan las listas donde otros lo ven. */
+export function useMiEstado() {
+  const query = useQuery({ queryKey: miEstadoChatQueryKey, queryFn: getMiEstado });
+  return { estado: query.data ?? null, isLoading: query.isLoading };
+}
+
+function refrescarListasPorEstado(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['chats-global'] });
+  queryClient.invalidateQueries({ queryKey: ['proyecto-conversaciones'] });
+}
+
+export function useSetMiEstado() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: SetEstadoChatPayload) => setMiEstado(payload),
+    onSuccess: (estado) => {
+      queryClient.setQueryData(miEstadoChatQueryKey, estado);
+      refrescarListasPorEstado(queryClient);
+    },
+  });
+}
+
+export function useClearMiEstado() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => clearMiEstado(),
+    onSuccess: () => {
+      queryClient.setQueryData(miEstadoChatQueryKey, null);
+      refrescarListasPorEstado(queryClient);
+    },
   });
 }
 
@@ -148,6 +579,10 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
   const socketRef = useRef<Socket | null>(null);
   const openIdsRef = useRef<number[]>(openConversationIds);
   const [isConnected, setIsConnected] = useState(false);
+  // conversación -> ids de quienes están escribiendo ahora (efímero, nunca se persiste)
+  const [typingByConversation, setTypingByConversation] = useState<Record<number, number[]>>({});
+  const typingTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const lastTypingEmitRef = useRef(new Map<number, number>());
 
   useEffect(() => {
     openIdsRef.current = openConversationIds;
@@ -160,6 +595,7 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;
+    const typingTimers = typingTimersRef.current;
 
     const handleNewMessage = ({
       idConversacion,
@@ -183,8 +619,79 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
           predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'mensajes',
         });
       }
+      if (mensaje.adjunto) {
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'archivos',
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ['chats-global'] });
+      // Quien envía ya leyó hasta su propio mensaje, y deja de "escribir".
+      updateRead(idConversacion, mensaje.remitente.idUsuario, mensaje.enviadoEn);
+      clearTyping(idConversacion, mensaje.remitente.idUsuario);
     };
+
+    const updateRead = (idConversacion: number, idUsuario: number, ultimaLecturaEn: string) => {
+      queryClient.setQueriesData<ChatLectura[]>(
+        { predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'lecturas' },
+        (current) => {
+          if (!current) return current;
+          const resto = current.filter((l) => l.idUsuario !== idUsuario);
+          return [...resto, { idUsuario, ultimaLecturaEn }];
+        },
+      );
+    };
+
+    const clearTyping = (idConversacion: number, idUsuario: number) => {
+      const key = `${idConversacion}:${idUsuario}`;
+      const timer = typingTimers.get(key);
+      if (timer) clearTimeout(timer);
+      typingTimers.delete(key);
+      setTypingByConversation((current) => {
+        if (!current[idConversacion]?.includes(idUsuario)) return current;
+        return { ...current, [idConversacion]: current[idConversacion].filter((id) => id !== idUsuario) };
+      });
+    };
+
+    const handleTyping = ({ idConversacion, idUsuario }: { idConversacion: number; idUsuario: number }) => {
+      const key = `${idConversacion}:${idUsuario}`;
+      const previo = typingTimers.get(key);
+      if (previo) clearTimeout(previo);
+      typingTimers.set(key, setTimeout(() => clearTyping(idConversacion, idUsuario), TYPING_EXPIRY_MS));
+      setTypingByConversation((current) => {
+        const ids = current[idConversacion] ?? [];
+        return ids.includes(idUsuario) ? current : { ...current, [idConversacion]: [...ids, idUsuario] };
+      });
+    };
+
+    const handleMessagesRead = ({
+      idConversacion,
+      idUsuario,
+      ultimaLecturaEn,
+    }: {
+      idConversacion: number;
+      idUsuario: number;
+      ultimaLecturaEn: string;
+    }) => updateRead(idConversacion, idUsuario, ultimaLecturaEn);
+
+    const handleReactionUpdated = ({
+      idConversacion,
+      idMensaje,
+      reacciones,
+    }: {
+      idConversacion: number;
+      idMensaje: number;
+      reacciones: ChatReaccionSocket[];
+    }) => {
+      const yo = queryClient.getQueryData<{ idUsuario: number }>(['currentUser']);
+      patchReacciones(
+        queryClient,
+        { predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'mensajes' },
+        idMensaje,
+        () => reaccionesDesdeSocket(reacciones, yo?.idUsuario),
+      );
+    };
+
+    const handleMessageChanged = ({ mensaje }: { mensaje: ChatMensaje }) => reemplazarMensaje(queryClient, mensaje);
 
     const handleConversationUpdated = () => {
       queryClient.invalidateQueries({ queryKey: ['chats-global'] });
@@ -215,13 +722,25 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
     };
 
     socket.on('newMessage', handleNewMessage);
+    socket.on('reactionUpdated', handleReactionUpdated);
+    socket.on('messageUpdated', handleMessageChanged);
+    socket.on('messageDeleted', handleMessageChanged);
     socket.on('conversationUpdated', handleConversationUpdated);
+    socket.on('typing', handleTyping);
+    socket.on('messagesRead', handleMessagesRead);
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
 
     return () => {
       socket.off('newMessage', handleNewMessage);
+      socket.off('reactionUpdated', handleReactionUpdated);
+      socket.off('messageUpdated', handleMessageChanged);
+      socket.off('messageDeleted', handleMessageChanged);
       socket.off('conversationUpdated', handleConversationUpdated);
+      socket.off('typing', handleTyping);
+      socket.off('messagesRead', handleMessagesRead);
+      for (const timer of typingTimers.values()) clearTimeout(timer);
+      typingTimers.clear();
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.close();
@@ -248,5 +767,14 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
     };
   }, [idsKey]);
 
-  return { isConnected };
+  // Avisa que la persona está escribiendo, como mucho una vez por TYPING_THROTTLE_MS.
+  const emitTyping = useCallback((idConversacion: number) => {
+    const socket = socketRef.current;
+    const ahora = Date.now();
+    if (!socket || ahora - (lastTypingEmitRef.current.get(idConversacion) ?? 0) < TYPING_THROTTLE_MS) return;
+    lastTypingEmitRef.current.set(idConversacion, ahora);
+    socket.emit('typing', { idConversacion });
+  }, []);
+
+  return { isConnected, typingByConversation, emitTyping };
 }

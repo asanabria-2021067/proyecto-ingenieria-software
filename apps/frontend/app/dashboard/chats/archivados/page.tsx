@@ -138,7 +138,7 @@ export default function ChatsArchivadosPage() {
                     </p>
                     <p className="type-meta truncate">{c.proyecto.tituloProyecto}</p>
                     {c.ultimoMensaje && (
-                      <p className="type-body truncate text-text-secondary">{c.ultimoMensaje.contenido}</p>
+                      <p className="type-body truncate text-text-secondary">{c.ultimoMensaje.eliminadoEn ? 'Mensaje eliminado' : c.ultimoMensaje.contenido}</p>
                     )}
                   </div>
                   <Lock className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
