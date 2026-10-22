@@ -17,7 +17,7 @@ export interface ContactFormProps {
   isPending: boolean;
 }
 
-const INPUT_CLASS = 'h-11 rounded-xl bg-white px-4 text-on-surface dark:bg-surface-container';
+const INPUT_CLASS = 'h-11 rounded-xl bg-page px-4 text-text-primary dark:bg-page';
 
 export function ContactForm({ defaultValues, onSubmit, isPending }: ContactFormProps) {
   const form = useForm<ContactFormValues>({
@@ -116,7 +116,7 @@ export function ContactForm({ defaultValues, onSubmit, isPending }: ContactFormP
                   rows={6}
                   maxLength={CONTACTO_LIMITES.mensaje}
                   placeholder="Cuéntanos con detalle qué necesitas."
-                  className="min-h-36 rounded-xl bg-white px-4 py-3 text-on-surface dark:bg-surface-container"
+                  className="min-h-36 rounded-xl bg-page px-4 py-3 text-text-primary dark:bg-page"
                 />
               </FormControl>
               <FormMessage />
@@ -127,7 +127,7 @@ export function ContactForm({ defaultValues, onSubmit, isPending }: ContactFormP
         <Button
           type="submit"
           disabled={isPending}
-          className="h-12 w-full rounded-xl bg-primary-container font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary active:scale-[0.98]"
+          className="h-12 w-full rounded-xl bg-primary font-headline font-bold text-on-primary shadow-card transition-all hover:bg-primary/90 active:scale-[0.98]"
         >
           {isPending ? <Spinner aria-hidden="true" /> : <Send aria-hidden="true" />}
           {isPending ? 'Enviando...' : 'Enviar mensaje'}
