@@ -319,6 +319,17 @@
   --color-on-accent: var(--color-on-secondary-fixed);
   --color-action: var(--color-inverse-surface);
   --color-on-action: var(--color-inverse-on-surface);
+  /*
+   * Barra de acciones masivas (HU-202): verde bosque de la sidebar del
+   * administrador, igual en claro y en oscuro. `action` (superficie inversa)
+   * quedaba blanca en modo oscuro y desentonaba con el resto de la interfaz.
+   */
+  --color-bulk-bar: var(--admin-forest);
+  --color-bulk-bar-border: var(--admin-forest-border);
+  --color-on-bulk-bar: var(--admin-ink);
+  /* Conteo de la barra: lima del administrador (acento puntual), legible en ambos temas. */
+  --color-bulk-bar-accent: var(--admin-lime);
+  --color-on-bulk-bar-accent: var(--admin-forest);
 
   --color-text-primary: var(--color-on-surface);
   --color-text-secondary: var(--color-on-surface-variant);
@@ -681,6 +692,24 @@ html {
   animation: surface-enter 0.38s var(--ease-out-quint) both;
 }
 
+/* HU-200: comentario al que lleva una notificación. Se ilumina y se apaga
+   solo; con movimiento reducido queda el resaltado sin transición. */
+@keyframes comment-spotlight {
+  0%,
+  55% {
+    background-color: color-mix(in srgb, var(--color-primary) 9%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+
+.comment-spotlight {
+  animation: comment-spotlight 3.2s var(--ease-out-quart) both;
+}
+
 .empty-state-visual {
   animation: empty-state-float 5s var(--ease-out-quart) infinite;
 }
@@ -813,6 +842,11 @@ button:disabled {
   --admin-graphite-hover:    #254f3e;
   --admin-graphite-active:   #295441;
   --admin-graphite-border:   #356050;
+  /* El verde bosque de modo claro, fijo en ambos temas (`.dark` no lo
+     redefine): lo usa la barra de acciones masivas del Kanban (HU-202), que
+     debe resaltar igual en claro y en oscuro. */
+  --admin-forest:            #103d30;
+  --admin-forest-border:     #356050;
   --admin-ink:               #f7faf8;
   --admin-ink-muted:         #c0d8cc;
   --admin-ink-secondary:     #c0d8cc;

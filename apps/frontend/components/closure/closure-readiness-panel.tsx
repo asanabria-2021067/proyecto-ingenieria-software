@@ -3,7 +3,7 @@
 import { useId, useState } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   CLOSURE_BLOCKER_CODES,
   type CloseReadinessSummary,
@@ -152,10 +152,10 @@ export function ClosureReadinessPanel({
 
   if (isLoading || !summary) {
     return (
-      <div className="space-y-4" aria-busy="true" aria-label="Cargando verificación del cierre">
+      <SkeletonRegion label="Cargando verificación del cierre" className="space-y-4">
         {showProgress && <Skeleton className="h-24 w-full rounded-card" />}
         <Skeleton className="h-56 w-full rounded-card" />
-      </div>
+      </SkeletonRegion>
     );
   }
 

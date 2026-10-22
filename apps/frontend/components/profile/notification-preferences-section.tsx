@@ -7,7 +7,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
   groupNotificationPreferences,
@@ -133,7 +133,7 @@ export function NotificationPreferencesSection({
             </EmptyContent>
           </Empty>
         ) : isLoading ? (
-          <div role="status" aria-label="Cargando preferencias de notificación" className="space-y-stack">
+          <SkeletonRegion label="Cargando preferencias de notificación" className="space-y-stack">
             {[0, 1, 2].map((i) => (
               <div key={i} className="space-y-inline">
                 <Skeleton className="h-5 w-48" />
@@ -141,7 +141,7 @@ export function NotificationPreferencesSection({
                 <Skeleton className="h-10 w-full" />
               </div>
             ))}
-          </div>
+          </SkeletonRegion>
         ) : grupos.length === 0 ? (
           <Empty tone="muted" role="status">
             <EmptyMedia variant="icon">

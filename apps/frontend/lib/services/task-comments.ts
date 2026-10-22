@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api/client';
+import type { ComentarioListado } from '@/lib/services/comments';
 
 export interface TareaComentarioAutor {
   idUsuario: number;
@@ -7,13 +8,11 @@ export interface TareaComentarioAutor {
   fotoUrl: string | null;
 }
 
-/** Forma de cada elemento del listado — el backend incluye `autor` solo aquí. */
-export interface TareaComentario {
-  idComentario: number;
-  idAutor: number;
-  contenido: string;
-  creadoEn: string;
-  editadoEn: string | null;
+/**
+ * Forma de cada elemento del listado — el backend incluye `autor` (y, desde
+ * HU-200, `menciones`) solo aquí. Misma forma que `ComentarioListado`.
+ */
+export interface TareaComentario extends ComentarioListado {
   autor: TareaComentarioAutor;
 }
 

@@ -11,6 +11,7 @@ import {
 } from '@/hooks/use-notifications';
 import { getNotificationLink, type Notificacion } from '@/lib/services/notifications';
 import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
+import { resolveCommentNotificationLink } from '@/components/notifications/comment-notification-link';
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -151,7 +152,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
             <ul className="divide-y divide-outline-variant/50">
               {recientes.map((n) => {
                 const isUnread = n.leidaEn === null;
-                const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n);
+                const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n) ?? resolveCommentNotificationLink(n);
 
                 const content = (
                   <div className="flex items-start gap-2">

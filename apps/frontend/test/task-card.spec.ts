@@ -79,6 +79,59 @@ describe('TaskCard (compacta, Secciones 33-46)', () => {
     expect(screen.getByText('Alta')).toBeInTheDocument();
   });
 
+  it.each([
+    ['ALTA', 'Prioridad alta', 'bg-destructive'],
+    ['MEDIA', 'Prioridad media', 'bg-accent'],
+    ['BAJA', 'Prioridad baja', 'bg-outline-variant'],
+  ] as const)(
+    'prioridad %s: franja de color y texto accesible "%s" (HU-201)',
+    (prioridad, textoAccesible, claseFranja) => {
+      const { container } = renderCard({ tarea: tarea({ prioridad }) });
+      expect(container.querySelector('article')).toHaveAttribute('data-prioridad', prioridad);
+      const franja = container.querySelector('[data-slot="prioridad-franja"]');
+      expect(franja).toHaveClass(claseFranja);
+      expect(franja).toHaveAttribute('aria-hidden', 'true');
+      expect(screen.getByText(textoAccesible)).toHaveClass('sr-only');
+    },
+  );
+
+  describe('selección múltiple (HU-202/T-382)', () => {
+    it('sin onAlternarSeleccion no muestra casilla', () => {
+      renderCard();
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    });
+
+    it('clic en la casilla alterna sin rango', () => {
+      const onAlternarSeleccion = vi.fn();
+      renderCard({ onAlternarSeleccion });
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar "Implementar login"' }));
+      expect(onAlternarSeleccion).toHaveBeenCalledWith(false);
+    });
+
+    it('Shift+clic sobre la tarjeta selecciona con rango y no abre el detalle', () => {
+      const onAlternarSeleccion = vi.fn();
+      const { props } = renderCard({ onAlternarSeleccion });
+      fireEvent.click(screen.getByRole('button', { name: 'Abrir detalles de "Implementar login"' }), { shiftKey: true });
+      expect(onAlternarSeleccion).toHaveBeenCalledWith(true);
+      expect(onAlternarSeleccion).toHaveBeenCalledTimes(1);
+      expect(props.onAbrirDetalles).not.toHaveBeenCalled();
+    });
+
+    it('clic normal sigue abriendo el detalle', () => {
+      const onAlternarSeleccion = vi.fn();
+      const { props } = renderCard({ onAlternarSeleccion });
+      fireEvent.click(screen.getByRole('button', { name: 'Abrir detalles de "Implementar login"' }));
+      expect(props.onAbrirDetalles).toHaveBeenCalledOnce();
+      expect(onAlternarSeleccion).not.toHaveBeenCalled();
+    });
+
+    it('seleccionada: casilla marcada y estado expuesto en la tarjeta', () => {
+      const { container } = renderCard({ onAlternarSeleccion: vi.fn(), seleccionada: true });
+      expect(screen.getByRole('checkbox')).toHaveAttribute('aria-checked', 'true');
+      expect(container.querySelector('article')).toHaveAttribute('data-seleccionada', 'true');
+    });
+  });
+
   it('muestra el rol cuando existe', () => {
     renderCard({ tarea: tarea({ rolProyecto: { idRolProyecto: 1, nombreRol: 'Backend' } }) });
     expect(screen.getByText('Backend')).toBeInTheDocument();

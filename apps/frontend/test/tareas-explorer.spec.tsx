@@ -7,10 +7,16 @@ import type { TareaPublicaDTO } from '@/lib/types/tasks';
 
 vi.mock('@/hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('@/hooks/use-project-tasks', () => ({ useProjectTasks: vi.fn() }));
+// HU-202: la lista consulta el usuario actual (¿es líder?) y, solo para el
+// líder, integrantes y etiquetas de la barra de acciones masivas.
+vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
+vi.mock('@/hooks/use-project-members', () => ({ useProjectMembers: vi.fn(() => ({ members: [] })) }));
+vi.mock('@/hooks/use-project-labels', () => ({ useProjectLabels: vi.fn(() => ({ labels: [] })) }));
 
 import TareasExplorerClient from '@/app/dashboard/projects/[id]/tareas/tareas-explorer-client';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { generarTareasFixture, TAREAS_FIXTURE } from '@/lib/tasks/task-fixtures';
 
 const proyectoFixture: ProyectoDetalleDTO = {
@@ -60,11 +66,73 @@ function renderExplorer() {
 describe('TareasExplorerClient — T-182/T-184 (HU-146)', () => {
   beforeEach(() => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    // Por defecto, un integrante que no es el líder: la lista de solo lectura de siempre.
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
   });
 
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+  });
+
+  describe('selección múltiple y acciones masivas (HU-202)', () => {
+    function mockLider() {
+      (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    }
+
+    it('un integrante que no es el líder no ve casillas ni ayuda y conserva el texto de solo lectura', () => {
+      mockTareas({ tasks: TAREAS_FIXTURE });
+      renderExplorer();
+
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+      expect(document.querySelector('[data-slot="ayuda-seleccion"]')).toBeNull();
+      expect(screen.getByText(/Vista de solo lectura/)).toBeInTheDocument();
+    });
+
+    it('el líder ve la ayuda con Shift y Esc, y una casilla por fila más la de «todas»', () => {
+      mockLider();
+      mockTareas({ tasks: TAREAS_FIXTURE, accionMasiva: { mutate: vi.fn(), isPending: false } } as any);
+      renderExplorer();
+
+      const ayuda = document.querySelector('[data-slot="ayuda-seleccion"]') as HTMLElement;
+      expect(ayuda).toHaveTextContent(/mantén Shift para seleccionar un rango/);
+      expect(ayuda).toHaveTextContent(/Esc limpia la selección/);
+      expect(screen.queryByText(/Vista de solo lectura/)).not.toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: 'Seleccionar todas las tareas de esta página' })).toBeInTheDocument();
+      expect(screen.getAllByRole('checkbox', { name: /^Seleccionar "/ })).toHaveLength(TAREAS_FIXTURE.length);
+    });
+
+    it('clic en una fila la marca; Shift+clic marca el rango en el orden de la tabla y abre la barra', () => {
+      mockLider();
+      mockTareas({ tasks: TAREAS_FIXTURE, accionMasiva: { mutate: vi.fn(), isPending: false } } as any);
+      renderExplorer();
+
+      const filas = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+      fireEvent.click(filas[0]);
+      fireEvent.click(filas[2], { shiftKey: true });
+
+      expect(filas.slice(0, 3).every((fila) => fila.getAttribute('data-state') === 'selected')).toBe(true);
+      expect(filas[3]).not.toHaveAttribute('data-state');
+      expect(screen.getByRole('toolbar', { name: 'Acciones masivas' })).toHaveTextContent('3seleccionadas');
+      expect(screen.getByRole('checkbox', { name: 'Seleccionar todas las tareas de esta página' })).toHaveAttribute(
+        'data-state',
+        'indeterminate',
+      );
+    });
+
+    it('«todas» marca y desmarca la página completa', () => {
+      mockLider();
+      mockTareas({ tasks: TAREAS_FIXTURE, accionMasiva: { mutate: vi.fn(), isPending: false } } as any);
+      renderExplorer();
+
+      const todas = screen.getByRole('checkbox', { name: 'Seleccionar todas las tareas de esta página' });
+      fireEvent.click(todas);
+      expect(screen.getByRole('toolbar', { name: 'Acciones masivas' })).toHaveTextContent(
+        `${TAREAS_FIXTURE.length}seleccionadas`,
+      );
+      fireEvent.click(todas);
+      expect(screen.queryByRole('toolbar', { name: 'Acciones masivas' })).not.toBeInTheDocument();
+    });
   });
 
   describe('render inicial', () => {

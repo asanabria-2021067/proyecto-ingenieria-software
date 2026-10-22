@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectAvanceQueryKey, projectTasksQueryKey } from '@/lib/query-keys/tasks';
 import {
   assignTask,
+  bulkTaskAction,
   closeAssignment,
   createTask,
   deleteTask,
@@ -15,6 +16,7 @@ import {
 import { attachLabelToTask, detachLabelFromTask } from '@/lib/services/labels';
 import type {
   AssignTaskInput,
+  BulkTaskActionInput,
   CloseAssignmentInput,
   CreateTaskInput,
   TareaPublicaDTO,
@@ -151,6 +153,17 @@ export function useProjectTasks(idProyecto: number) {
     },
   });
 
+  // HU-202: acción masiva (mover, asignar, etiquetar). Sin optimismo: el
+  // backend es todo o nada y puede rechazar la operación completa, así que
+  // el tablero se actualiza con la respuesta real al invalidar.
+  const accionMasiva = useMutation({
+    mutationFn: (input: BulkTaskActionInput) => bulkTaskAction(idProyecto, input),
+    onSuccess: () => {
+      invalidateTasks();
+      invalidateAvance();
+    },
+  });
+
   const asociarEtiqueta = useMutation({
     mutationFn: ({ taskId, labelId }: { taskId: number; labelId: number }) =>
       attachLabelToTask(idProyecto, taskId, labelId),
@@ -179,5 +192,6 @@ export function useProjectTasks(idProyecto: number) {
     eliminarTarea,
     asociarEtiqueta,
     retirarEtiqueta,
+    accionMasiva,
   };
 }

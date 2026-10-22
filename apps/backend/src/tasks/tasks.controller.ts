@@ -19,6 +19,7 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
 import { CloseAssignmentDto } from './dto/close-assignment.dto';
+import { BulkTaskActionDto } from './dto/bulk-task-action.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
@@ -73,6 +74,23 @@ export class TasksController {
     @Body() dto: CreateTaskDto,
   ) {
     return this.tasksService.create(projectId, user.userId, dto);
+  }
+
+  /**
+   * HU-202/T-383: mover, asignar/desasignar o etiquetar (agregar/quitar)
+   * varias tareas a la vez; exclusivo del líder y todo o nada. La familia de
+   * escritura exacta (tarea o asignación) la vuelve a exigir el servicio.
+   */
+  @Post('acciones-masivas')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(TASK_WRITE)
+  bulkAction(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: BulkTaskActionDto,
+  ) {
+    return this.tasksService.bulkAction(projectId, user.userId, dto);
   }
 
   @Patch(':taskId')

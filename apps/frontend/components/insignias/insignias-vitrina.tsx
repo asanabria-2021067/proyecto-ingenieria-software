@@ -3,6 +3,7 @@
 import { Trophy } from 'lucide-react';
 import { InsigniaCircular } from '@/components/insignias/insignia-circular';
 import type { InsigniaDto } from '@/lib/types/insignias';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 
 interface InsigniasVitrinaProps {
   insignias: InsigniaDto[];
@@ -36,7 +37,14 @@ export function InsigniasVitrina({ insignias, publica = false, isLoading = false
       </h2>
 
       {isLoading ? (
-        <p className="type-body text-text-secondary">Cargando insignias...</p>
+        <SkeletonRegion label="Cargando insignias" className="grid grid-cols-2 gap-tight sm:grid-cols-3 md:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="flex flex-col items-center gap-tight p-tight">
+              <Skeleton className="size-20 rounded-full" />
+              <Skeleton className="h-3.5 w-20" />
+            </div>
+          ))}
+        </SkeletonRegion>
       ) : isError ? (
         <p className="type-body text-text-secondary" role="alert">
           No se pudieron cargar las insignias.

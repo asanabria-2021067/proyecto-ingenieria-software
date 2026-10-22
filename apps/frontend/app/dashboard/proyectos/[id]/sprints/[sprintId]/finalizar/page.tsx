@@ -20,7 +20,7 @@ import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   DATA_TABLE_CARD,
   DATA_TABLE_HEAD_ROW,
@@ -58,7 +58,7 @@ function mensajeDeError(error: unknown): string {
 
 function ClosingSkeleton() {
   return (
-    <div className="space-y-6" aria-busy="true">
+    <SkeletonRegion label="Cargando cierre del sprint" className="space-y-6">
       <div className="grid grid-cols-2 gap-4 @3xl/project:grid-cols-4">
         <Skeleton className="h-28 rounded-card" />
         <Skeleton className="h-28 rounded-card" />
@@ -66,7 +66,7 @@ function ClosingSkeleton() {
         <Skeleton className="h-28 rounded-card" />
       </div>
       <Skeleton className="h-72 w-full rounded-xl" />
-    </div>
+    </SkeletonRegion>
   );
 }
 

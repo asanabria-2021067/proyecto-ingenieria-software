@@ -38,7 +38,8 @@ afterEach(() => {
 });
 
 const FAMILIAS = [
-  ['Tareas e hitos', 7],
+  // HU-200: + MENCION_COMENTARIO.
+  ['Tareas e hitos', 8],
   ['Postulaciones y equipo', 7],
   ['Proyectos', 17],
   ['Horas y reconocimiento', 5],
@@ -125,7 +126,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     guardado.resolver(preferencias(['NUEVO_SEGUIDOR']));
     await waitFor(() => expect(familia('Red de contactos')).toHaveTextContent('2 de 3 activas'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'true');
-    expect(familia('Tareas e hitos')).toHaveTextContent('7 de 7 activas');
+    expect(familia('Tareas e hitos')).toHaveTextContent('8 de 8 activas');
   });
 
   it('si el guardado falla, el contador no se mueve', async () => {

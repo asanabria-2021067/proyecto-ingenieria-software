@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { useAdminSprintCalendar } from '@/hooks/use-admin-sprint-calendar';
 import {
   SITUACION_SPRINT_LABEL_CORTA,
@@ -286,9 +286,9 @@ export default function AdminSprintsClient() {
             </EmptyContent>
           </Empty>
         ) : isPending ? (
-          <div role="status" aria-label="Cargando el calendario de Sprints">
+          <SkeletonRegion label="Cargando el calendario de Sprints">
             {vista === 'mes' ? <MesSkeleton /> : <ListaSkeleton />}
-          </div>
+          </SkeletonRegion>
         ) : total === 0 ? (
           <Empty tone="muted" role="status">
             <EmptyMedia variant="icon">
