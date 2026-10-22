@@ -11,6 +11,7 @@ import { getApiErrorMessage } from '@/components/projects/api-error';
 import { getHorasTarea, registrarHorasTarea } from '@/lib/services/task-hours';
 import { projectAvanceQueryKey, projectTasksQueryKey, taskHoursQueryKey } from '@/lib/query-keys/tasks';
 import type { RegistroTiempoTareaDTO } from '@/lib/types/tasks';
+import { SkeletonList } from '@/components/ui/skeleton';
 
 export interface TaskHoursPanelProps {
   idProyecto: number;
@@ -174,7 +175,7 @@ export function TaskHoursPanel({ idProyecto, idTarea, puedeRegistrar, enabled }:
         </form>
       )}
 
-      {isLoading && <p className="text-sm text-tertiary">Cargando horas registradas...</p>}
+      {isLoading && <SkeletonList label="Cargando horas registradas" count={2} lines={2} avatar="circle" layout="plain" />}
       {isError && (
         <p role="alert" className="text-sm text-error">
           No fue posible cargar las horas registradas.

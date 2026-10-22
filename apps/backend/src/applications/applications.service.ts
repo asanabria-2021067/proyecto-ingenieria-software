@@ -18,6 +18,7 @@ import {
 } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { ChatCanalesService } from '../chat/chat-canales.service';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
 
@@ -39,6 +40,7 @@ export class ApplicationsService {
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
     private readonly readPolicy: ProjectReadPolicyService,
+    private readonly chatCanales?: ChatCanalesService,
   ) {}
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -455,6 +457,8 @@ export class ApplicationsService {
 
     await this.notificationsService.publishEffects(effects);
 
+    // El nuevo integrante entra a #general (y a ningún otro canal).
+    if (esAceptada) await this.chatCanales?.sincronizarSinFallar(postulacion.rolProyecto.proyecto.idProyecto);
     if (esAceptada) this.eventEmitter.emit(INSIGNIAS_EVENTO, { claves: ['postulaciones'], idUsuarios: [postulacion.idUsuarioPostulante] });
 
     return postulacionActualizada;

@@ -15,6 +15,7 @@ import { ProjectPolicyService } from '../common/project-policy/project-policy.se
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
+import { ChatCanalesService } from '../chat/chat-canales.service';
 
 /**
  * C044 (06 v2 §13/§32): las cinco escrituras de salida corren en el runner
@@ -41,6 +42,7 @@ export class ExitRequestsService {
     // transacción de dominio. Opcional por el mismo motivo posicional que en
     // Tasks/Sprints; en producción el módulo siempre lo provee.
     private readonly bitacoraEventos?: BitacoraEventosService,
+    private readonly chatCanales?: ChatCanalesService,
   ) {}
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -401,7 +403,7 @@ export class ExitRequestsService {
     await this.context.getPendingSolicitudSalidaOrThrow(idProyecto, idSolicitud);
 
     const ahora = new Date();
-    return this.projectTx.run(idProyecto, liderId, 'exit-requests.approve', async (ctx) => {
+    const aprobada = await this.projectTx.run(idProyecto, liderId, 'exit-requests.approve', async (ctx) => {
       const { tx } = ctx;
       const proyecto = await this.authorization.assertProjectLeader(idProyecto, liderId, tx);
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'SALIDA', liderId);
@@ -534,6 +536,9 @@ export class ExitRequestsService {
       );
       return actualizada;
     });
+    // Sale del proyecto: sale también de todos sus canales.
+    await this.chatCanales?.sincronizarSinFallar(idProyecto);
+    return aprobada;
   }
 
   async rejectSolicitudSalida(idProyecto: number, idSolicitud: number, liderId: number) {

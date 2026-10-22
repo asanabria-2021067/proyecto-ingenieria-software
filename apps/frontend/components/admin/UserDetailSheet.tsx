@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import uvgSwal from '@/lib/swal';
@@ -173,7 +173,7 @@ function MetricCard({ label, value }: { label: string; value: number | string })
 
 function DrawerSkeleton() {
   return (
-    <div className="space-y-stack" role="status" aria-label="Cargando el detalle del usuario">
+    <SkeletonRegion className="space-y-stack" label="Cargando el detalle del usuario">
       <div className="flex flex-col items-center gap-tight pb-tight">
         <Skeleton className="size-20 rounded-full" />
         <Skeleton className="h-6 w-44" />
@@ -183,7 +183,7 @@ function DrawerSkeleton() {
       <Skeleton className="h-40 w-full rounded-card" />
       <Skeleton className="h-36 w-full rounded-card" />
       <Skeleton className="h-28 w-full rounded-card" />
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -604,10 +604,10 @@ function ProyectosActivos({ idUsuario }: { idUsuario: number }) {
       }
     >
       {isPending ? (
-        <div className="flex flex-col gap-tight" role="status" aria-label="Cargando proyectos activos">
+        <SkeletonRegion className="flex flex-col gap-tight" label="Cargando proyectos activos">
           <Skeleton className="h-14 w-full rounded-control" />
           <Skeleton className="h-14 w-full rounded-control" />
-        </div>
+        </SkeletonRegion>
       ) : isError || !data ? (
         <div className="flex flex-wrap items-center justify-between gap-tight" role="alert">
           <p className="type-body text-text-secondary">No se pudieron cargar los proyectos de este usuario.</p>

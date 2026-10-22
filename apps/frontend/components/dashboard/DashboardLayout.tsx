@@ -42,6 +42,7 @@ import { toast } from 'sonner';
 import logo from '@/public/logo.png';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { FontScaleToggle } from '@/components/font-scale-toggle';
+import { ShellSkeleton } from '@/components/layout/shell-skeleton';
 
 // T-293: la guía solo se muestra a quien entra por primera vez, pero react-joyride viajaba en el
 // JS inicial de todas las rutas del estudiante. Se carga aparte; no pinta nada hasta arrancar.
@@ -151,11 +152,7 @@ export default function DashboardLayout({
   }, [latestNotification, queryClient, router]);
 
   if (isLoading || isError || (!allowAdmin && isAdminUser(user))) {
-    return (
-      <div className="h-screen bg-surface flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <ShellSkeleton />;
   }
 
   return (

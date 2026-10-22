@@ -169,4 +169,62 @@ describe('ChatGateway', () => {
       expect(socket.leave).toHaveBeenCalledWith('conversation:3');
     });
   });
+
+  describe('typing', () => {
+    it('un participante emite typing al resto de la room (sin incluirse)', async () => {
+      const findUnique = vi.fn().mockResolvedValue({ idUsuario: 5 });
+      const { gateway } = makeGateway({ findUnique });
+      const emit = vi.fn();
+      const socket = { ...makeSocket(), to: vi.fn(() => ({ emit })) };
+      socket.data.userId = 5;
+
+      const ack = await gateway.typing(socket as any, { idConversacion: 3 });
+
+      expect(socket.to).toHaveBeenCalledWith('conversation:3');
+      expect(emit).toHaveBeenCalledWith('typing', { idConversacion: 3, idUsuario: 5 });
+      expect(ack).toEqual({ ok: true });
+    });
+
+    it('un ajeno a la conversacion no emite nada', async () => {
+      const { gateway } = makeGateway({ findUnique: vi.fn().mockResolvedValue(null) });
+      const socket = { ...makeSocket(), to: vi.fn() };
+      socket.data.userId = 99;
+
+      await expect(gateway.typing(socket as any, { idConversacion: 3 })).resolves.toEqual({ ok: false });
+      expect(socket.to).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('notifyMessagesRead', () => {
+    it('emite messagesRead a la room de la conversacion', () => {
+      const { gateway } = makeGateway();
+      const emit = vi.fn();
+      const to = vi.fn(() => ({ emit }));
+      Reflect.set(gateway, 'server', { to });
+      const fecha = new Date();
+
+      gateway.notifyMessagesRead(3, 7, fecha);
+
+      expect(to).toHaveBeenCalledWith('conversation:3');
+      expect(emit).toHaveBeenCalledWith('messagesRead', { idConversacion: 3, idUsuario: 7, ultimaLecturaEn: fecha });
+    });
+  });
+
+  describe('removeFromConversation', () => {
+    it('saca los sockets del usuario de la room y le refresca la lista', () => {
+      const { gateway } = makeGateway();
+      const emit = vi.fn();
+      const to = vi.fn(() => ({ emit }));
+      const socketsLeave = vi.fn();
+      const inRoom = vi.fn(() => ({ socketsLeave }));
+      Reflect.set(gateway, 'server', { to, in: inRoom });
+
+      gateway.removeFromConversation(3, [5]);
+
+      expect(inRoom).toHaveBeenCalledWith('user:5');
+      expect(socketsLeave).toHaveBeenCalledWith('conversation:3');
+      expect(to).toHaveBeenCalledWith('user:5');
+      expect(emit).toHaveBeenCalledWith('conversationUpdated', { idConversacion: 3 });
+    });
+  });
 });

@@ -16,7 +16,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { aviso, confirmar } from '@/lib/mensajes';
 import type { useProjectLabels } from '@/hooks/use-project-labels';
@@ -377,7 +377,7 @@ function ProjectLabelRow({
 
 function LabelsListSkeleton() {
   return (
-    <div className="divide-y divide-outline-variant/30">
+    <SkeletonRegion label="Cargando etiquetas" className="divide-y divide-outline-variant/30">
       {Array.from({ length: 4 }, (_, index) => (
         <div key={index} className="flex min-h-14 items-center gap-3 px-3 py-2">
           <Skeleton data-testid="label-row-skeleton" className="size-3 rounded-full" />
@@ -386,7 +386,7 @@ function LabelsListSkeleton() {
           <Skeleton data-testid="label-row-skeleton" className="size-9 rounded-md" />
         </div>
       ))}
-    </div>
+    </SkeletonRegion>
   );
 }
 

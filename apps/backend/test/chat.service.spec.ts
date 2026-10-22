@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ChatService } from '../src/chat/chat.service';
 
 // T-237: al finalizar un proyecto (estadoProyecto pasa a CERRADO dentro de
@@ -13,14 +13,16 @@ function makePrisma() {
   return {
     proyecto: { findFirst: vi.fn() },
     conversacion: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
-    conversacionParticipante: { update: vi.fn(), findFirst: vi.fn() },
+    conversacionParticipante: { update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
-    mensajeChat: { create: vi.fn(), count: vi.fn(), findMany: vi.fn() },
+    mensajeChat: { create: vi.fn(), count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
+    apodoConversacion: { findMany: vi.fn().mockResolvedValue([]) },
+    mensajeGuardado: { deleteMany: vi.fn(), createMany: vi.fn(), findMany: vi.fn() },
   };
 }
 
 function makeGateway() {
-  return { broadcastMessage: vi.fn(), notifyConversationCreated: vi.fn() };
+  return { broadcastMessage: vi.fn(), notifyConversationCreated: vi.fn(), notifyMessagesRead: vi.fn() };
 }
 
 const USUARIO = { idUsuario: 1, nombre: 'Ana', apellido: 'Pérez', fotoUrl: null };
@@ -51,7 +53,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
   beforeEach(() => {
     prisma = makePrisma();
     gateway = makeGateway();
-    service = new ChatService(prisma as any, gateway as any);
+    service = new ChatService(prisma as any, gateway as any, {} as any);
   });
 
   describe('createMessage', () => {
@@ -78,9 +80,9 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
 
       const resultado = await service.createMessage(10, 5, 1, 'hola');
 
-      expect(resultado).toEqual(mensaje);
+      expect(resultado).toEqual({ ...mensaje, citado: null });
       expect(prisma.mensajeChat.create).toHaveBeenCalled();
-      expect(gateway.broadcastMessage).toHaveBeenCalledWith(5, [2], mensaje);
+      expect(gateway.broadcastMessage).toHaveBeenCalledWith(5, [2], { ...mensaje, citado: null });
     });
   });
 
@@ -104,6 +106,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
           tipo: 'INDIVIDUAL',
           nombre: null,
           participantes: [{ idUsuario: 1, ultimaLecturaEn: null, usuario: USUARIO }],
+          apodos: [],
           mensajes: [],
         },
       ]);
@@ -123,6 +126,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
           tipo: 'INDIVIDUAL',
           nombre: null,
           participantes: [{ idUsuario: 1, ultimaLecturaEn: null, usuario: USUARIO }],
+          apodos: [],
           mensajes: [],
         },
       ]);
@@ -138,16 +142,27 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
     it('devuelve el historial normalmente aunque el proyecto esté CERRADO (solo lectura, no oculta nada)', async () => {
       prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('CERRADO'));
       const historial = [
-        { idMensaje: 1, idConversacion: 5, contenido: 'primer mensaje', enviadoEn: new Date(), remitente: USUARIO },
-        { idMensaje: 2, idConversacion: 5, contenido: 'segundo mensaje', enviadoEn: new Date(), remitente: USUARIO },
+        { idMensaje: 1, idConversacion: 5, contenido: 'primer mensaje', enviadoEn: new Date(), remitente: USUARIO, guardadoPor: [] },
+        { idMensaje: 2, idConversacion: 5, contenido: 'segundo mensaje', enviadoEn: new Date(), remitente: USUARIO, guardadoPor: [{ idUsuario: 1 }] },
       ];
       // El service pide orderBy idMensaje desc y hace .reverse(); se devuelve
       // ya en orden desc desde el mock para que el resultado final quede asc.
-      prisma.mensajeChat.findMany.mockResolvedValue([...historial].reverse());
+      prisma.mensajeChat.findMany.mockResolvedValue(historial.map((m) => ({ ...m, reacciones: [] })).reverse());
 
       const resultado = await service.getMessages(10, 5, 1);
 
-      expect(resultado).toEqual(historial);
+      expect(resultado.map((m) => [m.idMensaje, m.guardado])).toEqual([[1, false], [2, true]]);
+      expect(resultado[0]).not.toHaveProperty('guardadoPor');
+      expect(resultado[0]).toMatchObject({ citado: null, reacciones: [], apodoRemitente: null });
+    });
+
+    it('solo consulta los guardados del usuario autenticado (privacidad)', async () => {
+      prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+      prisma.mensajeChat.findMany.mockResolvedValue([]);
+
+      await service.getMessages(10, 5, 1);
+
+      expect(prisma.mensajeChat.findMany.mock.calls[0][0].select.guardadoPor.where).toEqual({ idUsuario: 1 });
     });
   });
 
@@ -279,6 +294,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
           { idUsuario: 1, ultimaLecturaEn: null, usuario: USUARIO },
           { idUsuario: 2, ultimaLecturaEn: null, usuario: { idUsuario: 2, nombre: 'Rosa', apellido: 'Fuentes', fotoUrl: null } },
         ],
+        apodos: [],
         mensajes: [],
         esFavorita: overrides.esFavorita ?? false,
         archivadaEn: null,
@@ -319,7 +335,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
             },
           },
         },
-        { mensajes: { some: { contenido: { contains: 'rosa', mode: 'insensitive' } } } },
+        { mensajes: { some: { eliminadoEn: null, contenido: { contains: 'rosa', mode: 'insensitive' } } } },
       ]);
     });
 
@@ -343,5 +359,138 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
 
       expect(resultado[0].proyecto).toEqual({ idProyecto: 10, tituloProyecto: 'Feria de Ciencias UVG 2026' });
     });
+  });
+
+  describe('toggleSavedMessage', () => {
+    beforeEach(() => {
+      prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+      prisma.mensajeChat.findFirst.mockResolvedValue({ idMensaje: 7 });
+    });
+
+    it('guarda el mensaje cuando no estaba guardado', async () => {
+      prisma.mensajeGuardado.deleteMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.toggleSavedMessage(10, 5, 7, 1)).resolves.toEqual({ guardado: true });
+      expect(prisma.mensajeGuardado.createMany).toHaveBeenCalledWith({
+        data: [{ idUsuario: 1, idMensaje: 7 }],
+        skipDuplicates: true,
+      });
+    });
+
+    it('quita el guardado cuando ya estaba guardado', async () => {
+      prisma.mensajeGuardado.deleteMany.mockResolvedValue({ count: 1 });
+
+      await expect(service.toggleSavedMessage(10, 5, 7, 1)).resolves.toEqual({ guardado: false });
+      expect(prisma.mensajeGuardado.deleteMany).toHaveBeenCalledWith({ where: { idUsuario: 1, idMensaje: 7 } });
+      expect(prisma.mensajeGuardado.createMany).not.toHaveBeenCalled();
+    });
+
+    it('rechaza a quien no participa en la conversacion', async () => {
+      await expect(service.toggleSavedMessage(10, 5, 7, 99)).rejects.toThrow(ForbiddenException);
+      expect(prisma.mensajeGuardado.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.mensajeGuardado.createMany).not.toHaveBeenCalled();
+    });
+
+    it('404 si el mensaje no pertenece a esa conversacion', async () => {
+      prisma.mensajeChat.findFirst.mockResolvedValue(null);
+
+      await expect(service.toggleSavedMessage(10, 5, 8, 1)).rejects.toThrow(NotFoundException);
+      expect(prisma.mensajeChat.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { idMensaje: 8, idConversacion: 5 } }));
+    });
+  });
+
+  describe('listSavedMessages', () => {
+    const guardadoRow = (idMensaje: number) => ({
+      guardadoEn: new Date('2026-10-16T10:00:00Z'),
+      mensaje: {
+        idMensaje,
+        contenido: `msg ${idMensaje}`,
+        enviadoEn: new Date('2026-10-16T09:00:00Z'),
+        remitente: USUARIO,
+        conversacion: {
+          idConversacion: 5,
+          idProyecto: 10,
+          tipo: 'INDIVIDUAL',
+          nombre: null,
+          nombrePersonalizado: null,
+          participantes: [{ usuario: USUARIO }],
+        },
+      },
+    });
+
+    it('solo trae guardados propios de conversaciones donde el usuario participa hoy', async () => {
+      prisma.mensajeGuardado.findMany.mockResolvedValue([guardadoRow(1)]);
+
+      const r = await service.listSavedMessages(1);
+
+      const args = prisma.mensajeGuardado.findMany.mock.calls[0][0];
+      expect(args.where).toEqual({
+        idUsuario: 1,
+        mensaje: { conversacion: { eliminadaEn: null, participantes: { some: { idUsuario: 1 } } } },
+      });
+      expect(r.items[0]).toMatchObject({ idMensaje: 1, contenido: 'msg 1', conversacion: { idConversacion: 5, idProyecto: 10 } });
+      expect(r.hasMore).toBe(false);
+    });
+
+    it('pagina de a 20 y marca hasMore con un elemento extra', async () => {
+      prisma.mensajeGuardado.findMany.mockResolvedValue(Array.from({ length: 21 }, (_, i) => guardadoRow(i + 1)));
+
+      const r = await service.listSavedMessages(1, { page: 3 });
+
+      const args = prisma.mensajeGuardado.findMany.mock.calls[0][0];
+      expect(args).toMatchObject({ skip: 40, take: 21 });
+      expect(r.items).toHaveLength(20);
+      expect(r.hasMore).toBe(true);
+    });
+  });
+});
+
+describe('ChatService - visto por', () => {
+  let prisma: ReturnType<typeof makePrisma>;
+  let gateway: ReturnType<typeof makeGateway>;
+  let service: ChatService;
+
+  beforeEach(() => {
+    prisma = makePrisma();
+    gateway = makeGateway();
+    service = new ChatService(prisma as any, gateway as any);
+  });
+
+  it('markRead: guarda ultimaLecturaEn y avisa por socket con la misma fecha', async () => {
+    prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+    prisma.conversacionParticipante.update.mockResolvedValue({});
+
+    await service.markRead(10, 5, 2);
+
+    const { data } = prisma.conversacionParticipante.update.mock.calls[0][0];
+    expect(data.ultimaLecturaEn).toBeInstanceOf(Date);
+    expect(gateway.notifyMessagesRead).toHaveBeenCalledWith(5, 2, data.ultimaLecturaEn);
+  });
+
+  it('markRead: un no participante recibe 403 y no se avisa a nadie', async () => {
+    prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+
+    await expect(service.markRead(10, 5, 99)).rejects.toThrow(ForbiddenException);
+    expect(prisma.conversacionParticipante.update).not.toHaveBeenCalled();
+    expect(gateway.notifyMessagesRead).not.toHaveBeenCalled();
+  });
+
+  it('getReadReceipts: devuelve la lectura de los demas participantes, sin la propia', async () => {
+    prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+    const lecturas = [{ idUsuario: 2, ultimaLecturaEn: new Date() }];
+    prisma.conversacionParticipante.findMany.mockResolvedValue(lecturas);
+
+    await expect(service.getReadReceipts(10, 5, 1)).resolves.toBe(lecturas);
+    expect(prisma.conversacionParticipante.findMany).toHaveBeenCalledWith({
+      where: { idConversacion: 5, idUsuario: { not: 1 } },
+      select: { idUsuario: true, ultimaLecturaEn: true },
+    });
+  });
+
+  it('getReadReceipts: un no participante recibe 403', async () => {
+    prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+
+    await expect(service.getReadReceipts(10, 5, 99)).rejects.toThrow(ForbiddenException);
+    expect(prisma.conversacionParticipante.findMany).not.toHaveBeenCalled();
   });
 });

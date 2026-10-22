@@ -25,7 +25,7 @@ import {
 import Link from 'next/link';
 import uvgSwal from '@/lib/swal';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SkeletonList } from '@/components/ui/skeleton';
 import {
   Empty,
   EmptyContent,
@@ -81,20 +81,7 @@ function humanizeTipo(tipo: string): string {
 }
 
 function NotificacionesSkeleton() {
-  return (
-    <div className="flex flex-col gap-stack" aria-hidden="true">
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="card-base flex items-start gap-stack">
-          <Skeleton className="h-11 w-11 shrink-0 rounded-2xl" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-2/5" />
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3.5 w-3/5" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  return <SkeletonList label="Cargando notificaciones" count={3} lines={3} avatar="square" />;
 }
 
 export default function NotificacionesPage() {

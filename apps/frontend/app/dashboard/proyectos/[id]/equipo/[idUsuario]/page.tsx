@@ -6,7 +6,7 @@ import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectMemberDetail } from '@/hooks/use-project-member-detail';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { ESTADO_SPRINT_STYLE } from '@/components/projects/sprint-status.utils';
 import {
@@ -86,7 +86,7 @@ function DisclosureChevron() {
 
 function DetalleSkeleton() {
   return (
-    <div className="flex flex-col gap-section" aria-busy="true" aria-label="Cargando detalle del integrante">
+    <SkeletonRegion label="Cargando detalle del integrante" className="flex flex-col gap-section">
       <Skeleton className="h-14 w-72 max-w-full rounded-card" />
       <div className="grid grid-cols-1 gap-grid @xl/project:grid-cols-3">
         {[0, 1, 2].map((i) => (
@@ -94,7 +94,7 @@ function DetalleSkeleton() {
         ))}
       </div>
       <Skeleton className="h-44 w-full rounded-card" />
-    </div>
+    </SkeletonRegion>
   );
 }
 

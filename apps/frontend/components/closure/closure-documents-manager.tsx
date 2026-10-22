@@ -4,7 +4,7 @@ import { useId, useRef, useState } from 'react';
 import { Loader2, Plus, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ClosureDocumentViewer, formatearTamano } from '@/components/closure/closure-document-viewer';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
@@ -99,7 +99,11 @@ export function ClosureDocumentsManager({
   const [evidenciaAQuitar, setEvidenciaAQuitar] = useState<ClosureRevisionDocument | null>(null);
 
   if (isLoading || revision === undefined) {
-    return <Skeleton className="h-56 w-full rounded-xl" aria-busy="true" aria-label="Cargando documentos del cierre" />;
+    return (
+      <SkeletonRegion label="Cargando documentos del cierre">
+        <Skeleton className="h-56 w-full rounded-xl" />
+      </SkeletonRegion>
+    );
   }
 
   const documentos = revision?.documentosEnviados ?? [];

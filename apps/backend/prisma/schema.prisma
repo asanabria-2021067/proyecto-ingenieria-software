@@ -324,6 +324,7 @@ model Usuario {
   fechaUltimaSesion DateTime?     @map("fecha_ultima_sesion")
 
   telefonos                        UsuarioTelefono[]
+  preferenciaNoMolestar            PreferenciaNoMolestar?
   perfil                           PerfilEstudiante?
   habilidades                      UsuarioHabilidad[]
   intereses                        UsuarioInteres[]
@@ -379,14 +380,20 @@ model Usuario {
   conversacionesCreadas            Conversacion[]             @relation("ConversacionesCreadas")
   conversacionesParticipa          ConversacionParticipante[]
   mensajesChatEnviados             MensajeChat[]              @relation("MensajesChatEnviados")
+  apodosDefinidos                  ApodoConversacion[]        @relation("ApodosDefinidos")
+  apodosRecibidos                  ApodoConversacion[]        @relation("ApodosRecibidos")
+  mensajesProgramadosChat          MensajeProgramado[]        @relation("MensajesProgramadosChat")
   tokensRefresco                   TokenRefresco[]
   proyectosGuardados               ProyectoGuardado[]
+  estadoChat                       EstadoChatUsuario?
   actividadesCreadas               ActividadProyecto[]
   asistencias                      AsistenciaActividad[]      @relation("AsistenciaUsuario")
   asistenciasConfirmadas           AsistenciaActividad[]      @relation("AsistenciaConfirmador")
   calendariosCompartidosPorMi      CalendarioCompartido[]     @relation("CalendarioPropietario")
   calendariosCompartidosConmigo    CalendarioCompartido[]     @relation("CalendarioInvitado")
   insignias                        InsigniaUsuario[]
+  reaccionesChat                   ReaccionMensajeChat[]
+  mensajesGuardados                MensajeGuardado[]
 
   @@index([estado, fechaCreacion])
   @@map("usuario")
@@ -1669,12 +1676,21 @@ model Conversacion {
   silenciada    Boolean   @default(false) @map("silenciada")
   esPrioritaria Boolean   @default(true) @map("es_prioritaria")
   eliminadaEn   DateTime? @map("eliminada_en")
+  // Canales del proyecto (#general + los que crea el líder). `nombreCanal` es
+  // el nombre normalizado (minúsculas, sin #); NULL en chats que no son canal,
+  // así el unique solo aplica a canales.
+  esCanal     Boolean @default(false) @map("es_canal")
+  nombreCanal String? @map("nombre_canal") @db.VarChar(40)
 
   proyecto      Proyecto                   @relation(fields: [idProyecto], references: [idProyecto])
   creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario])
   participantes ConversacionParticipante[]
   mensajes      MensajeChat[]
+  adjuntos      AdjuntoMensajeChat[]
+  apodos        ApodoConversacion[]
+  mensajesProgramados MensajeProgramado[]
 
+  @@unique([idProyecto, nombreCanal])
   @@index([idProyecto])
   @@map("conversacion")
 }
@@ -1684,6 +1700,10 @@ model ConversacionParticipante {
   idUsuario       Int       @map("id_usuario")
   agregadoEn      DateTime  @default(now()) @map("agregado_en")
   ultimaLecturaEn DateTime? @map("ultima_lectura_en")
+  // Silencio por usuario: hasta una fecha, o siempre.
+  silenciadaHasta   DateTime? @map("silenciada_hasta")
+  silenciadaSiempre Boolean   @default(false) @map("silenciada_siempre")
+  temaColor       String?   @map("tema_color") @db.VarChar(20)
 
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
   usuario      Usuario      @relation(fields: [idUsuario], references: [idUsuario])
@@ -1693,18 +1713,157 @@ model ConversacionParticipante {
   @@map("conversacion_participante")
 }
 
-model MensajeChat {
-  idMensaje      Int      @id @default(autoincrement()) @map("id_mensaje")
-  idConversacion Int      @map("id_conversacion")
-  idRemitente    Int      @map("id_remitente")
-  contenido      String   @db.Text
-  enviadoEn      DateTime @default(now()) @map("enviado_en")
+// Modo no molestar del chat, por horario y por usuario. dias_semana usa 0 = domingo ... 6 = sabado
+// y se interpreta en la zona horaria indicada; el rango puede cruzar la medianoche.
+model PreferenciaNoMolestar {
+  idPreferencia Int      @id @default(autoincrement()) @map("id_preferencia")
+  idUsuario     Int      @unique @map("id_usuario")
+  activo        Boolean  @default(false)
+  horaInicio    String   @default("22:00") @map("hora_inicio") @db.VarChar(5)
+  horaFin       String   @default("07:00") @map("hora_fin") @db.VarChar(5)
+  diasSemana    Int[]    @default([0, 1, 2, 3, 4, 5, 6]) @map("dias_semana")
+  zona          String   @default("America/Guatemala") @db.VarChar(64)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
 
-  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
-  remitente    Usuario      @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario])
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@map("preferencia_no_molestar")
+}
+
+model MensajeChat {
+  idMensaje       Int      @id @default(autoincrement()) @map("id_mensaje")
+  idConversacion  Int      @map("id_conversacion")
+  idRemitente     Int      @map("id_remitente")
+  contenido       String   @db.Text
+  enviadoEn       DateTime @default(now()) @map("enviado_en")
+  editadoEn       DateTime? @map("editado_en")
+  eliminadoEn     DateTime? @map("eliminado_en")
+  idMensajeCitado Int?     @map("id_mensaje_citado")
+
+  conversacion Conversacion       @relation(fields: [idConversacion], references: [idConversacion])
+  remitente    Usuario            @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario])
+  adjunto      AdjuntoMensajeChat?
+  citado       MensajeChat?       @relation("MensajeCitado", fields: [idMensajeCitado], references: [idMensaje], onDelete: SetNull)
+  respuestas   MensajeChat[]      @relation("MensajeCitado")
+  reacciones   ReaccionMensajeChat[]
+  guardadoPor  MensajeGuardado[]
 
   @@index([idConversacion, enviadoEn])
   @@map("mensaje_chat")
+}
+
+/// Archivo adjunto de un mensaje del chat (uno por mensaje). El binario vive en
+/// Cloudinary en modo autenticado; aqui solo hay metadatos y la clave remota.
+model AdjuntoMensajeChat {
+  idAdjunto           Int      @id @default(autoincrement()) @map("id_adjunto")
+  idMensaje           Int      @unique @map("id_mensaje")
+  idConversacion      Int      @map("id_conversacion")
+  nombreOriginal      String   @map("nombre_original") @db.VarChar(255)
+  mime                String   @db.VarChar(100)
+  tamanoBytes         Int      @map("tamano_bytes")
+  claveAlmacenamiento String   @map("clave_almacenamiento") @db.VarChar(255)
+  creadoEn            DateTime @default(now()) @map("creado_en")
+
+  mensaje      MensajeChat  @relation(fields: [idMensaje], references: [idMensaje])
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
+
+  @@index([idConversacion, idMensaje])
+  @@map("adjunto_mensaje_chat")
+}
+
+/// Reacción con emoji de un usuario a un mensaje del chat (una por mensaje+usuario+emoji).
+model ReaccionMensajeChat {
+  idReaccion Int      @id @default(autoincrement()) @map("id_reaccion")
+  idMensaje  Int      @map("id_mensaje")
+  idUsuario  Int      @map("id_usuario")
+  emoji      String   @db.VarChar(16)
+  creadaEn   DateTime @default(now()) @map("creada_en")
+
+  mensaje MensajeChat @relation(fields: [idMensaje], references: [idMensaje], onDelete: Cascade)
+  usuario Usuario     @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@unique([idMensaje, idUsuario, emoji])
+  @@index([idMensaje])
+  @@map("reaccion_mensaje_chat")
+}
+
+// Apodos por chat: cada usuario define como ve a otro participante; es privado
+// (solo lo ve quien lo define).
+model ApodoConversacion {
+  idApodo           Int      @id @default(autoincrement()) @map("id_apodo")
+  idConversacion    Int      @map("id_conversacion")
+  idUsuarioDefine   Int      @map("id_usuario_define")
+  idUsuarioObjetivo Int      @map("id_usuario_objetivo")
+  apodo             String   @db.VarChar(40)
+
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Cascade)
+  define       Usuario      @relation("ApodosDefinidos", fields: [idUsuarioDefine], references: [idUsuario])
+  objetivo     Usuario      @relation("ApodosRecibidos", fields: [idUsuarioObjetivo], references: [idUsuario])
+
+  @@unique([idConversacion, idUsuarioDefine, idUsuarioObjetivo])
+  @@index([idUsuarioDefine])
+  @@map("apodo_conversacion")
+}
+
+// Estado personalizado del usuario en el chat. Vencido (venceEn <= ahora) se trata
+// como inexistente al leer; no hay job de limpieza.
+enum TipoEstadoChat {
+  EN_CLASE
+  OCUPADO
+  DISPONIBLE
+  PERSONALIZADO
+}
+
+model EstadoChatUsuario {
+  idUsuario Int           @id @map("id_usuario")
+  tipo      TipoEstadoChat
+  texto     String?       @db.VarChar(60)
+  venceEn   DateTime?     @map("vence_en")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@map("estado_chat_usuario")
+}
+
+/// Marcador personal de un mensaje de chat: privado, solo lo ve quien guarda.
+model MensajeGuardado {
+  idUsuario  Int      @map("id_usuario")
+  idMensaje  Int      @map("id_mensaje")
+  guardadoEn DateTime @default(now()) @map("guardado_en")
+
+  usuario Usuario     @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  mensaje MensajeChat @relation(fields: [idMensaje], references: [idMensaje], onDelete: Cascade)
+
+  @@id([idUsuario, idMensaje])
+  @@index([idUsuario, guardadoEn])
+  @@map("mensaje_guardado")
+}
+
+enum EstadoMensajeProgramado {
+  PENDIENTE
+  ENVIADO
+  CANCELADO
+  FALLIDO
+}
+
+// Mensaje de chat para enviar a una hora futura (job cada minuto).
+model MensajeProgramado {
+  idMensajeProgramado Int                     @id @default(autoincrement()) @map("id_mensaje_programado")
+  idConversacion      Int                     @map("id_conversacion")
+  idRemitente         Int                     @map("id_remitente")
+  contenido           String                  @db.Text
+  enviarEn            DateTime                @map("enviar_en")
+  estado              EstadoMensajeProgramado @default(PENDIENTE)
+  creadoEn            DateTime                @default(now()) @map("creado_en")
+  enviadoEn           DateTime?               @map("enviado_en")
+  idMensaje           Int?                    @map("id_mensaje")
+
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
+  remitente    Usuario      @relation("MensajesProgramadosChat", fields: [idRemitente], references: [idUsuario])
+
+  @@index([estado, enviarEn])
+  @@index([idConversacion, idRemitente])
+  @@map("mensaje_programado")
 }
 
 // HU-190 (T-346): niveles de una insignia. Sin nivel (null) = aún sin umbral alcanzado.
