@@ -36,7 +36,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -229,12 +229,12 @@ function VerdictDialog({
 
 function ReviewSkeleton() {
   return (
-    <div className={`${PAGE} pb-12 pt-8`} aria-busy="true">
+    <SkeletonRegion label="Cargando solicitud de cierre" className={`${PAGE} pb-12 pt-8`}>
       <Skeleton className="mb-4 h-4 w-72" />
       <Skeleton className="mb-4 h-28 w-full rounded-card" />
       <Skeleton className="mb-4 h-56 w-full rounded-card" />
       <Skeleton className="h-56 w-full rounded-card" />
-    </div>
+    </SkeletonRegion>
   );
 }
 

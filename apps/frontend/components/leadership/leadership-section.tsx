@@ -8,7 +8,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/
 import { LeadershipAppealSheet } from '@/components/leadership/leadership-appeal-sheet';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   useLeadershipAppealMutations,
@@ -173,7 +173,9 @@ export function LeadershipSection({
             Apelaciones pendientes
           </h2>
           {apelaciones.isPending ? (
-            <Skeleton className="mt-stack h-24 w-full rounded-control" />
+            <SkeletonRegion label="Cargando apelaciones" className="mt-stack">
+              <Skeleton className="h-24 w-full rounded-control" />
+            </SkeletonRegion>
           ) : apelaciones.isError ? (
             <p className="type-meta mt-stack">No fue posible consultar las apelaciones.</p>
           ) : pendiente ? (
@@ -231,9 +233,9 @@ export function LeadershipSection({
         </div>
         <div className="card-base overflow-hidden p-0">
           {historial.isPending ? (
-            <div className="p-card">
+            <SkeletonRegion label="Cargando historial de liderazgo" className="p-card">
               <Skeleton className="h-24 w-full rounded-control" />
-            </div>
+            </SkeletonRegion>
           ) : historial.isError ? (
             <p className="type-meta p-card">No fue posible consultar el historial de liderazgo.</p>
           ) : cambios.length === 0 ? (

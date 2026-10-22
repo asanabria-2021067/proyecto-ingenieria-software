@@ -18,7 +18,7 @@ import {
 } from '@/components/dashboard/data-table';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tag, type TagTone } from '@/components/ui/tag';
 import { useRequireCan } from '@/hooks/use-can';
@@ -72,11 +72,11 @@ export default function AdminAnunciosPage() {
       </section>
 
       {isLoading ? (
-        <div className="space-y-tight" role="status" aria-label="Cargando anuncios">
+        <SkeletonRegion className="space-y-tight" label="Cargando anuncios">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-14 w-full" />
           ))}
-        </div>
+        </SkeletonRegion>
       ) : isError ? (
         <Empty tone="danger" role="alert">
           <EmptyHeader>

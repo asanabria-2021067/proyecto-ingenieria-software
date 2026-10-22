@@ -9,7 +9,7 @@ import { SecurityEventsTable } from '@/components/admin/security/security-events
 import { DATA_TABLE_CARD, DATA_TABLE_HEAD_ROW, DataTablePager } from '@/components/dashboard/data-table';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { useAdminSecurityEvents } from '@/hooks/use-admin-security-events';
 import type { SecurityEvent } from '@/lib/types/admin-security';
 import {
@@ -23,7 +23,7 @@ import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admi
 
 function TablaSkeleton() {
   return (
-    <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando eventos de seguridad">
+    <SkeletonRegion className={DATA_TABLE_CARD} label="Cargando eventos de seguridad">
       <div className={`${DATA_TABLE_HEAD_ROW} px-stack py-tight`}>
         <Skeleton className="h-4 w-40" />
       </div>
@@ -39,7 +39,7 @@ function TablaSkeleton() {
           </div>
         ))}
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 

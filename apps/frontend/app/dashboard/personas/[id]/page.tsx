@@ -11,8 +11,7 @@ import {
   Share2,
   Users,
 } from 'lucide-react';
-import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -50,16 +49,17 @@ function motivoAfinidad(mismaCarrera: boolean, amigosEnComun: number): string | 
 
 function PerfilSkeleton() {
   return (
-    <SkeletonTheme baseColor="var(--color-surface-container)" highlightColor="var(--color-surface-container-high)">
-      <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
-        <Skeleton width={140} height={20} className="mb-section" />
-        <div className="card-base flex flex-col items-center gap-tight py-section">
-          <Skeleton circle width={80} height={80} />
-          <Skeleton width={200} height={24} />
-          <Skeleton width={140} height={16} />
-        </div>
+    <SkeletonRegion
+      label="Cargando perfil"
+      className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page"
+    >
+      <Skeleton className="mb-section h-5 w-36" />
+      <div className="card-base flex flex-col items-center gap-tight py-section" aria-hidden="true">
+        <Skeleton className="size-20 rounded-full" />
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-4 w-36" />
       </div>
-    </SkeletonTheme>
+    </SkeletonRegion>
   );
 }
 

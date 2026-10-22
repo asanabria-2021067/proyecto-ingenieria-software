@@ -64,6 +64,28 @@ export class ComentariosController {
     return this.comentariosService.findByProyecto(idProyecto, user.userId);
   }
 
+  /**
+   * HU-200 (T-376): integrantes que se pueden mencionar con @ en cualquier
+   * comentario del proyecto (líder + participantes ACTIVO). Lectura con la
+   * misma autorización que los comentarios del proyecto.
+   */
+  @Get('proyecto/:idProyecto/mencionables')
+  findMencionables(
+    @Param('idProyecto', ParseIntPipe) idProyecto: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.comentariosService.findMencionables(idProyecto, user.userId);
+  }
+
+  /** HU-200 (T-378): contador de comentarios por hito del proyecto. */
+  @Get('proyecto/:idProyecto/hitos/conteo')
+  countByHitos(
+    @Param('idProyecto', ParseIntPipe) idProyecto: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.comentariosService.countByHitosDelProyecto(idProyecto, user.userId);
+  }
+
   /** E030: lectura (alcance §34 en el servicio); sin metadata de escritura. */
   @Get('hito/:idHito')
   findByHito(

@@ -18,8 +18,21 @@ import { ProjectPolicyService } from '../common/project-policy/project-policy.se
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { CreateComentarioDto } from './dto/create-comentario.dto';
 import { UpdateComentarioDto } from './dto/update-comentario.dto';
+import { extraerMenciones, normalizarMenciones } from './menciones/menciones.parser';
 
 type Db = Prisma.TransactionClient | PrismaService;
+
+/** HU-200: dónde vive un comentario, para el texto y el enlace de la mención. */
+interface ContextoComentario {
+  contexto: 'TAREA' | 'PROYECTO' | 'HITO';
+  idProyecto: number;
+  idTarea: number | null;
+  idHito: number | null;
+}
+
+const usuarioPublicoSelect = {
+  select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
+} as const;
 
 /**
  * C036 (06 v2 §16/§32/§34): el canal A de proyecto/hito escribe dentro de
@@ -30,6 +43,10 @@ type Db = Prisma.TransactionClient | PrismaService;
  * C037: el canal de tarea (createForTask/updateForTask/removeForTask) también
  * corre bajo `run` con la familia `COMENTARIO_TAREA` y exige que la tarea
  * pertenezca a un Sprint ACTIVO; `COMENTARIO_TAREA` se notifica tras el commit.
+ * HU-200: en los tres canales, crear y editar validan las menciones `@[…](id)`
+ * dentro del mismo `run` (solo líder o participantes ACTIVO; el resto queda
+ * como texto) y sincronizan `MencionComentario`. Tras el commit, cada nuevo
+ * mencionado recibe `MENCION_COMENTARIO` en lugar del aviso genérico.
  */
 @Injectable()
 export class ComentariosService {
@@ -76,7 +93,7 @@ export class ComentariosService {
 
     // C036: autorización del canal y política dentro del lock; la notificación
     // existente se emite después del commit.
-    const comentario = await this.projectTx.run(
+    const { comentario, mencionados } = await this.projectTx.run(
       contexto.idProyecto,
       userId,
       'comentarios.create',
@@ -84,19 +101,28 @@ export class ComentariosService {
         const { tx } = ctx;
         await this.assertChannelAWriteAllowed(contexto.idProyecto, userId, tx);
         await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_PROYECTO_HITO', userId);
-        return tx.comentario.create({
+        const menciones = await this.prepararMenciones(tx, contexto.idProyecto, dto.contenido);
+        const comentario = await tx.comentario.create({
           data: {
             idAutor: userId,
             idProyecto: dto.idProyecto,
             idTarea: dto.idTarea,
             idHito: dto.idHito,
-            contenido: dto.contenido.trim(),
+            contenido: menciones.contenido,
           },
         });
+        await this.sincronizarMenciones(tx, comentario.idComentario, menciones.mencionados, true);
+        return { comentario, mencionados: menciones.mencionados };
       },
     );
 
-    await this.notifyChannelA(userId, contexto.idProyecto, dto, tipo, comentario.idComentario);
+    await this.notificarMenciones(mencionados, userId, comentario.idComentario, {
+      contexto: dto.idProyecto ? 'PROYECTO' : 'HITO',
+      idProyecto: contexto.idProyecto,
+      idTarea: null,
+      idHito: dto.idHito ?? null,
+    });
+    await this.notifyChannelA(userId, contexto.idProyecto, dto, tipo, comentario.idComentario, mencionados);
     return comentario;
   }
 
@@ -124,7 +150,7 @@ export class ComentariosService {
     userId: number,
     contenido: string,
   ) {
-    const { tarea, comentario } = await this.projectTx.run(
+    const { tarea, comentario, mencionados } = await this.projectTx.run(
       projectId,
       userId,
       'comentarios.createForTask',
@@ -135,20 +161,32 @@ export class ComentariosService {
         await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_TAREA', userId, {
           sprintId: tarea.idSprint,
         });
+        const menciones = await this.prepararMenciones(tx, projectId, contenido);
         const comentario = await tx.comentario.create({
           data: {
             idAutor: userId,
             idTarea: taskId,
-            contenido: contenido.trim(),
+            contenido: menciones.contenido,
           },
         });
-        return { tarea, comentario };
+        await this.sincronizarMenciones(tx, comentario.idComentario, menciones.mencionados, true);
+        return { tarea, comentario, mencionados: menciones.mencionados };
       },
     );
 
     this.events?.emit(INSIGNIAS_EVENTO, { claves: ['comentarios'], idUsuarios: [userId] });
 
-    const recipientIds = await this.getTaskCommentRecipientIds(taskId, tarea.creadaPor, userId);
+    await this.notificarMenciones(mencionados, userId, comentario.idComentario, {
+      contexto: 'TAREA',
+      idProyecto: projectId,
+      idTarea: taskId,
+      idHito: null,
+    });
+
+    // HU-200: quien fue mencionado ya recibió un aviso más específico.
+    const recipientIds = (await this.getTaskCommentRecipientIds(taskId, tarea.creadaPor, userId)).filter(
+      (recipientId) => !mencionados.includes(recipientId),
+    );
     await this.notifications.notifyUsers(recipientIds, {
       tipoNotificacion: TipoNotificacion.COMENTARIO_TAREA,
       tituloNotificacion: 'Nuevo comentario',
@@ -197,7 +235,8 @@ export class ComentariosService {
 
   /**
    * Notificación del canal A (proyecto/hito) a los participantes activos,
-   * conservada sin cambios y emitida después del commit del `run` (C036).
+   * emitida después del commit del `run` (C036). HU-200: los mencionados
+   * quedan fuera porque ya recibieron `MENCION_COMENTARIO`.
    */
   private async notifyChannelA(
     userId: number,
@@ -205,8 +244,9 @@ export class ComentariosService {
     data: { idTarea?: number; idHito?: number },
     tipo: TipoNotificacion,
     idComentario: number,
+    mencionados: number[] = [],
   ): Promise<void> {
-    await this.notifications.notifyProjectActiveParticipants(idProyecto, userId, {
+    const payload = {
       tipoNotificacion: tipo,
       tituloNotificacion: 'Nuevo comentario',
       mensajeNotificacion: 'Se agregó un comentario nuevo en el proyecto.',
@@ -216,11 +256,190 @@ export class ComentariosService {
         idTarea: data.idTarea ?? null,
         idHito: data.idHito ?? null,
       },
+    };
+    if (mencionados.length === 0) {
+      await this.notifications.notifyProjectActiveParticipants(idProyecto, userId, payload);
+      return;
+    }
+    await this.notifications.notifyProjectActiveParticipants(idProyecto, userId, payload, undefined, mencionados);
+  }
+
+  // ---------------------------------------------------------------------
+  // HU-200 — menciones con @
+  // ---------------------------------------------------------------------
+
+  /**
+   * T-376: líder y participantes ACTIVO del proyecto, es decir, los mismos que
+   * pueden leer sus comentarios (`assertChannelAReadAllowed`). Es la lista del
+   * autocompletado, y la misma regla que valida cada mención al guardar.
+   */
+  async findMencionables(idProyecto: number, userId: number) {
+    await this.readPolicy.assertRead(undefined, { projectId: idProyecto, actorId: userId, scope: 'resumen' });
+    await this.assertChannelAReadAllowed(idProyecto, userId);
+
+    const [proyecto, participaciones] = await Promise.all([
+      this.prisma.proyecto.findUnique({
+        where: { idProyecto },
+        select: { creador: usuarioPublicoSelect },
+      }),
+      this.prisma.participacionProyecto.findMany({
+        where: { estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto } },
+        select: { usuario: usuarioPublicoSelect },
+      }),
+    ]);
+
+    const porId = new Map<number, { idUsuario: number; nombre: string; apellido: string; fotoUrl: string | null; esLider: boolean }>();
+    if (proyecto?.creador) {
+      porId.set(proyecto.creador.idUsuario, { ...proyecto.creador, esLider: true });
+    }
+    for (const { usuario } of participaciones) {
+      if (!porId.has(usuario.idUsuario)) {
+        porId.set(usuario.idUsuario, { ...usuario, esLider: false });
+      }
+    }
+    return [...porId.values()].sort((a, b) =>
+      `${a.nombre} ${a.apellido}`.localeCompare(`${b.nombre} ${b.apellido}`, 'es'),
+    );
+  }
+
+  /** Subconjunto de `candidatos` que puede ser mencionado en el proyecto. */
+  private async idsMencionables(db: Db, idProyecto: number, candidatos: number[]): Promise<Set<number>> {
+    const proyecto = await db.proyecto.findUnique({
+      where: { idProyecto },
+      select: { creadoPor: true },
+    });
+    const participaciones = await db.participacionProyecto.findMany({
+      where: { idUsuario: { in: candidatos }, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto } },
+      select: { idUsuario: true },
+    });
+    const elegibles = new Set(participaciones.map((p) => p.idUsuario));
+    if (proyecto && candidatos.includes(proyecto.creadoPor)) {
+      elegibles.add(proyecto.creadoPor);
+    }
+    return elegibles;
+  }
+
+  /**
+   * Recorta el contenido y deja como token solo las menciones válidas; una
+   * mención a quien no pertenece al proyecto se degrada a texto, sin error.
+   * Sin tokens no consulta la base.
+   */
+  private async prepararMenciones(db: Db, idProyecto: number, contenido: string) {
+    const texto = contenido.trim();
+    const candidatos = extraerMenciones(texto).map((m) => m.idUsuario);
+    if (candidatos.length === 0) {
+      return { contenido: texto, mencionados: [] as number[] };
+    }
+    const elegibles = await this.idsMencionables(db, idProyecto, candidatos);
+    return {
+      contenido: normalizarMenciones(texto, elegibles),
+      mencionados: candidatos.filter((id) => elegibles.has(id)),
+    };
+  }
+
+  /**
+   * Deja en `MencionComentario` exactamente `mencionados` y devuelve los que se
+   * agregaron en esta escritura: al editar, solo ellos reciben aviso.
+   */
+  private async sincronizarMenciones(
+    db: Db,
+    idComentario: number,
+    mencionados: number[],
+    esNuevo: boolean,
+  ): Promise<number[]> {
+    const previas = esNuevo
+      ? []
+      : (
+          await db.mencionComentario.findMany({ where: { idComentario }, select: { idUsuario: true } })
+        ).map((m) => m.idUsuario);
+    const quitar = previas.filter((id) => !mencionados.includes(id));
+    const agregar = mencionados.filter((id) => !previas.includes(id));
+
+    if (quitar.length > 0) {
+      await db.mencionComentario.deleteMany({ where: { idComentario, idUsuario: { in: quitar } } });
+    }
+    if (agregar.length > 0) {
+      await db.mencionComentario.createMany({
+        data: agregar.map((idUsuario) => ({ idComentario, idUsuario })),
+        skipDuplicates: true,
+      });
+    }
+    return agregar;
+  }
+
+  /** T-377: aviso post-commit a los mencionados; el autor nunca se notifica a sí mismo. */
+  private async notificarMenciones(
+    mencionados: number[],
+    autorId: number,
+    idComentario: number,
+    ctx: ContextoComentario,
+  ): Promise<void> {
+    const destinatarios = mencionados.filter((id) => id !== autorId);
+    if (destinatarios.length === 0) return;
+
+    const [autor, tituloContexto] = await Promise.all([
+      this.prisma.usuario.findUnique({
+        where: { idUsuario: autorId },
+        select: { nombre: true, apellido: true },
+      }),
+      this.tituloContexto(ctx),
+    ]);
+
+    await this.notifications.notifyFromTemplate(destinatarios, 'MENCION_COMENTARIO', {
+      autorNombre: autor ? `${autor.nombre} ${autor.apellido}` : 'Un integrante',
+      contexto: ctx.contexto,
+      tituloContexto,
+      idProyecto: ctx.idProyecto,
+      idComentario,
+      idTarea: ctx.idTarea,
+      idHito: ctx.idHito,
     });
   }
 
-  private readonly autorSelect = {
-    select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
+  private async tituloContexto(ctx: ContextoComentario): Promise<string> {
+    if (ctx.idTarea !== null) {
+      const tarea = await this.prisma.tarea.findUnique({
+        where: { idTarea: ctx.idTarea },
+        select: { tituloTarea: true },
+      });
+      return tarea?.tituloTarea ?? '';
+    }
+    if (ctx.idHito !== null) {
+      const hito = await this.prisma.hito.findUnique({
+        where: { idHito: ctx.idHito },
+        select: { tituloHito: true },
+      });
+      return hito?.tituloHito ?? '';
+    }
+    const proyecto = await this.prisma.proyecto.findUnique({
+      where: { idProyecto: ctx.idProyecto },
+      select: { tituloProyecto: true },
+    });
+    return proyecto?.tituloProyecto ?? '';
+  }
+
+  /**
+   * T-378: el contador de comentarios de cada hito del proyecto (botón de la
+   * tarjeta del hito). Ruta autorizada, no el detalle público del proyecto.
+   */
+  async countByHitosDelProyecto(idProyecto: number, userId: number) {
+    await this.readPolicy.assertRead(undefined, { projectId: idProyecto, actorId: userId, scope: 'resumen' });
+    await this.assertChannelAReadAllowed(idProyecto, userId);
+    const grupos = await this.prisma.comentario.groupBy({
+      by: ['idHito'],
+      where: { eliminadoEn: null, hito: { idProyecto } },
+      _count: { _all: true },
+    });
+    return grupos
+      .filter((g): g is typeof g & { idHito: number } => g.idHito !== null)
+      .map((g) => ({ idHito: g.idHito, cantidad: g._count._all }));
+  }
+
+  private readonly autorSelect = usuarioPublicoSelect;
+
+  /** Menciones de cada comentario con el nombre VIGENTE del usuario (T-378). */
+  private readonly mencionesInclude = {
+    select: { usuario: usuarioPublicoSelect },
   } as const;
 
   async findByProyecto(idProyecto: number, userId: number) {
@@ -229,7 +448,7 @@ export class ComentariosService {
     await this.assertChannelAReadAllowed(idProyecto, userId);
     return this.prisma.comentario.findMany({
       where: { idProyecto, eliminadoEn: null },
-      include: { autor: this.autorSelect },
+      include: { autor: this.autorSelect, menciones: this.mencionesInclude },
       orderBy: { creadoEn: 'asc' },
     });
   }
@@ -254,7 +473,7 @@ export class ComentariosService {
     await this.assertChannelAReadAllowed(projectId, userId);
     return this.prisma.comentario.findMany({
       where: { idTarea: taskId, eliminadoEn: null },
-      include: { autor: this.autorSelect },
+      include: { autor: this.autorSelect, menciones: this.mencionesInclude },
       orderBy: { creadoEn: 'desc' },
     });
   }
@@ -269,7 +488,7 @@ export class ComentariosService {
     await this.assertChannelAReadAllowed(hito.idProyecto, userId);
     return this.prisma.comentario.findMany({
       where: { idHito, eliminadoEn: null },
-      include: { autor: this.autorSelect },
+      include: { autor: this.autorSelect, menciones: this.mencionesInclude },
       orderBy: { creadoEn: 'asc' },
     });
   }
@@ -369,16 +588,33 @@ export class ComentariosService {
   async update(idComentario: number, userId: number, dto: UpdateComentarioDto) {
     const { idProyecto } = await this.loadChannelAComment(idComentario, userId, 'editar');
 
-    return this.projectTx.run(idProyecto, userId, 'comentarios.update', async (ctx) => {
-      const { tx } = ctx;
-      await this.loadChannelAComment(idComentario, userId, 'editar', tx);
-      await this.assertChannelAWriteAllowed(idProyecto, userId, tx);
-      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_PROYECTO_HITO', userId);
-      return tx.comentario.update({
-        where: { idComentario },
-        data: { contenido: dto.contenido.trim(), editadoEn: new Date() },
-      });
+    const { actualizado, idHito, nuevos } = await this.projectTx.run(
+      idProyecto,
+      userId,
+      'comentarios.update',
+      async (ctx) => {
+        const { tx } = ctx;
+        const { comentario } = await this.loadChannelAComment(idComentario, userId, 'editar', tx);
+        await this.assertChannelAWriteAllowed(idProyecto, userId, tx);
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_PROYECTO_HITO', userId);
+        const menciones = await this.prepararMenciones(tx, idProyecto, dto.contenido);
+        const actualizado = await tx.comentario.update({
+          where: { idComentario },
+          data: { contenido: menciones.contenido, editadoEn: new Date() },
+        });
+        const nuevos = await this.sincronizarMenciones(tx, idComentario, menciones.mencionados, false);
+        return { actualizado, idHito: comentario.idHito ?? null, nuevos };
+      },
+    );
+
+    // HU-200: al editar solo se avisa a quien se agregó en esta edición.
+    await this.notificarMenciones(nuevos, userId, idComentario, {
+      contexto: idHito === null ? 'PROYECTO' : 'HITO',
+      idProyecto,
+      idTarea: null,
+      idHito,
     });
+    return actualizado;
   }
 
   /** C036: DELETE genérico del canal A (soft delete), mismo orden que `update`. */
@@ -416,6 +652,7 @@ export class ComentariosService {
         eliminadoEn: true,
         idProyecto: true,
         idTarea: true,
+        idHito: true,
         hito: { select: { idProyecto: true } },
       },
     });
@@ -450,24 +687,41 @@ export class ComentariosService {
     userId: number,
     dto: UpdateComentarioDto,
   ) {
-    return this.projectTx.run(projectId, userId, 'comentarios.updateForTask', async (ctx) => {
-      const { tx } = ctx;
-      const tarea = await this.getTareaEnProyectoOrThrow(projectId, taskId, tx);
-      const comentario = await this.getComentarioEnTareaOrThrow(taskId, commentId, tx);
+    const { actualizado, nuevos } = await this.projectTx.run(
+      projectId,
+      userId,
+      'comentarios.updateForTask',
+      async (ctx) => {
+        const { tx } = ctx;
+        const tarea = await this.getTareaEnProyectoOrThrow(projectId, taskId, tx);
+        const comentario = await this.getComentarioEnTareaOrThrow(taskId, commentId, tx);
 
-      if (comentario.idAutor !== userId) {
-        throw new ForbiddenException('Solo el autor puede editar este comentario');
-      }
+        if (comentario.idAutor !== userId) {
+          throw new ForbiddenException('Solo el autor puede editar este comentario');
+        }
 
-      await this.assertChannelAWriteAllowed(projectId, userId, tx);
-      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_TAREA', userId, {
-        sprintId: tarea.idSprint,
-      });
-      return tx.comentario.update({
-        where: { idComentario: commentId },
-        data: { contenido: dto.contenido.trim(), editadoEn: new Date() },
-      });
+        await this.assertChannelAWriteAllowed(projectId, userId, tx);
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_TAREA', userId, {
+          sprintId: tarea.idSprint,
+        });
+        const menciones = await this.prepararMenciones(tx, projectId, dto.contenido);
+        const actualizado = await tx.comentario.update({
+          where: { idComentario: commentId },
+          data: { contenido: menciones.contenido, editadoEn: new Date() },
+        });
+        const nuevos = await this.sincronizarMenciones(tx, commentId, menciones.mencionados, false);
+        return { actualizado, nuevos };
+      },
+    );
+
+    // HU-200: al editar solo se avisa a quien se agregó en esta edición.
+    await this.notificarMenciones(nuevos, userId, commentId, {
+      contexto: 'TAREA',
+      idProyecto: projectId,
+      idTarea: taskId,
+      idHito: null,
     });
+    return actualizado;
   }
 
   /**

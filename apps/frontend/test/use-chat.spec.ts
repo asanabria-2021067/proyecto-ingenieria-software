@@ -31,7 +31,23 @@ vi.mock('socket.io-client', () => ({
   io: (...args: unknown[]) => mockIo(...args),
 }));
 
-import { TYPING_EXPIRY_MS, TYPING_THROTTLE_MS, useGlobalChatSocket } from '../hooks/use-chat';
+const mockToggleReaction = vi.fn();
+const toggleSavedMock = vi.hoisted(() => vi.fn());
+const listSavedMock = vi.hoisted(() => vi.fn());
+vi.mock('../lib/services/chat', () => ({
+  toggleReaction: (...args: unknown[]) => mockToggleReaction(...args),
+  toggleSavedMessage: (...args: unknown[]) => toggleSavedMock(...args),
+  listSavedMessages: (...args: unknown[]) => listSavedMock(...args),
+}));
+
+import {
+  TYPING_EXPIRY_MS,
+  TYPING_THROTTLE_MS,
+  useGlobalChatSocket,
+  useSavedMessages,
+  useToggleReaction,
+  useToggleSavedMessage,
+} from '../hooks/use-chat';
 import { conversationMessagesQueryKey, conversationReadsQueryKey } from '../lib/query-keys/chat';
 import type { ChatMensaje } from '../lib/types/chat';
 
@@ -294,5 +310,141 @@ describe('useGlobalChatSocket - escribiendo y visto por', () => {
     act(() => socket.__emit('messagesRead', { idConversacion: 5, idUsuario: 2, ultimaLecturaEn: '2026-10-16T10:00:00Z' }));
 
     expect(queryClient.getQueryData(conversationReadsQueryKey(10, 5))).toBeUndefined();
+  });
+});
+
+describe('useGlobalChatSocket - reactionUpdated', () => {
+  it('reemplaza las reacciones del mensaje y deriva reaccionadoPorMi del usuario actual', async () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(['currentUser'], { idUsuario: 7 });
+    queryClient.setQueryData(conversationMessagesQueryKey(1, 5), [mensaje, { ...mensaje, idMensaje: 2 }]);
+
+    renderHook(() => useGlobalChatSocket([5]), { wrapper });
+
+    act(() => {
+      socket.__emit('reactionUpdated', {
+        idConversacion: 5,
+        idMensaje: 1,
+        reacciones: [{ emoji: 'X', count: 2, idsUsuarios: [7, 8] }],
+      });
+    });
+
+    await waitFor(() => {
+      const [primero, segundo] = queryClient.getQueryData(conversationMessagesQueryKey(1, 5)) as ChatMensaje[];
+      expect(primero.reacciones).toEqual([{ emoji: 'X', count: 2, reaccionadoPorMi: true }]);
+      expect(segundo.reacciones).toBeUndefined();
+    });
+  });
+
+  it('ignora el evento si la conversacion no esta en cache', () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+
+    renderHook(() => useGlobalChatSocket([]), { wrapper });
+    act(() => {
+      socket.__emit('reactionUpdated', { idConversacion: 9, idMensaje: 1, reacciones: [] });
+    });
+
+    expect(queryClient.getQueryData(conversationMessagesQueryKey(1, 9))).toBeUndefined();
+  });
+});
+
+describe('useToggleReaction', () => {
+  const clave = conversationMessagesQueryKey(1, 5);
+
+  it('aplica la reaccion de forma optimista y luego la reemplaza con la respuesta del servidor', async () => {
+    let resolver!: (v: unknown) => void;
+    mockToggleReaction.mockReturnValue(new Promise((r) => (resolver = r)));
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(clave, [mensaje]);
+
+    const { result } = renderHook(() => useToggleReaction(1, 5), { wrapper });
+    act(() => {
+      result.current.mutate({ idMensaje: 1, emoji: 'X' });
+    });
+
+    await waitFor(() =>
+      expect((queryClient.getQueryData(clave) as ChatMensaje[])[0].reacciones).toEqual([
+        { emoji: 'X', count: 1, reaccionadoPorMi: true },
+      ]),
+    );
+
+    resolver([{ emoji: 'X', count: 3, reaccionadoPorMi: true }]);
+    await waitFor(() =>
+      expect((queryClient.getQueryData(clave) as ChatMensaje[])[0].reacciones).toEqual([
+        { emoji: 'X', count: 3, reaccionadoPorMi: true },
+      ]),
+    );
+    expect(mockToggleReaction).toHaveBeenCalledWith(1, 5, 1, 'X');
+  });
+
+  it('si el servidor falla, revierte al estado previo', async () => {
+    mockToggleReaction.mockRejectedValue(new Error('403'));
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(clave, [mensaje]);
+
+    const { result } = renderHook(() => useToggleReaction(1, 5), { wrapper });
+    act(() => {
+      result.current.mutate({ idMensaje: 1, emoji: 'X' });
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(queryClient.getQueryData(clave)).toEqual([mensaje]);
+  });
+});
+
+describe('mensajes guardados', () => {
+  it('useToggleSavedMessage actualiza guardado en la cache del historial e invalida la lista de guardados', async () => {
+    toggleSavedMock.mockResolvedValue({ guardado: true });
+    const { queryClient, wrapper } = createWrapper();
+    const key = conversationMessagesQueryKey(10, 5);
+    queryClient.setQueryData<ChatMensaje[]>(key, [mensaje, { ...mensaje, idMensaje: 2 }]);
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useToggleSavedMessage(10, 5), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync(1);
+    });
+
+    expect(toggleSavedMock).toHaveBeenCalledWith(10, 5, 1);
+    expect(queryClient.getQueryData<ChatMensaje[]>(key)?.map((m) => m.guardado)).toEqual([true, undefined]);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['chats-guardados'] });
+  });
+
+  it('useToggleSavedMessage sin cache del historial no revienta', async () => {
+    toggleSavedMock.mockResolvedValue({ guardado: false });
+    const { wrapper } = createWrapper();
+
+    const { result } = renderHook(() => useToggleSavedMessage(10, 5), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync(1);
+    });
+
+    expect(toggleSavedMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('useSavedMessages pagina con hasMore y no consulta si esta deshabilitado', async () => {
+    const item = { idMensaje: 1, contenido: 'x' };
+    listSavedMock.mockResolvedValueOnce({ items: [item], hasMore: true }).mockResolvedValueOnce({ items: [{ ...item, idMensaje: 2 }], hasMore: false });
+    const { wrapper } = createWrapper();
+
+    const apagado = renderHook(() => useSavedMessages(false), { wrapper });
+    expect(apagado.result.current.guardados).toEqual([]);
+    expect(listSavedMock).not.toHaveBeenCalled();
+    apagado.unmount();
+
+    const { result } = renderHook(() => useSavedMessages(true), { wrapper });
+    await waitFor(() => expect(result.current.guardados).toHaveLength(1));
+    expect(result.current.hasMore).toBe(true);
+
+    await act(async () => {
+      await result.current.cargarMas();
+    });
+    await waitFor(() => expect(result.current.guardados).toHaveLength(2));
+    expect(listSavedMock).toHaveBeenLastCalledWith(2);
+    expect(result.current.hasMore).toBe(false);
   });
 });

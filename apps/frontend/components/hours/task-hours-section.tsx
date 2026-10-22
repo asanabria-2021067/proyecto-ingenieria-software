@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { OverestimationNotice } from '@/components/hours/overestimation-notice';
@@ -320,7 +320,7 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
 
   if (isLoading) {
     return (
-      <div className="space-y-3" aria-busy="true" aria-label="Cargando horas de la tarea">
+      <SkeletonRegion label="Cargando horas de la tarea" className="space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Skeleton className="h-16 rounded-xl" />
           <Skeleton className="h-16 rounded-xl" />
@@ -329,7 +329,7 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
         </div>
         <Skeleton className="h-24 rounded-md" />
         <Skeleton className="h-28 rounded-md" />
-      </div>
+      </SkeletonRegion>
     );
   }
 

@@ -28,8 +28,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+import { SkeletonList } from '@/components/ui/skeleton';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { useArchivedConversations } from '@/hooks/use-chat';
 import { getMessages } from '@/lib/services/chat';
@@ -49,15 +48,11 @@ function formatHora(iso: string): string {
 }
 
 function ListaSkeleton() {
-  return (
-    <SkeletonTheme baseColor="var(--color-surface-container)" highlightColor="var(--color-surface-container-high)">
-      <div className="space-y-tight" aria-hidden="true">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} height={64} borderRadius="var(--radius-control)" />
-        ))}
-      </div>
-    </SkeletonTheme>
-  );
+  return <SkeletonList label="Cargando chats archivados" count={5} lines={2} avatar="circle" className="gap-tight" />;
+}
+
+function HistorialSkeleton() {
+  return <SkeletonList label="Cargando historial" count={3} lines={1} avatar="circle" layout="plain" />;
 }
 
 export default function ChatsArchivadosPage() {
@@ -143,7 +138,7 @@ export default function ChatsArchivadosPage() {
                     </p>
                     <p className="type-meta truncate">{c.proyecto.tituloProyecto}</p>
                     {c.ultimoMensaje && (
-                      <p className="type-body truncate text-text-secondary">{c.ultimoMensaje.contenido}</p>
+                      <p className="type-body truncate text-text-secondary">{c.ultimoMensaje.eliminadoEn ? 'Mensaje eliminado' : c.ultimoMensaje.contenido}</p>
                     )}
                   </div>
                   <Lock className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
@@ -205,7 +200,7 @@ function ArchivedThreadSheet({ conversacion, currentUserId, onOpenChange }: Arch
         )}
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-          {isLoading && <p className="text-xs text-tertiary">Cargando historial…</p>}
+          {isLoading && <HistorialSkeleton />}
           {!isLoading && messages.length === 0 && (
             <p className="text-xs text-tertiary">Esta conversación no tiene mensajes.</p>
           )}

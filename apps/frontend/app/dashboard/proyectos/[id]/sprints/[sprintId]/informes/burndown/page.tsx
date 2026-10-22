@@ -5,7 +5,7 @@ import { AlertCircle } from 'lucide-react';
 import { useProjectSprints, useSprintBurndown } from '@/hooks/use-project-sprints';
 import { BurndownChart } from '@/components/projects/burndown-chart';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -65,7 +65,11 @@ export default function InformeBurndownPage() {
         )}
       </ProjectPageHeader>
 
-      {isLoading && <Skeleton className="h-[400px] w-full rounded-xl" />}
+      {isLoading && (
+        <SkeletonRegion label="Cargando burndown">
+          <Skeleton className="h-[400px] w-full rounded-xl" />
+        </SkeletonRegion>
+      )}
 
       {!isLoading && isError && (
         <Empty tone="danger" role="alert">

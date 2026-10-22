@@ -11,7 +11,7 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { useClosureDocument } from '@/hooks/use-closure-document';
@@ -155,9 +155,9 @@ export function ClosureDocumentViewer({
         {/* Cuerpo */}
         <div className="min-h-0 flex-1 bg-surface-container-low">
           {isLoading && (
-            <div className="h-full p-4" aria-busy="true" aria-label="Cargando documento">
+            <SkeletonRegion label="Cargando documento" className="h-full p-4">
               <Skeleton className="h-full w-full rounded-lg" />
-            </div>
+            </SkeletonRegion>
           )}
           {!isLoading && isError && status !== 403 && (
             <div className="flex h-full items-center justify-center p-6">

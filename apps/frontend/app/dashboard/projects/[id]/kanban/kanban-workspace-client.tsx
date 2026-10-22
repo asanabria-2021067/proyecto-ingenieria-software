@@ -15,7 +15,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useTaskSelection } from '@/hooks/use-task-selection';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Empty,
   EmptyContent,
@@ -164,11 +164,11 @@ function WorkspaceSkeleton() {
       <Skeleton className="mb-4 h-4 w-72" />
       <Skeleton className="mb-6 h-16 w-full max-w-xl rounded-xl" />
       <Skeleton className="mb-4 h-9 w-48" />
-      <div className="flex gap-4 overflow-hidden">
+      <SkeletonRegion label="Cargando tablero" className="flex gap-4 overflow-hidden">
         {[0, 1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-[480px] w-[300px] shrink-0 rounded-xl" />
         ))}
-      </div>
+      </SkeletonRegion>
     </ProjectPageShell>
   );
 }
@@ -482,10 +482,10 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
 
           <TabsContent value="tablero" className="mt-0 min-h-0">
             {isLoadingSprints ? (
-              <div className="space-y-3">
+              <SkeletonRegion label="Cargando sprints" className="space-y-3">
                 <Skeleton className="h-9 w-48" />
                 <Skeleton className="h-[420px] w-full rounded-xl" />
-              </div>
+              </SkeletonRegion>
             ) : isErrorSprints ? (
               <div role="alert" className="space-y-3 py-10 text-center">
                 <p className="type-body font-medium text-destructive">

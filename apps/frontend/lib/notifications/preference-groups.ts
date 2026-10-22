@@ -61,6 +61,11 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   HITO_ACTUALIZADO: { grupo: 'tareas', etiqueta: 'Hito actualizado', descripcion: 'Cambia un hito de tu proyecto.' },
   COMENTARIO_TAREA: { grupo: 'tareas', etiqueta: 'Comentario en una tarea', descripcion: 'Alguien comenta una tarea tuya.' },
   COMENTARIO_HITO: { grupo: 'tareas', etiqueta: 'Comentario en un hito', descripcion: 'Alguien comenta un hito de tu proyecto.' },
+  MENCION_COMENTARIO: {
+    grupo: 'tareas',
+    etiqueta: 'Menciones en comentarios',
+    descripcion: 'Alguien te menciona con @ en un comentario de tarea, hito o proyecto.',
+  },
   EVIDENCIA_REVISADA: { grupo: 'tareas', etiqueta: 'Evidencia revisada', descripcion: 'Revisan una evidencia que entregaste.' },
   TAREA_POR_VENCER: { grupo: 'tareas', etiqueta: 'Tarea por vencer', descripcion: 'Una tarea tuya está cerca de su fecha límite.' },
 

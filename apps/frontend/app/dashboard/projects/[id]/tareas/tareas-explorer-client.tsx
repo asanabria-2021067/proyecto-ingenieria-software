@@ -13,7 +13,7 @@ import { useTaskSelection } from '@/hooks/use-task-selection';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Kbd } from '@/components/ui/kbd';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -344,7 +344,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
 
         {/* loading — skeleton con forma de fila (título + meta + pastillas), nunca spinner */}
         {isLoading && (
-          <div className="space-y-inline p-card" role="status" aria-label="Cargando tareas">
+          <SkeletonRegion className="space-y-inline p-card" label="Cargando tareas">
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
@@ -358,7 +358,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
                 <Skeleton className="h-6 w-20 shrink-0 rounded-control" />
               </div>
             ))}
-          </div>
+          </SkeletonRegion>
         )}
 
         {/* error */}

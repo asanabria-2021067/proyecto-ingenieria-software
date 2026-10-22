@@ -15,7 +15,7 @@ import { CloseAssignmentForm } from '@/components/projects/close-assignment-form
 import { KANBAN_COLUMN_CLASS, KanbanColumnHeader, kanbanColumnBodyClass } from '@/components/projects/kanban-column-frame';
 import { PendingLeaderReview } from '@/components/projects/pending-leader-review';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -334,11 +334,11 @@ function ExitS7Blockers({ blockers }: { blockers: ExitS7Blocker[] }) {
 // ─── Skeletons (Sección 28: patrón dominante = skeletons locales) ───────────
 function ExitPreparationWorkspaceSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[1600px] px-5 py-6 md:px-7">
+    <SkeletonRegion label="Cargando preparación de salida" className="mx-auto w-full max-w-[1600px] px-5 py-6 md:px-7">
       <Skeleton className="mb-4 h-4 w-72" />
       <Skeleton className="mb-4 h-28 w-full max-w-2xl rounded-xl" />
       <ExitPreparationBodySkeleton />
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -500,7 +500,9 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
           renderiza F9 ni F11 — evita el flash "Kanban -> luego Solicitud
           enviada" en carga directa. */}
       {proyectoCerrado ? null : isLoadingCurrent ? (
-        <ExitPreparationBodySkeleton />
+        <SkeletonRegion label="Cargando solicitud de salida">
+          <ExitPreparationBodySkeleton />
+        </SkeletonRegion>
       ) : isErrorCurrent ? (
         <div
           role="alert"
@@ -520,7 +522,9 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
         <PendingLeaderReview solicitadaEn={currentRequest?.solicitadaEn} motivo={currentRequest?.motivo} />
       ) : esPreparacion ? (
         isLoadingSummary ? (
-          <ExitPreparationBodySkeleton />
+          <SkeletonRegion label="Cargando resumen de salida">
+            <ExitPreparationBodySkeleton />
+          </SkeletonRegion>
         ) : isErrorSummary ? (
           <div
             role="alert"

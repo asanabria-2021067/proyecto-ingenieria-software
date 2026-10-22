@@ -42,6 +42,8 @@ vi.mock('../app/dashboard/projects/[id]/project-detail-client', () => ({
   default: () => createElement('div', { 'data-testid': 'leader-workspace' }),
 }));
 vi.mock('../lib/swal', () => ({ default: { fire: vi.fn() } }));
+// HU-200: la conversación del proyecto tiene su propia prueba (comment-thread.spec.tsx).
+vi.mock('../components/projects/detail/project-comments-card', () => ({ ProjectCommentsCard: () => null }));
 const iniciarChatCon = vi.fn();
 vi.mock('../components/chat-dock/chat-dock-context', () => ({
   ChatDockProvider: ({ children }: { children: ReactNode }) => children,
