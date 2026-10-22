@@ -3,7 +3,7 @@
 import { ESTADO_REVISION_LABEL } from '@/components/projects/closure-review-status.utils';
 import type { EstadoRevisionCierre } from '@/lib/types/closure';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -27,6 +27,7 @@ import {
   Users,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
+import { ProjectCommentsCard } from '@/components/projects/detail/project-comments-card';
 import { Postulacion, Proyecto, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 import {
   MODALIDAD_ICON,
@@ -409,6 +410,13 @@ export default function ProyectoDetallePage() {
             </div>
           )}
           </section>
+
+          {/* HU-200: conversación del proyecto para los integrantes activos. */}
+          {esParticipante && (
+            <Suspense fallback={null}>
+              <ProjectCommentsCard idProyecto={projectId} />
+            </Suspense>
+          )}
         </ProjectGridMain>
 
         <ProjectGridAside aria-label="Información del proyecto">

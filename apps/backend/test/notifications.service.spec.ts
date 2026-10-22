@@ -107,6 +107,24 @@ describe('NotificationsService', () => {
     expect(prisma.notificacion.createMany).toHaveBeenCalled();
   });
 
+  it('notifyProjectActiveParticipants también excluye a los ids recibidos (HU-200: mencionados)', async () => {
+    const prisma = makePrisma();
+    prisma.participacionProyecto.findMany.mockResolvedValue([]);
+    const service = new NotificationsService(prisma);
+    await service.notifyProjectActiveParticipants(
+      1,
+      2,
+      { tipoNotificacion: TipoNotificacion.COMENTARIO_PROYECTO, tituloNotificacion: 'x' },
+      undefined,
+      [8, 9],
+    );
+    expect(prisma.participacionProyecto.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ idUsuario: { notIn: [2, 8, 9] } }),
+      }),
+    );
+  });
+
   describe('notifySprintFinalizationStarted (A4)', () => {
     /**
      * NotificationsService exige un NotificationsGateway real (clase con

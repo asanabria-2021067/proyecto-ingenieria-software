@@ -681,6 +681,24 @@ html {
   animation: surface-enter 0.38s var(--ease-out-quint) both;
 }
 
+/* HU-200: comentario al que lleva una notificación. Se ilumina y se apaga
+   solo; con movimiento reducido queda el resaltado sin transición. */
+@keyframes comment-spotlight {
+  0%,
+  55% {
+    background-color: color-mix(in srgb, var(--color-primary) 9%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+
+.comment-spotlight {
+  animation: comment-spotlight 3.2s var(--ease-out-quart) both;
+}
+
 .empty-state-visual {
   animation: empty-state-float 5s var(--ease-out-quart) infinite;
 }

@@ -32,6 +32,9 @@ const AUTOR_SELECT = {
   select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
 } as const;
 
+/** HU-200: cada comentario trae sus menciones con el nombre vigente del usuario. */
+const MENCIONES_INCLUDE = { select: { usuario: AUTOR_SELECT } } as const;
+
 const ID_PROYECTO = 10;
 const OTRO_PROYECTO_ID = 77;
 const LIDER_ID = 1;
@@ -53,7 +56,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
       expect(prisma.comentario.findMany).toHaveBeenCalledTimes(1);
       expect(prisma.comentario.findMany).toHaveBeenCalledWith({
         where: { idProyecto: ID_PROYECTO, eliminadoEn: null },
-        include: { autor: AUTOR_SELECT },
+        include: { autor: AUTOR_SELECT, menciones: MENCIONES_INCLUDE },
         orderBy: { creadoEn: 'asc' },
       });
     });
@@ -141,7 +144,7 @@ describe('ComentariosService - autorización de lectura de comentarios', () => {
       expect(result).toEqual([{ idComentario: 4 }]);
       expect(prisma.comentario.findMany).toHaveBeenCalledWith({
         where: { idHito: ID_HITO, eliminadoEn: null },
-        include: { autor: AUTOR_SELECT },
+        include: { autor: AUTOR_SELECT, menciones: MENCIONES_INCLUDE },
         orderBy: { creadoEn: 'asc' },
       });
     });

@@ -278,6 +278,18 @@ export interface NotificationTemplateData {
     nivel: string;
     nivelNombre: string;
   };
+  // HU-200 (T-377): mención con @ en un comentario. Las claves de ids son las
+  // mismas que ya usan COMENTARIO_TAREA/PROYECTO/HITO, para que el enlace del
+  // centro de notificaciones resuelva los cuatro tipos con una sola regla.
+  MENCION_COMENTARIO: {
+    autorNombre: string;
+    contexto: 'TAREA' | 'PROYECTO' | 'HITO';
+    tituloContexto: string;
+    idProyecto: number;
+    idComentario: number;
+    idTarea: number | null;
+    idHito: number | null;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -524,6 +536,14 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Nueva insignia',
     message: (data: NotificationTemplateData['INSIGNIA_OBTENIDA']) =>
       `Obtuviste la insignia "${data.insigniaNombre}" nivel ${data.nivelNombre}.`,
+  },
+
+  MENCION_COMENTARIO: {
+    title: 'Te mencionaron en un comentario',
+    message: (data: NotificationTemplateData['MENCION_COMENTARIO']) => {
+      const donde = { TAREA: 'la tarea', PROYECTO: 'el proyecto', HITO: 'el hito' }[data.contexto];
+      return `${data.autorNombre} te mencionó en un comentario de ${donde} "${data.tituloContexto}".`;
+    },
   },
 } as const;
 
