@@ -1,12 +1,18 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertCircle, ClipboardList, SearchX } from 'lucide-react';
+import { AlertCircle, ClipboardList, MousePointerClick, SearchX } from 'lucide-react';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
+import { useProjectMembers } from '@/hooks/use-project-members';
+import { useProjectLabels } from '@/hooks/use-project-labels';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { useTaskSelection } from '@/hooks/use-task-selection';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Kbd } from '@/components/ui/kbd';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Select,
@@ -40,6 +46,7 @@ import {
   estaVencida,
 } from '@/components/projects/task-board.utils';
 import { Tag } from '@/components/ui/tag';
+import { TaskBulkActionsBar } from '@/components/projects/task-bulk-actions-bar';
 import {
   filterTasksByPriority,
   filterTasksByStatus,
@@ -74,6 +81,8 @@ const BORDE_TARJETA = 'first:pl-card last:pr-card';
 const FILA_GUIA = 'border-outline-variant/50 bg-surface-container-low hover:bg-surface-container-low';
 const CELDA_GUIA = `h-auto py-tight text-xs font-semibold text-text-secondary ${BORDE_TARJETA}`;
 const FILA_TAREA = 'border-outline-variant/50 hover:bg-surface-container-low';
+/** Fila marcada (HU-202/T-382): mismo tinte verde que la tarjeta seleccionada del Kanban. */
+const FILA_SELECCIONADA = 'bg-primary/5 hover:bg-primary/5 data-[state=selected]:bg-primary/5';
 const CELDA_TAREA = BORDE_TARJETA;
 
 const TAMANO_PAGINA = 15;
@@ -114,7 +123,15 @@ function PrioridadBadge({ prioridad }: { prioridad: Prioridad }) {
 
 export default function TareasExplorerClient({ idProyecto }: Props) {
   const { data: proyecto, isLoading: isLoadingProyecto } = useProjectDetail(idProyecto);
-  const { tasks, isLoading, isError, refetch } = useProjectTasks(idProyecto);
+  const { tasks, isLoading, isError, refetch, accionMasiva } = useProjectTasks(idProyecto);
+  const { data: currentUser } = useCurrentUser();
+  // HU-202: solo el líder selecciona y actúa en bloque; para el resto la
+  // lista sigue siendo de solo lectura.
+  const isLeader = !!currentUser && !!proyecto && currentUser.idUsuario === proyecto.creador.idUsuario;
+  // Integrantes y etiquetas solo los usa la barra del líder: con id 0 las
+  // consultas quedan deshabilitadas para los demás.
+  const { members } = useProjectMembers(isLeader ? idProyecto : 0);
+  const { labels } = useProjectLabels(isLeader ? idProyecto : 0);
 
   const [busqueda, setBusqueda] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<string>(FILTRO_TODOS);
@@ -160,6 +177,26 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
     [tareasFiltradas, page],
   );
 
+  // Selección múltiple sobre la página visible: el rango con Shift sigue el
+  // orden de la tabla y al cambiar de página o de filtro se desmarca lo que
+  // deja de verse.
+  const idsPagina = useMemo(
+    () => (isLeader ? paginado.items.map((t) => t.idTarea) : []),
+    [isLeader, paginado.items],
+  );
+  const seleccion = useTaskSelection(idsPagina);
+  const tareasSeleccionadas = useMemo(
+    () => paginado.items.filter((t) => seleccion.seleccionadas.has(t.idTarea)),
+    [paginado.items, seleccion.seleccionadas],
+  );
+  const marcadasEnPagina = idsPagina.filter((id) => seleccion.seleccionadas.has(id)).length;
+  const estadoSeleccionTodas: boolean | 'indeterminate' =
+    marcadasEnPagina === 0 ? false : marcadasEnPagina === idsPagina.length ? true : 'indeterminate';
+  const alternarTodas = () => {
+    if (estadoSeleccionTodas === true) seleccion.deseleccionarVarias(idsPagina);
+    else seleccion.seleccionarVarias(idsPagina);
+  };
+
   // resumen sobre TODAS las tareas del proyecto (no solo la página ni el filtro)
   const resumen = useMemo(
     () => ({
@@ -187,7 +224,11 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
       <ProjectPageHeader
         back={{ href: `/dashboard/projects/${idProyecto}/kanban`, label: 'Volver al Tablero' }}
         title="Lista de tareas"
-        description="Vista de solo lectura de todas las tareas del proyecto. Para editar, abre el Kanban."
+        description={
+          isLeader
+            ? 'Todas las tareas del proyecto. Selecciona varias para moverlas, asignarlas o etiquetarlas a la vez; para editar una tarea, abre el Kanban.'
+            : 'Vista de solo lectura de todas las tareas del proyecto. Para editar, abre el Kanban.'
+        }
       >
         {isLoadingProyecto ? (
           <Skeleton className="mt-tight h-4 w-48" />
@@ -287,6 +328,17 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
         </Select>
       </section>
 
+      {isLeader && paginado.items.length > 0 && (
+        <p data-slot="ayuda-seleccion" className="mb-stack flex items-start gap-1.5 text-xs text-text-secondary">
+          <MousePointerClick className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+          <span className="hidden md:inline">
+            Haz clic en las filas o en sus casillas para seleccionar varias tareas; mantén <Kbd>Shift</Kbd> para
+            seleccionar un rango. <Kbd>Esc</Kbd> limpia la selección.
+          </span>
+          <span className="md:hidden">Toca las filas para seleccionar varias tareas.</span>
+        </p>
+      )}
+
       {/* tabla: la franja guía y las filas llegan al borde de la tarjeta, como en Mis Tareas */}
       <div className="card-base min-h-0 overflow-hidden p-0">
 
@@ -363,6 +415,16 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
             <Table>
               <TableHeader>
                 <TableRow className={FILA_GUIA}>
+                  {isLeader && (
+                    <TableHead scope="col" className={`w-10 ${CELDA_GUIA}`}>
+                      <Checkbox
+                        checked={estadoSeleccionTodas}
+                        onCheckedChange={alternarTodas}
+                        aria-label="Seleccionar todas las tareas de esta página"
+                        className="bg-surface-container-lowest"
+                      />
+                    </TableHead>
+                  )}
                   <TableHead scope="col" className={CELDA_GUIA}>Título</TableHead>
                   <TableHead scope="col" className={CELDA_GUIA}>Hito</TableHead>
                   <TableHead scope="col" className={CELDA_GUIA}>Estado</TableHead>
@@ -373,48 +435,78 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginado.items.map((tarea) => (
-                  <TableRow key={tarea.idTarea} className={FILA_TAREA}>
-                    <TableCell className={`max-w-sm whitespace-normal type-body font-semibold text-text-primary ${CELDA_TAREA}`}>
-                      {tarea.tituloTarea}
-                    </TableCell>
-                    <TableCell className={CELDA_TAREA}>
-                      <span className="type-meta">{tarea.hito?.tituloHito ?? 'Sin hito'}</span>
-                    </TableCell>
-                    <TableCell className={CELDA_TAREA}>
-                      <EstadoBadge estado={tarea.estadoTarea} />
-                    </TableCell>
-                    <TableCell className={CELDA_TAREA}>
-                      <PrioridadBadge prioridad={tarea.prioridad} />
-                    </TableCell>
-                    <TableCell className={CELDA_TAREA}>
-                      <span className="type-meta tabular-nums text-text-secondary">{formatFecha(tarea.fechaLimite)}</span>
-                    </TableCell>
-                    <TableCell className={CELDA_TAREA}>
-                      <span className="type-meta">
-                        {tarea.asignacionActiva
-                          ? `${tarea.asignacionActiva.usuario.nombre} ${tarea.asignacionActiva.usuario.apellido}`
-                          : 'Sin asignar'}
-                      </span>
-                    </TableCell>
-                    <TableCell className={CELDA_TAREA}>
-                      {tarea.etiquetas.length === 0 ? (
-                        <span className="type-meta">—</span>
-                      ) : (
-                        <div className="flex flex-wrap gap-micro">
-                          {tarea.etiquetas.map((etiqueta) => (
-                            <span
-                              key={etiqueta.idEtiqueta}
-                              className="pill pill-neutral"
-                            >
-                              {etiqueta.nombreEtiqueta}
-                            </span>
-                          ))}
-                        </div>
+                {paginado.items.map((tarea) => {
+                  const seleccionada = seleccion.estaSeleccionada(tarea.idTarea);
+                  const alternar = (rango: boolean) => seleccion.alternar(tarea.idTarea, { rango, orden: idsPagina });
+                  return (
+                    <TableRow
+                      key={tarea.idTarea}
+                      data-state={seleccionada ? 'selected' : undefined}
+                      onClick={isLeader ? (event) => alternar(event.shiftKey) : undefined}
+                      // Shift+clic no debe extender la selección de texto del navegador.
+                      onMouseDown={
+                        isLeader
+                          ? (event) => {
+                              if (event.shiftKey) event.preventDefault();
+                            }
+                          : undefined
+                      }
+                      className={`${FILA_TAREA} ${isLeader ? 'cursor-pointer' : ''} ${seleccionada ? FILA_SELECCIONADA : ''}`}
+                    >
+                      {isLeader && (
+                        <TableCell className={`w-10 ${CELDA_TAREA}`}>
+                          <Checkbox
+                            checked={seleccionada}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              alternar(event.shiftKey);
+                            }}
+                            aria-label={`Seleccionar "${tarea.tituloTarea}"`}
+                            className="bg-surface-container-lowest"
+                          />
+                        </TableCell>
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      <TableCell className={`max-w-sm whitespace-normal type-body font-semibold text-text-primary ${CELDA_TAREA}`}>
+                        {tarea.tituloTarea}
+                      </TableCell>
+                      <TableCell className={CELDA_TAREA}>
+                        <span className="type-meta">{tarea.hito?.tituloHito ?? 'Sin hito'}</span>
+                      </TableCell>
+                      <TableCell className={CELDA_TAREA}>
+                        <EstadoBadge estado={tarea.estadoTarea} />
+                      </TableCell>
+                      <TableCell className={CELDA_TAREA}>
+                        <PrioridadBadge prioridad={tarea.prioridad} />
+                      </TableCell>
+                      <TableCell className={CELDA_TAREA}>
+                        <span className="type-meta tabular-nums text-text-secondary">{formatFecha(tarea.fechaLimite)}</span>
+                      </TableCell>
+                      <TableCell className={CELDA_TAREA}>
+                        <span className="type-meta">
+                          {tarea.asignacionActiva
+                            ? `${tarea.asignacionActiva.usuario.nombre} ${tarea.asignacionActiva.usuario.apellido}`
+                            : 'Sin asignar'}
+                        </span>
+                      </TableCell>
+                      <TableCell className={CELDA_TAREA}>
+                        {tarea.etiquetas.length === 0 ? (
+                          <span className="type-meta">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-micro">
+                            {tarea.etiquetas.map((etiqueta) => (
+                              <span
+                                key={etiqueta.idEtiqueta}
+                                className="pill pill-neutral"
+                              >
+                                {etiqueta.nombreEtiqueta}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
         )}
@@ -452,6 +544,16 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
             Siguiente
           </Button>
         </nav>
+      )}
+
+      {isLeader && (
+        <TaskBulkActionsBar
+          tareas={tareasSeleccionadas}
+          members={members}
+          labels={labels}
+          accionMasiva={accionMasiva}
+          onLimpiar={seleccion.limpiar}
+        />
       )}
     </ProjectPageShell>
   );
