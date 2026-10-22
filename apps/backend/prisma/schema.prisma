@@ -275,6 +275,8 @@ enum TipoNotificacion {
   INSIGNIA_OBTENIDA
   // HU-200 (T-377): alguien mencionó al usuario con @ en un comentario de tarea, proyecto o hito.
   MENCION_COMENTARIO
+  // HU-205 (T-394): solicitud enviada desde la página de contacto, solo para administradores.
+  SOLICITUD_CONTACTO
 }
 
 enum EstadoAmistad {

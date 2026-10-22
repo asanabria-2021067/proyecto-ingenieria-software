@@ -136,6 +136,11 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   },
   CUENTA_VERIFICADA: { grupo: 'cuenta', etiqueta: 'Cuenta verificada', descripcion: 'Administración verifica tu cuenta.' },
   ALERTA_SEGURIDAD: { grupo: 'cuenta', etiqueta: 'Alerta de seguridad', descripcion: 'La plataforma detecta actividad inusual de acceso.' },
+  SOLICITUD_CONTACTO: {
+    grupo: 'cuenta',
+    etiqueta: 'Solicitud de contacto',
+    descripcion: 'Alguien escribe a administración desde la página de contacto.',
+  },
 };
 
 export interface NotificationPreferenceItem extends NotificationPreference {

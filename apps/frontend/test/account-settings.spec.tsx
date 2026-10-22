@@ -45,7 +45,7 @@ const FAMILIAS = [
   ['Horas y reconocimiento', 5],
   ['Recordatorios y calendario', 2],
   ['Red de contactos', 3],
-  ['Cuenta y seguridad', 4],
+  ['Cuenta y seguridad', 5],
 ] as const;
 
 const familia = (titulo: string) => screen.getByRole('button', { name: new RegExp(`^${titulo}`) });
