@@ -26,7 +26,7 @@ export const AUTH_INPUT_COMPACT = `${AUTH_INPUT_BASE} py-3`;
 export const AUTH_FIELD_ERROR = 'text-xs text-error text-left';
 
 export const AUTH_PRIMARY_BUTTON =
-  'w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary dark:hover:bg-[#153e26] active:scale-[0.98] disabled:opacity-60';
+  'w-full rounded-md bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary dark:hover:bg-[#153e26] active:scale-[0.98] disabled:opacity-60';
 
 interface AuthSplitLayoutProps {
   /** Mensaje institucional superpuesto sobre la fotografía. */
