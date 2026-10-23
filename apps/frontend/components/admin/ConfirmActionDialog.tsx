@@ -53,7 +53,7 @@ export function ConfirmActionDialog({
         <AlertDialogFooter>
           <AlertDialogCancel
             onClick={onCancel}
-            className="rounded-control border-outline-variant text-on-surface hover:bg-surface-container-high"
+            className="rounded-md border-outline-variant text-on-surface hover:bg-surface-container-high"
           >
             Cancelar
           </AlertDialogCancel>
