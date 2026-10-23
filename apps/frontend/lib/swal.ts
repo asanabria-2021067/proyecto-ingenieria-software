@@ -13,7 +13,7 @@ export const swalCustomClass = {
   title: 'type-section text-text-primary mt-tight',
   htmlContainer: 'type-body text-text-secondary mt-micro',
   confirmButton: 'rounded-md bg-primary px-card py-tight text-body font-medium text-on-primary hover:bg-primary/90 transition-colors',
-  cancelButton: 'rounded-control bg-transparent border border-outline-variant px-card py-tight text-body font-medium text-text-primary hover:bg-muted transition-colors',
+  cancelButton: 'rounded-md bg-transparent border border-outline-variant px-card py-tight text-body font-medium text-text-primary hover:bg-muted transition-colors',
   actions: 'gap-inline mt-stack w-full justify-center',
   icon: 'scale-75 mb-0', // Make the icon smaller and reduce margin
 };
