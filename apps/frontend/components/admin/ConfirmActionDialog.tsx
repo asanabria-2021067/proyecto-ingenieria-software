@@ -24,11 +24,11 @@ interface ConfirmActionDialogProps {
 
 const actionClasses: Record<string, string> = {
   destructive:
-    'bg-error text-on-error hover:bg-error/90 rounded-control px-4 py-2 text-sm font-bold transition-colors',
+    'bg-error text-on-error hover:bg-error/90 rounded-md px-4 py-2 text-sm font-bold transition-colors',
   warning:
-    'bg-amber-600 text-white hover:bg-amber-700 rounded-control px-4 py-2 text-sm font-bold transition-colors',
+    'bg-amber-600 text-white hover:bg-amber-700 rounded-md px-4 py-2 text-sm font-bold transition-colors',
   default:
-    'bg-primary text-on-primary hover:bg-primary/90 rounded-control px-4 py-2 text-sm font-bold transition-colors',
+    'bg-primary text-on-primary hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-bold transition-colors',
 };
 
 export function ConfirmActionDialog({
