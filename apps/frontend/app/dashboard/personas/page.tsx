@@ -163,12 +163,14 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
       )}
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2.5 border-t border-outline-variant pt-tight">
-        <Link
-          href={`/dashboard/personas/${usuario.idUsuario}`}
-          className="type-meta inline-flex h-8 items-center rounded-control px-tight font-semibold text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="h-8 rounded-md px-2.5 text-xs font-bold text-primary hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/30"
         >
-          Ver perfil
-        </Link>
+          <Link href={`/dashboard/personas/${usuario.idUsuario}`}>Ver perfil</Link>
+        </Button>
         <Button
           size="sm"
           variant={amistad.variant}
