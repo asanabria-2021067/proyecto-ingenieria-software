@@ -205,7 +205,7 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
 
   return (
-    <article className="card-base flex items-center gap-tight py-tight transition-shadow hover:shadow-raised">
+    <article className="card-base flex flex-wrap items-center gap-tight py-tight transition-shadow hover:shadow-raised">
       <ConfirmActionDialog {...confirmarEliminarAmistad} />
       <Avatar className="size-11 shrink-0">
         {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
@@ -214,7 +214,7 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
         </AvatarFallback>
       </Avatar>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 grow basis-56">
         <div className="flex flex-wrap items-center gap-tight">
           <p className="type-subtitle text-text-primary">{nombreCompleto}</p>
           {usuario.semestre != null && (
@@ -234,7 +234,7 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-tight">
+      <div className="ml-auto flex shrink-0 items-center gap-tight">
         <div className="flex items-center justify-center gap-2">
           <BotonesPersona usuario={usuario} amistad={amistad} />
         </div>
