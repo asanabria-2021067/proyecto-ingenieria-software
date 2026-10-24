@@ -356,7 +356,7 @@ export default function MyProjectViewClient({ id }: Props) {
           <>
             <button
               onClick={cancelEdit}
-              className="flex items-center gap-2 rounded-md bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+              className="flex items-center gap-2 rounded-md bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface motion-control motion-focus hover:bg-primary hover:text-on-primary"
             >
               <ArrowLeft className="h-4 w-4" />
               Cancelar
@@ -375,7 +375,7 @@ export default function MyProjectViewClient({ id }: Props) {
           <>
             <Link
               href={volverHref}
-              className="flex items-center gap-2 rounded-md bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+              className="flex items-center gap-2 rounded-md bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface motion-control motion-focus hover:bg-primary hover:text-on-primary"
             >
               <ArrowLeft className="h-4 w-4" />
               Volver
