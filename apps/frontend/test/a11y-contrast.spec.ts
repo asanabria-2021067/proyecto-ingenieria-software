@@ -124,10 +124,45 @@ describe('Paleta salvia del estudiante: sidebar y tarjeta de bienvenida', () => 
     }
   });
 
+  // «Neutro elegante» (solo claro): en oscuro los `sage-nav-*` son referencias a los `sage-*` ya medidos.
+  it.each([
+    ['ink', 'surface'],
+    ['ink', 'header'],
+    ['ink', 'open'],
+    ['ink', 'hover'],
+    ['ink', 'active'],
+    ['ink-soft', 'surface'],
+    ['ink-soft', 'open'],
+    ['ink-soft', 'active'],
+    ['ink-muted', 'surface'],
+    ['ink-muted', 'header'],
+    ['ink-muted', 'open'],
+    ['ink-muted', 'active'],
+  ] as const)('sidebar neutra: texto %s sobre %s alcanza AA en claro', (texto, fondo) => {
+    expect(contraste(rgb(token(`sage-nav-${texto}`, 'claro')), rgb(token(`sage-nav-${fondo}`, 'claro')))).toBeGreaterThanOrEqual(AA_TEXTO_NORMAL);
+  });
+
+  it.each([
+    ['icon', 'surface'],
+    ['icon', 'open'],
+    ['icon', 'hover'],
+    ['icon', 'active'],
+    ['accent', 'surface'],
+    ['accent', 'active'],
+  ] as const)('sidebar neutra: %s sobre %s alcanza 3:1 en claro', (color, fondo) => {
+    expect(contraste(rgb(token(`sage-nav-${color}`, 'claro')), rgb(token(`sage-nav-${fondo}`, 'claro')))).toBeGreaterThanOrEqual(AA_GRAFICO);
+  });
+
+  it('en oscuro la sidebar del estudiante conserva la paleta salvia', () => {
+    const oscuro = css.slice(css.indexOf('\n.dark {'));
+    expect(oscuro).toContain('--color-sage-nav-surface: var(--color-sage-surface);');
+    expect(oscuro).toContain('--color-sage-nav-active: var(--color-sage-active);');
+  });
+
   it('la sidebar del estudiante solo reasigna los tokens `--admin-*` dentro de su propia clase', () => {
     expect(leer('components/dashboard/DashboardLayout.tsx')).toMatch(/admin-sidebar student-sidebar/);
     expect(leer('components/admin/AdminLayout.tsx')).not.toContain('student-');
-    expect(css).toMatch(/\.student-sidebar,\n\.student-account-menu \{[^}]*--admin-bg: var\(--color-sage-surface\);/);
+    expect(css).toMatch(/\.student-sidebar,\n\.student-account-menu \{[^}]*--admin-bg: var\(--color-sage-nav-surface\);/);
   });
 });
 

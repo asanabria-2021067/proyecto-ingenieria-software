@@ -154,6 +154,22 @@
   --color-sage-kpi-border: #cddcc6;
   --color-sage-track: #e6efe2;
 
+  /* «Neutro elegante»: solo la sidebar del estudiante (y su menú de cuenta) en modo claro.
+     Fondo casi blanco que se integra con la navbar y las tarjetas; el salvia queda para la
+     navegación activa, los iconos y acentos. La tarjeta de bienvenida sigue con `sage-*`.
+     Contraste AA medido: tinta ≥ 9:1, soft ≥ 6.8:1, muted ≥ 4.8:1, iconos/acento ≥ 3.3:1. */
+  --color-sage-nav-surface: #fafcfb;
+  --color-sage-nav-header: #ffffff;
+  --color-sage-nav-open: #eff4f0;
+  --color-sage-nav-hover: #e3eee5;
+  --color-sage-nav-active: #d7e9db;
+  --color-sage-nav-border: #e0e8e2;
+  --color-sage-nav-accent: #238451;
+  --color-sage-nav-icon: #438860;
+  --color-sage-nav-ink: #293b32;
+  --color-sage-nav-ink-soft: #3a5043;
+  --color-sage-nav-ink-muted: #4f675a;
+
   /* HU-190: anillo de nivel de las insignias. Solo gráfico: el nombre del nivel
      siempre va también en texto. Ver docs/design-system.md. */
   --color-insignia-bronce: #cd7f32;
@@ -191,6 +207,19 @@
   --color-sage-kpi: #22342b;
   --color-sage-kpi-border: #34493d;
   --color-sage-track: #34493d;
+
+  /* En oscuro la sidebar del estudiante conserva la paleta salvia aprobada. */
+  --color-sage-nav-surface: var(--color-sage-surface);
+  --color-sage-nav-header: var(--color-sage-surface);
+  --color-sage-nav-open: var(--color-sage-open);
+  --color-sage-nav-hover: var(--color-sage-hover);
+  --color-sage-nav-active: var(--color-sage-active);
+  --color-sage-nav-border: var(--color-sage-border);
+  --color-sage-nav-accent: var(--color-sage-accent);
+  --color-sage-nav-icon: var(--color-sage-accent);
+  --color-sage-nav-ink: var(--color-sage-ink);
+  --color-sage-nav-ink-soft: var(--color-sage-ink-soft);
+  --color-sage-nav-ink-muted: var(--color-sage-ink-muted);
 
   /* Sobre el salvia de revisión: texto blanco en claro, negro en oscuro. */
   --color-on-review: #000000;
@@ -1094,28 +1123,34 @@ button:disabled {
 }
 
 /* Sidebar del estudiante: la misma carcasa que la del administrador (`.admin-sidebar`) con la
-   paleta salvia. Solo redefine los tokens `--admin-*` dentro de su sidebar y de su menú de
-   cuenta (que se pinta en un portal); la del administrador no cambia. */
+   paleta `sage-nav-*` (neutra en claro, salvia en oscuro). Solo redefine los tokens `--admin-*`
+   dentro de su sidebar y de su menú de cuenta (que se pinta en un portal); la del administrador
+   no cambia. El avatar y «Cerrar sesión» siguen con los tokens `sage-*`. */
 .student-sidebar,
 .student-account-menu {
-  --admin-bg: var(--color-sage-surface);
-  --admin-border: var(--color-sage-border);
-  --admin-text: var(--color-sage-ink);
-  --admin-text-muted: var(--color-sage-ink-muted);
-  --admin-text-dim: var(--color-sage-ink-soft);
-  --admin-ink: var(--color-sage-ink);
-  --admin-ink-muted: var(--color-sage-ink-soft);
-  --admin-ink-secondary: var(--color-sage-ink-muted);
-  --admin-icon: var(--color-sage-accent);
-  --admin-graphite-surface: var(--color-sage-open);
-  --admin-graphite-hover: var(--color-sage-hover);
-  --admin-graphite-active: var(--color-sage-active);
-  --admin-graphite-border: var(--color-sage-active);
-  --admin-lime: var(--color-sage-accent);
+  --admin-bg: var(--color-sage-nav-surface);
+  --admin-border: var(--color-sage-nav-border);
+  --admin-text: var(--color-sage-nav-ink);
+  --admin-text-muted: var(--color-sage-nav-ink-muted);
+  --admin-text-dim: var(--color-sage-nav-ink-soft);
+  --admin-ink: var(--color-sage-nav-ink);
+  --admin-ink-muted: var(--color-sage-nav-ink-soft);
+  --admin-ink-secondary: var(--color-sage-nav-ink-muted);
+  --admin-icon: var(--color-sage-nav-icon);
+  --admin-graphite-surface: var(--color-sage-nav-open);
+  --admin-graphite-hover: var(--color-sage-nav-hover);
+  --admin-graphite-active: var(--color-sage-nav-active);
+  --admin-graphite-border: var(--color-sage-nav-border);
+  --admin-lime: var(--color-sage-nav-accent);
   --admin-avatar-bg: var(--color-sage-avatar);
   --admin-avatar-fg: var(--color-sage-on-avatar);
-  --admin-menu-border: var(--color-sage-border);
+  --admin-menu-border: var(--color-sage-nav-border);
   --admin-menu-danger: var(--color-sage-danger);
+}
+
+/* Cabecera de marca en blanco puro en claro (en oscuro es el mismo fondo de la sidebar). */
+.student-sidebar .admin-sidebar-brand {
+  background-color: var(--color-sage-nav-header);
 }
 
 /* El menú de cuenta del estudiante va sobre una superficie clara en modo claro: sombra más suave. */

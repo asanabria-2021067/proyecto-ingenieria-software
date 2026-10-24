@@ -44,11 +44,8 @@ import { searchProjects } from '@/lib/services/projects';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
 import type { EstadoPostulacion, ProyectoResumen, TipoProyecto } from '@/types';
 import { apiFetch } from '@/lib/api/client';
-import {
-  estadoBadgeLabel,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
-} from '@/components/projects/available-project-card';
+import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
 import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
@@ -269,10 +266,8 @@ function DashboardProjectCard({
     <article className="card-base group flex min-h-52 flex-col">
       <div className="mb-stack flex items-start justify-between gap-tight">
         <div className="flex flex-wrap items-center gap-tight">
-          <span className="pill pill-neutral">
-            {tipoBadgeLabel(project.tipoProyecto)}
-          </span>
-          <span className="pill pill-neutral">
+          <TipoBadge tipo={project.tipoProyecto} />
+          <span className={`pill ${estadoBadgeStyle(project.estadoProyecto)}`}>
             {estadoBadgeLabel(project.estadoProyecto)}
           </span>
         </div>
@@ -292,7 +287,7 @@ function DashboardProjectCard({
           <Clock className="size-4" aria-hidden="true" />
           {project.modalidadProyecto}
         </span>
-        <Button asChild size="sm">
+        <Button asChild size="sm" className="text-[13px] font-semibold">
           <Link
             href={`/dashboard/proyectos/${project.idProyecto}`}
             aria-label={`Ver ${project.tituloProyecto}`}
