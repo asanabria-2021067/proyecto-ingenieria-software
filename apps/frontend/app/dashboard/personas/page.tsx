@@ -103,8 +103,9 @@ function textoMotivo(usuario: UsuarioBusquedaDto): string | null {
 /** Tarjeta con avatar, nombre y carrera centrados; etiquetas agrupadas; y las
  * acciones ancladas abajo (`mt-auto`) para que todas midan lo mismo en la rejilla.
  * «Agregar como amigo» reutiliza el botón negro de «Ver proyecto» y «Solicitud
- * enviada» el de «Ver mi solicitud» de Mis Proyectos. "Ver perfil" lleva a la
- * página de detalle, no a un panel lateral (ahí caben los amigos en común). */
+ * enviada» el de «Ver mi solicitud» de Mis Proyectos; van en una fila con
+ * «Ver perfil» a la izquierda. "Ver perfil" lleva a la página de detalle, no a
+ * un panel lateral (ahí caben los amigos en común). */
 function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const { amistad, seguimiento, confirmarEliminarAmistad } = useAccionesAmistad(usuario);
   const motivo = textoMotivo(usuario);
@@ -160,18 +161,10 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
         </div>
       )}
 
-      <div className="mt-auto flex flex-col items-center gap-tight border-t border-outline-variant pt-tight">
-        <Button
-          variant={amistad.variant}
-          disabled={amistad.disabled}
-          onClick={amistad.onClick}
-          className={`h-9.5 w-full rounded-md text-[13px] font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-primary/30 ${tonoAmistad}`}
-        >
-          {amistad.label}
-        </Button>
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2.5 border-t border-outline-variant pt-tight">
         <Link
           href={`/dashboard/personas/${usuario.idUsuario}`}
-          className="group/perfil type-meta inline-flex items-center gap-micro rounded-control px-tight py-micro font-semibold text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="group/perfil type-meta inline-flex h-8 items-center gap-micro rounded-control px-tight font-semibold text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         >
           Ver perfil
           <ArrowRight
@@ -179,6 +172,15 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
             aria-hidden="true"
           />
         </Link>
+        <Button
+          size="sm"
+          variant={amistad.variant}
+          disabled={amistad.disabled}
+          onClick={amistad.onClick}
+          className={`h-8 rounded-md px-3 text-xs font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-primary/30 ${tonoAmistad}`}
+        >
+          {amistad.label}
+        </Button>
       </div>
     </article>
   );
