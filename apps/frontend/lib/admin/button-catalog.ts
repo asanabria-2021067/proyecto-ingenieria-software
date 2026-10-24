@@ -82,7 +82,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
       etiqueta: 'Acciones del proyecto',
       archivo: 'components/projects/navigation/project-actions-menu.tsx',
       clases: [
-        'flex size-8 shrink-0 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-surface-container-high hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+        'flex size-8 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-surface-container-high hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
       ],
       soloIcono: true,
     },
