@@ -100,6 +100,39 @@ function textoMotivo(usuario: UsuarioBusquedaDto): string | null {
   return null;
 }
 
+/** Medidas compactas comunes a los dos botones de Personas; `cn` (tailwind-merge)
+ * las impone sobre las del botón de «Ver proyecto» sin tocar su apariencia. */
+const ACCION_PERSONA = 'h-8 rounded-md px-3 text-xs font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-primary/30';
+
+/** «Ver perfil» (UI negra de «Ver proyecto») y el botón de amistad (verde
+ * institucional, o «Ver mi solicitud» si ya se envió). Lo comparten la tarjeta
+ * y la fila de lista; quien lo usa decide cómo centrar o agrupar. */
+function BotonesPersona({
+  usuario,
+  amistad,
+}: {
+  usuario: UsuarioBusquedaDto;
+  amistad: ReturnType<typeof useAccionesAmistad>['amistad'];
+}) {
+  const solicitudEnviada = usuario.solicitudPendiente?.direccion === 'enviada' && !usuario.esAmigo;
+  const tono = amistad.variant === 'default' ? REQUEST_INBOX_BUTTON_GREEN : solicitudEnviada ? BOTON_EN_REVISION : '';
+  return (
+    <>
+      <Button asChild className={`${PROJECT_ACTION_BUTTON_CLASS} ${ACCION_PERSONA}`}>
+        <Link href={`/dashboard/personas/${usuario.idUsuario}`}>Ver perfil</Link>
+      </Button>
+      <Button
+        variant={amistad.variant}
+        disabled={amistad.disabled}
+        onClick={amistad.onClick}
+        className={`${ACCION_PERSONA} ${tono}`}
+      >
+        {amistad.label}
+      </Button>
+    </>
+  );
+}
+
 /** Tarjeta con avatar, nombre y carrera centrados; etiquetas agrupadas; y las
  * acciones ancladas abajo (`mt-auto`) para que todas midan lo mismo en la rejilla.
  * «Agregar como amigo» reutiliza el botón verde institucional de la bandeja de
@@ -111,9 +144,6 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const { amistad, seguimiento, confirmarEliminarAmistad } = useAccionesAmistad(usuario);
   const motivo = textoMotivo(usuario);
   const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
-  const solicitudEnviada = usuario.solicitudPendiente?.direccion === 'enviada' && !usuario.esAmigo;
-  const tonoAmistad =
-    amistad.variant === 'default' ? REQUEST_INBOX_BUTTON_GREEN : solicitudEnviada ? BOTON_EN_REVISION : '';
 
   return (
     <article className="@container card-base interactive-lift group relative flex h-full min-w-0 flex-col gap-tight hover:border-outline-variant hover:shadow-raised">
@@ -163,17 +193,7 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
       )}
 
       <div className="mt-auto flex flex-wrap items-center justify-center gap-2 border-t border-outline-variant pt-tight">
-        <Button asChild className={`${PROJECT_ACTION_BUTTON_CLASS} focus-visible:ring-2 focus-visible:ring-primary/30`}>
-          <Link href={`/dashboard/personas/${usuario.idUsuario}`}>Ver perfil</Link>
-        </Button>
-        <Button
-          variant={amistad.variant}
-          disabled={amistad.disabled}
-          onClick={amistad.onClick}
-          className={`h-9.5 rounded-md px-4.5 text-[13px] font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-primary/30 ${tonoAmistad}`}
-        >
-          {amistad.label}
-        </Button>
+        <BotonesPersona usuario={usuario} amistad={amistad} />
       </div>
     </article>
   );
