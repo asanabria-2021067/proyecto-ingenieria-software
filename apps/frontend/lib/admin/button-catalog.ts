@@ -133,7 +133,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Explorar proyectos',
       archivo: 'app/dashboard/projects/mine/page.tsx',
-      clases: ['inline-flex items-center justify-center rounded-xl border border-outline-variant bg-surface-container-lowest px-5 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-surface-container'],
+      clases: ['inline-flex items-center justify-center rounded-md border border-outline-variant bg-surface-container-lowest px-5 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-surface-container'],
     },
     {
       etiqueta: 'Limpiar filtros (Gestión de Usuarios)',
