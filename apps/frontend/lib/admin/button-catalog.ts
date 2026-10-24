@@ -45,7 +45,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Cambiar tema',
       archivo: 'components/theme-toggle.tsx',
-      clases: ['flex size-10 items-center justify-center rounded-control bg-muted text-text-primary transition-colors hover:bg-surface-container-high'],
+      clases: ['flex size-10 items-center justify-center rounded-md bg-muted text-text-primary transition-colors hover:bg-surface-container-high'],
       soloIcono: true,
     },
     {
