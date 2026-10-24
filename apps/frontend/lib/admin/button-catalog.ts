@@ -121,7 +121,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Cancelar (Mi proyecto, estudiante)',
       archivo: 'app/dashboard/projects/mine/[id]/my-project-view-client.tsx',
-      clases: ['flex items-center gap-2 rounded-xl bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary'],
+      clases: ['flex items-center gap-2 rounded-md bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary'],
     },
   ],
   estadoVacio: [
