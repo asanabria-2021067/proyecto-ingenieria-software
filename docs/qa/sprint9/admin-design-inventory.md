@@ -128,7 +128,7 @@ literales: el árbol queda en 42 archivos.
 | Medida | Antes | Después |
 |---|---:|---:|
 | Tamaños literales | 47 | 2 |
-| Radios literales | 68 | 28 |
+| Radios literales | 68 | 29 |
 | Titulares fuera de la escala | 2 | 0 |
 | Archivos sin ningún literal de tamaño o radio | — | 27 de 42 |
 
@@ -154,7 +154,7 @@ actualizarla, hace fallar la prueba.
 | `app/dashboard/admin/proyectos/[id]/admin-project-detail-client.tsx` | `rounded-lg`, `rounded-md` | Sin token de igual valor |
 | `app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx` | 4 × `rounded-lg`, `rounded-md`, `text-[13px]` | Sin token de igual valor; el texto de 13 px es el de los botones de acción en móvil, donde 14 px no cabe |
 | `app/dashboard/admin/proyectos/admin-projects-client.tsx` | `rounded-lg` | Sin token de igual valor |
-| `app/dashboard/admin/solicitudes-recuperacion/page.tsx` | 2 × `rounded-lg` | Sin token de igual valor |
+| `app/dashboard/admin/solicitudes-recuperacion/page.tsx` | 2 × `rounded-lg`, `rounded-md` | Sin token de igual valor |
 | `app/dashboard/admin/sprints/admin-sprints-client.tsx` | `rounded-md` | Sin token de igual valor |
 | `app/dashboard/admin/usuarios/page.tsx` | `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
 | `components/admin/AdminLayout.tsx` | `rounded-lg`, `rounded-md` | Tarjeta del logotipo |

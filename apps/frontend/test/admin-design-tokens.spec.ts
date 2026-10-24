@@ -41,7 +41,7 @@ const LINEA_BASE: Record<string, Medida> = {
 const ESTADO_ACTUAL: Record<string, Medida> = {
   '/dashboard/admin': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/usuarios': { px: 0, radio: 1, hex: 0, boton: 2, titular: true },
-  '/dashboard/admin/solicitudes-recuperacion': { px: 0, radio: 2, hex: 0, boton: 2, titular: true },
+  '/dashboard/admin/solicitudes-recuperacion': { px: 0, radio: 3, hex: 0, boton: 2, titular: true },
   // Al pasar a la tabla compartida perdió su radio literal y sus tres `<button>` propios.
   '/dashboard/admin/cuentas-pendientes': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },

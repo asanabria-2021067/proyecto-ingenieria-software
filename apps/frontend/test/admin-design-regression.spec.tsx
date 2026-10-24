@@ -23,7 +23,7 @@ const EXCEPCIONES: Record<string, string[]> = {
   'app/dashboard/admin/proyectos/[id]/admin-project-detail-client.tsx': ['rounded-lg', 'rounded-md'],
   'app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-md', 'text-[13px]'],
   'app/dashboard/admin/proyectos/admin-projects-client.tsx': ['rounded-lg'],
-  'app/dashboard/admin/solicitudes-recuperacion/page.tsx': ['rounded-lg', 'rounded-lg'],
+  'app/dashboard/admin/solicitudes-recuperacion/page.tsx': ['rounded-lg', 'rounded-lg', 'rounded-md'],
   'app/dashboard/admin/sprints/admin-sprints-client.tsx': ['rounded-md'],
   'app/dashboard/admin/usuarios/page.tsx': ['rounded-md'],
   'components/admin/AdminLayout.tsx': ['rounded-lg', 'rounded-md'],
@@ -77,7 +77,7 @@ describe('FG07-C04: el inventario registra el antes y el después', () => {
 
   it('declara los totales medidos del árbol completo, antes y después', () => {
     expect(inventario).toContain('| Tamaños literales | 47 | 2 |');
-    expect(inventario).toContain('| Radios literales | 68 | 28 |');
+    expect(inventario).toContain('| Radios literales | 68 | 29 |');
   });
 
   it('enumera cada excepción que esta prueba fija', () => {
