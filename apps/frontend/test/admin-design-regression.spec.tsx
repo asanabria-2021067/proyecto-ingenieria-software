@@ -25,12 +25,15 @@ const EXCEPCIONES: Record<string, string[]> = {
   'app/dashboard/admin/proyectos/admin-projects-client.tsx': ['rounded-lg'],
   'app/dashboard/admin/solicitudes-recuperacion/page.tsx': ['rounded-lg', 'rounded-lg'],
   'app/dashboard/admin/sprints/admin-sprints-client.tsx': ['rounded-md'],
+  'app/dashboard/admin/usuarios/page.tsx': ['rounded-md'],
   'components/admin/AdminLayout.tsx': ['rounded-lg', 'rounded-md'],
   'components/admin/ConfirmActionDialog.tsx': ['rounded-md', 'rounded-md', 'rounded-md', 'rounded-md'],
   'components/admin/ProjectFeedbackSheet.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg'],
   'components/admin/ProjectReviewSheet.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg'],
   'components/admin/RevisionHistoryPanel.tsx': ['rounded-lg'],
   'components/admin/UserDetailSheet.tsx': ['rounded-md'],
+  'components/admin/security/security-events-filters.tsx': ['rounded-md'],
+  'components/admin/security/security-events-table.tsx': ['rounded-md'],
   'components/admin/sprints/sprint-month-view.tsx': ['text-[15px]'],
 };
 
@@ -52,12 +55,12 @@ describe('FG07-C04: regresión del diseño administrativo', () => {
     expect([...valores].sort()).toEqual(['rounded-lg', 'rounded-md', 'text-[13px]', 'text-[15px]']);
   });
 
-  it('30 de los 42 archivos del árbol quedan sin ningún literal', () => {
+  it('27 de los 42 archivos del árbol quedan sin ningún literal', () => {
     // 40 al cerrar T-320; entró la página propia de «Tendencias de uso» y salió el catálogo temporal de
     // etiquetas, ninguna de las dos con literales; después entraron la pantalla de anuncios (HU-191) y el
     // catálogo temporal de botones, tampoco con literales.
     expect(ARBOL).toHaveLength(42);
-    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(30);
+    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(27);
   });
 });
 
@@ -74,7 +77,7 @@ describe('FG07-C04: el inventario registra el antes y el después', () => {
 
   it('declara los totales medidos del árbol completo, antes y después', () => {
     expect(inventario).toContain('| Tamaños literales | 47 | 2 |');
-    expect(inventario).toContain('| Radios literales | 68 | 25 |');
+    expect(inventario).toContain('| Radios literales | 68 | 28 |');
   });
 
   it('enumera cada excepción que esta prueba fija', () => {

@@ -39,14 +39,14 @@ describe('FG07-C03: superficies administrativas sobre tokens', () => {
     expect(leer(archivo)).not.toMatch(/text-\[1[01]px\]/);
   });
 
-  it('en todo el árbol quedan 2 tamaños y 25 radios literales, todos sin token de igual valor', () => {
+  it('en todo el árbol quedan 2 tamaños y 28 radios literales, todos sin token de igual valor', () => {
     const total = ARBOL.map((archivo) => medir(leer(archivo))).reduce(
       (suma, m) => ({ px: suma.px + m.px, radio: suma.radio + m.radio, hex: suma.hex + m.hex }),
       { px: 0, radio: 0, hex: 0 },
     );
     // Línea base del mismo árbol en 7091a310: 46 tamaños y 63 radios; con la vista de cuentas
     // pendientes (HU-179, PR #270) tal como llegó, 47 y 68.
-    expect(total).toEqual({ px: 2, radio: 25, hex: 0 });
+    expect(total).toEqual({ px: 2, radio: 28, hex: 0 });
     // Los radios que quedan son rounded-lg y rounded-md: no existe un token con su valor.
     const restantes = ARBOL.flatMap((archivo) => leer(archivo).match(/(?<![\w-])rounded-(?:md|lg|xl|2xl|3xl)\b/g) ?? []);
     expect(new Set(restantes)).toEqual(new Set(['rounded-lg', 'rounded-md']));

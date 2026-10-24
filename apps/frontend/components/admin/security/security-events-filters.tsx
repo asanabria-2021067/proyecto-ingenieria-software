@@ -24,7 +24,7 @@ const CONTROL = DASHBOARD_FILTER_TRIGGER_CLASS;
 const SELECT = `w-full ${CONTROL} data-[size=default]:h-11.5`;
 // Mismo botón compacto que «Ver perfil» en Gestión de Usuarios; el realce solo aplica cuando está activo.
 const LIMPIAR =
-  'flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-tag bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface transition-all enabled:hover:bg-primary enabled:hover:text-on-primary disabled:cursor-not-allowed disabled:opacity-50';
+  'flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface transition-all enabled:hover:bg-primary enabled:hover:text-on-primary disabled:cursor-not-allowed disabled:opacity-50';
 const ERROR = 'type-meta text-error';
 
 /**

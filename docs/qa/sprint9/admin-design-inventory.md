@@ -128,9 +128,9 @@ literales: el árbol queda en 42 archivos.
 | Medida | Antes | Después |
 |---|---:|---:|
 | Tamaños literales | 47 | 2 |
-| Radios literales | 68 | 25 |
+| Radios literales | 68 | 28 |
 | Titulares fuera de la escala | 2 | 0 |
-| Archivos sin ningún literal de tamaño o radio | — | 30 de 42 |
+| Archivos sin ningún literal de tamaño o radio | — | 27 de 42 |
 
 Qué se hizo con cada diferencia de la sección 4:
 
@@ -156,12 +156,15 @@ actualizarla, hace fallar la prueba.
 | `app/dashboard/admin/proyectos/admin-projects-client.tsx` | `rounded-lg` | Sin token de igual valor |
 | `app/dashboard/admin/solicitudes-recuperacion/page.tsx` | 2 × `rounded-lg` | Sin token de igual valor |
 | `app/dashboard/admin/sprints/admin-sprints-client.tsx` | `rounded-md` | Sin token de igual valor |
+| `app/dashboard/admin/usuarios/page.tsx` | `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
 | `components/admin/AdminLayout.tsx` | `rounded-lg`, `rounded-md` | Tarjeta del logotipo |
 | `components/admin/ConfirmActionDialog.tsx` | 4 × `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
 | `components/admin/ProjectFeedbackSheet.tsx` | 3 × `rounded-lg` | Sin token de igual valor |
 | `components/admin/ProjectReviewSheet.tsx` | 3 × `rounded-lg` | Sin token de igual valor |
 | `components/admin/RevisionHistoryPanel.tsx` | `rounded-lg` | Sin token de igual valor |
 | `components/admin/UserDetailSheet.tsx` | `rounded-md` | Sin token de igual valor |
+| `components/admin/security/security-events-filters.tsx` | `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
+| `components/admin/security/security-events-table.tsx` | `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
 | `components/admin/sprints/sprint-month-view.tsx` | `text-[15px]` | Texto denso del calendario de Sprints |
 
 Otras excepciones:
