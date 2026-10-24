@@ -327,7 +327,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Quitar invitado',
       archivo: 'components/calendar/invitados-field.tsx',
-      clases: ['inline-flex size-6 shrink-0 items-center justify-center rounded-pill text-text-secondary transition-colors hover:bg-surface-container hover:text-text-primary'],
+      clases: ['inline-flex size-6 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-surface-container hover:text-text-primary'],
       soloIcono: true,
     },
   ],
