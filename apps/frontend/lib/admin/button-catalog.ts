@@ -265,13 +265,13 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Vista en tarjetas (activa)',
       archivo: 'app/dashboard/personas/page.tsx',
-      clases: ['flex size-8 items-center justify-center rounded-control transition-colors', 'bg-action text-on-action'],
+      clases: ['flex size-8 items-center justify-center rounded-control motion-select', 'bg-action text-on-action'],
       soloIcono: true,
     },
     {
       etiqueta: 'Vista en lista',
       archivo: 'app/dashboard/personas/page.tsx',
-      clases: ['flex size-8 items-center justify-center rounded-control transition-colors', 'text-text-secondary hover:bg-muted hover:text-text-primary'],
+      clases: ['flex size-8 items-center justify-center rounded-control motion-select', 'text-text-secondary hover:bg-muted hover:text-text-primary'],
       soloIcono: true,
     },
     {

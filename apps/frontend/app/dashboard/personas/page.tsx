@@ -567,7 +567,7 @@ export default function PersonasPage() {
                     aria-label="Ver como tarjetas"
                     aria-pressed={vista === 'tarjetas'}
                     onClick={() => setVista('tarjetas')}
-                    className={`flex size-8 items-center justify-center rounded-control transition-colors ${
+                    className={`flex size-8 items-center justify-center rounded-control motion-select ${
                       vista === 'tarjetas'
                         ? 'bg-action text-on-action'
                         : 'text-text-secondary hover:bg-muted hover:text-text-primary'
@@ -585,7 +585,7 @@ export default function PersonasPage() {
                     aria-label="Ver como lista"
                     aria-pressed={vista === 'lista'}
                     onClick={() => setVista('lista')}
-                    className={`flex size-8 items-center justify-center rounded-control transition-colors ${
+                    className={`flex size-8 items-center justify-center rounded-control motion-select ${
                       vista === 'lista'
                         ? 'bg-action text-on-action'
                         : 'text-text-secondary hover:bg-muted hover:text-text-primary'
