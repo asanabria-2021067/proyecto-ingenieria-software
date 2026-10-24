@@ -321,7 +321,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Descartar anuncio',
       archivo: 'components/anuncios/anuncio-banner.tsx',
-      clases: ['flex size-8 shrink-0 items-center justify-center rounded-control hover:bg-black/10 focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:bg-white/10'],
+      clases: ['flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-black/10 focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:bg-white/10'],
       soloIcono: true,
     },
     {
