@@ -20,7 +20,6 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { SkeletonList } from '@/components/ui/skeleton';
 import {
-  ArrowRight,
   LayoutGrid,
   List,
   MoreVertical,
@@ -236,15 +235,9 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-tight">
-        <Button
-          size="sm"
-          variant={amistad.variant}
-          disabled={amistad.disabled}
-          onClick={amistad.onClick}
-          className="h-7 rounded-md px-2.5 text-[11px]"
-        >
-          {amistad.label}
-        </Button>
+        <div className="flex items-center justify-center gap-2">
+          <BotonesPersona usuario={usuario} amistad={amistad} />
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -261,13 +254,6 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Link
-          href={`/dashboard/personas/${usuario.idUsuario}`}
-          className="type-meta flex items-center gap-micro font-semibold text-primary hover:underline"
-        >
-          Ver perfil
-          <ArrowRight className="size-3.5" aria-hidden="true" />
-        </Link>
       </div>
     </article>
   );
