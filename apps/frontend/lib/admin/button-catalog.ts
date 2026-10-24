@@ -298,7 +298,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Buscar en el chat',
       archivo: 'components/chat-dock/chat-window.tsx',
-      clases: ['rounded-control p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary'],
+      clases: ['rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary'],
       soloIcono: true,
     },
     {
