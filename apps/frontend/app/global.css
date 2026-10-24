@@ -797,6 +797,128 @@ html {
   transform: translateY(0);
 }
 
+/* ─────────────────────────────────────────────
+   HU-196 · Microanimaciones de botones
+   Tres lenguajes de interacción sobre los diseños estáticos aprobados (ver
+   Diagnóstico → Botones). Solo animan color, borde, sombra, transform y
+   opacidad; nunca dimensiones. Los hover van bajo `(hover: hover)` para no
+   quedar pegados en pantallas táctiles, y todo se desactiva con
+   `prefers-reduced-motion` al final del archivo.
+   ──────────────────────────────────────────── */
+:root {
+  --motion-fast: 110ms;       /* presionado */
+  --motion-base: 180ms;       /* hover y cambios de color */
+  --motion-indicator: 200ms;  /* indicador seleccionado */
+  --motion-ease: var(--ease-out-quart);
+  /* Sombra contextual de `motion-action`; cada `motion-glow-*` la tiñe. */
+  --motion-glow: rgb(0 0 0 / 0.14);
+}
+
+.dark {
+  --motion-glow: rgb(255 255 255 / 0.12);
+}
+
+/* A · Acción: primarios, inversos, secundarios y acciones importantes.
+   Elevación de 1 px con sombra contextual, leve brillo y presión al pulsar. */
+.motion-action {
+  transition:
+    background-color var(--motion-base) ease-out,
+    color var(--motion-base) ease-out,
+    border-color var(--motion-base) ease-out,
+    box-shadow var(--motion-base) var(--motion-ease),
+    transform var(--motion-base) var(--motion-ease),
+    filter var(--motion-base) ease-out;
+}
+
+@media (hover: hover) {
+  .motion-action:hover:not(:disabled, [aria-disabled='true']) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px var(--motion-glow);
+    filter: brightness(1.03);
+  }
+}
+
+.motion-action:active:not(:disabled, [aria-disabled='true']) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+  filter: brightness(0.98);
+  transition-duration: var(--motion-fast);
+}
+
+.motion-glow-primary { --motion-glow: color-mix(in srgb, var(--color-primary) 32%, transparent); }
+.motion-glow-sage    { --motion-glow: color-mix(in srgb, var(--color-consult) 45%, transparent); }
+.motion-glow-danger  { --motion-glow: color-mix(in srgb, var(--color-error) 28%, transparent); }
+.motion-glow-warning { --motion-glow: color-mix(in srgb, #f97316 32%, transparent); }
+
+/* B · Control: outline, filtros, paginadores y acciones compactas.
+   Solo color, borde y sombra; presión sin desplazamiento. */
+.motion-control {
+  transition:
+    background-color var(--motion-base) ease-out,
+    color var(--motion-base) ease-out,
+    border-color var(--motion-base) ease-out,
+    box-shadow var(--motion-base) ease-out,
+    filter var(--motion-fast) ease-out;
+}
+
+.motion-control:active:not(:disabled, [aria-disabled='true']) {
+  filter: brightness(0.96);
+}
+
+/* Icono: la misma base de control más la transición del propio icono. */
+.motion-icon {
+  transition:
+    background-color var(--motion-base) ease-out,
+    color var(--motion-base) ease-out,
+    border-color var(--motion-base) ease-out;
+}
+
+.motion-icon svg {
+  transition:
+    color var(--motion-base) ease-out,
+    transform var(--motion-fast) var(--motion-ease);
+}
+
+.motion-icon:active:not(:disabled, [aria-disabled='true']) svg {
+  transform: scale(0.92);
+}
+
+/* C · Navegación y selección: chips, conmutadores, segmentados y pestañas.
+   Fondo e indicador progresivos; sin elevación ni brillo. */
+.motion-select {
+  transition:
+    background-color var(--motion-indicator) ease-out,
+    color var(--motion-indicator) ease-out,
+    border-color var(--motion-indicator) ease-out,
+    box-shadow var(--motion-indicator) ease-out;
+}
+
+/* Enlaces de texto: el subrayado aparece por color, no de golpe. */
+.motion-link {
+  text-decoration-line: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.2em;
+  transition:
+    color var(--motion-base) ease-out,
+    text-decoration-color var(--motion-base) ease-out;
+}
+
+@media (hover: hover) {
+  .motion-link:hover {
+    text-decoration-color: currentColor;
+  }
+}
+
+.motion-link:focus-visible {
+  text-decoration-color: currentColor;
+}
+
+/* Foco de teclado compartido para los botones que no traían un anillo propio. */
+.motion-focus:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* El selector de tamaño de fuente (font-scale-toggle.tsx) cambia el
    font-size del <html>, y casi todo el layout usa `rem` (que siempre se
    mide contra el root, nunca contra un ancestro) — así que sin esto el
@@ -1270,8 +1392,16 @@ button:disabled {
   }
 
   .interactive-lift:hover,
-  button:active:not(:disabled) {
+  button:active:not(:disabled),
+  .motion-action:hover,
+  .motion-action:active,
+  .motion-icon:active svg {
     transform: none;
+    filter: none;
+  }
+
+  .motion-action:hover {
+    box-shadow: none;
   }
 }
 
