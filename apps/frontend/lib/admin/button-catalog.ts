@@ -314,14 +314,14 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
       etiqueta: 'Cerrar diálogo',
       archivo: 'components/projects/task-form-dialog.tsx',
       clases: [
-        'inline-flex size-9 items-center justify-center rounded-md text-tertiary transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+        'inline-flex size-9 items-center justify-center rounded-md text-tertiary motion-icon hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
       ],
       soloIcono: true,
     },
     {
       etiqueta: 'Descartar anuncio',
       archivo: 'components/anuncios/anuncio-banner.tsx',
-      clases: ['flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-black/10 focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:bg-white/10'],
+      clases: ['motion-icon flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-black/10 focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:bg-white/10'],
       soloIcono: true,
     },
     {
