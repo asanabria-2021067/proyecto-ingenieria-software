@@ -363,13 +363,13 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Anterior (bitácora, deshabilitado)',
       archivo: 'app/dashboard/proyectos/[id]/bitacora/page.tsx',
-      clases: ['rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface disabled:opacity-40'],
+      clases: ['rounded-md border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface disabled:opacity-40'],
       disabled: true,
     },
     {
       etiqueta: 'Siguiente (bitácora)',
       archivo: 'app/dashboard/proyectos/[id]/bitacora/page.tsx',
-      clases: ['rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface disabled:opacity-40'],
+      clases: ['rounded-md border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface disabled:opacity-40'],
     },
   ],
   pieTarjeta: [
