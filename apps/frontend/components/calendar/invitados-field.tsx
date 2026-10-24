@@ -37,7 +37,7 @@ function Chip({ persona, sufijo, onQuitar, disabled }: {
           disabled={disabled}
           aria-label={`Quitar a ${persona.nombre} ${persona.apellido}`}
           // G04 (UI-18): área táctil de 24×24 px alrededor del ícono de 12 px (antes 16×16).
-          className="-mr-1.5 inline-flex size-6 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-surface-container hover:text-text-primary"
+          className="-mr-1.5 inline-flex size-6 shrink-0 items-center justify-center rounded-md text-text-secondary motion-icon motion-focus hover:bg-error/10 hover:text-error"
         >
           <X className="size-3" aria-hidden="true" />
         </button>
