@@ -233,7 +233,7 @@ export default function MyProjectsPage() {
               </Link>
               <Link
                 href="/dashboard/proyectos"
-                className="inline-flex items-center justify-center rounded-md border border-outline-variant bg-surface-container-lowest px-5 py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-surface-container"
+                className="inline-flex items-center justify-center rounded-md border border-outline-variant bg-surface-container-lowest px-5 py-2.5 text-sm font-bold text-on-surface motion-control motion-focus hover:border-outline hover:bg-surface-container"
               >
                 Explorar ideas
               </Link>
