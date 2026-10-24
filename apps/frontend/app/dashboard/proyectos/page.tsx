@@ -210,7 +210,7 @@ export default function ProyectosPage() {
                 type="button"
                 onClick={() => setTipoFiltro('')}
                 aria-pressed={tipoFiltro === ''}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold motion-select ${
                   tipoFiltro === '' ? 'bg-primary text-on-primary' : 'bg-surface-container text-text-secondary hover:bg-surface-container-high'
                 }`}
               >
@@ -224,7 +224,7 @@ export default function ProyectosPage() {
                     type="button"
                     onClick={() => setTipoFiltro((actual) => (actual === tipo ? '' : tipo))}
                     aria-pressed={tipoFiltro === tipo}
-                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold motion-select ${
                       tipoFiltro === tipo ? 'bg-primary text-on-primary' : 'bg-surface-container text-text-secondary hover:bg-surface-container-high'
                     }`}
                   >

@@ -567,7 +567,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                       <button
                         type="button"
                         onClick={() => toggleHabilidad(h.idHabilidad)}
-                        className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        className={`rounded-full px-3 py-1 text-xs font-medium motion-select ${
                           sel
                             ? 'bg-primary text-on-primary'
                             : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'
@@ -630,7 +630,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                     key={i.idInteres}
                     type="button"
                     onClick={() => toggleInteres(i.idInteres)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    className={`rounded-full px-3 py-1 text-xs font-medium motion-select ${
                       selectedIntereses.includes(i.idInteres)
                         ? 'bg-secondary text-on-secondary'
                         : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'
@@ -678,7 +678,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                     key={c.idCualidad}
                     type="button"
                     onClick={() => toggleCualidad(c.idCualidad)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    className={`rounded-full px-3 py-1 text-xs font-medium motion-select ${
                       selectedCualidades.includes(c.idCualidad)
                         ? 'bg-tertiary text-white'
                         : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'

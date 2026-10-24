@@ -233,22 +233,22 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Todos (activo)',
       archivo: 'app/dashboard/proyectos/page.tsx',
-      clases: ['shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors', 'bg-primary text-on-primary'],
+      clases: ['shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold motion-select', 'bg-primary text-on-primary'],
     },
     {
       etiqueta: 'Académico',
       archivo: 'app/dashboard/proyectos/page.tsx',
-      clases: ['shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors', 'bg-surface-container text-text-secondary hover:bg-surface-container-high'],
+      clases: ['shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold motion-select', 'bg-surface-container text-text-secondary hover:bg-surface-container-high'],
     },
     {
       etiqueta: 'React (elegida)',
       archivo: 'components/profile/CompleteProfileDialog.tsx',
-      clases: ['rounded-full px-3 py-1 text-xs font-medium transition-colors', 'bg-primary text-on-primary'],
+      clases: ['rounded-full px-3 py-1 text-xs font-medium motion-select', 'bg-primary text-on-primary'],
     },
     {
       etiqueta: 'Python',
       archivo: 'components/profile/CompleteProfileDialog.tsx',
-      clases: ['rounded-full px-3 py-1 text-xs font-medium transition-colors', 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'],
+      clases: ['rounded-full px-3 py-1 text-xs font-medium motion-select', 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'],
     },
   ],
   conmutadores: [
