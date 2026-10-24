@@ -45,7 +45,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { BOTON_EN_REVISION, getIniciales } from '@/components/projects/available-project-card';
-import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
+import { REQUEST_INBOX_BUTTON_GREEN } from '@/components/admin/request-inbox-details';
 import {
   Empty,
   EmptyContent,
@@ -102,7 +102,8 @@ function textoMotivo(usuario: UsuarioBusquedaDto): string | null {
 
 /** Tarjeta con avatar, nombre y carrera centrados; etiquetas agrupadas; y las
  * acciones ancladas abajo (`mt-auto`) para que todas midan lo mismo en la rejilla.
- * «Agregar como amigo» reutiliza el botón negro de «Ver proyecto» y «Solicitud
+ * «Agregar como amigo» reutiliza el botón verde institucional de la bandeja de
+ * solicitudes (mismo tono que «Ver proyecto» publicado en Mis Proyectos) y «Solicitud
  * enviada» el de «Ver mi solicitud» de Mis Proyectos; van en una fila con
  * «Ver perfil» a la izquierda. "Ver perfil" lleva a la página de detalle, no a
  * un panel lateral (ahí caben los amigos en común). */
@@ -112,7 +113,7 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
   const solicitudEnviada = usuario.solicitudPendiente?.direccion === 'enviada' && !usuario.esAmigo;
   const tonoAmistad =
-    amistad.variant === 'default' ? PROJECT_ACTION_BUTTON_CLASS : solicitudEnviada ? BOTON_EN_REVISION : '';
+    amistad.variant === 'default' ? REQUEST_INBOX_BUTTON_GREEN : solicitudEnviada ? BOTON_EN_REVISION : '';
 
   return (
     <article className="card-base interactive-lift group relative flex h-full flex-col gap-tight hover:border-outline-variant hover:shadow-raised">
