@@ -44,7 +44,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getIniciales } from '@/components/projects/available-project-card';
+import { BOTON_EN_REVISION, getIniciales } from '@/components/projects/available-project-card';
+import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
 import {
   Empty,
   EmptyContent,
@@ -99,23 +100,28 @@ function textoMotivo(usuario: UsuarioBusquedaDto): string | null {
   return null;
 }
 
-/** Tarjeta con avatar arriba centrado y acciones alineadas debajo (semestre +
- * botón de amistad); "Ver perfil" lleva a la página de detalle, no a un panel
- * lateral, para poder mostrar ahí el perfil completo (incluye amigos en común). */
+/** Tarjeta con avatar, nombre y carrera centrados; etiquetas agrupadas; y las
+ * acciones ancladas abajo (`mt-auto`) para que todas midan lo mismo en la rejilla.
+ * «Agregar como amigo» reutiliza el botón negro de «Ver proyecto» y «Solicitud
+ * enviada» el de «Ver mi solicitud» de Mis Proyectos. "Ver perfil" lleva a la
+ * página de detalle, no a un panel lateral (ahí caben los amigos en común). */
 function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const { amistad, seguimiento, confirmarEliminarAmistad } = useAccionesAmistad(usuario);
   const motivo = textoMotivo(usuario);
   const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
+  const solicitudEnviada = usuario.solicitudPendiente?.direccion === 'enviada' && !usuario.esAmigo;
+  const tonoAmistad =
+    amistad.variant === 'default' ? PROJECT_ACTION_BUTTON_CLASS : solicitudEnviada ? BOTON_EN_REVISION : '';
 
   return (
-    <article className="card-base group relative flex flex-col gap-tight transition-shadow hover:shadow-raised">
+    <article className="card-base interactive-lift group relative flex h-full flex-col gap-tight hover:border-outline-variant hover:shadow-raised">
       <ConfirmActionDialog {...confirmarEliminarAmistad} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             aria-label={`Más acciones para ${nombreCompleto}`}
-            className="absolute right-tight top-tight rounded-control p-tight text-text-secondary opacity-0 transition-opacity hover:bg-surface-container-high hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
+            className="absolute right-tight top-tight rounded-control p-tight text-text-secondary opacity-0 transition-[opacity,background-color,color,transform] duration-180 ease-out hover:scale-105 hover:bg-surface-container-high hover:text-text-primary focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/30 group-hover:opacity-100 data-[state=open]:bg-surface-container-high data-[state=open]:text-text-primary data-[state=open]:opacity-100"
           >
             <MoreVertical className="size-4" aria-hidden="true" />
           </button>
@@ -127,7 +133,7 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <div className="flex flex-col items-center gap-micro text-center">
+      <div className="flex flex-col items-center gap-micro px-gap text-center">
         <Avatar className="size-16">
           {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
           <AvatarFallback className="type-section font-medium text-text-secondary">
@@ -138,27 +144,13 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
         {usuario.carrera && <p className="type-meta max-w-full truncate">{usuario.carrera}</p>}
       </div>
 
-      <div className="flex items-center justify-between gap-tight">
-        {usuario.semestre != null ? (
-          <span className={`pill font-semibold ${getSemestreBadgeStyle(usuario.semestre)}`}>
-            Semestre {usuario.semestre}
-          </span>
-        ) : (
-          <span />
-        )}
-        <Button
-          size="sm"
-          variant={amistad.variant}
-          disabled={amistad.disabled}
-          onClick={amistad.onClick}
-          className="h-7 rounded-md px-2.5 text-[11px]"
-        >
-          {amistad.label}
-        </Button>
-      </div>
-
-      {(motivo || usuario.habilidades.length > 0) && (
-        <div className="flex flex-wrap gap-tight">
+      {(usuario.semestre != null || motivo || usuario.habilidades.length > 0) && (
+        <div className="flex flex-wrap justify-center gap-tight">
+          {usuario.semestre != null && (
+            <span className={`pill font-semibold ${getSemestreBadgeStyle(usuario.semestre)}`}>
+              Semestre {usuario.semestre}
+            </span>
+          )}
           {motivo && <span className="pill pill-accent">{motivo}</span>}
           {usuario.habilidades.slice(0, 2).map((h) => (
             <span key={h} className={`pill font-semibold ${getHabilidadBadgeStyle(h)}`}>
@@ -168,13 +160,26 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
         </div>
       )}
 
-      <Link
-        href={`/dashboard/personas/${usuario.idUsuario}`}
-        className="type-meta mt-tight flex items-center justify-end gap-micro border-t border-outline-variant pt-tight font-semibold text-primary hover:underline"
-      >
-        Ver perfil
-        <ArrowRight className="size-3.5" aria-hidden="true" />
-      </Link>
+      <div className="mt-auto flex flex-col items-center gap-tight border-t border-outline-variant pt-tight">
+        <Button
+          variant={amistad.variant}
+          disabled={amistad.disabled}
+          onClick={amistad.onClick}
+          className={`h-9.5 w-full rounded-md text-[13px] font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-primary/30 ${tonoAmistad}`}
+        >
+          {amistad.label}
+        </Button>
+        <Link
+          href={`/dashboard/personas/${usuario.idUsuario}`}
+          className="group/perfil type-meta inline-flex items-center gap-micro rounded-control px-tight py-micro font-semibold text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        >
+          Ver perfil
+          <ArrowRight
+            className="size-3.5 transition-transform duration-180 ease-out group-hover/perfil:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover/perfil:translate-x-0"
+            aria-hidden="true"
+          />
+        </Link>
+      </div>
     </article>
   );
 }
