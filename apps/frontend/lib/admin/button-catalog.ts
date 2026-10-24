@@ -292,7 +292,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Nuevo chat',
       archivo: 'components/chat-dock/chat-list-popover.tsx',
-      clases: ['flex size-7 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary'],
+      clases: ['flex size-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary'],
       soloIcono: true,
     },
     {

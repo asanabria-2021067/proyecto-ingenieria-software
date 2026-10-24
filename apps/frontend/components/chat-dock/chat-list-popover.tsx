@@ -80,7 +80,7 @@ export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) 
                 }}
                 aria-label="Ver mensajes guardados"
                 title="Ver mensajes guardados"
-                className="flex size-7 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
+                className="flex size-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
               >
                 <Bookmark className="size-4" aria-hidden="true" />
               </button>
@@ -90,7 +90,7 @@ export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) 
               onClick={() => setNuevoChatAbierto(true)}
               aria-label="Nuevo chat"
               title="Nuevo chat"
-              className="flex size-7 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
+              className="flex size-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
             >
               <SquarePen className="size-4" aria-hidden="true" />
             </button>
@@ -100,7 +100,7 @@ export function ChatListPopover({ onClose, onOpenSaved }: ChatListPopoverProps) 
                 onClick={() => setCanalDialogo(null)}
                 aria-label="Crear canal"
                 title="Crear canal"
-                className="flex size-7 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
+                className="flex size-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary"
               >
                 <Hash className="size-4" aria-hidden="true" />
               </button>
