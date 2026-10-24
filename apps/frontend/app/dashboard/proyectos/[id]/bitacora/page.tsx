@@ -618,7 +618,7 @@ export default function BitacoraPage() {
                     type="button"
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page <= 1}
-                    className="rounded-md border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface disabled:opacity-40"
+                    className="rounded-md border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface motion-control motion-focus hover:border-outline hover:bg-surface-container-low disabled:opacity-40"
                   >
                     Anterior
                   </button>
@@ -629,7 +629,7 @@ export default function BitacoraPage() {
                     type="button"
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page >= totalPages}
-                    className="rounded-md border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface disabled:opacity-40"
+                    className="rounded-md border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface motion-control motion-focus hover:border-outline hover:bg-surface-container-low disabled:opacity-40"
                   >
                     Siguiente
                   </button>
