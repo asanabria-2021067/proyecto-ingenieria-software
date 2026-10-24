@@ -85,7 +85,7 @@ export function ChatAdjuntoChip({ adjunto, idProyecto, idConversacion }: ChatAdj
           onClick={descargar}
           disabled={descargando}
           aria-label={`Descargar ${adjunto.nombreOriginal}`}
-          className="rounded-control p-1.5 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary disabled:opacity-50"
+          className="rounded-md p-1.5 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary disabled:opacity-50"
         >
           {descargando ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Download className="size-4" aria-hidden="true" />}
         </button>

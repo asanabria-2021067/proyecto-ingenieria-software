@@ -304,7 +304,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Descargar adjunto (deshabilitado)',
       archivo: 'components/chat-dock/chat-adjunto.tsx',
-      clases: ['rounded-control p-1.5 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary disabled:opacity-50'],
+      clases: ['rounded-md p-1.5 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary disabled:opacity-50'],
       soloIcono: true,
       disabled: true,
     },
