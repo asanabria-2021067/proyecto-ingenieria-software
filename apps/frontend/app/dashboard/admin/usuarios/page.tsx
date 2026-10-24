@@ -145,7 +145,7 @@ function UserActions({
       <button
         type="button"
         onClick={() => onViewProfile(user.idUsuario)}
-        className="flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+        className="flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface motion-control motion-focus hover:bg-primary hover:text-on-primary"
         aria-label={`Ver perfil de ${user.nombre} ${user.apellido}`}
       >
         <Eye className="h-3.5 w-3.5" aria-hidden="true" />

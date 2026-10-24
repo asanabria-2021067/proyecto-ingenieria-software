@@ -41,7 +41,7 @@ const DETALLE_ANCHO = '@4xl/bandeja:w-auto';
 const FECHA_EN_LINEA = '@5xl/bandeja:inline';
 // Mismo botón compacto que «Ver perfil» en Gestión de Usuarios.
 const BOTON_DETALLE =
-  'flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary';
+  'flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface motion-control motion-focus hover:bg-primary hover:text-on-primary';
 
 function Origen({ origen }: { origen: SecurityEvent['origen'] }) {
   const { etiqueta, ip } = originLabel(origen);
