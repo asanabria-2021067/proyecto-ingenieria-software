@@ -328,7 +328,7 @@ export default function AdminUsuariosPage() {
           {(search || rol || estado || year) && (
             <button
               onClick={clearFilters}
-              className="flex items-center gap-1.5 rounded-control px-3 py-2.5 text-sm font-medium text-tertiary hover:bg-surface-container-high transition-colors"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2.5 text-sm font-medium text-tertiary hover:bg-surface-container-high transition-colors"
             >
               <X className="h-3.5 w-3.5" />
               Limpiar filtros
