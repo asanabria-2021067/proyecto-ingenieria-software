@@ -218,7 +218,7 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
         </AvatarFallback>
       </Avatar>
 
-      <div className="flex min-w-0 grow basis-56 flex-col gap-micro">
+      <div className="flex min-w-0 grow basis-44 flex-col gap-micro">
         <div className="flex flex-wrap items-center gap-tight">
           <p className="type-subtitle text-text-primary">{nombreCompleto}</p>
           {usuario.semestre != null && (
