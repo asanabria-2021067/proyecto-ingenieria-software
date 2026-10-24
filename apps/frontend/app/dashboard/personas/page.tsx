@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { BOTON_EN_REVISION, getIniciales } from '@/components/projects/available-project-card';
 import { REQUEST_INBOX_BUTTON_GREEN } from '@/components/admin/request-inbox-details';
+import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
 import {
   Empty,
   EmptyContent,
@@ -162,12 +163,7 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
       )}
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2.5 border-t border-outline-variant pt-tight">
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className="h-8 rounded-md px-2.5 text-xs font-bold text-primary hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/30"
-        >
+        <Button asChild className={`${PROJECT_ACTION_BUTTON_CLASS} focus-visible:ring-2 focus-visible:ring-primary/30`}>
           <Link href={`/dashboard/personas/${usuario.idUsuario}`}>Ver perfil</Link>
         </Button>
         <Button
