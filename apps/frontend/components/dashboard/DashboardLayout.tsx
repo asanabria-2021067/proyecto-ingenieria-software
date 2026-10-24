@@ -257,7 +257,7 @@ export default function DashboardLayout({
                 window.dispatchEvent(new Event('start-onboarding-tour'))
               }
               aria-label="Repetir tour de bienvenida"
-              className="flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary transition-colors hover:bg-surface-container-high hover:text-text-primary"
+              className="flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary motion-icon hover:bg-surface-container-high hover:text-text-primary"
             >
               <RotateCcw className="size-5" aria-hidden="true" />
             </button>

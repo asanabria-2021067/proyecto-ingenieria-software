@@ -45,27 +45,27 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Cambiar tema',
       archivo: 'components/theme-toggle.tsx',
-      clases: ['flex size-10 items-center justify-center rounded-md bg-muted text-text-primary transition-colors hover:bg-surface-container-high'],
+      clases: ['flex size-10 items-center justify-center rounded-md bg-muted text-text-primary motion-icon hover:bg-surface-container-high'],
       soloIcono: true,
     },
     {
       etiqueta: 'Repetir tour de bienvenida',
       archivo: 'components/dashboard/DashboardLayout.tsx',
-      clases: ['flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary transition-colors hover:bg-surface-container-high hover:text-text-primary'],
+      clases: ['flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary motion-icon hover:bg-surface-container-high hover:text-text-primary'],
       soloIcono: true,
     },
     {
       etiqueta: 'Actualizar',
       archivo: 'components/admin/AdminLayout.tsx',
       clases: [
-        'flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary outline-none transition-colors hover:bg-surface-container-high hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60',
+        'flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary outline-none motion-icon hover:bg-surface-container-high hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60',
       ],
       soloIcono: true,
     },
     {
       etiqueta: 'Notificaciones',
       archivo: 'components/layout/notifications-bell.tsx',
-      clases: ['relative flex items-center justify-center h-10 w-10 rounded-md text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer'],
+      clases: ['relative flex items-center justify-center h-10 w-10 rounded-md text-on-surface hover:bg-surface-container-high motion-icon cursor-pointer'],
       soloIcono: true,
     },
   ],

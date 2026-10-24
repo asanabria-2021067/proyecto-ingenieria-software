@@ -284,7 +284,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               disabled={actualizando}
               aria-label="Actualizar"
               title="Actualizar"
-              className="flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary outline-none transition-colors hover:bg-surface-container-high hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
+              className="flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary outline-none motion-icon hover:bg-surface-container-high hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
             >
               <RotateCcw
                 className={`size-5 ${actualizando ? 'motion-safe:animate-spin [animation-direction:reverse]' : ''}`}
