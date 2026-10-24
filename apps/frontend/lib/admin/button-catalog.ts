@@ -292,19 +292,19 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Nuevo chat',
       archivo: 'components/chat-dock/chat-list-popover.tsx',
-      clases: ['flex size-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-on-surface/10 hover:text-text-primary'],
+      clases: ['flex size-7 items-center justify-center rounded-md text-text-secondary motion-icon hover:bg-on-surface/10 hover:text-text-primary'],
       soloIcono: true,
     },
     {
       etiqueta: 'Buscar en el chat',
       archivo: 'components/chat-dock/chat-window.tsx',
-      clases: ['rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary'],
+      clases: ['motion-icon motion-focus rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary'],
       soloIcono: true,
     },
     {
       etiqueta: 'Descargar adjunto (deshabilitado)',
       archivo: 'components/chat-dock/chat-adjunto.tsx',
-      clases: ['rounded-md p-1.5 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary disabled:opacity-50'],
+      clases: ['motion-icon motion-focus rounded-md p-1.5 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary disabled:opacity-50'],
       soloIcono: true,
       disabled: true,
     },

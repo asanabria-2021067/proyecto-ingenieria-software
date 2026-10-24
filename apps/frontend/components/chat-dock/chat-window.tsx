@@ -267,14 +267,14 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
           onClick={() => setBuscarAbierto((abierto) => !abierto)}
           aria-label="Buscar en la conversación"
           aria-expanded={buscarAbierto}
-          className="rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary"
+          className="motion-icon motion-focus rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary"
         >
           <Search className="size-4" aria-hidden="true" />
         </button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" aria-label="Opciones de la conversación" className="rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary">
+            <button type="button" aria-label="Opciones de la conversación" className="motion-icon motion-focus rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary">
               <MoreVertical className="size-4" aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
@@ -357,10 +357,10 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <button type="button" onClick={onMinimize} aria-label={minimized ? 'Expandir chat' : 'Minimizar chat'} className="rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary">
+        <button type="button" onClick={onMinimize} aria-label={minimized ? 'Expandir chat' : 'Minimizar chat'} className="motion-icon motion-focus rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary">
           {minimized ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}
         </button>
-        <button type="button" onClick={onClose} aria-label="Cerrar chat" className="rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary">
+        <button type="button" onClick={onClose} aria-label="Cerrar chat" className="motion-icon motion-focus rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary">
           <X className="size-4" aria-hidden="true" />
         </button>
       </div>
