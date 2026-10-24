@@ -315,7 +315,7 @@ export function LeadershipChangeDialog({
             variant="outline"
             onClick={() => cerrar(false)}
             disabled={transfer.isPending}
-            className="h-10 w-full rounded-lg border-outline-variant text-sm font-semibold sm:w-auto"
+            className="h-10 w-full rounded-md border-outline-variant text-sm font-semibold sm:w-auto"
           >
             Cancelar
           </Button>

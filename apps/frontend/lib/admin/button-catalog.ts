@@ -170,7 +170,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
       etiqueta: 'Cancelar (ancho completo en móvil)',
       variante: 'outline',
       archivo: 'components/leadership/leadership-change-dialog.tsx',
-      clases: ['h-10 w-full rounded-lg border-outline-variant text-sm font-semibold sm:w-auto'],
+      clases: ['h-10 w-full rounded-md border-outline-variant text-sm font-semibold sm:w-auto'],
     },
     {
       etiqueta: 'Confirmar (ancho completo en móvil)',
