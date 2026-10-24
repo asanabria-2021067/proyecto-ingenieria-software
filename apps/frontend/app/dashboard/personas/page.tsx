@@ -205,16 +205,16 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
 
   return (
-    <article className="card-base flex flex-wrap items-center gap-tight py-tight transition-shadow hover:shadow-raised">
+    <article className="card-base flex flex-wrap items-center gap-gap transition-shadow hover:shadow-raised">
       <ConfirmActionDialog {...confirmarEliminarAmistad} />
-      <Avatar className="size-11 shrink-0">
+      <Avatar className="size-14 shrink-0 self-start">
         {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
-        <AvatarFallback className="type-body font-medium text-text-secondary">
+        <AvatarFallback className="type-section font-medium text-text-secondary">
           {getIniciales(usuario.nombre, usuario.apellido)}
         </AvatarFallback>
       </Avatar>
 
-      <div className="min-w-0 grow basis-56">
+      <div className="flex min-w-0 grow basis-56 flex-col gap-micro">
         <div className="flex flex-wrap items-center gap-tight">
           <p className="type-subtitle text-text-primary">{nombreCompleto}</p>
           {usuario.semestre != null && (
@@ -223,15 +223,17 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
             </span>
           )}
         </div>
-        <div className="mt-micro flex flex-wrap items-center gap-tight">
-          {usuario.carrera && <span className="type-meta">{usuario.carrera}</span>}
-          {motivo && <span className="pill pill-accent">{motivo}</span>}
-          {usuario.habilidades.slice(0, 3).map((h) => (
-            <span key={h} className={`pill font-semibold ${getHabilidadBadgeStyle(h)}`}>
-              {h}
-            </span>
-          ))}
-        </div>
+        {usuario.carrera && <p className="type-meta">{usuario.carrera}</p>}
+        {(motivo || usuario.habilidades.length > 0) && (
+          <div className="mt-micro flex flex-wrap items-center gap-tight">
+            {motivo && <span className="pill pill-accent">{motivo}</span>}
+            {usuario.habilidades.slice(0, 3).map((h) => (
+              <span key={h} className={`pill font-semibold ${getHabilidadBadgeStyle(h)}`}>
+                {h}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-tight">
