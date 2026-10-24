@@ -76,6 +76,6 @@ function ToggleGroupItem({
  * la otra, el mismo realce verde que el botón «Ver perfil».
  */
 const SEGMENTED_ITEM_CLASS =
-  'px-4 transition-colors hover:bg-primary hover:text-on-primary data-[state=on]:bg-primary data-[state=on]:text-on-primary'
+  'px-4 motion-select hover:bg-primary hover:text-on-primary data-[state=on]:bg-primary data-[state=on]:text-on-primary'
 
 export { ToggleGroup, ToggleGroupItem, SEGMENTED_ITEM_CLASS }
