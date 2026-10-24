@@ -209,7 +209,7 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const solicitudEnviada = usuario.solicitudPendiente?.direccion === 'enviada' && !usuario.esAmigo;
 
   return (
-    <article className="card-base flex flex-wrap items-center gap-gap transition-shadow hover:shadow-raised">
+    <article className="card-base flex flex-wrap items-center gap-gap transition-[border-color,background-color,box-shadow] duration-180 ease-out hover:border-primary/40 hover:bg-primary/5 hover:shadow-raised">
       <ConfirmActionDialog {...confirmarEliminarAmistad} />
       <Avatar className="size-14 shrink-0 self-start">
         {usuario.fotoUrl && <AvatarImage src={usuario.fotoUrl} alt="" />}
