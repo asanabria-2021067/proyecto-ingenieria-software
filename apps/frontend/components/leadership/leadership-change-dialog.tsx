@@ -323,7 +323,7 @@ export function LeadershipChangeDialog({
             type="button"
             onClick={confirmar}
             disabled={!puedeConfirmar}
-            className="h-10 w-full gap-1.5 rounded-lg text-sm font-bold sm:w-auto"
+            className="h-10 w-full gap-1.5 rounded-md text-sm font-bold sm:w-auto"
           >
             {transfer.isPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <UserCog className="size-4" aria-hidden="true" />}
             {confirmLabel}
