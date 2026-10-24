@@ -23,7 +23,7 @@ interface ProjectSidebarProps {
 const ACTOR_LABEL = { leader: 'Líder', participant: 'Participante' } as const;
 
 const TOGGLE_CLASS =
-  'flex size-8 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
+  'flex size-8 shrink-0 items-center justify-center rounded-md text-text-secondary motion-icon hover:bg-on-surface/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
 
 /**
  * HU-154 (T-215): sidebar contextual del proyecto, independiente de la

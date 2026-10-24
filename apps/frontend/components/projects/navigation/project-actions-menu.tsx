@@ -59,7 +59,7 @@ export function ProjectActionsMenu({
             <button
               type="button"
               aria-label="Acciones del proyecto"
-              className="flex size-8 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-surface-container-high hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-text-secondary motion-icon hover:bg-surface-container-high hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               <MoreVertical className="size-4" aria-hidden="true" />
             </button>
