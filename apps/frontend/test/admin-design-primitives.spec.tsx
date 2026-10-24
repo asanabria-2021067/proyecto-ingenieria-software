@@ -65,7 +65,7 @@ describe('FG07-C02: primitivas que ya compartían las bandejas (sin cambios)', (
     expect(screen.getByRole('navigation', { name: 'Paginación de prueba' })).toHaveClass('card-base');
     expect(screen.getByRole('button', { name: 'Página anterior' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Página siguiente' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Página siguiente' })).toHaveClass('rounded-control');
+    expect(screen.getByRole('button', { name: 'Página siguiente' })).toHaveClass('rounded-md');
   });
 
   it('la etiqueta estándar mantiene forma, tono y tamaño', () => {
