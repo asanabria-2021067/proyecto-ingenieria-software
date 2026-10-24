@@ -245,7 +245,13 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
           variant={amistad.variant}
           disabled={amistad.disabled}
           onClick={amistad.onClick}
-          className={`${PROJECT_ACTION_BUTTON_CLASS} ${solicitudEnviada ? BOTON_EN_REVISION : ''}`}
+          className={
+            amistad.variant === 'default'
+              ? PROJECT_ACTION_BUTTON_CLASS
+              : solicitudEnviada
+                ? `${PROJECT_ACTION_BUTTON_CLASS} ${BOTON_EN_REVISION}`
+                : 'h-9.5 rounded-md px-4.5 text-[13px] font-semibold'
+          }
         >
           {amistad.label}
         </Button>
