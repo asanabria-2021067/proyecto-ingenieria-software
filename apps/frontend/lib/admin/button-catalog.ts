@@ -74,7 +74,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
       etiqueta: 'Plegar la sidebar del proyecto',
       archivo: 'components/projects/project-sidebar.tsx',
       clases: [
-        'flex size-8 shrink-0 items-center justify-center rounded-control text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+        'flex size-8 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
       ],
       soloIcono: true,
     },
