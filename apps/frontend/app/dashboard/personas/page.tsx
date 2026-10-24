@@ -164,13 +164,9 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2.5 border-t border-outline-variant pt-tight">
         <Link
           href={`/dashboard/personas/${usuario.idUsuario}`}
-          className="group/perfil type-meta inline-flex h-8 items-center gap-micro rounded-control px-tight font-semibold text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="type-meta inline-flex h-8 items-center rounded-control px-tight font-semibold text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         >
           Ver perfil
-          <ArrowRight
-            className="size-3.5 transition-transform duration-180 ease-out group-hover/perfil:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover/perfil:translate-x-0"
-            aria-hidden="true"
-          />
         </Link>
         <Button
           size="sm"
