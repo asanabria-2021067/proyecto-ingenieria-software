@@ -164,7 +164,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
       etiqueta: 'Salir del proyecto',
       variante: 'default',
       archivo: 'components/projects/leave-project-modal.tsx',
-      clases: ['h-10 gap-1.5 rounded-md bg-orange-500 text-xs font-bold text-white hover:bg-orange-600'],
+      clases: ['h-10 gap-1.5 rounded-md bg-orange-500 text-xs font-bold text-white hover:bg-orange-600 motion-glow-warning'],
     },
     {
       etiqueta: 'Cancelar (ancho completo en móvil)',
