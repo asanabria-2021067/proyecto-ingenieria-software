@@ -152,7 +152,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
       etiqueta: 'Crear hito',
       variante: 'default',
       archivo: 'components/projects/create-milestone-dialog.tsx',
-      clases: ['h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90'],
+      clases: ['h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90 motion-glow-primary'],
     },
     {
       etiqueta: 'Crear chat',
