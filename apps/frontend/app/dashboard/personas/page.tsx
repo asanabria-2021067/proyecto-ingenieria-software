@@ -104,8 +104,8 @@ function textoMotivo(usuario: UsuarioBusquedaDto): string | null {
  * acciones ancladas abajo (`mt-auto`) para que todas midan lo mismo en la rejilla.
  * «Agregar como amigo» reutiliza el botón verde institucional de la bandeja de
  * solicitudes (mismo tono que «Ver proyecto» publicado en Mis Proyectos) y «Solicitud
- * enviada» el de «Ver mi solicitud» de Mis Proyectos; van en una fila con
- * «Ver perfil» a la izquierda. "Ver perfil" lleva a la página de detalle, no a
+ * enviada» el de «Ver mi solicitud» de Mis Proyectos; van centrados junto a
+ * «Ver perfil», el botón negro de «Ver proyecto». "Ver perfil" lleva a la página de detalle, no a
  * un panel lateral (ahí caben los amigos en común). */
 function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const { amistad, seguimiento, confirmarEliminarAmistad } = useAccionesAmistad(usuario);
@@ -162,7 +162,7 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
         </div>
       )}
 
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-2.5 border-t border-outline-variant pt-tight">
+      <div className="mt-auto flex flex-wrap items-center justify-center gap-2 border-t border-outline-variant pt-tight">
         <Button asChild className={`${PROJECT_ACTION_BUTTON_CLASS} focus-visible:ring-2 focus-visible:ring-primary/30`}>
           <Link href={`/dashboard/personas/${usuario.idUsuario}`}>Ver perfil</Link>
         </Button>
