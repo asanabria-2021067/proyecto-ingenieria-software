@@ -65,7 +65,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Notificaciones',
       archivo: 'components/layout/notifications-bell.tsx',
-      clases: ['relative flex items-center justify-center h-10 w-10 rounded-xl text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer'],
+      clases: ['relative flex items-center justify-center h-10 w-10 rounded-md text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer'],
       soloIcono: true,
     },
   ],
