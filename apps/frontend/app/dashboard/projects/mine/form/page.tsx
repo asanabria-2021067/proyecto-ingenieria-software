@@ -430,7 +430,7 @@ function NewProjectFormContent() {
             {step < 2 ? (
               <button
                 onClick={() => goTo(step + 1)}
-                className="flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-all duration-200"
+                className="flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-md text-sm font-bold hover:bg-primary/90 transition-all duration-200"
               >
                 Siguiente
                 <ChevronRight className="w-4 h-4" />

@@ -340,7 +340,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Siguiente',
       archivo: 'app/dashboard/projects/mine/form/page.tsx',
-      clases: ['flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-all duration-200'],
+      clases: ['flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-md text-sm font-bold hover:bg-primary/90 transition-all duration-200'],
     },
     {
       etiqueta: 'Agregar rol',
