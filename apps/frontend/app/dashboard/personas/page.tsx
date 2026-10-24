@@ -116,7 +116,7 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
     amistad.variant === 'default' ? REQUEST_INBOX_BUTTON_GREEN : solicitudEnviada ? BOTON_EN_REVISION : '';
 
   return (
-    <article className="card-base interactive-lift group relative flex h-full flex-col gap-tight hover:border-outline-variant hover:shadow-raised">
+    <article className="@container card-base interactive-lift group relative flex h-full min-w-0 flex-col gap-tight hover:border-outline-variant hover:shadow-raised">
       <ConfirmActionDialog {...confirmarEliminarAmistad} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
