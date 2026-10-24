@@ -51,7 +51,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Repetir tour de bienvenida',
       archivo: 'components/dashboard/DashboardLayout.tsx',
-      clases: ['flex size-10 items-center justify-center rounded-control bg-muted text-text-secondary transition-colors hover:bg-surface-container-high hover:text-text-primary'],
+      clases: ['flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary transition-colors hover:bg-surface-container-high hover:text-text-primary'],
       soloIcono: true,
     },
     {
