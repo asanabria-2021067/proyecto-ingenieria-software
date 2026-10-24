@@ -109,7 +109,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Generar enlace',
       archivo: 'app/dashboard/admin/solicitudes-recuperacion/page.tsx',
-      clases: ['flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition-all hover:bg-primary/90 disabled:opacity-50'],
+      clases: ['flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90 disabled:opacity-50'],
     },
   ],
   grisAVerde: [
