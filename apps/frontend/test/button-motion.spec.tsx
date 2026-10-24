@@ -83,11 +83,15 @@ describe('HU-196 · lenguajes de interacción', () => {
 
   it('con movimiento reducido no hay elevación, escala, brillo ni sombra de hover', () => {
     const reducido = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce) {\n  html'));
-    expect(reducido).toContain('.motion-action:hover,');
-    expect(reducido).toContain('.motion-action:active,');
-    expect(reducido).toContain('.motion-icon:active svg');
+    // Los selectores repiten el `:not(...)` de las reglas de hover/active: con menos
+    // especificidad la elevación seguía aplicándose con movimiento reducido.
+    const guarda = ":not(:disabled, [aria-disabled='true'])";
+    expect(reducido).toContain(`.motion-action:hover${guarda},`);
+    expect(reducido).toContain(`.motion-action:active${guarda},`);
+    expect(reducido).toContain(`.motion-control:active${guarda},`);
+    expect(reducido).toContain(`.motion-icon:active${guarda} svg`);
     expect(reducido).toMatch(/transform: none;\n\s+filter: none;/);
-    expect(reducido).toContain('.motion-action:hover {\n    box-shadow: none;');
+    expect(reducido).toContain(`.motion-action:hover${guarda} {\n    box-shadow: none;`);
   });
 });
 

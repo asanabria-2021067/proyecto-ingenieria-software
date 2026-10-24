@@ -1391,16 +1391,18 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 
+  /* Misma especificidad que las reglas de hover/active de arriba (`:not(...)` cuenta). */
   .interactive-lift:hover,
   button:active:not(:disabled),
-  .motion-action:hover,
-  .motion-action:active,
-  .motion-icon:active svg {
+  .motion-action:hover:not(:disabled, [aria-disabled='true']),
+  .motion-action:active:not(:disabled, [aria-disabled='true']),
+  .motion-control:active:not(:disabled, [aria-disabled='true']),
+  .motion-icon:active:not(:disabled, [aria-disabled='true']) svg {
     transform: none;
     filter: none;
   }
 
-  .motion-action:hover {
+  .motion-action:hover:not(:disabled, [aria-disabled='true']) {
     box-shadow: none;
   }
 }
