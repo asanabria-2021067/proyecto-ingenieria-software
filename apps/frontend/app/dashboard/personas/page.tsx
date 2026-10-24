@@ -167,11 +167,10 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
           <Link href={`/dashboard/personas/${usuario.idUsuario}`}>Ver perfil</Link>
         </Button>
         <Button
-          size="sm"
           variant={amistad.variant}
           disabled={amistad.disabled}
           onClick={amistad.onClick}
-          className={`h-8 rounded-md px-3 text-xs font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-primary/30 ${tonoAmistad}`}
+          className={`h-9.5 rounded-md px-4.5 text-[13px] font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-primary/30 ${tonoAmistad}`}
         >
           {amistad.label}
         </Button>
