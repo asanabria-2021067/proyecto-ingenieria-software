@@ -162,7 +162,7 @@ export const BOTON_EN_REVISION =
   'bg-[#F4F5F6] text-[#414850] border border-[#CBD1D6] hover:bg-[#E9EBEC] dark:bg-surface-container-high dark:text-on-surface-variant dark:border-outline-variant dark:hover:bg-surface-container-highest';
 
 /** «Ver proyecto» de un proyecto con cierre solicitado: verde oscuro de marca. */
-const BOTON_CIERRE_SOLICITADO = 'bg-[#0A4232] text-white hover:bg-[#08352A] dark:bg-primary dark:text-on-primary dark:hover:bg-primary/90';
+const BOTON_CIERRE_SOLICITADO = 'motion-glow-primary bg-[#0A4232] text-white hover:bg-[#08352A] dark:bg-primary dark:text-on-primary dark:hover:bg-primary/90';
 
 /**
  * Función central para "Mis Proyectos": a partir del estado real determina

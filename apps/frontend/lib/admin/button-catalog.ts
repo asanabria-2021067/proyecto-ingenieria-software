@@ -377,7 +377,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
       etiqueta: 'Ver proyecto (cierre solicitado)',
       variante: 'default',
       archivo: 'components/projects/available-project-card.tsx',
-      clases: ['bg-[#0A4232] text-white hover:bg-[#08352A] dark:bg-primary dark:text-on-primary dark:hover:bg-primary/90'],
+      clases: ['motion-glow-primary bg-[#0A4232] text-white hover:bg-[#08352A] dark:bg-primary dark:text-on-primary dark:hover:bg-primary/90'],
     },
   ],
 };
