@@ -170,7 +170,7 @@ export function Step2({
         );
       })}
 
-      <button onClick={onAddRol} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-outline-variant text-sm font-bold text-primary hover:border-primary hover:bg-primary/5 transition-all duration-200">
+      <button onClick={onAddRol} className="w-full flex items-center justify-center gap-2 py-3 rounded-md border-2 border-dashed border-outline-variant text-sm font-bold text-primary hover:border-primary hover:bg-primary/5 transition-all duration-200">
         <Plus className="w-4 h-4" /> Agregar rol
       </button>
     </div>
