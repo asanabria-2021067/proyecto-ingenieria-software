@@ -335,18 +335,18 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Anterior',
       archivo: 'app/dashboard/projects/mine/form/page.tsx',
-      clases: ['flex items-center gap-2 text-sm font-bold text-tertiary hover:text-on-surface transition-all duration-200'],
+      clases: ['flex items-center gap-2 text-sm font-bold text-tertiary hover:text-on-surface motion-control motion-focus'],
     },
     {
       etiqueta: 'Siguiente',
       archivo: 'app/dashboard/projects/mine/form/page.tsx',
-      clases: ['flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-md text-sm font-bold hover:bg-primary/90 transition-all duration-200'],
+      clases: ['flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-md text-sm font-bold hover:bg-primary/90 motion-action motion-glow-primary motion-focus'],
     },
     {
       etiqueta: 'Agregar rol',
       archivo: 'app/dashboard/projects/mine/form/Step2.tsx',
       clases: [
-        'w-full flex items-center justify-center gap-2 py-3 rounded-md border-2 border-dashed border-outline-variant text-sm font-bold text-primary hover:border-primary hover:bg-primary/5 transition-all duration-200',
+        'w-full flex items-center justify-center gap-2 py-3 rounded-md border-2 border-dashed border-outline-variant text-sm font-bold text-primary hover:border-primary hover:bg-primary/5 motion-control motion-focus',
       ],
     },
   ],
