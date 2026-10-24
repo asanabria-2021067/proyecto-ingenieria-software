@@ -128,7 +128,7 @@ literales: el árbol queda en 42 archivos.
 | Medida | Antes | Después |
 |---|---:|---:|
 | Tamaños literales | 47 | 2 |
-| Radios literales | 68 | 24 |
+| Radios literales | 68 | 25 |
 | Titulares fuera de la escala | 2 | 0 |
 | Archivos sin ningún literal de tamaño o radio | — | 30 de 42 |
 
@@ -156,7 +156,7 @@ actualizarla, hace fallar la prueba.
 | `app/dashboard/admin/proyectos/admin-projects-client.tsx` | `rounded-lg` | Sin token de igual valor |
 | `app/dashboard/admin/solicitudes-recuperacion/page.tsx` | 2 × `rounded-lg` | Sin token de igual valor |
 | `app/dashboard/admin/sprints/admin-sprints-client.tsx` | `rounded-md` | Sin token de igual valor |
-| `components/admin/AdminLayout.tsx` | `rounded-lg` | Tarjeta del logotipo |
+| `components/admin/AdminLayout.tsx` | `rounded-lg`, `rounded-md` | Tarjeta del logotipo |
 | `components/admin/ConfirmActionDialog.tsx` | 4 × `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
 | `components/admin/ProjectFeedbackSheet.tsx` | 3 × `rounded-lg` | Sin token de igual valor |
 | `components/admin/ProjectReviewSheet.tsx` | 3 × `rounded-lg` | Sin token de igual valor |

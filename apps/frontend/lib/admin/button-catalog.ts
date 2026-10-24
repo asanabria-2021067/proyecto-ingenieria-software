@@ -58,7 +58,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
       etiqueta: 'Actualizar',
       archivo: 'components/admin/AdminLayout.tsx',
       clases: [
-        'flex size-10 items-center justify-center rounded-control bg-muted text-text-secondary outline-none transition-colors hover:bg-surface-container-high hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60',
+        'flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary outline-none transition-colors hover:bg-surface-container-high hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60',
       ],
       soloIcono: true,
     },

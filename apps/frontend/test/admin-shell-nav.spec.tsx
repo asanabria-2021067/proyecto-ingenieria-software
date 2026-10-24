@@ -357,7 +357,7 @@ describe('AdminLayout — «Actualizar» en la barra superior', () => {
     expect(boton.querySelector('svg')).not.toBeNull();
     expect(boton).toHaveTextContent('');
     // Mismo botón de icono de la barra del estudiante.
-    expect(boton).toHaveClass('size-10', 'rounded-control', 'bg-muted');
+    expect(boton).toHaveClass('size-10', 'rounded-md', 'bg-muted');
     expect(boton.previousElementSibling).toBe(screen.getByTestId('bell'));
     expect(boton.nextElementSibling).toBe(screen.getByTestId('theme'));
   });
