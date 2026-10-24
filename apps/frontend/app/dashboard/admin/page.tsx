@@ -330,7 +330,7 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
           <div className="mt-auto border-t border-outline-variant/50 px-card py-inline">
             <Link
               href="/dashboard/admin/usuarios?riesgo=horas"
-              className="type-meta -my-tight inline-flex items-center gap-micro rounded-control py-tight font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="type-meta -my-tight inline-flex items-center gap-micro rounded-control py-tight font-semibold text-primary outline-none motion-link focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               Ver todos
               <ArrowRight className="size-3.5" aria-hidden="true" />

@@ -206,27 +206,27 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Ver todos (administrador)',
       archivo: 'app/dashboard/admin/page.tsx',
-      clases: ['type-meta -my-tight inline-flex items-center gap-micro rounded-control py-tight font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40'],
+      clases: ['type-meta -my-tight inline-flex items-center gap-micro rounded-control py-tight font-semibold text-primary outline-none motion-link focus-visible:ring-2 focus-visible:ring-primary/40'],
     },
     {
       etiqueta: 'Ver (fila de bandeja)',
       archivo: 'app/dashboard/admin/apelaciones/appeals-inbox-client.tsx',
-      clases: ['ml-auto flex min-h-11 w-fit min-w-11 items-center justify-center gap-micro whitespace-nowrap rounded-control px-tight type-meta font-semibold text-primary hover:underline'],
+      clases: ['ml-auto flex min-h-11 w-fit min-w-11 items-center justify-center gap-micro whitespace-nowrap rounded-control px-tight type-meta font-semibold text-primary motion-link'],
     },
     {
       etiqueta: 'Ver todos (estudiante)',
       archivo: 'app/dashboard/page.tsx',
-      clases: ['type-body font-medium text-primary hover:underline'],
+      clases: ['type-body font-medium text-primary motion-link'],
     },
     {
       etiqueta: 'Regístrate',
       archivo: 'app/login/page.tsx',
-      clases: ['font-bold text-primary hover:underline'],
+      clases: ['font-bold text-primary motion-link'],
     },
     {
       etiqueta: 'Agregar requisito',
       archivo: 'app/dashboard/projects/mine/form/Step2.tsx',
-      clases: ['flex items-center gap-1 text-xs text-primary font-bold hover:underline'],
+      clases: ['flex items-center gap-1 text-xs text-primary font-bold motion-link'],
     },
   ],
   chips: [

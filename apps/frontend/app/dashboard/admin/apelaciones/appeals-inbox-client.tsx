@@ -145,7 +145,7 @@ function FilaApelacion({ apelacion: a, filtro, page }: { apelacion: ApelacionIte
         <Link
           href={appealDetailHref(a.idApelacion, filtro, page)}
           aria-label={`${accion}: apelación #${a.idApelacion}, ${a.asunto}`}
-          className="ml-auto flex min-h-11 w-fit min-w-11 items-center justify-center gap-micro whitespace-nowrap rounded-control px-tight type-meta font-semibold text-primary hover:underline"
+          className="ml-auto flex min-h-11 w-fit min-w-11 items-center justify-center gap-micro whitespace-nowrap rounded-control px-tight type-meta font-semibold text-primary motion-link"
         >
           <span className="hidden @2xl/bandeja:inline">{accion}</span>
           <ChevronRight className="size-4 @2xl/bandeja:size-3.5" aria-hidden="true" />

@@ -108,7 +108,7 @@ export function Step2({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className={`${labelClass} mb-0`}>Habilidades requeridas</label>
-              <button onClick={() => onAddRequisito(rol.id)} className="flex items-center gap-1 text-xs text-primary font-bold hover:underline">
+              <button onClick={() => onAddRequisito(rol.id)} className="flex items-center gap-1 text-xs text-primary font-bold motion-link">
                 <Plus className="w-3 h-3" /> Agregar habilidad
               </button>
             </div>

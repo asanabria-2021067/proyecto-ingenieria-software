@@ -611,7 +611,7 @@ export default function DashboardPage() {
                   </div>
                   <Link
                     href="/dashboard/proyectos"
-                    className="type-body font-medium text-primary hover:underline"
+                    className="type-body font-medium text-primary motion-link"
                   >
                     Ver todos
                   </Link>
