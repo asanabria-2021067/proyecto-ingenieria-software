@@ -255,12 +255,12 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
     {
       etiqueta: 'Destacados (activo)',
       archivo: 'app/dashboard/page.tsx',
-      clases: ['type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors', 'bg-action text-on-action'],
+      clases: ['type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold motion-select', 'bg-action text-on-action'],
     },
     {
       etiqueta: 'Disponibles',
       archivo: 'app/dashboard/page.tsx',
-      clases: ['type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors', 'text-text-secondary hover:text-text-primary'],
+      clases: ['type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold motion-select', 'text-text-secondary hover:text-text-primary'],
     },
     {
       etiqueta: 'Vista en tarjetas (activa)',
@@ -278,14 +278,14 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
       etiqueta: 'Semana (activa)',
       archivo: 'app/dashboard/calendario/page.tsx',
       clases: [
-        'rounded-pill px-3 py-1 text-xs font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/60',
+        'rounded-pill px-3 py-1 text-xs font-bold outline-none motion-select focus-visible:ring-2 focus-visible:ring-primary/60',
         'bg-surface-container-lowest text-on-surface shadow-card',
       ],
     },
     {
       etiqueta: 'Mes',
       archivo: 'app/dashboard/calendario/page.tsx',
-      clases: ['rounded-pill px-3 py-1 text-xs font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/60', 'text-on-surface-variant'],
+      clases: ['rounded-pill px-3 py-1 text-xs font-bold outline-none motion-select focus-visible:ring-2 focus-visible:ring-primary/60', 'text-on-surface-variant'],
     },
   ],
   chat: [

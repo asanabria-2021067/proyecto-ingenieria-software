@@ -665,7 +665,7 @@ export default function CalendarioPage() {
                 <RadioGroupPrimitive.Item
                   key={opcion.value}
                   value={opcion.value}
-                  className={`rounded-pill px-3 py-1 text-xs font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
+                  className={`rounded-pill px-3 py-1 text-xs font-bold outline-none motion-select focus-visible:ring-2 focus-visible:ring-primary/60 ${
                     vista === opcion.value ? 'bg-surface-container-lowest text-on-surface shadow-card' : 'text-on-surface-variant'
                   }`}
                 >

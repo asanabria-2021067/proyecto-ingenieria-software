@@ -575,7 +575,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => setProjectTab('destacados')}
-                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors ${projectTab === 'destacados'
+                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold motion-select ${projectTab === 'destacados'
                         ? 'bg-action text-on-action'
                         : 'text-text-secondary hover:text-text-primary'
                         }`}
@@ -593,7 +593,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => setProjectTab('disponibles')}
-                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors ${projectTab === 'disponibles'
+                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold motion-select ${projectTab === 'disponibles'
                         ? 'bg-action text-on-action'
                         : 'text-text-secondary hover:text-text-primary'
                         }`}
