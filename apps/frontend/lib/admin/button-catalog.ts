@@ -158,7 +158,7 @@ export const BOTONES_INLINE: Record<FamiliaInline, MuestraInline[]> = {
       etiqueta: 'Crear chat',
       variante: 'default',
       archivo: 'components/chat-dock/new-chat-dialog.tsx',
-      clases: ['h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'],
+      clases: ['h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground motion-glow-primary'],
     },
     {
       etiqueta: 'Salir del proyecto',

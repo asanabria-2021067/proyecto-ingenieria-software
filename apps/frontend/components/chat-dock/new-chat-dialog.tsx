@@ -249,7 +249,7 @@ export function NewChatDialog({ open, onOpenChange, idProyecto: idProyectoFijo, 
             <Button
               type="submit"
               disabled={crear.isPending}
-              className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+              className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground motion-glow-primary"
             >
               {crear.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
               {crear.isPending ? 'Creando...' : 'Crear chat'}
