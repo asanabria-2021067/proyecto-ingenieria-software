@@ -22,6 +22,7 @@ import { getAdminReviewInbox, resolverRevision } from '@/lib/services/projects';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { TipoBadge } from '@/components/projects/tipo-badge';
 import { ADMIN_PAGE, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
+import { SkeletonCard, SkeletonList, SkeletonRegion } from '@/components/ui/skeleton';
 
 // Acciones de la tarjeta: el mismo botón compacto de «Ver proyecto» del panel
 // (alto, radio y tipografía), sin icono y con el color semántico de cada acción.
@@ -158,9 +159,10 @@ export default function AdminReviewsInboxPage() {
         )}
 
         {loading && !inbox && (
-          <div className="flex items-center justify-center py-24">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          </div>
+          <SkeletonRegion label="Cargando solicitudes de revisión" className="space-y-10">
+            <SkeletonCard count={3} lines={1} className="md:grid-cols-3 lg:grid-cols-3" />
+            <SkeletonList count={4} lines={2} trailing={1} layout="rows" />
+          </SkeletonRegion>
         )}
 
         {!loading && inbox && (

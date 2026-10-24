@@ -23,6 +23,8 @@ function makePrisma() {
     tarea: { findFirst: vi.fn() },
     participacionProyecto: { findFirst: vi.fn() },
     asignacionTarea: { findFirst: vi.fn() },
+    // HU-200: editar sincroniza las menciones del comentario.
+    mencionComentario: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn(), createMany: vi.fn() },
   };
   return prisma as typeof prisma & ConstructorParameters<typeof ComentariosService>[0];
 }
@@ -109,7 +111,10 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
 
       expect(prisma.comentario.findMany).toHaveBeenCalledWith({
         where: { idTarea: TASK_ID, eliminadoEn: null },
-        include: { autor: { select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true } } },
+        include: {
+          autor: { select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true } },
+          menciones: { select: { usuario: { select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true } } } },
+        },
         orderBy: { creadoEn: 'desc' },
       });
     });

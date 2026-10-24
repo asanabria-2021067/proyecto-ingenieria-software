@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
 import { Postulacion, Proyecto } from '@/types';
+import { SkeletonCard, SkeletonDetail } from '@/components/ui/skeleton';
 
 export const postulacionSchema = z.object({
   justificacion: z
@@ -115,9 +116,7 @@ export default function PostularPage() {
           Volver al proyecto
         </Link>
 
-        {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm">Cargando...</div>
-        )}
+        {isLoading && <SkeletonDetail label="Cargando el rol" sections={2} />}
 
         {proyecto && rol && (
           <>
@@ -149,9 +148,13 @@ export default function PostularPage() {
             )}
 
             {isLoadingPostulaciones ? (
-              <div className="text-center py-12 text-tertiary text-sm">
-                Validando tus postulaciones existentes...
-              </div>
+              <SkeletonCard
+                label="Validando tus postulaciones existentes"
+                count={1}
+                lines={3}
+                footer
+                className="md:grid-cols-1 lg:grid-cols-1"
+              />
             ) : postulacionActiva ? (
               <div className="space-y-4 bg-surface-container-low border border-outline-variant rounded-2xl p-6">
                 <div className="flex items-start gap-3 text-primary">

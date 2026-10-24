@@ -10,7 +10,7 @@ import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectActivities, useProjectActivity, useProjectAttendanceMutations } from '@/hooks/use-project-attendance';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -230,11 +230,11 @@ export default function AsistenciaPage() {
           </ProjectPageHeader>
 
           {cargando && (
-            <div className="space-y-stack">
+            <SkeletonRegion label="Cargando actividades" className="space-y-stack">
               <ActivityRowSkeleton />
               <ActivityRowSkeleton />
               <ActivityRowSkeleton />
-            </div>
+            </SkeletonRegion>
           )}
 
           {!cargando && isError && (

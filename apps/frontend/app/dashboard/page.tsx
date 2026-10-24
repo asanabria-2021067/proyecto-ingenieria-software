@@ -47,8 +47,7 @@ import { apiFetch } from '@/lib/api/client';
 import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
 import { TipoBadge } from '@/components/projects/tipo-badge';
 import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
-import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+import { Skeleton, SkeletonCard, SkeletonRegion } from '@/components/ui/skeleton';
 import { useFeedSocial } from '@/hooks/use-social';
 import { SocialProjectCard } from '@/components/social/social-project-card';
 import { dashboardPage } from '@/components/layout/dashboard-page';
@@ -302,34 +301,22 @@ function DashboardProjectCard({
 
 function DashboardSkeleton() {
   return (
-    <SkeletonTheme
-      baseColor="var(--color-surface-container)"
-      highlightColor="var(--color-surface-container-high)"
-    >
-      <div className={dashboardPage('py-section lg:py-page')}>
-        <section className="mb-section">
-          <Skeleton width="min(150px, 100%)" height={16} className="mb-2" />
-          <Skeleton width="min(300px, 100%)" height={48} />
-          <Skeleton width="min(500px, 100%)" height={20} className="mt-2" />
-        </section>
+    <SkeletonRegion label="Cargando tu inicio" className={dashboardPage('py-section lg:py-page')}>
+      <section className="mb-section space-y-tight" aria-hidden="true">
+        <Skeleton className="h-4 w-36 max-w-full" />
+        <Skeleton className="h-12 w-72 max-w-full" />
+        <Skeleton className="h-5 w-full max-w-lg" />
+      </section>
 
-        <div className="mb-section grid grid-cols-1 gap-grid md:grid-cols-3">
-          <Skeleton height={192} borderRadius="var(--radius-card)" />
-          <Skeleton height={192} borderRadius="var(--radius-card)" />
-          <Skeleton height={192} borderRadius="var(--radius-card)" />
-        </div>
+      <SkeletonCard count={3} lines={2} className="mb-section md:grid-cols-3 lg:grid-cols-3" />
 
-        <div className="grid grid-cols-1 gap-grid lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <Skeleton width={200} height={32} className="mb-section" />
-            <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
-              <Skeleton height={200} borderRadius="var(--radius-card)" />
-              <Skeleton height={200} borderRadius="var(--radius-card)" />
-            </div>
-          </div>
+      <div className="grid grid-cols-1 gap-grid lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <Skeleton className="mb-section h-8 w-48" />
+          <SkeletonCard count={2} lines={3} footer className="gap-gap lg:grid-cols-2" />
         </div>
       </div>
-    </SkeletonTheme>
+    </SkeletonRegion>
   );
 }
 

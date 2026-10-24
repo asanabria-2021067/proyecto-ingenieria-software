@@ -5,7 +5,7 @@ import { AlertCircle } from 'lucide-react';
 import { useSprintsAnalytics } from '@/hooks/use-project-sprints';
 import { VelocityChart } from '@/components/projects/velocity-chart';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
@@ -29,7 +29,11 @@ export default function InformeVelocidadPage() {
         description="Story points completados por cada Sprint cerrado, frente al promedio del proyecto."
       />
 
-      {isLoading && <Skeleton className="h-[340px] w-full rounded-xl" />}
+      {isLoading && (
+        <SkeletonRegion label="Cargando velocidad">
+          <Skeleton className="h-[340px] w-full rounded-xl" />
+        </SkeletonRegion>
+      )}
 
       {!isLoading && isError && (
         <Empty tone="danger" role="alert">

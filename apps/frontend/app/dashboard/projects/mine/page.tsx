@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { SkeletonRegion } from '@/components/ui/skeleton';
 
 const ESTADO_LABEL: Record<string, string> = {
   BORRADOR: 'Borrador',
@@ -181,11 +182,11 @@ export default function MyProjectsPage() {
         </div>
 
         {isLoading && (
-          <div className={PROJECT_CARD_GRID} role="status" aria-label="Cargando proyectos">
+          <SkeletonRegion className={PROJECT_CARD_GRID} label="Cargando proyectos">
             {Array.from({ length: 6 }).map((_, i) => (
               <AvailableProjectCardSkeleton key={i} />
             ))}
-          </div>
+          </SkeletonRegion>
         )}
 
         {!isLoading && isError && (
@@ -282,6 +283,14 @@ export default function MyProjectsPage() {
               />
             ))}
           </div>
+        )}
+
+        {!isLoading && isLoadingParticipo && (
+          <SkeletonRegion label="Cargando proyectos donde participo" className={`mt-8 ${PROJECT_CARD_GRID}`}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <AvailableProjectCardSkeleton key={i} />
+            ))}
+          </SkeletonRegion>
         )}
 
         {!isLoadingParticipo && participoFiltrados.length > 0 && (

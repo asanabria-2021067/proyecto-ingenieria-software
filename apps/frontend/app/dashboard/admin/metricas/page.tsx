@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 
 // T-293: la sección trae recharts; se carga aparte, igual que cuando vivía en el Panel Admin.
 const AdminMetricsSection = dynamic(
@@ -11,11 +11,11 @@ const AdminMetricsSection = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="grid grid-cols-1 gap-grid lg:grid-cols-2" role="status" aria-label="Cargando las tendencias de uso">
+      <SkeletonRegion className="grid grid-cols-1 gap-grid lg:grid-cols-2" label="Cargando las tendencias de uso">
         {Array.from({ length: 5 }, (_, i) => (
           <Skeleton key={i} className="h-96 rounded-card" />
         ))}
-      </div>
+      </SkeletonRegion>
     ),
   },
 );

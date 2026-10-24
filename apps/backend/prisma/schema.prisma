@@ -273,6 +273,8 @@ enum TipoNotificacion {
   TAREA_POR_VENCER
   // HU-190 (T-347): el usuario alcanzó un nuevo nivel de una insignia.
   INSIGNIA_OBTENIDA
+  // HU-200 (T-377): alguien mencionó al usuario con @ en un comentario de tarea, proyecto o hito.
+  MENCION_COMENTARIO
 }
 
 enum EstadoAmistad {
@@ -352,6 +354,7 @@ model Usuario {
   configuracionesActualizadas      ConfiguracionSistema[]
   revisionesProyectoRealizadas     RevisionProyecto[]         @relation("RevisionesProyectoRealizadas")
   comentariosEscritos              Comentario[]
+  mencionesRecibidas               MencionComentario[]
   mensajesRevisionEnviados         MensajeRevisionProyecto[]  @relation("MensajesEnviados")
   solicitudesSalidaSolicitadas     SolicitudSalidaProyecto[]  @relation("SolicitudSalidaSolicitante")
   solicitudesSalidaResueltas       SolicitudSalidaProyecto[]  @relation("SolicitudSalidaResolutor")
@@ -1605,13 +1608,31 @@ model Comentario {
   editadoEn    DateTime? @map("editado_en")
   eliminadoEn  DateTime? @map("eliminado_en")
 
-  autor    Usuario   @relation(fields: [idAutor], references: [idUsuario])
-  proyecto Proyecto? @relation(fields: [idProyecto], references: [idProyecto])
-  tarea    Tarea?    @relation(fields: [idTarea], references: [idTarea])
-  hito     Hito?     @relation(fields: [idHito], references: [idHito])
+  autor     Usuario             @relation(fields: [idAutor], references: [idUsuario])
+  proyecto  Proyecto?           @relation(fields: [idProyecto], references: [idProyecto])
+  tarea     Tarea?              @relation(fields: [idTarea], references: [idTarea])
+  hito      Hito?               @relation(fields: [idHito], references: [idHito])
+  menciones MencionComentario[]
 
   @@index([idTarea])
   @@map("comentario")
+}
+
+// HU-200 (T-376): integrante mencionado con @ en un comentario. El texto guarda
+// el token `@[Nombre](idUsuario)`; esta fila es la mención ya validada (solo
+// líder o participantes activos del proyecto), una por usuario y comentario.
+model MencionComentario {
+  idMencion    Int      @id @default(autoincrement()) @map("id_mencion")
+  idComentario Int      @map("id_comentario")
+  idUsuario    Int      @map("id_usuario")
+  creadaEn     DateTime @default(now()) @map("creada_en")
+
+  comentario Comentario @relation(fields: [idComentario], references: [idComentario], onDelete: Cascade)
+  usuario    Usuario    @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@unique([idComentario, idUsuario])
+  @@index([idUsuario])
+  @@map("mencion_comentario")
 }
 
 model MensajeRevisionProyecto {

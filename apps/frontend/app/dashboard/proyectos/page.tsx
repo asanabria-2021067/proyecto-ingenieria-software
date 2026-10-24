@@ -29,6 +29,7 @@ import { AlertCircle, Bookmark, FolderOpen, SearchX } from 'lucide-react';
 import { useState } from 'react';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
+import { SkeletonRegion } from '@/components/ui/skeleton';
 
 type OrganizacionFiltro = {
   idOrganizacion: number;
@@ -241,11 +242,11 @@ export default function ProyectosPage() {
         )}
 
         {isLoading && (
-          <div className={PROJECT_CARD_GRID} role="status" aria-label="Cargando proyectos">
+          <SkeletonRegion className={PROJECT_CARD_GRID} label="Cargando proyectos">
             {Array.from({ length: 6 }).map((_, i) => (
               <AvailableProjectCardSkeleton key={i} />
             ))}
-          </div>
+          </SkeletonRegion>
         )}
 
         {!isLoading && isError && (

@@ -19,7 +19,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import type {
   EstadoSprint,
@@ -82,10 +82,10 @@ function Metrica({ label, value, tono = 'text-text-primary' }: { label: string; 
 
 function RevisionSkeleton() {
   return (
-    <div className="grid gap-grid @3xl/project:grid-cols-[18rem_minmax(0,1fr)]" aria-busy="true" aria-label="Cargando revisión de horas">
+    <SkeletonRegion label="Cargando revisión de horas" className="grid gap-grid @3xl/project:grid-cols-[18rem_minmax(0,1fr)]">
       <Skeleton className="h-64 w-full rounded-card" />
       <Skeleton className="h-96 w-full rounded-card" />
-    </div>
+    </SkeletonRegion>
   );
 }
 

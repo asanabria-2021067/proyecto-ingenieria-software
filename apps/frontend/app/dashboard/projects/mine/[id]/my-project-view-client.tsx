@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, MessageSquare, Pencil, X, Plus, Send, Save, Eye } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SkeletonDetail } from '@/components/ui/skeleton';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -44,13 +44,7 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 function ViewSkeleton() {
-  return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-4">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <Skeleton key={i} className="h-11 w-full rounded-xl" />
-      ))}
-    </div>
-  );
+  return <SkeletonDetail label="Cargando proyecto" sections={3} className="max-w-3xl mx-auto px-6 py-8" />;
 }
 
 function parseComments(raw: string | null | undefined): { general: string; roles: string } {

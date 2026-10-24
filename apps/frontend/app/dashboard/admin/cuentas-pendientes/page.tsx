@@ -15,7 +15,7 @@ import {
 } from '@/components/dashboard/data-table';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Table,
   TableHeader,
@@ -61,7 +61,7 @@ function formatFecha(dateStr: string): string {
 
 function TablaSkeleton() {
   return (
-    <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando cuentas pendientes">
+    <SkeletonRegion className={DATA_TABLE_CARD} label="Cargando cuentas pendientes">
       <div className={`${DATA_TABLE_HEAD_ROW} px-stack py-tight`}>
         <Skeleton className="h-4 w-40" />
       </div>
@@ -77,7 +77,7 @@ function TablaSkeleton() {
           </div>
         ))}
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 

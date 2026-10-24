@@ -3,6 +3,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
+  AtSign,
   Award,
   Bell,
   BellOff,
@@ -24,7 +25,7 @@ import {
 import Link from 'next/link';
 import uvgSwal from '@/lib/swal';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SkeletonList } from '@/components/ui/skeleton';
 import {
   Empty,
   EmptyContent,
@@ -42,12 +43,15 @@ import {
   type Notificacion,
 } from '@/lib/services/notifications';
 import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
+import { resolveCommentNotificationLink } from '@/components/notifications/comment-notification-link';
 import { useConteoNoLeidas } from '@/hooks/use-notifications';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 
 /** Heurística por palabra clave del tipo (30+ valores en TipoNotificacion):
  * evita mantener un mapa exhaustivo que se desactualiza con cada tipo nuevo. */
 const TYPE_ICON_RULES: Array<[string, typeof Bell]> = [
+  // HU-200: antes que 'COMENTARIO', que también coincide con MENCION_COMENTARIO.
+  ['MENCION', AtSign],
   ['POSTULACION', UserCheck],
   ['TAREA', ClipboardList],
   ['HITO', Flag],
@@ -77,20 +81,7 @@ function humanizeTipo(tipo: string): string {
 }
 
 function NotificacionesSkeleton() {
-  return (
-    <div className="flex flex-col gap-stack" aria-hidden="true">
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="card-base flex items-start gap-stack">
-          <Skeleton className="h-11 w-11 shrink-0 rounded-2xl" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-2/5" />
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3.5 w-3/5" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  return <SkeletonList label="Cargando notificaciones" count={3} lines={3} avatar="square" />;
 }
 
 export default function NotificacionesPage() {
@@ -257,7 +248,7 @@ export default function NotificacionesPage() {
 
               <div className="flex flex-col gap-tight">
                 {notifs.map((n) => {
-                  const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n);
+                  const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n) ?? resolveCommentNotificationLink(n);
                   const Icon = getNotifIcon(n.tipoNotificacion);
                   const cardClassName = `card-base flex items-start gap-stack transition-all ${
                     n.leidaEn ? '' : 'border-primary/30 bg-primary-container/5 shadow-sm'

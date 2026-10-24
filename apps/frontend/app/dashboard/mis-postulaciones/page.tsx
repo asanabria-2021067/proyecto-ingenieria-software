@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
+import { SkeletonList } from '@/components/ui/skeleton';
 
 export default function MisPostulacionesPage() {
   const queryClient = useQueryClient();
@@ -177,9 +177,7 @@ export default function MisPostulacionesPage() {
         )}
 
         {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm" role="status">
-            Cargando tus postulaciones...
-          </div>
+          <SkeletonList label="Cargando tus postulaciones" count={4} lines={3} trailing={1} />
         )}
         {isError && (
           <Empty tone="danger" className="surface-enter" role="alert">

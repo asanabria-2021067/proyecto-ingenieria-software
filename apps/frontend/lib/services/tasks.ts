@@ -1,6 +1,8 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
   AssignTaskInput,
+  BulkTaskActionInput,
+  BulkTaskActionResultDTO,
   CloseAssignmentInput,
   CreateTaskInput,
   TareaPublicaDTO,
@@ -59,6 +61,17 @@ export function assignTask(
 export function unassignTask(idProyecto: number, idTarea: number): Promise<void> {
   return apiFetch<void>(`/proyectos/${idProyecto}/tareas/${idTarea}/asignar`, {
     method: 'DELETE',
+  });
+}
+
+/** HU-202 — `POST /proyectos/:id/tareas/acciones-masivas` (solo líder, todo o nada). */
+export function bulkTaskAction(
+  idProyecto: number,
+  input: BulkTaskActionInput,
+): Promise<BulkTaskActionResultDTO> {
+  return apiFetch<BulkTaskActionResultDTO>(`/proyectos/${idProyecto}/tareas/acciones-masivas`, {
+    method: 'POST',
+    body: JSON.stringify(input),
   });
 }
 

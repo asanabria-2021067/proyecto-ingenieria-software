@@ -7,7 +7,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AlertCircle, ChartLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { SEGMENTED_ITEM_CLASS, ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { formatearHoras } from '@/lib/hours/format';
@@ -187,11 +187,11 @@ function MetricTrendCard({
 
 function MetricasSkeleton({ amplia }: { amplia: boolean }) {
   return (
-    <div className={amplia ? REJILLA.amplia : REJILLA.compacta} aria-busy="true">
+    <SkeletonRegion label="Cargando las gráficas de tendencias" className={amplia ? REJILLA.amplia : REJILLA.compacta}>
       {METRICAS.map((m) => (
         <Skeleton key={m.serie} className={`rounded-card ${amplia ? 'h-96' : 'h-72'}`} />
       ))}
-    </div>
+    </SkeletonRegion>
   );
 }
 

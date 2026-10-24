@@ -33,6 +33,7 @@ import {
 import { useDashboardSidebarCollapsed } from '@/components/dashboard/use-dashboard-sidebar-collapsed';
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
+import { resolveCommentNotificationLink } from '@/components/notifications/comment-notification-link';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
 import { AnuncioBanner } from '@/components/anuncios/anuncio-banner';
 import { ChatDockProvider } from '@/components/chat-dock/chat-dock-context';
@@ -41,6 +42,7 @@ import { toast } from 'sonner';
 import logo from '@/public/logo.png';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { FontScaleToggle } from '@/components/font-scale-toggle';
+import { ShellSkeleton } from '@/components/layout/shell-skeleton';
 
 // T-293: la guía solo se muestra a quien entra por primera vez, pero react-joyride viajaba en el
 // JS inicial de todas las rutas del estudiante. Se carga aparte; no pinta nada hasta arrancar.
@@ -140,7 +142,8 @@ export default function DashboardLayout({
     queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
     queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
 
-    const href = getNotificationLink(latestNotification);
+    // HU-200: una mención o un comentario nuevo enlazan al comentario desde el aviso en vivo.
+    const href = getNotificationLink(latestNotification) ?? resolveCommentNotificationLink(latestNotification);
     toast(latestNotification.tituloNotificacion, {
       description: latestNotification.mensajeNotificacion,
       duration: 6000,
@@ -149,11 +152,7 @@ export default function DashboardLayout({
   }, [latestNotification, queryClient, router]);
 
   if (isLoading || isError || (!allowAdmin && isAdminUser(user))) {
-    return (
-      <div className="h-screen bg-surface flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <ShellSkeleton />;
   }
 
   return (

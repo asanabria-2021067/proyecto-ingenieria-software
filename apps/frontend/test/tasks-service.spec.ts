@@ -5,6 +5,7 @@ vi.mock('../lib/api/client', () => ({ apiFetch: vi.fn() }));
 import { apiFetch } from '../lib/api/client';
 import {
   assignTask,
+  bulkTaskAction,
   createTask,
   deleteTask,
   getProjectTask,
@@ -78,6 +79,14 @@ describe('lib/services/tasks', () => {
     expect(lastCall()[0]).toBe('/proyectos/7/tareas/3');
     expect(lastCall()[1]).toEqual({ method: 'DELETE' });
     expect(result).toBeUndefined();
+  });
+
+  it('bulkTaskAction: POST /acciones-masivas con el body exacto (HU-202)', async () => {
+    (apiFetch as any).mockResolvedValue({ accion: 'MOVER', tareas: [], idsActualizadas: [] });
+    const input = { idsTareas: [3, 4], accion: 'MOVER' as const, estadoTarea: 'HECHO' as const };
+    await bulkTaskAction(7, input);
+    expect(lastCall()[0]).toBe('/proyectos/7/tareas/acciones-masivas');
+    expect(lastCall()[1]).toEqual({ method: 'POST', body: JSON.stringify(input) });
   });
 
   it('propaga el error enriquecido de apiFetch sin sustituirlo', async () => {

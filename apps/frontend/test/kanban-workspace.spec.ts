@@ -347,6 +347,55 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     expect(screen.queryByRole('button', { name: /gestionar etiquetas/i })).not.toBeInTheDocument();
   });
 
+  describe('selección múltiple y acciones masivas (HU-202)', () => {
+    const dosTareas = () => [
+      tarea({ idTarea: 1, tituloTarea: 'Primera' }),
+      tarea({ idTarea: 2, tituloTarea: 'Segunda' }),
+    ];
+
+    it('el líder ve la ayuda con Shift y Esc y una casilla por tarjeta; un tercero no', () => {
+      (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+      mockUseProjectTasks({ tasks: dosTareas(), accionMasiva: mutationStub() } as any);
+
+      const { unmount } = renderWorkspace();
+      const ayuda = document.querySelector('[data-slot="ayuda-seleccion"]') as HTMLElement;
+      expect(ayuda).toHaveTextContent(/mantén Shift al hacer clic para seleccionar un rango/);
+      expect(ayuda).toHaveTextContent(/Esc limpia la selección/);
+      expect(screen.getAllByRole('checkbox', { name: /^Seleccionar / })).toHaveLength(2);
+      unmount();
+
+      (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
+      renderWorkspace();
+      expect(document.querySelector('[data-slot="ayuda-seleccion"]')).toBeNull();
+      expect(screen.queryByRole('checkbox', { name: /^Seleccionar / })).not.toBeInTheDocument();
+    });
+
+    it('marcar tarjetas muestra la barra con el conteo; Esc la limpia', () => {
+      (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+      mockUseProjectTasks({ tasks: dosTareas(), accionMasiva: mutationStub() } as any);
+      renderWorkspace();
+
+      expect(screen.queryByRole('toolbar', { name: 'Acciones masivas' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar "Primera"' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar "Segunda"' }));
+      expect(screen.getByRole('toolbar', { name: 'Acciones masivas' })).toHaveTextContent('2seleccionadas');
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('toolbar', { name: 'Acciones masivas' })).not.toBeInTheDocument();
+    });
+
+    it('cambiar a la pestaña Hitos descarta la selección', () => {
+      (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+      mockUseProjectTasks({ tasks: dosTareas(), accionMasiva: mutationStub() } as any);
+      renderWorkspace();
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar "Primera"' }));
+      expect(screen.getByRole('toolbar', { name: 'Acciones masivas' })).toBeInTheDocument();
+      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Hitos' }));
+      expect(screen.queryByRole('toolbar', { name: 'Acciones masivas' })).not.toBeInTheDocument();
+    });
+  });
+
   it('muestra un chip por cada rol activo del usuario (varios badges, Sección 28)', () => {
     const proyectoConRoles = {
       ...proyectoFixture,

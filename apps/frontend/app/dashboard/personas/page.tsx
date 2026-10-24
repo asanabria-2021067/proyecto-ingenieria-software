@@ -18,8 +18,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+import { SkeletonList } from '@/components/ui/skeleton';
 import {
   ArrowRight,
   LayoutGrid,
@@ -290,15 +289,13 @@ function RecomendacionCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
 
 function ListaSkeleton() {
   return (
-    <SkeletonTheme baseColor="var(--color-surface-container)" highlightColor="var(--color-surface-container-high)">
-      <ul className="grid gap-tight md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
-        {Array.from({ length: 9 }).map((_, i) => (
-          <li key={i} className="p-tight">
-            <Skeleton height={56} borderRadius="var(--radius-control)" />
-          </li>
-        ))}
-      </ul>
-    </SkeletonTheme>
+    <SkeletonList
+      label="Cargando personas"
+      count={9}
+      lines={2}
+      avatar="circle"
+      className="grid gap-tight md:grid-cols-2 xl:grid-cols-3"
+    />
   );
 }
 
