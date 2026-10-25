@@ -247,7 +247,7 @@ describe('HU-198 (N-01) · marcar como leídas solo las filtradas', () => {
     const controller = new NotificationsController(service as unknown as ConstructorParameters<typeof NotificationsController>[0]);
     controller.markAllAsRead({ userId: 4 }, { tipos: ['MENCION_COMENTARIO'] });
     controller.markAllAsRead({ userId: 4 }, {});
-    expect(service.markAllAsRead).toHaveBeenNthCalledWith(1, 4, ['MENCION_COMENTARIO']);
-    expect(service.markAllAsRead).toHaveBeenNthCalledWith(2, 4, undefined);
+    expect(service.markAllAsRead).toHaveBeenNthCalledWith(1, 4, { tipos: ['MENCION_COMENTARIO'], q: undefined, proyecto: undefined });
+    expect(service.markAllAsRead).toHaveBeenNthCalledWith(2, 4, { tipos: undefined, q: undefined, proyecto: undefined });
   });
 });

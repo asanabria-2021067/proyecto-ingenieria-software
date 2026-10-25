@@ -355,9 +355,13 @@ export class NotificationsService {
    * categoría filtrada); sin `tipos`, todas las suyas, como siempre.
    * `actualizadas` cuenta las que pasaron a leídas: las ya leídas no se tocan.
    */
-  async markAllAsRead(userId: number, tipos?: TipoNotificacion[]): Promise<{ actualizadas: number }> {
+  async markAllAsRead(
+    userId: number,
+    filtros?: TipoNotificacion[] | Omit<FiltroNotificaciones, 'leida'>,
+  ): Promise<{ actualizadas: number }> {
+    const { tipos, q, proyecto } = Array.isArray(filtros) ? { tipos: filtros } : (filtros ?? {});
     const result = await this.prisma.notificacion.updateMany({
-      where: { ...filtroNotificaciones(userId, { tipos }), leidaEn: null },
+      where: { ...filtroNotificaciones(userId, { tipos, q, proyecto }), leidaEn: null },
       data: { leidaEn: new Date() },
     });
     return { actualizadas: result.count };

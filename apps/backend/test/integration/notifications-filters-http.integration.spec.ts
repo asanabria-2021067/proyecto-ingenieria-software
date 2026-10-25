@@ -160,6 +160,14 @@ describeIntegration('HU-198 — filtros y marcado filtrado de notificaciones (Po
     expect((await pedir('GET', '/notificaciones?page=1&orden=DESC', tokens.a)).status).toBe(400);
   });
 
+  it('leer-todas con q y proyecto marca solo lo que esa lista muestra', async () => {
+    const res = await pedir('PATCH', `/notificaciones/leer-todas?proyecto=${ids.proyecto}&q=horas`, tokens.a);
+    expect(res).toMatchObject({ status: 200, body: { actualizadas: 1 } });
+    const sinLeer = await prisma.notificacion.findMany({ where: { idUsuario: ids.a, leidaEn: null }, select: { tituloNotificacion: true } });
+    expect(sinLeer.map((n) => n.tituloNotificacion)).not.toContain('TAREA_ASIGNADA 1');
+    expect(sinLeer).toHaveLength(6);
+  });
+
   it('mias/proyectos lista solo proyectos existentes referenciados por los avisos propios', async () => {
     const res = await pedir('GET', '/notificaciones/mias/proyectos', tokens.a);
     expect(res.status).toBe(200);

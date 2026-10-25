@@ -58,10 +58,13 @@ export class NotificationsController {
     return this.notificationsService.updatePreference(user.userId, dto.tipo, dto.activa);
   }
 
-  /** HU-198: `?tipos=A,B` acota el marcado a la categoría filtrada; sin él, todas las propias. */
+  /**
+   * HU-198: `?tipos=A,B` acota el marcado a la categoría filtrada; sin él, todas las propias.
+   * Sprint 10: `q` y `proyecto` acotan igual que en la lista, así «marcar filtradas» coincide con lo listado.
+   */
   @Patch('leer-todas')
   markAllAsRead(@CurrentUser() user: { userId: number }, @Query() query: NotificationTypesFilterDto) {
-    return this.notificationsService.markAllAsRead(user.userId, query.tipos);
+    return this.notificationsService.markAllAsRead(user.userId, { tipos: query.tipos, q: query.q, proyecto: query.proyecto });
   }
 
   @Patch(':id/leer')

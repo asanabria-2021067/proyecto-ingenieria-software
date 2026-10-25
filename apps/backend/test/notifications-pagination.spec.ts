@@ -196,6 +196,21 @@ describe('GET /notificaciones · q, proyecto y orden (Sprint 10)', () => {
     expect(prisma.notificacion.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ orderBy: [{ creadaEn: 'desc' }, { idNotificacion: 'desc' }] }));
   });
 
+  it('leer-todas acota con q y proyecto además de tipos, siempre solo no leídas del usuario', async () => {
+    const prisma = { notificacion: { updateMany: vi.fn().mockResolvedValue({ count: 2 }) } };
+    const service = new NotificationsService(prisma as unknown as PrismaService);
+    await expect(service.markAllAsRead(7, { tipos: ['TAREA_ASIGNADA'], q: 'sprint', proyecto: 'ninguno' })).resolves.toEqual({ actualizadas: 2 });
+    const where = prisma.notificacion.updateMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({ idUsuario: 7, leidaEn: null, tipoNotificacion: { in: ['TAREA_ASIGNADA'] } });
+    expect(where.AND).toHaveLength(2);
+    // Compatibilidad: la firma anterior con el arreglo de tipos sigue valiendo.
+    await service.markAllAsRead(7, ['MENCION_COMENTARIO']);
+    expect(prisma.notificacion.updateMany).toHaveBeenLastCalledWith({
+      where: { idUsuario: 7, tipoNotificacion: { in: ['MENCION_COMENTARIO'] }, leidaEn: null },
+      data: { leidaEn: expect.any(Date) },
+    });
+  });
+
   it('mias/proyectos devuelve solo proyectos referenciados por los avisos del usuario, con título', async () => {
     const prisma = {
       $queryRaw: vi.fn().mockResolvedValue([{ id: 64 }, { id: 9 }, { id: null }]),
