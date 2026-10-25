@@ -275,6 +275,10 @@ enum TipoNotificacion {
   INSIGNIA_OBTENIDA
   // HU-200 (T-377): alguien mencionó al usuario con @ en un comentario de tarea, proyecto o hito.
   MENCION_COMENTARIO
+  // HU-195 (T-364): ciclo de vida de una reunión de Administración con el equipo del usuario.
+  REUNION_PROGRAMADA
+  REUNION_ACTUALIZADA
+  REUNION_CANCELADA
 }
 
 enum EstadoAmistad {
