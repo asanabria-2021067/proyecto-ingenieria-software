@@ -21,10 +21,12 @@ const TRIGGER_CLASS =
 
 /**
  * Opción con el resaltado de `SelectItem` (verde con texto claro) y la marca a
- * la derecha, como en los selectores de Mis Proyectos.
+ * la derecha, como en los selectores de Mis Proyectos. Radix da `tabindex=0` a
+ * la opción enfocada y la regla global de `:focus-visible` le pondría un
+ * contorno que el `Select` no tiene: aquí el foco ya es el fondo verde.
  */
 const ITEM_CLASS =
-  'cursor-default rounded-lg py-1.5 pr-8 pl-2 focus:bg-primary focus:text-on-primary focus:[&_*]:text-on-primary data-[state=checked]:font-semibold [&>span:first-child]:right-2 [&>span:first-child]:left-auto';
+  'cursor-default rounded-lg py-1.5 pr-8 pl-2 focus-visible:outline-none! focus:bg-primary focus:text-on-primary focus:[&_*]:text-on-primary data-[state=checked]:font-semibold [&>span:first-child]:right-2 [&>span:first-child]:left-auto';
 
 /**
  * Filtro de selección múltiple con la apariencia de los filtros del dashboard
@@ -58,7 +60,8 @@ export function DashboardFilterMultiSelect({
         <button
           type="button"
           aria-label={elegidas > 0 ? `${ariaLabel}, ${elegidas} ${elegidas === 1 ? 'seleccionada' : 'seleccionadas'}` : ariaLabel}
-          className={cn(TRIGGER_CLASS, DASHBOARD_FILTER_TRIGGER_CLASS, className)}
+          // Misma altura efectiva que el `SelectTrigger` de Mis Proyectos (36 px).
+          className={cn(TRIGGER_CLASS, DASHBOARD_FILTER_TRIGGER_CLASS, 'h-9 py-2', className)}
         >
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate">{label}</span>
