@@ -29,6 +29,13 @@ vi.mock('@/lib/services/social', () => ({
   dejarDeSeguir: (id: number) => dejarDeSeguirMock(id),
 }));
 
+const searchParamsMock = vi.hoisted(() => vi.fn(() => new URLSearchParams()));
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => searchParamsMock(),
+  usePathname: () => '/dashboard/personas',
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
+
 vi.mock('@/lib/services/catalogs', () => ({
   getHabilidades: () => Promise.resolve([{ idHabilidad: 1, nombreHabilidad: 'React' }]),
   getIntereses: () => Promise.resolve([{ idInteres: 1, nombreInteres: 'IA' }]),
@@ -67,18 +74,12 @@ function solicitud(overrides: Partial<SolicitudAmistadPendienteDto> = {}): Solic
   };
 }
 
-/** Radix Tabs selecciona en `onMouseDown`, no en `click` (ver
- * @radix-ui/react-tabs `TabsTrigger`); `fireEvent.click` no dispara el
- * mousedown sintético que Testing Library normalmente emite en un click
- * real de usuario. */
-function clickTab(name: string) {
-  fireEvent.mouseDown(screen.getByRole('tab', { name }), { button: 0 });
-}
-
-async function renderPersonas() {
+/** La sección vive en `?seccion=` (Descubrir sin parámetro). */
+async function renderPersonas(seccion?: 'amigos' | 'amigos-de-amigos') {
+  searchParamsMock.mockReturnValue(new URLSearchParams(seccion ? `seccion=${seccion}` : ''));
   const { default: PersonasPage } = await import('@/app/dashboard/personas/page');
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  return render(
     <QueryClientProvider client={queryClient}>
       <PersonasPage />
     </QueryClientProvider>,
@@ -92,28 +93,16 @@ beforeEach(() => {
   swalFire.mockClear();
 });
 
+const directorio = () => screen.findByRole('region', { name: 'Directorio de personas' });
+
 describe('PersonasPage', () => {
-  it('cambiar de pestaña dispara la consulta correspondiente', async () => {
-    await renderPersonas();
-    await waitFor(() =>
-      expect(buscarUsuariosMock).toHaveBeenCalledWith(
-        expect.objectContaining({ carrera: false, amigosDeAmigos: false, soloAmigos: false }),
-      ),
-    );
-
-    clickTab('Mi carrera');
-    await waitFor(() =>
-      expect(buscarUsuariosMock).toHaveBeenCalledWith(
-        expect.objectContaining({ carrera: true, amigosDeAmigos: false, soloAmigos: false }),
-      ),
-    );
-
-    clickTab('Mis amigos');
-    await waitFor(() =>
-      expect(buscarUsuariosMock).toHaveBeenCalledWith(
-        expect.objectContaining({ carrera: false, amigosDeAmigos: false, soloAmigos: true }),
-      ),
-    );
+  it.each([
+    [undefined, { amigosDeAmigos: false, soloAmigos: false }],
+    ['amigos', { amigosDeAmigos: false, soloAmigos: true }],
+    ['amigos-de-amigos', { amigosDeAmigos: true, soloAmigos: false }],
+  ] as const)('la sección ?seccion=%s pide su consulta al backend', async (seccion, flags) => {
+    await renderPersonas(seccion);
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalledWith(expect.objectContaining(flags)));
   });
 
   it('el contador del botón de filtros refleja los chips seleccionados', async () => {
@@ -172,7 +161,7 @@ describe('PersonasPage', () => {
     });
     await renderPersonas();
 
-    const main = await screen.findByRole('main');
+    const main = await directorio();
     expect(await within(main).findByText('Carla Ruiz')).toBeInTheDocument();
     expect(within(main).getByText('Ingeniería')).toBeInTheDocument();
     expect(within(main).getByText('React')).toBeInTheDocument();
@@ -189,7 +178,7 @@ describe('PersonasPage', () => {
     });
     await renderPersonas();
 
-    const main = await screen.findByRole('main');
+    const main = await directorio();
     expect(await within(main).findByText('Carla Ruiz')).toBeInTheDocument();
     // en tarjetas, "Ver perfil" trae una flecha aparte del texto (article > a)
     expect(screen.getByRole('button', { name: 'Ver como tarjetas' })).toHaveAttribute(
@@ -210,15 +199,23 @@ describe('PersonasPage', () => {
     expect(within(main).getByText('Carla Ruiz')).toBeInTheDocument();
   });
 
-  it('cada estado vacío renderiza su mensaje correspondiente', async () => {
-    await renderPersonas();
+  it('cada sección renderiza su estado vacío', async () => {
+    const vista = await renderPersonas();
     expect(await screen.findByText('No encontramos a nadie')).toBeInTheDocument();
+    vista.unmount();
 
-    clickTab('Amigos de amigos');
-    expect(await screen.findByText('Agregá a tu primer amigo')).toBeInTheDocument();
+    const amigosDeAmigos = await renderPersonas('amigos-de-amigos');
+    expect(await screen.findByText('Agrega a tu primer amigo')).toBeInTheDocument();
+    amigosDeAmigos.unmount();
 
-    clickTab('Mis amigos');
-    expect(await screen.findByText('Todavía no tenés amigos')).toBeInTheDocument();
+    await renderPersonas('amigos');
+    expect(await screen.findByText('Aún no tienes amigos')).toBeInTheDocument();
+  });
+
+  it('amigos de amigos sin coincidencias, teniendo amigos, lo dice sin inventar conexiones', async () => {
+    getAmigosMock.mockResolvedValue([usuario({ idUsuario: 3, esAmigo: true })]);
+    await renderPersonas('amigos-de-amigos');
+    expect(await screen.findByText('Aún no hay conexiones en común')).toBeInTheDocument();
   });
 
   // T-195: chips de señal (motivo de recomendación) vs. chips de etiqueta
@@ -364,30 +361,57 @@ describe('PersonasPage — radio de los botones de acción', () => {
 
 // Pestañas con radio medio (no cápsula) y estados vacíos en tarjeta blanca,
 // con el mismo criterio que Chats archivados.
-describe('PersonasPage — pestañas y estados vacíos', () => {
+describe('PersonasPage — navegación secundaria y estados vacíos', () => {
   beforeEach(() => {
     getSolicitudesPendientesMock.mockResolvedValue([]);
     getAmigosMock.mockResolvedValue([]);
     buscarUsuariosMock.mockResolvedValue({ items: [], hasMore: false });
   });
 
-  it('las cuatro pestañas usan radio medio y el activo conserva verde con texto blanco', async () => {
+  it('sin pestañas: la sidebar agrupa Explorar y Conexiones, con el activo verde y enlaces a ?seccion=', async () => {
     await renderPersonas();
 
-    const pestanas = screen.getAllByRole('tab');
-    expect(pestanas.map((t) => t.textContent)).toEqual(['Todos', 'Amigos de amigos', 'Mi carrera', 'Mis amigos']);
-    for (const t of pestanas) {
-      expect(t).toHaveClass('rounded-md', 'data-[state=active]:bg-primary', 'data-[state=active]:text-on-primary');
-      expect(t).not.toHaveClass('rounded-pill');
-    }
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    const nav = screen.getAllByRole('navigation', { name: 'Navegación de Personas' })[0];
+    expect(within(nav).getByRole('group', { name: 'Explorar' })).toBeInTheDocument();
+    expect(within(nav).getByRole('group', { name: 'Conexiones' })).toBeInTheDocument();
+    const enlaces = within(nav).getAllByRole('link');
+    expect(enlaces.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Descubrir personas', '/dashboard/personas'],
+      ['Mis amigos', '/dashboard/personas?seccion=amigos'],
+      ['Amigos de amigos', '/dashboard/personas?seccion=amigos-de-amigos'],
+    ]);
+    expect(enlaces[0]).toHaveAttribute('aria-current', 'page');
+    expect(enlaces[0]).toHaveClass('bg-sage-nav-active');
+    expect(enlaces[1]).not.toHaveAttribute('aria-current');
   });
 
   it.each([
-    ['Mis amigos', 'Todavía no tenés amigos', 'Buscá compañeros en la pestaña Todos y agregalos.'],
-    ['Amigos de amigos', 'Agregá a tu primer amigo', 'Cuando tengas amigos vas a empezar a ver también a los suyos acá.'],
-  ])('en «%s» el vacío es una tarjeta blanca con sus textos intactos y sin acción nueva', async (pestana, titulo, descripcion) => {
-    await renderPersonas();
-    clickTab(pestana);
+    [undefined, 'Descubrir personas', 'Busca compañeros, sigue su actividad y hazte amigo.'],
+    ['amigos', 'Mis amigos', 'Mantén el contacto con las personas de tu comunidad.'],
+    ['amigos-de-amigos', 'Amigos de amigos', 'Descubre estudiantes con conexiones en común.'],
+  ] as const)('?seccion=%s cambia el encabezado y marca su destino', async (seccion, titulo, descripcion) => {
+    await renderPersonas(seccion);
+    expect(screen.getByRole('heading', { level: 1, name: titulo })).toBeInTheDocument();
+    expect(screen.getByText(descripcion)).toBeInTheDocument();
+    const nav = screen.getAllByRole('navigation', { name: 'Navegación de Personas' })[0];
+    expect(within(nav).getByRole('link', { name: titulo })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('las recomendaciones solo aparecen en Descubrir', async () => {
+    const vista = await renderPersonas();
+    expect(await screen.findByText('Personas que quizás conozcas')).toBeInTheDocument();
+    vista.unmount();
+    await renderPersonas('amigos');
+    await screen.findByText('Aún no tienes amigos');
+    expect(screen.queryByText('Personas que quizás conozcas')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['amigos', 'Aún no tienes amigos', 'Busca compañeros en Descubrir personas y agrégalos.'],
+    ['amigos-de-amigos', 'Agrega a tu primer amigo', 'Cuando tengas amigos, aquí verás a las personas conectadas con ellos.'],
+  ] as const)('en «%s» el vacío es una tarjeta blanca con su mensaje contextual y sin acción nueva', async (seccion, titulo, descripcion) => {
+    await renderPersonas(seccion);
 
     const tituloEl = await screen.findByText(titulo);
     const tarjeta = tituloEl.closest('[data-slot="empty"]') as HTMLElement;
