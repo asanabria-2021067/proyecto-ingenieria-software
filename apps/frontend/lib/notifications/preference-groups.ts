@@ -42,7 +42,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroupId, { titulo: str
   postulaciones: { titulo: 'Postulaciones y equipo', descripcion: 'Postulaciones, roles y participación en proyectos.' },
   proyectos: { titulo: 'Proyectos', descripcion: 'Publicación, revisión, liderazgo y cierre de proyectos.' },
   horas: { titulo: 'Horas y reconocimiento', descripcion: 'Validación y acreditación de tus horas.' },
-  recordatorios: { titulo: 'Recordatorios y calendario', descripcion: 'Eventos próximos y calendarios compartidos.' },
+  recordatorios: { titulo: 'Recordatorios y calendario', descripcion: 'Eventos próximos, reuniones de Administración y calendarios compartidos.' },
   contactos: { titulo: 'Red de contactos', descripcion: 'Solicitudes de amistad y seguidores.' },
   cuenta: { titulo: 'Cuenta y seguridad', descripcion: 'Avisos sobre accesos y recuperación de contraseñas.' },
   otras: { titulo: 'Otras notificaciones', descripcion: 'Tipos que la plataforma añadió y aún no tienen una descripción propia.' },
@@ -119,6 +119,10 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
 
   RECORDATORIO_EVENTO: { grupo: 'recordatorios', etiqueta: 'Recordatorio de evento', descripcion: 'Un evento de tu calendario está por empezar.' },
   CALENDARIO_COMPARTIDO: { grupo: 'recordatorios', etiqueta: 'Calendario compartido', descripcion: 'Alguien comparte su calendario contigo.' },
+  // HU-195: reuniones que Administración convoca con el equipo de tus proyectos.
+  REUNION_PROGRAMADA: { grupo: 'recordatorios', etiqueta: 'Reunión programada', descripcion: 'Administración convoca a tu equipo a una reunión.' },
+  REUNION_ACTUALIZADA: { grupo: 'recordatorios', etiqueta: 'Reunión actualizada', descripcion: 'Cambia la fecha, el lugar o el enlace de una reunión de tu equipo.' },
+  REUNION_CANCELADA: { grupo: 'recordatorios', etiqueta: 'Reunión cancelada', descripcion: 'Administración cancela una reunión de tu equipo.' },
 
   SOLICITUD_AMISTAD: { grupo: 'contactos', etiqueta: 'Solicitud de amistad', descripcion: 'Recibes una solicitud de amistad.' },
   AMISTAD_ACEPTADA: { grupo: 'contactos', etiqueta: 'Amistad aceptada', descripcion: 'Aceptan tu solicitud de amistad.' },

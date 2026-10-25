@@ -43,7 +43,8 @@ const FAMILIAS = [
   ['Postulaciones y equipo', 7],
   ['Proyectos', 17],
   ['Horas y reconocimiento', 5],
-  ['Recordatorios y calendario', 2],
+  // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA.
+  ['Recordatorios y calendario', 5],
   ['Red de contactos', 3],
   ['Cuenta y seguridad', 4],
 ] as const;
