@@ -147,7 +147,7 @@ export default function PerfilPersonaPage() {
               </div>
 
               <div className="mt-tight grid w-full max-w-sm grid-cols-2 gap-tight">
-                <Button variant={amistad.variant} disabled={amistad.disabled} onClick={amistad.onClick}>
+                <Button variant={amistad.variant} disabled={amistad.disabled} onClick={amistad.onClick} className="h-9.5 rounded-md px-4.5 text-[13px] font-semibold">
                   {amistad.label}
                 </Button>
                 <Button variant="outline" disabled={seguimiento.disabled} onClick={seguimiento.onClick}>
