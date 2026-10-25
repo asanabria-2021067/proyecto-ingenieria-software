@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
 import { cleanupIntegrationFixtures } from './setup/cleanup';
@@ -168,6 +168,149 @@ describeIntegration('HU-195 — servicio de reuniones de Administración (Postgr
       const creada = await service.create(id('ADMIN'), dto([p.P2.idProyecto]));
       const registro = await prisma.bitacoraAuditoria.findFirst({ where: { tipoObjeto: 'REUNION_ADMINISTRACION', idObjeto: String(creada.idReunion) } });
       expect(registro).toMatchObject({ idUsuario: id('ADMIN'), accion: 'REUNION_ADMIN_CREADA', detalleJson: { proyectos: [p.P2.idProyecto], politicaEdicion: 'TODOS_ADMINISTRADORES', motivoGestion: 'POLITICA' } });
+    });
+  });
+
+  describe('G06 · editar, sincronizar y concurrencia', () => {
+    const usuariosDe = async (idReunion: number, tipo: string) => (await avisos(idReunion, tipo)).map((f) => f.idUsuario);
+    const proyecciones = (idReunion: number) =>
+      prisma.eventoProyecto.findMany({ where: { idReunion }, orderBy: { idProyecto: 'asc' }, select: { idEvento: true, idProyecto: true, eliminadoEn: true, tituloEvento: true, fechaInicio: true, recordatorioEnviadoEn: true } });
+
+    it('cambiar el título reescribe todas las proyecciones, sube la versión y avisa ACTUALIZADA una vez por persona', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P1.idProyecto, p.P2.idProyecto]));
+      emitidos.length = 0;
+      const editada = await service.update(creada.idReunion, id('ADMIN2'), { version: 1, tituloEvento: 'Seguimiento reprogramado' });
+
+      expect(editada).toMatchObject({ version: 2, integridad: 'OK', contenido: { tituloEvento: 'Seguimiento reprogramado' } });
+      expect((await proyecciones(creada.idReunion)).map((x) => x.tituloEvento)).toEqual(['Seguimiento reprogramado', 'Seguimiento reprogramado']);
+      expect(await usuariosDe(creada.idReunion, 'REUNION_ACTUALIZADA')).toEqual([id('L1'), id('M1'), id('COMUN'), id('L2'), id('M2')].sort((a, b) => a - b));
+      expect(await usuariosDe(creada.idReunion, 'REUNION_PROGRAMADA')).toHaveLength(5);
+      expect(emitidos.every((e) => e.tipo === 'REUNION_ACTUALIZADA')).toBe(true);
+    });
+
+    it('un PATCH sin cambios reales no sube la versión ni avisa', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P2.idProyecto]));
+      emitidos.length = 0;
+      const igual = await service.update(creada.idReunion, id('ADMIN'), { version: 1, tituloEvento: 'Seguimiento HU-195', proyectos: [p.P2.idProyecto] });
+      expect(igual.version).toBe(1);
+      expect(await usuariosDe(creada.idReunion, 'REUNION_ACTUALIZADA')).toEqual([]);
+      expect(emitidos).toEqual([]);
+    });
+
+    it('una versión desfasada es 409 y no escribe', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P2.idProyecto]));
+      await service.update(creada.idReunion, id('ADMIN'), { version: 1, tituloEvento: 'Primera edición' });
+      const error = await service.update(creada.idReunion, id('ADMIN2'), { version: 1, tituloEvento: 'Edición perdida' }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toMatchObject({ versionActual: 2 });
+      expect((await proyecciones(creada.idReunion))[0].tituloEvento).toBe('Primera edición');
+    });
+
+    it('AC-16: dos administradores editan a la vez la misma versión: uno gana, el otro recibe 409', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P2.idProyecto]));
+      const resultados = await Promise.allSettled([
+        service.update(creada.idReunion, id('ADMIN'), { version: 1, tituloEvento: 'Versión de ADMIN' }),
+        service.update(creada.idReunion, id('ADMIN2'), { version: 1, tituloEvento: 'Versión de ADMIN2' }),
+      ]);
+      expect(resultados.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      const rechazo = resultados.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+      expect(rechazo.reason).toBeInstanceOf(ConflictException);
+      const ganador = (resultados.find((r) => r.status === 'fulfilled') as PromiseFulfilledResult<{ contenido: { tituloEvento: string } }>).value;
+      expect((await proyecciones(creada.idReunion))[0].tituloEvento).toBe(ganador.contenido.tituloEvento);
+      expect((await prisma.reunionAdministracion.findUniqueOrThrow({ where: { idReunion: creada.idReunion } })).version).toBe(2);
+    });
+
+    it('AC-06B: retirar P2 no da de baja a COMUN, que sigue por P1; solo L2 y M2 reciben la cancelación', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P1.idProyecto, p.P2.idProyecto]));
+      const editada = await service.update(creada.idReunion, id('ADMIN'), { version: 1, proyectos: [p.P1.idProyecto] });
+
+      expect(editada.proyectos.map((x) => x.idProyecto)).toEqual([p.P1.idProyecto]);
+      expect(await usuariosDe(creada.idReunion, 'REUNION_CANCELADA')).toEqual([id('L2'), id('M2')].sort((a, b) => a - b));
+      expect(await usuariosDe(creada.idReunion, 'REUNION_ACTUALIZADA')).toEqual([]);
+      const filaP2 = (await proyecciones(creada.idReunion)).find((x) => x.idProyecto === p.P2.idProyecto);
+      expect(filaP2?.eliminadoEn).not.toBeNull();
+    });
+
+    it('añadir un proyecto avisa solo a quien no estaba ya convocado (COMUN no recibe una segunda convocatoria)', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P1.idProyecto]));
+      await service.update(creada.idReunion, id('ADMIN'), { version: 1, proyectos: [p.P1.idProyecto, p.P2.idProyecto] });
+      const programadas = await avisos(creada.idReunion, 'REUNION_PROGRAMADA');
+      expect(programadas.filter((f) => f.claveIdempotencia === `reunion:${creada.idReunion}:v2:programada`).map((f) => f.idUsuario)).toEqual([id('L2'), id('M2')].sort((a, b) => a - b));
+      expect(programadas.filter((f) => f.idUsuario === id('COMUN'))).toHaveLength(1);
+    });
+
+    it('AC-15: quitar y volver a añadir un proyecto reactiva la MISMA proyección (sin violar el UNIQUE)', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P1.idProyecto, p.P2.idProyecto]));
+      const original = (await proyecciones(creada.idReunion)).find((x) => x.idProyecto === p.P2.idProyecto);
+      await service.update(creada.idReunion, id('ADMIN'), { version: 1, proyectos: [p.P1.idProyecto] });
+      await service.update(creada.idReunion, id('ADMIN'), { version: 2, proyectos: [p.P1.idProyecto, p.P2.idProyecto], tituloEvento: 'Vuelve P2' });
+
+      const filas = await proyecciones(creada.idReunion);
+      expect(filas).toHaveLength(2);
+      const p2 = filas.find((x) => x.idProyecto === p.P2.idProyecto);
+      expect(p2).toMatchObject({ idEvento: original?.idEvento, eliminadoEn: null, tituloEvento: 'Vuelve P2' });
+      expect(filas.every((x) => x.tituloEvento === 'Vuelve P2')).toBe(true);
+    });
+
+    it('reprogramar reabre el recordatorio de todas las proyecciones', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P1.idProyecto, p.P2.idProyecto]));
+      await prisma.eventoProyecto.updateMany({ where: { idReunion: creada.idReunion }, data: { recordatorioEnviadoEn: new Date() } });
+      await service.update(creada.idReunion, id('ADMIN'), { version: 1, fechaInicio: esc.enDias(6).toISOString(), fechaFin: esc.enDias(6, 16).toISOString() });
+      expect((await proyecciones(creada.idReunion)).map((x) => x.recordatorioEnviadoEn)).toEqual([null, null]);
+    });
+
+    it('con un CERRADO convocado: reprogramar dentro de su ventana sí; fuera, 400; añadir uno vencido, 400', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.PC.idProyecto]));
+      await service.update(creada.idReunion, id('ADMIN'), { version: 1, fechaInicio: esc.enDias(20).toISOString(), fechaFin: esc.enDias(20, 16).toISOString() });
+      await expect(service.update(creada.idReunion, id('ADMIN'), { version: 2, fechaInicio: esc.enDias(70).toISOString(), fechaFin: esc.enDias(70, 16).toISOString() })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.update(creada.idReunion, id('ADMIN'), { version: 2, proyectos: [p.PC.idProyecto, p.PVENC.idProyecto] })).rejects.toBeInstanceOf(BadRequestException);
+      // Cambiar solo la descripción de un CERRADO ya convocado no revalida la ventana.
+      expect((await service.update(creada.idReunion, id('ADMIN'), { version: 2, descripcionEvento: 'Agenda' })).version).toBe(3);
+    });
+
+    it('AC-11/AC-12/AC-13: políticas, cambio de política solo por el creador y editor revocado', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P2.idProyecto], { politicaEdicion: 'SOLO_CREADOR' }));
+      expect(await service.update(creada.idReunion, id('ADMIN2'), { version: 1, tituloEvento: 'X' }).catch((e: unknown) => e)).toBeInstanceOf(ForbiddenException);
+
+      await service.update(creada.idReunion, id('ADMIN'), { version: 1, politicaEdicion: 'ADMINISTRADORES_SELECCIONADOS', editores: [id('ADMIN2')] });
+      expect((await service.update(creada.idReunion, id('ADMIN2'), { version: 2, tituloEvento: 'Editado por ADMIN2' })).version).toBe(3);
+      // Un editor no amplía permisos: no cambia la política.
+      await expect(service.update(creada.idReunion, id('ADMIN2'), { version: 3, politicaEdicion: 'TODOS_ADMINISTRADORES' })).rejects.toBeInstanceOf(ForbiddenException);
+
+      const rol = await prisma.usuarioRolAcceso.findFirstOrThrow({ where: { idUsuario: id('ADMIN2') } });
+      await prisma.usuarioRolAcceso.delete({ where: { idUsuarioRolAcceso: rol.idUsuarioRolAcceso } });
+      try {
+        await expect(service.update(creada.idReunion, id('ADMIN2'), { version: 3, tituloEvento: 'Sin rol' })).rejects.toBeInstanceOf(ForbiddenException);
+      } finally {
+        await prisma.usuarioRolAcceso.create({ data: { idUsuario: id('ADMIN2'), idRolAcceso: rol.idRolAcceso } });
+      }
+      const registro = await prisma.bitacoraAuditoria.findFirst({ where: { tipoObjeto: 'REUNION_ADMINISTRACION', idObjeto: String(creada.idReunion), accion: 'REUNION_ADMIN_ACTUALIZADA' }, orderBy: { idAuditoria: 'asc' } });
+      expect(registro?.detalleJson).toMatchObject({ politica: { antes: 'SOLO_CREADOR', despues: 'ADMINISTRADORES_SELECCIONADOS' }, editores: { antes: [], despues: [id('ADMIN2')] } });
+    });
+
+    it('QC-01: si el creador pierde el rol, otro administrador gestiona por respaldo y queda auditado', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P2.idProyecto], { politicaEdicion: 'SOLO_CREADOR' }));
+      const rol = await prisma.usuarioRolAcceso.findFirstOrThrow({ where: { idUsuario: id('ADMIN') } });
+      await prisma.usuarioRolAcceso.delete({ where: { idUsuarioRolAcceso: rol.idUsuarioRolAcceso } });
+      try {
+        const editada = await service.update(creada.idReunion, id('ADMIN2'), { version: 1, tituloEvento: 'Respaldo' });
+        expect(editada).toMatchObject({ version: 2, canManage: true, motivoGestion: 'RESPALDO_CREADOR_SIN_AUTORIZACION', puedeCambiarPolitica: false });
+        const registro = await prisma.bitacoraAuditoria.findFirst({ where: { tipoObjeto: 'REUNION_ADMINISTRACION', idObjeto: String(creada.idReunion), accion: 'REUNION_ADMIN_ACTUALIZADA' } });
+        expect(registro).toMatchObject({ idUsuario: id('ADMIN2'), detalleJson: { motivoGestion: 'RESPALDO_CREADOR_SIN_AUTORIZACION' } });
+      } finally {
+        await prisma.usuarioRolAcceso.create({ data: { idUsuario: id('ADMIN'), idRolAcceso: rol.idRolAcceso } });
+      }
     });
   });
 });
