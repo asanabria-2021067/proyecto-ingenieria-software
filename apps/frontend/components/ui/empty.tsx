@@ -20,9 +20,18 @@ const emptyVariants = cva(
         flush:
           'rounded-none border-0 bg-transparent px-0 py-8 text-on-surface shadow-none md:px-0 md:py-10',
       },
+      size: {
+        default: '',
+        // Banda horizontal (~80–100 px): ícono a la izquierda, texto al centro y acción a la
+        // derecha. En pantallas angostas la acción baja bajo el texto. Reacomoda las piezas
+        // por su `data-slot`, así que se usan las mismas EmptyMedia/EmptyHeader/EmptyContent.
+        compact:
+          'flex-row flex-wrap items-center justify-start gap-x-4 gap-y-3 px-5 py-4 text-left md:px-6 md:py-4 [&>[data-slot=empty-icon]]:mb-0 [&>[data-slot=empty-header]]:max-w-none [&>[data-slot=empty-header]]:min-w-48 [&>[data-slot=empty-header]]:flex-1 [&>[data-slot=empty-header]]:items-start [&>[data-slot=empty-header]]:gap-1 [&>[data-slot=empty-header]]:text-left [&>[data-slot=empty-content]]:w-auto [&>[data-slot=empty-content]]:max-w-none',
+      },
     },
     defaultVariants: {
       tone: 'default',
+      size: 'default',
     },
   },
 )
@@ -30,12 +39,13 @@ const emptyVariants = cva(
 function Empty({
   className,
   tone = 'default',
+  size = 'default',
   ...props
 }: React.ComponentProps<'section'> & VariantProps<typeof emptyVariants>) {
   return (
     <section
       data-slot="empty"
-      className={cn(emptyVariants({ tone, className }))}
+      className={cn(emptyVariants({ tone, size, className }))}
       {...props}
     />
   )
