@@ -7,11 +7,25 @@ import {
   type PostCommitEffectSink,
 } from '../notifications/notifications.service';
 import { GUATEMALA_TIME_ZONE } from '../common/utils/guatemala-date';
-import { cargarProyectosParaReunion, motivoNoElegible, type ProyectoParaReunion } from './admin-meeting-eligibility';
-import { administradoresActivos, cargarGestion, type MotivoGestion } from './admin-meeting-access';
+import {
+  MESES_VENTANA_POSCIERRE,
+  cargarProyectosParaReunion,
+  motivoNoElegible,
+  sumarMesesCalendario,
+  ventanaPoscierre,
+  type ProyectoParaReunion,
+} from './admin-meeting-eligibility';
+import {
+  administradoresActivos,
+  cargarGestion,
+  evaluarGestion,
+  puedeCambiarPolitica,
+  type MotivoGestion,
+} from './admin-meeting-access';
 import { equiposDeProyectos, proyectoDeCadaUsuario, unionDeEquipos } from './admin-meeting-team';
 import { CreateAdminMeetingDto } from './dto/create-admin-meeting.dto';
 import { UpdateAdminMeetingDto } from './dto/update-admin-meeting.dto';
+import { EligibleMeetingProjectsQueryDto, ListAdminMeetingsQueryDto } from './dto/admin-meetings-query.dto';
 
 type Tx = Prisma.TransactionClient;
 
@@ -356,8 +370,154 @@ export class AdminMeetingsService {
 
   /** Detalle para Administración: contenido canónico, proyectos, permisos y si quien consulta la gestiona. */
   async detalle(idReunion: number, actorId: number) {
-    const reunion = await this.prisma.reunionAdministracion.findUnique({
-      where: { idReunion },
+    const [resumen] = await this.resumir([idReunion], actorId);
+    if (!resumen) throw new NotFoundException(`Reunión ${idReunion} no encontrada`);
+    return resumen;
+  }
+
+  /**
+   * Agenda de Administración, paginada por fecha de la reunión (que vive en
+   * sus proyecciones): activas de la más próxima a la más lejana; pasadas y
+   * canceladas, de la más reciente hacia atrás.
+   */
+  async listar(actorId: number, query: ListAdminMeetingsQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const estado = query.estado ?? 'activas';
+    const ahora = new Date();
+    const filtros: Prisma.EventoProyectoWhereInput[] = [{ idReunion: { not: null } }];
+    if (estado === 'canceladas') {
+      filtros.push({ reunion: { canceladaEn: { not: null } } });
+    } else {
+      filtros.push({ eliminadoEn: null, reunion: { canceladaEn: null } });
+      filtros.push(estado === 'activas' ? { fechaFin: { gte: ahora } } : { fechaFin: { lt: ahora } });
+    }
+    if (query.hasta) filtros.push({ fechaInicio: { lte: new Date(query.hasta) } });
+    if (query.desde) filtros.push({ fechaFin: { gte: new Date(query.desde) } });
+    const where: Prisma.EventoProyectoWhereInput = { AND: filtros };
+
+    const [grupos, todas] = await Promise.all([
+      this.prisma.eventoProyecto.groupBy({
+        by: ['idReunion'],
+        where,
+        _min: { fechaInicio: true },
+        orderBy: [{ _min: { fechaInicio: estado === 'activas' ? 'asc' : 'desc' } }, { idReunion: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.eventoProyecto.findMany({ where, distinct: ['idReunion'], select: { idReunion: true } }),
+    ]);
+    const ids = grupos.map((g) => g.idReunion).filter((id): id is number => id !== null);
+    return { data: await this.resumir(ids, actorId), total: todas.length, page, totalPages: Math.ceil(todas.length / limit) };
+  }
+
+  /**
+   * Proyectos que se pueden convocar para un rango (por defecto, ahora), con
+   * líder y tamaño del equipo convocable. El servidor vuelve a validar todo al guardar.
+   */
+  async proyectosElegibles(query: EligibleMeetingProjectsQueryDto) {
+    const ahora = new Date();
+    const fechaInicio = query.fechaInicio ? new Date(query.fechaInicio) : ahora;
+    const rango = { fechaInicio, fechaFin: query.fechaFin ? new Date(query.fechaFin) : fechaInicio };
+    // Prefiltro en base (los CERRADO con cierre reciente, con un día de margen); la regla exacta va en memoria.
+    const desdeCierre = new Date(sumarMesesCalendario(ahora, -MESES_VENTANA_POSCIERRE).getTime() - 86_400_000);
+    const candidatos = await this.prisma.proyecto.findMany({
+      where: {
+        eliminadoEn: null,
+        OR: [
+          { estadoProyecto: { in: ['PUBLICADO', 'EN_PROGRESO'] } },
+          { estadoProyecto: 'CERRADO', revisionesCierre: { some: { estadoRevision: 'APROBADA', resueltaEn: { gte: desdeCierre } } } },
+        ],
+      },
+      select: { idProyecto: true },
+    });
+    const proyectos = await cargarProyectosParaReunion(this.prisma, candidatos.map((c) => c.idProyecto));
+    const elegibles = [...proyectos.values()]
+      .filter((p) => motivoNoElegible(p, rango, ahora) === null)
+      .sort((a, b) => a.tituloProyecto.localeCompare(b.tituloProyecto, 'es'));
+    const equipos = await equiposDeProyectos(this.prisma, elegibles);
+    const lideres = new Map(
+      (await this.prisma.usuario.findMany({ where: { idUsuario: { in: elegibles.map((p) => p.creadoPor) } }, select: PERSONA_SELECT }))
+        .map((u) => [u.idUsuario, u]),
+    );
+    return elegibles.map((p) => ({
+      idProyecto: p.idProyecto,
+      tituloProyecto: p.tituloProyecto,
+      estadoProyecto: p.estadoProyecto,
+      lider: lideres.get(p.creadoPor) ?? null,
+      integrantesConvocables: equipos.get(p.idProyecto)?.length ?? 0,
+      cierreOficial: p.cierreOficial,
+      ventanaHasta: p.cierreOficial ? ventanaPoscierre(p.cierreOficial).hasta : null,
+    }));
+  }
+
+  /**
+   * «Ver detalles de participantes»: por proyecto, el líder y los integrantes
+   * del equipo (ACTIVO; en un CERRADO también COMPLETADO) con su estado de
+   * cuenta y si reciben la convocatoria. Solo informativo: no hay selección individual.
+   */
+  async participantes(idReunion: number) {
+    const reunion = await this.prisma.reunionAdministracion.findUnique({ where: { idReunion }, select: { idReunion: true, canceladaEn: true } });
+    if (!reunion) throw new NotFoundException(`Reunión ${idReunion} no encontrada`);
+    const proyecciones = await this.proyeccionesVigentes(this.prisma, reunion);
+    const ids = proyecciones.map((p) => p.idProyecto);
+    const proyectos = await cargarProyectosParaReunion(this.prisma, ids);
+    const equipos = await equiposDeProyectos(this.prisma, vigentes(proyectos, ids));
+    const participaciones = await this.prisma.participacionProyecto.findMany({
+      where: { rolProyecto: { idProyecto: { in: ids } }, estadoParticipacion: { in: ['ACTIVO', 'COMPLETADO'] } },
+      select: {
+        estadoParticipacion: true,
+        rolProyecto: { select: { idProyecto: true, nombreRol: true } },
+        usuario: { select: { ...PERSONA_SELECT, estado: true } },
+      },
+      orderBy: [{ usuario: { apellido: 'asc' } }, { usuario: { nombre: 'asc' } }],
+    });
+    const lideres = new Map(
+      (await this.prisma.usuario.findMany({ where: { idUsuario: { in: [...proyectos.values()].map((p) => p.creadoPor) } }, select: { ...PERSONA_SELECT, estado: true } }))
+        .map((u) => [u.idUsuario, u]),
+    );
+    const persona = (u: { idUsuario: number; nombre: string; apellido: string; estado: string }, idProyecto: number) => ({
+      idUsuario: u.idUsuario,
+      nombre: u.nombre,
+      apellido: u.apellido,
+      estadoCuenta: u.estado,
+      convocado: equipos.get(idProyecto)?.includes(u.idUsuario) ?? false,
+    });
+    return {
+      idReunion,
+      totalDestinatariosUnicos: unionDeEquipos(equipos).size,
+      proyectos: proyecciones.map((proyeccion) => {
+        const proyecto = proyectos.get(proyeccion.idProyecto);
+        const lider = proyecto ? lideres.get(proyecto.creadoPor) : undefined;
+        const admitidos = proyecto?.estadoProyecto === 'CERRADO' ? ['ACTIVO', 'COMPLETADO'] : ['ACTIVO'];
+        // Una persona con dos roles en el proyecto aparece una vez (con el primero).
+        const integrantes = new Map<number, ReturnType<typeof persona> & { rol: string; estadoParticipacion: string }>();
+        for (const p of participaciones) {
+          if (p.rolProyecto.idProyecto !== proyeccion.idProyecto || !admitidos.includes(p.estadoParticipacion)) continue;
+          if (integrantes.has(p.usuario.idUsuario)) continue;
+          integrantes.set(p.usuario.idUsuario, { ...persona(p.usuario, proyeccion.idProyecto), rol: p.rolProyecto.nombreRol, estadoParticipacion: p.estadoParticipacion });
+        }
+        return {
+          idProyecto: proyeccion.idProyecto,
+          tituloProyecto: proyeccion.proyecto.tituloProyecto,
+          estadoProyecto: proyeccion.proyecto.estadoProyecto,
+          lider: lider ? persona(lider, proyeccion.idProyecto) : null,
+          integrantes: [...integrantes.values()],
+          totalConvocados: equipos.get(proyeccion.idProyecto)?.length ?? 0,
+        };
+      }),
+    };
+  }
+
+  /**
+   * Respuesta de Administración para varias reuniones con un número fijo de
+   * consultas (padres, proyecciones y administradores activos), sin N+1.
+   * Conserva el orden de `ids`.
+   */
+  private async resumir(ids: number[], actorId: number) {
+    if (ids.length === 0) return [];
+    const reuniones = await this.prisma.reunionAdministracion.findMany({
+      where: { idReunion: { in: ids } },
       select: {
         idReunion: true,
         idCreador: true,
@@ -370,38 +530,52 @@ export class AdminMeetingsService {
         editores: { select: { usuario: { select: PERSONA_SELECT } }, orderBy: { idUsuario: 'asc' } },
       },
     });
-    if (!reunion) throw new NotFoundException(`Reunión ${idReunion} no encontrada`);
-
-    const proyecciones = await this.proyeccionesVigentes(this.prisma, reunion);
-    const { contenido, integridad } = contenidoCanonico(proyecciones);
-    const editores = reunion.editores.map((e) => e.usuario);
-    const { gestion, puedeCambiarPolitica } = await cargarGestion(
-      this.prisma,
-      { idCreador: reunion.idCreador, politicaEdicion: reunion.politicaEdicion, editores: editores.map((e) => e.idUsuario) },
+    const filas = await this.prisma.eventoProyecto.findMany({
+      where: { idReunion: { in: ids } },
+      select: { ...PROYECCION_SELECT, idReunion: true, eliminadoEn: true },
+      orderBy: { idProyecto: 'asc' },
+    });
+    const autorizados = await administradoresActivos(this.prisma, [
       actorId,
-    );
-    return {
-      idReunion: reunion.idReunion,
-      version: reunion.version,
-      estado: reunion.canceladaEn ? 'CANCELADA' : contenido && contenido.fechaFin.getTime() < Date.now() ? 'PASADA' : 'ACTIVA',
-      integridad,
-      contenido,
-      proyectos: proyecciones.map((p) => ({
-        idProyecto: p.idProyecto,
-        idEvento: p.idEvento,
-        tituloProyecto: p.proyecto.tituloProyecto,
-        estadoProyecto: p.proyecto.estadoProyecto,
-      })),
-      creador: reunion.creador,
-      politicaEdicion: reunion.politicaEdicion,
-      editores,
-      creadaEn: reunion.creadaEn,
-      actualizadaEn: reunion.actualizadaEn,
-      canceladaEn: reunion.canceladaEn,
-      canManage: gestion.puede,
-      motivoGestion: gestion.puede ? gestion.motivo : null,
-      puedeCambiarPolitica,
-    };
+      ...reuniones.flatMap((r) => [r.idCreador, ...r.editores.map((e) => e.usuario.idUsuario)]),
+    ]);
+    const porId = new Map(reuniones.map((r) => [r.idReunion, r]));
+    const ahora = Date.now();
+
+    return ids.flatMap((idReunion) => {
+      const reunion = porId.get(idReunion);
+      if (!reunion) return [];
+      // Activas, o en una reunión cancelada las que se cancelaron con ella (mismo instante).
+      const proyecciones = filas.filter(
+        (f) => f.idReunion === idReunion && (reunion.canceladaEn ? mismoValor(f.eliminadoEn, reunion.canceladaEn) : f.eliminadoEn === null),
+      );
+      const { contenido, integridad } = contenidoCanonico(proyecciones);
+      const editores = reunion.editores.map((e) => e.usuario);
+      const paraGestion = { idCreador: reunion.idCreador, politicaEdicion: reunion.politicaEdicion, editores: editores.map((e) => e.idUsuario) };
+      const gestion = evaluarGestion(paraGestion, actorId, autorizados);
+      return [{
+        idReunion,
+        version: reunion.version,
+        estado: reunion.canceladaEn ? 'CANCELADA' : contenido && contenido.fechaFin.getTime() < ahora ? 'PASADA' : 'ACTIVA',
+        integridad,
+        contenido,
+        proyectos: proyecciones.map((p) => ({
+          idProyecto: p.idProyecto,
+          idEvento: p.idEvento,
+          tituloProyecto: p.proyecto.tituloProyecto,
+          estadoProyecto: p.proyecto.estadoProyecto,
+        })),
+        creador: reunion.creador,
+        politicaEdicion: reunion.politicaEdicion,
+        editores,
+        creadaEn: reunion.creadaEn,
+        actualizadaEn: reunion.actualizadaEn,
+        canceladaEn: reunion.canceladaEn,
+        canManage: gestion.puede,
+        motivoGestion: gestion.puede ? gestion.motivo : null,
+        puedeCambiarPolitica: puedeCambiarPolitica(paraGestion, actorId, autorizados),
+      }];
+    });
   }
 
   // -------------------------------------------------------------------------
