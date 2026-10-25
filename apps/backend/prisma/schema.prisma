@@ -394,6 +394,7 @@ model Usuario {
   insignias                        InsigniaUsuario[]
   reaccionesChat                   ReaccionMensajeChat[]
   mensajesGuardados                MensajeGuardado[]
+  reunionesAdministracionCreadas   ReunionAdministracion[]    @relation("ReunionesAdministracionCreadas")
 
   @@index([estado, fechaCreacion])
   @@map("usuario")
@@ -709,14 +710,40 @@ model EventoProyecto {
   /// proyecto. Si tiene valores, solo ellos y el líder ven el evento y
   /// reciben el recordatorio.
   invitados             Int[]           @default([]) @map("invitados")
+  /// HU-195: null = evento normal del líder. Con valor, proyección de una
+  /// reunión de Administración: solo Administración la edita o cancela.
+  idReunion             Int?            @map("id_reunion")
 
-  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto])
-  creador  Usuario  @relation(fields: [idCreador], references: [idUsuario])
+  proyecto Proyecto               @relation(fields: [idProyecto], references: [idProyecto])
+  creador  Usuario                @relation(fields: [idCreador], references: [idUsuario])
+  reunion  ReunionAdministracion? @relation(fields: [idReunion], references: [idReunion], onDelete: Restrict)
 
+  @@unique([idReunion, idProyecto])
   @@index([idProyecto, eliminadoEn])
   @@index([fechaInicio])
   @@index([eliminadoEn, recordatorioEnviadoEn, fechaInicio])
   @@map("evento_proyecto")
+}
+
+/// HU-195 (T-362): reunión de Administración con uno o varios proyectos. Es la
+/// fuente de verdad de identidad, autoría, versión y cancelación. El contenido
+/// del calendario (título, fechas, modalidad, lugar o enlace) vive en sus
+/// EventoProyecto, uno por proyecto, que se escriben idénticos en una sola
+/// transacción; aquí no se duplica.
+model ReunionAdministracion {
+  idReunion     Int       @id @default(autoincrement()) @map("id_reunion")
+  idCreador     Int       @map("id_creador")
+  /// Control optimista: cada cambio material la incrementa; un PATCH con otra versión es 409.
+  version       Int       @default(1)
+  creadaEn      DateTime  @default(now()) @map("creada_en")
+  actualizadaEn DateTime? @map("actualizada_en")
+  canceladaEn   DateTime? @map("cancelada_en")
+
+  creador Usuario          @relation("ReunionesAdministracionCreadas", fields: [idCreador], references: [idUsuario])
+  eventos EventoProyecto[]
+
+  @@index([canceladaEn, creadaEn])
+  @@map("reunion_administracion")
 }
 
 /// HU-184: un usuario comparte su calendario (eventos y fechas límite de
