@@ -1078,3 +1078,67 @@ describe('rolesDestino — deuda contractual registrada, sin cambio de comportam
     for (const detalle of [true, false]) expect(JSON.stringify(proyectarEventoCompartido(fila, detalle))).not.toContain('rolesDestino');
   });
 });
+
+describe('EventsService — reuniones de Administración en el calendario (HU-195, G09)', () => {
+  const RANGO = ['2030-10-01T00:00:00.000Z', '2030-10-31T23:59:59.000Z'] as const;
+  const proyeccion = (idProyecto: number, idReunion: number | null, inicio = '2030-10-05T15:00:00Z') => ({
+    idEvento: idProyecto * 100 + (idReunion ?? 0),
+    idProyecto,
+    idReunion,
+    fechaInicio: new Date(inicio),
+    fechaFin: new Date(inicio),
+  });
+
+  it('marca el origen y muestra una sola vez la reunión de quien está en dos de sus proyectos', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValue([{ idProyecto: 8 }, { idProyecto: 5 }]);
+    prisma.eventoProyecto.findMany.mockResolvedValue([proyeccion(8, 7), proyeccion(5, 7), proyeccion(5, null, '2030-10-02T15:00:00Z')]);
+    const service = new EventsService(prisma);
+
+    const eventos = await service.findForUserInRange(PARTICIPANT_ID, ...RANGO);
+    expect(eventos.map((e) => [e.idProyecto, e.idReunion, e.origen])).toEqual([[5, null, 'PROYECTO'], [5, 7, 'ADMINISTRACION']]);
+  });
+
+  it('sin equipo cerrado no consulta reuniones históricas', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValue([{ idProyecto: PROJECT_ID }]);
+    prisma.eventoProyecto.findMany.mockResolvedValue([]);
+    prisma.participacionProyecto.findFirst.mockResolvedValue(null);
+    const service = new EventsService(prisma);
+
+    await service.findForUserInRange(PARTICIPANT_ID, ...RANGO);
+    expect(prisma.eventoProyecto.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('con equipo cerrado agrega SOLO las reuniones de Administración no canceladas de esos proyectos', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValue([]);
+    prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+    prisma.eventoProyecto.findMany.mockResolvedValue([proyeccion(9, 3)]);
+    const service = new EventsService(prisma);
+
+    const eventos = await service.findForUserInRange(PARTICIPANT_ID, ...RANGO);
+    expect(eventos).toHaveLength(1);
+    expect(prisma.eventoProyecto.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.eventoProyecto.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        idReunion: { not: null },
+        eliminadoEn: null,
+        reunion: { canceladaEn: null },
+        proyecto: expect.objectContaining({ estadoProyecto: 'CERRADO', roles: { some: { participaciones: { some: { idUsuario: PARTICIPANT_ID, estadoParticipacion: 'COMPLETADO' } } } } }),
+      }),
+    }));
+  });
+
+  it('la agenda compartida tampoco repite la reunión y no expone idReunion', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findMany.mockResolvedValue([{ idProyecto: 5 }, { idProyecto: 8 }]);
+    const fila = (idProyecto: number) => ({ ...proyeccion(idProyecto, 7), tituloEvento: 'R', tipoEvento: 'REUNION', modalidad: 'VIRTUAL', proyecto: { idProyecto, tituloProyecto: `P${idProyecto}` } });
+    prisma.eventoProyecto.findMany.mockResolvedValue([fila(5), fila(8)]);
+    const service = new EventsService(prisma);
+
+    const compartidos = await service.findSharedInRange(LEADER_ID, PARTICIPANT_ID, ...RANGO);
+    expect(compartidos).toHaveLength(1);
+    expect(compartidos[0]).not.toHaveProperty('idReunion');
+  });
+});
