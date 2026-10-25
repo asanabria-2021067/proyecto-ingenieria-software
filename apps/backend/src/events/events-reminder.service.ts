@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService, type PostCommitEffect } from '../notifications/notifications.service';
+import { cargarProyectosParaReunion } from './admin-meeting-eligibility';
+import { equiposDeProyectos } from './admin-meeting-team';
 // El contenedor corre en UTC (sin TZ en docker-compose), así que sin este huso
 // el texto del recordatorio sale desplazado respecto a la hora que el usuario
 // ve en el calendario.
@@ -61,8 +63,11 @@ export class EventsReminderService {
         fechaInicio: true,
         antelacionMinutos: true,
         invitados: true,
+        idReunion: true,
         proyecto: { select: { tituloProyecto: true, creadoPor: true } },
       },
+      // Determinista: dentro de una reunión, la proyección del menor proyecto avisa primero.
+      orderBy: [{ fechaInicio: 'asc' }, { idProyecto: 'asc' }],
     });
 
     for (const evento of candidatos) {
@@ -71,7 +76,52 @@ export class EventsReminderService {
         continue; // todavía no llega su antelación configurada
       }
 
-      await this.enviarRecordatorio(evento);
+      if (typeof evento.idReunion === 'number') {
+        await this.enviarRecordatorioReunion({ ...evento, idReunion: evento.idReunion });
+      } else {
+        await this.enviarRecordatorio(evento);
+      }
+    }
+  }
+
+  /**
+   * HU-195 (T-364): una reunión de Administración tiene una proyección por
+   * proyecto, pero es UNA sesión. Cada proyección avisa al equipo convocado de
+   * su proyecto (en un CERRADO, su equipo histórico), y la clave
+   * `reunion:<id>:recordatorio:<inicio>` hace que una persona que está en
+   * varios de esos proyectos —o un cron que corre dos veces— reciba un solo
+   * recordatorio. El aviso y la marca de la proyección se confirman juntos; el
+   * socket, después. Si la fecha cambia, la clave también, y todos reciben el de la nueva.
+   */
+  private async enviarRecordatorioReunion(evento: {
+    idEvento: number;
+    idProyecto: number;
+    idReunion: number;
+    tituloEvento: string;
+    fechaInicio: Date;
+    proyecto: { tituloProyecto: string };
+  }): Promise<void> {
+    try {
+      const fechaInicioIso = evento.fechaInicio.toISOString();
+      const effects: PostCommitEffect[] = [];
+      await this.prisma.$transaction(async (tx) => {
+        const proyecto = (await cargarProyectosParaReunion(tx, [evento.idProyecto])).get(evento.idProyecto);
+        const equipo = proyecto && !proyecto.eliminadoEn ? ((await equiposDeProyectos(tx, [proyecto])).get(evento.idProyecto) ?? []) : [];
+        await this.notifications.persistTemplateTx(tx, equipo, 'RECORDATORIO_EVENTO', {
+          eventTitle: evento.tituloEvento,
+          projectTitle: evento.proyecto.tituloProyecto,
+          projectId: evento.idProyecto,
+          eventId: evento.idEvento,
+          fechaInicioTexto: evento.fechaInicio.toLocaleString('es-GT', { dateStyle: 'long', timeStyle: 'short', timeZone: GUATEMALA_TIME_ZONE }),
+          fechaInicioIso,
+        }, { add: (effect) => effects.push(effect) }, { claveIdempotencia: `reunion:${evento.idReunion}:recordatorio:${fechaInicioIso}` });
+        await tx.eventoProyecto.update({ where: { idEvento: evento.idEvento }, data: { recordatorioEnviadoEn: new Date() } });
+      });
+      await this.notifications.publishEffects(effects);
+    } catch (error) {
+      this.logger.warn(
+        `Fallo al enviar el recordatorio de la reunión ${evento.idReunion} (evento ${evento.idEvento}): ${(error as Error)?.message ?? error}`,
+      );
     }
   }
 
