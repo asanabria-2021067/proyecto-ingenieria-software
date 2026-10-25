@@ -87,6 +87,13 @@ import {
 
 type VistaId = 'tarjetas' | 'lista';
 
+/**
+ * Columnas por el ancho del CONTENIDO (`@container/personas`, lo que queda
+ * tras las dos sidebars), no de la ventana: dos desde 36rem y tres solo desde
+ * 64rem, donde cada tarjeta conserva sus dos botones en una línea.
+ */
+const COLUMNAS_PERSONAS = '@xl/personas:grid-cols-2 @5xl/personas:grid-cols-3';
+
 /** T-195: rangos fijos, mutuamente excluyentes (no acumulables como
  * habilidades/intereses) — "Todos" es la ausencia de filtro. */
 const SEMESTRE_TODOS = 'todos';
@@ -331,7 +338,7 @@ function ListaSkeleton() {
       count={9}
       lines={2}
       avatar="circle"
-      className="grid gap-tight md:grid-cols-2 xl:grid-cols-3"
+      className={`grid gap-tight ${COLUMNAS_PERSONAS}`}
     />
   );
 }
@@ -519,7 +526,7 @@ function PersonasView() {
             <section className="mb-section">
               <h2 className="type-section mb-card">Personas que quizás conozcas</h2>
               {recomendaciones.length > 0 ? (
-                <div className="grid gap-tight sm:grid-cols-2 xl:grid-cols-3">
+                <div className={`grid gap-tight ${COLUMNAS_PERSONAS}`}>
                   {recomendaciones.map((usuario) => (
                     <RecomendacionCard key={usuario.idUsuario} usuario={usuario} />
                   ))}
@@ -701,7 +708,7 @@ function PersonasView() {
                   ) : (
                     <>
                       {vista === 'tarjetas' ? (
-                        <ul className="grid gap-gap sm:grid-cols-2 xl:grid-cols-3">
+                        <ul className={`grid gap-gap ${COLUMNAS_PERSONAS}`}>
                           {resultados.map((usuario) => (
                             <li key={usuario.idUsuario}>
                               <PersonaCard usuario={usuario} />
