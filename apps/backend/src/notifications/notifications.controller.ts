@@ -13,7 +13,7 @@ import { NotificationsService } from './notifications.service';
 import { UpdatePreferenciaNotificacionDto } from './dto/update-preferencia-notificacion.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
+import { ListNotificationsQueryDto, NotificationTypesFilterDto } from './dto/list-notifications-query.dto';
 
 @Controller('notificaciones')
 @UseGuards(JwtAuthGuard)
@@ -52,9 +52,10 @@ export class NotificationsController {
     return this.notificationsService.updatePreference(user.userId, dto.tipo, dto.activa);
   }
 
+  /** HU-198: `?tipos=A,B` acota el marcado a la categoría filtrada; sin él, todas las propias. */
   @Patch('leer-todas')
-  markAllAsRead(@CurrentUser() user: { userId: number }) {
-    return this.notificationsService.markAllAsRead(user.userId);
+  markAllAsRead(@CurrentUser() user: { userId: number }, @Query() query: NotificationTypesFilterDto) {
+    return this.notificationsService.markAllAsRead(user.userId, query.tipos);
   }
 
   @Patch(':id/leer')

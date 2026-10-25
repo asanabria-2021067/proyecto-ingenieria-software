@@ -316,9 +316,14 @@ export class NotificationsService {
     });
   }
 
-  async markAllAsRead(userId: number): Promise<{ actualizadas: number }> {
+  /**
+   * HU-198 (N-01): con `tipos` marca solo esas no leídas del usuario (la
+   * categoría filtrada); sin `tipos`, todas las suyas, como siempre.
+   * `actualizadas` cuenta las que pasaron a leídas: las ya leídas no se tocan.
+   */
+  async markAllAsRead(userId: number, tipos?: TipoNotificacion[]): Promise<{ actualizadas: number }> {
     const result = await this.prisma.notificacion.updateMany({
-      where: { idUsuario: userId, leidaEn: null },
+      where: { ...filtroNotificaciones(userId, { tipos }), leidaEn: null },
       data: { leidaEn: new Date() },
     });
     return { actualizadas: result.count };

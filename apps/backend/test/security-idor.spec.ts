@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TasksContextService } from '../src/tasks/tasks-context.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
+import { NotificationsController } from '../src/notifications/notifications.controller';
 import { ExitRequestsAuthorizationService } from '../src/exit-requests/exit-requests.authorization.service';
 import type { ExitRequestsContextService } from '../src/exit-requests/exit-requests.context.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
@@ -226,5 +227,27 @@ describe('ExitRequestsAuthorizationService.assertProjectLeader — líder del pr
     await expect(service.assertProjectLeader(PROYECTO_A, 999)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
+  });
+});
+
+describe('HU-198 (N-01) · marcar como leídas solo las filtradas', () => {
+  it('con tipos marca solo esos, siempre del usuario autenticado y solo las no leídas', async () => {
+    const prisma = { notificacion: { updateMany: vi.fn().mockResolvedValue({ count: 2 }) } };
+    const service = new NotificationsService(prisma as unknown as PrismaService);
+
+    await expect(service.markAllAsRead(1, ['TAREA_ASIGNADA', 'TAREA_POR_VENCER'])).resolves.toEqual({ actualizadas: 2 });
+    expect(prisma.notificacion.updateMany).toHaveBeenCalledWith({
+      where: { idUsuario: 1, tipoNotificacion: { in: ['TAREA_ASIGNADA', 'TAREA_POR_VENCER'] }, leidaEn: null },
+      data: { leidaEn: expect.any(Date) },
+    });
+  });
+
+  it('el controlador pasa los tipos de la query; sin ellos, el marcado general de siempre', async () => {
+    const service = { markAllAsRead: vi.fn() };
+    const controller = new NotificationsController(service as unknown as ConstructorParameters<typeof NotificationsController>[0]);
+    controller.markAllAsRead({ userId: 4 }, { tipos: ['MENCION_COMENTARIO'] });
+    controller.markAllAsRead({ userId: 4 }, {});
+    expect(service.markAllAsRead).toHaveBeenNthCalledWith(1, 4, ['MENCION_COMENTARIO']);
+    expect(service.markAllAsRead).toHaveBeenNthCalledWith(2, 4, undefined);
   });
 });
