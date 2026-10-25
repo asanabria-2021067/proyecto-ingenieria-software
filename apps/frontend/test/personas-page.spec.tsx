@@ -36,8 +36,18 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
+const usuarioActualMock = vi.hoisted(() => vi.fn(() => ({ data: undefined as unknown, isPending: false })));
+vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: () => usuarioActualMock() }));
+
+if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false;
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
+
 vi.mock('@/lib/services/catalogs', () => ({
-  getHabilidades: () => Promise.resolve([{ idHabilidad: 1, nombreHabilidad: 'React' }]),
+  getHabilidades: () =>
+    Promise.resolve([
+      { idHabilidad: 1, nombreHabilidad: 'React' },
+      { idHabilidad: 2, nombreHabilidad: 'Node' },
+    ]),
   getIntereses: () => Promise.resolve([{ idInteres: 1, nombreInteres: 'IA' }]),
 }));
 
@@ -90,8 +100,20 @@ beforeEach(() => {
   getSolicitudesPendientesMock.mockResolvedValue([]);
   getAmigosMock.mockResolvedValue([]);
   buscarUsuariosMock.mockResolvedValue({ items: [], hasMore: false });
+  usuarioActualMock.mockReturnValue({ data: undefined, isPending: false });
   swalFire.mockClear();
 });
+
+/** Escape sobre el menú abierto, que es quien lo escucha. */
+async function cerrarMenu() {
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+}
+
+function elegirSemestre(opcion: string) {
+  fireEvent.keyDown(screen.getByRole('combobox', { name: 'Filtrar por semestre' }), { key: 'Enter' });
+  fireEvent.click(screen.getByRole('option', { name: opcion }));
+}
 
 const directorio = () => screen.findByRole('region', { name: 'Directorio de personas' });
 
@@ -105,51 +127,91 @@ describe('PersonasPage', () => {
     await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalledWith(expect.objectContaining(flags)));
   });
 
-  it('el contador del botón de filtros refleja los chips seleccionados', async () => {
+  it('sin botón «Filtros» ni panel: buscador, semestre, habilidades, intereses y vista en una fila', async () => {
     await renderPersonas();
     await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalled());
 
-    const botonFiltros = screen.getByRole('button', { name: /Filtros/i });
-    expect(within(botonFiltros).queryByText('1')).not.toBeInTheDocument();
-
-    fireEvent.click(botonFiltros);
-    fireEvent.click(await screen.findByRole('button', { name: 'React' }));
-
-    expect(within(botonFiltros).getByText('1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Filtros/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Filtrar por semestre' })).toHaveTextContent('Todos los semestres');
+    expect(screen.getByRole('button', { name: 'Filtrar por habilidades' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filtrar por intereses' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver como tarjetas' })).toBeInTheDocument();
   });
 
-  // T-195: el filtro de semestre vive dentro del popover de Filtros.
-  it('T-195: el contador del botón Filtros suma también el filtro de semestre', async () => {
+  it('semestre: selección única que pide el rango al backend y vuelve a «Todos» sin parámetro', async () => {
     await renderPersonas();
     await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalled());
 
-    const botonFiltros = screen.getByRole('button', { name: /Filtros/i });
-    fireEvent.click(botonFiltros);
-    fireEvent.click(await screen.findByRole('button', { name: '1°-4°' }));
+    elegirSemestre('8.º en adelante');
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalledWith(expect.objectContaining({ semestreRango: '8+' })));
+    expect(screen.getByRole('button', { name: 'Quitar filtro Semestre 8.º en adelante' })).toBeInTheDocument();
 
-    expect(within(botonFiltros).getByText('1')).toBeInTheDocument();
+    elegirSemestre('Todos los semestres');
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenLastCalledWith(expect.objectContaining({ semestreRango: undefined })));
   });
 
-  it('T-195: filtrar por semestre desde el popover dispara la consulta con el rango elegido', async () => {
+  it('habilidades e intereses: varias a la vez, el menú no se cierra, el disparador cuenta y cada chip se quita', async () => {
     await renderPersonas();
     await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: /Filtros/i }));
-    fireEvent.click(await screen.findByRole('button', { name: '8°+' }));
+    const habilidades = screen.getByRole('button', { name: 'Filtrar por habilidades' });
+    fireEvent.keyDown(habilidades, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'React' }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Node' }));
+    // Sigue abierto tras cada elección.
+    expect(screen.getByRole('menuitemcheckbox', { name: 'React' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Node' })).toHaveAttribute('aria-checked', 'true');
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenLastCalledWith(expect.objectContaining({ habilidades: [1, 2] })));
+    expect(screen.getByRole('button', { name: 'Filtrar por habilidades, 2 seleccionadas' })).toHaveTextContent('2');
+    await cerrarMenu();
 
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Filtrar por intereses' }), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'IA' }));
     await waitFor(() =>
-      expect(buscarUsuariosMock).toHaveBeenCalledWith(
-        expect.objectContaining({ semestreRango: '8+' }),
+      expect(buscarUsuariosMock).toHaveBeenLastCalledWith(expect.objectContaining({ habilidades: [1, 2], intereses: [1] })),
+    );
+    await cerrarMenu();
+
+    const aplicados = screen.getByRole('group', { name: 'Filtros aplicados' });
+    fireEvent.click(within(aplicados).getByRole('button', { name: 'Quitar filtro React' }));
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenLastCalledWith(expect.objectContaining({ habilidades: [2], intereses: [1] })));
+
+    fireEvent.click(within(aplicados).getByRole('button', { name: 'Limpiar todo' }));
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenLastCalledWith(expect.objectContaining({ habilidades: [], intereses: [] })));
+    expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+  });
+
+  it('«Solo personas de mi carrera» filtra por la carrera real y se combina con la sección y los demás filtros', async () => {
+    usuarioActualMock.mockReturnValue({ data: { perfil: { carrera: { idCarrera: 3, nombreCarrera: 'Ingeniería en Sistemas' } } }, isPending: false });
+    await renderPersonas('amigos-de-amigos');
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Solo personas de mi carrera' }));
+    elegirSemestre('1.º–4.º');
+    await waitFor(() =>
+      expect(buscarUsuariosMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ carrera: true, amigosDeAmigos: true, semestreRango: '1-4' }),
       ),
     );
+    expect(screen.getByRole('button', { name: 'Quitar filtro Mi carrera: Ingeniería en Sistemas' })).toBeInTheDocument();
+  });
 
-    // Volver a "Todos" quita el filtro (undefined, no un string vacío).
-    fireEvent.click(screen.getByRole('button', { name: 'Todos', pressed: false }));
-    await waitFor(() =>
-      expect(buscarUsuariosMock).toHaveBeenCalledWith(
-        expect.objectContaining({ semestreRango: undefined }),
-      ),
-    );
+  it('sin carrera en el perfil, el filtro de carrera queda desactivado y lo explica, sin inventar una', async () => {
+    usuarioActualMock.mockReturnValue({ data: { perfil: { carrera: null } }, isPending: false });
+    await renderPersonas();
+    const casilla = screen.getByRole('checkbox', { name: 'Solo personas de mi carrera' });
+    expect(casilla).toBeDisabled();
+    expect(casilla).toHaveAccessibleDescription('Agrega tu carrera en tu perfil para usar este filtro.');
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalledWith(expect.objectContaining({ carrera: false })));
+  });
+
+  it('cambiar a lista no reinicia los filtros', async () => {
+    await renderPersonas();
+    await waitFor(() => expect(buscarUsuariosMock).toHaveBeenCalled());
+    elegirSemestre('5.º–7.º');
+    fireEvent.click(screen.getByRole('button', { name: 'Ver como lista' }));
+    expect(screen.getByRole('combobox', { name: 'Filtrar por semestre' })).toHaveTextContent('5.º–7.º');
+    expect(screen.getByRole('button', { name: 'Quitar filtro Semestre 5.º–7.º' })).toBeInTheDocument();
   });
 
   it('la tarjeta muestra nombre, carrera y habilidades, y enlaza al perfil completo', async () => {

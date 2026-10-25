@@ -7,8 +7,11 @@
       amigos, Amigos de amigos) en `?seccion=`, con el patrón de la sidebar
       de un proyecto. Cada sección es una consulta paginada distinta al
       backend, no un filtro en el navegador.
-   2. Habilidades e intereses salen de la vista principal y quedan detrás
-      de un botón de filtros (Popover).
+   2. Filtros en línea con la UI de Mis Proyectos: semestre (selección
+      única), habilidades e intereses (selección múltiple) y «Solo personas
+      de mi carrera». Todo se resuelve en el backend (`/social/usuarios/
+      buscar`): familias distintas con AND, varios valores de una misma
+      familia con OR, sobre el directorio paginado completo.
    3. La lista pasa a una rejilla densa.
    4. Semestre y habilidades usan la paleta de colores variados del mockup
       (lib/social/badge-colors.ts) en vez de los tokens neutros del sistema
@@ -26,16 +29,18 @@ import {
   LayoutGrid,
   List,
   MoreVertical,
-  SlidersHorizontal,
   UserCheck,
   UserPlus,
   UserX,
   Users,
+  X,
 } from 'lucide-react';
-import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
+import { DASHBOARD_FILTER_TRIGGER_CLASS, DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
+import { DashboardFilterMultiSelect } from '@/components/dashboard/dashboard-filter-multi-select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -65,6 +70,7 @@ import {
   useRecomendaciones,
   useSolicitudesAmistadPendientes,
 } from '@/hooks/use-social';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { getHabilidades, getIntereses } from '@/lib/services/catalogs';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
 import { formatMotivoRecomendacion } from '@/lib/social/recomendaciones';
@@ -83,11 +89,12 @@ type VistaId = 'tarjetas' | 'lista';
 
 /** T-195: rangos fijos, mutuamente excluyentes (no acumulables como
  * habilidades/intereses) — "Todos" es la ausencia de filtro. */
-const SEMESTRE_OPCIONES: { id: SemestreRango | 'todos'; label: string }[] = [
-  { id: 'todos', label: 'Todos' },
-  { id: '1-4', label: '1°-4°' },
-  { id: '5-7', label: '5°-7°' },
-  { id: '8+', label: '8°+' },
+const SEMESTRE_TODOS = 'todos';
+const SEMESTRE_OPCIONES: { id: SemestreRango | typeof SEMESTRE_TODOS; label: string }[] = [
+  { id: SEMESTRE_TODOS, label: 'Todos los semestres' },
+  { id: '1-4', label: '1.º–4.º' },
+  { id: '5-7', label: '5.º–7.º' },
+  { id: '8+', label: '8.º en adelante' },
 ];
 
 /** El motivo se arma acá a partir de los datos estructurados del backend
@@ -370,14 +377,22 @@ function PersonasView() {
   const [habilidadesSel, setHabilidadesSel] = useState<number[]>([]);
   const [interesesSel, setInteresesSel] = useState<number[]>([]);
   const [semestreRango, setSemestreRango] = useState<SemestreRango | undefined>(undefined);
+  const [soloMiCarreraElegido, setSoloMiCarrera] = useState(false);
+
+  // «Mi carrera» filtra por la carrera real del perfil; sin ese dato no hay filtro que aplicar.
+  const { data: usuarioActual, isPending: cargandoUsuario } = useCurrentUser();
+  const miCarrera = usuarioActual?.perfil?.carrera?.nombreCarrera ?? null;
+  const soloMiCarrera = soloMiCarreraElegido && miCarrera !== null;
 
   const { data: habilidades = [] } = useQuery({ queryKey: ['catalogo-habilidades'], queryFn: getHabilidades });
   const { data: intereses = [] } = useQuery({ queryKey: ['catalogo-intereses'], queryFn: getIntereses });
+  const opcionesHabilidades = habilidades.map((h) => ({ id: h.idHabilidad, nombre: h.nombreHabilidad }));
+  const opcionesIntereses = intereses.map((i) => ({ id: i.idInteres, nombre: i.nombreInteres }));
 
   const { amigos } = useAmigos();
   const { resultados, hasMore, isLoading, cargarMas, cargandoMas } = useBuscarUsuarios({
     q,
-    carrera: false,
+    carrera: soloMiCarrera,
     amigosDeAmigos: seccion === 'amigos-de-amigos',
     soloAmigos: seccion === 'amigos',
     habilidades: habilidadesSel,
@@ -394,7 +409,32 @@ function PersonasView() {
     accion: 'aceptar' | 'rechazar';
   } | null>(null);
 
-  const totalFiltros = habilidadesSel.length + interesesSel.length + (semestreRango ? 1 : 0);
+  const totalFiltros = habilidadesSel.length + interesesSel.length + (semestreRango ? 1 : 0) + (soloMiCarrera ? 1 : 0);
+
+  function limpiarFiltros() {
+    setHabilidadesSel([]);
+    setInteresesSel([]);
+    setSemestreRango(undefined);
+    setSoloMiCarrera(false);
+  }
+
+  // Etiquetas de los criterios activos, cada una con su forma de quitarse.
+  const chipsActivos = [
+    ...(semestreRango
+      ? [{ key: 'semestre', label: `Semestre ${SEMESTRE_OPCIONES.find((o) => o.id === semestreRango)?.label}`, quitar: () => setSemestreRango(undefined) }]
+      : []),
+    ...habilidadesSel.map((id) => ({
+      key: `h-${id}`,
+      label: opcionesHabilidades.find((o) => o.id === id)?.nombre ?? 'Habilidad',
+      quitar: () => setHabilidadesSel((prev) => prev.filter((h) => h !== id)),
+    })),
+    ...interesesSel.map((id) => ({
+      key: `i-${id}`,
+      label: opcionesIntereses.find((o) => o.id === id)?.nombre ?? 'Interés',
+      quitar: () => setInteresesSel((prev) => prev.filter((i) => i !== id)),
+    })),
+    ...(soloMiCarrera ? [{ key: 'carrera', label: `Mi carrera: ${miCarrera}`, quitar: () => setSoloMiCarrera(false) }] : []),
+  ];
 
   function pedirConfirmacionSolicitud(solicitud: SolicitudAmistadPendienteDto, accion: 'aceptar' | 'rechazar') {
     setConfirmSolicitud({ solicitud, accion });
@@ -424,14 +464,6 @@ function PersonasView() {
         uvgSwal.fire({ icon: 'error', title: 'No se pudo resolver la solicitud', text: error.message });
       },
     });
-  }
-
-  function toggleHabilidad(id: number) {
-    setHabilidadesSel((prev) => (prev.includes(id) ? prev.filter((h) => h !== id) : [...prev, id]));
-  }
-
-  function toggleInteres(id: number) {
-    setInteresesSel((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   }
 
   const vacio = mensajeVacio(seccion, amigos.length > 0, totalFiltros > 0 || q.trim().length >= 2);
@@ -519,66 +551,45 @@ function PersonasView() {
             <section aria-label="Directorio de personas">
               <div className="flex flex-wrap items-center gap-inline">
                 <DashboardSearchField
-                  containerClassName="flex-1"
+                  containerClassName="min-w-full flex-1 sm:min-w-64"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Buscar por nombre o apellido"
                   aria-label="Buscar personas"
                 />
 
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="gap-tight">
-                      <SlidersHorizontal className="size-4" aria-hidden="true" />
-                      Filtros
-                      {totalFiltros > 0 && <span className="pill pill-accent">{totalFiltros}</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-80">
-                    <section className="mb-stack">
-                      <h3 className="type-meta uppercase tracking-wide">Semestre</h3>
-                      <div className="mt-tight flex flex-wrap gap-tight">
-                        {SEMESTRE_OPCIONES.map((opcion) => {
-                          const activo = opcion.id === 'todos' ? !semestreRango : semestreRango === opcion.id;
-                          return (
-                            <button
-                              key={opcion.id}
-                              type="button"
-                              aria-pressed={activo}
-                              onClick={() => setSemestreRango(opcion.id === 'todos' ? undefined : opcion.id)}
-                              className={`pill ${activo ? 'pill-accent' : 'pill-neutral'}`}
-                            >
-                              {opcion.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </section>
-                    {[
-                      { titulo: 'Habilidades', lista: habilidades.map((h) => ({ id: h.idHabilidad, nombre: h.nombreHabilidad })), sel: habilidadesSel, toggle: toggleHabilidad },
-                      { titulo: 'Intereses', lista: intereses.map((i) => ({ id: i.idInteres, nombre: i.nombreInteres })), sel: interesesSel, toggle: toggleInteres },
-                    ].map(({ titulo, lista, sel, toggle }) =>
-                      lista.length > 0 ? (
-                        <section key={titulo} className="mb-stack last:mb-0">
-                          <h3 className="type-meta uppercase tracking-wide">{titulo}</h3>
-                          <div className="mt-tight flex flex-wrap gap-tight">
-                            {lista.map((opcion) => (
-                              <button
-                                key={opcion.id}
-                                type="button"
-                                aria-pressed={sel.includes(opcion.id)}
-                                onClick={() => toggle(opcion.id)}
-                                className={`pill ${sel.includes(opcion.id) ? 'pill-accent' : 'pill-neutral'}`}
-                              >
-                                {opcion.nombre}
-                              </button>
-                            ))}
-                          </div>
-                        </section>
-                      ) : null,
-                    )}
-                  </PopoverContent>
-                </Popover>
+                <Select
+                  value={semestreRango ?? SEMESTRE_TODOS}
+                  onValueChange={(v) => setSemestreRango(v === SEMESTRE_TODOS ? undefined : (v as SemestreRango))}
+                >
+                  <SelectTrigger aria-label="Filtrar por semestre" className={`w-full sm:w-48 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="z-50">
+                    {SEMESTRE_OPCIONES.map((opcion) => (
+                      <SelectItem key={opcion.id} value={opcion.id} className="focus:bg-primary focus:text-on-primary">
+                        {opcion.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <DashboardFilterMultiSelect
+                  label="Habilidades"
+                  ariaLabel="Filtrar por habilidades"
+                  options={opcionesHabilidades}
+                  value={habilidadesSel}
+                  onChange={setHabilidadesSel}
+                  className="w-full sm:w-44"
+                />
+                <DashboardFilterMultiSelect
+                  label="Intereses"
+                  ariaLabel="Filtrar por intereses"
+                  options={opcionesIntereses}
+                  value={interesesSel}
+                  onChange={setInteresesSel}
+                  className="w-full sm:w-44"
+                />
 
                 <div className="flex items-center gap-micro rounded-control border border-outline-variant p-micro">
                   <Tooltip>
@@ -620,6 +631,48 @@ function PersonasView() {
                 </div>
               </div>
 
+              <div className="mt-tight flex flex-wrap items-center gap-x-inline gap-y-tight">
+                <label className="type-body inline-flex min-h-8 cursor-pointer items-center gap-tight text-text-primary has-disabled:cursor-not-allowed has-disabled:text-text-secondary">
+                  <Checkbox
+                    checked={soloMiCarrera}
+                    onCheckedChange={(v) => setSoloMiCarrera(v === true)}
+                    disabled={cargandoUsuario || miCarrera === null}
+                    aria-describedby={!cargandoUsuario && miCarrera === null ? 'personas-sin-carrera' : undefined}
+                  />
+                  Solo personas de mi carrera
+                </label>
+                {!cargandoUsuario && miCarrera === null && (
+                  <span id="personas-sin-carrera" className="type-meta">
+                    Agrega tu carrera en{' '}
+                    <Link href="/dashboard/perfil/editar" className="font-semibold text-primary hover:underline">
+                      tu perfil
+                    </Link>{' '}
+                    para usar este filtro.
+                  </span>
+                )}
+              </div>
+
+              {chipsActivos.length > 0 && (
+                <div className="mt-tight flex flex-wrap items-center gap-tight" role="group" aria-label="Filtros aplicados">
+                  {chipsActivos.map((chip) => (
+                    <span key={chip.key} className="pill pill-accent inline-flex items-center gap-1 pr-1">
+                      {chip.label}
+                      <button
+                        type="button"
+                        aria-label={`Quitar filtro ${chip.label}`}
+                        onClick={chip.quitar}
+                        className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      >
+                        <X aria-hidden="true" className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <Button type="button" variant="ghost" size="sm" onClick={limpiarFiltros} className="font-medium text-primary">
+                    Limpiar todo
+                  </Button>
+                </div>
+              )}
+
               <div className="mt-card">
                   {isLoading ? (
                     <ListaSkeleton />
@@ -639,14 +692,7 @@ function PersonasView() {
                       </EmptyHeader>
                       {totalFiltros > 0 && (
                         <EmptyContent>
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setHabilidadesSel([]);
-                              setInteresesSel([]);
-                              setSemestreRango(undefined);
-                            }}
-                          >
+                          <Button variant="outline" onClick={limpiarFiltros}>
                             Quitar filtros
                           </Button>
                         </EmptyContent>
