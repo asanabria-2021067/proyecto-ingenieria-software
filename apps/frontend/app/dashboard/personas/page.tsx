@@ -568,7 +568,7 @@ function PersonasView() {
             <section aria-label="Directorio de personas">
               <div className="flex flex-wrap items-center gap-inline">
                 <DashboardSearchField
-                  containerClassName="min-w-full flex-1 sm:min-w-64"
+                  containerClassName="min-w-full flex-1 sm:min-w-48"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Buscar por nombre o apellido"
@@ -597,7 +597,7 @@ function PersonasView() {
                   options={opcionesHabilidades}
                   value={habilidadesSel}
                   onChange={setHabilidadesSel}
-                  className="w-full sm:w-44"
+                  className="w-full sm:w-40"
                 />
                 <DashboardFilterMultiSelect
                   label="Intereses"
@@ -605,7 +605,7 @@ function PersonasView() {
                   options={opcionesIntereses}
                   value={interesesSel}
                   onChange={setInteresesSel}
-                  className="w-full sm:w-44"
+                  className="w-full sm:w-40"
                 />
 
                 <div className="flex items-center gap-micro rounded-control border border-outline-variant p-micro">
