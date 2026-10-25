@@ -313,4 +313,73 @@ describeIntegration('HU-195 — servicio de reuniones de Administración (Postgr
       }
     });
   });
+
+  describe('G07 · cancelar', () => {
+    const usuariosDe = async (idReunion: number, tipo: string) => (await avisos(idReunion, tipo)).map((f) => f.idUsuario);
+
+    it('cancela padre y proyecciones con el mismo instante, avisa una vez y conserva el historial', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P1.idProyecto, p.P2.idProyecto]));
+      emitidos.length = 0;
+      const cancelada = await service.cancel(creada.idReunion, id('ADMIN2'));
+
+      expect(cancelada).toMatchObject({ estado: 'CANCELADA', version: 2, integridad: 'OK' });
+      expect(cancelada.proyectos.map((x) => x.idProyecto)).toEqual(creada.proyectos.map((x) => x.idProyecto));
+      const filas = await prisma.eventoProyecto.findMany({ where: { idReunion: creada.idReunion } });
+      expect(filas.every((f) => f.eliminadoEn?.getTime() === cancelada.canceladaEn?.getTime())).toBe(true);
+      expect(await usuariosDe(creada.idReunion, 'REUNION_CANCELADA')).toEqual([id('L1'), id('M1'), id('COMUN'), id('L2'), id('M2')].sort((a, b) => a - b));
+      expect(emitidos.every((e) => e.tipo === 'REUNION_CANCELADA')).toBe(true);
+    });
+
+    it('AC-17: cancelar dos veces (también a la vez) avisa una sola vez y no mueve la fecha de cancelación', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P2.idProyecto]));
+      await Promise.all([service.cancel(creada.idReunion, id('ADMIN')), service.cancel(creada.idReunion, id('ADMIN2'))]);
+      const primera = await prisma.reunionAdministracion.findUniqueOrThrow({ where: { idReunion: creada.idReunion } });
+      const otra = await service.cancel(creada.idReunion, id('ADMIN'));
+
+      expect(otra.canceladaEn).toEqual(primera.canceladaEn);
+      expect(otra.version).toBe(2);
+      const lista = await usuariosDe(creada.idReunion, 'REUNION_CANCELADA');
+      expect(lista).toEqual([...new Set(lista)]);
+      expect(lista).toHaveLength(3);
+      expect(await prisma.bitacoraAuditoria.count({ where: { tipoObjeto: 'REUNION_ADMINISTRACION', idObjeto: String(creada.idReunion), accion: 'REUNION_ADMIN_CANCELADA' } })).toBe(1);
+    });
+
+    it('una reunión cancelada ya no se edita (409)', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P2.idProyecto]));
+      await service.cancel(creada.idReunion, id('ADMIN'));
+      await expect(service.update(creada.idReunion, id('ADMIN'), { version: 2, tituloEvento: 'Tarde' })).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('QC-02: un convocado que ya salió del equipo también se entera, si su cuenta sigue activa; quien ya recibió su baja no se repite', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P1.idProyecto, p.P2.idProyecto]));
+      // L2 y M2 dejan de estar convocados al retirar P2 (reciben su cancelación en ese momento).
+      await service.update(creada.idReunion, id('ADMIN'), { version: 1, proyectos: [p.P1.idProyecto] });
+      // M1 sale del proyecto después de ser convocado.
+      const part = await prisma.participacionProyecto.findFirstOrThrow({ where: { idUsuario: id('M1'), idRolProyecto: p.P1.idRol } });
+      await prisma.participacionProyecto.update({ where: { idParticipacion: part.idParticipacion }, data: { estadoParticipacion: 'RETIRADO' } });
+      try {
+        await service.cancel(creada.idReunion, id('ADMIN'));
+        const canceladas = await avisos(creada.idReunion, 'REUNION_CANCELADA');
+        // M1 (exmiembro convocado) sí; L2 y M2, una sola cancelación (la del retiro de P2).
+        expect(canceladas.filter((f) => f.idUsuario === id('M1'))).toHaveLength(1);
+        for (const usuario of [id('L2'), id('M2')]) expect(canceladas.filter((f) => f.idUsuario === usuario)).toHaveLength(1);
+        // El aviso no nombra proyectos.
+        expect(canceladas.every((f) => !('projectId' in (f.datosJson as object)))).toBe(true);
+      } finally {
+        await prisma.participacionProyecto.update({ where: { idParticipacion: part.idParticipacion }, data: { estadoParticipacion: 'ACTIVO' } });
+      }
+    });
+
+    it('quien no gestiona la reunión no la cancela (403) y nada cambia', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P2.idProyecto], { politicaEdicion: 'SOLO_CREADOR' }));
+      await expect(service.cancel(creada.idReunion, id('ADMIN2'))).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.cancel(creada.idReunion, id('ESTUDIANTE'))).rejects.toBeInstanceOf(ForbiddenException);
+      expect((await prisma.reunionAdministracion.findUniqueOrThrow({ where: { idReunion: creada.idReunion } })).canceladaEn).toBeNull();
+    });
+  });
 });
