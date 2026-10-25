@@ -13,6 +13,20 @@ type TxClient = Prisma.TransactionClient;
 /** T-292: tamaño de página por defecto de GET /notificaciones?page=N. */
 const NOTIFICATIONS_PAGE_SIZE = 20;
 
+export interface FiltroNotificaciones {
+  tipos?: TipoNotificacion[];
+  leida?: boolean;
+}
+
+/** HU-198: siempre con el usuario de la sesión; los filtros solo acotan dentro de lo suyo. */
+function filtroNotificaciones(userId: number, { tipos, leida }: FiltroNotificaciones): Prisma.NotificacionWhereInput {
+  return {
+    idUsuario: userId,
+    ...(tipos ? { tipoNotificacion: { in: [...new Set(tipos)] } } : {}),
+    ...(leida === undefined ? {} : { leidaEn: leida ? { not: null } : null }),
+  };
+}
+
 /**
  * Sprint 7 (06 v2 §16/§40/§44/§45): efecto diferido al post-commit. Tipo
  * estructural compatible con `EffectBuffer` del runner de proyecto sin
@@ -235,9 +249,9 @@ export class NotificationsService {
     }
   }
 
-  findAll(userId?: number) {
+  findAll(userId?: number, filtros: FiltroNotificaciones = {}) {
     return this.prisma.notificacion.findMany({
-      where: userId ? { idUsuario: userId } : undefined,
+      where: userId ? filtroNotificaciones(userId, filtros) : undefined,
       orderBy: { creadaEn: 'desc' },
       take: 100,
     });
@@ -246,9 +260,11 @@ export class NotificationsService {
   /**
    * T-292 (HU-176): página de notificaciones del usuario, de la más reciente a
    * la más antigua. Misma forma que el listado paginado de proyectos.
+   * HU-198 (T-370): `data` y `total` usan el MISMO filtro (tipos, leída), siempre
+   * acotado al usuario de la sesión; filtrar en memoria tras paginar daría páginas vacías.
    */
-  async findPage(userId: number, page: number, limit = NOTIFICATIONS_PAGE_SIZE) {
-    const where = { idUsuario: userId };
+  async findPage(userId: number, page: number, limit = NOTIFICATIONS_PAGE_SIZE, filtros: FiltroNotificaciones = {}) {
+    const where = filtroNotificaciones(userId, filtros);
     const [data, total] = await Promise.all([
       this.prisma.notificacion.findMany({
         where,
