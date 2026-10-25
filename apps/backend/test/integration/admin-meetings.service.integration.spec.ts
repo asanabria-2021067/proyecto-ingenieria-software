@@ -277,6 +277,18 @@ describeIntegration('HU-195 — servicio de reuniones de Administración (Postgr
       expect((await service.update(creada.idReunion, id('ADMIN'), { version: 2, descripcionEvento: 'Agenda' })).version).toBe(3);
     });
 
+    it('AC-18B: con proyecciones divergentes (inducidas en la base) no se elige ninguna: detalle INCONSISTENTE y edición 409', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P1.idProyecto, p.P2.idProyecto]));
+      const [primera] = creada.proyectos;
+      await prisma.eventoProyecto.update({ where: { idEvento: primera.idEvento }, data: { tituloEvento: 'Divergente' } });
+
+      expect(await service.detalle(creada.idReunion, id('ADMIN'))).toMatchObject({ integridad: 'INCONSISTENTE', contenido: null });
+      await expect(service.update(creada.idReunion, id('ADMIN'), { version: 1, descripcionEvento: 'x' })).rejects.toBeInstanceOf(ConflictException);
+      // El padre no guarda una copia que se pudiera tomar en su lugar.
+      expect(Object.keys(await prisma.reunionAdministracion.findUniqueOrThrow({ where: { idReunion: creada.idReunion } }))).not.toContain('tituloEvento');
+    });
+
     it('AC-11/AC-12/AC-13: políticas, cambio de política solo por el creador y editor revocado', async () => {
       const { id, p } = esc;
       const creada = await service.create(id('ADMIN'), dto([p.P2.idProyecto], { politicaEdicion: 'SOLO_CREADOR' }));
