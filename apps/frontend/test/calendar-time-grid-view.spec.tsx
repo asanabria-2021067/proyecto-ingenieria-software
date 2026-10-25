@@ -633,3 +633,22 @@ describe('TimeGridView — texto de los bloques medible por axe (WCAG 1.4.3)', (
     expect(compacto.querySelector('span > span')).toHaveTextContent('12:00');
   });
 });
+
+describe('TimeGridView — ficha propia de "Todo el día" (calendario administrativo)', () => {
+  it('renderTodoElDia reemplaza la ficha de su ítem y, si devuelve undefined, deja la ficha por defecto', () => {
+    const key = '2026-10-07';
+    render(
+      <TimeGridView
+        days={semana()}
+        todayKey="2026-10-06"
+        itemsByDay={new Map([[key, [tarea(1, key), tarea(2, key)]]])}
+        onSelectEvento={() => {}}
+        renderTodoElDia={(item) => (item.id === 1 ? <button type="button">Ficha propia</button> : undefined)}
+        ahora={AHORA}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Ficha propia' })).toBeInTheDocument();
+    expect(screen.queryByText('Tarea 1')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Tarea 2/ })).toHaveAttribute('href', '/dashboard/projects/1/kanban/tasks/2');
+  });
+});

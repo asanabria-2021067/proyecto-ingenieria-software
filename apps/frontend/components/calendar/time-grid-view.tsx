@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { Fragment, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import type { CalendarDay } from '@/lib/calendar/utils';
 import { agendaItemKey, type AgendaItem } from '@/lib/calendar/agenda';
@@ -104,6 +104,7 @@ export function TimeGridView({
   itemsByDay,
   onSelectEvento,
   onVerDia,
+  renderTodoElDia,
   ahora,
 }: {
   days: CalendarDay[];
@@ -112,6 +113,12 @@ export function TimeGridView({
   onSelectEvento: (item: EventoItem) => void;
   /** Semana: el "+N" de un horario muy cargado abre ese día en la vista Día. */
   onVerDia?: (dayKey: string) => void;
+  /**
+   * Ficha propia de un ítem de la franja "Todo el día" (calendario
+   * administrativo: finalización de un Sprint). `undefined` usa la ficha por
+   * defecto; el calendario del estudiante no la pasa.
+   */
+  renderTodoElDia?: (item: AgendaItem) => React.ReactNode | undefined;
   ahora: Date;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -185,7 +192,9 @@ export function TimeGridView({
                 }`}
               >
                 {todoElDia.slice(0, limite).map((item) => (
-                  <ChipTodoElDia key={agendaItemKey(item)} item={item} onSelectEvento={onSelectEvento} />
+                  <Fragment key={agendaItemKey(item)}>
+                    {renderTodoElDia?.(item) ?? <ChipTodoElDia item={item} onSelectEvento={onSelectEvento} />}
+                  </Fragment>
                 ))}
                 {ocultos > 0 && (
                   <button
