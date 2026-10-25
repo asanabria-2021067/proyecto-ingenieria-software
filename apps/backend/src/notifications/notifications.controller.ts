@@ -22,9 +22,9 @@ export class NotificationsController {
 
   @Get()
   findAll(@CurrentUser() user: { userId: number }, @Query() query: ListNotificationsQueryDto) {
-    const filtros = { tipos: query.tipos, leida: query.leida };
+    const filtros = { tipos: query.tipos, leida: query.leida, q: query.q, proyecto: query.proyecto };
     if (query.page !== undefined) {
-      return this.notificationsService.findPage(user.userId, query.page, query.limit, filtros);
+      return this.notificationsService.findPage(user.userId, query.page, query.limit, filtros, query.orden);
     }
     return this.notificationsService.findAll(user.userId, filtros);
   }

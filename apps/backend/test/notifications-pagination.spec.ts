@@ -67,7 +67,7 @@ describe('NotificationsController.findAll (T-292)', () => {
   it('con page responde la página pedida', async () => {
     const { service, controller } = build();
     await controller.findAll({ userId: 3 }, { page: 2, limit: 10 });
-    expect(service.findPage).toHaveBeenCalledWith(3, 2, 10, { tipos: undefined, leida: undefined });
+    expect(service.findPage).toHaveBeenCalledWith(3, 2, 10, { tipos: undefined, leida: undefined, q: undefined, proyecto: undefined }, undefined);
     expect(service.findAll).not.toHaveBeenCalled();
   });
 });
@@ -131,6 +131,69 @@ describe('HU-198 (T-370) · filtros de GET /notificaciones', () => {
     const service = { findAll: vi.fn().mockResolvedValue([]), findPage: vi.fn() };
     const controller = new NotificationsController(service as unknown as ConstructorParameters<typeof NotificationsController>[0]);
     await controller.findAll({ userId: 3 }, { tipos: ['TAREA_ASIGNADA'], leida: false });
-    expect(service.findAll).toHaveBeenCalledWith(3, { tipos: ['TAREA_ASIGNADA'], leida: false });
+    expect(service.findAll).toHaveBeenCalledWith(3, { tipos: ['TAREA_ASIGNADA'], leida: false, q: undefined, proyecto: undefined });
   });
+});
+
+/**
+ * Sprint 10 (bandeja de notificaciones): búsqueda `q`, filtro `proyecto`
+ * (id del payload o `ninguno`) y `orden`, todos aditivos sobre HU-198.
+ */
+describe('GET /notificaciones · q, proyecto y orden (Sprint 10)', () => {
+  const aplicar = async (query: Record<string, unknown>) => {
+    const dto = plainToInstance(ListNotificationsQueryDto, query, { enableImplicitConversion: true });
+    const errores = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+    return { dto, propiedades: errores.map((e) => e.property) };
+  };
+
+  it('q se recorta; en blanco se ignora; más de 120 caracteres es 400', async () => {
+    expect((await aplicar({ q: '  horas ' })).dto.q).toBe('horas');
+    expect((await aplicar({ q: '   ' })).dto.q).toBeUndefined();
+    expect((await aplicar({ q: 'x'.repeat(121) })).propiedades).toEqual(['q']);
+  });
+
+  it('proyecto acepta un id positivo o "ninguno"; otra cosa es 400', async () => {
+    expect((await aplicar({ proyecto: '64' })).dto.proyecto).toBe(64);
+    expect((await aplicar({ proyecto: 'ninguno' })).dto.proyecto).toBe('ninguno');
+    for (const valor of ['0', '-1', 'abc', '1.5', '']) expect((await aplicar({ proyecto: valor })).propiedades, valor).toEqual(['proyecto']);
+  });
+
+  it('orden acepta solo asc o desc', async () => {
+    expect((await aplicar({ orden: 'asc' })).dto.orden).toBe('asc');
+    expect((await aplicar({ orden: 'ASC' })).propiedades).toEqual(['orden']);
+  });
+
+  it('q busca en título y mensaje sin distinguir mayúsculas; proyecto mira projectId e idProyecto del payload', async () => {
+    const prisma = makePrisma(1);
+    const service = new NotificationsService(prisma as unknown as PrismaService);
+    await service.findPage(7, 1, 20, { q: 'Horas', proyecto: 64 });
+    const where = {
+      idUsuario: 7,
+      AND: [
+        { OR: [{ tituloNotificacion: { contains: 'Horas', mode: 'insensitive' } }, { mensajeNotificacion: { contains: 'Horas', mode: 'insensitive' } }] },
+        { OR: [{ datosJson: { path: ['projectId'], equals: 64 } }, { datosJson: { path: ['idProyecto'], equals: 64 } }] },
+      ],
+    };
+    expect(prisma.notificacion.findMany).toHaveBeenCalledWith(expect.objectContaining({ where }));
+    expect(prisma.notificacion.count).toHaveBeenCalledWith({ where });
+  });
+
+  it('proyecto=ninguno exige que ninguna clave de proyecto tenga valor', async () => {
+    const prisma = makePrisma(1);
+    const service = new NotificationsService(prisma as unknown as PrismaService);
+    await service.findPage(7, 1, 20, { proyecto: 'ninguno' });
+    expect(prisma.notificacion.count).toHaveBeenCalledWith({
+      where: { idUsuario: 7, AND: [{ AND: [{ datosJson: { path: ['projectId'], equals: expect.anything() } }, { datosJson: { path: ['idProyecto'], equals: expect.anything() } }] }] },
+    });
+  });
+
+  it('orden=asc invierte fecha y desempate; por defecto desc', async () => {
+    const prisma = makePrisma(1);
+    const service = new NotificationsService(prisma as unknown as PrismaService);
+    await service.findPage(7, 1, 20, {}, 'asc');
+    expect(prisma.notificacion.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ orderBy: [{ creadaEn: 'asc' }, { idNotificacion: 'asc' }] }));
+    await service.findPage(7, 1, 20);
+    expect(prisma.notificacion.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ orderBy: [{ creadaEn: 'desc' }, { idNotificacion: 'desc' }] }));
+  });
+
 });

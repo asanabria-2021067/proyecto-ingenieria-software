@@ -16,14 +16,40 @@ const NOTIFICATIONS_PAGE_SIZE = 20;
 export interface FiltroNotificaciones {
   tipos?: TipoNotificacion[];
   leida?: boolean;
+  /** Sprint 10 (bandeja): texto parcial, sin distinguir mayúsculas, sobre título y mensaje. */
+  q?: string;
+  /** Id referenciado por el payload (`projectId` o `idProyecto`) o `ninguno` = sin proyecto. */
+  proyecto?: number | 'ninguno';
+}
+
+/** Claves con las que los payloads de notificación referencian un proyecto. */
+const CLAVES_PROYECTO = ['projectId', 'idProyecto'] as const;
+
+function filtroProyecto(proyecto: number | 'ninguno'): Prisma.NotificacionWhereInput {
+  if (proyecto === 'ninguno') {
+    // Clave ausente o nula en todas las variantes: aviso sin proyecto.
+    return { AND: CLAVES_PROYECTO.map((clave) => ({ datosJson: { path: [clave], equals: Prisma.AnyNull } })) };
+  }
+  return { OR: CLAVES_PROYECTO.map((clave) => ({ datosJson: { path: [clave], equals: proyecto } })) };
 }
 
 /** HU-198: siempre con el usuario de la sesión; los filtros solo acotan dentro de lo suyo. */
-function filtroNotificaciones(userId: number, { tipos, leida }: FiltroNotificaciones): Prisma.NotificacionWhereInput {
+function filtroNotificaciones(userId: number, { tipos, leida, q, proyecto }: FiltroNotificaciones): Prisma.NotificacionWhereInput {
+  const condiciones: Prisma.NotificacionWhereInput[] = [];
+  if (q) {
+    condiciones.push({
+      OR: [
+        { tituloNotificacion: { contains: q, mode: 'insensitive' } },
+        { mensajeNotificacion: { contains: q, mode: 'insensitive' } },
+      ],
+    });
+  }
+  if (proyecto !== undefined) condiciones.push(filtroProyecto(proyecto));
   return {
     idUsuario: userId,
     ...(tipos ? { tipoNotificacion: { in: [...new Set(tipos)] } } : {}),
     ...(leida === undefined ? {} : { leidaEn: leida ? { not: null } : null }),
+    ...(condiciones.length > 0 ? { AND: condiciones } : {}),
   };
 }
 
@@ -263,12 +289,20 @@ export class NotificationsService {
    * HU-198 (T-370): `data` y `total` usan el MISMO filtro (tipos, leída), siempre
    * acotado al usuario de la sesión; filtrar en memoria tras paginar daría páginas vacías.
    */
-  async findPage(userId: number, page: number, limit = NOTIFICATIONS_PAGE_SIZE, filtros: FiltroNotificaciones = {}) {
+  async findPage(
+    userId: number,
+    page: number,
+    limit = NOTIFICATIONS_PAGE_SIZE,
+    filtros: FiltroNotificaciones = {},
+    orden: 'asc' | 'desc' = 'desc',
+  ) {
     const where = filtroNotificaciones(userId, filtros);
     const [data, total] = await Promise.all([
       this.prisma.notificacion.findMany({
         where,
-        orderBy: [{ creadaEn: 'desc' }, { idNotificacion: 'desc' }],
+        // Sprint 10: el desempate sigue la misma dirección que la fecha, así
+        // ascendente y descendente son el reverso exacto uno del otro.
+        orderBy: [{ creadaEn: orden }, { idNotificacion: orden }],
         skip: (page - 1) * limit,
         take: limit,
       }),

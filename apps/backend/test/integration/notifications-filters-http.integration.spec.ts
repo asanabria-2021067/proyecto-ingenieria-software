@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { JwtService } from '@nestjs/jwt';
 import type { PrismaClient, TipoNotificacion } from '@prisma/client';
 import { describeIntegration, createIntegrationPrismaClient } from './setup/database';
-import { createIntegrationUser } from './setup/fixtures';
+import { createIntegrationProject, createIntegrationUser } from './setup/fixtures';
 import { cleanupIntegrationFixtures } from './setup/cleanup';
 import { startIntegrationHttpHarness, type IntegrationHttpHarness } from './setup/http-harness';
 import { NotificationsController } from '../../src/notifications/notifications.controller';
@@ -21,8 +21,8 @@ import { ListNotificationsQueryDto, NotificationTypesFilterDto } from '../../src
 describeIntegration('HU-198 — filtros y marcado filtrado de notificaciones (PostgreSQL real)', () => {
   let prisma: PrismaClient;
   let harness: IntegrationHttpHarness;
-  const scope = { userIds: [] as number[] };
-  const ids = { a: 0, b: 0 };
+  const scope = { userIds: [] as number[], projectIds: [] as number[] };
+  const ids = { a: 0, b: 0, proyecto: 0 };
   const tokens = { a: '', b: '' };
   const BASE = new Date('2031-01-10T12:00:00.000Z');
 
@@ -33,12 +33,16 @@ describeIntegration('HU-198 — filtros y marcado filtrado de notificaciones (Po
   };
   const sembrar = async () => {
     await prisma.notificacion.deleteMany({ where: { idUsuario: { in: [ids.a, ids.b] } } });
-    const fila = (idUsuario: number, tipo: TipoNotificacion, minutos: number, leida = false) => ({
-      idUsuario, tipoNotificacion: tipo, tituloNotificacion: `${tipo} ${minutos}`, creadaEn: new Date(BASE.getTime() + minutos * 60_000), leidaEn: leida ? BASE : null,
+    const fila = (idUsuario: number, tipo: TipoNotificacion, minutos: number, leida = false, datosJson?: object, mensaje?: string) => ({
+      idUsuario, tipoNotificacion: tipo, tituloNotificacion: `${tipo} ${minutos}`, mensajeNotificacion: mensaje ?? null, creadaEn: new Date(BASE.getTime() + minutos * 60_000), leidaEn: leida ? BASE : null,
+      ...(datosJson ? { datosJson } : {}),
     });
     await prisma.notificacion.createMany({
       data: [
-        fila(ids.a, 'TAREA_ASIGNADA', 1), fila(ids.a, 'TAREA_ASIGNADA', 2), fila(ids.a, 'TAREA_ASIGNADA', 3, true),
+        // Sprint 10: payloads con proyecto (projectId e idProyecto) y mensajes para la búsqueda.
+        fila(ids.a, 'TAREA_ASIGNADA', 1, false, { projectId: ids.proyecto }, 'Revisa las HORAS del sprint'),
+        fila(ids.a, 'TAREA_ASIGNADA', 2, false, { idProyecto: ids.proyecto }),
+        fila(ids.a, 'TAREA_ASIGNADA', 3, true, { projectId: 999_999_999 }),
         fila(ids.a, 'TAREA_POR_VENCER', 4), fila(ids.a, 'MENCION_COMENTARIO', 5), fila(ids.a, 'REUNION_PROGRAMADA', 6),
         // Empate de creadaEn: desempata idNotificacion desc.
         fila(ids.a, 'NUEVO_SEGUIDOR', 7), fila(ids.a, 'NUEVO_SEGUIDOR', 7),
@@ -63,7 +67,9 @@ describeIntegration('HU-198 — filtros y marcado filtrado de notificaciones (Po
     const a = await createIntegrationUser(prisma, { nombre: 'A', apellido: 'HU198' });
     const b = await createIntegrationUser(prisma, { nombre: 'B', apellido: 'HU198' });
     scope.userIds.push(a.idUsuario, b.idUsuario);
-    Object.assign(ids, { a: a.idUsuario, b: b.idUsuario });
+    const proyecto = await createIntegrationProject(prisma, a.idUsuario, { tituloProyecto: 'Bandeja S10' });
+    scope.projectIds.push(proyecto.idProyecto);
+    Object.assign(ids, { a: a.idUsuario, b: b.idUsuario, proyecto: proyecto.idProyecto });
     const jwt = new JwtService({ secret: getJwtSecret() });
     tokens.a = jwt.sign({ sub: a.idUsuario, correo: a.correo, tipo: 'access' });
     tokens.b = jwt.sign({ sub: b.idUsuario, correo: b.correo, tipo: 'access' });
@@ -127,5 +133,30 @@ describeIntegration('HU-198 — filtros y marcado filtrado de notificaciones (Po
     expect((await pedir('PATCH', '/notificaciones/leer-todas', tokens.a)).body).toEqual({ actualizadas: 7 });
     expect(await prisma.notificacion.count({ where: { idUsuario: ids.a, leidaEn: null } })).toBe(0);
     expect(await prisma.notificacion.count({ where: { idUsuario: ids.b, leidaEn: null } })).toBe(2);
+  });
+
+  // ── Sprint 10 · bandeja: q, proyecto, orden y mias/proyectos ─────────────
+  it('q busca en título y mensaje, parcial y sin mayúsculas, dentro del mismo filtro que data y total', async () => {
+    const res = await pedir('GET', '/notificaciones?page=1&q=horas', tokens.a);
+    expect(res.body).toMatchObject({ total: 1, data: [{ tituloNotificacion: 'TAREA_ASIGNADA 1' }] });
+    expect((await pedir('GET', '/notificaciones?page=1&q=tarea_asig&leida=false', tokens.a)).body.total).toBe(2);
+    expect((await pedir('GET', '/notificaciones?page=1&q=tarea_asig', tokens.b)).body.total).toBe(1);
+    expect((await pedir('GET', `/notificaciones?page=1&q=${'x'.repeat(121)}`, tokens.a)).status).toBe(400);
+  });
+
+  it('proyecto=<id> acepta projectId e idProyecto del payload; proyecto=ninguno solo avisos sin proyecto', async () => {
+    const conProyecto = await pedir('GET', `/notificaciones?page=1&proyecto=${ids.proyecto}`, tokens.a);
+    expect(conProyecto.body.total).toBe(2);
+    expect(conProyecto.body.data.map((n: { tituloNotificacion: string }) => n.tituloNotificacion)).toEqual(['TAREA_ASIGNADA 2', 'TAREA_ASIGNADA 1']);
+    const sinProyecto = await pedir('GET', '/notificaciones?page=1&proyecto=ninguno', tokens.a);
+    expect(sinProyecto.body.total).toBe(5);
+    for (const valor of ['0', 'abc', '']) expect((await pedir('GET', `/notificaciones?page=1&proyecto=${valor}`, tokens.a)).status, valor).toBe(400);
+  });
+
+  it('orden=asc es el reverso exacto de la lista por defecto', async () => {
+    const desc = (await pedir('GET', '/notificaciones?page=1&limit=50', tokens.a)).body.data.map((n: { idNotificacion: number }) => n.idNotificacion);
+    const asc = (await pedir('GET', '/notificaciones?page=1&limit=50&orden=asc', tokens.a)).body.data.map((n: { idNotificacion: number }) => n.idNotificacion);
+    expect(asc).toEqual([...desc].reverse());
+    expect((await pedir('GET', '/notificaciones?page=1&orden=DESC', tokens.a)).status).toBe(400);
   });
 });
