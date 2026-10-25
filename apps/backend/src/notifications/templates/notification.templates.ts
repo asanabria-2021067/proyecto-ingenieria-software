@@ -257,6 +257,35 @@ export interface NotificationTemplateData {
     ownerId: number;
     ownerName: string;
   };
+
+  // HU-195 (T-364): reunión de Administración con el equipo del destinatario.
+  // `projectId`/`eventId` son los de la proyección que ESE usuario ve; nunca
+  // se nombran otros proyectos de la misma reunión.
+  REUNION_PROGRAMADA: {
+    meetingId: number;
+    eventId: number;
+    projectId: number;
+    projectTitle: string;
+    eventTitle: string;
+    fechaInicioTexto: string;
+    fechaInicioIso: string;
+  };
+  REUNION_ACTUALIZADA: {
+    meetingId: number;
+    eventId: number;
+    projectId: number;
+    projectTitle: string;
+    eventTitle: string;
+    fechaInicioTexto: string;
+    fechaInicioIso: string;
+  };
+  // Sin proyecto: también la reciben convocados que ya no pertenecen al equipo.
+  REUNION_CANCELADA: {
+    meetingId: number;
+    eventTitle: string;
+    fechaInicioTexto: string;
+    fechaInicioIso: string;
+  };
   // HU-186 (T-330): aviso de vencimiento emitido por TasksDueReminderService
   // al responsable de la tarea. taskId/projectId viajan en datosJson para el
   // enlace del centro de notificaciones; el texto no los muestra.
@@ -522,6 +551,24 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Calendario compartido',
     message: (data: NotificationTemplateData['CALENDARIO_COMPARTIDO']) =>
       `${data.ownerName} compartió su calendario contigo. Actívalo en tu calendario para ver sus actividades.`,
+  },
+
+  REUNION_PROGRAMADA: {
+    title: 'Nueva reunión de Administración',
+    message: (data: NotificationTemplateData['REUNION_PROGRAMADA']) =>
+      `Administración convocó a tu equipo de "${data.projectTitle}" a "${data.eventTitle}" el ${data.fechaInicioTexto}.`,
+  },
+
+  REUNION_ACTUALIZADA: {
+    title: 'Reunión de Administración actualizada',
+    message: (data: NotificationTemplateData['REUNION_ACTUALIZADA']) =>
+      `Cambió la reunión "${data.eventTitle}" con tu equipo de "${data.projectTitle}". Ahora es el ${data.fechaInicioTexto}.`,
+  },
+
+  REUNION_CANCELADA: {
+    title: 'Reunión de Administración cancelada',
+    message: (data: NotificationTemplateData['REUNION_CANCELADA']) =>
+      `Administración canceló la reunión "${data.eventTitle}" del ${data.fechaInicioTexto}.`,
   },
 
   TAREA_POR_VENCER: {
