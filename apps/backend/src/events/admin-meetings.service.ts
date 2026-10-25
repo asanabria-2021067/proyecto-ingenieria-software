@@ -293,6 +293,67 @@ export class AdminMeetingsService {
     return this.detalle(idReunion, actorId);
   }
 
+  /**
+   * Cancelación lógica e idempotente: fija `canceladaEn` y retira todas las
+   * proyecciones con ese mismo instante (el historial las reconoce así). Una
+   * segunda cancelación responde el mismo estado sin volver a avisar.
+   * QC-02: avisa al equipo elegible actual y a quien recibió la convocatoria
+   * aunque ya no esté en el equipo, siempre con cuenta ACTIVO y sin repetir a
+   * quien ya recibió una cancelación de esta reunión (p. ej. al ser retirado su proyecto).
+   */
+  async cancel(idReunion: number, actorId: number) {
+    const ahora = new Date();
+    const effects: PostCommitEffect[] = [];
+    const sink: PostCommitEffectSink = { add: (effect) => effects.push(effect) };
+    await this.prisma.$transaction(async (tx) => {
+      const reunion = await this.bloquear(tx, idReunion);
+      const { gestion } = await cargarGestion(
+        tx,
+        { idCreador: reunion.idCreador, politicaEdicion: reunion.politicaEdicion, editores: reunion.editores.map((e) => e.idUsuario) },
+        actorId,
+      );
+      if (!gestion.puede) throw new ForbiddenException('No puedes gestionar esta reunión');
+      if (reunion.canceladaEn) return;
+
+      const activas = await this.proyeccionesActivas(tx, idReunion);
+      const { contenido, integridad } = contenidoCanonico(activas);
+      await tx.reunionAdministracion.update({
+        where: { idReunion },
+        data: { canceladaEn: ahora, actualizadaEn: ahora, version: reunion.version + 1 },
+      });
+      await tx.eventoProyecto.updateMany({ where: { idReunion, eliminadoEn: null }, data: { eliminadoEn: ahora } });
+
+      const idsProyecto = activas.map((p) => p.idProyecto);
+      const proyectos = await cargarProyectosParaReunion(tx, idsProyecto);
+      const equipo = unionDeEquipos(await equiposDeProyectos(tx, vigentes(proyectos, idsProyecto)));
+      const prefijo = `reunion:${idReunion}:`;
+      const convocados = await tx.notificacion.findMany({
+        where: { tipoNotificacion: 'REUNION_PROGRAMADA', claveIdempotencia: { startsWith: prefijo }, usuario: { estado: 'ACTIVO' } },
+        distinct: ['idUsuario'],
+        select: { idUsuario: true },
+      });
+      const yaCancelados = new Set(
+        (await tx.notificacion.findMany({
+          where: { tipoNotificacion: 'REUNION_CANCELADA', claveIdempotencia: { startsWith: prefijo } },
+          distinct: ['idUsuario'],
+          select: { idUsuario: true },
+        })).map((n) => n.idUsuario),
+      );
+      const destinatarios = [...new Set([...equipo, ...convocados.map((c) => c.idUsuario)])].filter((id) => !yaCancelados.has(id));
+      // Con proyecciones divergentes (no debería ocurrir) el aviso usa la primera y la bitácora lo registra.
+      const texto = contenido ?? activas[0];
+      if (texto) await this.avisarCancelacion(tx, idReunion, texto, destinatarios, `${prefijo}cancelada`, sink);
+      await this.auditar(tx, actorId, idReunion, 'REUNION_ADMIN_CANCELADA', gestion.motivo, {
+        version: reunion.version + 1,
+        proyectos: idsProyecto,
+        destinatarios: destinatarios.length,
+        integridad,
+      });
+    });
+    await this.notifications.publishEffects(effects);
+    return this.detalle(idReunion, actorId);
+  }
+
   /** Detalle para Administración: contenido canónico, proyectos, permisos y si quien consulta la gestiona. */
   async detalle(idReunion: number, actorId: number) {
     const reunion = await this.prisma.reunionAdministracion.findUnique({
