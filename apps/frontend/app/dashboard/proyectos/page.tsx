@@ -135,7 +135,7 @@ export default function ProyectosPage() {
         </div>
 
         {/* Buscador y filtros */}
-        <div className="card-base mb-section space-y-stack">
+        <div className="mb-section space-y-stack">
           <div className="flex flex-col gap-stack sm:flex-row">
             <DashboardSearchField
               containerClassName="flex-1"
