@@ -374,6 +374,24 @@ describeIntegration('HU-195 — servicio de reuniones de Administración (Postgr
       }
     });
 
+    it('G14: PATCH y DELETE a la vez quedan serializados: nunca una reunión cancelada con contenido editado después', async () => {
+      const { id, p } = esc;
+      const creada = await service.create(id('ADMIN'), dto([p.P1.idProyecto, p.P2.idProyecto]));
+      const [edicion, cancelacion] = await Promise.allSettled([
+        service.update(creada.idReunion, id('ADMIN2'), { version: 1, tituloEvento: 'Carrera' }),
+        service.cancel(creada.idReunion, id('ADMIN')),
+      ]);
+      expect(cancelacion.status).toBe('fulfilled');
+      if (edicion.status === 'rejected') expect(edicion.reason).toBeInstanceOf(ConflictException);
+      const final = await prisma.reunionAdministracion.findUniqueOrThrow({ where: { idReunion: creada.idReunion } });
+      expect(final.canceladaEn).not.toBeNull();
+      const filas = await prisma.eventoProyecto.findMany({ where: { idReunion: creada.idReunion } });
+      // Todas las proyecciones canceladas con el mismo instante y con el mismo contenido.
+      expect(new Set(filas.map((f) => f.eliminadoEn?.getTime())).size).toBe(1);
+      expect(new Set(filas.map((f) => f.tituloEvento)).size).toBe(1);
+      expect(final.version).toBe(edicion.status === 'fulfilled' ? 3 : 2);
+    });
+
     it('quien no gestiona la reunión no la cancela (403) y nada cambia', async () => {
       const { id, p } = esc;
       const creada = await service.create(id('ADMIN'), dto([p.P2.idProyecto], { politicaEdicion: 'SOLO_CREADOR' }));
