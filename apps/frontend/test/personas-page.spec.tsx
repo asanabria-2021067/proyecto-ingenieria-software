@@ -414,7 +414,7 @@ describe('PersonasPage — vacío de recomendaciones', () => {
 
     const tarjeta = (await screen.findByText('Aún no hay recomendaciones')).closest('[data-slot="empty"]') as HTMLElement;
     expect(tarjeta).toHaveClass('bg-surface-container-lowest', 'border-outline-variant/70', 'rounded-2xl', 'shadow-sm');
-    expect(tarjeta).toHaveClass('flex-row', 'items-center', 'py-4');
+    expect(tarjeta).toHaveClass('grid', 'md:items-center', 'py-4');
     expect(tarjeta).not.toHaveClass('border-dashed', 'flex-col');
     expect(within(tarjeta).getByText('Completa tu perfil para descubrir personas con intereses similares')).toBeInTheDocument();
     expect(tarjeta.querySelector('[data-slot="empty-icon"]')).toHaveClass('text-text-secondary', 'border-transparent');

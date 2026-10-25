@@ -62,10 +62,10 @@ describe('Empty — tamaño compacto', () => {
     );
 
     const compacto = screen.getByRole('region', { name: 'compacto' });
-    expect(compacto).toHaveClass('flex-row', 'items-center', 'text-left', 'py-4', 'rounded-2xl', 'shadow-sm');
-    expect(compacto).not.toHaveClass('flex-col', 'text-center', 'py-10');
+    expect(compacto).toHaveClass('grid', 'md:items-center', 'text-left', 'py-4', 'rounded-2xl', 'shadow-sm');
+    expect(compacto).not.toHaveClass('flex', 'flex-col', 'text-center', 'text-balance', 'py-10');
     const normal = screen.getByRole('region', { name: 'normal' });
     expect(normal).toHaveClass('flex-col', 'text-center', 'py-10', 'md:py-12');
-    expect(normal).not.toHaveClass('flex-row', 'text-left');
+    expect(normal).not.toHaveClass('grid', 'text-left');
   });
 });
