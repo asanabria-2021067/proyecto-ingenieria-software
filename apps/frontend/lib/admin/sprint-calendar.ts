@@ -148,7 +148,8 @@ export const ORDEN_SITUACION_SPRINT: readonly AdminSprintSituacion[] = [
   'SIN_FECHA',
 ];
 
-function sinTildes(texto: string): string {
+/** Texto en minúsculas y sin tildes, para búsquedas parciales. */
+export function sinTildes(texto: string): string {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
