@@ -25,6 +25,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { SkeletonList } from '@/components/ui/skeleton';
 import {
+  AlertCircle,
   ArrowRight,
   LayoutGrid,
   List,
@@ -397,7 +398,7 @@ function PersonasView() {
   const opcionesIntereses = intereses.map((i) => ({ id: i.idInteres, nombre: i.nombreInteres }));
 
   const { amigos } = useAmigos();
-  const { resultados, hasMore, isLoading, cargarMas, cargandoMas } = useBuscarUsuarios({
+  const { resultados, hasMore, isLoading, isError, reintentar, cargarMas, cargandoMas } = useBuscarUsuarios({
     q,
     carrera: soloMiCarrera,
     amigosDeAmigos: seccion === 'amigos-de-amigos',
@@ -408,7 +409,11 @@ function PersonasView() {
   });
 
   const { solicitudes } = useSolicitudesAmistadPendientes();
-  const { recomendaciones, isLoading: isLoadingRecomendaciones } = useRecomendaciones();
+  const {
+    recomendaciones,
+    isLoading: isLoadingRecomendaciones,
+    isError: errorRecomendaciones,
+  } = useRecomendaciones();
   const aceptarSolicitud = useAceptarSolicitudAmistad();
   const rechazarSolicitud = useRechazarSolicitudAmistad();
   const [confirmSolicitud, setConfirmSolicitud] = useState<{
@@ -525,7 +530,12 @@ function PersonasView() {
           {seccion === 'descubrir' && !isLoadingRecomendaciones && (
             <section className="mb-section">
               <h2 className="type-section mb-card">Personas que quizás conozcas</h2>
-              {recomendaciones.length > 0 ? (
+              {errorRecomendaciones ? (
+                // Un fallo no se presenta como «sin recomendaciones».
+                <p className="type-meta" role="status">
+                  No se pudieron cargar las recomendaciones en este momento.
+                </p>
+              ) : recomendaciones.length > 0 ? (
                 <div className={`grid gap-tight ${COLUMNAS_PERSONAS}`}>
                   {recomendaciones.map((usuario) => (
                     <RecomendacionCard key={usuario.idUsuario} usuario={usuario} />
@@ -683,6 +693,21 @@ function PersonasView() {
               <div className="mt-card">
                   {isLoading ? (
                     <ListaSkeleton />
+                  ) : isError ? (
+                    <Empty tone="danger" className="surface-enter" role="alert">
+                      <EmptyMedia variant="icon">
+                        <AlertCircle aria-hidden="true" className="size-7" />
+                      </EmptyMedia>
+                      <EmptyHeader>
+                        <EmptyTitle>No se pudo cargar el directorio de personas</EmptyTitle>
+                        <EmptyDescription>Verifica que tu sesión siga activa o vuelve a intentarlo.</EmptyDescription>
+                      </EmptyHeader>
+                      <EmptyContent>
+                        <Button variant="outline" onClick={() => void reintentar()}>
+                          Reintentar
+                        </Button>
+                      </EmptyContent>
+                    </Empty>
                   ) : resultados.length === 0 ? (
                     // Mismo criterio que Chats archivados: tarjeta blanca (tono por
                     // defecto de Empty) con el icono pequeño y neutro.

@@ -269,6 +269,20 @@ describe('PersonasPage', () => {
     expect(within(main).getByText('Carla Ruiz')).toBeInTheDocument();
   });
 
+  it('un fallo del directorio se distingue de «sin resultados» y permite reintentar', async () => {
+    buscarUsuariosMock.mockRejectedValue(new Error('500'));
+    await renderPersonas();
+    const alerta = await screen.findByRole('alert');
+    expect(alerta).toHaveTextContent('No se pudo cargar el directorio de personas');
+    expect(screen.queryByText('No encontramos a nadie')).not.toBeInTheDocument();
+    expect(screen.queryByText('Aún no hay recomendaciones')).not.toBeInTheDocument();
+    expect(screen.getByText('No se pudieron cargar las recomendaciones en este momento.')).toBeInTheDocument();
+
+    buscarUsuariosMock.mockResolvedValue({ items: [], hasMore: false });
+    fireEvent.click(within(alerta).getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByText('No encontramos a nadie')).toBeInTheDocument();
+  });
+
   it('cada sección renderiza su estado vacío', async () => {
     const vista = await renderPersonas();
     expect(await screen.findByText('No encontramos a nadie')).toBeInTheDocument();
