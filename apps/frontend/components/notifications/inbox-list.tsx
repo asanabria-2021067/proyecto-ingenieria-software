@@ -47,7 +47,7 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         className={cn(
           'group/fila flex w-full items-start gap-inline border-l-2 px-inline py-inline text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40',
           seleccionada
-            ? 'border-l-sage-nav-accent bg-sage-nav-active/60 dark:bg-sage-nav-active/40'
+            ? 'border-l-sage-nav-accent bg-sage-nav-active'
             : noLeida
               ? 'border-l-transparent bg-primary/5 hover:bg-primary/10'
               : 'border-l-transparent hover:bg-surface-container-low',
@@ -64,10 +64,14 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         </span>
 
         <span className="min-w-0 flex-1">
-          {origen && <span className="type-meta block truncate text-[11px] uppercase tracking-wide text-text-secondary">{origen}</span>}
-          <span className={cn('block truncate text-sm text-on-surface', noLeida ? 'font-bold' : 'font-medium')}>{n.tituloNotificacion}</span>
+          {origen && (
+            <span className={cn('type-meta block truncate text-[11px] uppercase tracking-wide', seleccionada ? 'text-sage-nav-ink-soft' : 'text-text-secondary')}>{origen}</span>
+          )}
+          <span className={cn('block truncate text-sm', seleccionada ? 'text-sage-nav-ink' : 'text-on-surface', noLeida ? 'font-bold' : 'font-medium')}>
+            {n.tituloNotificacion}
+          </span>
           {n.mensajeNotificacion && (
-            <span className={cn('mt-0.5 line-clamp-2 text-xs leading-snug', noLeida ? 'text-on-surface-variant' : 'text-tertiary')}>
+            <span className={cn('mt-0.5 line-clamp-2 text-xs leading-snug', seleccionada ? 'text-sage-nav-ink-soft' : noLeida ? 'text-on-surface-variant' : 'text-tertiary')}>
               {n.mensajeNotificacion}
             </span>
           )}
@@ -82,7 +86,10 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         </span>
 
         <span className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
-          <time dateTime={n.creadaEn} className={cn('text-[11px] tabular-nums', noLeida ? 'font-semibold text-primary' : 'text-text-secondary')}>
+          <time
+            dateTime={n.creadaEn}
+            className={cn('text-[11px] tabular-nums', seleccionada ? 'font-semibold text-sage-nav-ink-soft' : noLeida ? 'font-semibold text-primary' : 'text-text-secondary')}
+          >
             {fecha}
           </time>
           {noLeida && <span aria-hidden="true" className="size-2 rounded-full bg-primary ring-2 ring-surface-container-lowest" />}
