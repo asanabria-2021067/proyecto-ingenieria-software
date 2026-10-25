@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { AlertCircle, ArrowRight, CalendarRange, SearchX } from 'lucide-react';
 import { SprintListView } from '@/components/admin/sprints/sprint-list-view';
 import { AdminCalendarView } from '@/components/admin/sprints/admin-calendar-view';
+import { MeetingListView } from '@/components/admin/sprints/meeting-list-view';
 import { DASHBOARD_FILTER_TRIGGER_CLASS, DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import {
   Breadcrumb,
@@ -347,6 +348,7 @@ export default function AdminSprintsClient() {
             ) : (
               <SprintListView items={ordenados} />
             )}
+            <MeetingListView busqueda={busqueda} />
           </>
         )}
       </div>

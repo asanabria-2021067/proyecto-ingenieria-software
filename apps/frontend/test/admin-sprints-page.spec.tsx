@@ -289,6 +289,8 @@ describe('Calendario de Sprints — búsqueda y filtros', () => {
   it('busca por proyecto o líder, filtra por situación, combina y limpia', async () => {
     renderPage('lista');
     await screen.findByRole('table');
+    // Que termine la carga de reuniones (su esqueleto también es un `status`).
+    await screen.findByText('No hay reuniones administrativas próximas.');
     const buscador = screen.getByRole('textbox', { name: 'Buscar Sprints por proyecto o líder' });
     expect(screen.getByRole('status')).toHaveTextContent('7 Sprints operables');
     expect(screen.queryByRole('button', { name: 'Limpiar filtros' })).not.toBeInTheDocument();
@@ -608,5 +610,37 @@ describe('Calendario administrativo — vistas Día y Semana', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Semana siguiente' }));
     expect(screen.getByRole('heading', { level: 2, name: /12 oct/ })).toBeInTheDocument();
     expect(within(detalle()).getByRole('heading', { level: 2, name: '15 de octubre de 2026' })).toBeInTheDocument();
+  });
+});
+
+describe('Calendario administrativo — Lista y solo consulta', () => {
+  it('la Lista conserva la tabla de Sprints y añade la agenda activa de reuniones', async () => {
+    getUpcomingMock.mockResolvedValue({ reuniones: REUNIONES, completo: true });
+    renderPage('lista');
+
+    const seccion = within((await screen.findByRole('heading', { level: 2, name: 'Reuniones administrativas próximas' })).closest('section') as HTMLElement);
+    expect(await seccion.findByText('Seguimiento de cierre')).toBeInTheDocument();
+    expect(seccion.getByText('Revisión de avance')).toBeInTheDocument();
+    expect(seccion.queryByText('Reunión cancelada')).not.toBeInTheDocument();
+    expect(getUpcomingMock).toHaveBeenCalledWith('activas');
+    expect(screen.getAllByRole('table')).toHaveLength(2);
+    expect(filasDeLaLista()[0]).toBe('Plataforma de Tutorías');
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar Sprints por proyecto o líder' }), { target: { value: 'monitoreo' } });
+    expect(seccion.queryByText('Seguimiento de cierre')).not.toBeInTheDocument();
+    expect(seccion.getByText('Revisión de avance')).toBeInTheDocument();
+  });
+
+  it.each(['dia', 'semana', 'mes', 'lista'] as const)('%s: no hay ningún control para agendar, editar o cancelar reuniones', async (vista) => {
+    getRangeMock.mockResolvedValue({ reuniones: REUNIONES, completo: true });
+    getUpcomingMock.mockResolvedValue({ reuniones: REUNIONES, completo: true });
+    renderPage(vista, '2026-10-08');
+    await screen.findAllByText('Seguimiento de cierre');
+
+    const prohibido = /agendar|programar|nueva reuni|crear|editar|cancelar|reprogramar/i;
+    expect(screen.queryAllByRole('button', { name: prohibido })).toHaveLength(0);
+    expect(screen.queryAllByRole('link', { name: prohibido })).toHaveLength(0);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('form')).not.toBeInTheDocument();
   });
 });
