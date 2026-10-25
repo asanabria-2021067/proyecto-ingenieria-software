@@ -207,6 +207,7 @@ export class EventsService {
     const proyecto = await this.getProjectOrThrow(projectId);
     this.assertLeader(proyecto, userId);
     const actual = await this.getEventOrThrow(projectId, eventId);
+    this.assertNoEsReunionAdministracion(actual);
 
     if (dto.fechaInicio !== undefined || dto.fechaFin !== undefined) {
       this.assertFechaFinPosterior(
@@ -283,7 +284,7 @@ export class EventsService {
   async remove(projectId: number, eventId: number, userId: number): Promise<void> {
     const proyecto = await this.getProjectOrThrow(projectId);
     this.assertLeader(proyecto, userId);
-    await this.getEventOrThrow(projectId, eventId);
+    this.assertNoEsReunionAdministracion(await this.getEventOrThrow(projectId, eventId));
 
     await this.prisma.eventoProyecto.update({
       where: { idEvento: eventId },
@@ -370,6 +371,13 @@ export class EventsService {
     }
   }
 
+  /** HU-195: la proyección de una reunión de Administración solo se gestiona desde /admin/reuniones. */
+  private assertNoEsReunionAdministracion(evento: { idReunion: number | null }): void {
+    if (typeof evento.idReunion === 'number') {
+      throw new ForbiddenException('Es una reunión de Administración: solo Administración puede modificarla o cancelarla');
+    }
+  }
+
   private async assertCanRead(projectId: number, userId: number): Promise<void> {
     const proyecto = await this.getProjectOrThrow(projectId);
     if (proyecto.creadoPor === userId) {
@@ -391,7 +399,7 @@ export class EventsService {
   private async getEventOrThrow(projectId: number, eventId: number) {
     const evento = await this.prisma.eventoProyecto.findFirst({
       where: { idEvento: eventId, idProyecto: projectId, eliminadoEn: null },
-      select: EVENT_SELECT,
+      select: { ...EVENT_SELECT, idReunion: true },
     });
     if (!evento) {
       throw new NotFoundException(`Evento con id ${eventId} no encontrado en el proyecto ${projectId}`);

@@ -301,6 +301,42 @@ describe('EventsService — cancelación (DELETE, T-265)', () => {
   });
 });
 
+describe('EventsService — proyección de una reunión de Administración (HU-195, G03)', () => {
+  const reunion = { idEvento: EVENT_ID, idProyecto: PROJECT_ID, idReunion: 7, fechaInicio: new Date('2030-10-01T14:00:00Z'), fechaFin: new Date('2030-10-01T15:00:00Z'), modalidad: 'VIRTUAL', invitados: [] };
+
+  it('el líder no puede editarla: 403 antes de escribir, aunque el proyecto sea suyo', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.eventoProyecto.findFirst.mockResolvedValue(reunion);
+    const service = new EventsService(prisma);
+
+    await expect(service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { tituloEvento: 'Cambiado', invitados: [] })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.eventoProyecto.update).not.toHaveBeenCalled();
+    expect(prisma.participacionProyecto.findMany).not.toHaveBeenCalled();
+  });
+
+  it('el líder no puede cancelarla: 403 sin soft delete', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.eventoProyecto.findFirst.mockResolvedValue(reunion);
+    const service = new EventsService(prisma);
+
+    await expect(service.remove(PROJECT_ID, EVENT_ID, LEADER_ID)).rejects.toThrow('solo Administración puede modificarla o cancelarla');
+    expect(prisma.eventoProyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('un evento ordinario (idReunion null) sigue siendo editable por su líder', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());
+    prisma.eventoProyecto.findFirst.mockResolvedValue({ ...reunion, idReunion: null });
+    prisma.eventoProyecto.update.mockResolvedValue({});
+    const service = new EventsService(prisma);
+
+    await service.remove(PROJECT_ID, EVENT_ID, LEADER_ID);
+    expect(prisma.eventoProyecto.update).toHaveBeenCalledWith({ where: { idEvento: EVENT_ID }, data: { eliminadoEn: expect.any(Date) } });
+  });
+});
+
 describe('EventsService — rango global (GET /usuarios/me/eventos, T-264)', () => {
   it('sin proyectos (ni líder ni participante) devuelve [] sin consultar eventos', async () => {
     const prisma = makePrisma();
