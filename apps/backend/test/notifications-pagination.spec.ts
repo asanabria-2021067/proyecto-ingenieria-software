@@ -196,4 +196,27 @@ describe('GET /notificaciones · q, proyecto y orden (Sprint 10)', () => {
     expect(prisma.notificacion.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ orderBy: [{ creadaEn: 'desc' }, { idNotificacion: 'desc' }] }));
   });
 
+  it('mias/proyectos devuelve solo proyectos referenciados por los avisos del usuario, con título', async () => {
+    const prisma = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: 64 }, { id: 9 }, { id: null }]),
+      proyecto: { findMany: vi.fn().mockResolvedValue([{ idProyecto: 9, tituloProyecto: 'B' }, { idProyecto: 64, tituloProyecto: 'Tutorías' }]) },
+    };
+    const service = new NotificationsService(prisma as unknown as PrismaService);
+    await expect(service.findProjectsReferenced(7)).resolves.toEqual([{ idProyecto: 9, tituloProyecto: 'B' }, { idProyecto: 64, tituloProyecto: 'Tutorías' }]);
+    expect(prisma.proyecto.findMany).toHaveBeenCalledWith({
+      where: { idProyecto: { in: [64, 9] } },
+      select: { idProyecto: true, tituloProyecto: true },
+      orderBy: { tituloProyecto: 'asc' },
+    });
+    const consulta = prisma.$queryRaw.mock.calls[0][0];
+    expect(consulta.values).toEqual([7]);
+    expect(consulta.strings.join('?')).toContain('id_usuario = ?');
+  });
+
+  it('sin proyectos referenciados no consulta la tabla de proyectos', async () => {
+    const prisma = { $queryRaw: vi.fn().mockResolvedValue([]), proyecto: { findMany: vi.fn() } };
+    const service = new NotificationsService(prisma as unknown as PrismaService);
+    await expect(service.findProjectsReferenced(7)).resolves.toEqual([]);
+    expect(prisma.proyecto.findMany).not.toHaveBeenCalled();
+  });
 });

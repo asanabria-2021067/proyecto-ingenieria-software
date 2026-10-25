@@ -39,6 +39,12 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(user.userId);
   }
 
+  /** Sprint 10 (bandeja): proyectos referenciados por los avisos propios, para el filtro por proyecto. */
+  @Get('mias/proyectos')
+  findProjectsReferenced(@CurrentUser() user: { userId: number }) {
+    return this.notificationsService.findProjectsReferenced(user.userId);
+  }
+
   @Get('preferencias')
   getPreferences(@CurrentUser() user: { userId: number }) {
     return this.notificationsService.getPreferences(user.userId);

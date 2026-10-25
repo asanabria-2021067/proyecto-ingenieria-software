@@ -363,6 +363,31 @@ export class NotificationsService {
     return { actualizadas: result.count };
   }
 
+  /**
+   * Sprint 10 (bandeja): proyectos que aparecen en los avisos del usuario de la
+   * sesión, para el desplegable «Todos los proyectos». Solo ids que ya viajan en
+   * sus propios payloads: no se consultan membresías ni proyectos ajenos. El
+   * título sale de la tabla de proyectos; un id sin proyecto (borrado) se omite.
+   */
+  async findProjectsReferenced(userId: number): Promise<{ idProyecto: number; tituloProyecto: string }[]> {
+    const filas = await this.prisma.$queryRaw<{ id: number | null }[]>(Prisma.sql`
+      SELECT DISTINCT COALESCE(
+        NULLIF(datos_json->>'projectId', '')::bigint,
+        NULLIF(datos_json->>'idProyecto', '')::bigint
+      ) AS id
+      FROM notificacion
+      WHERE id_usuario = ${userId}
+        AND (jsonb_typeof(datos_json->'projectId') = 'number' OR jsonb_typeof(datos_json->'idProyecto') = 'number')
+    `);
+    const ids = filas.map((fila) => Number(fila.id)).filter((id) => Number.isSafeInteger(id) && id > 0);
+    if (ids.length === 0) return [];
+    return this.prisma.proyecto.findMany({
+      where: { idProyecto: { in: ids } },
+      select: { idProyecto: true, tituloProyecto: true },
+      orderBy: { tituloProyecto: 'asc' },
+    });
+  }
+
   /** HU-185 (T-326): un tipo sin fila guardada se reporta como activo. */
   async getPreferences(userId: number): Promise<{ tipo: TipoNotificacion; activa: boolean }[]> {
     const guardadas = await this.prisma.preferenciaNotificacion.findMany({

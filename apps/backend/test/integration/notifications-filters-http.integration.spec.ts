@@ -60,7 +60,7 @@ describeIntegration('HU-198 — filtros y marcado filtrado de notificaciones (Po
       controllers: [{
         controller: NotificationsController,
         deps: [NotificationsService],
-        handlers: { findAll: [Object, ListNotificationsQueryDto], markAllAsRead: [Object, NotificationTypesFilterDto] },
+        handlers: { findAll: [Object, ListNotificationsQueryDto], markAllAsRead: [Object, NotificationTypesFilterDto], findProjectsReferenced: [Object] },
       }],
       providers: [{ provide: NotificationsService, useValue: new NotificationsService(prisma as unknown as PrismaService, gateway) }],
     });
@@ -158,5 +158,13 @@ describeIntegration('HU-198 — filtros y marcado filtrado de notificaciones (Po
     const asc = (await pedir('GET', '/notificaciones?page=1&limit=50&orden=asc', tokens.a)).body.data.map((n: { idNotificacion: number }) => n.idNotificacion);
     expect(asc).toEqual([...desc].reverse());
     expect((await pedir('GET', '/notificaciones?page=1&orden=DESC', tokens.a)).status).toBe(400);
+  });
+
+  it('mias/proyectos lista solo proyectos existentes referenciados por los avisos propios', async () => {
+    const res = await pedir('GET', '/notificaciones/mias/proyectos', tokens.a);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([{ idProyecto: ids.proyecto, tituloProyecto: 'Bandeja S10' }]);
+    expect((await pedir('GET', '/notificaciones/mias/proyectos', tokens.b)).body).toEqual([]);
+    expect((await pedir('GET', '/notificaciones/mias/proyectos')).status).toBe(401);
   });
 });
