@@ -124,8 +124,17 @@ export function parseFechaParam(valor: string | null | undefined): string | null
   return toDateKey(parseFechaSolo(valor)) === valor ? valor : null;
 }
 
+/** Vistas del calendario administrativo, en el orden del selector. */
+export const VISTAS_ADMIN_CALENDARIO = ['dia', 'semana', 'mes', 'lista'] as const;
+export type VistaAdminCalendario = (typeof VISTAS_ADMIN_CALENDARIO)[number];
+
+/** Vista de `?vista=`; un valor ausente o desconocido abre Mes. */
+export function parseVistaParam(valor: string | null | undefined): VistaAdminCalendario {
+  return VISTAS_ADMIN_CALENDARIO.find((vista) => vista === valor) ?? 'mes';
+}
+
 /** Enlace al calendario de Sprints en una vista y, si se indica, con un día seleccionado. */
-export function adminSprintsHref(vista: 'mes' | 'lista', fecha?: string | null): string {
+export function adminSprintsHref(vista: VistaAdminCalendario, fecha?: string | null): string {
   return `/dashboard/admin/sprints?vista=${vista}${fecha ? `&fecha=${fecha}` : ''}`;
 }
 

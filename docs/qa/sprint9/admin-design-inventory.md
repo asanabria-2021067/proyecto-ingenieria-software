@@ -165,7 +165,7 @@ actualizarla, hace fallar la prueba.
 | `components/admin/UserDetailSheet.tsx` | `rounded-md` | Sin token de igual valor |
 | `components/admin/security/security-events-filters.tsx` | `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
 | `components/admin/security/security-events-table.tsx` | `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
-| `components/admin/sprints/sprint-month-view.tsx` | `text-[15px]` | Texto denso del calendario de Sprints |
+| `components/admin/sprints/admin-calendar-view.tsx` | `text-[15px]` | Texto denso del calendario de Sprints |
 
 Otras excepciones:
 

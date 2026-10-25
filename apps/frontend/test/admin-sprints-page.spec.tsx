@@ -20,12 +20,22 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParamsMock(),
 }));
 vi.mock('../lib/services/admin-sprints', () => ({ getAdminSprintCalendar: vi.fn() }));
+vi.mock('../lib/services/admin-meetings', () => ({
+  getAdminMeetingsInRange: vi.fn(),
+  getAllAdminMeetings: vi.fn(),
+  getAdminMeetingParticipants: vi.fn(),
+}));
 
 import AdminSprintsClient from '../app/dashboard/admin/sprints/admin-sprints-client';
 import { getAdminSprintCalendar } from '../lib/services/admin-sprints';
+import { getAdminMeetingParticipants, getAdminMeetingsInRange, getAllAdminMeetings } from '../lib/services/admin-meetings';
+import type { AdminMeeting } from '../lib/types/admin-meetings';
 import type { AdminSprintCalendar, AdminSprintCalendarItem } from '../lib/types/admin-sprints';
 
 const getCalendarMock = vi.mocked(getAdminSprintCalendar);
+const getRangeMock = vi.mocked(getAdminMeetingsInRange);
+const getUpcomingMock = vi.mocked(getAllAdminMeetings);
+const getParticipantsMock = vi.mocked(getAdminMeetingParticipants);
 
 function sprint(overrides: Partial<AdminSprintCalendarItem> & { idSprint: number }): AdminSprintCalendarItem {
   return {
@@ -63,7 +73,7 @@ function calendario(items?: AdminSprintCalendarItem[]): AdminSprintCalendar {
   };
 }
 
-function renderPage(vista?: 'mes' | 'lista', fecha?: string) {
+function renderPage(vista?: 'dia' | 'semana' | 'mes' | 'lista', fecha?: string) {
   const params = new URLSearchParams(vista ? `vista=${vista}` : '');
   if (fecha !== undefined) params.set('fecha', fecha);
   searchParamsMock.mockReturnValue(params);
@@ -76,7 +86,7 @@ const dia = (nombre: RegExp) => screen.getByRole('button', { name: nombre });
 const detalle = () => screen.getByRole('region', { name: /de 2026$/ });
 
 function filasDeLaLista(): string[] {
-  return within(screen.getByRole('table'))
+  return within(screen.getAllByRole('table')[0])
     .getAllByRole('row')
     .slice(1)
     .map((fila) => within(fila).getAllByRole('cell')[0].querySelector('p')?.textContent ?? '');
@@ -90,6 +100,12 @@ function elegirSituacion(opcion: string) {
 beforeEach(() => {
   getCalendarMock.mockReset();
   getCalendarMock.mockResolvedValue(calendario());
+  getRangeMock.mockReset();
+  getRangeMock.mockResolvedValue({ reuniones: [], completo: true });
+  getUpcomingMock.mockReset();
+  getUpcomingMock.mockResolvedValue({ reuniones: [], completo: true });
+  getParticipantsMock.mockReset();
+  getParticipantsMock.mockResolvedValue({ idReunion: 0, totalDestinatariosUnicos: 0 });
 });
 
 afterEach(cleanup);
@@ -114,7 +130,7 @@ describe('Calendario de Sprints — encabezado y vistas', () => {
     expect(screen.queryByRole('heading', { level: 2, name: 'Octubre 2026' })).not.toBeInTheDocument();
     unmount();
 
-    searchParamsMock.mockReturnValue(new URLSearchParams('vista=semana'));
+    searchParamsMock.mockReturnValue(new URLSearchParams('vista=anual'));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(createElement(QueryClientProvider, { client }, createElement(AdminSprintsClient)));
     expect(await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' })).toBeInTheDocument();
@@ -178,7 +194,7 @@ describe('Calendario de Sprints — vista Mes', () => {
     fireEvent.click(dia(/^8 de octubre de 2026,/));
 
     const panel = within(detalle());
-    const lista = panel.getByRole('list', { name: 'Sprints que finalizan el 8 de octubre de 2026' });
+    const lista = panel.getByRole('list', { name: 'Actividades del 8 de octubre de 2026' });
     const tarjetas = within(lista).getAllByRole('listitem');
     expect(tarjetas).toHaveLength(2);
     for (const tarjeta of tarjetas) expect(tarjeta).toHaveClass('card-base');
@@ -188,7 +204,7 @@ describe('Calendario de Sprints — vista Mes', () => {
     expect(lista).not.toHaveTextContent('2 finalizaciones planificadas');
     expect(fecha.closest('.card-base')).toHaveTextContent('2 finalizaciones planificadas');
     // Sin desbordamiento no hay flechas de carrusel.
-    expect(panel.queryByRole('button', { name: /^Sprints (anteriores|siguientes)$/ })).not.toBeInTheDocument();
+    expect(panel.queryByRole('button', { name: /^Actividades (anteriores|siguientes)$/ })).not.toBeInTheDocument();
   });
 
   it('un día sin finalizaciones lo dice en su propia tarjeta de vacío, aparte de la fecha', async () => {
@@ -196,7 +212,8 @@ describe('Calendario de Sprints — vista Mes', () => {
     await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
 
     fireEvent.click(dia(/^9 de octubre de 2026,/));
-    const mensaje = within(detalle()).getByText('No hay finalizaciones planificadas para este día.');
+    // Con la consulta de reuniones resuelta (vacía), el vacío ya puede decir que tampoco hay reuniones.
+    const mensaje = await within(detalle()).findByText('No hay finalizaciones ni reuniones para este día.');
     // mismo vacío que el calendario del estudiante: tarjeta Empty con icono, no un texto bajo la fecha
     const vacio = mensaje.closest('[data-slot="empty"]') as HTMLElement;
     expect(vacio).not.toBeNull();
@@ -313,11 +330,16 @@ describe('Calendario de Sprints — carga, vacío y error', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('sin Sprints operables lo explica y no pinta calendario ni tabla', async () => {
+  it('sin Sprints operables la Lista lo explica sin tabla de Sprints y el Mes sigue disponible para las reuniones', async () => {
     getCalendarMock.mockResolvedValue(calendario([]));
-    renderPage('mes');
+    const { unmount } = renderPage('lista');
     expect(await screen.findByText('No hay Sprints operables para supervisar.')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    unmount();
+
+    renderPage('mes');
+    expect(await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' })).toBeInTheDocument();
+    expect(screen.getByText('Sin finalizaciones planificadas este mes')).toBeInTheDocument();
   });
 
   it('si el endpoint falla avisa sin detalles técnicos y permite reintentar', async () => {
@@ -355,7 +377,7 @@ describe('Calendario de Sprints — día en la URL (?fecha=)', () => {
     renderPage('mes', '2026-11-20');
     await screen.findByRole('heading', { level: 2, name: 'Noviembre 2026' });
 
-    expect(within(detalle()).getByText('No hay finalizaciones planificadas para este día.')).toBeInTheDocument();
+    expect(await within(detalle()).findByText('No hay finalizaciones ni reuniones para este día.')).toBeInTheDocument();
   });
 
   it.each(['2026-02-30', '2026-13-01', 'hoy', '2026-1-5', ''])('fecha inválida «%s» cae en el hoy del servidor', async (fecha) => {
@@ -407,5 +429,184 @@ describe('Calendario de Sprints — día en la URL (?fecha=)', () => {
       'href',
       '/dashboard/admin/sprints?vista=lista&fecha=2026-10-08',
     );
+  });
+});
+
+// ─── Reuniones de Administración y vistas Día / Semana ───────────────────────
+
+/** Instante ISO de una hora LOCAL de octubre de 2026 (independiente del huso de la máquina). */
+const local = (d: number, h: number, m = 0) => new Date(2026, 9, d, h, m).toISOString();
+
+function reunion(idReunion: number, overrides: Partial<AdminMeeting> = {}): AdminMeeting {
+  return {
+    idReunion,
+    estado: 'ACTIVA',
+    integridad: 'OK',
+    contenido: {
+      tituloEvento: 'Seguimiento de cierre',
+      descripcionEvento: null,
+      fechaInicio: local(8, 9),
+      fechaFin: local(8, 10, 30),
+      modalidad: 'PRESENCIAL',
+      ubicacionNombre: 'Edificio CIT, salón 210',
+    },
+    proyectos: [
+      { idProyecto: 3, idEvento: 31, tituloProyecto: 'Huerto Comunitario', estadoProyecto: 'EN_PROGRESO' },
+      { idProyecto: 1, idEvento: 11, tituloProyecto: 'Portal de Voluntariado', estadoProyecto: 'EN_PROGRESO' },
+    ],
+    creador: { idUsuario: 9, nombre: 'Ana', apellido: 'López' },
+    ...overrides,
+  };
+}
+
+const REUNIONES: AdminMeeting[] = [
+  reunion(1),
+  reunion(2, {
+    contenido: { ...reunion(2).contenido!, tituloEvento: 'Revisión de avance', fechaInicio: local(6, 15), fechaFin: local(6, 16), modalidad: 'VIRTUAL', ubicacionNombre: null },
+    proyectos: [{ idProyecto: 5, idEvento: 51, tituloProyecto: 'App de Monitoreo', estadoProyecto: 'EN_PROGRESO' }],
+  }),
+  reunion(3, { estado: 'CANCELADA', contenido: { ...reunion(3).contenido!, tituloEvento: 'Reunión cancelada' } }),
+  reunion(4, { integridad: 'INCONSISTENTE', contenido: null }),
+];
+
+describe('Calendario administrativo — reuniones en el Mes', () => {
+  beforeEach(() => {
+    getRangeMock.mockResolvedValue({ reuniones: REUNIONES, completo: true });
+    getParticipantsMock.mockImplementation(async (id) => ({ idReunion: id, totalDestinatariosUnicos: id === 1 ? 7 : 1 }));
+  });
+
+  it('pide las reuniones del rango visible del Mes y las cuenta aparte de las finalizaciones', async () => {
+    renderPage('mes');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+
+    expect(await screen.findByText('2 reuniones administrativas')).toBeInTheDocument();
+    // La métrica principal no cambia: solo finalizaciones de Sprints del mes.
+    expect(screen.getByText('5 finalizaciones planificadas este mes')).toBeInTheDocument();
+    const [desde, hasta] = getRangeMock.mock.calls[0];
+    expect(desde).toEqual(new Date(2026, 8, 28));
+    expect(hasta).toEqual(new Date(2026, 10, 9));
+    expect(dia(/^8 de octubre de 2026, 2 finalizaciones planificadas, 1 reunión administrativa$/)).toHaveTextContent('1 reunión');
+  });
+
+  it('excluye canceladas, avisa de las inconsistentes y muestra la reunión completa en el panel del día', async () => {
+    renderPage('mes', '2026-10-08');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+    const panel = within(detalle());
+    const tarjeta = (await panel.findByText('Seguimiento de cierre')).closest('li') as HTMLElement;
+
+    expect(screen.queryByText('Reunión cancelada')).not.toBeInTheDocument();
+    expect(screen.getByText('1 reunión no se muestra porque sus datos no son consistentes.')).toBeInTheDocument();
+    expect(panel.getByText('2 finalizaciones planificadas')).toBeInTheDocument();
+    expect(panel.getByText('1 reunión administrativa')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('Reunión administrativa')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('8 oct 2026')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('09:00 – 10:30')).toBeInTheDocument();
+    expect(within(tarjeta).getByText(/Presencial/)).toBeInTheDocument();
+    expect(within(tarjeta).getByText(/Edificio CIT, salón 210/)).toBeInTheDocument();
+    expect(within(tarjeta).getByText('2 equipos')).toBeInTheDocument();
+    expect(await within(tarjeta).findByText('7 personas')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('Ana López')).toBeInTheDocument();
+    expect(within(tarjeta).getByRole('link', { name: 'Ver proyecto Portal de Voluntariado' })).toHaveAttribute(
+      'href',
+      '/dashboard/admin/proyectos/1',
+    );
+    // Las finalizaciones del día siguen con su tarjeta de siempre, antes que la reunión.
+    const tarjetas = within(panel.getByRole('list', { name: 'Actividades del 8 de octubre de 2026' })).getAllByRole('listitem');
+    expect(tarjetas[0]).toHaveTextContent('Tutorías — Sprint 6 Demo');
+  });
+
+  it('la búsqueda alcanza a los proyectos de una reunión multiproyecto; el filtro de situación no oculta reuniones', async () => {
+    renderPage('mes', '2026-10-08');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+    await within(detalle()).findByText('Seguimiento de cierre');
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar Sprints por proyecto o líder' }), { target: { value: 'voluntariado' } });
+    expect(within(detalle()).getByText('Seguimiento de cierre')).toBeInTheDocument();
+    expect(dia(/^6 de octubre de 2026, hoy, sin finalizaciones planificadas$/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar Sprints por proyecto o líder' }), { target: { value: '' } });
+    elegirSituacion('Plan vencido');
+    expect(within(detalle()).getByText('Seguimiento de cierre')).toBeInTheDocument();
+    expect(dia(/^8 de octubre de 2026, sin finalizaciones planificadas, 1 reunión administrativa$/)).toBeInTheDocument();
+  });
+
+  it('si fallan las reuniones lo avisa y los Sprints siguen visibles', async () => {
+    getRangeMock.mockRejectedValue(new Error('500'));
+    renderPage('mes', '2026-10-08');
+
+    const alerta = await screen.findByRole('alert');
+    expect(alerta).toHaveTextContent('No se pudieron cargar las reuniones administrativas.');
+    expect(within(detalle()).getByText('Huerto Comunitario')).toBeInTheDocument();
+    fireEvent.click(within(alerta).getByRole('button', { name: 'Reintentar' }));
+    expect(getRangeMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Calendario administrativo — vistas Día y Semana', () => {
+  beforeEach(() => {
+    getRangeMock.mockResolvedValue({ reuniones: REUNIONES, completo: true });
+  });
+
+  it('el selector ofrece Día, Semana, Mes y Lista y cada enlace conserva el día', async () => {
+    renderPage('semana', '2026-10-08');
+    await screen.findByRole('heading', { level: 2, name: /5 oct/ });
+    const selector = within(screen.getByRole('navigation', { name: 'Vista del calendario' }));
+    expect(selector.getAllByRole('link').map((l) => l.textContent)).toEqual(['Día', 'Semana', 'Mes', 'Lista']);
+    expect(selector.getByRole('link', { name: 'Semana' })).toHaveAttribute('aria-current', 'page');
+    expect(selector.getByRole('link', { name: 'Día' })).toHaveAttribute('href', '/dashboard/admin/sprints?vista=dia&fecha=2026-10-08');
+  });
+
+  it('Semana pide su rango, pone las reuniones a su hora y las finalizaciones en «Todo el día»', async () => {
+    renderPage('semana', '2026-10-08');
+    const bloque = await screen.findByRole('button', { name: 'Seguimiento de cierre, 09:00 a 10:30' });
+
+    const [desde, hasta] = getRangeMock.mock.calls[0];
+    expect(desde).toEqual(new Date(2026, 9, 5));
+    expect(hasta).toEqual(new Date(2026, 9, 12));
+    expect(screen.getByText('Todo el día')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Finalización planificada: Huerto Comunitario, Sprint 1, En curso' })).toBeInTheDocument();
+    // Semana del 5 al 11: dos el 8 y una el 6 (la del 4 y la del 12 quedan fuera).
+    expect(screen.getByText('3 finalizaciones planificadas esta semana')).toBeInTheDocument();
+
+    // Elegir la reunión la resalta en el panel del día.
+    fireEvent.click(bloque);
+    const tarjeta = within(detalle()).getByText('Seguimiento de cierre').closest('li') as HTMLElement;
+    expect(tarjeta).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('elegir una finalización en la franja lleva el panel a su día y resalta su tarjeta', async () => {
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    renderPage('semana', '2026-10-06');
+    await screen.findByRole('button', { name: 'Seguimiento de cierre, 09:00 a 10:30' });
+
+    fireEvent.click(screen.getByRole('button', { name: /^Finalización planificada: Huerto Comunitario/ }));
+    const panel = within(detalle());
+    expect(panel.getByRole('heading', { level: 2, name: '8 de octubre de 2026' })).toBeInTheDocument();
+    expect(panel.getByText('Huerto Comunitario', { selector: 'p' }).closest('li')).toHaveAttribute('aria-current', 'true');
+    expect(panel.getByText('Tutorías — Sprint 6 Demo').closest('li')).not.toHaveAttribute('aria-current');
+    expect(replaceState).toHaveBeenLastCalledWith(null, '', '/dashboard/admin/sprints?vista=semana&fecha=2026-10-08');
+    replaceState.mockRestore();
+  });
+
+  it('Día navega de día en día, actualiza el panel y «Hoy» vuelve al día del servidor', async () => {
+    renderPage('dia', '2026-10-07');
+    await screen.findByRole('heading', { level: 2, name: /, 7 de octubre de 2026$/i });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Día siguiente' }));
+    expect(screen.getByRole('heading', { level: 2, name: /, 8 de octubre de 2026$/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Seguimiento de cierre, 09:00 a 10:30' })).toBeInTheDocument();
+    expect(within(detalle()).getByRole('heading', { level: 2, name: '8 de octubre de 2026' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hoy' }));
+    expect(within(detalle()).getByRole('heading', { level: 2, name: '6 de octubre de 2026' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Revisión de avance, 15:00 a 16:00' })).toBeInTheDocument();
+  });
+
+  it('Semana navega de siete en siete días', async () => {
+    renderPage('semana', '2026-10-08');
+    await screen.findByRole('heading', { level: 2, name: /5 oct/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Semana siguiente' }));
+    expect(screen.getByRole('heading', { level: 2, name: /12 oct/ })).toBeInTheDocument();
+    expect(within(detalle()).getByRole('heading', { level: 2, name: '15 de octubre de 2026' })).toBeInTheDocument();
   });
 });

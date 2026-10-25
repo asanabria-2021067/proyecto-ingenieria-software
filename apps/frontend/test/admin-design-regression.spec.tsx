@@ -34,7 +34,7 @@ const EXCEPCIONES: Record<string, string[]> = {
   'components/admin/UserDetailSheet.tsx': ['rounded-md'],
   'components/admin/security/security-events-filters.tsx': ['rounded-md'],
   'components/admin/security/security-events-table.tsx': ['rounded-md'],
-  'components/admin/sprints/sprint-month-view.tsx': ['text-[15px]'],
+  'components/admin/sprints/admin-calendar-view.tsx': ['text-[15px]'],
 };
 
 const literales = (fuente: string) =>
