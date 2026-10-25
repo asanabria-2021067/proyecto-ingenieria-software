@@ -4,9 +4,10 @@ import { ApplicationsController } from './applications.controller';
 import { ApplicationsService } from './applications.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ProjectPolicyModule } from '../common/project-policy/project-policy.module';
+import { EventsModule } from '../events/events.module';
 
 @Module({
-  imports: [NotificationsModule, ProjectPolicyModule, ChatModule],
+  imports: [NotificationsModule, ProjectPolicyModule, ChatModule, EventsModule],
   controllers: [ApplicationsController],
   providers: [ApplicationsService],
   exports: [ApplicationsService],

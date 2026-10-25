@@ -368,6 +368,42 @@ export class AdminMeetingsService {
     return this.detalle(idReunion, actorId);
   }
 
+  /**
+   * HU-195 (T-364): quien entra a un proyecto con reuniones de Administración
+   * FUTURAS y no canceladas recibe su propia convocatoria, en la misma
+   * transacción que activa su participación (si esta revierte, no queda aviso).
+   * No se avisa a quien ya estaba convocado por otro proyecto de la reunión, y
+   * la clave `reunion:<id>:v<versión>:programada` impide repetirla en un reintento.
+   * El calendario ya se la muestra por ser participante ACTIVO.
+   */
+  async notificarIngresoTx(tx: Tx, idUsuario: number, idProyecto: number, sink: PostCommitEffectSink): Promise<void> {
+    const activo = await tx.usuario.findFirst({ where: { idUsuario, estado: 'ACTIVO' }, select: { idUsuario: true } });
+    if (!activo) return;
+    const proyecciones = await tx.eventoProyecto.findMany({
+      where: { idProyecto, idReunion: { not: null }, eliminadoEn: null, fechaInicio: { gt: new Date() }, reunion: { canceladaEn: null } },
+      select: { ...PROYECCION_SELECT, idReunion: true, reunion: { select: { version: true } } },
+    });
+    for (const proyeccion of proyecciones) {
+      const idReunion = proyeccion.idReunion as number;
+      const otras = (await tx.eventoProyecto.findMany({
+        where: { idReunion, eliminadoEn: null, idProyecto: { not: idProyecto } },
+        select: { idProyecto: true },
+      })).map((o) => o.idProyecto);
+      const otrosProyectos = await cargarProyectosParaReunion(tx, otras);
+      if (unionDeEquipos(await equiposDeProyectos(tx, vigentes(otrosProyectos, otras))).has(idUsuario)) continue;
+
+      await this.notifications.persistTemplateTx(tx, [idUsuario], 'REUNION_PROGRAMADA', {
+        meetingId: idReunion,
+        eventId: proyeccion.idEvento,
+        projectId: proyeccion.idProyecto,
+        projectTitle: proyeccion.proyecto.tituloProyecto,
+        eventTitle: proyeccion.tituloEvento,
+        fechaInicioTexto: fechaTexto(proyeccion.fechaInicio),
+        fechaInicioIso: proyeccion.fechaInicio.toISOString(),
+      }, sink, { claveIdempotencia: `reunion:${idReunion}:v${proyeccion.reunion?.version}:programada` });
+    }
+  }
+
   /** Detalle para Administración: contenido canónico, proyectos, permisos y si quien consulta la gestiona. */
   async detalle(idReunion: number, actorId: number) {
     const [resumen] = await this.resumir([idReunion], actorId);
