@@ -205,7 +205,9 @@ export function NotificationInbox() {
   };
   const restablecerReparto = () => panelLista.current?.resize(LISTA_DEFAULT);
 
-  const pendientesFiltro = noLeidasFiltro.data ?? (lectura === 'no-leidas' ? totalFiltrado : 0);
+  // «Sin leer» del encabezado = lo que «marcar filtradas» tocaría: bajo la
+  // pestaña Leídas no hay nada que marcar.
+  const pendientesFiltro = lectura === 'leidas' ? 0 : (noLeidasFiltro.data ?? (lectura === 'no-leidas' ? totalFiltrado : 0));
 
   const cabeceraBandeja = (
     <div className="flex shrink-0 items-center gap-tight border-b border-outline-variant/60 px-inline py-tight">
@@ -325,17 +327,19 @@ export function NotificationInbox() {
             {vistaMovil === 'detalle' && mostrada ? (
               visor
             ) : (
-              <>
+              <div role="region" aria-label="Bandeja de entrada" className="flex min-h-0 flex-1 flex-col">
                 {cabeceraBandeja}
                 {toolbar}
                 {listado}
-              </>
+              </div>
             )}
           </div>
         ) : (
           <ResizablePanelGroup direction="horizontal" autoSaveId={INBOX_PANELS_AUTOSAVE_ID} className="min-w-0 flex-1">
             <ResizablePanel
               ref={panelLista}
+              role="region"
+              aria-label="Bandeja de entrada"
               collapsible
               collapsedSize={0}
               defaultSize={LISTA_DEFAULT}

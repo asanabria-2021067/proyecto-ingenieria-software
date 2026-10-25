@@ -78,6 +78,7 @@ function FolderItem({ icon: Icon, label, active, count, collapsed, onClick }: Fo
       <button
         type="button"
         onClick={onClick}
+        aria-label={nombre}
         aria-current={active ? 'true' : undefined}
         className={cn(
           'flex w-full items-center gap-inline rounded-control px-inline py-tight text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
@@ -87,7 +88,7 @@ function FolderItem({ icon: Icon, label, active, count, collapsed, onClick }: Fo
         <Icon className="size-4.5 shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {contador && (
-          <span aria-label={`${count} sin leer`} className="pill pill-sm pill-accent tabular-nums">
+          <span aria-hidden="true" className="pill pill-sm pill-accent tabular-nums">
             {contador}
           </span>
         )}
