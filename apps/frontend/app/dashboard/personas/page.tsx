@@ -475,8 +475,8 @@ export default function PersonasPage() {
               ))}
             </div>
           ) : (
-            // Tarjeta blanca, igual que los vacíos de las pestañas y Chats archivados.
-            <Empty className="surface-enter" aria-live="polite">
+            // Tarjeta blanca de los demás vacíos, en banda horizontal: aquí no hace falta un bloque alto.
+            <Empty size="compact" className="surface-enter" aria-live="polite">
               <EmptyMedia
                 variant="compact"
                 className="size-10 rounded-control border-transparent text-text-secondary"
@@ -484,11 +484,14 @@ export default function PersonasPage() {
                 <Users aria-hidden="true" className="size-5" />
               </EmptyMedia>
               <EmptyHeader>
-                <EmptyTitle className="type-subtitle">Sin recomendaciones por ahora</EmptyTitle>
-                <EmptyDescription>
-                  Agrega amigos o completa tu perfil para que te sugiramos personas.
-                </EmptyDescription>
+                <EmptyTitle className="type-subtitle">Aún no hay recomendaciones</EmptyTitle>
+                <EmptyDescription>Completa tu perfil para descubrir personas con intereses similares</EmptyDescription>
               </EmptyHeader>
+              <EmptyContent>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/dashboard/perfil/editar">Completar perfil</Link>
+                </Button>
+              </EmptyContent>
             </Empty>
           )}
         </section>

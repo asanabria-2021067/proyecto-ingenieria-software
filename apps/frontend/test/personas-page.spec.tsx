@@ -401,7 +401,7 @@ describe('PersonasPage — pestañas y estados vacíos', () => {
   });
 });
 
-// «Sin recomendaciones por ahora» usa la misma tarjeta blanca que los demás vacíos.
+// El vacío de recomendaciones usa la misma tarjeta blanca que los demás vacíos, en su tamaño compacto.
 describe('PersonasPage — vacío de recomendaciones', () => {
   beforeEach(() => {
     getSolicitudesPendientesMock.mockResolvedValue([]);
@@ -409,13 +409,17 @@ describe('PersonasPage — vacío de recomendaciones', () => {
     buscarUsuariosMock.mockResolvedValue({ items: [], hasMore: false });
   });
 
-  it('se muestra en tarjeta blanca con su texto intacto y el icono neutro', async () => {
+  it('es una banda horizontal compacta en tarjeta blanca, con el icono neutro y el enlace a completar el perfil', async () => {
     await renderPersonas();
 
-    const tarjeta = (await screen.findByText('Sin recomendaciones por ahora')).closest('[data-slot="empty"]') as HTMLElement;
+    const tarjeta = (await screen.findByText('Aún no hay recomendaciones')).closest('[data-slot="empty"]') as HTMLElement;
     expect(tarjeta).toHaveClass('bg-surface-container-lowest', 'border-outline-variant/70', 'rounded-2xl', 'shadow-sm');
-    expect(tarjeta).not.toHaveClass('border-dashed');
-    expect(within(tarjeta).getByText('Agrega amigos o completa tu perfil para que te sugiramos personas.')).toBeInTheDocument();
+    expect(tarjeta).toHaveClass('flex-row', 'items-center', 'py-4');
+    expect(tarjeta).not.toHaveClass('border-dashed', 'flex-col');
+    expect(within(tarjeta).getByText('Completa tu perfil para descubrir personas con intereses similares')).toBeInTheDocument();
     expect(tarjeta.querySelector('[data-slot="empty-icon"]')).toHaveClass('text-text-secondary', 'border-transparent');
+    const enlace = within(tarjeta).getByRole('link', { name: 'Completar perfil' });
+    expect(enlace).toHaveAttribute('href', '/dashboard/perfil/editar');
+    expect(enlace).toHaveAttribute('data-slot', 'button');
   });
 });
