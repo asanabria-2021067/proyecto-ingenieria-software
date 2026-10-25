@@ -64,31 +64,42 @@ export class NotificationsService {
    * si se recibe un sink, un efecto post-commit por destinatario (clave
    * `notification:<usuario>:<tipo>`, deduplicada por el buffer). Con lista
    * vacía no escribe ni registra nada.
+   *
+   * HU-195: con `claveIdempotencia` (la operación lógica, p. ej.
+   * `reunion:7:v2:actualizada`), el índice único (usuario, clave) descarta a
+   * quien ya tiene ese aviso —reintento o carrera— y solo se emite a quien se
+   * insertó de verdad.
    */
   async persistUsersTx(
     tx: TxClient,
     userIds: number[],
     payload: NotificationInput,
     effects?: PostCommitEffectSink,
+    opciones: { claveIdempotencia?: string } = {},
   ): Promise<{ count: number }> {
     const recipients = await this.filterEnabledRecipients(tx, [...new Set(userIds)], payload.tipoNotificacion);
     if (recipients.length === 0) {
       return { count: 0 };
     }
 
-    const created = await tx.notificacion.createMany({
-      data: recipients.map((idUsuario) => ({
-        idUsuario,
-        tipoNotificacion: payload.tipoNotificacion,
-        tituloNotificacion: payload.tituloNotificacion,
-        mensajeNotificacion: payload.mensajeNotificacion,
-        datosJson: payload.datosJson,
-      })),
-      skipDuplicates: false,
-    });
+    const data = recipients.map((idUsuario) => ({
+      idUsuario,
+      tipoNotificacion: payload.tipoNotificacion,
+      tituloNotificacion: payload.tituloNotificacion,
+      mensajeNotificacion: payload.mensajeNotificacion,
+      datosJson: payload.datosJson,
+      claveIdempotencia: opciones.claveIdempotencia,
+    }));
+    let delivered = recipients;
+    if (opciones.claveIdempotencia) {
+      const rows = await tx.notificacion.createManyAndReturn({ data, skipDuplicates: true, select: { idUsuario: true } });
+      delivered = rows.map((row) => row.idUsuario);
+    } else {
+      await tx.notificacion.createMany({ data, skipDuplicates: false });
+    }
 
     if (effects) {
-      for (const idUsuario of recipients) {
+      for (const idUsuario of delivered) {
         effects.add({
           key: `notification:${idUsuario}:${payload.tipoNotificacion}`,
           publish: () => this.emitNotification([idUsuario], payload),
@@ -96,7 +107,7 @@ export class NotificationsService {
       }
     }
 
-    return { count: created.count };
+    return { count: delivered.length };
   }
 
   /** Igual que `persistUsersTx`, construyendo título/mensaje desde la plantilla catalogada. */
@@ -106,8 +117,9 @@ export class NotificationsService {
     templateKey: K,
     data: NotificationTemplateData[K],
     effects?: PostCommitEffectSink,
+    opciones: { claveIdempotencia?: string } = {},
   ): Promise<{ count: number }> {
-    return this.persistUsersTx(tx, userIds, this.payloadFromTemplate(templateKey, data), effects);
+    return this.persistUsersTx(tx, userIds, this.payloadFromTemplate(templateKey, data), effects, opciones);
   }
 
   /**
