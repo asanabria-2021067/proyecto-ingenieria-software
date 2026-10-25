@@ -73,7 +73,7 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   vi.mocked(getNotificacionesPagina).mockImplementation((_page, filtros) => responderPagina(filtros));
   vi.mocked(getProyectosDeNotificaciones).mockResolvedValue([{ idProyecto: 4, tituloProyecto: 'Tutorías' }]);
-  vi.mocked(getConteoNoLeidas).mockResolvedValue({ total: 2 });
+  vi.mocked(getConteoNoLeidas).mockResolvedValue({ total: 2, porTipo: { TAREA_ASIGNADA: 1, REUNION_CANCELADA: 1 } });
   vi.mocked(marcarLeida).mockImplementation(async (id) => ({ ...AVISOS.find((n) => n.idNotificacion === id)!, leidaEn: iso(0) }));
   vi.mocked(marcarTodasLeidas).mockResolvedValue({ actualizadas: 2 });
 });
@@ -97,6 +97,12 @@ describe('NotificationInbox', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Hoy' })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Selecciona una notificación');
     expect(screen.getByRole('button', { name: 'Marcar todas como leídas' })).toBeEnabled();
+    // Los contadores de categoría salen del desglose por tipo del conteo global, no de una petición por categoría.
+    const carpetas = screen.getByRole('complementary', { name: 'Carpetas de notificaciones' });
+    expect(within(carpetas).getByRole('button', { name: 'Tareas e hitos, 1 sin leer' })).toBeInTheDocument();
+    expect(within(carpetas).getByRole('button', { name: 'Recordatorios y calendario, 1 sin leer' })).toBeInTheDocument();
+    expect(within(carpetas).getByRole('button', { name: 'Proyectos' })).toBeInTheDocument();
+    expect(vi.mocked(getNotificacionesPagina).mock.calls.filter(([, f]) => f?.tipos && !('orden' in (f ?? {})))).toHaveLength(0);
     // El filtro inicial viaja al servidor sin leída, sin búsqueda y con orden descendente.
     expect(llamadasDeLista()[0][1]).toEqual({ tipos: undefined, q: undefined, proyecto: undefined, leida: undefined, orden: 'desc' });
   });

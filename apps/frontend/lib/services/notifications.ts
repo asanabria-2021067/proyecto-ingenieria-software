@@ -75,8 +75,14 @@ export function getProyectosDeNotificaciones(): Promise<ProyectoDeNotificaciones
   return apiFetch<ProyectoDeNotificaciones[]>('/notificaciones/mias/proyectos');
 }
 
-export function getConteoNoLeidas(): Promise<{ total: number }> {
-  return apiFetch<{ total: number }>('/notificaciones/mias/conteo-no-leidas');
+export interface ConteoNoLeidas {
+  total: number;
+  /** Sprint 10: no leídas por tipo real; la bandeja suma por categoría. Ausente en respuestas antiguas. */
+  porTipo?: Record<string, number>;
+}
+
+export function getConteoNoLeidas(): Promise<ConteoNoLeidas> {
+  return apiFetch<ConteoNoLeidas>('/notificaciones/mias/conteo-no-leidas');
 }
 
 export function marcarLeida(id: number): Promise<Notificacion> {

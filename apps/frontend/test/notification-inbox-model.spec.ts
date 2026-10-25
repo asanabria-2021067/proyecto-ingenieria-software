@@ -5,6 +5,7 @@ import {
   accionDeAviso,
   agruparPorDia,
   categoriaDeTipo,
+  conteosPorCategoria,
   detallesDeAviso,
   estadoDeReunion,
   etiquetaDeDia,
@@ -33,6 +34,11 @@ describe('categorías de la bandeja', () => {
     expect(recordatorios?.tipos).toEqual(expect.arrayContaining(['REUNION_PROGRAMADA', 'REUNION_ACTUALIZADA', 'REUNION_CANCELADA']));
     expect(categoriaDeTipo('REUNION_CANCELADA')).toBe('recordatorios');
     expect(categoriaDeTipo('TIPO_NUEVO_DESCONOCIDO')).toBe('otras');
+  });
+
+  it('suma el desglose por tipo en un conteo por categoría; tipos desconocidos van a «otras»', () => {
+    expect(conteosPorCategoria({ TAREA_ASIGNADA: 2, HITO_ACTUALIZADO: 1, REUNION_CANCELADA: 3, RARO: 1, HORAS_VALIDADAS: 0 })).toEqual({ tareas: 3, recordatorios: 3, otras: 1 });
+    expect(conteosPorCategoria(undefined)).toEqual({});
   });
 
   it('etiqueta e icono por tipo, con respaldo para tipos desconocidos', () => {

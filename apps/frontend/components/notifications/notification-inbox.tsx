@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCheck, PanelLeftClose } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -17,7 +17,7 @@ import {
   type FiltrosMarcado,
   type Notificacion,
 } from '@/lib/services/notifications';
-import { INBOX_CATEGORIES } from '@/lib/notifications/inbox-model';
+import { INBOX_CATEGORIES, conteosPorCategoria } from '@/lib/notifications/inbox-model';
 import type { NotificationGroupId } from '@/lib/notifications/preference-groups';
 import { cn } from '@/lib/utils';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
@@ -108,25 +108,11 @@ export function NotificationInbox() {
     queryFn: () => getNotificacionesPagina(1, { ...filtrosMarcado, leida: false }),
     select: (pagina) => pagina.total,
   });
+  // Un solo conteo del servidor alimenta «N nuevas», la carpeta «No leídas» y
+  // el contador de cada categoría (sumando su desglose por tipo).
   const { data: conteoGlobal } = useConteoNoLeidas();
   const nuevas = conteoGlobal?.total ?? 0;
-
-  const conteosCategoria = useQueries({
-    queries: INBOX_CATEGORIES.map((c) => ({
-      queryKey: ['notificaciones', 'conteo-categoria', c.id],
-      queryFn: () => getNotificacionesPagina(1, { tipos: c.tipos, leida: false }),
-      select: (pagina: { total: number }) => pagina.total,
-      staleTime: 30 * 1000,
-    })),
-  });
-  const porCategoria = useMemo(() => {
-    const conteos: Partial<Record<NotificationGroupId, number>> = {};
-    INBOX_CATEGORIES.forEach((c, i) => {
-      const total = conteosCategoria[i]?.data;
-      if (typeof total === 'number') conteos[c.id] = total;
-    });
-    return conteos;
-  }, [conteosCategoria]);
+  const porCategoria = useMemo(() => conteosPorCategoria(conteoGlobal?.porTipo), [conteoGlobal?.porTipo]);
 
   const { data: proyectos = [] } = useQuery({ queryKey: ['notificaciones', 'proyectos'], queryFn: getProyectosDeNotificaciones, staleTime: 60 * 1000 });
 
