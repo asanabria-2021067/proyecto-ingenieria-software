@@ -127,6 +127,13 @@ export function getNotificationLink(n: {
     // los calendarios recibidos; notificaciones antiguas sin id abren el calendario.
     case 'CALENDARIO_COMPARTIDO':
       return linkCalendarioCompartido(datos.ownerId);
+    // HU-195: reuniones de Administración. El calendario no recibe un evento
+    // por URL, así que se abre tal cual: ahí aparece la reunión (o ya no, si se
+    // canceló). Nunca se arma la ruta con ids del aviso.
+    case 'REUNION_PROGRAMADA':
+    case 'REUNION_ACTUALIZADA':
+    case 'REUNION_CANCELADA':
+      return '/dashboard/calendario';
     default:
       return null;
   }
