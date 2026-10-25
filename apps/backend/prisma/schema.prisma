@@ -1526,9 +1526,14 @@ model Notificacion {
   datosJson           Json?            @map("datos_json")
   creadaEn            DateTime         @default(now()) @map("creada_en")
   leidaEn             DateTime?        @map("leida_en")
+  /// HU-195: operación lógica que originó el aviso (p. ej. `reunion:7:v2:actualizada`).
+  /// Con UNIQUE(idUsuario, clave), un reintento o una carrera no persisten un segundo
+  /// aviso al mismo usuario. Null para los avisos que no lo necesitan.
+  claveIdempotencia   String?          @map("clave_idempotencia") @db.VarChar(160)
 
   usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
 
+  @@unique([idUsuario, claveIdempotencia])
   @@index([idUsuario, leidaEn])
   @@index([idUsuario, creadaEn])
   @@index([tipoNotificacion])
