@@ -236,7 +236,7 @@ describe('PersonasPage', () => {
   it('la rejilla reparte columnas por el ancho del contenido, no de la ventana', async () => {
     buscarUsuariosMock.mockResolvedValue({ items: [usuario({ idUsuario: 10, nombre: 'Carla', apellido: 'Ruiz' })], hasMore: false });
     await renderPersonas();
-    const rejilla = (await screen.findByText('Carla Ruiz')).closest('ul') as HTMLElement;
+    const rejilla = (await within(await directorio()).findByText('Carla Ruiz')).closest('ul') as HTMLElement;
     expect(rejilla).toHaveClass('@xl/personas:grid-cols-2', '@5xl/personas:grid-cols-3');
     expect(rejilla).not.toHaveClass('xl:grid-cols-3');
   });
