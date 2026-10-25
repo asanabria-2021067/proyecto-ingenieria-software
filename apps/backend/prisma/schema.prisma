@@ -395,6 +395,7 @@ model Usuario {
   reaccionesChat                   ReaccionMensajeChat[]
   mensajesGuardados                MensajeGuardado[]
   reunionesAdministracionCreadas   ReunionAdministracion[]    @relation("ReunionesAdministracionCreadas")
+  reunionesAdministracionEditables ReunionAdministradorEditor[] @relation("ReunionesAdministracionEditables")
 
   @@index([estado, fechaCreacion])
   @@map("usuario")
@@ -731,19 +732,43 @@ model EventoProyecto {
 /// EventoProyecto, uno por proyecto, que se escriben idénticos en una sola
 /// transacción; aquí no se duplica.
 model ReunionAdministracion {
-  idReunion     Int       @id @default(autoincrement()) @map("id_reunion")
-  idCreador     Int       @map("id_creador")
+  idReunion       Int                    @id @default(autoincrement()) @map("id_reunion")
+  idCreador       Int                    @map("id_creador")
+  politicaEdicion PoliticaEdicionReunion @default(TODOS_ADMINISTRADORES) @map("politica_edicion")
   /// Control optimista: cada cambio material la incrementa; un PATCH con otra versión es 409.
-  version       Int       @default(1)
-  creadaEn      DateTime  @default(now()) @map("creada_en")
-  actualizadaEn DateTime? @map("actualizada_en")
-  canceladaEn   DateTime? @map("cancelada_en")
+  version         Int                    @default(1)
+  creadaEn        DateTime               @default(now()) @map("creada_en")
+  actualizadaEn   DateTime?              @map("actualizada_en")
+  canceladaEn     DateTime?              @map("cancelada_en")
 
-  creador Usuario          @relation("ReunionesAdministracionCreadas", fields: [idCreador], references: [idUsuario])
-  eventos EventoProyecto[]
+  creador  Usuario                      @relation("ReunionesAdministracionCreadas", fields: [idCreador], references: [idUsuario])
+  editores ReunionAdministradorEditor[]
+  eventos  EventoProyecto[]
 
   @@index([canceladaEn, creadaEn])
   @@map("reunion_administracion")
+}
+
+/// HU-195: quién, además del creador, gestiona una reunión de Administración.
+/// Ser administrador al momento de cada acción se valida aparte: TODOS_ADMINISTRADORES,
+/// cualquier administrador; SOLO_CREADOR, el creador; ADMINISTRADORES_SELECCIONADOS,
+/// el creador y los administradores de ReunionAdministradorEditor.
+enum PoliticaEdicionReunion {
+  TODOS_ADMINISTRADORES
+  SOLO_CREADOR
+  ADMINISTRADORES_SELECCIONADOS
+}
+
+model ReunionAdministradorEditor {
+  idReunion Int @map("id_reunion")
+  idUsuario Int @map("id_usuario")
+
+  reunion ReunionAdministracion @relation(fields: [idReunion], references: [idReunion], onDelete: Restrict)
+  usuario Usuario               @relation("ReunionesAdministracionEditables", fields: [idUsuario], references: [idUsuario])
+
+  @@id([idReunion, idUsuario])
+  @@index([idUsuario])
+  @@map("reunion_administrador_editor")
 }
 
 /// HU-184: un usuario comparte su calendario (eventos y fechas límite de
