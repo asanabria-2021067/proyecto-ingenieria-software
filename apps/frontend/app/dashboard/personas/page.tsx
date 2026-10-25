@@ -535,10 +535,10 @@ function PersonasView() {
                   </EmptyMedia>
                   <EmptyHeader>
                     <EmptyTitle className="type-subtitle">Aún no hay recomendaciones</EmptyTitle>
-                    <EmptyDescription>Completa tu perfil para descubrir personas con intereses similares</EmptyDescription>
+                    <EmptyDescription>Completa tu perfil para descubrir personas con intereses similares.</EmptyDescription>
                   </EmptyHeader>
                   <EmptyContent>
-                    <Button asChild variant="outline" size="sm">
+                    <Button asChild variant="secondary" size="sm">
                       <Link href="/dashboard/perfil/editar">Completar perfil</Link>
                     </Button>
                   </EmptyContent>

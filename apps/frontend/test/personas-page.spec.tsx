@@ -502,10 +502,12 @@ describe('PersonasPage — vacío de recomendaciones', () => {
     expect(tarjeta).toHaveClass('bg-surface-container-lowest', 'border-outline-variant/70', 'rounded-2xl', 'shadow-sm');
     expect(tarjeta).toHaveClass('grid', 'md:items-center', 'py-4');
     expect(tarjeta).not.toHaveClass('border-dashed', 'flex-col');
-    expect(within(tarjeta).getByText('Completa tu perfil para descubrir personas con intereses similares')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('Completa tu perfil para descubrir personas con intereses similares.')).toBeInTheDocument();
     expect(tarjeta.querySelector('[data-slot="empty-icon"]')).toHaveClass('text-text-secondary', 'border-transparent');
     const enlace = within(tarjeta).getByRole('link', { name: 'Completar perfil' });
     expect(enlace).toHaveAttribute('href', '/dashboard/perfil/editar');
     expect(enlace).toHaveAttribute('data-slot', 'button');
+    // Variante secundaria existente del sistema de botones, con su animación.
+    expect(enlace).toHaveClass('bg-secondary', 'text-secondary-foreground', 'motion-action');
   });
 });
