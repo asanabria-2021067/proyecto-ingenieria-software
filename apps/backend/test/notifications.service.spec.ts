@@ -16,6 +16,7 @@ function makePrisma() {
       update: vi.fn(),
       updateMany: vi.fn(),
       createMany: vi.fn(),
+      groupBy: vi.fn(),
     },
     usuarioRolAcceso: { findFirst: vi.fn(), findMany: vi.fn() },
     participacionProyecto: { findMany: vi.fn() },
@@ -33,11 +34,21 @@ describe('NotificationsService', () => {
     expect(prisma.notificacion.findMany).toHaveBeenCalled();
   });
 
-  it('getUnreadCount retorna total', async () => {
+  it('getUnreadCount retorna el total y el desglose por tipo de las no leídas del usuario', async () => {
     const prisma = makePrisma();
-    prisma.notificacion.count.mockResolvedValue(5);
+    prisma.notificacion.groupBy.mockResolvedValue([
+      { tipoNotificacion: 'TAREA_ASIGNADA', _count: { _all: 3 } },
+      { tipoNotificacion: 'REUNION_PROGRAMADA', _count: { _all: 2 } },
+    ]);
     const service = new NotificationsService(prisma);
-    await expect(service.getUnreadCount(1)).resolves.toEqual({ total: 5 });
+    await expect(service.getUnreadCount(1)).resolves.toEqual({ total: 5, porTipo: { TAREA_ASIGNADA: 3, REUNION_PROGRAMADA: 2 } });
+    expect(prisma.notificacion.groupBy).toHaveBeenCalledWith({
+      by: ['tipoNotificacion'],
+      where: { idUsuario: 1, leidaEn: null },
+      _count: { _all: true },
+    });
+    prisma.notificacion.groupBy.mockResolvedValue([]);
+    await expect(service.getUnreadCount(1)).resolves.toEqual({ total: 0, porTipo: {} });
   });
 
   it('markAsRead falla si no existe', async () => {

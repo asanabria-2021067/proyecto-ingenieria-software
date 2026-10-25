@@ -318,11 +318,25 @@ export class NotificationsService {
     });
   }
 
-  async getUnreadCount(userId: number): Promise<{ total: number }> {
-    const total = await this.prisma.notificacion.count({
+  /**
+   * Sprint 10 (bandeja): además del total, el desglose por tipo (`porTipo`),
+   * con el que la bandeja pinta el contador de cada categoría en UNA sola
+   * petición en vez de una por categoría (la ráfaga chocaba con el límite de
+   * 10 req/s). Solo tipos con al menos una no leída; el total es su suma.
+   */
+  async getUnreadCount(userId: number): Promise<{ total: number; porTipo: Record<string, number> }> {
+    const filas = await this.prisma.notificacion.groupBy({
+      by: ['tipoNotificacion'],
       where: { idUsuario: userId, leidaEn: null },
+      _count: { _all: true },
     });
-    return { total };
+    const porTipo: Record<string, number> = {};
+    let total = 0;
+    for (const fila of filas) {
+      porTipo[fila.tipoNotificacion] = fila._count._all;
+      total += fila._count._all;
+    }
+    return { total, porTipo };
   }
 
   async markAsRead(id: number, userId: number) {

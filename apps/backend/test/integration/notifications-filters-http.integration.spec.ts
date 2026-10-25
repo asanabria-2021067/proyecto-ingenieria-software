@@ -60,7 +60,7 @@ describeIntegration('HU-198 — filtros y marcado filtrado de notificaciones (Po
       controllers: [{
         controller: NotificationsController,
         deps: [NotificationsService],
-        handlers: { findAll: [Object, ListNotificationsQueryDto], markAllAsRead: [Object, NotificationTypesFilterDto], findProjectsReferenced: [Object] },
+        handlers: { findAll: [Object, ListNotificationsQueryDto], markAllAsRead: [Object, NotificationTypesFilterDto], findProjectsReferenced: [Object], getUnreadCount: [Object] },
       }],
       providers: [{ provide: NotificationsService, useValue: new NotificationsService(prisma as unknown as PrismaService, gateway) }],
     });
@@ -174,5 +174,15 @@ describeIntegration('HU-198 — filtros y marcado filtrado de notificaciones (Po
     expect(res.body).toEqual([{ idProyecto: ids.proyecto, tituloProyecto: 'Bandeja S10' }]);
     expect((await pedir('GET', '/notificaciones/mias/proyectos', tokens.b)).body).toEqual([]);
     expect((await pedir('GET', '/notificaciones/mias/proyectos')).status).toBe(401);
+  });
+
+  it('mias/conteo-no-leidas trae el total y el desglose por tipo, solo de las propias no leídas', async () => {
+    const res = await pedir('GET', '/notificaciones/mias/conteo-no-leidas', tokens.a);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      total: 7,
+      porTipo: { TAREA_ASIGNADA: 2, TAREA_POR_VENCER: 1, MENCION_COMENTARIO: 1, REUNION_PROGRAMADA: 1, NUEVO_SEGUIDOR: 2 },
+    });
+    expect((await pedir('GET', '/notificaciones/mias/conteo-no-leidas', tokens.b)).body).toEqual({ total: 2, porTipo: { TAREA_ASIGNADA: 1, MENCION_COMENTARIO: 1 } });
   });
 });
