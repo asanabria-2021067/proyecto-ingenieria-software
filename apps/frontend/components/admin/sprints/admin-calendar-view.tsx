@@ -30,7 +30,7 @@ import {
   formatDiaLargoConAnio,
 } from '@/lib/admin/sprint-calendar';
 import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
-import { IconoTipoEvento } from '@/lib/calendar/paleta';
+import { IconoTipoEvento, TONO_CLASES } from '@/lib/calendar/paleta';
 import { etiquetaRango, navegar, rangoVisible, type VistaCalendario } from '@/lib/calendar/vista';
 import { formatMonthLabel, parseFechaSolo, toDateKey } from '@/lib/calendar/utils';
 import type { AdminSprintCalendarItem } from '@/lib/types/admin-sprints';
@@ -174,7 +174,8 @@ export function AdminCalendarView({
           >
             ‹
           </Button>
-          <h2 className="type-section capitalize text-text-primary" aria-live="polite">
+          {/* Las dos etiquetas ya llegan con su mayúscula inicial (`capitalize` daría «28 De Octubre De 2026»). */}
+          <h2 className="type-section text-text-primary" aria-live="polite">
             {vista === 'mes' ? formatMonthLabel(ancla.getFullYear(), ancla.getMonth()) : etiquetaRango(vista, ancla)}
           </h2>
           <Button
@@ -273,9 +274,11 @@ export function AdminCalendarView({
                     )}
                     {enReunion > 0 && (
                       <span className={`${CALENDAR_DAY_CHIP_CLASS} tabular-nums`}>
-                        <span aria-hidden="true">
+                        {/* En una celda angosta el ícono no cabe junto al número: punto del tono de Reunión. */}
+                        <span aria-hidden="true" className="hidden @xl/mes:contents">
                           <IconoTipoEvento tipo="REUNION" tono={3} />
                         </span>
+                        <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-pill @xl/mes:hidden ${TONO_CLASES[3].punto}`} />
                         <span className="truncate">
                           {enReunion}
                           <span className="hidden @xl/mes:inline"> {enReunion === 1 ? 'reunión' : 'reuniones'}</span>
