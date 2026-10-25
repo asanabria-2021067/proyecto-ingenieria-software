@@ -11,7 +11,8 @@ import { useCallback, useSyncExternalStore } from 'react';
 export const DASHBOARD_SIDEBAR_STORAGE_KEY = 'uvg-collab-dashboard-sidebar';
 export const ADMIN_SIDEBAR_STORAGE_KEY = 'uvg-collab-admin-sidebar';
 
-function crearPreferenciaColapsada(storageKey: string) {
+/** Fábrica compartida: cada sidebar (global, administrador, bandeja de notificaciones) guarda su propia clave. */
+export function crearPreferenciaColapsada(storageKey: string) {
   const cambioLocal = `${storageKey}-change`;
   let almacenamientoInutilizable = false;
   let preferenciaEnMemoria: 'collapsed' | 'expanded' = 'expanded';
