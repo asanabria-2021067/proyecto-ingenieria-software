@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, CalendarX2, Check, CheckCheck, ChevronLeft, Chev
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { NotificationAvatar } from '@/components/notifications/notification-avatar';
+import { MensajeConCitas } from '@/components/notifications/inbox-list';
 import type { Notificacion } from '@/lib/services/notifications';
 import {
   accionDeAviso,
@@ -171,12 +172,31 @@ export function NotificationReaderContent({ notificacion: n }: { notificacion: N
                   <time dateTime={n.creadaEn}>{fechaCompleta(n.creadaEn)}</time>
                 </dd>
               </div>
+              {proyecto && (proyecto.titulo || proyecto.id) && (
+                <div className="flex min-w-0 gap-1">
+                  <dt className="font-semibold">Proyecto:</dt>
+                  <dd className="min-w-0 truncate">
+                    {proyecto.id ? (
+                      <Link href={`/dashboard/proyectos/${proyecto.id}`} className="font-semibold text-primary hover:underline">
+                        {proyecto.titulo ?? `Proyecto ${proyecto.id}`}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold text-on-surface">{proyecto.titulo}</span>
+                    )}
+                  </dd>
+                </div>
+              )}
             </dl>
           </div>
         </div>
       </header>
 
-      {n.mensajeNotificacion && <p className="type-body whitespace-pre-line break-words text-on-surface">{n.mensajeNotificacion}</p>}
+      {/* Mismo lenguaje que la fila: lo citado en verde mientras el aviso siga sin leer. */}
+      {n.mensajeNotificacion && (
+        <p className="type-body whitespace-pre-line break-words text-on-surface">
+          <MensajeConCitas texto={n.mensajeNotificacion} noLeida={noLeida} />
+        </p>
+      )}
 
       {detalles.length > 0 && (
         <section aria-label="Detalles" className="rounded-card border border-outline-variant/50 bg-surface-container-low/60 p-stack">
@@ -188,19 +208,6 @@ export function NotificationReaderContent({ notificacion: n }: { notificacion: N
               </div>
             ))}
           </dl>
-        </section>
-      )}
-
-      {proyecto && (proyecto.titulo || proyecto.id) && (
-        <section aria-label="Proyecto relacionado" className="flex flex-wrap items-center gap-tight text-sm">
-          <span className="text-text-secondary">Proyecto:</span>
-          {proyecto.id ? (
-            <Link href={`/dashboard/proyectos/${proyecto.id}`} className="font-semibold text-primary hover:underline">
-              {proyecto.titulo ?? `Proyecto ${proyecto.id}`}
-            </Link>
-          ) : (
-            <span className="font-semibold text-on-surface">{proyecto.titulo}</span>
-          )}
         </section>
       )}
 

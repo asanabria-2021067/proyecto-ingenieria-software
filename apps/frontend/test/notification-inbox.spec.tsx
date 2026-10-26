@@ -148,6 +148,18 @@ describe('NotificationInbox', () => {
     expect(marcarLeida).toHaveBeenCalledTimes(1);
   });
 
+  it('al confirmarse la lectura, la fila pierde el énfasis de no leída sin esperar a que la lista vuelva', async () => {
+    renderInbox();
+    await within(lista()).findByText('3 avisos · 2 sin leer');
+    // A partir de aquí la lista no vuelve del servidor: solo la caché puede apagar la fila.
+    vi.mocked(getNotificacionesPagina).mockImplementation(() => new Promise(() => {}));
+    expect(filas()[0]).toHaveAttribute('data-leida', 'false');
+    fireEvent.click(within(filas()[0]).getByRole('button'));
+    await waitFor(() => expect(filas()[0]).toHaveAttribute('data-leida', 'true'));
+    expect(within(filas()[0]).getByText('Te asignaron la tarea Diseño')).toHaveClass('font-medium');
+    expect(filas()[0].querySelector('.rounded-full.bg-primary')).toBeNull();
+  });
+
   it('anterior y siguiente recorren la lista cargada; una reunión cancelada no enlaza', async () => {
     renderInbox();
     await within(lista()).findByText('3 avisos · 2 sin leer');

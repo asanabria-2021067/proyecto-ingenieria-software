@@ -30,15 +30,30 @@ const FONDO_SELECCIONADA = 'bg-[color-mix(in_srgb,var(--color-primary)_8%,var(--
 
 /**
  * Barra izquierda, como en Outlook, dibujada con una sombra interior para que cambiar su grosor no mueva
- * el contenido (y conviva con el anillo de foco, que es otra sombra). No leída: verde suavizado de 3 px.
- * Seleccionada: verde pleno de 3 px. Seleccionada y no leída: una sola barra verde plena de 5 px.
+ * el contenido (y conviva con el anillo de foco, que es otra sombra). Verde = no leída: suavizado de 3 px,
+ * y seleccionada y no leída, una sola barra verde plena de 5 px. Seleccionada y leída: barra neutra
+ * (outline), para que la selección no se confunda con un aviso pendiente.
  */
 const BARRA_NO_LEIDA = 'shadow-[inset_3px_0_0_color-mix(in_srgb,var(--color-primary)_55%,transparent)]';
-const BARRA_SELECCIONADA = 'shadow-[inset_3px_0_0_var(--color-primary)]';
+const BARRA_SELECCIONADA_LEIDA = 'shadow-[inset_3px_0_0_var(--color-outline)]';
 const BARRA_SELECCIONADA_NO_LEIDA = 'shadow-[inset_5px_0_0_var(--color-primary)]';
 
-/** Asunto citado en la vista previa: marcador con el lima de acento (tag-lime), AA en claro y oscuro. */
-const CITA_DESTACADA = 'rounded-[3px] bg-tag-lime px-0.5 font-semibold text-on-tag-lime [box-decoration-break:clone]';
+/**
+ * Lo citado en el mensaje (la tarea, el rol, el proyecto…). Sin leer, en verde de acento como TEXTO
+ * (sin fondo ni subrayado; primary: 7:1 en claro, verde brillante en oscuro). Leído, vuelve al tono
+ * neutro de la descripción.
+ */
+export function MensajeConCitas({ texto, noLeida }: { texto: string; noLeida: boolean }) {
+  return segmentosDeMensaje(texto).map((segmento, i) =>
+    segmento.destacado ? (
+      <span key={i} data-cita="" className={noLeida ? 'font-semibold text-primary' : 'font-medium'}>
+        {segmento.texto}
+      </span>
+    ) : (
+      segmento.texto
+    ),
+  );
+}
 
 interface InboxRowProps {
   notificacion: Notificacion;
@@ -50,12 +65,12 @@ interface InboxRowProps {
 /**
  * Fila compacta (REGIÓN C, §4): avatar del emisor (identidadDeAviso), origen, título, vista previa
  * de dos líneas, chips de categoría y proyecto, fecha e indicador de no leída.
- * Lógica de Outlook: título en negrita y alto contraste, el asunto citado en la
- * vista previa destacado con el lima de acento y el resto de la descripción
- * neutro. Leída = fondo blanco. No leída = barra verde a la izquierda, punto
- * verde y un tinte casi imperceptible. Seleccionada = verde muy suave con su
- * barra; si además está sin leer, ambas barras son una sola más gruesa. El
- * avatar lleva el color de la categoría en cualquier estado.
+ * Lógica de Outlook. No leída = barra verde a la izquierda, título en negrita
+ * con alto contraste, lo citado en verde, punto verde y un tinte casi
+ * imperceptible. Leída = atenuada: fondo blanco, título medium en tono
+ * secundario, cita neutra, sin punto ni barra. Seleccionada = verde muy suave;
+ * sin leer, su barra y la de no leída son una sola más gruesa; leída, la barra
+ * es neutra. El avatar lleva el color de la categoría en cualquier estado.
  */
 export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }: InboxRowProps) {
   const noLeida = n.leidaEn === null;
@@ -76,7 +91,7 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         className={cn(
           'group/fila flex w-full items-start gap-inline px-inline py-inline text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40',
           seleccionada
-            ? cn('transition-colors', FONDO_SELECCIONADA, noLeida ? BARRA_SELECCIONADA_NO_LEIDA : BARRA_SELECCIONADA)
+            ? cn('transition-colors', FONDO_SELECCIONADA, noLeida ? BARRA_SELECCIONADA_NO_LEIDA : BARRA_SELECCIONADA_LEIDA)
             : cn(DATA_TABLE_ROW_HOVER, noLeida ? cn(FONDO_NO_LEIDA, BARRA_NO_LEIDA) : 'bg-surface-container-lowest'),
         )}
       >
@@ -89,18 +104,12 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
           {origen && (
             <span className="type-meta block truncate text-[11px] uppercase tracking-wide text-text-secondary">{origen}</span>
           )}
-          <span className="block truncate text-sm font-bold text-on-surface">{n.tituloNotificacion}</span>
+          <span className={cn('block truncate text-sm', noLeida ? 'font-bold text-on-surface' : 'font-medium text-on-surface-variant')}>
+            {n.tituloNotificacion}
+          </span>
           {n.mensajeNotificacion && (
             <span className={cn('mt-0.5 line-clamp-2 text-xs leading-snug', noLeida ? 'text-on-surface-variant' : 'text-tertiary')}>
-              {segmentosDeMensaje(n.mensajeNotificacion).map((segmento, i) =>
-                segmento.destacado ? (
-                  <mark key={i} className={CITA_DESTACADA}>
-                    {segmento.texto}
-                  </mark>
-                ) : (
-                  segmento.texto
-                ),
-              )}
+              <MensajeConCitas texto={n.mensajeNotificacion} noLeida={noLeida} />
             </span>
           )}
           <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
@@ -116,7 +125,7 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         <span className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
           <time
             dateTime={n.creadaEn}
-            className={cn('text-[11px] tabular-nums text-text-secondary', noLeida && 'font-semibold')}
+            className={cn('text-[11px] tabular-nums', noLeida ? 'font-semibold text-on-surface' : 'text-text-secondary')}
           >
             {fecha}
           </time>

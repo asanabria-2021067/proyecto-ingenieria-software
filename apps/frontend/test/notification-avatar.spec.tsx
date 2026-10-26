@@ -100,8 +100,9 @@ describe('avatar contextual en la fila', () => {
         <InboxRow notificacion={base({ tituloNotificacion: 'Leída', leidaEn: AHORA.toISOString() })} seleccionada onSeleccionar={() => {}} ahora={AHORA} />
       </ul>,
     );
-    // Como en Outlook, el título siempre en negrita y alto contraste; la lectura la dicen la barra y el punto.
-    expect(screen.getByText('Leída')).toHaveClass('font-bold', 'text-on-surface');
+    // Leída = atenuada: título medium en tono secundario (sin leer va en negrita y alto contraste).
+    expect(screen.getByText('Leída')).toHaveClass('font-medium', 'text-on-surface-variant');
+    expect(screen.getByText('Leída')).not.toHaveClass('font-bold');
     expect(container.querySelector('.rounded-full.bg-primary')).toBeNull();
     expect(screen.getByRole('button')).toHaveAttribute('aria-current', 'true');
     expect(avatar(container)).toBeInTheDocument();
@@ -114,19 +115,20 @@ describe('avatar contextual en la fila', () => {
     expect(chip).not.toHaveClass('pill-accent');
   });
 
-  it('el avatar lleva el color de su categoría (familia de etiqueta), igual leída o no y sin anillo', () => {
+  it('el avatar es un círculo neutro con el color de su categoría en la tinta y un borde fino, igual leída o no', () => {
     const casos = [
-      { tipoNotificacion: 'TAREA_ASIGNADA', datosJson: { projectTitle: 'Plataforma de Tutorías' }, color: ['bg-tag-blue', 'text-on-tag-blue'] },
-      { tipoNotificacion: 'NUEVA_POSTULACION', datosJson: { userName: 'María López' }, color: ['bg-tag-turquoise', 'text-on-tag-turquoise'] },
-      { tipoNotificacion: 'HORAS_ACREDITADAS', datosJson: {}, color: ['bg-tag-amber', 'text-on-tag-amber'] },
-      { tipoNotificacion: 'AMISTAD_ACEPTADA', datosJson: { userName: 'Luis Gómez' }, color: ['bg-tag-violet', 'text-on-tag-violet'] },
+      { tipoNotificacion: 'TAREA_ASIGNADA', datosJson: { projectTitle: 'Plataforma de Tutorías' }, color: ['text-on-tag-blue'] },
+      { tipoNotificacion: 'NUEVA_POSTULACION', datosJson: { userName: 'María López' }, color: ['text-on-tag-turquoise'] },
+      { tipoNotificacion: 'HORAS_ACREDITADAS', datosJson: {}, color: ['text-on-tag-amber'] },
+      { tipoNotificacion: 'AMISTAD_ACEPTADA', datosJson: { userName: 'Luis Gómez' }, color: ['text-on-tag-violet'] },
     ];
     for (const { color, ...aviso } of casos) {
       for (const leidaEn of [null, AHORA.toISOString()]) {
         const { container } = fila(base({ ...aviso, leidaEn }));
         const a = avatar(container);
-        expect(a, `${aviso.tipoNotificacion} ${leidaEn ? 'leída' : 'no leída'}`).toHaveClass(...color);
-        expect(a.className).not.toMatch(/(?:^|\s)ring-/);
+        expect(a, `${aviso.tipoNotificacion} ${leidaEn ? 'leída' : 'no leída'}`).toHaveClass(...color, 'bg-surface-container', 'ring-1', 'ring-current/30');
+        // Sin fondo de color: la categoría solo tiñe letras, trazo y borde.
+        expect(a.className).not.toMatch(/bg-tag-/);
         expect(a).not.toHaveClass('text-primary', 'text-tertiary');
         cleanup();
       }
@@ -143,7 +145,8 @@ describe('avatar contextual en la fila', () => {
     // Barra verde de no leída (3 px, verde suavizado) a la izquierda.
     expect(boton().className).toContain('shadow-[inset_3px_0_0_color-mix(in_srgb,var(--color-primary)_55%,transparent)]');
     expect(boton()).not.toHaveClass('bg-primary/5');
-    expect(fecha()).toHaveClass('text-text-secondary', 'font-semibold');
+    // Sin leer, la fecha gana contraste (como en Outlook), sin volverse verde.
+    expect(fecha()).toHaveClass('text-on-surface', 'font-semibold');
     expect(fecha()).not.toHaveClass('text-primary');
     cleanup();
 
@@ -168,24 +171,38 @@ describe('avatar contextual en la fila', () => {
     expect(container.querySelector('.rounded-full.bg-primary')).not.toBeNull();
   });
 
-  it('seleccionada y leída: barra verde plena de 3 px', () => {
-    render(
+  it('seleccionada y leída: conserva el fondo de selección con una barra neutra, sin el lenguaje de no leída', () => {
+    const { container } = render(
       <ul>
-        <InboxRow notificacion={base({ tituloNotificacion: 'Vista', leidaEn: AHORA.toISOString() })} seleccionada onSeleccionar={() => {}} ahora={AHORA} />
+        <InboxRow notificacion={base({ tituloNotificacion: 'Vista', mensajeNotificacion: 'La tarea "Diseño" cambió.', leidaEn: AHORA.toISOString() })} seleccionada onSeleccionar={() => {}} ahora={AHORA} />
       </ul>,
     );
-    expect(screen.getByRole('button')).toHaveClass('shadow-[inset_3px_0_0_var(--color-primary)]');
+    const boton = screen.getByRole('button');
+    expect(boton.className).toContain('var(--color-primary)_8%');
+    expect(boton).toHaveClass('shadow-[inset_3px_0_0_var(--color-outline)]');
+    expect(boton.className).not.toMatch(/inset_\d+px_0_0_(?:var\(--color-primary\)|color-mix)/);
+    expect(screen.getByText('Vista')).toHaveClass('font-medium');
+    expect(container.querySelector('.rounded-full.bg-primary')).toBeNull();
+    expect(screen.getByText('Diseño')).not.toHaveClass('text-primary');
   });
 
-  it('la cita de la vista previa se destaca en lima de acento y el resto de la descripción queda neutro', () => {
+  it('sin leer, la cita va en verde como texto (sin fondo ni subrayado) y el resto de la descripción queda neutro', () => {
     fila(base({ mensajeNotificacion: 'Se asignó la tarea "Diseñar wireframes" dentro de tu rol.' }));
     const cita = screen.getByText('Diseñar wireframes');
-    expect(cita.tagName).toBe('MARK');
-    expect(cita).toHaveClass('bg-tag-lime', 'text-on-tag-lime', 'font-semibold');
+    expect(cita.tagName).toBe('SPAN');
+    expect(cita).toHaveClass('text-primary', 'font-semibold');
+    expect(cita.className).not.toMatch(/bg-|underline|decoration/);
     const descripcion = cita.parentElement!;
     expect(descripcion).toHaveTextContent('Se asignó la tarea "Diseñar wireframes" dentro de tu rol.');
     expect(descripcion).toHaveClass('text-on-surface-variant');
     expect(descripcion.className).not.toMatch(/lime|primary/);
+  });
+
+  it('leída, la cita vuelve al tono neutro y la descripción se atenúa', () => {
+    fila(base({ mensajeNotificacion: 'Se asignó la tarea "Diseñar wireframes" dentro de tu rol.', leidaEn: AHORA.toISOString() }));
+    const cita = screen.getByText('Diseñar wireframes');
+    expect(cita).not.toHaveClass('text-primary');
+    expect(cita.parentElement).toHaveClass('text-tertiary');
   });
 
   it('títulos y mensajes largos siguen truncados', () => {
@@ -214,6 +231,6 @@ describe('avatar en el visor', () => {
   it('en el visor el avatar también lleva el color de la categoría (calendario: recordatorios)', () => {
     const { container } = render(<NotificationReaderContent notificacion={base({ tipoNotificacion: 'CALENDARIO_COMPARTIDO', tituloNotificacion: 'Calendario compartido', datosJson: { ownerId: 2, ownerName: 'Ana Ruiz' } })} />);
     expect(avatar(container)).toHaveAttribute('data-categoria', 'recordatorios');
-    expect(avatar(container)).toHaveClass('bg-tag-orange', 'text-on-tag-orange');
+    expect(avatar(container)).toHaveClass('bg-surface-container', 'text-on-tag-orange');
   });
 });

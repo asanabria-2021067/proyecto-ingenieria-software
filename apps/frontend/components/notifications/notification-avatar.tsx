@@ -21,20 +21,22 @@ const TONO: Record<IdentidadDeAviso['tipo'], string> = {
 };
 
 /**
- * Color de la CATEGORÍA del aviso, con la familia de etiqueta que ya la
- * representa (fondo tag-* suave y tinta on-tag-*, AA en claro y oscuro). Con
- * `categoria`, el avatar dice de qué trata el aviso y no si está leído: su color
- * no cambia al leerlo. La forma sigue saliendo del origen (círculo o cuadro).
+ * Color de la CATEGORÍA del aviso sobre un círculo neutro: la tinta on-tag-* de
+ * su familia de etiqueta va solo en las letras o el trazo del icono y en un
+ * borde fino; el fondo queda gris claro (surface-container). Esas tintas dan
+ * ≥ 5,7:1 sobre ese fondo en claro y ≥ 9,7:1 en oscuro. El color no cambia al
+ * leer el aviso; la forma sigue saliendo del origen (círculo o cuadro).
  */
+const NEUTRO = 'bg-surface-container ring-1 ring-current/30';
 export const COLOR_DE_CATEGORIA: Record<NotificationGroupId, string> = {
-  tareas: 'bg-tag-blue text-on-tag-blue',
-  postulaciones: 'bg-tag-turquoise text-on-tag-turquoise',
-  proyectos: 'bg-tag-sage text-on-tag-sage',
-  horas: 'bg-tag-amber text-on-tag-amber',
-  recordatorios: 'bg-tag-orange text-on-tag-orange',
-  contactos: 'bg-tag-violet text-on-tag-violet',
-  cuenta: 'bg-tag-slate text-on-tag-slate',
-  otras: 'bg-tag-neutral text-on-tag-neutral',
+  tareas: `${NEUTRO} text-on-tag-blue`,
+  postulaciones: `${NEUTRO} text-on-tag-turquoise`,
+  proyectos: `${NEUTRO} text-on-tag-sage`,
+  horas: `${NEUTRO} text-on-tag-amber`,
+  recordatorios: `${NEUTRO} text-on-tag-orange`,
+  contactos: `${NEUTRO} text-on-tag-violet`,
+  cuenta: `${NEUTRO} text-on-tag-slate`,
+  otras: `${NEUTRO} text-on-tag-neutral`,
 };
 
 export function NotificationAvatar({

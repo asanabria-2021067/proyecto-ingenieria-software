@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useConteoNoLeidas } from '@/hooks/use-notifications';
 import { aviso } from '@/lib/mensajes';
@@ -13,6 +13,7 @@ import {
   type FiltrosBandeja,
   type FiltrosMarcado,
   type Notificacion,
+  type NotificacionesPagina,
 } from '@/lib/services/notifications';
 import { INBOX_CATEGORIES } from '@/lib/notifications/inbox-model';
 import type { NotificationGroupId } from '@/lib/notifications/preference-groups';
@@ -133,6 +134,18 @@ export function NotificationInbox() {
     mutationFn: marcarLeida,
     onSuccess: (actualizada) => {
       setSeleccionada((actual) => (actual && actual.idNotificacion === actualizada.idNotificacion ? { ...actual, leidaEn: actualizada.leidaEn } : actual));
+      // La fila pierde el énfasis de no leída al instante, sin esperar a que la lista vuelva del servidor.
+      queryClient.setQueriesData<InfiniteData<NotificacionesPagina>>({ queryKey: ['notificaciones', 'bandeja'] }, (datos) =>
+        datos?.pages
+          ? {
+              ...datos,
+              pages: datos.pages.map((pagina) => ({
+                ...pagina,
+                data: pagina.data.map((x) => (x.idNotificacion === actualizada.idNotificacion ? { ...x, leidaEn: actualizada.leidaEn } : x)),
+              })),
+            }
+          : datos,
+      );
       invalidar();
     },
     onError: () => aviso.error('No se pudo marcar como leída', 'Inténtalo de nuevo en unos segundos.'),
