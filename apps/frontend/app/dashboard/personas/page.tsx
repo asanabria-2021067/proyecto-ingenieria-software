@@ -488,7 +488,7 @@ function PersonasView() {
       <div className={dashboardPage('@container/personas pt-7 pb-10')}>
         {/* Jerarquía de encabezado de Mis Proyectos. */}
         <header className="mb-section">
-          <h1 className="text-[28px] leading-8.5 font-bold text-on-surface">{encabezado.titulo}</h1>
+          <h1 className="type-display">{encabezado.titulo}</h1>
           <p className="mt-1 text-[14px] font-normal text-tertiary">{encabezado.descripcion}</p>
         </header>
 
