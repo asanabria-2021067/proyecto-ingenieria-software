@@ -360,7 +360,7 @@ export default function EditarPerfilPage() {
             <ChevronLeft className="w-4 h-4" />
             Volver al perfil
           </button>
-          <h1 className="text-3xl md:text-4xl font-black tracking-tight text-on-surface font-headline">
+          <h1 className="type-display">
             Editar Perfil Profesional
           </h1>
           <p className="mt-1 text-sm text-on-surface-variant">
