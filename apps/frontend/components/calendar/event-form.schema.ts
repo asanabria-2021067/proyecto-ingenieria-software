@@ -193,7 +193,26 @@ export function emptyEventForm(defaultProjectId?: number, initialDate?: Date, ah
   };
 }
 
-export function eventFormFromEvento(evento: EventoProyectoDTO): EventFormValues {
+/** Campos de un evento que el formulario necesita (una reunión de Administración también los tiene). */
+export type EventoParaFormulario = Pick<
+  EventoProyectoDTO,
+  | 'idProyecto'
+  | 'tituloEvento'
+  | 'descripcionEvento'
+  | 'tipoEvento'
+  | 'fechaInicio'
+  | 'fechaFin'
+  | 'modalidad'
+  | 'ubicacionLat'
+  | 'ubicacionLng'
+  | 'ubicacionNombre'
+  | 'linkSesion'
+  | 'rolesDestino'
+  | 'invitados'
+  | 'antelacionMinutos'
+>;
+
+export function eventFormFromEvento(evento: EventoParaFormulario): EventFormValues {
   const inicio = new Date(evento.fechaInicio);
   const fin = new Date(evento.fechaFin);
   return {
@@ -229,6 +248,11 @@ export interface BuildEventFormSchemaOptions {
    * Un `Date` fijo sirve para pruebas deterministas.
    */
   ahora?: Date | (() => Date);
+  /**
+   * Un evento de proyecto exige elegir su proyecto al crearlo. Una reunión de
+   * Administración no tiene uno solo: convoca a varios con su propio campo.
+   */
+  exigirProyecto?: boolean;
 }
 
 /**
@@ -238,7 +262,7 @@ export interface BuildEventFormSchemaOptions {
  * http(s) si es virtual/híbrida), pero validadas antes de enviar y con el
  * mensaje pegado a su campo.
  */
-export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora = () => new Date() }: BuildEventFormSchemaOptions) {
+export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora = () => new Date(), exigirProyecto = true }: BuildEventFormSchemaOptions) {
   return z
     .object({
       idProyecto: z.string(),
@@ -267,7 +291,7 @@ export function buildEventFormSchema({ mode, fechaInicioOriginal = null, ahora =
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tituloEvento'], message: 'El título no puede estar vacío.' });
       }
 
-      if (mode === 'create' && !Number(values.idProyecto)) {
+      if (exigirProyecto && mode === 'create' && !Number(values.idProyecto)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['idProyecto'], message: 'Selecciona un proyecto.' });
       }
 
