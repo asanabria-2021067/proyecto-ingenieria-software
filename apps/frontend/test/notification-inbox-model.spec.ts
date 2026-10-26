@@ -176,6 +176,8 @@ describe('identidad visual del emisor (avatares contextuales)', () => {
     expect(inicialesDe('María José Pérez')).toBe('MJ');
     expect(inicialesDe('Ana')).toBe('A');
     expect(inicialesDe('Sistema de Inventario Verde')).toBe('SI');
+    expect(inicialesDe('[S7 UI] Plataforma de tutorías entre estudiantes')).toBe('PT');
+    expect(inicialesDe('[Piloto]')).toBe('P');
     expect(inicialesDe('  🙂  ')).toBe('');
     expect(identidadDeAviso(aviso('NUEVO_SEGUIDOR', { userName: '   ' })).tipo).toBe('sistema');
   });

@@ -272,9 +272,14 @@ export type IdentidadDeAviso =
 
 const CONECTORES = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'y', 'e', 'en', 'para', 'con', 'a', 'al']);
 
-/** Hasta dos iniciales de las primeras palabras con significado («Plataforma de Tutorías» → «PT»). */
+/**
+ * Hasta dos iniciales de las primeras palabras con significado («Plataforma de Tutorías» → «PT»).
+ * Las etiquetas entre corchetes o paréntesis («[S7 UI] Plataforma…») no cuentan, salvo que no quede nada más.
+ */
 export function inicialesDe(nombre: string): string {
-  const palabras = nombre.trim().split(/\s+/).filter((p) => /\p{L}|\d/u.test(p));
+  const sinEtiquetas = nombre.replace(/\[[^\]]*\]|\([^)]*\)/g, ' ');
+  const base = /\p{L}|\d/u.test(sinEtiquetas) ? sinEtiquetas : nombre;
+  const palabras = base.trim().split(/\s+/).filter((p) => /\p{L}|\d/u.test(p));
   const utiles = palabras.filter((p) => !CONECTORES.has(p.toLowerCase()));
   const fuente = utiles.length > 0 ? utiles : palabras;
   return fuente
