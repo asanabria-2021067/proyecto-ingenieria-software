@@ -25,13 +25,16 @@ beforeAll(() => {
 
 const fila = (idUsuario: number, nombre: string, apellido: string) => ({ idUsuario, nombre, apellido, correo: `${nombre}@uvg.edu.gt`, fotoUrl: null, estado: 'ACTIVO', roles: ['administrador'], fechaCreacion: '' });
 
-let valores: () => AdminMeetingFormValues;
+/** Valores actuales del formulario, que el arnés escribe en pantalla. */
+const valores = (): Pick<AdminMeetingFormValues, 'politicaEdicion' | 'editores'> => JSON.parse(screen.getByTestId('valores').textContent ?? '{}');
 function Harness({ puedeCambiar = true, inicial = {} }: { puedeCambiar?: boolean; inicial?: Partial<AdminMeetingFormValues> }) {
   const form = useForm<AdminMeetingFormValues>({ defaultValues: { ...emptyAdminMeetingForm(), ...inicial } });
-  valores = () => form.getValues();
+  const politicaEdicion = form.watch('politicaEdicion');
+  const editores = form.watch('editores');
   return (
     <Form {...form}>
       <MeetingPermissionsField isPending={false} puedeCambiar={puedeCambiar} idCreador={1} editoresConocidos={[{ idUsuario: 3, nombre: 'Luis', apellido: 'Gómez' }]} />
+      <output data-testid="valores">{JSON.stringify({ politicaEdicion, editores })}</output>
     </Form>
   );
 }
