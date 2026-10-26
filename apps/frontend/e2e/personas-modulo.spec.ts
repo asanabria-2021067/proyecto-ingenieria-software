@@ -5,13 +5,14 @@ import { overflowHorizontal } from './support/calendario';
 import { desactivarTour } from './support/realtime';
 
 /**
- * Sprint 10: Personas como módulo social (navegación secundaria, filtros en
- * línea) contra el backend real y el seed. Solo lectura: no crea amistades.
+ * Sprint 10: Personas como módulo social (grupo «Personas» de la sidebar
+ * global, filtros en línea) contra el backend real y el seed. Solo lectura:
+ * no crea amistades.
  */
 const ESTUDIANTE = 'carlos.mendoza@uvg.edu.gt';
 const BUSCAR = /\/api\/social\/usuarios\/buscar\?/;
 
-test.describe('Personas: navegación secundaria y filtros con datos reales (Sprint 10)', () => {
+test.describe('Personas: grupo de la sidebar global y filtros con datos reales (Sprint 10)', () => {
   test.beforeEach(async ({ page }) => {
     await desactivarTour(page);
     await login(page, ESTUDIANTE);
@@ -20,10 +21,23 @@ test.describe('Personas: navegación secundaria y filtros con datos reales (Spri
 
   test('las secciones viven en la URL, cambian encabezado y consulta, y soportan atrás/adelante', async ({ page }) => {
     await page.goto('/dashboard/personas');
-    const nav = page.getByRole('navigation', { name: 'Navegación de Personas' });
+    const nav = page.getByRole('navigation', { name: 'Navegación principal' });
     await expect(page.getByRole('heading', { level: 1, name: 'Descubrir personas' })).toBeVisible({ timeout: 15_000 });
     await expect(nav.getByRole('link', { name: 'Descubrir personas' })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('tab')).toHaveCount(0);
+    // Una única sidebar: sin la columna secundaria del rediseño anterior.
+    await expect(page.getByRole('navigation', { name: 'Navegación de Personas' })).toHaveCount(0);
+    await expect(page.getByRole('complementary')).toHaveCount(1);
+
+    // El grupo se pliega y despliega como Proyectos y Mi trabajo, sin cerrar los demás.
+    const grupo = nav.getByRole('button', { name: /^Personas/ });
+    await expect(grupo).toHaveAttribute('aria-expanded', 'true');
+    await grupo.click();
+    await expect(grupo).toHaveAttribute('aria-expanded', 'false');
+    await expect(nav.getByRole('link', { name: 'Mis amigos' })).toHaveCount(0);
+    await expect(nav.getByRole('link', { name: 'Mis Proyectos' })).toBeVisible();
+    await grupo.click();
+    await expect(grupo).toHaveAttribute('aria-expanded', 'true');
 
     const amigos = page.waitForRequest((r) => BUSCAR.test(r.url()) && r.url().includes('soloAmigos=true'));
     await nav.getByRole('link', { name: 'Mis amigos' }).click();
@@ -40,12 +54,17 @@ test.describe('Personas: navegación secundaria y filtros con datos reales (Spri
     await ada;
     await expect(page.getByRole('heading', { level: 1, name: 'Amigos de amigos' })).toBeVisible();
 
+    await expect(nav.getByRole('link', { name: 'Amigos de amigos' })).toHaveAttribute('aria-current', 'page');
+    await expect(nav.getByRole('link', { name: 'Descubrir personas' })).not.toHaveAttribute('aria-current');
+
     await page.goBack();
     await expect(page.getByRole('heading', { level: 1, name: 'Mis amigos' })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Mis amigos' })).toHaveAttribute('aria-current', 'page');
     await page.goForward();
     await expect(page.getByRole('heading', { level: 1, name: 'Amigos de amigos' })).toBeVisible();
     await page.reload();
     await expect(page.getByRole('heading', { level: 1, name: 'Amigos de amigos' })).toBeVisible({ timeout: 15_000 });
+    await expect(nav.getByRole('link', { name: 'Amigos de amigos' })).toHaveAttribute('aria-current', 'page');
   });
 
   test('semestre, habilidades reales y mi carrera se envían juntos al backend y se quitan desde sus chips', async ({ page }) => {
@@ -90,6 +109,17 @@ test.describe('Personas: navegación secundaria y filtros con datos reales (Spri
     await expect(aplicados).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Filtrar por semestre' })).toContainText('Todos los semestres');
     await expect(page.getByRole('button', { name: 'Filtrar por habilidades' })).toBeVisible();
+  });
+
+  test('el contenido recupera el ancho: tres columnas de tarjetas con la sidebar global abierta en 1440 px', async ({ page }) => {
+    await page.goto('/dashboard/personas');
+    const directorio = page.getByRole('region', { name: 'Directorio de personas' });
+    const tarjetas = directorio.locator('ul > li');
+    await expect(tarjetas.nth(2)).toBeVisible({ timeout: 15_000 });
+    const [a, b, c] = await Promise.all([0, 1, 2].map((i) => tarjetas.nth(i).boundingBox()));
+    expect(a?.y).toBe(b?.y);
+    expect(b?.y).toBe(c?.y);
+    expect(await overflowHorizontal(page)).toBeLessThanOrEqual(0);
   });
 
   test('en móvil la navegación pasa a «Secciones» y la página no desborda', async ({ page }) => {
