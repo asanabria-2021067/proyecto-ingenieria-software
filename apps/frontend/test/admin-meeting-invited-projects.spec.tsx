@@ -138,3 +138,81 @@ describe('Proyectos invitados — selección múltiple', () => {
     expect(await screen.findByText('No hay proyectos que se puedan convocar en este horario.')).toBeInTheDocument();
   });
 });
+
+const equipo = (idProyecto: number, overrides: Partial<EquipoDeProyectoReunion> = {}): EquipoDeProyectoReunion => ({
+  idProyecto,
+  tituloProyecto: ELEGIBLES.find((p) => p.idProyecto === idProyecto)?.tituloProyecto ?? `Proyecto ${idProyecto}`,
+  descripcionProyecto: 'Huertos urbanos en el campus.',
+  estadoProyecto: 'EN_PROGRESO',
+  lider: { idUsuario: 10, nombre: 'Valeria', apellido: 'Ortiz', estadoCuenta: 'ACTIVO', convocado: true },
+  integrantes: [
+    { idUsuario: 11, nombre: 'Mía', apellido: 'Ruiz', estadoCuenta: 'ACTIVO', convocado: true, rol: 'Diseño', estadoParticipacion: 'ACTIVO' },
+    { idUsuario: 12, nombre: 'Saúl', apellido: 'Paz', estadoCuenta: 'INACTIVO', convocado: false, rol: 'Backend', estadoParticipacion: 'ACTIVO' },
+  ],
+  totalConvocados: 2,
+  ...overrides,
+});
+
+describe('Proyectos invitados — detalles de la tarjeta', () => {
+  it('«Ver detalles» despliega la misma tarjeta con título, descripción, líder y estudiantes, y se vuelve a contraer', async () => {
+    servicios.getMeetingProjectTeam.mockResolvedValue(equipo(1));
+    renderField({ inicial: [1] });
+    const ver = await screen.findByRole('button', { name: 'Ver detalles de Huerto Comunitario' });
+    expect(ver).toHaveAttribute('aria-expanded', 'false');
+    expect(servicios.getMeetingProjectTeam).not.toHaveBeenCalled();
+
+    fireEvent.click(ver);
+    const ocultar = screen.getByRole('button', { name: 'Ocultar detalles de Huerto Comunitario' });
+    expect(ocultar).toHaveAttribute('aria-expanded', 'true');
+    const detalles = document.getElementById(ocultar.getAttribute('aria-controls')!)!;
+    expect(await within(detalles).findByText('Huertos urbanos en el campus.')).toBeInTheDocument();
+    expect(within(detalles).getByText('Huerto Comunitario')).toBeInTheDocument();
+    expect(within(detalles).getByText('Valeria Ortiz')).toBeInTheDocument();
+    expect(within(detalles).getByText('Estudiantes participantes')).toBeInTheDocument();
+    expect(within(detalles).getByText('Mía Ruiz')).toBeInTheDocument();
+    expect(within(detalles).getByText('Backend · Cuenta no activa: no recibe la convocatoria')).toBeInTheDocument();
+    expect(detalles.textContent).not.toMatch(/@/);
+
+    fireEvent.click(ocultar);
+    expect(screen.getByRole('button', { name: 'Ver detalles de Huerto Comunitario' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Mía Ruiz')).not.toBeInTheDocument();
+  });
+
+  it('varias tarjetas pueden estar abiertas y cada proyecto se consulta una sola vez', async () => {
+    servicios.getMeetingProjectTeam.mockImplementation(async (id: number) =>
+      equipo(id, id === 2 ? { descripcionProyecto: null, integrantes: [], estadoProyecto: 'CERRADO' } : {}),
+    );
+    renderField({ inicial: [1, 2] });
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalles de Huerto Comunitario' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles de Plataforma de Tutorías' }));
+    expect(await screen.findByText('Este proyecto no tiene descripción.')).toBeInTheDocument();
+    expect(screen.getByText('Sin integrantes además del líder.')).toBeInTheDocument();
+    expect(screen.getByText('Mía Ruiz')).toBeInTheDocument();
+    // Cerrar y volver a abrir usa la caché.
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar detalles de Huerto Comunitario' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles de Huerto Comunitario' }));
+    expect(await screen.findByText('Mía Ruiz')).toBeInTheDocument();
+    expect(servicios.getMeetingProjectTeam.mock.calls.map(([id]) => id).sort()).toEqual([1, 2]);
+  });
+
+  it('en un proyecto cerrado marca al equipo al cierre', async () => {
+    servicios.getMeetingProjectTeam.mockResolvedValue(
+      equipo(3, {
+        estadoProyecto: 'CERRADO',
+        integrantes: [{ idUsuario: 13, nombre: 'Rita', apellido: 'Paz', estadoCuenta: 'ACTIVO', convocado: true, rol: 'QA', estadoParticipacion: 'COMPLETADO' }],
+      }),
+    );
+    renderField({ inicial: [3] });
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalles de Portal de Voluntariado' }));
+    expect(await screen.findByText('QA · Equipo al cierre')).toBeInTheDocument();
+  });
+
+  it('si los detalles fallan lo dice y permite reintentar', async () => {
+    servicios.getMeetingProjectTeam.mockRejectedValueOnce(new Error('caído')).mockResolvedValue(equipo(1));
+    renderField({ inicial: [1] });
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalles de Huerto Comunitario' }));
+    expect(await screen.findByText('No se pudieron cargar los detalles del proyecto.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByText('Mía Ruiz')).toBeInTheDocument();
+  });
+});
