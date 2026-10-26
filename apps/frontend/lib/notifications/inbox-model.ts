@@ -400,3 +400,32 @@ export function accionDeAviso(n: Pick<Notificacion, 'tipoNotificacion' | 'datosJ
   if (!href) return null;
   return { href, etiqueta: etiquetaDeDestino(href, n.tipoNotificacion) };
 }
+
+export interface SegmentoDeMensaje {
+  texto: string;
+  /** Lo que el aviso cita entre comillas (la tarea, el rol, el proyecto…): el «asunto» que se destaca. */
+  destacado: boolean;
+}
+
+/** Comillas que usan los mensajes del backend: rectas, angulares y tipográficas. */
+const CITA = /"([^"\n]+)"|«([^»\n]+)»|“([^”\n]+)”/g;
+
+/**
+ * Parte la vista previa en texto normal y citas. Las comillas quedan en el
+ * texto normal; solo lo citado se destaca. Sin citas, un solo segmento.
+ */
+export function segmentosDeMensaje(texto: string): SegmentoDeMensaje[] {
+  const segmentos: SegmentoDeMensaje[] = [];
+  let desde = 0;
+  for (const m of texto.matchAll(CITA)) {
+    const cita = m[1] ?? m[2] ?? m[3] ?? '';
+    const inicio = m.index ?? 0;
+    const apertura = m[0][0];
+    const cierre = m[0][m[0].length - 1];
+    segmentos.push({ texto: texto.slice(desde, inicio) + apertura, destacado: false }, { texto: cita, destacado: true });
+    desde = inicio + m[0].length;
+    segmentos.push({ texto: cierre, destacado: false });
+  }
+  segmentos.push({ texto: texto.slice(desde), destacado: false });
+  return segmentos.filter((s) => s.texto.length > 0);
+}

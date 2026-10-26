@@ -90,9 +90,9 @@ describe('avatar contextual en la fila', () => {
     }
   });
 
-  it('conserva el punto de no leída, el título en semibold y la selección', () => {
+  it('conserva el punto de no leída, el título en negrita y la selección', () => {
     const { container, rerender } = fila(base({ tituloNotificacion: 'Pendiente', datosJson: { userName: 'Ana' }, tipoNotificacion: 'NUEVO_SEGUIDOR' }));
-    expect(screen.getByText('Pendiente')).toHaveClass('font-semibold');
+    expect(screen.getByText('Pendiente')).toHaveClass('font-bold', 'text-on-surface');
     expect(container.querySelector('.rounded-full.bg-primary')).not.toBeNull();
 
     rerender(
@@ -100,7 +100,8 @@ describe('avatar contextual en la fila', () => {
         <InboxRow notificacion={base({ tituloNotificacion: 'Leída', leidaEn: AHORA.toISOString() })} seleccionada onSeleccionar={() => {}} ahora={AHORA} />
       </ul>,
     );
-    expect(screen.getByText('Leída')).toHaveClass('font-medium');
+    // Como en Outlook, el título siempre en negrita y alto contraste; la lectura la dicen la barra y el punto.
+    expect(screen.getByText('Leída')).toHaveClass('font-bold', 'text-on-surface');
     expect(container.querySelector('.rounded-full.bg-primary')).toBeNull();
     expect(screen.getByRole('button')).toHaveAttribute('aria-current', 'true');
     expect(avatar(container)).toBeInTheDocument();
@@ -138,15 +139,18 @@ describe('avatar contextual en la fila', () => {
     // No leída: tinte sutil sobre el blanco (no el fondo azulado de la página), sin línea lateral ni fecha verde.
     fila(base({ tipoNotificacion: 'PROYECTO_PUBLICADO', datosJson: { projectTitle: 'Plataforma de Tutorías' } }));
     expect(boton().className).toContain('var(--color-primary)_3%');
-    expect(boton()).toHaveClass('border-l-transparent', 'hover:bg-surface-container-low');
-    expect(boton()).not.toHaveClass('bg-primary/5', 'border-l-primary');
+    expect(boton()).toHaveClass('hover:bg-surface-container-low');
+    // Barra verde de no leída (3 px, verde suavizado) a la izquierda.
+    expect(boton().className).toContain('shadow-[inset_3px_0_0_color-mix(in_srgb,var(--color-primary)_55%,transparent)]');
+    expect(boton()).not.toHaveClass('bg-primary/5');
     expect(fecha()).toHaveClass('text-text-secondary', 'font-semibold');
     expect(fecha()).not.toHaveClass('text-primary');
     cleanup();
 
     // Leída: blanca, como las filas de Mis Tareas.
     fila(base({ tipoNotificacion: 'NUEVO_SEGUIDOR', datosJson: { userName: 'Ana Ruiz' }, leidaEn: AHORA.toISOString() }));
-    expect(boton()).toHaveClass('bg-surface-container-lowest', 'border-l-transparent', 'hover:bg-surface-container-low');
+    expect(boton()).toHaveClass('bg-surface-container-lowest', 'hover:bg-surface-container-low');
+    expect(boton().className).not.toMatch(/shadow-\[inset/);
     cleanup();
 
     // Seleccionada y no leída: verde suave con indicador lateral, y sigue en semibold con su punto.
@@ -156,10 +160,32 @@ describe('avatar contextual en la fila', () => {
       </ul>,
     );
     expect(boton().className).toContain('var(--color-primary)_8%');
-    expect(boton()).toHaveClass('border-l-primary');
+    // Selección y no leída se funden en UNA barra verde plena más gruesa (5 px), no dos líneas.
+    expect(boton()).toHaveClass('shadow-[inset_5px_0_0_var(--color-primary)]');
+    expect(boton().className.match(/shadow-\[inset/g)).toHaveLength(1);
     expect(boton()).not.toHaveClass('bg-sage-nav-active');
-    expect(screen.getByText('Elegida')).toHaveClass('font-semibold', 'text-on-surface');
+    expect(screen.getByText('Elegida')).toHaveClass('font-bold', 'text-on-surface');
     expect(container.querySelector('.rounded-full.bg-primary')).not.toBeNull();
+  });
+
+  it('seleccionada y leída: barra verde plena de 3 px', () => {
+    render(
+      <ul>
+        <InboxRow notificacion={base({ tituloNotificacion: 'Vista', leidaEn: AHORA.toISOString() })} seleccionada onSeleccionar={() => {}} ahora={AHORA} />
+      </ul>,
+    );
+    expect(screen.getByRole('button')).toHaveClass('shadow-[inset_3px_0_0_var(--color-primary)]');
+  });
+
+  it('la cita de la vista previa se destaca en lima de acento y el resto de la descripción queda neutro', () => {
+    fila(base({ mensajeNotificacion: 'Se asignó la tarea "Diseñar wireframes" dentro de tu rol.' }));
+    const cita = screen.getByText('Diseñar wireframes');
+    expect(cita.tagName).toBe('MARK');
+    expect(cita).toHaveClass('bg-tag-lime', 'text-on-tag-lime', 'font-semibold');
+    const descripcion = cita.parentElement!;
+    expect(descripcion).toHaveTextContent('Se asignó la tarea "Diseñar wireframes" dentro de tu rol.');
+    expect(descripcion).toHaveClass('text-on-surface-variant');
+    expect(descripcion.className).not.toMatch(/lime|primary/);
   });
 
   it('títulos y mensajes largos siguen truncados', () => {

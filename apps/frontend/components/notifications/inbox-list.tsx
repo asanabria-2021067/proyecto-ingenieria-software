@@ -15,6 +15,7 @@ import {
   identidadDeAviso,
   origenDeAviso,
   proyectoDeAviso,
+  segmentosDeMensaje,
   tituloDeCategoria,
 } from '@/lib/notifications/inbox-model';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,18 @@ import { cn } from '@/lib/utils';
 const FONDO_NO_LEIDA = 'bg-[color-mix(in_srgb,var(--color-primary)_3%,var(--color-surface-container-lowest))]';
 const FONDO_SELECCIONADA = 'bg-[color-mix(in_srgb,var(--color-primary)_8%,var(--color-surface-container-lowest))]';
 
+/**
+ * Barra izquierda, como en Outlook, dibujada con una sombra interior para que cambiar su grosor no mueva
+ * el contenido (y conviva con el anillo de foco, que es otra sombra). No leída: verde suavizado de 3 px.
+ * Seleccionada: verde pleno de 3 px. Seleccionada y no leída: una sola barra verde plena de 5 px.
+ */
+const BARRA_NO_LEIDA = 'shadow-[inset_3px_0_0_color-mix(in_srgb,var(--color-primary)_55%,transparent)]';
+const BARRA_SELECCIONADA = 'shadow-[inset_3px_0_0_var(--color-primary)]';
+const BARRA_SELECCIONADA_NO_LEIDA = 'shadow-[inset_5px_0_0_var(--color-primary)]';
+
+/** Asunto citado en la vista previa: marcador con el lima de acento (tag-lime), AA en claro y oscuro. */
+const CITA_DESTACADA = 'rounded-[3px] bg-tag-lime px-0.5 font-semibold text-on-tag-lime [box-decoration-break:clone]';
+
 interface InboxRowProps {
   notificacion: Notificacion;
   seleccionada: boolean;
@@ -37,10 +50,12 @@ interface InboxRowProps {
 /**
  * Fila compacta (REGIÓN C, §4): avatar del emisor (identidadDeAviso), origen, título, vista previa
  * de dos líneas, chips de categoría y proyecto, fecha e indicador de no leída.
- * Leída = fondo blanco. No leída = título semibold, punto verde y un tinte
- * casi imperceptible. Seleccionada = verde muy suave con indicador lateral; si
- * además está sin leer, conserva el semibold y el punto. El avatar lleva el
- * color de la categoría en cualquier estado.
+ * Lógica de Outlook: título en negrita y alto contraste, el asunto citado en la
+ * vista previa destacado con el lima de acento y el resto de la descripción
+ * neutro. Leída = fondo blanco. No leída = barra verde a la izquierda, punto
+ * verde y un tinte casi imperceptible. Seleccionada = verde muy suave con su
+ * barra; si además está sin leer, ambas barras son una sola más gruesa. El
+ * avatar lleva el color de la categoría en cualquier estado.
  */
 export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }: InboxRowProps) {
   const noLeida = n.leidaEn === null;
@@ -59,10 +74,10 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         aria-current={seleccionada ? 'true' : undefined}
         aria-label={`${noLeida ? 'No leída: ' : ''}${n.tituloNotificacion}${fecha ? `, ${fecha}` : ''}`}
         className={cn(
-          'group/fila flex w-full items-start gap-inline border-l-2 px-inline py-inline text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40',
+          'group/fila flex w-full items-start gap-inline px-inline py-inline text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40',
           seleccionada
-            ? cn('border-l-primary transition-colors', FONDO_SELECCIONADA)
-            : cn('border-l-transparent', DATA_TABLE_ROW_HOVER, noLeida ? FONDO_NO_LEIDA : 'bg-surface-container-lowest'),
+            ? cn('transition-colors', FONDO_SELECCIONADA, noLeida ? BARRA_SELECCIONADA_NO_LEIDA : BARRA_SELECCIONADA)
+            : cn(DATA_TABLE_ROW_HOVER, noLeida ? cn(FONDO_NO_LEIDA, BARRA_NO_LEIDA) : 'bg-surface-container-lowest'),
         )}
       >
         <span className="mt-0.5 shrink-0">
@@ -74,12 +89,18 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
           {origen && (
             <span className="type-meta block truncate text-[11px] uppercase tracking-wide text-text-secondary">{origen}</span>
           )}
-          <span className={cn('block truncate text-sm text-on-surface', noLeida ? 'font-semibold' : 'font-medium')}>
-            {n.tituloNotificacion}
-          </span>
+          <span className="block truncate text-sm font-bold text-on-surface">{n.tituloNotificacion}</span>
           {n.mensajeNotificacion && (
             <span className={cn('mt-0.5 line-clamp-2 text-xs leading-snug', noLeida ? 'text-on-surface-variant' : 'text-tertiary')}>
-              {n.mensajeNotificacion}
+              {segmentosDeMensaje(n.mensajeNotificacion).map((segmento, i) =>
+                segmento.destacado ? (
+                  <mark key={i} className={CITA_DESTACADA}>
+                    {segmento.texto}
+                  </mark>
+                ) : (
+                  segmento.texto
+                ),
+              )}
             </span>
           )}
           <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">

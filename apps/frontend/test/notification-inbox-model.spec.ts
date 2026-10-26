@@ -15,6 +15,7 @@ import {
   inicialesDe,
   origenDeAviso,
   proyectoDeAviso,
+  segmentosDeMensaje,
 } from '../lib/notifications/inbox-model';
 import { NOTIFICATION_TYPE_PRESENTATION } from '../lib/notifications/preference-groups';
 
@@ -185,5 +186,30 @@ describe('identidad visual del emisor (avatares contextuales)', () => {
   it('es determinista: el mismo aviso da siempre la misma identidad', () => {
     const n = aviso('SOLICITUD_AMISTAD', { userName: 'Ana Ruiz', idAmistad: 2 });
     expect(identidadDeAviso(n)).toEqual(identidadDeAviso({ ...n }));
+  });
+});
+
+describe('segmentosDeMensaje: el asunto citado de la vista previa', () => {
+  const destacados = (t: string) => segmentosDeMensaje(t).filter((s) => s.destacado).map((s) => s.texto);
+  const unido = (t: string) => segmentosDeMensaje(t).map((s) => s.texto).join('');
+
+  it('separa lo citado con comillas rectas, angulares y tipográficas, sin perder ni un carácter', () => {
+    for (const t of [
+      'Se asignó la tarea "Diseño" dentro de tu rol.',
+      'Te asignaron «Diseñar wireframes del módulo».',
+      'El rol “Backend” fue actualizado.',
+    ]) {
+      expect(unido(t), t).toBe(t);
+    }
+    expect(destacados('Se asignó la tarea "Diseño" dentro de tu rol.')).toEqual(['Diseño']);
+    expect(destacados('Te asignaron «Diseñar wireframes del módulo».')).toEqual(['Diseñar wireframes del módulo']);
+    expect(destacados('El rol “Backend” fue actualizado.')).toEqual(['Backend']);
+  });
+
+  it('varias citas en un mensaje; sin citas, un único segmento normal', () => {
+    expect(destacados('El rol "QA" del proyecto "Huerto" fue actualizado.')).toEqual(['QA', 'Huerto']);
+    expect(segmentosDeMensaje('Se consolidaron 5 horas.')).toEqual([{ texto: 'Se consolidaron 5 horas.', destacado: false }]);
+    // Una comilla suelta no destaca nada.
+    expect(destacados('Pulgadas: 5" de margen')).toEqual([]);
   });
 });
