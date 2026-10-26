@@ -1,10 +1,10 @@
 'use client';
 
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, UserPlus, X } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CommandItem } from '@/components/ui/command';
+import { InlineCommandSearch, useDevolverFocoAlCerrar } from './inline-command-search';
 import { useProjectMembers, type MiembroProyecto } from '@/hooks/use-project-members';
 
 export function iniciales(nombre: string, apellido: string): string {
@@ -68,6 +68,8 @@ export function InvitadosField({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const botonAnadirRef = useRef<HTMLButtonElement>(null);
+  useDevolverFocoAlCerrar(open, botonAnadirRef);
   const tituloId = useId();
   const { members, isLoading } = useProjectMembers(idProyecto);
 
@@ -105,47 +107,53 @@ export function InvitadosField({
         ))}
       </div>
 
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            disabled={disabled || idProyecto <= 0}
-            className="mt-tight inline-flex min-h-6 items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50"
-          >
-            <UserPlus className="size-4" aria-hidden="true" />
-            Añadir integrante
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-72 p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Buscar integrante del proyecto" />
-            <CommandList>
-              <CommandEmpty>{isLoading ? 'Cargando integrantes...' : 'No hay más integrantes para invitar.'}</CommandEmpty>
-              {disponibles.map((m) => (
-                <CommandItem
-                  key={m.idUsuario}
-                  value={`${m.nombre} ${m.apellido} ${m.correo}`}
-                  onSelect={() => {
-                    onChange([...value, m.idUsuario]);
-                    setOpen(false);
-                  }}
-                >
-                  <Avatar className="size-6">
-                    {m.fotoUrl && <AvatarImage src={m.fotoUrl} alt="" />}
-                    <AvatarFallback className="type-micro">{iniciales(m.nombre, m.apellido)}</AvatarFallback>
-                  </Avatar>
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm">
-                      {m.nombre} {m.apellido}
-                    </span>
-                    <span className="truncate text-xs text-text-secondary">{m.correo}</span>
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+      {/* Buscador en línea (como el de proyectos de Administración): los resultados se despliegan
+          debajo, dentro de la tarjeta, sin un segundo buscador flotando sobre el pie del diálogo. */}
+      {open ? (
+        <InlineCommandSearch
+          label="Buscar integrante del proyecto"
+          placeholder="Buscar integrante del proyecto"
+          open={open}
+          onOpenChange={setOpen}
+          empty={isLoading ? 'Cargando integrantes...' : 'No hay más integrantes para invitar.'}
+          autoFocus
+          disabled={disabled || idProyecto <= 0}
+          className="mt-tight"
+        >
+          {disponibles.map((m) => (
+            <CommandItem
+              key={m.idUsuario}
+              value={`${m.nombre} ${m.apellido} ${m.correo}`}
+              onSelect={() => {
+                onChange([...value, m.idUsuario]);
+                setOpen(false);
+              }}
+            >
+              <Avatar className="size-6">
+                {m.fotoUrl && <AvatarImage src={m.fotoUrl} alt="" />}
+                <AvatarFallback className="type-micro">{iniciales(m.nombre, m.apellido)}</AvatarFallback>
+              </Avatar>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm">
+                  {m.nombre} {m.apellido}
+                </span>
+                <span className="truncate text-xs text-text-secondary">{m.correo}</span>
+              </span>
+            </CommandItem>
+          ))}
+        </InlineCommandSearch>
+      ) : (
+        <button
+          ref={botonAnadirRef}
+          type="button"
+          onClick={() => setOpen(true)}
+          disabled={disabled || idProyecto <= 0}
+          className="mt-tight inline-flex min-h-6 items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50"
+        >
+          <UserPlus className="size-4" aria-hidden="true" />
+          Añadir integrante
+        </button>
+      )}
       {value.length === 0 && (
         <p className="type-meta mt-micro">Sin invitados, todos los integrantes del proyecto verán el evento.</p>
       )}

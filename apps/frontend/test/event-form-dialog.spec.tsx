@@ -1186,6 +1186,23 @@ describe('EventFormDialog — proyecto, invitados y modalidad (G05-C09, T-323)',
     expect(eventsMock.createEvent.mock.calls[0][1].invitados).toEqual([5]);
   });
 
+  it('«Añadir integrante» abre un solo buscador en línea dentro de la tarjeta; Escape cierra sus resultados, no el diálogo', async () => {
+    const onOpenChange = vi.fn();
+    render(<EventFormDialog open onOpenChange={onOpenChange} ledProjects={DOS} defaultProjectId={1} />, { wrapper });
+    fireEvent.click(screen.getByRole('button', { name: 'Añadir integrante' }));
+    const buscador = screen.getByRole('combobox', { name: 'Buscar integrante del proyecto' });
+    expect(screen.getAllByPlaceholderText('Buscar integrante del proyecto')).toHaveLength(1);
+    expect(await screen.findAllByRole('option')).toHaveLength(2);
+    // Los resultados viven dentro de «Participantes e invitados», no en una capa flotante aparte.
+    expect(screen.getByRole('group', { name: 'Participantes e invitados' })).toContainElement(screen.getByRole('listbox'));
+    fireEvent.keyDown(buscador, { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    // El foco vuelve a «Añadir integrante», no se pierde en el documento.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Añadir integrante' })).toHaveFocus());
+  });
+
   it('cambiar de proyecto vacía los invitados: los integrantes de un proyecto no se arrastran a otro', async () => {
     eventsMock.createEvent.mockResolvedValueOnce(evento());
     render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={DOS} defaultProjectId={1} />, { wrapper });

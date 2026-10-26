@@ -18,6 +18,7 @@ import { TIPO_EVENTO_ESTILO, TIPOS_EVENTO_EN_ORDEN, TONO_CLASES } from '@/lib/ca
 import { createEvent, updateEvent, type EventoProyectoDTO, type TipoEvento } from '@/lib/services/events';
 import { enfocarDisparador, enfocarElemento } from './event-detail-dialog';
 import { InvitadosField } from './invitados-field';
+import { esEscapeDeBuscadorEnLinea } from './inline-command-search';
 import {
   EVENT_DIALOG_BODY_CLASS,
   EVENT_DIALOG_CONTENT_CLASS,
@@ -197,6 +198,8 @@ export function EventFormDialog({
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
       <DialogContent
+        // Escape dentro del buscador de integrantes solo cierra sus resultados, nunca el diálogo con lo escrito.
+        onEscapeKeyDown={(e) => esEscapeDeBuscadorEnLinea(e) && e.preventDefault()}
         onCloseAutoFocus={(e) => (enfocarDisparador(restaurarFocoA) || enfocarElemento(restaurarFocoEn?.current)) && e.preventDefault()}
         className={EVENT_DIALOG_CONTENT_CLASS}
       >

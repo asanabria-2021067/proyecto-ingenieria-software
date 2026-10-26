@@ -1,12 +1,13 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { ChevronDown, FolderKanban, Info, Plus, X } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { CommandItem } from '@/components/ui/command';
 import { Skeleton } from '@/components/ui/skeleton';
 import { iniciales } from '@/components/calendar/invitados-field';
+import { InlineCommandSearch, useDevolverFocoAlCerrar } from '@/components/calendar/inline-command-search';
 import { useEligibleMeetingProjects, useMeetingProjectTeam } from '@/hooks/use-admin-meetings';
 import { MOTIVO_NO_ELEGIBLE } from '@/lib/admin/admin-meeting-form';
 import type { AdminMeetingPersona, MotivoNoElegible, PersonaDeEquipo, ProyectoElegibleReunion } from '@/lib/types/admin-meetings';
@@ -220,6 +221,8 @@ export function InvitedProjectsField({
   error?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const botonAgregarRef = useRef<HTMLButtonElement>(null);
+  useDevolverFocoAlCerrar(open, botonAgregarRef);
   const tituloId = useId();
   const descripcionId = useId();
   const errorId = useId();
@@ -296,62 +299,44 @@ export function InvitedProjectsField({
       {/* Un solo buscador en línea: el campo es el input real y los resultados se despliegan debajo,
           dentro de la tarjeta (con su propio scroll), sin flotar sobre el pie del diálogo. */}
       {value.length === 0 || open ? (
-        <Command
+        <InlineCommandSearch
           label="Buscar proyecto para invitar"
-          data-buscador-proyectos=""
-          className={`mt-tight h-auto rounded-control border bg-surface-container-lowest text-on-surface motion-focus focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30 [&_[data-slot=command-input-wrapper]]:h-10 [&_[data-slot=command-input-wrapper]]:border-b-0 ${
-            error ? 'border-destructive' : 'border-outline-variant'
-          }`}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape' && open) {
-              e.preventDefault();
-              setOpen(false);
-            }
-          }}
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
-          }}
+          placeholder="Buscar proyecto para invitar…"
+          open={open}
+          onOpenChange={setOpen}
+          empty={vacioDeLaLista}
+          autoFocus={value.length > 0}
+          disabled={disabled}
+          invalid={Boolean(error)}
+          describedBy={error ? errorId : undefined}
+          className="mt-tight"
+          footer={
+            elegibles.isError && (
+              <div className="border-t border-outline-variant/40 p-tight">
+                <Button type="button" variant="outline" size="sm" className="w-full rounded-pill" onClick={() => void elegibles.refetch()}>
+                  Reintentar
+                </Button>
+              </div>
+            )
+          }
         >
-          <CommandInput
-            placeholder="Buscar proyecto para invitar…"
-            aria-describedby={error ? errorId : undefined}
-            autoFocus={value.length > 0}
-            disabled={disabled}
-            onFocus={() => setOpen(true)}
-            onClick={() => setOpen(true)}
-            className="h-10"
-            // El foco se marca en todo el buscador (borde y anillo del contenedor, `focus-within`); el contorno
-            // global del input dibujaba un segundo recuadro dentro. La regla global no está en una capa de
-            // Tailwind, así que solo un estilo en línea la sustituye aquí.
-            style={{ outline: 'none' }}
-          />
-          {/* La lista siempre existe (cmdk apunta a ella con aria-controls); cerrada, se oculta. */}
-          <CommandList hidden={!open} className="max-h-60 border-t border-outline-variant/60">
-            <CommandEmpty>{vacioDeLaLista}</CommandEmpty>
-            {disponibles.map((p) => (
-              <CommandItem key={p.idProyecto} value={`${p.tituloProyecto} ${p.lider ? nombreDe(p.lider) : ''}`} onSelect={() => agregar(p)}>
-                <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-sm">{p.tituloProyecto}</span>
-                  <span className="truncate text-xs text-text-secondary">
-                    {p.lider ? `Líder: ${nombreDe(p.lider)}` : 'Sin líder registrado'}
-                    {' · '}
-                    {p.integrantesConvocables === 1 ? '1 persona' : `${p.integrantesConvocables} personas`}
-                    {p.ventanaHasta && ` · Cerrado, convocable hasta ${fechaCorta(p.ventanaHasta)}`}
-                  </span>
+          {disponibles.map((p) => (
+            <CommandItem key={p.idProyecto} value={`${p.tituloProyecto} ${p.lider ? nombreDe(p.lider) : ''}`} onSelect={() => agregar(p)}>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm">{p.tituloProyecto}</span>
+                <span className="truncate text-xs text-text-secondary">
+                  {p.lider ? `Líder: ${nombreDe(p.lider)}` : 'Sin líder registrado'}
+                  {' · '}
+                  {p.integrantesConvocables === 1 ? '1 persona' : `${p.integrantesConvocables} personas`}
+                  {p.ventanaHasta && ` · Cerrado, convocable hasta ${fechaCorta(p.ventanaHasta)}`}
                 </span>
-              </CommandItem>
-            ))}
-          </CommandList>
-          {open && elegibles.isError && (
-            <div className="border-t border-outline-variant/40 p-tight">
-              <Button type="button" variant="outline" size="sm" className="w-full rounded-pill" onClick={() => void elegibles.refetch()}>
-                Reintentar
-              </Button>
-            </div>
-          )}
-        </Command>
+              </span>
+            </CommandItem>
+          ))}
+        </InlineCommandSearch>
       ) : (
         <button
+          ref={botonAgregarRef}
           type="button"
           disabled={disabled}
           onClick={() => setOpen(true)}

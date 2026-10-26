@@ -24,6 +24,7 @@ import {
   RecordatorioFields,
   TituloDescripcionFields,
 } from '@/components/calendar/event-form-fields';
+import { esEscapeDeBuscadorEnLinea } from '@/components/calendar/inline-command-search';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import {
@@ -237,9 +238,7 @@ export function AdminMeetingFormDialog({
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
       <DialogContent
         // Escape dentro del buscador de proyectos solo cierra sus resultados, nunca el diálogo con lo escrito.
-        onEscapeKeyDown={(e) => {
-          if ((e.target as HTMLElement | null)?.closest?.('[data-buscador-proyectos]')) e.preventDefault();
-        }}
+        onEscapeKeyDown={(e) => esEscapeDeBuscadorEnLinea(e) && e.preventDefault()}
         onCloseAutoFocus={(e) => {
           if (restaurarFocoEn?.current) {
             e.preventDefault();
