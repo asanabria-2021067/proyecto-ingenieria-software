@@ -106,7 +106,7 @@ export function NotificationReaderToolbar({
               className="ml-micro rounded-md text-[13px] font-semibold"
             >
               <CheckCheck className="size-4" aria-hidden="true" />
-              <span className="hidden xl:inline">{etiquetaMarcarFiltradas}</span>
+              <span className="hidden 2xl:inline">{etiquetaMarcarFiltradas}</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>{etiquetaMarcarFiltradas}</TooltipContent>
