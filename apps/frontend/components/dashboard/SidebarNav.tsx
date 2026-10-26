@@ -26,6 +26,8 @@ export interface NavGroup {
   label: string;
   icon: LucideIcon;
   items: NavLeaf[];
+  /** Destino único que representa al grupo en la barra inferior móvil (sin él, van todos sus hijos). */
+  mobile?: NavLeaf;
 }
 
 export type NavEntry = NavLeaf | NavGroup;
@@ -33,7 +35,7 @@ export type NavEntry = NavLeaf | NavGroup;
 /** Aplana grupos a sus hijos — usado por la barra inferior móvil, que no tiene
  *  espacio para subopciones expandibles y necesita la lista plana original. */
 export function flattenNavEntries(entries: NavEntry[]): NavLeaf[] {
-  return entries.flatMap((entry) => (entry.type === 'group' ? entry.items : [entry]));
+  return entries.flatMap((entry) => (entry.type === 'group' ? (entry.mobile ? [entry.mobile] : entry.items) : [entry]));
 }
 
 /**
@@ -50,6 +52,18 @@ function isLeafActive(pathname: string, leaf: NavLeaf, search?: string | null): 
     return [...new URLSearchParams(hrefQuery).entries()].every(([k, v]) => actual.get(k) === v);
   }
   return leaf.exact ? pathname === leaf.href : pathname.startsWith(leaf.href);
+}
+
+/**
+ * Hijos activos de un grupo. Si varios coinciden (`/dashboard/personas` contiene
+ * a `/dashboard/personas?seccion=amigos`), solo cuenta el más específico, el de
+ * `href` más largo: un único destino marcado por grupo.
+ */
+function activeItemHrefs(items: NavLeaf[], pathname: string, search?: string | null): Set<string> {
+  const activos = items.filter((item) => isLeafActive(pathname, item, search));
+  if (activos.length <= 1) return new Set(activos.map((item) => item.href));
+  const masEspecifico = activos.reduce((mejor, item) => (item.href.length > mejor.href.length ? item : mejor));
+  return new Set([masEspecifico.href]);
 }
 
 function slug(label: string): string {
@@ -138,7 +152,8 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
         }
 
         const GroupIcon = entry.icon;
-        const groupActiveByRoute = entry.items.some((item) => isLeafActive(pathname, item, search));
+        const activos = activeItemHrefs(entry.items, pathname, search);
+        const groupActiveByRoute = activos.size > 0;
         const expanded = expandedOverrides[entry.label] ?? (groupActiveByRoute || !isAdmin);
         const groupId = `nav-group-${slug(entry.label)}`;
         const groupBadge = entry.items.reduce((total, item) => total + (item.badge ?? 0), 0);
@@ -167,7 +182,7 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
               // Guía vertical alineada bajo el icono del padre (padding 0.75rem + mitad del icono).
               <div id={groupId} className="admin-nav-children ml-[1.375rem] mt-0.5 space-y-0.5 pl-2.5">
                 {entry.items.map((item) => {
-                  const active = isLeafActive(pathname, item, search);
+                  const active = activos.has(item.href);
                   const ItemIcon = item.icon;
                   return (
                     <Link
@@ -233,8 +248,7 @@ interface CollapsedSidebarNavProps {
  * anclados del estudiante.
  */
 function CollapsedSidebarNav({ entries, pathname, search, pinned, onExpand, navId, navLabel }: CollapsedSidebarNavProps) {
-  const renderLeaf = (leaf: NavLeaf) => {
-    const active = isLeafActive(pathname, leaf, search);
+  const renderLeaf = (leaf: NavLeaf, active = isLeafActive(pathname, leaf, search)) => {
     const Icon = leaf.icon;
     return (
       <Tooltip key={leaf.href}>
@@ -272,19 +286,23 @@ function CollapsedSidebarNav({ entries, pathname, search, pinned, onExpand, navI
         <TooltipContent side="right">Expandir</TooltipContent>
       </Tooltip>
 
-      {entries.map((entry) =>
-        entry.type === 'group' ? (
+      {entries.map((entry) => {
+        if (entry.type !== 'group') {
+          return (
+            <div key={entry.href} className="flex flex-col items-center gap-1">
+              <div role="separator" aria-hidden="true" className="admin-nav-separator my-1 h-px w-8" />
+              {renderLeaf(entry)}
+            </div>
+          );
+        }
+        const activos = activeItemHrefs(entry.items, pathname, search);
+        return (
           <div key={entry.label} role="group" aria-label={entry.label} className="flex flex-col items-center gap-1">
             <div role="separator" aria-hidden="true" className="admin-nav-separator my-1 h-px w-8" />
-            {entry.items.map(renderLeaf)}
+            {entry.items.map((item) => renderLeaf(item, activos.has(item.href)))}
           </div>
-        ) : (
-          <div key={entry.href} className="flex flex-col items-center gap-1">
-            <div role="separator" aria-hidden="true" className="admin-nav-separator my-1 h-px w-8" />
-            {renderLeaf(entry)}
-          </div>
-        ),
-      )}
+        );
+      })}
 
       {pinned.length > 0 && (
         <div role="group" aria-label="Proyectos anclados" className="flex flex-col items-center gap-1">
