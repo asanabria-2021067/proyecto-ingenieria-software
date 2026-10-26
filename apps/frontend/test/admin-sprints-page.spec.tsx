@@ -644,3 +644,73 @@ describe('Calendario administrativo — Lista y solo consulta', () => {
     expect(screen.queryByRole('form')).not.toBeInTheDocument();
   });
 });
+
+// ─── Barra de navegación (misma distribución que el calendario del estudiante) ───
+
+describe('Calendario administrativo — barra de navegación', () => {
+  /** Contenedor que agrupa el selector de vistas con Hoy, las flechas y el periodo. */
+  const barra = () => screen.getByRole('navigation', { name: 'Vista del calendario' }).parentElement!;
+
+  it('pone el selector a la izquierda y Hoy, flechas y periodo a la derecha, en la misma barra', async () => {
+    renderPage('mes');
+    const periodo = await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+
+    const enBarra = within(barra());
+    const selector = screen.getByRole('navigation', { name: 'Vista del calendario' });
+    const hoy = enBarra.getByRole('button', { name: 'Hoy' });
+    const anterior = enBarra.getByRole('button', { name: 'Mes anterior' });
+    const siguiente = enBarra.getByRole('button', { name: 'Mes siguiente' });
+    expect(barra()).toContainElement(periodo);
+    // Orden: [vistas] … [Hoy] [‹] [›] periodo.
+    const orden = [selector, hoy, anterior, siguiente, periodo];
+    for (let i = 1; i < orden.length; i += 1) {
+      expect(orden[i - 1].compareDocumentPosition(orden[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it('la leyenda y el contador quedan fuera de la barra y del encabezado', async () => {
+    renderPage('mes');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+
+    expect(within(barra()).queryByText('Con plan vencido')).not.toBeInTheDocument();
+    expect(within(barra()).queryByText(/Sprints operables/)).not.toBeInTheDocument();
+    expect(screen.getByText('Con plan vencido')).toBeInTheDocument();
+    expect(screen.getByText(/Sprints operables/)).toBeInTheDocument();
+    const encabezado = screen.getByRole('heading', { level: 1, name: 'Calendario de Sprints' }).closest('header')!;
+    expect(encabezado).not.toContainElement(screen.getByRole('navigation', { name: 'Vista del calendario' }));
+    expect(within(encabezado).queryByText('Con plan vencido')).not.toBeInTheDocument();
+  });
+
+  it('el selector es un control segmentado: solo la vista activa lleva el fondo elevado', async () => {
+    renderPage('semana', '2026-10-08');
+    await screen.findByRole('button', { name: 'Hoy' });
+
+    const selector = within(screen.getByRole('navigation', { name: 'Vista del calendario' }));
+    const activa = selector.getByRole('link', { name: 'Semana' });
+    expect(activa).toHaveAttribute('aria-current', 'page');
+    expect(activa).toHaveClass('bg-surface-container-lowest', 'rounded-pill');
+    for (const nombre of ['Día', 'Mes', 'Lista']) {
+      expect(selector.getByRole('link', { name: nombre }), nombre).not.toHaveClass('bg-surface-container-lowest');
+    }
+    // Hoy es un botón del sistema, no un enlace de texto.
+    expect(screen.getByRole('button', { name: 'Hoy' })).toHaveAttribute('data-slot', 'button');
+  });
+
+  it('en Lista solo queda el selector, sin Hoy ni flechas', async () => {
+    renderPage('lista');
+    await screen.findByRole('table');
+
+    expect(screen.getByRole('navigation', { name: 'Vista del calendario' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hoy' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /anterior$/ })).not.toBeInTheDocument();
+  });
+
+  it('mientras carga o si falla, el selector sigue disponible para cambiar de vista', async () => {
+    getCalendarMock.mockReset();
+    getCalendarMock.mockRejectedValue(new Error('caído'));
+    renderPage('mes');
+
+    expect(await screen.findByText('No se pudo cargar el calendario de Sprints.')).toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: 'Vista del calendario' })).getByRole('link', { name: 'Lista' })).toBeInTheDocument();
+  });
+});
