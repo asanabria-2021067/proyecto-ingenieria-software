@@ -19,13 +19,13 @@ const TONO: Record<IdentidadDeAviso['tipo'], string> = {
   sistema: 'rounded-full bg-surface-container text-tertiary',
 };
 
-export function NotificationAvatar({ identidad, size = 'md' }: { identidad: IdentidadDeAviso; size?: 'md' | 'lg' }) {
+export function NotificationAvatar({ identidad, size = 'md', className }: { identidad: IdentidadDeAviso; size?: 'md' | 'lg'; className?: string }) {
   const caja = size === 'lg' ? 'size-10' : 'size-9';
   const icono = size === 'lg' ? 'size-5' : 'size-4';
   const letras = size === 'lg' ? 'text-sm' : 'text-[13px]';
 
   return (
-    <Avatar aria-hidden="true" data-identidad={identidad.tipo} className={cn(caja, 'shrink-0', TONO[identidad.tipo])}>
+    <Avatar aria-hidden="true" data-identidad={identidad.tipo} className={cn(caja, 'shrink-0', TONO[identidad.tipo], className)}>
       <AvatarFallback className={cn('rounded-[inherit] bg-transparent font-semibold leading-none', letras)}>
         {'iniciales' in identidad ? identidad.iniciales : createElement(identidad.icon, { className: icono })}
       </AvatarFallback>

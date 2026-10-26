@@ -113,6 +113,19 @@ describe('avatar contextual en la fila', () => {
     expect(chip).not.toHaveClass('pill-accent');
   });
 
+  it('acento de categoría: anillo fino en el avatar y línea lateral del mismo color, fondos neutros', () => {
+    const { container } = fila(base({ tipoNotificacion: 'HORAS_CONSOLIDADAS', datosJson: { projectTitle: 'Huerto UVG' } }), true);
+    const a = avatar(container);
+    expect(a).toHaveClass('ring-[1.5px]', 'ring-on-tag-amber', 'bg-surface-container');
+    const boton = screen.getByRole('button');
+    expect(boton).toHaveClass('border-l-2', 'border-l-on-tag-amber', 'bg-sage-nav-active');
+    cleanup();
+
+    const tarea = fila(base({ tipoNotificacion: 'TAREA_ASIGNADA' }));
+    expect(avatar(tarea.container)).toHaveClass('ring-on-tag-blue');
+    expect(screen.getByRole('button')).toHaveClass('border-l-on-tag-blue', 'bg-primary/5');
+  });
+
   it('títulos y mensajes largos siguen truncados', () => {
     fila(base({ tituloNotificacion: 'T'.repeat(300), mensajeNotificacion: 'M'.repeat(600) }));
     expect(screen.getByText('T'.repeat(300))).toHaveClass('truncate');
