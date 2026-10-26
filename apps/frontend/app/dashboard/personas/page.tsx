@@ -3,10 +3,10 @@
 /* ===========================================================================
    Personas — tarjetas al estilo del mockup de Stitch "Comunidad UVG"
    ---------------------------------------------------------------------------
-   1. Sprint 10: módulo social con navegación secundaria (Descubrir, Mis
-      amigos, Amigos de amigos) en `?seccion=`, con el patrón de la sidebar
-      de un proyecto. Cada sección es una consulta paginada distinta al
-      backend, no un filtro en el navegador.
+   1. Sprint 10: módulo social con tres secciones (Descubrir, Mis amigos,
+      Amigos de amigos) en `?seccion=`, que se eligen desde el grupo
+      «Personas» de la sidebar global. Cada sección es una consulta paginada
+      distinta al backend, no un filtro en el navegador.
    2. Filtros en línea con la UI de Mis Proyectos: semestre (selección
       única), habilidades e intereses (selección múltiple) y «Solo personas
       de mi carrera». Todo se resuelve en el backend (`/social/usuarios/
@@ -80,7 +80,6 @@ import type { SemestreRango, SolicitudAmistadPendienteDto, UsuarioBusquedaDto } 
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import {
   PersonasMobileNav,
-  PersonasSidebar,
   SECCIONES_PERSONAS,
   parseSeccionPersonas,
   type SeccionPersonas,
@@ -482,302 +481,300 @@ function PersonasView() {
   const encabezado = SECCIONES_PERSONAS[seccion];
 
   return (
-    // Mismo esqueleto que el layout de un proyecto: sidebar secundaria y contenido con scroll propio.
-    <div className="flex h-[calc(100vh-4rem)] min-h-0">
-      <PersonasSidebar seccion={seccion} />
-      <div className="@container/personas min-w-0 flex-1 overflow-y-auto">
-        <PersonasMobileNav seccion={seccion} />
-        <div className={dashboardPage('pt-7 pb-10')}>
-          {/* Jerarquía de encabezado de Mis Proyectos. */}
-          <header className="mb-section">
-            <h1 className="text-[28px] leading-8.5 font-bold text-on-surface">{encabezado.titulo}</h1>
-            <p className="mt-1 text-[14px] font-normal text-tertiary">{encabezado.descripcion}</p>
-          </header>
+    // Las secciones viven en el grupo «Personas» de la sidebar global; el contenido usa el
+    // contenedor de Mis Proyectos. `@container/personas` mide su ancho para la rejilla.
+    <>
+      <PersonasMobileNav seccion={seccion} />
+      <div className={dashboardPage('@container/personas pt-7 pb-10')}>
+        {/* Jerarquía de encabezado de Mis Proyectos. */}
+        <header className="mb-section">
+          <h1 className="text-[28px] leading-8.5 font-bold text-on-surface">{encabezado.titulo}</h1>
+          <p className="mt-1 text-[14px] font-normal text-tertiary">{encabezado.descripcion}</p>
+        </header>
 
-          {seccion !== 'amigos-de-amigos' && solicitudes.length > 0 && (
-            <section className="mb-section">
-              <h2 className="type-section mb-card">Solicitudes pendientes</h2>
-              <div className="flex flex-col gap-tight">
-                {solicitudes.map((s) => (
-                  <div key={s.idAmistad} className="card-base flex flex-wrap items-center justify-between gap-tight py-tight">
-                    <div className="flex items-center gap-tight">
-                      <Avatar>
-                        {s.solicitante.fotoUrl && (
-                          <AvatarImage src={s.solicitante.fotoUrl} alt={`${s.solicitante.nombre} ${s.solicitante.apellido}`} />
-                        )}
-                        <AvatarFallback className="type-meta font-medium text-text-secondary">
-                          {getIniciales(s.solicitante.nombre, s.solicitante.apellido)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <p className="type-subtitle text-text-primary">
-                        {s.solicitante.nombre} {s.solicitante.apellido}
-                      </p>
-                    </div>
-                    <div className="flex gap-tight">
-                      <Button size="sm" onClick={() => pedirConfirmacionSolicitud(s, 'aceptar')}>
-                        <UserCheck className="size-4" aria-hidden="true" /> Aceptar
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => pedirConfirmacionSolicitud(s, 'rechazar')}>
-                        <UserX className="size-4" aria-hidden="true" /> Rechazar
-                      </Button>
-                    </div>
+        {seccion !== 'amigos-de-amigos' && solicitudes.length > 0 && (
+          <section className="mb-section">
+            <h2 className="type-section mb-card">Solicitudes pendientes</h2>
+            <div className="flex flex-col gap-tight">
+              {solicitudes.map((s) => (
+                <div key={s.idAmistad} className="card-base flex flex-wrap items-center justify-between gap-tight py-tight">
+                  <div className="flex items-center gap-tight">
+                    <Avatar>
+                      {s.solicitante.fotoUrl && (
+                        <AvatarImage src={s.solicitante.fotoUrl} alt={`${s.solicitante.nombre} ${s.solicitante.apellido}`} />
+                      )}
+                      <AvatarFallback className="type-meta font-medium text-text-secondary">
+                        {getIniciales(s.solicitante.nombre, s.solicitante.apellido)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <p className="type-subtitle text-text-primary">
+                      {s.solicitante.nombre} {s.solicitante.apellido}
+                    </p>
                   </div>
+                  <div className="flex gap-tight">
+                    <Button size="sm" onClick={() => pedirConfirmacionSolicitud(s, 'aceptar')}>
+                      <UserCheck className="size-4" aria-hidden="true" /> Aceptar
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => pedirConfirmacionSolicitud(s, 'rechazar')}>
+                      <UserX className="size-4" aria-hidden="true" /> Rechazar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {seccion === 'descubrir' && !isLoadingRecomendaciones && (
+          <section className="mb-section">
+            <h2 className="type-section mb-card">Personas que quizás conozcas</h2>
+            {errorRecomendaciones ? (
+              // Un fallo no se presenta como «sin recomendaciones».
+              <p className="type-meta" role="status">
+                No se pudieron cargar las recomendaciones en este momento.
+              </p>
+            ) : recomendaciones.length > 0 ? (
+              <div className={`grid gap-tight ${COLUMNAS_PERSONAS}`}>
+                {recomendaciones.map((usuario) => (
+                  <RecomendacionCard key={usuario.idUsuario} usuario={usuario} />
                 ))}
               </div>
-            </section>
-          )}
-
-          {seccion === 'descubrir' && !isLoadingRecomendaciones && (
-            <section className="mb-section">
-              <h2 className="type-section mb-card">Personas que quizás conozcas</h2>
-              {errorRecomendaciones ? (
-                // Un fallo no se presenta como «sin recomendaciones».
-                <p className="type-meta" role="status">
-                  No se pudieron cargar las recomendaciones en este momento.
-                </p>
-              ) : recomendaciones.length > 0 ? (
-                <div className={`grid gap-tight ${COLUMNAS_PERSONAS}`}>
-                  {recomendaciones.map((usuario) => (
-                    <RecomendacionCard key={usuario.idUsuario} usuario={usuario} />
-                  ))}
-                </div>
-              ) : (
-                // Tarjeta blanca de los demás vacíos, en banda horizontal: aquí no hace falta un bloque alto.
-                <Empty size="compact" className="surface-enter" aria-live="polite">
-                  <EmptyMedia
-                    variant="compact"
-                    className="size-10 rounded-control border-transparent text-text-secondary"
-                  >
-                    <Users aria-hidden="true" className="size-5" />
-                  </EmptyMedia>
-                  <EmptyHeader>
-                    <EmptyTitle className="type-subtitle">Aún no hay recomendaciones</EmptyTitle>
-                    <EmptyDescription>Completa tu perfil para descubrir personas con intereses similares.</EmptyDescription>
-                  </EmptyHeader>
-                  <EmptyContent>
-                    <Button asChild variant="secondary" size="sm">
-                      <Link href="/dashboard/perfil/editar">Completar perfil</Link>
-                    </Button>
-                  </EmptyContent>
-                </Empty>
-              )}
-            </section>
-          )}
-
-          <div>
-            <section aria-label="Directorio de personas">
-              <div className="flex flex-wrap items-center gap-inline">
-                <DashboardSearchField
-                  containerClassName="min-w-full flex-1 sm:min-w-48"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Buscar por nombre o apellido"
-                  aria-label="Buscar personas"
-                />
-
-                <Select
-                  value={semestreRango ?? SEMESTRE_TODOS}
-                  onValueChange={(v) => setSemestreRango(v === SEMESTRE_TODOS ? undefined : (v as SemestreRango))}
+            ) : (
+              // Tarjeta blanca de los demás vacíos, en banda horizontal: aquí no hace falta un bloque alto.
+              <Empty size="compact" className="surface-enter" aria-live="polite">
+                <EmptyMedia
+                  variant="compact"
+                  className="size-10 rounded-control border-transparent text-text-secondary"
                 >
-                  <SelectTrigger aria-label="Filtrar por semestre" className={`w-full sm:w-48 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="z-50">
-                    {SEMESTRE_OPCIONES.map((opcion) => (
-                      <SelectItem key={opcion.id} value={opcion.id} className="focus:bg-primary focus:text-on-primary">
-                        {opcion.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <DashboardFilterMultiSelect
-                  label="Habilidades"
-                  ariaLabel="Filtrar por habilidades"
-                  options={opcionesHabilidades}
-                  value={habilidadesSel}
-                  onChange={setHabilidadesSel}
-                  className="w-full sm:w-40"
-                />
-                <DashboardFilterMultiSelect
-                  label="Intereses"
-                  ariaLabel="Filtrar por intereses"
-                  options={opcionesIntereses}
-                  value={interesesSel}
-                  onChange={setInteresesSel}
-                  className="w-full sm:w-40"
-                />
-
-                <div className="flex items-center gap-micro rounded-control border border-outline-variant p-micro">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        aria-label="Ver como tarjetas"
-                        aria-pressed={vista === 'tarjetas'}
-                        onClick={() => setVista('tarjetas')}
-                        className={`flex size-8 items-center justify-center rounded-control motion-select ${
-                          vista === 'tarjetas'
-                            ? 'bg-action text-on-action'
-                            : 'text-text-secondary hover:bg-muted hover:text-text-primary'
-                        }`}
-                      >
-                        <LayoutGrid className="size-4" aria-hidden="true" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>Ver como tarjetas</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        aria-label="Ver como lista"
-                        aria-pressed={vista === 'lista'}
-                        onClick={() => setVista('lista')}
-                        className={`flex size-8 items-center justify-center rounded-control motion-select ${
-                          vista === 'lista'
-                            ? 'bg-action text-on-action'
-                            : 'text-text-secondary hover:bg-muted hover:text-text-primary'
-                        }`}
-                      >
-                        <List className="size-4" aria-hidden="true" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>Ver como lista</TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
-
-              <div className="mt-tight flex flex-wrap items-center gap-x-inline gap-y-tight">
-                <label className="type-body inline-flex min-h-8 cursor-pointer items-center gap-tight text-text-primary has-disabled:cursor-not-allowed has-disabled:text-text-secondary">
-                  <Checkbox
-                    checked={soloMiCarrera}
-                    onCheckedChange={(v) => setSoloMiCarrera(v === true)}
-                    disabled={cargandoUsuario || miCarrera === null}
-                    aria-describedby={!cargandoUsuario && miCarrera === null ? 'personas-sin-carrera' : undefined}
-                  />
-                  Solo personas de mi carrera
-                </label>
-                {!cargandoUsuario && miCarrera === null && (
-                  <span id="personas-sin-carrera" className="type-meta">
-                    Agrega tu carrera en{' '}
-                    <Link href="/dashboard/perfil/editar" className="font-semibold text-primary hover:underline">
-                      tu perfil
-                    </Link>{' '}
-                    para usar este filtro.
-                  </span>
-                )}
-              </div>
-
-              {chipsActivos.length > 0 && (
-                <div className="mt-tight flex flex-wrap items-center gap-tight" role="group" aria-label="Filtros aplicados">
-                  {chipsActivos.map((chip) => (
-                    <span key={chip.key} className="pill pill-accent inline-flex items-center gap-1 pr-1">
-                      {chip.label}
-                      <button
-                        type="button"
-                        aria-label={`Quitar filtro ${chip.label}`}
-                        onClick={chip.quitar}
-                        className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                      >
-                        <X aria-hidden="true" className="size-3" />
-                      </button>
-                    </span>
-                  ))}
-                  <Button type="button" variant="ghost" size="sm" onClick={limpiarFiltros} className="font-medium text-primary">
-                    Limpiar todo
+                  <Users aria-hidden="true" className="size-5" />
+                </EmptyMedia>
+                <EmptyHeader>
+                  <EmptyTitle className="type-subtitle">Aún no hay recomendaciones</EmptyTitle>
+                  <EmptyDescription>Completa tu perfil para descubrir personas con intereses similares.</EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button asChild variant="secondary" size="sm">
+                    <Link href="/dashboard/perfil/editar">Completar perfil</Link>
                   </Button>
-                </div>
-              )}
+                </EmptyContent>
+              </Empty>
+            )}
+          </section>
+        )}
 
-              <div className="mt-card">
-                  {isLoading ? (
-                    <ListaSkeleton />
-                  ) : isError ? (
-                    <Empty tone="danger" className="surface-enter" role="alert">
-                      <EmptyMedia variant="icon">
-                        <AlertCircle aria-hidden="true" className="size-7" />
-                      </EmptyMedia>
-                      <EmptyHeader>
-                        <EmptyTitle>No se pudo cargar el directorio de personas</EmptyTitle>
-                        <EmptyDescription>Verifica que tu sesión siga activa o vuelve a intentarlo.</EmptyDescription>
-                      </EmptyHeader>
+        <div>
+          <section aria-label="Directorio de personas">
+            <div className="flex flex-wrap items-center gap-inline">
+              <DashboardSearchField
+                containerClassName="min-w-full flex-1 sm:min-w-48"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar por nombre o apellido"
+                aria-label="Buscar personas"
+              />
+
+              <Select
+                value={semestreRango ?? SEMESTRE_TODOS}
+                onValueChange={(v) => setSemestreRango(v === SEMESTRE_TODOS ? undefined : (v as SemestreRango))}
+              >
+                <SelectTrigger aria-label="Filtrar por semestre" className={`w-full sm:w-48 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-50">
+                  {SEMESTRE_OPCIONES.map((opcion) => (
+                    <SelectItem key={opcion.id} value={opcion.id} className="focus:bg-primary focus:text-on-primary">
+                      {opcion.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <DashboardFilterMultiSelect
+                label="Habilidades"
+                ariaLabel="Filtrar por habilidades"
+                options={opcionesHabilidades}
+                value={habilidadesSel}
+                onChange={setHabilidadesSel}
+                className="w-full sm:w-40"
+              />
+              <DashboardFilterMultiSelect
+                label="Intereses"
+                ariaLabel="Filtrar por intereses"
+                options={opcionesIntereses}
+                value={interesesSel}
+                onChange={setInteresesSel}
+                className="w-full sm:w-40"
+              />
+
+              <div className="flex items-center gap-micro rounded-control border border-outline-variant p-micro">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Ver como tarjetas"
+                      aria-pressed={vista === 'tarjetas'}
+                      onClick={() => setVista('tarjetas')}
+                      className={`flex size-8 items-center justify-center rounded-control motion-select ${
+                        vista === 'tarjetas'
+                          ? 'bg-action text-on-action'
+                          : 'text-text-secondary hover:bg-muted hover:text-text-primary'
+                      }`}
+                    >
+                      <LayoutGrid className="size-4" aria-hidden="true" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Ver como tarjetas</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Ver como lista"
+                      aria-pressed={vista === 'lista'}
+                      onClick={() => setVista('lista')}
+                      className={`flex size-8 items-center justify-center rounded-control motion-select ${
+                        vista === 'lista'
+                          ? 'bg-action text-on-action'
+                          : 'text-text-secondary hover:bg-muted hover:text-text-primary'
+                      }`}
+                    >
+                      <List className="size-4" aria-hidden="true" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Ver como lista</TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+
+            <div className="mt-tight flex flex-wrap items-center gap-x-inline gap-y-tight">
+              <label className="type-body inline-flex min-h-8 cursor-pointer items-center gap-tight text-text-primary has-disabled:cursor-not-allowed has-disabled:text-text-secondary">
+                <Checkbox
+                  checked={soloMiCarrera}
+                  onCheckedChange={(v) => setSoloMiCarrera(v === true)}
+                  disabled={cargandoUsuario || miCarrera === null}
+                  aria-describedby={!cargandoUsuario && miCarrera === null ? 'personas-sin-carrera' : undefined}
+                />
+                Solo personas de mi carrera
+              </label>
+              {!cargandoUsuario && miCarrera === null && (
+                <span id="personas-sin-carrera" className="type-meta">
+                  Agrega tu carrera en{' '}
+                  <Link href="/dashboard/perfil/editar" className="font-semibold text-primary hover:underline">
+                    tu perfil
+                  </Link>{' '}
+                  para usar este filtro.
+                </span>
+              )}
+            </div>
+
+            {chipsActivos.length > 0 && (
+              <div className="mt-tight flex flex-wrap items-center gap-tight" role="group" aria-label="Filtros aplicados">
+                {chipsActivos.map((chip) => (
+                  <span key={chip.key} className="pill pill-accent inline-flex items-center gap-1 pr-1">
+                    {chip.label}
+                    <button
+                      type="button"
+                      aria-label={`Quitar filtro ${chip.label}`}
+                      onClick={chip.quitar}
+                      className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    >
+                      <X aria-hidden="true" className="size-3" />
+                    </button>
+                  </span>
+                ))}
+                <Button type="button" variant="ghost" size="sm" onClick={limpiarFiltros} className="font-medium text-primary">
+                  Limpiar todo
+                </Button>
+              </div>
+            )}
+
+            <div className="mt-card">
+                {isLoading ? (
+                  <ListaSkeleton />
+                ) : isError ? (
+                  <Empty tone="danger" className="surface-enter" role="alert">
+                    <EmptyMedia variant="icon">
+                      <AlertCircle aria-hidden="true" className="size-7" />
+                    </EmptyMedia>
+                    <EmptyHeader>
+                      <EmptyTitle>No se pudo cargar el directorio de personas</EmptyTitle>
+                      <EmptyDescription>Verifica que tu sesión siga activa o vuelve a intentarlo.</EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
+                      <Button variant="outline" onClick={() => void reintentar()}>
+                        Reintentar
+                      </Button>
+                    </EmptyContent>
+                  </Empty>
+                ) : resultados.length === 0 ? (
+                  // Mismo criterio que Chats archivados: tarjeta blanca (tono por
+                  // defecto de Empty) con el icono pequeño y neutro.
+                  <Empty className="surface-enter" aria-live="polite">
+                    <EmptyMedia
+                      variant="compact"
+                      className="size-10 rounded-control border-transparent text-text-secondary"
+                    >
+                      <Users aria-hidden="true" className="size-5" />
+                    </EmptyMedia>
+                    <EmptyHeader>
+                      <EmptyTitle className="type-subtitle">{vacio.titulo}</EmptyTitle>
+                      <EmptyDescription>{vacio.descripcion}</EmptyDescription>
+                    </EmptyHeader>
+                    {totalFiltros > 0 && (
                       <EmptyContent>
-                        <Button variant="outline" onClick={() => void reintentar()}>
-                          Reintentar
+                        <Button variant="outline" onClick={limpiarFiltros}>
+                          Quitar filtros
                         </Button>
                       </EmptyContent>
-                    </Empty>
-                  ) : resultados.length === 0 ? (
-                    // Mismo criterio que Chats archivados: tarjeta blanca (tono por
-                    // defecto de Empty) con el icono pequeño y neutro.
-                    <Empty className="surface-enter" aria-live="polite">
-                      <EmptyMedia
-                        variant="compact"
-                        className="size-10 rounded-control border-transparent text-text-secondary"
-                      >
-                        <Users aria-hidden="true" className="size-5" />
-                      </EmptyMedia>
-                      <EmptyHeader>
-                        <EmptyTitle className="type-subtitle">{vacio.titulo}</EmptyTitle>
-                        <EmptyDescription>{vacio.descripcion}</EmptyDescription>
-                      </EmptyHeader>
-                      {totalFiltros > 0 && (
-                        <EmptyContent>
-                          <Button variant="outline" onClick={limpiarFiltros}>
-                            Quitar filtros
-                          </Button>
-                        </EmptyContent>
-                      )}
-                    </Empty>
-                  ) : (
-                    <>
-                      {vista === 'tarjetas' ? (
-                        <ul className={`grid gap-gap ${COLUMNAS_PERSONAS}`}>
-                          {resultados.map((usuario) => (
-                            <li key={usuario.idUsuario}>
-                              <PersonaCard usuario={usuario} />
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <ul className="flex flex-col gap-tight">
-                          {resultados.map((usuario) => (
-                            <li key={usuario.idUsuario}>
-                              <PersonaListRow usuario={usuario} />
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {hasMore && (
-                        <div className="mt-card flex justify-center">
-                          <Button variant="outline" onClick={cargarMas} disabled={cargandoMas}>
-                            {cargandoMas ? 'Cargando…' : 'Cargar más'}
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  )}
-              </div>
-            </section>
-          </div>
-
-          <ConfirmActionDialog
-            open={confirmSolicitud !== null}
-            title={confirmSolicitud?.accion === 'aceptar' ? 'Aceptar solicitud' : 'Rechazar solicitud'}
-            description={
-              confirmSolicitud
-                ? `¿Confirmas que deseas ${confirmSolicitud.accion === 'aceptar' ? 'aceptar' : 'rechazar'} la solicitud de ${confirmSolicitud.solicitud.solicitante.nombre} ${confirmSolicitud.solicitud.solicitante.apellido}?`
-                : ''
-            }
-            actionLabel={confirmSolicitud?.accion === 'aceptar' ? 'Sí, aceptar solicitud' : 'Sí, rechazar solicitud'}
-            variant={confirmSolicitud?.accion === 'rechazar' ? 'destructive' : 'default'}
-            isPending={aceptarSolicitud.isPending || rechazarSolicitud.isPending}
-            onConfirm={confirmarSolicitud}
-            onCancel={cancelarConfirmacionSolicitud}
-          />
+                    )}
+                  </Empty>
+                ) : (
+                  <>
+                    {vista === 'tarjetas' ? (
+                      <ul className={`grid gap-gap ${COLUMNAS_PERSONAS}`}>
+                        {resultados.map((usuario) => (
+                          <li key={usuario.idUsuario}>
+                            <PersonaCard usuario={usuario} />
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <ul className="flex flex-col gap-tight">
+                        {resultados.map((usuario) => (
+                          <li key={usuario.idUsuario}>
+                            <PersonaListRow usuario={usuario} />
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {hasMore && (
+                      <div className="mt-card flex justify-center">
+                        <Button variant="outline" onClick={cargarMas} disabled={cargandoMas}>
+                          {cargandoMas ? 'Cargando…' : 'Cargar más'}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+            </div>
+          </section>
         </div>
+
+        <ConfirmActionDialog
+          open={confirmSolicitud !== null}
+          title={confirmSolicitud?.accion === 'aceptar' ? 'Aceptar solicitud' : 'Rechazar solicitud'}
+          description={
+            confirmSolicitud
+              ? `¿Confirmas que deseas ${confirmSolicitud.accion === 'aceptar' ? 'aceptar' : 'rechazar'} la solicitud de ${confirmSolicitud.solicitud.solicitante.nombre} ${confirmSolicitud.solicitud.solicitante.apellido}?`
+              : ''
+          }
+          actionLabel={confirmSolicitud?.accion === 'aceptar' ? 'Sí, aceptar solicitud' : 'Sí, rechazar solicitud'}
+          variant={confirmSolicitud?.accion === 'rechazar' ? 'destructive' : 'default'}
+          isPending={aceptarSolicitud.isPending || rechazarSolicitud.isPending}
+          onConfirm={confirmarSolicitud}
+          onCancel={cancelarConfirmacionSolicitud}
+        />
       </div>
-    </div>
+    </>
   );
 }

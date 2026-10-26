@@ -7,11 +7,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { ProjectNavList, type NavListGroup } from '@/components/projects/navigation/project-nav-list';
 
 /**
- * Navegación secundaria de Personas: el mismo patrón que la de un proyecto
- * (`ProjectSidebar` desde lg, `ProjectMobileNav` con un Sheet por debajo) y
- * el mismo renderizador (`ProjectNavList`), con el activo verde de la
- * navegación global. La sección vive en `?seccion=`: sobrevive a la recarga
- * y al atrás/adelante; sin parámetro se abre Descubrir.
+ * Secciones de Personas. Desde md se eligen en el grupo «Personas» de la
+ * sidebar global (DashboardLayout, mismos `href`); por debajo, donde solo hay
+ * barra inferior, un Sheet «Secciones» (patrón de `ProjectMobileNav`) con el
+ * mismo renderizador (`ProjectNavList`) y el activo verde de la navegación
+ * global. La sección vive en `?seccion=`: sobrevive a la recarga y al
+ * atrás/adelante; sin parámetro se abre Descubrir.
  */
 export type SeccionPersonas = 'descubrir' | 'amigos' | 'amigos-de-amigos';
 
@@ -50,33 +51,16 @@ const item = (id: SeccionPersonas, icon: NavListGroup['items'][number]['icon']) 
   icon,
 });
 
+/** Una sola lista, en el orden del grupo «Personas» de la sidebar global. */
 const GRUPOS: NavListGroup[] = [
-  { id: 'explorar', label: 'Explorar', items: [item('descubrir', Compass)] },
-  { id: 'conexiones', label: 'Conexiones', items: [item('amigos', Users), item('amigos-de-amigos', Network)] },
+  { id: 'personas', label: null, items: [item('descubrir', Compass), item('amigos', Users), item('amigos-de-amigos', Network)] },
 ];
 
-/** Desde lg: columna gris contigua a la sidebar global, como la de un proyecto. */
-export function PersonasSidebar({ seccion }: { seccion: SeccionPersonas }) {
-  return (
-    <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-outline-variant bg-surface-container lg:flex">
-      <nav aria-label="Navegación de Personas" className="min-h-0 flex-1 overflow-y-auto px-inline py-stack">
-        <ProjectNavList
-          id="personas-nav"
-          groups={GRUPOS}
-          activeHref={SECCIONES_PERSONAS[seccion].href}
-          variant="full"
-          activeTone="sage"
-        />
-      </nav>
-    </aside>
-  );
-}
-
-/** Por debajo de lg: «Secciones» abre un Sheet con los mismos grupos (patrón de `ProjectMobileNav`). */
+/** Por debajo de md (sin sidebar global): «Secciones» abre un Sheet con las tres secciones. */
 export function PersonasMobileNav({ seccion }: { seccion: SeccionPersonas }) {
   const [abierto, setAbierto] = useState(false);
   return (
-    <div className="sticky top-0 z-20 flex items-center gap-tight border-b border-outline-variant bg-card px-stack py-tight lg:hidden">
+    <div className="sticky top-0 z-20 flex items-center gap-tight border-b border-outline-variant bg-card px-stack py-tight md:hidden">
       <Sheet open={abierto} onOpenChange={setAbierto}>
         <SheetTrigger asChild>
           <Button type="button" variant="outline" size="sm">

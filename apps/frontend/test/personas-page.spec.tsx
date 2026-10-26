@@ -445,20 +445,27 @@ describe('PersonasPage — radio de los botones de acción', () => {
 
 // Pestañas con radio medio (no cápsula) y estados vacíos en tarjeta blanca,
 // con el mismo criterio que Chats archivados.
-describe('PersonasPage — navegación secundaria y estados vacíos', () => {
+describe('PersonasPage — secciones y estados vacíos', () => {
   beforeEach(() => {
     getSolicitudesPendientesMock.mockResolvedValue([]);
     getAmigosMock.mockResolvedValue([]);
     buscarUsuariosMock.mockResolvedValue({ items: [], hasMore: false });
   });
 
-  it('sin pestañas: la sidebar agrupa Explorar y Conexiones, con el activo verde y enlaces a ?seccion=', async () => {
+  it('sin pestañas ni sidebar secundaria: en móvil «Secciones» abre las tres secciones, sin encabezados de grupo', async () => {
     await renderPersonas();
 
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
-    const nav = screen.getAllByRole('navigation', { name: 'Navegación de Personas' })[0];
-    expect(within(nav).getByRole('group', { name: 'Explorar' })).toBeInTheDocument();
-    expect(within(nav).getByRole('group', { name: 'Conexiones' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(screen.queryByText('Explorar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Conexiones')).not.toBeInTheDocument();
+    // La barra de «Secciones» solo existe por debajo de md, donde no hay sidebar global.
+    const boton = screen.getByRole('button', { name: 'Secciones' });
+    expect(boton.parentElement).toHaveClass('md:hidden');
+
+    fireEvent.click(boton);
+    const nav = within(await screen.findByRole('dialog')).getByRole('navigation', { name: 'Navegación de Personas' });
+    expect(within(nav).queryByRole('group')).not.toBeInTheDocument();
     const enlaces = within(nav).getAllByRole('link');
     expect(enlaces.map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
       ['Descubrir personas', '/dashboard/personas'],
@@ -467,19 +474,22 @@ describe('PersonasPage — navegación secundaria y estados vacíos', () => {
     ]);
     expect(enlaces[0]).toHaveAttribute('aria-current', 'page');
     expect(enlaces[0]).toHaveClass('bg-sage-nav-active');
-    expect(enlaces[1]).not.toHaveAttribute('aria-current');
+  });
+
+  it('el contenido usa el contenedor de Mis Proyectos sin columna lateral', async () => {
+    await renderPersonas();
+    const contenedor = screen.getByRole('heading', { level: 1 }).closest('header')?.parentElement as HTMLElement;
+    expect(contenedor).toHaveClass('mx-auto', 'w-full', 'max-w-[1400px]', 'px-section', '@container/personas');
   });
 
   it.each([
     [undefined, 'Descubrir personas', 'Busca compañeros, sigue su actividad y hazte amigo.'],
     ['amigos', 'Mis amigos', 'Mantén el contacto con las personas de tu comunidad.'],
     ['amigos-de-amigos', 'Amigos de amigos', 'Descubre estudiantes con conexiones en común.'],
-  ] as const)('?seccion=%s cambia el encabezado y marca su destino', async (seccion, titulo, descripcion) => {
+  ] as const)('?seccion=%s cambia el encabezado', async (seccion, titulo, descripcion) => {
     await renderPersonas(seccion);
     expect(screen.getByRole('heading', { level: 1, name: titulo })).toBeInTheDocument();
     expect(screen.getByText(descripcion)).toBeInTheDocument();
-    const nav = screen.getAllByRole('navigation', { name: 'Navegación de Personas' })[0];
-    expect(within(nav).getByRole('link', { name: titulo })).toHaveAttribute('aria-current', 'page');
   });
 
   it('las recomendaciones solo aparecen en Descubrir', async () => {
