@@ -210,7 +210,7 @@ export function NotificationInbox() {
     <div className="flex shrink-0 items-start gap-tight border-b border-outline-variant/60 px-stack pb-tight pt-inline">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-tight">
-          <h1 className="type-section text-on-surface">Notificaciones</h1>
+          <h1 className="type-display">Notificaciones</h1>
           {nuevas > 0 && (
             <span className="pill pill-accent">
               {nuevas} nueva{nuevas !== 1 ? 's' : ''}
