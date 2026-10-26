@@ -105,6 +105,13 @@ describe('avatar contextual en la fila', () => {
     expect(avatar(container)).toBeInTheDocument();
   });
 
+  it('la etiqueta de proyecto es salvia discreta (el lima queda para lo que debe destacar) y sigue truncada', () => {
+    fila(base({ tipoNotificacion: 'TAREA_ASIGNADA', datosJson: { projectId: 4, projectTitle: 'Proyecto con un nombre muy largo para la etiqueta' } }));
+    const chip = screen.getByTitle('Proyecto con un nombre muy largo para la etiqueta');
+    expect(chip).toHaveClass('pill-sage', 'max-w-44');
+    expect(chip).not.toHaveClass('pill-accent');
+  });
+
   it('títulos y mensajes largos siguen truncados', () => {
     fila(base({ tituloNotificacion: 'T'.repeat(300), mensajeNotificacion: 'M'.repeat(600) }));
     expect(screen.getByText('T'.repeat(300))).toHaveClass('truncate');

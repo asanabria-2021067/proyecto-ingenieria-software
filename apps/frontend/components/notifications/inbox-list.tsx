@@ -74,7 +74,7 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
           <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
             <span className="pill pill-sm pill-neutral">{categoria}</span>
             {proyecto?.titulo && (
-              <span className="pill pill-sm pill-accent max-w-44" title={proyecto.titulo}>
+              <span className="pill pill-sm pill-sage max-w-44" title={proyecto.titulo}>
                 <span className="truncate">{proyecto.titulo}</span>
               </span>
             )}
