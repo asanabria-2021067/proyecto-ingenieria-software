@@ -2,7 +2,7 @@
 
 import { createElement } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, CalendarX2, Check, ChevronLeft, ChevronRight, Inbox, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarX2, Check, CheckCheck, ChevronLeft, ChevronRight, Inbox, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Notificacion } from '@/lib/services/notifications';
@@ -30,6 +30,10 @@ interface ReaderToolbarProps {
   onAlternarLista?: () => void;
   /** Solo en móvil: vuelve a la lista. */
   onVolver?: () => void;
+  /** Marcado masivo con el alcance del filtro actual (texto exacto en `etiquetaMarcarFiltradas`). */
+  onMarcarFiltradas?: () => void;
+  etiquetaMarcarFiltradas?: string;
+  marcarFiltradasDeshabilitado?: boolean;
 }
 
 const ICON_BUTTON = 'size-8 rounded-md text-text-secondary hover:text-text-primary';
@@ -48,7 +52,18 @@ function IconAction({ label, onClick, disabled, children }: { label: string; onC
 }
 
 /** Barra superior del visor (§5.2): anterior/siguiente, marcar leída, contraer/restaurar bandeja y volver en móvil. */
-export function NotificationReaderToolbar({ onAnterior, onSiguiente, onMarcarLeida, marcando, listaContraida, onAlternarLista, onVolver }: ReaderToolbarProps) {
+export function NotificationReaderToolbar({
+  onAnterior,
+  onSiguiente,
+  onMarcarLeida,
+  marcando,
+  listaContraida,
+  onAlternarLista,
+  onVolver,
+  onMarcarFiltradas,
+  etiquetaMarcarFiltradas,
+  marcarFiltradasDeshabilitado,
+}: ReaderToolbarProps) {
   return (
     <div className="flex shrink-0 items-center gap-micro border-b border-outline-variant/60 px-inline py-tight">
       {onVolver && (
@@ -74,8 +89,28 @@ export function NotificationReaderToolbar({ onAnterior, onSiguiente, onMarcarLei
       {onMarcarLeida && (
         <Button type="button" variant="outline" size="sm" onClick={onMarcarLeida} disabled={marcando} className="ml-micro">
           <Check className="size-4" aria-hidden="true" />
-          Marcar como leída
+          <span className="hidden sm:inline">Marcar como leída</span>
+          <span className="sr-only sm:hidden">Marcar como leída</span>
         </Button>
+      )}
+      {onMarcarFiltradas && etiquetaMarcarFiltradas && (
+        // Compacta: icono siempre, texto solo cuando hay ancho (el nombre accesible no cambia).
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              size="sm"
+              onClick={onMarcarFiltradas}
+              disabled={marcarFiltradasDeshabilitado}
+              aria-label={etiquetaMarcarFiltradas}
+              className="ml-micro rounded-md text-[13px] font-semibold"
+            >
+              <CheckCheck className="size-4" aria-hidden="true" />
+              <span className="hidden xl:inline">{etiquetaMarcarFiltradas}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{etiquetaMarcarFiltradas}</TooltipContent>
+        </Tooltip>
       )}
     </div>
   );
@@ -105,7 +140,7 @@ const REUNION_TEXTO = {
  * fecha, mensaje completo, detalles estructurados, proyecto, avisos
  * relevantes y la acción de navegación. Todo sale del aviso real.
  */
-export function NotificationReaderContent({ notificacion: n }: { notificacion: Notificacion }) {
+export function NotificationReaderContent({ notificacion: n, fueraDelFiltro = false }: { notificacion: Notificacion; fueraDelFiltro?: boolean }) {
   const categoria = tituloDeCategoria(categoriaDeTipo(n.tipoNotificacion));
   const origen = origenDeAviso(n);
   const proyecto = proyectoDeAviso(n);
@@ -115,10 +150,16 @@ export function NotificationReaderContent({ notificacion: n }: { notificacion: N
   const noLeida = n.leidaEn === null;
 
   return (
-    <article aria-labelledby={`notificacion-${n.idNotificacion}-titulo`} className="flex flex-col gap-stack px-section py-stack">
+    <article aria-labelledby={`notificacion-${n.idNotificacion}-titulo`} className="flex max-w-3xl flex-col gap-stack px-section py-stack">
       <header className="flex flex-col gap-tight">
         <div className="flex flex-wrap items-center gap-tight">
           <span className="pill pill-neutral">{categoria}</span>
+          {fueraDelFiltro && (
+            // El aviso abierto se conserva al cambiar el filtro; se marca para que no parezca un resultado del filtro.
+            <span className="pill pill-amber" title="Este aviso no pertenece a la lista filtrada actual">
+              Fuera del filtro actual
+            </span>
+          )}
           {reunion && <span className={cn('pill', REUNION_TEXTO[reunion].clase)}>{REUNION_TEXTO[reunion].etiqueta}</span>}
           {noLeida && <span className="pill pill-accent">No leída</span>}
         </div>

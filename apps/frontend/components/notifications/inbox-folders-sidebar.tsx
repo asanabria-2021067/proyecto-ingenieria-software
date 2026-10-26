@@ -154,7 +154,7 @@ export function InboxFoldersSidebar({ seleccion, onSeleccionar, conteos, collaps
       className={cn(
         'flex h-full shrink-0 flex-col border-r border-sage-nav-border bg-sage-nav-surface',
         animar && 'transition-[width] duration-200 motion-reduce:transition-none',
-        collapsed ? 'w-14' : 'w-56',
+        collapsed ? 'w-14' : 'w-64',
         className,
       )}
     >

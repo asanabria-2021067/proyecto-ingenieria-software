@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck, PanelLeftClose } from 'lucide-react';
+import { PanelLeftClose } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -43,8 +43,10 @@ function etiquetaMarcar(categoria: NotificationGroupId | null, busqueda: string,
 
 /**
  * Sprint 10 — bandeja de notificaciones (HU-198 + rediseño Outlook/Gmail).
- * La página la envuelve en el contenedor compartido (`dashboardPage`) a altura
- * de ventana: cabecera arriba y, debajo, los paneles con scroll propio.
+ * La página la monta como fila a altura de ventana (patrón del workspace del
+ * proyecto): sidebar secundaria pegada a la global, y bandeja y visor con
+ * scroll propio hasta el borde derecho. El título vive en la columna de la
+ * bandeja y el marcado masivo en la barra del visor.
  * Cuatro regiones: la sidebar global queda fuera (DashboardLayout); aquí van
  * la sidebar secundaria de carpetas, la bandeja compacta y el visor. Todo
  * filtro viaja al servidor (tipos, leída, q, proyecto, orden) y se aplica
@@ -195,10 +197,21 @@ export function NotificationInbox() {
   // pestaña Leídas no hay nada que marcar.
   const pendientesFiltro = lectura === 'leidas' ? 0 : (noLeidasFiltro.data ?? (lectura === 'no-leidas' ? totalFiltrado : 0));
 
+  const etiquetaMarcado = etiquetaMarcar(categoria, busqueda, proyecto, lectura);
+
+  // Título de la página dentro de la columna de la bandeja (sin cabecera aparte).
   const cabeceraBandeja = (
-    <div className="flex shrink-0 items-center gap-tight border-b border-outline-variant/60 px-inline py-tight">
+    <div className="flex shrink-0 items-start gap-tight border-b border-outline-variant/60 px-stack pb-tight pt-inline">
       <div className="min-w-0 flex-1">
-        <h2 className="truncate text-sm font-bold text-on-surface">Bandeja de entrada</h2>
+        <div className="flex flex-wrap items-center gap-tight">
+          <h1 className="type-section text-on-surface">Notificaciones</h1>
+          {nuevas > 0 && (
+            <span className="pill pill-accent">
+              {nuevas} nueva{nuevas !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        <h2 className="mt-micro text-sm font-bold text-on-surface">Bandeja de entrada</h2>
         <p className="type-meta truncate text-[11px]" aria-live="polite">
           {lista.isPending ? 'Cargando…' : `${plural(totalFiltrado, 'aviso', 'avisos')} · ${pendientesFiltro} sin leer`}
         </p>
@@ -257,99 +270,76 @@ export function NotificationInbox() {
         onSiguiente={irSiguiente}
         onMarcarLeida={mostrada && mostrada.leidaEn === null ? () => marcarUna.mutate(mostrada.idNotificacion) : undefined}
         marcando={marcarUna.isPending}
+        onMarcarFiltradas={() => marcarFiltradas.mutate()}
+        etiquetaMarcarFiltradas={etiquetaMarcado}
+        marcarFiltradasDeshabilitado={marcarFiltradas.isPending || pendientesFiltro === 0}
         listaContraida={listaContraida}
         onAlternarLista={esMovil ? undefined : alternarLista}
         onVolver={esMovil ? () => setVistaMovil('lista') : undefined}
       />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        {mostrada ? <NotificationReaderContent key={mostrada.idNotificacion} notificacion={mostrada} /> : <NotificationReaderEmpty />}
+        {mostrada ? (
+          <NotificationReaderContent key={mostrada.idNotificacion} notificacion={mostrada} fueraDelFiltro={indice < 0 && !lista.isPending} />
+        ) : (
+          <NotificationReaderEmpty />
+        )}
       </div>
     </div>
   );
 
   return (
     <>
-      <header className="flex shrink-0 flex-col gap-tight md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-stack">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-container/15 text-primary">
-            <Bell className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-tight">
-              <h1 className="type-display">Notificaciones</h1>
-              {nuevas > 0 && (
-                <span className="pill pill-accent">
-                  {nuevas} nueva{nuevas !== 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-            <p className="type-meta mt-micro hidden md:block">Consulta los avisos de tus proyectos, reuniones y actividades académicas.</p>
-          </div>
-        </div>
-        <Button
-          type="button"
-          onClick={() => marcarFiltradas.mutate()}
-          disabled={marcarFiltradas.isPending || pendientesFiltro === 0}
-          className="self-start rounded-md text-[13px] font-semibold md:self-center"
-        >
-          <CheckCheck className="size-4" aria-hidden="true" />
-          {etiquetaMarcar(categoria, busqueda, proyecto, lectura)}
-        </Button>
-      </header>
+      {!esMovil && (
+        <InboxFoldersSidebar
+          seleccion={seleccionCarpetas}
+          onSeleccionar={elegirCarpeta}
+          conteos={{ noLeidas: nuevas, porCategoria }}
+          collapsed={carpetasContraidas}
+          onToggleCollapsed={soloRail ? undefined : alternarCarpetas}
+        />
+      )}
 
-      <div className="flex min-h-0 flex-1 overflow-hidden rounded-card border border-outline-variant/45 bg-surface-container-lowest shadow-card">
-        {!esMovil && (
-          <InboxFoldersSidebar
-            seleccion={seleccionCarpetas}
-            onSeleccionar={elegirCarpeta}
-            conteos={{ noLeidas: nuevas, porCategoria }}
-            collapsed={carpetasContraidas}
-            onToggleCollapsed={soloRail ? undefined : alternarCarpetas}
-          />
-        )}
-
-        {esMovil ? (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            {vistaMovil === 'detalle' && mostrada ? (
-              visor
-            ) : (
-              <div role="region" aria-label="Bandeja de entrada" className="flex min-h-0 flex-1 flex-col">
-                {cabeceraBandeja}
-                {toolbar}
-                {listado}
-              </div>
-            )}
-          </div>
-        ) : (
-          <ResizablePanelGroup direction="horizontal" autoSaveId={INBOX_PANELS_AUTOSAVE_ID} className="min-w-0 flex-1">
-            <ResizablePanel
-              ref={panelLista}
-              role="region"
-              aria-label="Bandeja de entrada"
-              collapsible
-              collapsedSize={0}
-              defaultSize={LISTA_DEFAULT}
-              minSize={LISTA_MIN}
-              maxSize={LISTA_MAX}
-              onCollapse={() => setListaContraida(true)}
-              onExpand={() => setListaContraida(false)}
-              className={cn('flex min-h-0 flex-col', listaContraida && 'hidden')}
-            >
+      {esMovil ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-container-lowest">
+          {vistaMovil === 'detalle' && mostrada ? (
+            visor
+          ) : (
+            <div role="region" aria-label="Bandeja de entrada" className="flex min-h-0 flex-1 flex-col">
               {cabeceraBandeja}
               {toolbar}
               {listado}
-            </ResizablePanel>
-            <ResizableHandle
-              withHandle
-              aria-label="Redimensionar bandeja"
-              title="Arrastra para redimensionar; doble clic para restablecer"
-              onDoubleClick={restablecerReparto}
-              className={cn('w-1.5 bg-outline-variant/40 transition-colors hover:bg-primary/40 focus-visible:bg-primary/40 data-[resize-handle-active]:bg-primary/60 [&>div]:border-outline-variant [&>div]:bg-surface-container-lowest motion-reduce:transition-none', listaContraida && 'hidden')}
-            />
-            <ResizablePanel className="flex min-h-0 flex-col">{visor}</ResizablePanel>
-          </ResizablePanelGroup>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <ResizablePanelGroup direction="horizontal" autoSaveId={INBOX_PANELS_AUTOSAVE_ID} className="min-w-0 flex-1 bg-surface-container-lowest">
+          <ResizablePanel
+            ref={panelLista}
+            role="region"
+            aria-label="Bandeja de entrada"
+            collapsible
+            collapsedSize={0}
+            defaultSize={LISTA_DEFAULT}
+            minSize={LISTA_MIN}
+            maxSize={LISTA_MAX}
+            onCollapse={() => setListaContraida(true)}
+            onExpand={() => setListaContraida(false)}
+            className={cn('flex min-h-0 flex-col', listaContraida && 'hidden')}
+          >
+            {cabeceraBandeja}
+            {toolbar}
+            {listado}
+          </ResizablePanel>
+          <ResizableHandle
+            withHandle
+            aria-label="Redimensionar bandeja"
+            title="Arrastra para redimensionar; doble clic para restablecer"
+            onDoubleClick={restablecerReparto}
+            className={cn('w-1.5 bg-outline-variant/40 transition-colors hover:bg-primary/40 focus-visible:bg-primary/40 data-[resize-handle-active]:bg-primary/60 [&>div]:border-outline-variant [&>div]:bg-surface-container-lowest motion-reduce:transition-none', listaContraida && 'hidden')}
+          />
+          <ResizablePanel className="flex min-h-0 flex-col">{visor}</ResizablePanel>
+        </ResizablePanelGroup>
+      )}
     </>
   );
 }
