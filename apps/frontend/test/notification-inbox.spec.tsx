@@ -86,9 +86,12 @@ afterEach(() => {
 });
 
 describe('NotificationInbox', () => {
-  it('muestra el encabezado con el conteo global, las filas compactas y el visor vacío', async () => {
+  it('muestra el encabezado dentro de la bandeja, las filas compactas y el visor vacío', async () => {
     renderInbox();
     expect(await screen.findByText('2 nuevas')).toBeInTheDocument();
+    // El título de la página vive en la columna de la bandeja, sin cabecera aparte.
+    expect(within(lista()).getByRole('heading', { level: 1, name: 'Notificaciones' })).toBeInTheDocument();
+    expect(within(lista()).getByRole('heading', { level: 2, name: 'Bandeja de entrada' })).toBeInTheDocument();
     expect(await within(lista()).findByText('3 avisos · 2 sin leer')).toBeInTheDocument();
     expect(filas()).toHaveLength(3);
     expect(filas()[0]).toHaveAttribute('data-leida', 'false');
@@ -212,5 +215,24 @@ describe('NotificationInbox', () => {
     });
     expect(within(filas()[1]).getByRole('button')).toHaveAttribute('aria-current', 'true');
     expect(screen.getByRole('article')).toHaveTextContent('Horas consolidadas del Sprint');
+  });
+
+  it('al cambiar de categoría el aviso abierto se conserva pero se marca como fuera del filtro', async () => {
+    renderInbox();
+    await within(lista()).findByText('3 avisos · 2 sin leer');
+    fireEvent.click(within(filas()[1]).getByRole('button'));
+    expect(screen.getByRole('article')).toHaveTextContent('Horas consolidadas del Sprint');
+    expect(screen.queryByText('Fuera del filtro actual')).not.toBeInTheDocument();
+
+    const carpetas = screen.getByRole('complementary', { name: 'Carpetas de notificaciones' });
+    fireEvent.click(within(carpetas).getByRole('button', { name: /^Recordatorios y calendario/ }));
+    await within(lista()).findByText('1 aviso · 1 sin leer');
+    // La lista ya no contiene el aviso abierto; el visor lo conserva y lo señala.
+    expect(within(lista()).queryByText('Horas consolidadas del Sprint')).not.toBeInTheDocument();
+    expect(screen.getByRole('article')).toHaveTextContent('Horas consolidadas del Sprint');
+    expect(screen.getByText('Fuera del filtro actual')).toBeInTheDocument();
+    // Anterior/siguiente no apuntan a nada de la lista filtrada.
+    expect(screen.getByRole('button', { name: 'Notificación anterior' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Notificación siguiente' })).toBeDisabled();
   });
 });
