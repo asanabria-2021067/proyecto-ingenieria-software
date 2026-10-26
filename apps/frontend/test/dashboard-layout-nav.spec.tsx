@@ -8,10 +8,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // Tareas», en la sidebar de escritorio y en la barra inferior móvil, sin
 // mover ni quitar ningún otro destino (INV-H14).
 
-const navegacion = vi.hoisted(() => ({ pathname: '/dashboard/mis-horas' }));
+const navegacion = vi.hoisted(() => ({ pathname: '/dashboard/mis-horas', search: '' }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => navegacion.pathname,
+  useSearchParams: () => new URLSearchParams(navegacion.search),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 vi.mock('next/image', () => ({ default: ({ alt }: { alt: string }) => <span role="img" aria-label={alt} /> }));
@@ -35,8 +36,11 @@ vi.mock('@/components/font-scale-toggle', () => ({ FontScaleToggle: () => null }
 
 import DashboardLayout from '../components/dashboard/DashboardLayout';
 
-function renderLayout(pathname: string) {
+/** Acepta un destino con query (`/dashboard/personas?seccion=amigos`): la ruta va a `usePathname` y la query a `useSearchParams`. */
+function renderLayout(destino: string) {
+  const [pathname, search = ''] = destino.split('?');
   navegacion.pathname = pathname;
+  navegacion.search = search;
   const queryClient = new QueryClient();
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -150,7 +154,9 @@ describe('DashboardLayout — navegación global del estudiante', () => {
 
   const DESTINOS = [
     ['Dashboard', '/dashboard'],
-    ['Personas', '/dashboard/personas'],
+    ['Descubrir personas', '/dashboard/personas'],
+    ['Mis amigos', '/dashboard/personas?seccion=amigos'],
+    ['Amigos de amigos', '/dashboard/personas?seccion=amigos-de-amigos'],
     ['Explorar Proyectos', '/dashboard/proyectos'],
     ['Mis Proyectos', '/dashboard/projects/mine'],
     ['Mis Tareas', '/dashboard/mis-tareas'],
@@ -160,7 +166,7 @@ describe('DashboardLayout — navegación global del estudiante', () => {
     ['Chats archivados', '/dashboard/chats/archivados'],
   ] as const;
 
-  it('Dashboard y Personas sueltos; Proyectos y Mi trabajo como grupos desplegables, abiertos de entrada', () => {
+  it('Dashboard suelto; Personas, Proyectos y Mi trabajo como grupos desplegables, abiertos de entrada', () => {
     const { escritorio } = renderLayout('/dashboard');
 
     expect(escritorio).toHaveAttribute('aria-label', 'Navegación principal');
@@ -169,12 +175,19 @@ describe('DashboardLayout — navegación global del estudiante', () => {
     );
 
     // Los grupos abren de entrada: la guía de bienvenida señala destinos que están dentro.
+    const personas = within(escritorio).getByRole('button', { name: /^Personas/ });
     const proyectos = within(escritorio).getByRole('button', { name: /^Proyectos/ });
     const trabajo = within(escritorio).getByRole('button', { name: /^Mi trabajo/ });
-    for (const grupo of [proyectos, trabajo]) {
+    for (const grupo of [personas, proyectos, trabajo]) {
       expect(grupo).toHaveAttribute('aria-expanded', 'true');
       expect(grupo).toHaveAttribute('data-state', 'open');
     }
+    const hijosPersonas = escritorio.querySelector(`#${personas.getAttribute('aria-controls')}`) as HTMLElement;
+    expect(within(hijosPersonas).getAllByRole('link').map((a) => a.textContent)).toEqual([
+      'Descubrir personas',
+      'Mis amigos',
+      'Amigos de amigos',
+    ]);
     const hijosProyectos = escritorio.querySelector(`#${proyectos.getAttribute('aria-controls')}`) as HTMLElement;
     expect(within(hijosProyectos).getAllByRole('link').map((a) => a.textContent)).toEqual(['Explorar Proyectos', 'Mis Proyectos']);
     const hijosTrabajo = escritorio.querySelector(`#${trabajo.getAttribute('aria-controls')}`) as HTMLElement;
@@ -239,5 +252,25 @@ describe('DashboardLayout — navegación global del estudiante', () => {
     expect(within(aside).queryByRole('button', { name: 'Colapsar barra lateral' })).not.toBeInTheDocument();
     // Colapsada conserva los mismos destinos, solo con iconos.
     expect(within(aside.querySelector('nav') as HTMLElement).getAllByRole('link')).toHaveLength(DESTINOS.length);
+  });
+
+  it('Personas: el grupo sigue abierto con una sección activa, se pliega como los demás y la barra móvil conserva un único destino', () => {
+    const { escritorio, movil } = renderLayout('/dashboard/personas?seccion=amigos-de-amigos');
+    const personas = within(escritorio).getByRole('button', { name: /^Personas/ });
+    expect(personas).toHaveClass('admin-nav-item', 'admin-nav-group');
+    expect(personas).toHaveAttribute('aria-expanded', 'true');
+    const activo = within(escritorio).getByRole('link', { name: 'Amigos de amigos' });
+    expect(activo).toHaveClass('admin-nav-subitem');
+    expect(activo).toHaveAttribute('aria-current', 'page');
+
+    fireEvent.click(personas);
+    expect(within(escritorio).queryByRole('link', { name: 'Mis amigos' })).not.toBeInTheDocument();
+    // Plegar Personas no cierra los otros grupos.
+    expect(within(escritorio).getByRole('link', { name: 'Explorar Proyectos' })).toBeInTheDocument();
+    expect(within(escritorio).getByRole('link', { name: 'Mis Tareas' })).toBeInTheDocument();
+
+    const enMovil = within(movil).getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/dashboard/personas'));
+    expect(enMovil.map((a) => [a.getAttribute('aria-label'), a.getAttribute('href')])).toEqual([['Personas', '/dashboard/personas']]);
+    expect(enMovil[0]).toHaveAttribute('aria-current', 'page');
   });
 });

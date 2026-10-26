@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
@@ -17,6 +17,8 @@ import {
   RotateCcw,
   Users,
   Archive,
+  Compass,
+  Network,
   Search as SearchIcon,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
@@ -55,7 +57,19 @@ const navEntries: NavEntry[] = [
     icon: LayoutDashboard,
     exact: true,
   },
-  { href: '/dashboard/personas', label: 'Personas', icon: Users },
+  {
+    type: 'group',
+    label: 'Personas',
+    icon: Users,
+    // La barra inferior móvil no tiene sitio para tres destinos: conserva uno solo.
+    mobile: { href: '/dashboard/personas', label: 'Personas', icon: Users },
+    items: [
+      // Sin `exact`: el perfil de una persona (/dashboard/personas/:id) sigue dentro del grupo.
+      { href: '/dashboard/personas', label: 'Descubrir personas', icon: Compass },
+      { href: '/dashboard/personas?seccion=amigos', label: 'Mis amigos', icon: Users },
+      { href: '/dashboard/personas?seccion=amigos-de-amigos', label: 'Amigos de amigos', icon: Network },
+    ],
+  },
   {
     type: 'group',
     label: 'Proyectos',
@@ -103,6 +117,12 @@ const navEntries: NavEntry[] = [
 ];
 
 const navItemsMobile = flattenNavEntries(navEntries);
+
+/** `useSearchParams` exige un límite de Suspense en el prerender: se aísla aquí (mismo patrón que AdminLayout). */
+function DashboardSidebarNav({ idUsuario }: { idUsuario: number | null }) {
+  const searchParams = useSearchParams();
+  return <SidebarNav entries={navEntries} idUsuario={idUsuario} search={searchParams?.toString() ?? ''} />;
+}
 
 export default function DashboardLayout({
   children,
@@ -185,7 +205,9 @@ export default function DashboardLayout({
           )}
         </div>
 
-        <SidebarNav entries={navEntries} idUsuario={user?.idUsuario ?? null} />
+        <Suspense fallback={<SidebarNav entries={navEntries} idUsuario={user?.idUsuario ?? null} />}>
+          <DashboardSidebarNav idUsuario={user?.idUsuario ?? null} />
+        </Suspense>
 
         {/* Único acceso a la cuenta en escritorio y tableta; en móvil está en la barra inferior. */}
         <div
