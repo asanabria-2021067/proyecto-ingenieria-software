@@ -1,10 +1,10 @@
 'use client';
 
-import { createElement } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, CalendarX2, Check, CheckCheck, ChevronLeft, ChevronRight, Inbox, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { NotificationAvatar } from '@/components/notifications/notification-avatar';
 import type { Notificacion } from '@/lib/services/notifications';
 import {
   accionDeAviso,
@@ -13,7 +13,7 @@ import {
   estadoDeReunion,
   etiquetaDeTipo,
   fechaCompleta,
-  iconoDeTipo,
+  identidadDeAviso,
   origenDeAviso,
   proyectoDeAviso,
   tituloDeCategoria,
@@ -158,8 +158,8 @@ export function NotificationReaderContent({ notificacion: n }: { notificacion: N
           {noLeida && <span className="pill pill-accent">No leída</span>}
         </div>
         <div className="flex items-start gap-inline">
-          <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-container/15 text-primary" aria-hidden="true">
-            {createElement(iconoDeTipo(n.tipoNotificacion), { className: 'size-5' })}
+          <span className="mt-0.5 shrink-0">
+            <NotificationAvatar identidad={identidadDeAviso(n)} size="lg" />
           </span>
           <div className="min-w-0 flex-1">
             <h3 id={`notificacion-${n.idNotificacion}-titulo`} className="type-section break-words text-on-surface">

@@ -1,16 +1,17 @@
 'use client';
 
-import { createElement, useCallback, type KeyboardEvent } from 'react';
+import { useCallback, type KeyboardEvent } from 'react';
 import { AlertCircle, BellOff, SearchX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { NotificationAvatar } from '@/components/notifications/notification-avatar';
 import type { Notificacion } from '@/lib/services/notifications';
 import {
   agruparPorDia,
   categoriaDeTipo,
   fechaCompacta,
-  iconoDeTipo,
+  identidadDeAviso,
   origenDeAviso,
   proyectoDeAviso,
   tituloDeCategoria,
@@ -25,13 +26,14 @@ interface InboxRowProps {
 }
 
 /**
- * Fila compacta (REGIÓN C, §4): icono del tipo, origen, título, vista previa
+ * Fila compacta (REGIÓN C, §4): avatar del emisor (identidadDeAviso), origen, título, vista previa
  * de dos líneas, chips de categoría y proyecto, fecha e indicador de no leída.
  * No leída = título en negrita, punto verde y fondo apenas teñido. Seleccionada
  * = salvia sutil con acento vertical a la izquierda, sin tocar los radios.
  */
 export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }: InboxRowProps) {
   const noLeida = n.leidaEn === null;
+  const identidad = identidadDeAviso(n);
   const origen = origenDeAviso(n);
   const proyecto = proyectoDeAviso(n);
   const categoria = tituloDeCategoria(categoriaDeTipo(n.tipoNotificacion));
@@ -53,14 +55,8 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
               : 'border-l-transparent hover:bg-surface-container-low',
         )}
       >
-        <span
-          className={cn(
-            'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-control',
-            noLeida ? 'bg-primary-container/15 text-primary' : 'bg-surface-container text-tertiary',
-          )}
-          aria-hidden="true"
-        >
-          {createElement(iconoDeTipo(n.tipoNotificacion), { className: 'size-4' })}
+        <span className="mt-0.5 shrink-0">
+          <NotificationAvatar identidad={identidad} />
         </span>
 
         <span className="min-w-0 flex-1">
