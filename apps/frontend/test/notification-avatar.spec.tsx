@@ -72,7 +72,8 @@ describe('avatar contextual en la fila', () => {
     const a = avatar(proyecto.container);
     expect(a).toHaveAttribute('data-identidad', 'proyecto');
     expect(a).toHaveTextContent('PT');
-    expect(a).toHaveClass('rounded-control');
+    expect(a).toHaveClass('rounded-[var(--radius-control)]');
+    expect(a).not.toHaveClass('rounded-full');
   });
 
   it('todas las identidades ocupan el mismo hueco de 36 px (la fila no cambia de alto)', () => {

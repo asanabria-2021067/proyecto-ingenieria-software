@@ -14,7 +14,8 @@ import { cn } from '@/lib/utils';
 const TONO: Record<IdentidadDeAviso['tipo'], string> = {
   persona: 'rounded-full bg-tag-sage text-on-tag-sage',
   institucion: 'rounded-full bg-tag-slate text-on-tag-slate',
-  proyecto: 'rounded-control bg-tag-neutral text-on-tag-neutral',
+  // Valor arbitrario del mismo token: `rounded-control` a secas no lo reconoce tailwind-merge y dejaría el rounded-full del Avatar.
+  proyecto: 'rounded-[var(--radius-control)] bg-tag-neutral text-on-tag-neutral',
   sistema: 'rounded-full bg-surface-container text-tertiary',
 };
 
