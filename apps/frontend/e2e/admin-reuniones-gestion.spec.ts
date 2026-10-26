@@ -65,7 +65,10 @@ test.describe('Reuniones de Administración: programar, editar y cancelar desde 
       await dialogo.getByLabel('Descripción (opcional)').fill('Revisión de avances de varios equipos.');
 
       // 3–5. Selector de proyectos elegibles reales; uno y luego hasta tres seleccionados.
-      await dialogo.getByRole('button', { name: /Buscar proyecto para invitar/ }).click();
+      const buscador = dialogo.getByRole('combobox', { name: 'Buscar proyecto para invitar' });
+      await buscador.click();
+      // Un solo buscador: los resultados se despliegan bajo el mismo campo.
+      await expect(dialogo.getByPlaceholder('Buscar proyecto para invitar…')).toHaveCount(1);
       const opciones = page.getByRole('option');
       await expect(opciones.first()).toBeVisible({ timeout: 15_000 });
       const disponibles = await opciones.count();
@@ -79,6 +82,7 @@ test.describe('Reuniones de Administración: programar, editar y cancelar desde 
       const objetivo = Math.min(3, disponibles);
       for (let i = 1; i < objetivo; i += 1) {
         await dialogo.getByRole('button', { name: 'Agregar otro proyecto' }).click();
+        await expect(dialogo.getByPlaceholder('Buscar proyecto para invitar…')).toHaveCount(1);
         await page.getByRole('option').first().click();
       }
       await expect(seleccion.getByRole('listitem')).toHaveCount(objetivo);

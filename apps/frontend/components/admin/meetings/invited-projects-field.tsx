@@ -1,11 +1,10 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { ChevronDown, FolderKanban, Info, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, FolderKanban, Info, Plus, X } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { iniciales } from '@/components/calendar/invitados-field';
 import { useEligibleMeetingProjects, useMeetingProjectTeam } from '@/hooks/use-admin-meetings';
@@ -294,60 +293,77 @@ export function InvitedProjectsField({
         </ul>
       )}
 
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          {value.length === 0 ? (
-            <button
-              type="button"
-              disabled={disabled}
-              aria-describedby={error ? errorId : undefined}
-              className={`mt-tight flex h-10 w-full items-center gap-tight rounded-control border bg-surface-container-lowest px-3 text-left text-sm text-on-surface-variant outline-none motion-focus hover:border-outline focus-visible:ring-2 focus-visible:ring-primary/60 disabled:pointer-events-none disabled:opacity-50 ${
-                error ? 'border-destructive' : 'border-outline-variant'
-              }`}
-            >
-              <Search className="size-4 shrink-0" aria-hidden="true" />
-              Buscar proyecto para invitar…
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={disabled}
-              className="mt-tight inline-flex min-h-6 items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50"
-            >
-              <Plus className="size-4" aria-hidden="true" />
-              Agregar otro proyecto
-            </button>
-          )}
-        </PopoverTrigger>
-        <PopoverContent className="w-[min(22rem,calc(100vw-2rem))] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Buscar proyecto para invitar…" />
-            <CommandList>
-              <CommandEmpty>{vacioDeLaLista}</CommandEmpty>
-              {disponibles.map((p) => (
-                <CommandItem key={p.idProyecto} value={`${p.tituloProyecto} ${p.lider ? nombreDe(p.lider) : ''}`} onSelect={() => agregar(p)}>
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm">{p.tituloProyecto}</span>
-                    <span className="truncate text-xs text-text-secondary">
-                      {p.lider ? `Líder: ${nombreDe(p.lider)}` : 'Sin líder registrado'}
-                      {' · '}
-                      {p.integrantesConvocables === 1 ? '1 persona' : `${p.integrantesConvocables} personas`}
-                      {p.ventanaHasta && ` · Cerrado, convocable hasta ${fechaCorta(p.ventanaHasta)}`}
+      {/* Un solo buscador en línea: el campo es el input real y los resultados se despliegan debajo,
+          dentro de la tarjeta (con su propio scroll), sin flotar sobre el pie del diálogo. */}
+      {value.length === 0 || open ? (
+        <Command
+          label="Buscar proyecto para invitar"
+          data-buscador-proyectos=""
+          className={`mt-tight h-auto rounded-control border bg-surface-container-lowest text-on-surface motion-focus focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30 [&_[data-slot=command-input-wrapper]]:h-10 [&_[data-slot=command-input-wrapper]]:border-b-0 ${
+            error ? 'border-destructive' : 'border-outline-variant'
+          }`}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' && open) {
+              e.preventDefault();
+              setOpen(false);
+            }
+          }}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+          }}
+        >
+          <CommandInput
+            placeholder="Buscar proyecto para invitar…"
+            aria-describedby={error ? errorId : undefined}
+            autoFocus={value.length > 0}
+            disabled={disabled}
+            onFocus={() => setOpen(true)}
+            onClick={() => setOpen(true)}
+            className="h-10 outline-none focus-visible:outline-none"
+          />
+          {open && (
+            <>
+              <CommandList className="max-h-60 border-t border-outline-variant/60">
+                <CommandEmpty>{vacioDeLaLista}</CommandEmpty>
+                {disponibles.map((p) => (
+                  <CommandItem
+                    key={p.idProyecto}
+                    value={`${p.tituloProyecto} ${p.lider ? nombreDe(p.lider) : ''}`}
+                    onSelect={() => agregar(p)}
+                  >
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate text-sm">{p.tituloProyecto}</span>
+                      <span className="truncate text-xs text-text-secondary">
+                        {p.lider ? `Líder: ${nombreDe(p.lider)}` : 'Sin líder registrado'}
+                        {' · '}
+                        {p.integrantesConvocables === 1 ? '1 persona' : `${p.integrantesConvocables} personas`}
+                        {p.ventanaHasta && ` · Cerrado, convocable hasta ${fechaCorta(p.ventanaHasta)}`}
+                      </span>
                     </span>
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandList>
-          </Command>
-          {elegibles.isError && (
-            <div className="border-t border-outline-variant/40 p-tight">
-              <Button type="button" variant="outline" size="sm" className="w-full rounded-pill" onClick={() => void elegibles.refetch()}>
-                Reintentar
-              </Button>
-            </div>
+                  </CommandItem>
+                ))}
+              </CommandList>
+              {elegibles.isError && (
+                <div className="border-t border-outline-variant/40 p-tight">
+                  <Button type="button" variant="outline" size="sm" className="w-full rounded-pill" onClick={() => void elegibles.refetch()}>
+                    Reintentar
+                  </Button>
+                </div>
+              )}
+            </>
           )}
-        </PopoverContent>
-      </Popover>
+        </Command>
+      ) : (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setOpen(true)}
+          className="mt-tight inline-flex min-h-6 items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50"
+        >
+          <Plus className="size-4" aria-hidden="true" />
+          Agregar otro proyecto
+        </button>
+      )}
 
       {error && (
         <p id={errorId} role="alert" className="mt-micro text-sm text-destructive">

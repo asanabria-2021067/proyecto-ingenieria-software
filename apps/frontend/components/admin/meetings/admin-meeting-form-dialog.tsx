@@ -236,6 +236,10 @@ export function AdminMeetingFormDialog({
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
       <DialogContent
+        // Escape dentro del buscador de proyectos solo cierra sus resultados, nunca el diálogo con lo escrito.
+        onEscapeKeyDown={(e) => {
+          if ((e.target as HTMLElement | null)?.closest?.('[data-buscador-proyectos]')) e.preventDefault();
+        }}
         onCloseAutoFocus={(e) => {
           if (restaurarFocoEn?.current) {
             e.preventDefault();

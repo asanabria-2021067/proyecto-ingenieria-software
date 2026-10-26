@@ -60,6 +60,8 @@ function renderField(props: Parameters<typeof Harness>[0] = {}) {
   );
 }
 
+/** El único buscador de proyectos (el input real, no un botón que abre otro). */
+const buscador = () => screen.getByRole('combobox', { name: 'Buscar proyecto para invitar' });
 const opciones = () => screen.queryAllByRole('option').map((o) => o.textContent ?? '');
 const valor = () => screen.getByTestId('valor').textContent;
 
@@ -75,7 +77,7 @@ describe('Proyectos invitados — selección múltiple', () => {
     expect(screen.getByText('0 proyectos seleccionados')).toBeInTheDocument();
     await waitFor(() => expect(servicios.getEligibleMeetingProjects).toHaveBeenCalledWith(RANGO));
 
-    fireEvent.click(screen.getByRole('button', { name: /Buscar proyecto para invitar/ }));
+    fireEvent.focus(buscador());
     await waitFor(() => expect(opciones()).toHaveLength(3));
     expect(opciones()[0]).toMatch(/Huerto Comunitario.*Líder: Valeria Ortiz.*3 personas/);
     expect(opciones()[2]).toMatch(/Cerrado, convocable hasta/);
@@ -83,7 +85,7 @@ describe('Proyectos invitados — selección múltiple', () => {
 
   it('elegir un proyecto lo muestra en una tarjeta con su líder, lo quita de las opciones y permite agregar otro', async () => {
     renderField();
-    fireEvent.click(screen.getByRole('button', { name: /Buscar proyecto para invitar/ }));
+    fireEvent.focus(buscador());
     fireEvent.click(await screen.findByRole('option', { name: /Plataforma de Tutorías/ }));
 
     const seleccion = screen.getByRole('list', { name: 'Proyectos seleccionados' });
@@ -131,10 +133,24 @@ describe('Proyectos invitados — selección múltiple', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Invita al menos un proyecto.');
   });
 
+  it('hay un solo buscador: enfocarlo despliega los resultados debajo, sin un segundo campo, y Escape los cierra', async () => {
+    renderField();
+    expect(screen.getAllByRole('combobox')).toHaveLength(1);
+    fireEvent.focus(buscador());
+    await waitFor(() => expect(opciones()).toHaveLength(3));
+    expect(screen.getAllByRole('combobox')).toHaveLength(1);
+    expect(screen.getAllByPlaceholderText('Buscar proyecto para invitar…')).toHaveLength(1);
+    // Los resultados viven dentro de la sección (en el flujo), no en una capa flotante aparte.
+    expect(screen.getByRole('group', { name: 'Proyectos invitados' })).toContainElement(screen.getByRole('listbox'));
+    fireEvent.keyDown(buscador(), { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Buscar proyecto para invitar' })).toBeInTheDocument();
+  });
+
   it('sin proyectos elegibles lo dice en el buscador', async () => {
     servicios.getEligibleMeetingProjects.mockResolvedValue([]);
     renderField();
-    fireEvent.click(screen.getByRole('button', { name: /Buscar proyecto para invitar/ }));
+    fireEvent.focus(buscador());
     expect(await screen.findByText('No hay proyectos que se puedan convocar en este horario.')).toBeInTheDocument();
   });
 });

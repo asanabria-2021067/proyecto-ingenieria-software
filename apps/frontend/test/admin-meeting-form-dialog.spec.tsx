@@ -62,8 +62,9 @@ function renderDialog() {
 }
 
 async function invitar(nombre: RegExp) {
-  const disparador = screen.queryByRole('button', { name: /Buscar proyecto para invitar/ }) ?? screen.getByRole('button', { name: 'Agregar otro proyecto' });
-  fireEvent.click(disparador);
+  const agregarOtro = screen.queryByRole('button', { name: 'Agregar otro proyecto' });
+  if (agregarOtro) fireEvent.click(agregarOtro);
+  fireEvent.focus(screen.getByRole('combobox', { name: 'Buscar proyecto para invitar' }));
   fireEvent.click(await screen.findByRole('option', { name: nombre }));
 }
 
@@ -93,6 +94,17 @@ describe('Programar reunión administrativa — diálogo', () => {
     for (const modalidad of ['Presencial', 'Virtual', 'Híbrida']) expect(screen.getByRole('radio', { name: modalidad })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Enviar recordatorio' })).toBeChecked();
     expect(screen.getByRole('group', { name: 'Proyectos invitados' })).toBeInTheDocument();
+  });
+
+  it('Escape dentro del buscador de proyectos cierra sus resultados, no el diálogo', async () => {
+    renderDialog();
+    const buscador = screen.getByRole('combobox', { name: 'Buscar proyecto para invitar' });
+    fireEvent.focus(buscador);
+    expect(await screen.findAllByRole('option')).toHaveLength(2);
+    fireEvent.keyDown(buscador, { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Programar reunión administrativa' })).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 
   it('sin proyectos invitados no envía nada y lo explica junto a la sección', async () => {
