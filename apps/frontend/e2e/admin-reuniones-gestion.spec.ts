@@ -19,6 +19,16 @@ const clave = (fecha: Date) =>
   `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
 
 async function captura(page: Page, testInfo: TestInfo, nombre: string) {
+  // La evidencia se toma con las transiciones terminadas (apertura del modal, cierre del buscador);
+  // las animaciones infinitas (esqueletos) no se esperan.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
   const carpeta = process.env.CAPTURAS_REUNIONES;
   const destino = carpeta ? path.join(carpeta, `${nombre}.png`) : testInfo.outputPath(`${nombre}.png`);
   await page.screenshot({ path: destino });
@@ -72,6 +82,7 @@ test.describe('Reuniones de Administración: programar, editar y cancelar desde 
         await page.getByRole('option').first().click();
       }
       await expect(seleccion.getByRole('listitem')).toHaveCount(objetivo);
+      await expect(page.getByRole('listbox')).toHaveCount(0);
       await expect(dialogo.getByText(objetivo === 1 ? '1 proyecto seleccionado' : `${objetivo} proyectos seleccionados`)).toBeVisible();
       await captura(page, testInfo, '05-varios-proyectos');
 
@@ -85,6 +96,8 @@ test.describe('Reuniones de Administración: programar, editar y cancelar desde 
       // 7–9. Las tres modalidades con su enlace y/o el mapa existente.
       await dialogo.getByRole('radio', { name: 'Presencial' }).click();
       await expect(dialogo.getByText('Ubicación presencial')).toBeVisible();
+      // Las teselas vienen de OpenStreetMap: sin red, la evidencia muestra el mapa sin fondo.
+      await dialogo.locator('.leaflet-tile-loaded').first().waitFor({ timeout: 10_000 }).catch(() => undefined);
       await captura(page, testInfo, '08-modalidad-presencial');
       await dialogo.getByRole('radio', { name: 'Híbrida' }).click();
       await expect(dialogo.getByLabel('Enlace de conexión virtual')).toBeVisible();
