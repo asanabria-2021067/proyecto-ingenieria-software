@@ -22,9 +22,10 @@ const TONO: Record<IdentidadDeAviso['tipo'], string> = {
 
 /**
  * Color de la CATEGORÍA del aviso, con la familia de etiqueta que ya la
- * representa (fondo tag-* suave y tinta on-tag-*, AA en claro y oscuro). Con
- * `categoria`, el avatar dice de qué trata el aviso y no si está leído: su color
- * no cambia al leerlo. La forma sigue saliendo del origen (círculo o cuadro).
+ * representa (fondo tag-* suave y tinta on-tag-*, AA en claro y oscuro), mientras
+ * el aviso está sin leer. Leído (`leida`), el avatar pierde el color y queda gris
+ * (surface-container con tinta tertiary: 6:1 en claro, 10:1 en oscuro). La forma
+ * sigue saliendo del origen (círculo o cuadro).
  */
 export const COLOR_DE_CATEGORIA: Record<NotificationGroupId, string> = {
   tareas: 'bg-tag-blue text-on-tag-blue',
@@ -37,14 +38,19 @@ export const COLOR_DE_CATEGORIA: Record<NotificationGroupId, string> = {
   otras: 'bg-tag-neutral text-on-tag-neutral',
 };
 
+const GRIS_LEIDA = 'bg-surface-container text-tertiary';
+
 export function NotificationAvatar({
   identidad,
   categoria,
+  leida = false,
   size = 'md',
   className,
 }: {
   identidad: IdentidadDeAviso;
   categoria?: NotificationGroupId;
+  /** Aviso ya leído: sin el color de su categoría, en gris. */
+  leida?: boolean;
   size?: 'md' | 'lg';
   className?: string;
 }) {
@@ -57,7 +63,8 @@ export function NotificationAvatar({
       aria-hidden="true"
       data-identidad={identidad.tipo}
       data-categoria={categoria}
-      className={cn(caja, 'shrink-0', TONO[identidad.tipo], categoria && COLOR_DE_CATEGORIA[categoria], className)}
+      data-leida={leida || undefined}
+      className={cn(caja, 'shrink-0', TONO[identidad.tipo], categoria && (leida ? GRIS_LEIDA : COLOR_DE_CATEGORIA[categoria]), className)}
     >
       <AvatarFallback className={cn('rounded-[inherit] bg-transparent font-semibold leading-none', letras)}>
         {'iniciales' in identidad ? identidad.iniciales : createElement(identidad.icon, { className: icono })}

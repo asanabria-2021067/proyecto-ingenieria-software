@@ -96,8 +96,8 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         )}
       >
         <span className="mt-0.5 shrink-0">
-          {/* El color del avatar es el de la categoría (igual leída o no); la lectura la dicen el título y el punto. */}
-          <NotificationAvatar identidad={identidad} categoria={idCategoria} />
+          {/* Sin leer, el avatar lleva el color de su categoría; leído, queda gris. */}
+          <NotificationAvatar identidad={identidad} categoria={idCategoria} leida={!noLeida} />
         </span>
 
         <span className="min-w-0 flex-1">

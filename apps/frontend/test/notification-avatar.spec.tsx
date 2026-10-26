@@ -115,7 +115,7 @@ describe('avatar contextual en la fila', () => {
     expect(chip).not.toHaveClass('pill-accent');
   });
 
-  it('el avatar lleva el color de su categoría (fondo y tinta de su familia de etiqueta), igual leída o no y sin anillo', () => {
+  it('sin leer, el avatar lleva el color de su categoría; leído, pierde el color y queda gris', () => {
     const casos = [
       { tipoNotificacion: 'TAREA_ASIGNADA', datosJson: { projectTitle: 'Plataforma de Tutorías' }, color: ['bg-tag-blue', 'text-on-tag-blue'] },
       { tipoNotificacion: 'NUEVA_POSTULACION', datosJson: { userName: 'María López' }, color: ['bg-tag-turquoise', 'text-on-tag-turquoise'] },
@@ -123,14 +123,17 @@ describe('avatar contextual en la fila', () => {
       { tipoNotificacion: 'AMISTAD_ACEPTADA', datosJson: { userName: 'Luis Gómez' }, color: ['bg-tag-violet', 'text-on-tag-violet'] },
     ];
     for (const { color, ...aviso } of casos) {
-      for (const leidaEn of [null, AHORA.toISOString()]) {
-        const { container } = fila(base({ ...aviso, leidaEn }));
-        const a = avatar(container);
-        expect(a, `${aviso.tipoNotificacion} ${leidaEn ? 'leída' : 'no leída'}`).toHaveClass(...color);
-        expect(a.className).not.toMatch(/(?:^|\s)ring-/);
-        expect(a).not.toHaveClass('text-primary', 'text-tertiary');
-        cleanup();
-      }
+      const sinLeer = fila(base({ ...aviso, leidaEn: null }));
+      const a = avatar(sinLeer.container);
+      expect(a, `${aviso.tipoNotificacion} no leída`).toHaveClass(...color);
+      expect(a.className).not.toMatch(/(?:^|\s)ring-/);
+      cleanup();
+
+      const leida = fila(base({ ...aviso, leidaEn: AHORA.toISOString() }));
+      const b = avatar(leida.container);
+      expect(b, `${aviso.tipoNotificacion} leída`).toHaveClass('bg-surface-container', 'text-tertiary');
+      expect(b.className).not.toMatch(/bg-tag-|text-on-tag-/);
+      cleanup();
     }
   });
 
