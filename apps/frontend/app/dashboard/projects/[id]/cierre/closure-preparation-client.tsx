@@ -277,7 +277,7 @@ function ClosurePreparationView({ proyecto }: { proyecto: ProyectoDetalleDTO }) 
           <FileText className="size-8" />
         </span>
         <div className="min-w-0 space-y-2">
-          <h1 className="line-clamp-2 text-2xl font-bold leading-tight text-on-surface md:text-[28px]">
+          <h1 className="type-display line-clamp-2">
             {proyecto.tituloProyecto}
           </h1>
           <p className="text-sm text-tertiary">
