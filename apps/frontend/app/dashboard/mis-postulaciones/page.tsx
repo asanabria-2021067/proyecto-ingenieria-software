@@ -102,7 +102,7 @@ export default function MisPostulacionesPage() {
       <div className={dashboardPage('py-8')}>
         <div className="mb-6 flex flex-col gap-stack lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
+            <h1 className="type-display mb-1">
               Mis Postulaciones
             </h1>
             <p className="text-tertiary text-sm">
