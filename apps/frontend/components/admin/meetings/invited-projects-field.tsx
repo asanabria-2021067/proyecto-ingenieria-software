@@ -319,38 +319,35 @@ export function InvitedProjectsField({
             disabled={disabled}
             onFocus={() => setOpen(true)}
             onClick={() => setOpen(true)}
-            className="h-10 outline-none focus-visible:outline-none"
+            className="h-10"
+            // El foco se marca en todo el buscador (borde y anillo del contenedor, `focus-within`); el contorno
+            // global del input dibujaba un segundo recuadro dentro. La regla global no está en una capa de
+            // Tailwind, así que solo un estilo en línea la sustituye aquí.
+            style={{ outline: 'none' }}
           />
-          {open && (
-            <>
-              <CommandList className="max-h-60 border-t border-outline-variant/60">
-                <CommandEmpty>{vacioDeLaLista}</CommandEmpty>
-                {disponibles.map((p) => (
-                  <CommandItem
-                    key={p.idProyecto}
-                    value={`${p.tituloProyecto} ${p.lider ? nombreDe(p.lider) : ''}`}
-                    onSelect={() => agregar(p)}
-                  >
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate text-sm">{p.tituloProyecto}</span>
-                      <span className="truncate text-xs text-text-secondary">
-                        {p.lider ? `Líder: ${nombreDe(p.lider)}` : 'Sin líder registrado'}
-                        {' · '}
-                        {p.integrantesConvocables === 1 ? '1 persona' : `${p.integrantesConvocables} personas`}
-                        {p.ventanaHasta && ` · Cerrado, convocable hasta ${fechaCorta(p.ventanaHasta)}`}
-                      </span>
-                    </span>
-                  </CommandItem>
-                ))}
-              </CommandList>
-              {elegibles.isError && (
-                <div className="border-t border-outline-variant/40 p-tight">
-                  <Button type="button" variant="outline" size="sm" className="w-full rounded-pill" onClick={() => void elegibles.refetch()}>
-                    Reintentar
-                  </Button>
-                </div>
-              )}
-            </>
+          {/* La lista siempre existe (cmdk apunta a ella con aria-controls); cerrada, se oculta. */}
+          <CommandList hidden={!open} className="max-h-60 border-t border-outline-variant/60">
+            <CommandEmpty>{vacioDeLaLista}</CommandEmpty>
+            {disponibles.map((p) => (
+              <CommandItem key={p.idProyecto} value={`${p.tituloProyecto} ${p.lider ? nombreDe(p.lider) : ''}`} onSelect={() => agregar(p)}>
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm">{p.tituloProyecto}</span>
+                  <span className="truncate text-xs text-text-secondary">
+                    {p.lider ? `Líder: ${nombreDe(p.lider)}` : 'Sin líder registrado'}
+                    {' · '}
+                    {p.integrantesConvocables === 1 ? '1 persona' : `${p.integrantesConvocables} personas`}
+                    {p.ventanaHasta && ` · Cerrado, convocable hasta ${fechaCorta(p.ventanaHasta)}`}
+                  </span>
+                </span>
+              </CommandItem>
+            ))}
+          </CommandList>
+          {open && elegibles.isError && (
+            <div className="border-t border-outline-variant/40 p-tight">
+              <Button type="button" variant="outline" size="sm" className="w-full rounded-pill" onClick={() => void elegibles.refetch()}>
+                Reintentar
+              </Button>
+            </div>
           )}
         </Command>
       ) : (
