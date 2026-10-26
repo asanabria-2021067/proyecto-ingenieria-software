@@ -196,7 +196,7 @@ export function NotificationInbox() {
 
   // Título de la página dentro de la columna de la bandeja (sin cabecera aparte).
   const cabeceraBandeja = (
-    <div className="flex shrink-0 items-start gap-tight border-b border-outline-variant/60 px-stack pb-tight pt-inline">
+    <div className="flex shrink-0 items-start gap-tight px-stack pb-tight pt-inline">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-tight">
           <h1 className="type-display">Notificaciones</h1>
@@ -273,7 +273,7 @@ export function NotificationInbox() {
   return (
     <>
       {esMovil ? (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-container-lowest">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-page">
           {vistaMovil === 'detalle' && mostrada ? (
             visor
           ) : (
@@ -285,7 +285,7 @@ export function NotificationInbox() {
           )}
         </div>
       ) : (
-        <ResizablePanelGroup direction="horizontal" autoSaveId={INBOX_PANELS_AUTOSAVE_ID} className="min-w-0 flex-1 bg-surface-container-lowest">
+        <ResizablePanelGroup direction="horizontal" autoSaveId={INBOX_PANELS_AUTOSAVE_ID} className="min-w-0 flex-1 bg-page">
           <ResizablePanel
             ref={panelLista}
             role="region"

@@ -68,7 +68,7 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         className={cn(
           'group/fila flex w-full items-start gap-inline border-l-2 px-inline py-inline text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40',
           acento.linea,
-          seleccionada ? 'bg-sage-nav-active' : noLeida ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-surface-container-low',
+          seleccionada ? 'bg-sage-nav-active' : noLeida ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-surface-container',
         )}
       >
         <span className="mt-0.5 shrink-0">
