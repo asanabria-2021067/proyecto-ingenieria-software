@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { NotificationAvatar } from '@/components/notifications/notification-avatar';
-import { DATA_TABLE_HEAD_ROW, DATA_TABLE_HEAD_TEXT } from '@/components/dashboard/data-table';
+import { DATA_TABLE_HEAD_ROW, DATA_TABLE_HEAD_TEXT, DATA_TABLE_ROW_HOVER, DATA_TABLE_ROWS } from '@/components/dashboard/data-table';
 import type { Notificacion } from '@/lib/services/notifications';
 import {
   agruparPorDia,
@@ -19,6 +19,14 @@ import {
 } from '@/lib/notifications/inbox-model';
 import { cn } from '@/lib/utils';
 
+/**
+ * Superficies de la fila, sobre el blanco de la tarjeta (como las filas de Mis Tareas) y nunca sobre el
+ * fondo azulado de la página: la no leída lleva un tinte verde casi imperceptible y la seleccionada, uno
+ * suave con indicador lateral. Mezclas de los mismos tokens, así siguen al tema claro y oscuro.
+ */
+const FONDO_NO_LEIDA = 'bg-[color-mix(in_srgb,var(--color-primary)_3%,var(--color-surface-container-lowest))]';
+const FONDO_SELECCIONADA = 'bg-[color-mix(in_srgb,var(--color-primary)_8%,var(--color-surface-container-lowest))]';
+
 interface InboxRowProps {
   notificacion: Notificacion;
   seleccionada: boolean;
@@ -29,9 +37,10 @@ interface InboxRowProps {
 /**
  * Fila compacta (REGIÓN C, §4): avatar del emisor (identidadDeAviso), origen, título, vista previa
  * de dos líneas, chips de categoría y proyecto, fecha e indicador de no leída.
- * No leída = título en negrita, punto verde, fondo apenas teñido y avatar en
- * verde (anillo, letras o trazo del icono) con la línea lateral a juego. Leída =
- * fondo blanco y avatar gris, sin línea. Seleccionada = fondo salvia sutil.
+ * Leída = fondo blanco. No leída = título semibold, punto verde y un tinte
+ * casi imperceptible. Seleccionada = verde muy suave con indicador lateral; si
+ * además está sin leer, conserva el semibold y el punto. El avatar lleva el
+ * color de la categoría en cualquier estado.
  */
 export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }: InboxRowProps) {
   const noLeida = n.leidaEn === null;
@@ -50,13 +59,10 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         aria-current={seleccionada ? 'true' : undefined}
         aria-label={`${noLeida ? 'No leída: ' : ''}${n.tituloNotificacion}${fecha ? `, ${fecha}` : ''}`}
         className={cn(
-          'group/fila flex w-full items-start gap-inline border-l-2 px-inline py-inline text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40',
-          noLeida ? 'border-l-primary' : 'border-l-transparent',
+          'group/fila flex w-full items-start gap-inline border-l-2 px-inline py-inline text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40',
           seleccionada
-            ? 'bg-sage-nav-active'
-            : noLeida
-              ? 'bg-primary/5 hover:bg-primary/10'
-              : 'bg-surface-container-lowest hover:bg-surface-container-low',
+            ? cn('border-l-primary transition-colors', FONDO_SELECCIONADA)
+            : cn('border-l-transparent', DATA_TABLE_ROW_HOVER, noLeida ? FONDO_NO_LEIDA : 'bg-surface-container-lowest'),
         )}
       >
         <span className="mt-0.5 shrink-0">
@@ -66,13 +72,13 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
 
         <span className="min-w-0 flex-1">
           {origen && (
-            <span className={cn('type-meta block truncate text-[11px] uppercase tracking-wide', seleccionada ? 'text-sage-nav-ink-soft' : 'text-text-secondary')}>{origen}</span>
+            <span className="type-meta block truncate text-[11px] uppercase tracking-wide text-text-secondary">{origen}</span>
           )}
-          <span className={cn('block truncate text-sm', seleccionada ? 'text-sage-nav-ink' : 'text-on-surface', noLeida ? 'font-bold' : 'font-medium')}>
+          <span className={cn('block truncate text-sm text-on-surface', noLeida ? 'font-semibold' : 'font-medium')}>
             {n.tituloNotificacion}
           </span>
           {n.mensajeNotificacion && (
-            <span className={cn('mt-0.5 line-clamp-2 text-xs leading-snug', seleccionada ? 'text-sage-nav-ink-soft' : noLeida ? 'text-on-surface-variant' : 'text-tertiary')}>
+            <span className={cn('mt-0.5 line-clamp-2 text-xs leading-snug', noLeida ? 'text-on-surface-variant' : 'text-tertiary')}>
               {n.mensajeNotificacion}
             </span>
           )}
@@ -89,7 +95,7 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         <span className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
           <time
             dateTime={n.creadaEn}
-            className={cn('text-[11px] tabular-nums', seleccionada ? 'font-semibold text-sage-nav-ink-soft' : noLeida ? 'font-semibold text-primary' : 'text-text-secondary')}
+            className={cn('text-[11px] tabular-nums text-text-secondary', noLeida && 'font-semibold')}
           >
             {fecha}
           </time>
@@ -209,7 +215,7 @@ export function InboxList({
           >
             {grupo.etiqueta}
           </h3>
-          <ul className="divide-y divide-outline-variant/40" onKeyDown={onKeyDown}>
+          <ul className={DATA_TABLE_ROWS} onKeyDown={onKeyDown}>
             {grupo.items.map((n) => (
               <InboxRow
                 key={n.idNotificacion}

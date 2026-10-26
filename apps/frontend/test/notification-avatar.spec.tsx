@@ -90,9 +90,9 @@ describe('avatar contextual en la fila', () => {
     }
   });
 
-  it('conserva el punto de no leída, el título en negrita y la selección', () => {
+  it('conserva el punto de no leída, el título en semibold y la selección', () => {
     const { container, rerender } = fila(base({ tituloNotificacion: 'Pendiente', datosJson: { userName: 'Ana' }, tipoNotificacion: 'NUEVO_SEGUIDOR' }));
-    expect(screen.getByText('Pendiente')).toHaveClass('font-bold');
+    expect(screen.getByText('Pendiente')).toHaveClass('font-semibold');
     expect(container.querySelector('.rounded-full.bg-primary')).not.toBeNull();
 
     rerender(
@@ -132,12 +132,34 @@ describe('avatar contextual en la fila', () => {
     }
   });
 
-  it('superficies de la fila: no leída con línea y fondo apenas teñido; leída blanca y sin línea', () => {
+  it('superficies: leída blanca, no leída con tinte casi imperceptible y seleccionada verde suave con indicador lateral', () => {
+    const boton = () => screen.getByRole('button');
+    const fecha = () => boton().querySelector('time')!;
+    // No leída: tinte sutil sobre el blanco (no el fondo azulado de la página), sin línea lateral ni fecha verde.
     fila(base({ tipoNotificacion: 'PROYECTO_PUBLICADO', datosJson: { projectTitle: 'Plataforma de Tutorías' } }));
-    expect(screen.getByRole('button')).toHaveClass('border-l-2', 'border-l-primary', 'bg-primary/5');
+    expect(boton().className).toContain('var(--color-primary)_3%');
+    expect(boton()).toHaveClass('border-l-transparent', 'hover:bg-surface-container-low');
+    expect(boton()).not.toHaveClass('bg-primary/5', 'border-l-primary');
+    expect(fecha()).toHaveClass('text-text-secondary', 'font-semibold');
+    expect(fecha()).not.toHaveClass('text-primary');
     cleanup();
+
+    // Leída: blanca, como las filas de Mis Tareas.
     fila(base({ tipoNotificacion: 'NUEVO_SEGUIDOR', datosJson: { userName: 'Ana Ruiz' }, leidaEn: AHORA.toISOString() }));
-    expect(screen.getByRole('button')).toHaveClass('border-l-transparent', 'bg-surface-container-lowest');
+    expect(boton()).toHaveClass('bg-surface-container-lowest', 'border-l-transparent', 'hover:bg-surface-container-low');
+    cleanup();
+
+    // Seleccionada y no leída: verde suave con indicador lateral, y sigue en semibold con su punto.
+    const { container } = render(
+      <ul>
+        <InboxRow notificacion={base({ tituloNotificacion: 'Elegida', datosJson: { userName: 'Ana' }, tipoNotificacion: 'NUEVO_SEGUIDOR' })} seleccionada onSeleccionar={() => {}} ahora={AHORA} />
+      </ul>,
+    );
+    expect(boton().className).toContain('var(--color-primary)_8%');
+    expect(boton()).toHaveClass('border-l-primary');
+    expect(boton()).not.toHaveClass('bg-sage-nav-active');
+    expect(screen.getByText('Elegida')).toHaveClass('font-semibold', 'text-on-surface');
+    expect(container.querySelector('.rounded-full.bg-primary')).not.toBeNull();
   });
 
   it('títulos y mensajes largos siguen truncados', () => {
