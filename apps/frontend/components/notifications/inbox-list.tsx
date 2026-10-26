@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { NotificationAvatar } from '@/components/notifications/notification-avatar';
+import { DATA_TABLE_HEAD_ROW, DATA_TABLE_HEAD_TEXT } from '@/components/dashboard/data-table';
 import type { Notificacion } from '@/lib/services/notifications';
 import {
   agruparPorDia,
@@ -216,7 +217,7 @@ export function InboxList({
         <section key={grupo.clave} aria-labelledby={`inbox-dia-${grupo.clave}`}>
           <h3
             id={`inbox-dia-${grupo.clave}`}
-            className="type-subtitle sticky top-0 z-10 border-y border-outline-variant/40 bg-page/95 px-inline py-1.5 font-semibold uppercase backdrop-blur-sm first:border-t-0"
+            className={cn(DATA_TABLE_HEAD_ROW, DATA_TABLE_HEAD_TEXT, 'sticky top-0 z-10 border-t px-inline py-tight uppercase first:border-t-0')}
           >
             {grupo.etiqueta}
           </h3>
