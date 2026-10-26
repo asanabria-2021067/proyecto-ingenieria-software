@@ -6,9 +6,11 @@ import { desactivarTour } from './support/realtime';
 
 /**
  * Sprint 10: el Calendario de Sprints de Administración lee las reuniones de
- * Administración del backend real en Día, Semana, Mes y Lista, solo para
- * consulta. La reunión se prepara por la API (el seed no trae ninguna) y se
- * cancela al terminar; la interfaz bajo prueba no crea ni gestiona nada.
+ * Administración del backend real en Día, Semana, Mes y Lista. La reunión se
+ * prepara por la API (el seed no trae ninguna) y se cancela al terminar. La
+ * gestión desde la interfaz (programar, editar, cancelar) la cubre
+ * `admin-reuniones-gestion.spec.ts`; aquí solo se comprueba que sus acciones
+ * aparecen en la tarjeta de quien puede gestionarla.
  */
 const ADMIN = 'admin@uvg.edu.gt';
 
@@ -16,7 +18,7 @@ const clave = (fecha: Date) =>
   `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
 
 test.describe('Calendario administrativo: reuniones reales en las cuatro vistas (Sprint 10)', () => {
-  test('una reunión aparece a su hora con su detalle, sin controles de gestión, y al cancelarse sale de la agenda', async ({ page }, testInfo) => {
+  test('una reunión aparece a su hora con su detalle y sus acciones de gestión, y al cancelarse sale de la agenda', async ({ page }, testInfo) => {
     await login(page, ADMIN, '/dashboard/admin');
     const inicio = enDias(2, 10);
     const fin = enDias(2, 11);
@@ -74,10 +76,15 @@ test.describe('Calendario administrativo: reuniones reales en las cuatro vistas 
       await page.goto(`/dashboard/admin/sprints?vista=lista&fecha=${dia}`);
       await expect(page.getByRole('cell', { name: titulo })).toBeVisible({ timeout: 15_000 });
 
-      // Solo consulta y sin desbordar la página en móvil.
-      const prohibido = /agendar|programar|nueva reuni|editar|cancelar|reprogramar/i;
-      await expect(page.getByRole('button', { name: prohibido })).toHaveCount(0);
-      await expect(page.getByRole('link', { name: prohibido })).toHaveCount(0);
+      // Quien la creó puede gestionarla desde su tarjeta; ningún diálogo se abre solo.
+      await page.goto(`/dashboard/admin/sprints?vista=semana&fecha=${dia}`);
+      await page.getByRole('button', { name: `${titulo}, 10:00 a 11:00` }).click();
+      const elegida = page.locator('li[aria-current="true"]');
+      await expect(elegida.getByRole('button', { name: `Editar reunión ${titulo}` })).toBeVisible();
+      await expect(elegida.getByRole('button', { name: `Cancelar reunión ${titulo}` })).toBeVisible();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+
+      // Sin desbordar la página en móvil.
       await page.setViewportSize({ width: 375, height: 800 });
       await page.goto(`/dashboard/admin/sprints?vista=mes&fecha=${dia}`);
       await expect(page.getByRole('heading', { level: 1, name: 'Calendario de Sprints' })).toBeVisible();

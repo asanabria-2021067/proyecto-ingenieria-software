@@ -139,9 +139,10 @@ const ORIGENES_DEL_MAPA: Record<string, RegExp> = {
   'connect-src': /^https:\/\/nominatim\.openstreetmap\.org$/,
 };
 
-export function retirarDeudaCspDelMapa(cspViolations: CspCollector): string[] {
+export function retirarDeudaCspDelMapa(cspViolations: CspCollector, pagina = '/dashboard/calendario'): string[] {
   const todas = cspViolations.drain();
-  const ajenas = todas.filter((v) => !(ORIGENES_DEL_MAPA[v.directive]?.test(v.blocked) && v.disposition === 'report' && v.page === '/dashboard/calendario'));
+  // `pagina`: la ruta que abre el mapa (el calendario del estudiante o, en HU-195, el de Administración).
+  const ajenas = todas.filter((v) => !(ORIGENES_DEL_MAPA[v.directive]?.test(v.blocked) && v.disposition === 'report' && v.page === pagina));
   expect(ajenas, 'violaciones CSP que no son la deuda conocida del mapa').toEqual([]);
   return [...new Set(todas.map((v) => `${v.directive} ${v.blocked}`))].sort();
 }
