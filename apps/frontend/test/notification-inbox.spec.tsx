@@ -15,6 +15,9 @@ vi.mock('../lib/services/notifications', async (importOriginal) => {
   };
 });
 vi.mock('../lib/mensajes', () => ({ aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() } }));
+// Radix Select en jsdom (mismo apaño que los specs de administración).
+if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false;
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
 
 import {
   getConteoNoLeidas,
@@ -66,6 +69,11 @@ function renderInbox() {
 }
 
 const lista = () => screen.getByRole('region', { name: 'Bandeja de entrada' });
+/** Abre un Select de la barra de filtros y elige una opción. */
+function elegir(nombreSelect: string, opcion: string) {
+  fireEvent.keyDown(screen.getByRole('combobox', { name: nombreSelect }), { key: 'Enter' });
+  fireEvent.click(screen.getByRole('option', { name: opcion }));
+}
 const filas = () => within(lista()).getAllByRole('listitem');
 
 beforeEach(() => {
@@ -100,11 +108,12 @@ describe('NotificationInbox', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Hoy' })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Selecciona una notificación');
     expect(screen.getByRole('button', { name: 'Marcar todas como leídas' })).toBeEnabled();
-    // Los contadores de categoría salen del desglose por tipo del conteo global, no de una petición por categoría.
-    const carpetas = screen.getByRole('complementary', { name: 'Carpetas de notificaciones' });
-    expect(within(carpetas).getByRole('button', { name: 'Tareas e hitos, 1 sin leer' })).toBeInTheDocument();
-    expect(within(carpetas).getByRole('button', { name: 'Recordatorios y calendario, 1 sin leer' })).toBeInTheDocument();
-    expect(within(carpetas).getByRole('button', { name: 'Proyectos' })).toBeInTheDocument();
+    // Sin sidebar secundaria: categoría y proyecto son selects de la barra de filtros, y el orden un botón de dos estados.
+    expect(screen.queryByRole('complementary', { name: 'Carpetas de notificaciones' })).not.toBeInTheDocument();
+    expect(within(lista()).getByRole('combobox', { name: 'Filtrar por categoría' })).toHaveTextContent('Todas las categorías');
+    expect(within(lista()).getByRole('combobox', { name: 'Filtrar por proyecto' })).toHaveTextContent('Todos los proyectos');
+    expect(within(lista()).getByRole('button', { name: /^Orden: más recientes primero/ })).toHaveTextContent('Más recientes');
+    // Un solo conteo global: ninguna petición por categoría.
     expect(vi.mocked(getNotificacionesPagina).mock.calls.filter(([, f]) => f?.tipos && !('orden' in (f ?? {})))).toHaveLength(0);
     // El filtro inicial viaja al servidor sin leída, sin búsqueda y con orden descendente.
     expect(llamadasDeLista()[0][1]).toEqual({ tipos: undefined, q: undefined, proyecto: undefined, leida: undefined, orden: 'desc' });
@@ -155,12 +164,9 @@ describe('NotificationInbox', () => {
     await within(lista()).findByText('2 avisos · 2 sin leer');
     // Solo «No leídas» no acota nada: el marcado sigue siendo el de todas.
     expect(screen.getByRole('button', { name: 'Marcar todas como leídas' })).toBeEnabled();
-    // La carpeta «No leídas» queda activa en la sidebar.
-    const carpetas = screen.getByRole('complementary', { name: 'Carpetas de notificaciones' });
-    expect(within(carpetas).getByRole('button', { name: /^No leídas/ })).toHaveAttribute('aria-current', 'true');
-
     fireEvent.click(screen.getByRole('radio', { name: 'Todas' }));
-    fireEvent.click(within(carpetas).getByRole('button', { name: /^Recordatorios y calendario/ }));
+    elegir('Filtrar por categoría', 'Recordatorios y calendario');
+    expect(screen.getByRole('combobox', { name: 'Filtrar por categoría' })).toHaveTextContent('Recordatorios y calendario');
     await waitFor(() => expect(llamadasDeLista().at(-1)?.[1].tipos).toEqual(expect.arrayContaining(['REUNION_PROGRAMADA', 'REUNION_CANCELADA'])));
     expect(llamadasDeLista().at(-1)?.[1].leida).toBeUndefined();
     await within(lista()).findByText('1 aviso · 1 sin leer');
@@ -217,22 +223,54 @@ describe('NotificationInbox', () => {
     expect(screen.getByRole('article')).toHaveTextContent('Horas consolidadas del Sprint');
   });
 
-  it('al cambiar de categoría el aviso abierto se conserva pero se marca como fuera del filtro', async () => {
+  it('al cambiar de categoría, un aviso abierto que ya no pertenece al resultado deja el visor vacío', async () => {
     renderInbox();
     await within(lista()).findByText('3 avisos · 2 sin leer');
     fireEvent.click(within(filas()[1]).getByRole('button'));
     expect(screen.getByRole('article')).toHaveTextContent('Horas consolidadas del Sprint');
-    expect(screen.queryByText('Fuera del filtro actual')).not.toBeInTheDocument();
 
-    const carpetas = screen.getByRole('complementary', { name: 'Carpetas de notificaciones' });
-    fireEvent.click(within(carpetas).getByRole('button', { name: /^Recordatorios y calendario/ }));
+    elegir('Filtrar por categoría', 'Recordatorios y calendario');
     await within(lista()).findByText('1 aviso · 1 sin leer');
-    // La lista ya no contiene el aviso abierto; el visor lo conserva y lo señala.
     expect(within(lista()).queryByText('Horas consolidadas del Sprint')).not.toBeInTheDocument();
-    expect(screen.getByRole('article')).toHaveTextContent('Horas consolidadas del Sprint');
-    expect(screen.getByText('Fuera del filtro actual')).toBeInTheDocument();
-    // Anterior/siguiente no apuntan a nada de la lista filtrada.
-    expect(screen.getByRole('button', { name: 'Notificación anterior' })).toBeDisabled();
+    expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Selecciona una notificación');
     expect(screen.getByRole('button', { name: 'Notificación siguiente' })).toBeDisabled();
+
+    // Si el aviso sigue en el resultado (p. ej. solo cambia el orden), la selección se conserva.
+    elegir('Filtrar por categoría', 'Todas las categorías');
+    await within(lista()).findByText('3 avisos · 2 sin leer');
+    fireEvent.click(within(filas()[1]).getByRole('button'));
+    fireEvent.click(screen.getByRole('button', { name: /^Orden: más recientes primero/ }));
+    await waitFor(() => expect(llamadasDeLista().at(-1)?.[1].orden).toBe('asc'));
+    await within(lista()).findByText('3 avisos · 2 sin leer');
+    expect(screen.getByRole('article')).toHaveTextContent('Horas consolidadas del Sprint');
+  });
+
+  it('bajo «No leídas», leer el aviso abierto no vacía el visor aunque la lista deje de mostrarlo', async () => {
+    renderInbox();
+    await within(lista()).findByText('3 avisos · 2 sin leer');
+    fireEvent.click(screen.getByRole('radio', { name: 'No leídas' }));
+    await within(lista()).findByText('2 avisos · 2 sin leer');
+    fireEvent.click(within(filas()[0]).getByRole('button'));
+    await waitFor(() => expect(vi.mocked(marcarLeida).mock.calls[0]?.[0]).toBe(1));
+    // Tras releer, la lista (solo no leídas) ya no incluye el aviso 1; el visor lo conserva.
+    AVISOS[0] = { ...AVISOS[0], leidaEn: iso(0) };
+    fireEvent.click(screen.getByRole('button', { name: 'Notificación siguiente' }));
+    await waitFor(() => expect(screen.getByRole('article')).toHaveTextContent('Reunión de Administración cancelada'));
+    AVISOS[0] = { ...AVISOS[0], leidaEn: null };
+  });
+
+  it('el botón de orden alterna entre recientes y antiguas y manda el orden al servidor', async () => {
+    renderInbox();
+    await within(lista()).findByText('3 avisos · 2 sin leer');
+    const boton = () => within(lista()).getByRole('button', { name: /^Orden:/ });
+    expect(boton()).toHaveAttribute('data-orden', 'desc');
+    fireEvent.click(boton());
+    expect(boton()).toHaveAttribute('data-orden', 'asc');
+    expect(boton()).toHaveTextContent('Más antiguas');
+    await waitFor(() => expect(llamadasDeLista().at(-1)?.[1].orden).toBe('asc'));
+    fireEvent.click(boton());
+    expect(boton()).toHaveTextContent('Más recientes');
+    await waitFor(() => expect(llamadasDeLista().at(-1)?.[1].orden).toBe('desc'));
   });
 });

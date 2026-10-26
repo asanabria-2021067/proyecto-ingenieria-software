@@ -5,8 +5,8 @@ import { analizarAccesibilidad, violacionesBloqueantes, describirViolaciones } f
 import { API_URL, desactivarTour } from './support/realtime';
 
 /**
- * Sprint 10 — centro de notificaciones como bandeja (carpetas, lista compacta
- * y visor) contra la pila real. Lectura sobre los avisos sembrados de la
+ * Sprint 10 — centro de notificaciones como bandeja (lista compacta con sus
+ * filtros y visor) contra la pila real. Lectura sobre los avisos sembrados de la
  * cuenta; el único cambio que persiste es leer el aviso que se abre (el mismo
  * contrato que ya usaba la campana). Los tres tipos de reunión de HU-195 no
  * existen en la siembra: su visor se comprueba respondiendo SOLO ese listado
@@ -33,15 +33,11 @@ async function abrirBandeja(page: Page) {
 }
 
 const filas = (page: Page) => page.getByRole('region', { name: 'Bandeja de entrada' }).locator('li[data-notificacion]');
-const carpetas = (page: Page) => page.getByRole('complementary', { name: 'Carpetas de notificaciones' });
 
 test.beforeEach(async ({ page }) => {
   await desactivarTour(page);
   await login(page, CARLOS);
-  await page.evaluate(() => {
-    localStorage.removeItem('uvg-collab-inbox-folders');
-    localStorage.removeItem('react-resizable-panels:uvg-collab-inbox-panels');
-  });
+  await page.evaluate(() => localStorage.removeItem('react-resizable-panels:uvg-collab-inbox-panels'));
 });
 
 test('la lista pagina del servidor, el visor abre el aviso y lo lee una sola vez', async ({ page }) => {
@@ -77,25 +73,24 @@ test('la lista pagina del servidor, el visor abre el aviso y lo lee una sola vez
   await expect(page.getByRole('button', { name: 'Notificación anterior' })).toBeDisabled();
 });
 
-test('la sidebar de carpetas se contrae, conserva la selección y recuerda la preferencia', async ({ page }) => {
+test('sin sidebar secundaria: la bandeja va pegada a la sidebar global y los filtros viven en su barra', async ({ page }) => {
   await abrirBandeja(page);
-  const aside = carpetas(page);
-  await expect(aside).toHaveAttribute('data-state', 'expanded');
-  await aside.getByRole('button', { name: /^Proyectos/ }).click();
-  await expect(aside.getByRole('button', { name: /^Proyectos/ })).toHaveAttribute('aria-current', 'true');
-
-  await aside.getByRole('button', { name: 'Contraer carpetas de notificaciones' }).click();
-  await expect(aside).toHaveAttribute('data-state', 'collapsed');
-  // Contraída: sin nombres visibles, con tooltip y la selección intacta.
-  await expect(aside.getByText('Recibidas')).toHaveCount(0);
-  await expect(aside.getByRole('button', { name: /^Proyectos/ })).toHaveAttribute('aria-current', 'true');
-  await aside.getByRole('button', { name: /^Proyectos/ }).hover();
-  await expect(page.getByRole('tooltip').first()).toContainText('Proyectos');
-  // El foco se mueve al botón opuesto (expandir).
-  await expect(aside.getByRole('button', { name: 'Expandir carpetas de notificaciones' })).toBeFocused();
-
-  await page.reload();
-  await expect(carpetas(page)).toHaveAttribute('data-state', 'collapsed');
+  await expect(page.getByRole('complementary', { name: 'Carpetas de notificaciones' })).toHaveCount(0);
+  const medidas = await page.evaluate(() => {
+    const global = document.querySelector('aside.student-sidebar, aside.admin-sidebar')!.getBoundingClientRect();
+    const bandeja = document.querySelector('[role="region"][aria-label="Bandeja de entrada"]')!.getBoundingClientRect();
+    const grupo = document.querySelector('[data-panel-group]')!.getBoundingClientRect();
+    return { globalRight: global.right, bandejaLeft: bandeja.left, grupoRight: grupo.right, grupoBottom: grupo.bottom, w: innerWidth, h: innerHeight };
+  });
+  expect(Math.abs(medidas.bandejaLeft - medidas.globalRight)).toBeLessThan(2);
+  expect(Math.abs(medidas.grupoRight - medidas.w)).toBeLessThan(2);
+  expect(Math.abs(medidas.grupoBottom - medidas.h)).toBeLessThan(2);
+  const lista = page.getByRole('region', { name: 'Bandeja de entrada' });
+  await expect(lista.getByRole('combobox', { name: 'Filtrar por categoría' })).toHaveText('Todas las categorías');
+  await expect(lista.getByRole('combobox', { name: 'Filtrar por proyecto' })).toHaveText('Todos los proyectos');
+  await lista.getByRole('combobox', { name: 'Filtrar por categoría' }).click();
+  await expect(page.getByRole('option', { name: 'Recordatorios y calendario' })).toBeVisible();
+  await page.keyboard.press('Escape');
   // La sidebar global no cambió.
   await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
 });
@@ -107,11 +102,11 @@ test('pestañas, categoría, búsqueda y orden viajan al servidor y acotan el ma
   const noLeidas = page.waitForRequest((r) => r.url().includes('/notificaciones?') && r.url().includes('leida=false') && !r.url().includes('tipos='));
   await lista.getByRole('radio', { name: 'No leídas' }).click();
   await noLeidas;
-  await expect(carpetas(page).getByRole('button', { name: /^No leídas/ })).toHaveAttribute('aria-current', 'true');
   await expect(page.getByRole('button', { name: 'Marcar todas como leídas' })).toBeVisible();
 
   const porCategoria = page.waitForRequest((r) => r.url().includes('tipos=') && r.url().includes('leida=false') && r.url().includes('TAREA_ASIGNADA') && r.url().includes('page=1&limit=20'));
-  await carpetas(page).getByRole('button', { name: /^Tareas e hitos/ }).click();
+  await lista.getByRole('combobox', { name: 'Filtrar por categoría' }).click();
+  await page.getByRole('option', { name: 'Tareas e hitos' }).click();
   await porCategoria;
   await expect(page.getByRole('button', { name: 'Marcar como leídas las de esta categoría' })).toBeVisible();
 
@@ -123,9 +118,15 @@ test('pestañas, categoría, búsqueda y orden viajan al servidor y acotan el ma
   await lista.getByRole('button', { name: 'Limpiar búsqueda' }).click();
 
   const ascendente = page.waitForRequest((r) => r.url().includes('orden=asc'));
-  await lista.getByRole('combobox', { name: 'Ordenar por fecha' }).click();
-  await page.getByRole('option', { name: 'Más antiguas' }).click();
+  const orden = lista.getByRole('button', { name: /^Orden:/ });
+  await expect(orden).toHaveText('Más recientes');
+  await orden.click();
+  await expect(orden).toHaveText('Más antiguas');
   await ascendente;
+  const descendente = page.waitForRequest((r) => r.url().includes('/notificaciones?') && !r.url().includes('orden=asc') && r.url().includes('tipos='));
+  await orden.click();
+  await expect(orden).toHaveText('Más recientes');
+  await descendente;
 
   await lista.getByRole('combobox', { name: 'Filtrar por proyecto' }).click();
   const sinProyecto = page.waitForRequest((r) => r.url().includes('proyecto=ninguno'));
@@ -151,7 +152,6 @@ test('la bandeja se redimensiona con el teclado, se contrae y se restaura sin pe
   await lista.getByRole('button', { name: 'Contraer bandeja' }).click();
   await expect(lista).toBeHidden();
   await expect(page.getByRole('article').getByRole('heading', { level: 3 })).toHaveText(propios[0].tituloNotificacion);
-  await expect(carpetas(page)).toBeVisible();
   await page.getByRole('button', { name: 'Restaurar bandeja' }).click();
   await expect(lista).toBeVisible();
   await expect(filas(page).first().getByRole('button')).toHaveAttribute('aria-current', 'true');
@@ -162,7 +162,6 @@ test('en móvil alterna entre la lista y el detalle conservando el aviso', async
   test.skip(propios.length === 0, 'La cuenta no tiene notificaciones sembradas');
   await page.setViewportSize({ width: 390, height: 844 });
   await abrirBandeja(page);
-  await expect(carpetas(page)).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: 'Filtrar por categoría' })).toBeVisible();
   await filas(page).first().getByRole('button').click();
   await expect(page.getByRole('article').getByRole('heading', { level: 3 })).toHaveText(propios[0].tituloNotificacion);
