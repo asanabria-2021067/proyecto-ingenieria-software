@@ -1,9 +1,13 @@
 import { apiFetch } from '@/lib/api/client';
 import type {
   AdminMeeting,
+  AdminMeetingDetalle,
   AdminMeetingEstadoListado,
   AdminMeetingPage,
   AdminMeetingParticipantes,
+  AdminMeetingPayload,
+  EquipoDeProyectoReunion,
+  ProyectoElegibleReunion,
 } from '@/lib/types/admin-meetings';
 
 /** Máximo que admite el contrato por página. */
@@ -62,4 +66,34 @@ export async function getAdminMeetingsInRange(desde: Date, hasta: Date): Promise
 
 export function getAdminMeetingParticipants(idReunion: number): Promise<AdminMeetingParticipantes> {
   return apiFetch<AdminMeetingParticipantes>(`/admin/reuniones/${idReunion}/participantes`);
+}
+
+/** Proyectos convocables para el rango de la reunión (por defecto, ahora). El servidor revalida al guardar. */
+export function getEligibleMeetingProjects(rango?: { fechaInicio: Date; fechaFin: Date }): Promise<ProyectoElegibleReunion[]> {
+  const params = rango ? `?${new URLSearchParams({ fechaInicio: rango.fechaInicio.toISOString(), fechaFin: rango.fechaFin.toISOString() })}` : '';
+  return apiFetch<ProyectoElegibleReunion[]>(`/admin/reuniones/proyectos-elegibles${params}`);
+}
+
+/** Líder, integrantes y convocados de un proyecto, con la regla de equipo del backend. */
+export function getMeetingProjectTeam(idProyecto: number): Promise<EquipoDeProyectoReunion> {
+  return apiFetch<EquipoDeProyectoReunion>(`/admin/reuniones/equipos/${idProyecto}`);
+}
+
+export function getAdminMeeting(idReunion: number): Promise<AdminMeetingDetalle> {
+  return apiFetch<AdminMeetingDetalle>(`/admin/reuniones/${idReunion}`);
+}
+
+/** Una sola operación: el backend crea la reunión, sus proyecciones y los avisos. */
+export function createAdminMeeting(payload: AdminMeetingPayload): Promise<AdminMeetingDetalle> {
+  return apiFetch<AdminMeetingDetalle>('/admin/reuniones', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+/** `version` es la que se leyó: si otro administrador la cambió antes, el backend responde 409. */
+export function updateAdminMeeting(idReunion: number, payload: Partial<AdminMeetingPayload> & { version: number }): Promise<AdminMeetingDetalle> {
+  return apiFetch<AdminMeetingDetalle>(`/admin/reuniones/${idReunion}`, { method: 'PATCH', body: JSON.stringify(payload) });
+}
+
+/** Cancela (no borra) la reunión para todos sus proyectos; es idempotente. */
+export function cancelAdminMeeting(idReunion: number): Promise<AdminMeetingDetalle> {
+  return apiFetch<AdminMeetingDetalle>(`/admin/reuniones/${idReunion}`, { method: 'DELETE' });
 }

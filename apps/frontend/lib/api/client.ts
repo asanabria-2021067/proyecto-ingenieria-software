@@ -121,6 +121,10 @@ async function buildApiError(res: Response, method: string | undefined, path: st
   if (typeof body.code === 'string') {
     (error as any).code = body.code;
   }
+  // El cuerpo completo, para los rechazos con datos estructurados además del
+  // mensaje (p. ej. `proyectos[].motivo` o `versionActual` de las reuniones de
+  // Administración). No se registra en consola.
+  (error as any).body = body;
   (error as any).method = (method ?? 'GET').toUpperCase();
   (error as any).endpoint = stripQuery(path);
   logApiError(error);
