@@ -256,12 +256,19 @@ describe('PersonasPage', () => {
       'true',
     );
 
+    const clasesEnTarjeta = within(main).getByRole('link', { name: 'Ver perfil' }).className;
+
     fireEvent.click(screen.getByRole('button', { name: 'Ver como lista' }));
 
     expect(screen.getByRole('button', { name: 'Ver como lista' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
+    // la lista reutiliza los botones de la tarjeta, agrupados a la derecha y seguidos del menú
+    const verPerfil = within(main).getByRole('link', { name: 'Ver perfil' });
+    expect(verPerfil.className).toBe(clasesEnTarjeta);
+    expect(verPerfil.parentElement).toHaveClass('justify-end', 'gap-2');
+    expect(verPerfil.parentElement?.lastElementChild).toHaveAccessibleName('Más acciones para Carla Ruiz');
     expect(screen.getByRole('button', { name: 'Ver como tarjetas' })).toHaveAttribute(
       'aria-pressed',
       'false',
