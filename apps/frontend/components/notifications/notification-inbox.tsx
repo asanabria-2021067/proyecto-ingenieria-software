@@ -17,20 +17,22 @@ import {
   type FiltrosMarcado,
   type Notificacion,
 } from '@/lib/services/notifications';
-import { INBOX_CATEGORIES, conteosPorCategoria } from '@/lib/notifications/inbox-model';
+import { INBOX_CATEGORIES } from '@/lib/notifications/inbox-model';
 import type { NotificationGroupId } from '@/lib/notifications/preference-groups';
 import { cn } from '@/lib/utils';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
-import { InboxFoldersSidebar, type InboxFoldersSelection } from './inbox-folders-sidebar';
 import { InboxList } from './inbox-list';
 import { InboxToolbar, type InboxProjectFilter, type InboxReadTab } from './inbox-toolbar';
-import { MOBILE_QUERY, RAIL_ONLY_QUERY, INBOX_PANELS_AUTOSAVE_ID, useInboxFoldersCollapsed, useMediaQuery } from './inbox-preferences';
+import { MOBILE_QUERY, INBOX_PANELS_AUTOSAVE_ID, useMediaQuery } from './inbox-preferences';
 import { NotificationReaderContent, NotificationReaderEmpty, NotificationReaderToolbar } from './notification-reader';
 
-/** Reparto por defecto bandeja/visor (porcentaje del ancho disponible; ~340 px en un portátil). */
-const LISTA_DEFAULT = 36;
-const LISTA_MIN = 24;
-const LISTA_MAX = 55;
+/**
+ * Reparto bandeja/visor en porcentaje del ancho tras la sidebar global
+ * (~1200 px en escritorio): ~420 px por defecto, ~300 px mínimo, ~600 px máximo.
+ */
+const LISTA_DEFAULT = 35;
+const LISTA_MIN = 25;
+const LISTA_MAX = 50;
 
 const plural = (n: number, singular: string, pluralForm: string) => `${n} ${n === 1 ? singular : pluralForm}`;
 
@@ -44,11 +46,11 @@ function etiquetaMarcar(categoria: NotificationGroupId | null, busqueda: string,
 /**
  * Sprint 10 — bandeja de notificaciones (HU-198 + rediseño Outlook/Gmail).
  * La página la monta como fila a altura de ventana (patrón del workspace del
- * proyecto): sidebar secundaria pegada a la global, y bandeja y visor con
- * scroll propio hasta el borde derecho. El título vive en la columna de la
- * bandeja y el marcado masivo en la barra del visor.
- * Cuatro regiones: la sidebar global queda fuera (DashboardLayout); aquí van
- * la sidebar secundaria de carpetas, la bandeja compacta y el visor. Todo
+ * proyecto): bandeja pegada a la sidebar global y visor con scroll propio
+ * hasta el borde derecho. El título vive en la columna de la bandeja y el
+ * marcado masivo en la barra del visor. Tres regiones: la sidebar global queda
+ * fuera (DashboardLayout); aquí van la bandeja compacta (con categoría,
+ * proyecto, lectura y orden en su barra de filtros) y el visor. Todo
  * filtro viaja al servidor (tipos, leída, q, proyecto, orden) y se aplica
  * antes de paginar: los contadores y «marcar filtradas» abarcan toda la
  * colección, no la página cargada.
@@ -56,9 +58,6 @@ function etiquetaMarcar(categoria: NotificationGroupId | null, busqueda: string,
 export function NotificationInbox() {
   const queryClient = useQueryClient();
   const esMovil = useMediaQuery(MOBILE_QUERY);
-  const soloRail = useMediaQuery(RAIL_ONLY_QUERY);
-  const { collapsed: carpetasPref, toggleCollapsed: alternarCarpetas } = useInboxFoldersCollapsed();
-  const carpetasContraidas = soloRail || carpetasPref;
 
   // ── Filtros ────────────────────────────────────────────────────────────────
   const [categoria, setCategoria] = useState<NotificationGroupId | null>(null);
@@ -78,12 +77,6 @@ export function NotificationInbox() {
   );
   const hayFiltros = categoria !== null || lectura !== 'todas' || busqueda.trim() !== '' || proyecto !== null;
 
-  const seleccionCarpetas: InboxFoldersSelection = { bandeja: lectura === 'no-leidas' ? 'no-leidas' : 'recibidas', categoria };
-  const elegirCarpeta = (s: InboxFoldersSelection) => {
-    setCategoria(s.categoria);
-    if (s.bandeja === 'no-leidas') setLectura('no-leidas');
-    else if (lectura === 'no-leidas') setLectura('todas');
-  };
   const limpiarFiltros = () => {
     setCategoria(null);
     setLectura('todas');
@@ -110,18 +103,30 @@ export function NotificationInbox() {
     queryFn: () => getNotificacionesPagina(1, { ...filtrosMarcado, leida: false }),
     select: (pagina) => pagina.total,
   });
-  // Un solo conteo del servidor alimenta «N nuevas», la carpeta «No leídas» y
-  // el contador de cada categoría (sumando su desglose por tipo).
+  // Conteo global de no leídas (badge «N nuevas»), distinto del total filtrado y
+  // de las no leídas dentro del filtro que anuncia la cabecera de la bandeja.
   const { data: conteoGlobal } = useConteoNoLeidas();
   const nuevas = conteoGlobal?.total ?? 0;
-  const porCategoria = useMemo(() => conteosPorCategoria(conteoGlobal?.porTipo), [conteoGlobal?.porTipo]);
 
   const { data: proyectos = [] } = useQuery({ queryKey: ['notificaciones', 'proyectos'], queryFn: getProyectosDeNotificaciones, staleTime: 60 * 1000 });
 
   // ── Selección y lectura ────────────────────────────────────────────────────
-  // El aviso seleccionado se guarda entero: si el filtro «No leídas» lo saca de
-  // la lista al leerlo, el visor lo conserva sin perder el contexto.
-  const [seleccionada, setSeleccionada] = useState<Notificacion | null>(null);
+  // El aviso seleccionado se guarda entero junto con la clave del filtro que lo
+  // listaba: si ese mismo filtro deja de mostrarlo (p. ej. «No leídas» al
+  // leerlo), el visor lo conserva; si el usuario cambia de filtro y ya no
+  // pertenece al resultado, la selección se limpia y el visor queda vacío.
+  const claveFiltros = JSON.stringify(filtrosMarcado) + (lectura === 'todas' ? '' : lectura);
+  const [seleccion, setSeleccion] = useState<{ aviso: Notificacion; clave: string } | null>(null);
+  const seleccionada = seleccion?.aviso ?? null;
+  const setSeleccionada = useCallback(
+    (valor: Notificacion | null | ((actual: Notificacion | null) => Notificacion | null)) => {
+      setSeleccion((actual) => {
+        const siguiente = typeof valor === 'function' ? valor(actual?.aviso ?? null) : valor;
+        return siguiente ? { aviso: siguiente, clave: actual && actual.aviso.idNotificacion === siguiente.idNotificacion ? actual.clave : claveFiltros } : null;
+      });
+    },
+    [claveFiltros],
+  );
   const [vistaMovil, setVistaMovil] = useState<'lista' | 'detalle'>('lista');
 
   const invalidar = useCallback(() => {
@@ -155,13 +160,14 @@ export function NotificationInbox() {
       setVistaMovil('detalle');
       leerAlAbrir(n);
     },
-    [leerAlAbrir],
+    [leerAlAbrir, setSeleccionada],
   );
 
-  // La fila refrescada (p. ej. ya leída) manda sobre la copia guardada; si el
-  // filtro la sacó de la lista, se muestra la copia.
+  // La fila refrescada (p. ej. ya leída) manda sobre la copia guardada. Fuera de
+  // la lista, la copia solo se muestra mientras el filtro sea el que la listó
+  // (o la lista aún carga); con otro filtro, el visor se vacía.
   const indice = seleccionada ? notificaciones.findIndex((n) => n.idNotificacion === seleccionada.idNotificacion) : -1;
-  const mostrada = indice >= 0 ? notificaciones[indice] : seleccionada;
+  const mostrada = indice >= 0 ? notificaciones[indice] : seleccion && (seleccion.clave === claveFiltros || lista.isPending) ? seleccionada : null;
   const anterior = indice > 0 ? notificaciones[indice - 1] : null;
   const siguiente = indice >= 0 && indice < notificaciones.length - 1 ? notificaciones[indice + 1] : null;
   const irAnterior = anterior ? () => seleccionar(anterior) : undefined;
@@ -279,7 +285,7 @@ export function NotificationInbox() {
       />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {mostrada ? (
-          <NotificationReaderContent key={mostrada.idNotificacion} notificacion={mostrada} fueraDelFiltro={indice < 0 && !lista.isPending} />
+          <NotificationReaderContent key={mostrada.idNotificacion} notificacion={mostrada} />
         ) : (
           <NotificationReaderEmpty />
         )}
@@ -289,16 +295,6 @@ export function NotificationInbox() {
 
   return (
     <>
-      {!esMovil && (
-        <InboxFoldersSidebar
-          seleccion={seleccionCarpetas}
-          onSeleccionar={elegirCarpeta}
-          conteos={{ noLeidas: nuevas, porCategoria }}
-          collapsed={carpetasContraidas}
-          onToggleCollapsed={soloRail ? undefined : alternarCarpetas}
-        />
-      )}
-
       {esMovil ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-container-lowest">
           {vistaMovil === 'detalle' && mostrada ? (

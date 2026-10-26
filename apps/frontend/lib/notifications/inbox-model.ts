@@ -70,18 +70,6 @@ export const INBOX_CATEGORIES: readonly InboxCategory[] = NOTIFICATION_GROUP_IDS
   }))
   .filter((categoria) => categoria.tipos.length > 0);
 
-/** Suma el desglose por tipo del servidor en un conteo por categoría (solo categorías con alguna no leída). */
-export function conteosPorCategoria(porTipo: Readonly<Record<string, number>> | undefined): Partial<Record<NotificationGroupId, number>> {
-  const conteos: Partial<Record<NotificationGroupId, number>> = {};
-  if (!porTipo) return conteos;
-  for (const [tipo, cantidad] of Object.entries(porTipo)) {
-    if (typeof cantidad !== 'number' || cantidad <= 0) continue;
-    const categoria = categoriaDeTipo(tipo);
-    conteos[categoria] = (conteos[categoria] ?? 0) + cantidad;
-  }
-  return conteos;
-}
-
 export function categoriaDeTipo(tipo: string): NotificationGroupId {
   return NOTIFICATION_TYPE_PRESENTATION[tipo]?.grupo ?? 'otras';
 }

@@ -140,7 +140,7 @@ const REUNION_TEXTO = {
  * fecha, mensaje completo, detalles estructurados, proyecto, avisos
  * relevantes y la acción de navegación. Todo sale del aviso real.
  */
-export function NotificationReaderContent({ notificacion: n, fueraDelFiltro = false }: { notificacion: Notificacion; fueraDelFiltro?: boolean }) {
+export function NotificationReaderContent({ notificacion: n }: { notificacion: Notificacion }) {
   const categoria = tituloDeCategoria(categoriaDeTipo(n.tipoNotificacion));
   const origen = origenDeAviso(n);
   const proyecto = proyectoDeAviso(n);
@@ -154,12 +154,6 @@ export function NotificationReaderContent({ notificacion: n, fueraDelFiltro = fa
       <header className="flex flex-col gap-tight">
         <div className="flex flex-wrap items-center gap-tight">
           <span className="pill pill-neutral">{categoria}</span>
-          {fueraDelFiltro && (
-            // El aviso abierto se conserva al cambiar el filtro; se marca para que no parezca un resultado del filtro.
-            <span className="pill pill-amber" title="Este aviso no pertenece a la lista filtrada actual">
-              Fuera del filtro actual
-            </span>
-          )}
           {reunion && <span className={cn('pill', REUNION_TEXTO[reunion].clase)}>{REUNION_TEXTO[reunion].etiqueta}</span>}
           {noLeida && <span className="pill pill-accent">No leída</span>}
         </div>
