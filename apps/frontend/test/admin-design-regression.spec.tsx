@@ -24,7 +24,6 @@ const EXCEPCIONES: Record<string, string[]> = {
   'app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-md', 'text-[13px]'],
   'app/dashboard/admin/proyectos/admin-projects-client.tsx': ['rounded-lg'],
   'app/dashboard/admin/solicitudes-recuperacion/page.tsx': ['rounded-lg', 'rounded-lg', 'rounded-md'],
-  'app/dashboard/admin/sprints/admin-sprints-client.tsx': ['rounded-md'],
   'app/dashboard/admin/usuarios/page.tsx': ['rounded-md', 'rounded-md'],
   'components/admin/AdminLayout.tsx': ['rounded-lg', 'rounded-md'],
   'components/admin/ConfirmActionDialog.tsx': ['rounded-md', 'rounded-md', 'rounded-md', 'rounded-md'],
@@ -59,9 +58,10 @@ describe('FG07-C04: regresión del diseño administrativo', () => {
     // 40 al cerrar T-320; entró la página propia de «Tendencias de uso» y salió el catálogo temporal de
     // etiquetas, ninguna de las dos con literales; después entraron la pantalla de anuncios (HU-191) y el
     // catálogo temporal de botones, tampoco con literales. Luego entró la lista de reuniones del
-    // calendario administrativo (`meeting-list-view.tsx`), sin literales.
+    // calendario administrativo (`meeting-list-view.tsx`), sin literales. El selector de vistas del
+    // calendario de Sprints pasó al control segmentado del estudiante (`rounded-pill`) y perdió su `rounded-md`.
     expect(ARBOL).toHaveLength(43);
-    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(28);
+    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(29);
   });
 });
 
@@ -78,7 +78,7 @@ describe('FG07-C04: el inventario registra el antes y el después', () => {
 
   it('declara los totales medidos del árbol completo, antes y después', () => {
     expect(inventario).toContain('| Tamaños literales | 47 | 2 |');
-    expect(inventario).toContain('| Radios literales | 68 | 31 |');
+    expect(inventario).toContain('| Radios literales | 68 | 30 |');
   });
 
   it('enumera cada excepción que esta prueba fija', () => {

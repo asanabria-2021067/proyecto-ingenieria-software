@@ -113,7 +113,7 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin/proyectos` | sí | 0 | 1 | 0 | 0 |
 | `/dashboard/admin/proyectos/[id]` | sí | 0 | 2 | 0 | 0 |
 | `/dashboard/admin/proyectos/[id]/cierre` | sí | 1 | 5 | 0 | 0 |
-| `/dashboard/admin/sprints` | sí | 0 | 1 | 0 | 0 |
+| `/dashboard/admin/sprints` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/projects/admin/reviews` | sí | 0 | 0 | 0 | 0 |
 
 Árbol administrativo completo (las 13 vistas de T-320 más sus componentes: 40 archivos, sin `AdminMetricsSection`;
@@ -128,7 +128,7 @@ literales: el árbol queda en 42 archivos.
 | Medida | Antes | Después |
 |---|---:|---:|
 | Tamaños literales | 47 | 2 |
-| Radios literales | 68 | 31 |
+| Radios literales | 68 | 30 |
 | Titulares fuera de la escala | 2 | 0 |
 | Archivos sin ningún literal de tamaño o radio | — | 27 de 42 |
 
@@ -155,7 +155,6 @@ actualizarla, hace fallar la prueba.
 | `app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx` | 4 × `rounded-lg`, `rounded-md`, `text-[13px]` | Sin token de igual valor; el texto de 13 px es el de los botones de acción en móvil, donde 14 px no cabe |
 | `app/dashboard/admin/proyectos/admin-projects-client.tsx` | `rounded-lg` | Sin token de igual valor |
 | `app/dashboard/admin/solicitudes-recuperacion/page.tsx` | 2 × `rounded-lg`, `rounded-md` | Sin token de igual valor |
-| `app/dashboard/admin/sprints/admin-sprints-client.tsx` | `rounded-md` | Sin token de igual valor |
 | `app/dashboard/admin/usuarios/page.tsx` | 2 × `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
 | `components/admin/AdminLayout.tsx` | `rounded-lg`, `rounded-md` | Tarjeta del logotipo |
 | `components/admin/ConfirmActionDialog.tsx` | 4 × `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |

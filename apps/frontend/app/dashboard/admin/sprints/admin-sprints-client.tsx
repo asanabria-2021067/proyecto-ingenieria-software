@@ -17,7 +17,6 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
@@ -60,28 +59,51 @@ const FILTRO_TODAS = 'TODAS';
 const ETIQUETA_VISTA: Record<VistaAdminCalendario, string> = { dia: 'Día', semana: 'Semana', mes: 'Mes', lista: 'Lista' };
 
 /**
- * Selector Día | Semana | Mes | Lista, con el mismo grupo de botones del
- * calendario del estudiante. Son enlaces: la vista es navegable, compartible
- * y sobrevive a la recarga; todas conservan el día elegido.
+ * Selector Día | Semana | Mes | Lista con el control segmentado del
+ * calendario del estudiante (mismas clases que su `RadioGroup`). Aquí son
+ * enlaces: la vista es navegable, compartible y sobrevive a la recarga; todas
+ * conservan el día elegido. Abre la barra que va justo encima del calendario.
  */
 function SelectorVista({ vista, fecha }: { vista: VistaAdminCalendario; fecha: string | null }) {
   return (
-    <nav aria-label="Vista del calendario">
-      <ButtonGroup>
-        {VISTAS_ADMIN_CALENDARIO.map((opcion) => (
-          <Button
-            key={opcion}
-            asChild
-            variant={opcion === vista ? 'default' : 'outline'}
-            className="h-9 rounded-md text-xs font-bold"
-          >
-            <Link href={adminSprintsHref(opcion, fecha)} aria-current={opcion === vista ? 'page' : undefined}>
-              {ETIQUETA_VISTA[opcion]}
-            </Link>
-          </Button>
-        ))}
-      </ButtonGroup>
+    <nav aria-label="Vista del calendario" className="flex w-fit rounded-pill bg-surface-container p-1">
+      {VISTAS_ADMIN_CALENDARIO.map((opcion) => (
+        <Link
+          key={opcion}
+          href={adminSprintsHref(opcion, fecha)}
+          aria-current={opcion === vista ? 'page' : undefined}
+          className={`rounded-pill px-3 py-1 text-xs font-bold outline-none motion-select focus-visible:ring-2 focus-visible:ring-primary/60 ${
+            opcion === vista
+              ? 'bg-surface-container-lowest text-on-surface shadow-card'
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          {ETIQUETA_VISTA[opcion]}
+        </Link>
+      ))}
     </nav>
+  );
+}
+
+/** Leyenda de las marcas del calendario (Día, Semana y Mes). */
+function LeyendaCalendario() {
+  return (
+    <div className="flex flex-wrap items-center gap-tight">
+      <span className="flex items-center gap-1 type-meta">
+        <span className="h-1.5 w-1.5 rounded-pill bg-primary" aria-hidden="true" />
+        Finalización
+      </span>
+      <span className="flex items-center gap-1 type-meta">
+        <span className="h-1.5 w-1.5 rounded-pill bg-attention" aria-hidden="true" />
+        Con plan vencido
+      </span>
+      <span className="flex items-center gap-1 type-meta">
+        <span aria-hidden="true">
+          <IconoTipoEvento tipo="REUNION" tono={3} />
+        </span>
+        Reunión administrativa
+      </span>
+    </div>
   );
 }
 
@@ -183,37 +205,13 @@ export default function AdminSprintsClient() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-x-section gap-y-stack">
-        <div className="min-w-0">
-          <h1 className={ADMIN_PAGE_TITLE}>
-            Calendario de Sprints
-          </h1>
-          <p className={ADMIN_PAGE_LEAD}>
-            Supervisa las fechas planificadas de finalización de los Sprints activos y las reuniones administrativas.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-gap">
-          {/* Leyenda junto al selector, como en el calendario del estudiante. */}
-          {vista !== 'lista' && (
-            <div className="flex flex-wrap items-center gap-tight">
-              <span className="flex items-center gap-1 type-meta">
-                <span className="h-1.5 w-1.5 rounded-pill bg-primary" aria-hidden="true" />
-                Finalización
-              </span>
-              <span className="flex items-center gap-1 type-meta">
-                <span className="h-1.5 w-1.5 rounded-pill bg-attention" aria-hidden="true" />
-                Con plan vencido
-              </span>
-              <span className="flex items-center gap-1 type-meta">
-                <span aria-hidden="true">
-                  <IconoTipoEvento tipo="REUNION" tono={3} />
-                </span>
-                Reunión administrativa
-              </span>
-            </div>
-          )}
-          <SelectorVista vista={vista} fecha={fecha} />
-        </div>
+      <header className="mb-6 min-w-0">
+        <h1 className={ADMIN_PAGE_TITLE}>
+          Calendario de Sprints
+        </h1>
+        <p className={ADMIN_PAGE_LEAD}>
+          Supervisa las fechas planificadas de finalización de los Sprints activos y las reuniones administrativas.
+        </p>
       </header>
 
       <div className="@container/sprints flex flex-col gap-stack">
@@ -249,24 +247,30 @@ export default function AdminSprintsClient() {
           </Select>
         </section>
 
-        {data && total > 0 && (
+        {/* Leyenda y métricas: separadas de la barra de navegación, que va justo encima del calendario. */}
+        {((data && total > 0) || vista !== 'lista') && (
           <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-inline gap-y-micro">
-            <p className="type-body text-text-secondary" role="status" aria-live="polite">
-              {hayFiltros ? (
-                <>
-                  <span className="font-semibold tabular-nums text-text-primary">{filtrados.length}</span> de{' '}
-                  <span className="tabular-nums">{total}</span> Sprints
-                </>
-              ) : (
-                <>
-                  <span className="font-semibold tabular-nums text-text-primary">{total}</span>{' '}
-                  {total === 1 ? 'Sprint operable' : 'Sprints operables'}
-                </>
+            <div className="flex flex-wrap items-center gap-x-section gap-y-micro">
+              {data && total > 0 && (
+                <p className="type-body text-text-secondary" role="status" aria-live="polite">
+                  {hayFiltros ? (
+                    <>
+                      <span className="font-semibold tabular-nums text-text-primary">{filtrados.length}</span> de{' '}
+                      <span className="tabular-nums">{total}</span> Sprints
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold tabular-nums text-text-primary">{total}</span>{' '}
+                      {total === 1 ? 'Sprint operable' : 'Sprints operables'}
+                    </>
+                  )}
+                </p>
               )}
-            </p>
+              {vista !== 'lista' && <LeyendaCalendario />}
+            </div>
             <div className="flex flex-wrap items-center gap-x-inline gap-y-micro">
               {/* Un Sprint sin fecha no cae en ningún día: en el calendario se avisa y se lleva a la Lista. */}
-              {vista !== 'lista' && sinFecha > 0 && (
+              {data && vista !== 'lista' && sinFecha > 0 && (
                 <Link
                   href={adminSprintsHref('lista', fecha)}
                   onClick={() => setSituacion('SIN_FECHA')}
@@ -284,6 +288,10 @@ export default function AdminSprintsClient() {
             </div>
           </div>
         )}
+
+        {/* En Día, Semana y Mes el selector abre la barra del calendario junto a Hoy y las flechas;
+            en Lista, mientras carga o si falla, va solo en ese mismo sitio. */}
+        {(vista === 'lista' || isPending || isError) && <SelectorVista vista={vista} fecha={fecha} />}
 
         {isError ? (
           <Empty tone="danger" role="alert">
@@ -315,6 +323,7 @@ export default function AdminSprintsClient() {
             onVerDia={verDia}
             itemsByDay={itemsByDay}
             busqueda={busqueda}
+            selectorVista={<SelectorVista vista={vista} fecha={fecha} />}
           />
         ) : (
           <>

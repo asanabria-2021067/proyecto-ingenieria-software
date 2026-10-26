@@ -53,7 +53,8 @@ const ESTADO_ACTUAL: Record<string, Medida> = {
   '/dashboard/admin/proyectos': { px: 0, radio: 1, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/proyectos/[id]': { px: 0, radio: 2, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/proyectos/[id]/cierre': { px: 1, radio: 5, hex: 0, boton: 0, titular: true },
-  '/dashboard/admin/sprints': { px: 0, radio: 1, hex: 0, boton: 0, titular: true },
+  // El selector de vistas usa el control segmentado del calendario del estudiante (`rounded-pill`).
+  '/dashboard/admin/sprints': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/projects/admin/reviews': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
 };
 

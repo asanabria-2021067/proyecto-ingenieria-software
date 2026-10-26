@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ArrowRight, CalendarDays, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertCircle, ArrowRight, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { CALENDAR_DAY_CHIP_CLASS, CalendarMonthGrid } from '@/components/calendar/month-view';
 import { TimeGridView } from '@/components/calendar/time-grid-view';
 import { Button } from '@/components/ui/button';
@@ -68,6 +68,7 @@ export function AdminCalendarView({
   onVerDia,
   itemsByDay,
   busqueda,
+  selectorVista,
 }: {
   vista: VistaCalendario;
   /** Día actual `YYYY-MM-DD` según el backend. */
@@ -81,6 +82,8 @@ export function AdminCalendarView({
   itemsByDay: ReadonlyMap<string, AdminSprintCalendarItem[]>;
   /** Búsqueda de la página: también filtra reuniones por título o proyecto. El filtro de situación no les aplica. */
   busqueda: string;
+  /** Selector Día | Semana | Mes | Lista de la página: abre la barra de navegación, a la izquierda. */
+  selectorVista: ReactNode;
 }) {
   const ancla = parseFechaSolo(selectedKey);
   const rango = useMemo(() => rangoVisible(vista, parseFechaSolo(selectedKey)), [vista, selectedKey]);
@@ -163,55 +166,56 @@ export function AdminCalendarView({
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-gap gap-y-tight">
-        <div className="flex items-center gap-tight">
+      {/* Barra de navegación con la distribución del calendario del estudiante: vistas a la
+          izquierda; Hoy, flechas y periodo visible a la derecha. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-gap gap-y-tight">
+        {selectorVista}
+        <div className="flex min-w-0 items-center gap-tight">
+          <Button type="button" variant="outline" className="h-8 rounded-pill px-3 text-xs font-bold" onClick={() => elegirDia(hoy)}>
+            Hoy
+          </Button>
           <Button
             type="button"
             variant="outline"
-            className="h-8 w-8 rounded-control p-0"
+            className="size-8 shrink-0 rounded-pill p-0"
             aria-label={pasos.anterior}
             onClick={() => mover(-1)}
           >
-            ‹
+            <ChevronLeft className="size-4" aria-hidden="true" />
           </Button>
-          {/* Las dos etiquetas ya llegan con su mayúscula inicial (`capitalize` daría «28 De Octubre De 2026»). */}
-          <h2 className="type-section text-text-primary" aria-live="polite">
-            {vista === 'mes' ? formatMonthLabel(ancla.getFullYear(), ancla.getMonth()) : etiquetaRango(vista, ancla)}
-          </h2>
           <Button
             type="button"
             variant="outline"
-            className="h-8 w-8 rounded-control p-0"
+            className="size-8 shrink-0 rounded-pill p-0"
             aria-label={pasos.siguiente}
             onClick={() => mover(1)}
           >
-            ›
+            <ChevronRight className="size-4" aria-hidden="true" />
           </Button>
+          {/* Las dos etiquetas ya llegan con su mayúscula inicial (`capitalize` daría «28 De Octubre De 2026»). */}
+          <h2 className="type-subtitle min-w-0 text-text-primary" aria-live="polite">
+            {vista === 'mes' ? formatMonthLabel(ancla.getFullYear(), ancla.getMonth()) : etiquetaRango(vista, ancla)}
+          </h2>
         </div>
-        <div className="flex flex-wrap items-center gap-x-gap gap-y-micro">
-          <span className="type-meta tabular-nums">
-            {finalizacionesDelPeriodo === 0
-              ? `Sin finalizaciones planificadas ${pasos.periodo}`
-              : `${contarFinalizaciones(finalizacionesDelPeriodo)} ${pasos.periodo}`}
-          </span>
-          {/* Conteo secundario: solo cuando la consulta del rango terminó (nunca un cero provisional). */}
-          {reunionesListas ? (
-            <span className="type-meta tabular-nums">{contarReuniones(reunionesDelPeriodo)}</span>
-          ) : (
-            reunionesQuery.isFetching && (
-              <span className="type-meta" role="status">
-                Cargando reuniones…
-              </span>
-            )
-          )}
-          <button
-            type="button"
-            onClick={() => elegirDia(hoy)}
-            className="type-body inline-flex min-h-8 items-center rounded-control px-tight font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
-          >
-            Hoy
-          </button>
-        </div>
+      </div>
+
+      {/* Resumen del periodo visible, bajo la barra. */}
+      <div className="mb-4 mt-tight flex flex-wrap items-center gap-x-gap gap-y-micro">
+        <span className="type-meta tabular-nums">
+          {finalizacionesDelPeriodo === 0
+            ? `Sin finalizaciones planificadas ${pasos.periodo}`
+            : `${contarFinalizaciones(finalizacionesDelPeriodo)} ${pasos.periodo}`}
+        </span>
+        {/* Conteo secundario: solo cuando la consulta del rango terminó (nunca un cero provisional). */}
+        {reunionesListas ? (
+          <span className="type-meta tabular-nums">{contarReuniones(reunionesDelPeriodo)}</span>
+        ) : (
+          reunionesQuery.isFetching && (
+            <span className="type-meta" role="status">
+              Cargando reuniones…
+            </span>
+          )
+        )}
       </div>
 
       {/* Un fallo de reuniones no se ve como «sin reuniones»: se avisa y los Sprints siguen operativos. */}
