@@ -148,7 +148,11 @@ export function TimeGridView({
   return (
     <div className="card-base overflow-hidden p-0">
       <div className={days.length > 1 ? 'overflow-x-auto' : ''} data-testid="cuadricula-semana">
-      <div className={`grid border-b border-outline-variant/40 ${anchoMinimo}`} style={plantilla}>
+      {/* Columnas alineadas: el cuerpo tiene scroll vertical y, con barras clásicas (Chrome/Firefox en
+          Linux o Windows), la barra le quitaba ~15 px y sus columnas quedaban corridas respecto de la
+          cabecera. Cuerpo, cabecera y «Todo el día» reservan el mismo canal (`scrollbar-gutter: stable`):
+          las tres filas tienen el mismo ancho útil con cualquier tipo de barra. */}
+      <div className={`grid overflow-hidden border-b border-outline-variant/40 [scrollbar-gutter:stable] ${anchoMinimo}`} style={plantilla}>
         <div />
         {days.map((day) => {
           const isToday = day.key === todayKey;
@@ -177,7 +181,7 @@ export function TimeGridView({
       </div>
 
       {hayTodoElDia && (
-        <div className={`grid border-b border-outline-variant/40 ${anchoMinimo}`} style={plantilla}>
+        <div className={`grid overflow-hidden border-b border-outline-variant/40 [scrollbar-gutter:stable] ${anchoMinimo}`} style={plantilla}>
           <div className="type-meta flex items-start justify-end px-1 py-1 text-right leading-tight">Todo el día</div>
           {columnas.map(({ day, todoElDia }) => {
             // G02 (UI-13): en Día hay sitio para todas (con scroll acotado); en
@@ -223,7 +227,7 @@ export function TimeGridView({
         tabIndex={0}
         role="group"
         aria-label={days.length > 1 ? 'Horario de la semana por horas' : 'Horario del día por horas'}
-        className={`relative h-[min(34rem,70dvh)] overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${anchoMinimo}`}
+        className={`relative h-[min(34rem,70dvh)] overflow-y-auto overscroll-contain outline-none [scrollbar-gutter:stable] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${anchoMinimo}`}
         data-testid="cuadricula-horas"
       >
         <div className="grid" style={{ ...plantilla, height: 24 * HORA_ALTO_PX }}>
