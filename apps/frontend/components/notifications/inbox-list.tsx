@@ -216,7 +216,7 @@ export function InboxList({
         <section key={grupo.clave} aria-labelledby={`inbox-dia-${grupo.clave}`}>
           <h3
             id={`inbox-dia-${grupo.clave}`}
-            className="sticky top-0 z-10 border-y border-outline-variant/40 bg-surface-container-low/95 px-inline py-1.5 text-[11px] font-bold uppercase tracking-wider text-text-secondary backdrop-blur-sm first:border-t-0"
+            className="type-subtitle sticky top-0 z-10 border-y border-outline-variant/40 bg-page/95 px-inline py-1.5 font-semibold uppercase backdrop-blur-sm first:border-t-0"
           >
             {grupo.etiqueta}
           </h3>
