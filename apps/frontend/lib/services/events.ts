@@ -26,6 +26,13 @@ export interface EventoProyectoDTO {
   tipoEvento: TipoEvento;
   /** HU-184: idUsuario invitados; [] = todo el proyecto. */
   invitados: number[];
+  /**
+   * HU-195: `ADMINISTRACION` = proyección de una reunión de Administración. La
+   * gestiona solo Administración (el backend responde 403 a editarla o borrarla
+   * por la ruta del proyecto). Opcional: la agenda compartida no lo envía.
+   */
+  origen?: 'PROYECTO' | 'ADMINISTRACION';
+  idReunion?: number | null;
 }
 
 /** GET /usuarios/me/eventos incluye el proyecto para poder agruparlo en la vista global. */

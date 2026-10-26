@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { AlignLeft, Bell, CalendarDays, Eye, ExternalLink, Link2, Loader2, MapPin, Pencil, Trash2, Users } from 'lucide-react';
+import { AlignLeft, Bell, Building2, CalendarDays, Eye, ExternalLink, Link2, Loader2, MapPin, Pencil, Trash2, Users } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -202,7 +202,9 @@ export function EventDetailDialog({
 
   const estilo = MODALIDAD_ESTILO[evento.modalidad];
   const tipo = TIPO_EVENTO_ESTILO[evento.tipoEvento];
-  const puedeEditar = editable && !compartidoPor;
+  // HU-195: una reunión de Administración no se edita ni se elimina desde el proyecto (el backend da 403).
+  const deAdministracion = evento.origen === 'ADMINISTRACION';
+  const puedeEditar = editable && !compartidoPor && !deAdministracion;
   const nombresInvitados = idProyectoEquipo === 0 ? [] : [
     ...new Map(members.filter((m) => evento.invitados.includes(m.idUsuario)).map((m) => [m.idUsuario, `${m.nombre} ${m.apellido}`])).values(),
   ];
@@ -242,6 +244,12 @@ export function EventDetailDialog({
               Calendario de {compartidoPor.nombre} · solo lectura
             </p>
           )}
+          {deAdministracion && (
+            <p className="type-meta inline-flex items-center gap-1">
+              <Building2 className="size-3.5" aria-hidden="true" />
+              Convocada por Administración · solo lectura
+            </p>
+          )}
         </DialogHeader>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
@@ -279,11 +287,13 @@ export function EventDetailDialog({
           )}
 
           <Fila icon={<Users className="size-4" />} label="Para quién">
-            {evento.invitados.length === 0
-              ? 'Todo el proyecto'
-              : nombresInvitados.length > 0
-                ? nombresInvitados.join(', ')
-                : `${evento.invitados.length} ${evento.invitados.length === 1 ? 'invitado' : 'invitados'}`}
+            {deAdministracion
+              ? 'Equipos de los proyectos convocados'
+              : evento.invitados.length === 0
+                ? 'Todo el proyecto'
+                : nombresInvitados.length > 0
+                  ? nombresInvitados.join(', ')
+                  : `${evento.invitados.length} ${evento.invitados.length === 1 ? 'invitado' : 'invitados'}`}
           </Fila>
 
           <Fila icon={<Bell className="size-4" />} label="Recordatorio">
