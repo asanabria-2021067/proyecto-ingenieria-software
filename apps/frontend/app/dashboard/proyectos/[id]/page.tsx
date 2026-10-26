@@ -683,7 +683,7 @@ function HistoricalProjectPage({
               </span>
             )}
           </div>
-          <h1 className="mt-3.5 text-[26px] leading-8 font-bold text-on-surface line-clamp-2">{resumen.tituloProyecto}</h1>
+          <h1 className="type-display mt-3.5 line-clamp-2">{resumen.tituloProyecto}</h1>
           <p className="mt-2 text-[14px] leading-5.25 text-on-surface-variant">
             {resumen.descripcionProyecto || 'Sin descripción disponible.'}
           </p>
