@@ -37,7 +37,13 @@ import { BUSQUEDA_DEBOUNCE_MS } from '../components/notifications/inbox-toolbar'
  * visor, lectura al abrir, filtros que viajan al servidor y marcado acotado.
  */
 
-const HOY = new Date();
+// Mediodía de hoy: los avisos «de hace 1 y 2 horas» caen siempre en «Hoy» (con el reloj real, entre las
+// 00:00 y las 02:00 pasaban a «Ayer» y la prueba fallaba según la hora).
+const HOY = (() => {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  return d;
+})();
 const iso = (horas: number) => new Date(HOY.getTime() - horas * 3_600_000).toISOString();
 
 const AVISOS: Notificacion[] = [
@@ -77,6 +83,8 @@ function elegir(nombreSelect: string, opcion: string) {
 const filas = () => within(lista()).getAllByRole('listitem');
 
 beforeEach(() => {
+  // Solo la fecha: React Query y waitFor siguen con temporizadores reales.
+  vi.useFakeTimers({ toFake: ['Date'], now: HOY });
   // react-resizable-panels mide el grupo con ResizeObserver, que jsdom no trae.
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   vi.mocked(getNotificacionesPagina).mockImplementation((_page, filtros) => responderPagina(filtros));
