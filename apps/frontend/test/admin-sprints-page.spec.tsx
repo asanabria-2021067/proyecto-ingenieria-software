@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 
@@ -24,7 +24,14 @@ vi.mock('../lib/services/admin-meetings', () => ({
   getAdminMeetingsInRange: vi.fn(),
   getAllAdminMeetings: vi.fn(),
   getAdminMeetingParticipants: vi.fn(),
+  getEligibleMeetingProjects: vi.fn().mockResolvedValue([]),
+  getMeetingProjectTeam: vi.fn(),
+  getAdminMeeting: vi.fn(),
+  createAdminMeeting: vi.fn(),
+  updateAdminMeeting: vi.fn(),
+  cancelAdminMeeting: vi.fn(),
 }));
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 8, nombre: 'Ana', apellido: 'Pérez' } }) }));
 
 import AdminSprintsClient from '../app/dashboard/admin/sprints/admin-sprints-client';
 import { getAdminSprintCalendar } from '../lib/services/admin-sprints';
@@ -631,15 +638,18 @@ describe('Calendario administrativo — Lista y solo consulta', () => {
     expect(seccion.getByText('Revisión de avance')).toBeInTheDocument();
   });
 
-  it.each(['dia', 'semana', 'mes', 'lista'] as const)('%s: no hay ningún control para agendar, editar o cancelar reuniones', async (vista) => {
+  // T-363: programar es la única acción general; editar y cancelar dependen del permiso de cada reunión
+  // (`canManage`), que estas reuniones no traen. Nada se abre hasta que el administrador lo pide.
+  it.each(['dia', 'semana', 'mes', 'lista'] as const)('%s: sin permiso de gestión ninguna reunión ofrece editar ni cancelar', async (vista) => {
     getRangeMock.mockResolvedValue({ reuniones: REUNIONES, completo: true });
     getUpcomingMock.mockResolvedValue({ reuniones: REUNIONES, completo: true });
     renderPage(vista, '2026-10-08');
     await screen.findAllByText('Seguimiento de cierre');
 
-    const prohibido = /agendar|programar|nueva reuni|crear|editar|cancelar|reprogramar/i;
-    expect(screen.queryAllByRole('button', { name: prohibido })).toHaveLength(0);
-    expect(screen.queryAllByRole('link', { name: prohibido })).toHaveLength(0);
+    const gestion = /editar|cancelar|reprogramar/i;
+    expect(screen.queryAllByRole('button', { name: gestion })).toHaveLength(0);
+    expect(screen.queryAllByRole('link', { name: gestion })).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Programar reunión' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('form')).not.toBeInTheDocument();
   });
@@ -712,5 +722,33 @@ describe('Calendario administrativo — barra de navegación', () => {
 
     expect(await screen.findByText('No se pudo cargar el calendario de Sprints.')).toBeInTheDocument();
     expect(within(screen.getByRole('navigation', { name: 'Vista del calendario' })).getByRole('link', { name: 'Lista' })).toBeInTheDocument();
+  });
+});
+
+// ─── Programar reunión (HU-195, T-363) ───────────────────────────────────────
+
+describe('Calendario administrativo — programar reunión', () => {
+  it('el encabezado ofrece «Programar reunión» y abre el diálogo administrativo', async () => {
+    renderPage('mes');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+    const encabezado = screen.getByRole('heading', { level: 1, name: 'Calendario de Sprints' }).closest('header')!;
+    fireEvent.click(within(encabezado).getByRole('button', { name: 'Programar reunión' }));
+    expect(await screen.findByRole('dialog', { name: 'Programar reunión administrativa' })).toBeInTheDocument();
+  });
+
+  it('el día elegido (hoy o futuro) ofrece programarla ese día a las 09:00; un día pasado no', async () => {
+    // El reloj del navegador en el día del escenario (6 de octubre): el 8 a las 09:00 aún no pasó.
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 6, 8, 0) });
+    onTestFinished(() => void vi.useRealTimers());
+    renderPage('mes', '2026-10-08');
+    const panel = await screen.findByRole('region', { name: /8 de octubre de 2026/ });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Programar reunión este día' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Programar reunión administrativa' });
+    expect(within(dialogo).getByLabelText('Hora de inicio')).toHaveValue('09:00');
+    cleanup();
+
+    renderPage('mes', '2026-10-01');
+    const pasado = await screen.findByRole('region', { name: /1 de octubre de 2026/ });
+    expect(within(pasado).queryByRole('button', { name: 'Programar reunión este día' })).not.toBeInTheDocument();
   });
 });

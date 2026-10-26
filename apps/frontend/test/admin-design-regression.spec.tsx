@@ -54,16 +54,16 @@ describe('FG07-C04: regresión del diseño administrativo', () => {
     expect([...valores].sort()).toEqual(['rounded-lg', 'rounded-md', 'text-[13px]', 'text-[15px]']);
   });
 
-  it('31 de los 45 archivos del árbol quedan sin ningún literal', () => {
+  it('32 de los 46 archivos del árbol quedan sin ningún literal', () => {
     // 40 al cerrar T-320; entró la página propia de «Tendencias de uso» y salió el catálogo temporal de
     // etiquetas, ninguna de las dos con literales; después entraron la pantalla de anuncios (HU-191) y el
     // catálogo temporal de botones, tampoco con literales. Luego entró la lista de reuniones del
     // calendario administrativo (`meeting-list-view.tsx`), sin literales. El selector de vistas del
     // calendario de Sprints pasó al control segmentado del estudiante (`rounded-pill`) y perdió su `rounded-md`.
-    // HU-195 (T-363): entran el campo de proyectos invitados y los permisos de gestión de la reunión de
-    // Administración, sin literales.
-    expect(ARBOL).toHaveLength(45);
-    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(31);
+    // HU-195 (T-363): entran el campo de proyectos invitados, los permisos de gestión y el diálogo de la
+    // reunión de Administración, sin literales.
+    expect(ARBOL).toHaveLength(46);
+    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(32);
   });
 });
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ArrowRight, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
+import { AlertCircle, ArrowRight, CalendarDays, CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { CALENDAR_DAY_CHIP_CLASS, CalendarMonthGrid } from '@/components/calendar/month-view';
 import { TimeGridView } from '@/components/calendar/time-grid-view';
 import { Button } from '@/components/ui/button';
@@ -69,6 +69,7 @@ export function AdminCalendarView({
   itemsByDay,
   busqueda,
   selectorVista,
+  onProgramarReunion,
 }: {
   vista: VistaCalendario;
   /** Día actual `YYYY-MM-DD` según el backend. */
@@ -84,6 +85,8 @@ export function AdminCalendarView({
   busqueda: string;
   /** Selector Día | Semana | Mes | Lista de la página: abre la barra de navegación, a la izquierda. */
   selectorVista: ReactNode;
+  /** Abre «Programar reunión» con el día elegido (solo hoy o días futuros). */
+  onProgramarReunion?: (dia: string) => void;
 }) {
   const ancla = parseFechaSolo(selectedKey);
   const rango = useMemo(() => rangoVisible(vista, parseFechaSolo(selectedKey)), [vista, selectedKey]);
@@ -332,6 +335,18 @@ export function AdminCalendarView({
                 </h2>
                 {sprintsDelDia > 0 && <p className="type-meta mt-micro tabular-nums">{contarFinalizaciones(sprintsDelDia)}</p>}
                 {reunionesDelDia > 0 && <p className="type-meta mt-micro tabular-nums">{contarReuniones(reunionesDelDia)}</p>}
+                {onProgramarReunion && selectedKey >= hoy && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onProgramarReunion(selectedKey)}
+                    className="-ml-tight mt-micro h-8 gap-1.5 rounded-pill px-tight text-xs font-bold text-primary hover:bg-primary/10 hover:text-primary"
+                  >
+                    <CalendarPlus className="size-4" aria-hidden="true" />
+                    Programar reunión este día
+                  </Button>
+                )}
               </div>
               {delDia.length > 0 && (desplazable.arriba || desplazable.abajo) && (
                 <div className="flex shrink-0 gap-micro">

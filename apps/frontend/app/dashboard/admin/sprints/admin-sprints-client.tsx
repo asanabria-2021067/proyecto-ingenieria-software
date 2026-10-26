@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { AlertCircle, ArrowRight, CalendarRange, SearchX } from 'lucide-react';
+import { AlertCircle, ArrowRight, CalendarPlus, CalendarRange, SearchX } from 'lucide-react';
 import { SprintListView } from '@/components/admin/sprints/sprint-list-view';
 import { AdminCalendarView } from '@/components/admin/sprints/admin-calendar-view';
 import { MeetingListView } from '@/components/admin/sprints/meeting-list-view';
+import { AdminMeetingFormDialog } from '@/components/admin/meetings/admin-meeting-form-dialog';
 import { DASHBOARD_FILTER_TRIGGER_CLASS, DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import {
   Breadcrumb,
@@ -169,6 +170,14 @@ export default function AdminSprintsClient() {
   // Semana → Día desde el «+N» de un horario cargado: es otra vista, así que queda en el historial.
   const verDia = (dia: string) => window.history.pushState(null, '', adminSprintsHref('dia', dia));
 
+  // «Programar reunión»: desde el encabezado (sin día) o desde el día elegido en el calendario (a las 09:00).
+  const [programando, setProgramando] = useState<{ dia: Date | undefined } | null>(null);
+  const botonProgramarRef = useRef<HTMLButtonElement>(null);
+  const programarEnDia = (dia: string) => {
+    const [y, m, d] = dia.split('-').map(Number);
+    setProgramando({ dia: new Date(y, m - 1, d, 9, 0) });
+  };
+
   const [busqueda, setBusqueda] = useState('');
   const [situacion, setSituacion] = useState<AdminSprintSituacion | null>(null);
 
@@ -205,14 +214,33 @@ export default function AdminSprintsClient() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <header className="mb-6 min-w-0">
-        <h1 className={ADMIN_PAGE_TITLE}>
-          Calendario de Sprints
-        </h1>
-        <p className={ADMIN_PAGE_LEAD}>
-          Supervisa las fechas planificadas de finalización de los Sprints activos y las reuniones administrativas.
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-x-section gap-y-stack">
+        <div className="min-w-0">
+          <h1 className={ADMIN_PAGE_TITLE}>
+            Calendario de Sprints
+          </h1>
+          <p className={ADMIN_PAGE_LEAD}>
+            Supervisa las fechas planificadas de finalización de los Sprints activos y las reuniones administrativas.
+          </p>
+        </div>
+        {/* Mismo botón que «Agendar actividad» del calendario del estudiante. */}
+        <Button
+          ref={botonProgramarRef}
+          type="button"
+          onClick={() => setProgramando({ dia: undefined })}
+          className="h-9 gap-1.5 rounded-pill bg-primary px-4 text-xs font-bold text-on-primary hover:bg-primary/90"
+        >
+          <CalendarPlus className="size-4" aria-hidden="true" />
+          Programar reunión
+        </Button>
       </header>
+
+      <AdminMeetingFormDialog
+        open={programando !== null}
+        onOpenChange={(abierto) => !abierto && setProgramando(null)}
+        initialDate={programando?.dia}
+        restaurarFocoEn={programando?.dia === undefined ? botonProgramarRef : undefined}
+      />
 
       <div className="@container/sprints flex flex-col gap-stack">
         <section aria-label="Filtros de Sprints" className="grid grid-cols-1 gap-stack @2xl/sprints:flex">
@@ -324,6 +352,7 @@ export default function AdminSprintsClient() {
             itemsByDay={itemsByDay}
             busqueda={busqueda}
             selectorVista={<SelectorVista vista={vista} fecha={fecha} />}
+            onProgramarReunion={programarEnDia}
           />
         ) : (
           <>
