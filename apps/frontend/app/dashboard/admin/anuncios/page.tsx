@@ -66,7 +66,7 @@ export default function AdminAnunciosPage() {
             Avisos que aparecen como banner en el dashboard. Cada persona puede cerrarlos y no vuelven a mostrársele.
           </p>
         </div>
-        <Button type="button" onClick={() => setFormulario({})}>
+        <Button type="button" onClick={() => setFormulario({})} className="text-xs font-bold">
           <Plus className="size-4" aria-hidden="true" /> Nuevo anuncio
         </Button>
       </section>
