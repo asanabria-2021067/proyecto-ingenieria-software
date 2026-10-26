@@ -141,7 +141,7 @@ export default function PerfilPage() {
             </div>
 
             <div className="flex-1">
-              <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-on-surface">
+              <h1 className="type-display">
                 {fullName || (isAdmin ? 'Administrador' : 'Perfil de estudiante')}
               </h1>
 
