@@ -71,7 +71,9 @@ describe('T-293: imports estáticos de librerías pesadas', () => {
 
 describe('T-293: módulos ya diferidos', () => {
   it('el mapa de lugar del evento se carga con next/dynamic y sin SSR', () => {
-    const src = readFileSync(join(ROOT, 'components/calendar/event-form-dialog.tsx'), 'utf8');
+    // El campo de ubicación vive en las piezas compartidas del diálogo (evento de proyecto y reunión de Administración).
+    const src = readFileSync(join(ROOT, 'components/calendar/event-form-fields.tsx'), 'utf8');
+    expect(readFileSync(join(ROOT, 'components/calendar/event-form-dialog.tsx'), 'utf8')).not.toMatch(/event-location-picker/);
     expect(src).toMatch(/dynamic\(\(\) => import\('\.\/event-location-picker'\)/);
     expect(src).toMatch(/ssr:\s*false/);
     expect(src).not.toMatch(/^import .*from '\.\/event-location-picker'/m);

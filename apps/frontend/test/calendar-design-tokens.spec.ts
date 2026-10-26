@@ -47,7 +47,12 @@ describe('calendario — tokens de tipografía y radios (G04-C10, UI-33)', () =>
   it('los botones de un mismo grupo comparten radio: pie del formulario y barra del calendario en pastilla', () => {
     const dialogo = leer(join('components', 'calendar', 'event-form-dialog.tsx'));
     const pie = dialogo.slice(dialogo.indexOf('<DialogFooter'));
-    const radiosDeBotones = [...pie.matchAll(/<Button[\s\S]*?className="([^"]*)"/g)].map((m) => m[1].match(/rounded-[a-z]+/)?.[0]);
+    // Cancelar y el botón principal usan las clases compartidas del diálogo; Eliminar conserva la suya.
+    const piezas = leer(join('components', 'calendar', 'event-form-fields.tsx'));
+    const clase = (nombre: string) => piezas.match(new RegExp(`export const ${nombre} =\\s*'([^']*)'`))?.[1] ?? '';
+    const radiosDeBotones = [...pie.matchAll(/<Button[\s\S]*?className=(?:"([^"]*)"|\{(EVENT_DIALOG_[A-Z_]+)\})/g)].map(
+      (m) => (m[1] ?? clase(m[2])).match(/rounded-[a-z]+/)?.[0],
+    );
     expect(radiosDeBotones).toEqual(['rounded-pill', 'rounded-pill', 'rounded-pill']);
 
     const pagina = leer(join('app', 'dashboard', 'calendario', 'page.tsx'));
@@ -161,12 +166,13 @@ describe('calendario — texto de error legible (G05.1-C01, G05-HALLAZGO-01)', (
     const TEXTO = /(?<![\w-])(?:hover:)?text-on-status-error\b/g;
     expect({
       detalle: cuenta('event-detail-dialog.tsx', TEXTO),
-      formulario: cuenta('event-form-dialog.tsx', TEXTO),
+      formulario: cuenta('event-form-dialog.tsx', TEXTO) + cuenta('event-form-fields.tsx', TEXTO),
       ubicacion: cuenta('event-location-picker.tsx', TEXTO),
       compartir: cuenta('share-calendar-dialog.tsx', TEXTO),
       columna: cuenta('calendar-sidebar.tsx', TEXTO),
     }).toEqual({ detalle: 1, formulario: 3, ubicacion: 1, compartir: 4, columna: 3 });
-    // La alerta del formulario conserva su borde y su fondo de error.
-    expect(leer(join('components', 'calendar', 'event-form-dialog.tsx'))).toMatch(/border-status-error\/40 bg-status-error\/10 [^"]*text-on-status-error/);
+    // La alerta del formulario conserva su borde y su fondo de error (clase compartida del diálogo).
+    expect(leer(join('components', 'calendar', 'event-form-fields.tsx'))).toMatch(/border-status-error\/40 bg-status-error\/10 [^']*text-on-status-error/);
+    expect(leer(join('components', 'calendar', 'event-form-dialog.tsx'))).toMatch(/className=\{EVENT_DIALOG_ERROR_CLASS\}/);
   });
 });
