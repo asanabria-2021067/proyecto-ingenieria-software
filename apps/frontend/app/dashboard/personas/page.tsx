@@ -553,7 +553,7 @@ function PersonasView() {
                   <EmptyDescription>Completa tu perfil para descubrir personas con intereses similares.</EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
-                  <Button asChild variant="secondary" size="sm">
+                  <Button asChild variant="secondary" size="sm" className="text-xs font-bold">
                     <Link href="/dashboard/perfil/editar">Completar perfil</Link>
                   </Button>
                 </EmptyContent>
