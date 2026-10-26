@@ -115,20 +115,19 @@ describe('avatar contextual en la fila', () => {
     expect(chip).not.toHaveClass('pill-accent');
   });
 
-  it('el avatar es un círculo neutro con el color de su categoría en la tinta y un borde fino, igual leída o no', () => {
+  it('el avatar lleva el color de su categoría (fondo y tinta de su familia de etiqueta), igual leída o no y sin anillo', () => {
     const casos = [
-      { tipoNotificacion: 'TAREA_ASIGNADA', datosJson: { projectTitle: 'Plataforma de Tutorías' }, color: ['text-on-tag-blue'] },
-      { tipoNotificacion: 'NUEVA_POSTULACION', datosJson: { userName: 'María López' }, color: ['text-on-tag-turquoise'] },
-      { tipoNotificacion: 'HORAS_ACREDITADAS', datosJson: {}, color: ['text-on-tag-amber'] },
-      { tipoNotificacion: 'AMISTAD_ACEPTADA', datosJson: { userName: 'Luis Gómez' }, color: ['text-on-tag-violet'] },
+      { tipoNotificacion: 'TAREA_ASIGNADA', datosJson: { projectTitle: 'Plataforma de Tutorías' }, color: ['bg-tag-blue', 'text-on-tag-blue'] },
+      { tipoNotificacion: 'NUEVA_POSTULACION', datosJson: { userName: 'María López' }, color: ['bg-tag-turquoise', 'text-on-tag-turquoise'] },
+      { tipoNotificacion: 'HORAS_ACREDITADAS', datosJson: {}, color: ['bg-tag-amber', 'text-on-tag-amber'] },
+      { tipoNotificacion: 'AMISTAD_ACEPTADA', datosJson: { userName: 'Luis Gómez' }, color: ['bg-tag-violet', 'text-on-tag-violet'] },
     ];
     for (const { color, ...aviso } of casos) {
       for (const leidaEn of [null, AHORA.toISOString()]) {
         const { container } = fila(base({ ...aviso, leidaEn }));
         const a = avatar(container);
-        expect(a, `${aviso.tipoNotificacion} ${leidaEn ? 'leída' : 'no leída'}`).toHaveClass(...color, 'bg-surface-container', 'ring-1', 'ring-current/30');
-        // Sin fondo de color: la categoría solo tiñe letras, trazo y borde.
-        expect(a.className).not.toMatch(/bg-tag-/);
+        expect(a, `${aviso.tipoNotificacion} ${leidaEn ? 'leída' : 'no leída'}`).toHaveClass(...color);
+        expect(a.className).not.toMatch(/(?:^|\s)ring-/);
         expect(a).not.toHaveClass('text-primary', 'text-tertiary');
         cleanup();
       }
@@ -231,6 +230,6 @@ describe('avatar en el visor', () => {
   it('en el visor el avatar también lleva el color de la categoría (calendario: recordatorios)', () => {
     const { container } = render(<NotificationReaderContent notificacion={base({ tipoNotificacion: 'CALENDARIO_COMPARTIDO', tituloNotificacion: 'Calendario compartido', datosJson: { ownerId: 2, ownerName: 'Ana Ruiz' } })} />);
     expect(avatar(container)).toHaveAttribute('data-categoria', 'recordatorios');
-    expect(avatar(container)).toHaveClass('bg-surface-container', 'text-on-tag-orange');
+    expect(avatar(container)).toHaveClass('bg-tag-orange', 'text-on-tag-orange');
   });
 });
