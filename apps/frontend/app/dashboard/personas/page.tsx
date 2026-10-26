@@ -26,7 +26,6 @@ import { useSearchParams } from 'next/navigation';
 import { SkeletonList } from '@/components/ui/skeleton';
 import {
   AlertCircle,
-  ArrowRight,
   LayoutGrid,
   List,
   MoreVertical,
@@ -214,13 +213,12 @@ function PersonaCard({ usuario }: { usuario: UsuarioBusquedaDto }) {
 }
 
 /** Misma info que `PersonaCard`, en una fila horizontal para la vista de lista:
- * botón de amistad negro de «Ver proyecto» arriba a la derecha y, debajo,
- * «Ver perfil →» con el menú de tres puntos. */
+ * los mismos `BotonesPersona` de la tarjeta, agrupados a la derecha y seguidos
+ * del menú de tres puntos. */
 function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
   const { amistad, seguimiento, confirmarEliminarAmistad } = useAccionesAmistad(usuario);
   const motivo = textoMotivo(usuario);
   const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
-  const solicitudEnviada = usuario.solicitudPendiente?.direccion === 'enviada' && !usuario.esAmigo;
 
   return (
     <article className="card-base flex flex-wrap items-center gap-gap transition-[border-color,background-color,box-shadow] duration-180 ease-out hover:border-primary/40 hover:bg-primary/5 hover:shadow-raised">
@@ -254,49 +252,24 @@ function PersonaListRow({ usuario }: { usuario: UsuarioBusquedaDto }) {
         )}
       </div>
 
-      <div className="ml-auto flex shrink-0 flex-col items-end gap-tight">
-        <Button
-          variant={amistad.variant}
-          disabled={amistad.disabled}
-          onClick={amistad.onClick}
-          className={
-            amistad.variant === 'default'
-              ? PROJECT_ACTION_BUTTON_CLASS
-              : solicitudEnviada
-                ? `${PROJECT_ACTION_BUTTON_CLASS} ${BOTON_EN_REVISION}`
-                : 'h-9.5 rounded-md px-4.5 text-[13px] font-semibold'
-          }
-        >
-          {amistad.label}
-        </Button>
-        <div className="flex items-center gap-micro">
-          <Link
-            href={`/dashboard/personas/${usuario.idUsuario}`}
-            className="group/perfil type-meta inline-flex items-center gap-micro rounded-control px-tight py-micro font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-          >
-            Ver perfil
-            <ArrowRight
-              className="size-3.5 transition-transform duration-180 ease-out group-hover/perfil:translate-x-0.5 motion-reduce:transition-none"
-              aria-hidden="true"
-            />
-          </Link>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label={`Más acciones para ${nombreCompleto}`}
-                className="rounded-control p-tight text-text-secondary hover:bg-surface-container-high hover:text-text-primary"
-              >
-                <MoreVertical className="size-4" aria-hidden="true" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled={seguimiento.disabled} onSelect={seguimiento.onClick}>
-                {seguimiento.label}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+        <BotonesPersona usuario={usuario} amistad={amistad} />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Más acciones para ${nombreCompleto}`}
+              className="rounded-control p-tight text-text-secondary hover:bg-surface-container-high hover:text-text-primary"
+            >
+              <MoreVertical className="size-4" aria-hidden="true" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem disabled={seguimiento.disabled} onSelect={seguimiento.onClick}>
+              {seguimiento.label}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </article>
   );
