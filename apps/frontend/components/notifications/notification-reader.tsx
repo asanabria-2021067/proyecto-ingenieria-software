@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, CalendarX2, Check, CheckCheck, ChevronLeft, ChevronRight, Inbox, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarX2, Check, CheckCheck, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { NotificationAvatar } from '@/components/notifications/notification-avatar';
@@ -26,8 +26,6 @@ interface ReaderToolbarProps {
   /** Sin función = la notificación ya está leída (el backend no marca «no leída»). */
   onMarcarLeida?: () => void;
   marcando?: boolean;
-  listaContraida?: boolean;
-  onAlternarLista?: () => void;
   /** Solo en móvil: vuelve a la lista. */
   onVolver?: () => void;
   /** Marcado masivo con el alcance del filtro actual (texto exacto en `etiquetaMarcarFiltradas`). */
@@ -51,14 +49,12 @@ function IconAction({ label, onClick, disabled, children }: { label: string; onC
   );
 }
 
-/** Barra superior del visor (§5.2): anterior/siguiente, marcar leída, contraer/restaurar bandeja y volver en móvil. */
+/** Barra superior del visor (§5.2): anterior/siguiente, marcar leída y volver en móvil. */
 export function NotificationReaderToolbar({
   onAnterior,
   onSiguiente,
   onMarcarLeida,
   marcando,
-  listaContraida,
-  onAlternarLista,
   onVolver,
   onMarcarFiltradas,
   etiquetaMarcarFiltradas,
@@ -71,13 +67,6 @@ export function NotificationReaderToolbar({
           <ArrowLeft className="size-4" aria-hidden="true" />
           Volver a notificaciones
         </Button>
-      )}
-      {onAlternarLista && (
-        <span className="hidden md:inline-flex">
-          <IconAction label={listaContraida ? 'Restaurar bandeja' : 'Contraer bandeja'} onClick={onAlternarLista}>
-            {listaContraida ? <PanelLeftOpen className="size-4" aria-hidden="true" /> : <PanelLeftClose className="size-4" aria-hidden="true" />}
-          </IconAction>
-        </span>
       )}
       <h2 className={cn('min-w-0 flex-1 truncate text-sm font-semibold text-on-surface', onVolver && 'hidden md:block')}>Detalle de la notificación</h2>
       <IconAction label="Notificación anterior" onClick={onAnterior}>

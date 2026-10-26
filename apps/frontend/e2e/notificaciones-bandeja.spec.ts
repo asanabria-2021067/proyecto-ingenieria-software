@@ -134,7 +134,7 @@ test('pestañas, categoría, búsqueda y orden viajan al servidor y acotan el ma
   await sinProyecto;
 });
 
-test('la bandeja se redimensiona con el teclado, se contrae y se restaura sin perder el aviso abierto', async ({ page }) => {
+test('la bandeja se redimensiona con el teclado y restablece su ancho con doble clic', async ({ page }) => {
   const propios: Aviso[] = await (await page.request.get(`${API}/notificaciones?page=1&limit=1`)).json().then((r) => r.data);
   test.skip(propios.length === 0, 'La cuenta no tiene notificaciones sembradas');
   await abrirBandeja(page);
@@ -149,11 +149,7 @@ test('la bandeja se redimensiona con el teclado, se contrae y se restaura sin pe
   await separador.dblclick();
   await expect.poll(async () => Math.abs((await lista.boundingBox())!.width - antes)).toBeLessThan(8);
 
-  await lista.getByRole('button', { name: 'Contraer bandeja' }).click();
-  await expect(lista).toBeHidden();
-  await expect(page.getByRole('article').getByRole('heading', { level: 3 })).toHaveText(propios[0].tituloNotificacion);
-  await page.getByRole('button', { name: 'Restaurar bandeja' }).click();
-  await expect(lista).toBeVisible();
+  await expect(page.getByRole('button', { name: /Contraer bandeja|Restaurar bandeja/ })).toHaveCount(0);
   await expect(filas(page).first().getByRole('button')).toHaveAttribute('aria-current', 'true');
 });
 

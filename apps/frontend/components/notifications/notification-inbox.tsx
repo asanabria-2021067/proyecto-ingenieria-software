@@ -2,10 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PanelLeftClose } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useConteoNoLeidas } from '@/hooks/use-notifications';
 import { aviso } from '@/lib/mensajes';
 import {
@@ -19,7 +16,6 @@ import {
 } from '@/lib/services/notifications';
 import { INBOX_CATEGORIES } from '@/lib/notifications/inbox-model';
 import type { NotificationGroupId } from '@/lib/notifications/preference-groups';
-import { cn } from '@/lib/utils';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { InboxList } from './inbox-list';
 import { InboxToolbar, type InboxProjectFilter, type InboxReadTab } from './inbox-toolbar';
@@ -188,15 +184,8 @@ export function NotificationInbox() {
     onError: () => aviso.error('No se pudieron marcar las notificaciones'),
   });
 
-  // ── Panel de la bandeja (contraer / restaurar / restablecer) ───────────────
+  // ── Panel de la bandeja (restablecer el reparto) ──────────────────────────
   const panelLista = useRef<ImperativePanelHandle>(null);
-  const [listaContraida, setListaContraida] = useState(false);
-  const alternarLista = () => {
-    const panel = panelLista.current;
-    if (!panel) return;
-    if (panel.isCollapsed()) panel.expand();
-    else panel.collapse();
-  };
   const restablecerReparto = () => panelLista.current?.resize(LISTA_DEFAULT);
 
   // «Sin leer» del encabezado = lo que «marcar filtradas» tocaría: bajo la
@@ -222,16 +211,6 @@ export function NotificationInbox() {
           {lista.isPending ? 'Cargando…' : `${plural(totalFiltrado, 'aviso', 'avisos')} · ${pendientesFiltro} sin leer`}
         </p>
       </div>
-      {!esMovil && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button type="button" variant="ghost" size="icon-sm" className="size-8 rounded-md text-text-secondary hover:text-text-primary" aria-label="Contraer bandeja" onClick={alternarLista}>
-              <PanelLeftClose className="size-4" aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Contraer bandeja</TooltipContent>
-        </Tooltip>
-      )}
     </div>
   );
 
@@ -279,8 +258,6 @@ export function NotificationInbox() {
         onMarcarFiltradas={() => marcarFiltradas.mutate()}
         etiquetaMarcarFiltradas={etiquetaMarcado}
         marcarFiltradasDeshabilitado={marcarFiltradas.isPending || pendientesFiltro === 0}
-        listaContraida={listaContraida}
-        onAlternarLista={esMovil ? undefined : alternarLista}
         onVolver={esMovil ? () => setVistaMovil('lista') : undefined}
       />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -313,14 +290,10 @@ export function NotificationInbox() {
             ref={panelLista}
             role="region"
             aria-label="Bandeja de entrada"
-            collapsible
-            collapsedSize={0}
             defaultSize={LISTA_DEFAULT}
             minSize={LISTA_MIN}
             maxSize={LISTA_MAX}
-            onCollapse={() => setListaContraida(true)}
-            onExpand={() => setListaContraida(false)}
-            className={cn('flex min-h-0 flex-col', listaContraida && 'hidden')}
+            className="flex min-h-0 flex-col"
           >
             {cabeceraBandeja}
             {toolbar}
@@ -331,7 +304,7 @@ export function NotificationInbox() {
             aria-label="Redimensionar bandeja"
             title="Arrastra para redimensionar; doble clic para restablecer"
             onDoubleClick={restablecerReparto}
-            className={cn('w-1.5 bg-outline-variant/40 transition-colors hover:bg-primary/40 focus-visible:bg-primary/40 data-[resize-handle-active]:bg-primary/60 [&>div]:border-outline-variant [&>div]:bg-surface-container-lowest motion-reduce:transition-none', listaContraida && 'hidden')}
+            className="w-1.5 bg-outline-variant/40 transition-colors hover:bg-primary/40 focus-visible:bg-primary/40 data-[resize-handle-active]:bg-primary/60 [&>div]:border-outline-variant [&>div]:bg-surface-container-lowest motion-reduce:transition-none"
           />
           <ResizablePanel className="flex min-h-0 flex-col">{visor}</ResizablePanel>
         </ResizablePanelGroup>
