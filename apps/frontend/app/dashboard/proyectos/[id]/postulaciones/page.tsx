@@ -99,7 +99,7 @@ export default function PostulacionesProyectoPage() {
         </Link>
 
         <div className="mb-8">
-          <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
+          <h1 className="type-display mb-1">
             Postulaciones recibidas
           </h1>
           <p className="text-tertiary text-sm">
