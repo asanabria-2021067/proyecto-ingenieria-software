@@ -113,17 +113,20 @@ describe('avatar contextual en la fila', () => {
     expect(chip).not.toHaveClass('pill-accent');
   });
 
-  it('acento de categoría: anillo fino en el avatar y línea lateral del mismo color, fondos neutros', () => {
-    const { container } = fila(base({ tipoNotificacion: 'HORAS_CONSOLIDADAS', datosJson: { projectTitle: 'Huerto UVG' } }), true);
+  it('no leída: avatar en verde (anillo y contenido) con línea lateral a juego; leída: gris, sin línea y fondo blanco', () => {
+    const { container } = fila(base({ tipoNotificacion: 'PROYECTO_PUBLICADO', datosJson: { projectTitle: 'Plataforma de Tutorías' } }));
     const a = avatar(container);
-    expect(a).toHaveClass('ring-[1.5px]', 'ring-on-tag-amber', 'bg-surface-container');
-    const boton = screen.getByRole('button');
-    expect(boton).toHaveClass('border-l-2', 'border-l-on-tag-amber', 'bg-sage-nav-active');
+    expect(a).toHaveClass('ring-[1.5px]', 'ring-primary', 'text-primary', 'bg-surface-container');
+    expect(a).not.toHaveClass('bg-tag-neutral');
+    expect(a).toHaveTextContent('PT');
+    expect(screen.getByRole('button')).toHaveClass('border-l-2', 'border-l-primary', 'bg-primary/5');
     cleanup();
 
-    const tarea = fila(base({ tipoNotificacion: 'TAREA_ASIGNADA' }));
-    expect(avatar(tarea.container)).toHaveClass('ring-on-tag-blue');
-    expect(screen.getByRole('button')).toHaveClass('border-l-on-tag-blue', 'bg-primary/5');
+    const leida = fila(base({ tipoNotificacion: 'NUEVO_SEGUIDOR', datosJson: { userName: 'Ana Ruiz' }, leidaEn: AHORA.toISOString() }));
+    const b = avatar(leida.container);
+    expect(b).toHaveClass('ring-outline-variant', 'text-tertiary', 'bg-surface-container');
+    expect(b).not.toHaveClass('ring-primary', 'text-primary', 'bg-tag-sage');
+    expect(screen.getByRole('button')).toHaveClass('border-l-transparent', 'bg-surface-container-lowest');
   });
 
   it('títulos y mensajes largos siguen truncados', () => {

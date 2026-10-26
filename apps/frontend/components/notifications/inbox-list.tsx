@@ -17,24 +17,7 @@ import {
   proyectoDeAviso,
   tituloDeCategoria,
 } from '@/lib/notifications/inbox-model';
-import type { NotificationGroupId } from '@/lib/notifications/preference-groups';
 import { cn } from '@/lib/utils';
-
-/**
- * Acento semántico de cada categoría con la tinta de su familia de etiqueta
- * (on-tag-*, ya ajustada para claro y oscuro): anillo fino en el avatar y
- * línea lateral de la fila. Solo bordes; los fondos siguen neutros.
- */
-const ACENTO: Record<NotificationGroupId, { anillo: string; linea: string }> = {
-  tareas: { anillo: 'ring-on-tag-blue', linea: 'border-l-on-tag-blue' },
-  postulaciones: { anillo: 'ring-on-tag-turquoise', linea: 'border-l-on-tag-turquoise' },
-  proyectos: { anillo: 'ring-on-tag-sage', linea: 'border-l-on-tag-sage' },
-  horas: { anillo: 'ring-on-tag-amber', linea: 'border-l-on-tag-amber' },
-  recordatorios: { anillo: 'ring-on-tag-orange', linea: 'border-l-on-tag-orange' },
-  contactos: { anillo: 'ring-on-tag-violet', linea: 'border-l-on-tag-violet' },
-  cuenta: { anillo: 'ring-on-tag-slate', linea: 'border-l-on-tag-slate' },
-  otras: { anillo: 'ring-outline', linea: 'border-l-outline' },
-};
 
 interface InboxRowProps {
   notificacion: Notificacion;
@@ -46,17 +29,16 @@ interface InboxRowProps {
 /**
  * Fila compacta (REGIÓN C, §4): avatar del emisor (identidadDeAviso), origen, título, vista previa
  * de dos líneas, chips de categoría y proyecto, fecha e indicador de no leída.
- * No leída = título en negrita, punto verde y fondo apenas teñido. Seleccionada
- * = fondo salvia sutil. La línea lateral y el anillo del avatar llevan el color de la categoría.
+ * No leída = título en negrita, punto verde, fondo apenas teñido y avatar en
+ * verde (anillo, letras o trazo del icono) con la línea lateral a juego. Leída =
+ * fondo blanco y avatar gris, sin línea. Seleccionada = fondo salvia sutil.
  */
 export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }: InboxRowProps) {
   const noLeida = n.leidaEn === null;
   const identidad = identidadDeAviso(n);
   const origen = origenDeAviso(n);
   const proyecto = proyectoDeAviso(n);
-  const idCategoria = categoriaDeTipo(n.tipoNotificacion);
-  const categoria = tituloDeCategoria(idCategoria);
-  const acento = ACENTO[idCategoria];
+  const categoria = tituloDeCategoria(categoriaDeTipo(n.tipoNotificacion));
   const fecha = fechaCompacta(n.creadaEn, ahora);
 
   return (
@@ -68,12 +50,19 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         aria-label={`${noLeida ? 'No leída: ' : ''}${n.tituloNotificacion}${fecha ? `, ${fecha}` : ''}`}
         className={cn(
           'group/fila flex w-full items-start gap-inline border-l-2 px-inline py-inline text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40',
-          acento.linea,
-          seleccionada ? 'bg-sage-nav-active' : noLeida ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-surface-container',
+          noLeida ? 'border-l-primary' : 'border-l-transparent',
+          seleccionada
+            ? 'bg-sage-nav-active'
+            : noLeida
+              ? 'bg-primary/5 hover:bg-primary/10'
+              : 'bg-surface-container-lowest hover:bg-surface-container-low',
         )}
       >
         <span className="mt-0.5 shrink-0">
-          <NotificationAvatar identidad={identidad} className={cn('ring-[1.5px]', acento.anillo)} />
+          <NotificationAvatar
+            identidad={identidad}
+            className={cn('bg-surface-container ring-[1.5px]', noLeida ? 'text-primary ring-primary' : 'text-tertiary ring-outline-variant')}
+          />
         </span>
 
         <span className="min-w-0 flex-1">
