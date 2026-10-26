@@ -16,6 +16,8 @@ interface ConfirmActionDialogProps {
   title: string;
   description: string;
   actionLabel: string;
+  /** Texto del botón que descarta la acción (por defecto «Cancelar»). */
+  cancelLabel?: string;
   variant?: 'destructive' | 'warning' | 'default';
   isPending?: boolean;
   onConfirm: () => void;
@@ -36,6 +38,7 @@ export function ConfirmActionDialog({
   title,
   description,
   actionLabel,
+  cancelLabel = 'Cancelar',
   variant = 'default',
   isPending = false,
   onConfirm,
@@ -55,7 +58,7 @@ export function ConfirmActionDialog({
             onClick={onCancel}
             className="rounded-md border-outline-variant text-on-surface hover:bg-surface-container-high"
           >
-            Cancelar
+            {cancelLabel}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}

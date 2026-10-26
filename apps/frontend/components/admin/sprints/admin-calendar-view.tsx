@@ -2,10 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ArrowRight, CalendarDays, CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, ArrowRight, CalendarDays, CalendarPlus, CalendarX2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil } from 'lucide-react';
 import { CALENDAR_DAY_CHIP_CLASS, CalendarMonthGrid } from '@/components/calendar/month-view';
 import { TimeGridView } from '@/components/calendar/time-grid-view';
 import { Button } from '@/components/ui/button';
+import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
+import { getApiErrorMessage } from '@/components/projects/api-error';
+import { aviso } from '@/lib/mensajes';
+import { cancelAdminMeeting } from '@/lib/services/admin-meetings';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { useAdminMeetingParticipants, useAdminMeetingsInRange } from '@/hooks/use-admin-meetings';
 import {
@@ -500,6 +505,26 @@ function DiaReunionRow({
   const equipos = reunion.proyectos.length;
   const convocados = participantes.data?.totalDestinatariosUnicos;
   const enlace = safeExternalHref(contenido.linkSesion ?? null);
+  const queryClient = useQueryClient();
+  const [confirmando, setConfirmando] = useState(false);
+  // Una sola petición cancela la reunión para todos sus proyectos; los avisos los envía el backend.
+  const cancelar = useMutation({
+    mutationFn: () => cancelAdminMeeting(reunion.idReunion),
+    onSuccess: () => {
+      setConfirmando(false);
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'reuniones'] });
+      aviso.exito('Reunión cancelada', 'Se avisará a los equipos convocados.');
+    },
+    onError: (error) => {
+      setConfirmando(false);
+      const status = (error as { statusCode?: number }).statusCode;
+      aviso.error(
+        'No se pudo cancelar la reunión',
+        status === 403 ? 'No tienes permiso para cancelar esta reunión.' : status === 404 ? 'La reunión ya no existe.' : getApiErrorMessage(error, 'calendar'),
+      );
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'reuniones'] });
+    },
+  });
   return (
     <li data-entrada={clave} aria-current={seleccionada || undefined} className={`${TARJETA} ${seleccionada ? TARJETA_ELEGIDA : ''}`}>
       <p className="type-body break-words font-semibold text-text-primary">{contenido.tituloEvento}</p>
@@ -592,6 +617,31 @@ function DiaReunionRow({
             <Pencil className="size-3.5" aria-hidden="true" />
             Editar reunión
           </Button>
+          {reunion.estado === 'ACTIVA' && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={cancelar.isPending}
+              onClick={() => setConfirmando(true)}
+              aria-label={`Cancelar reunión ${contenido.tituloEvento}`}
+              className="h-8 gap-1.5 rounded-pill px-3 text-xs font-bold text-on-status-error hover:bg-error/10 hover:text-on-status-error"
+            >
+              <CalendarX2 className="size-3.5" aria-hidden="true" />
+              Cancelar reunión
+            </Button>
+          )}
+          <ConfirmActionDialog
+            open={confirmando}
+            title="¿Cancelar la reunión?"
+            description={`«${contenido.tituloEvento}» se cancelará para ${equipos === 1 ? 'el proyecto convocado' : `los ${equipos} proyectos convocados`}. Sus integrantes recibirán el aviso de cancelación y la reunión dejará de aparecer en sus calendarios.`}
+            actionLabel="Confirmar cancelación"
+            cancelLabel="Conservar reunión"
+            variant="destructive"
+            isPending={cancelar.isPending}
+            onConfirm={() => cancelar.mutate()}
+            onCancel={() => setConfirmando(false)}
+          />
         </div>
       )}
     </li>

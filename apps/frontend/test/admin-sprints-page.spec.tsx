@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 if (typeof (globalThis as any).ResizeObserver === 'undefined') {
   (globalThis as any).ResizeObserver = class {
@@ -31,6 +31,7 @@ vi.mock('../lib/services/admin-meetings', () => ({
   updateAdminMeeting: vi.fn(),
   cancelAdminMeeting: vi.fn(),
 }));
+vi.mock('../lib/mensajes', () => ({ confirmar: vi.fn(), aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() } }));
 vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 8, nombre: 'Ana', apellido: 'Pérez' } }) }));
 
 import AdminSprintsClient from '../app/dashboard/admin/sprints/admin-sprints-client';
@@ -799,5 +800,39 @@ describe('Calendario administrativo — editar reunión', () => {
     fireEvent.click(panel.getByRole('button', { name: 'Editar reunión Seguimiento de cierre' }));
     expect(await screen.findByRole('dialog', { name: 'Editar reunión administrativa' })).toBeInTheDocument();
     expect(getAdminMeeting).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('Calendario administrativo — cancelar reunión', () => {
+  it('pide confirmación; «Conservar reunión» no cancela y confirmar cancela una vez y refresca el calendario', async () => {
+    const { cancelAdminMeeting } = await import('../lib/services/admin-meetings');
+    const { aviso } = await import('../lib/mensajes');
+    vi.mocked(cancelAdminMeeting).mockResolvedValue({} as never);
+    const gestionable = reunion(1, { canManage: true });
+    const pasada = reunion(7, { canManage: true, estado: 'PASADA', contenido: { ...reunion(7).contenido!, tituloEvento: 'Ya realizada' } });
+    getRangeMock.mockResolvedValue({ reuniones: [gestionable, pasada], completo: true });
+    renderPage('mes', '2026-10-08');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+    const panel = within(detalle());
+    await panel.findByText('Ya realizada');
+    // Una reunión ya realizada se puede corregir, pero no cancelar.
+    expect(panel.getAllByRole('button', { name: /^Cancelar reunión/ })).toHaveLength(1);
+
+    fireEvent.click(panel.getByRole('button', { name: 'Cancelar reunión Seguimiento de cierre' }));
+    const confirmacion = await screen.findByRole('alertdialog', { name: '¿Cancelar la reunión?' });
+    expect(confirmacion).toHaveTextContent('se cancelará para los 2 proyectos convocados');
+    expect(confirmacion).toHaveTextContent('recibirán el aviso de cancelación');
+    fireEvent.click(within(confirmacion).getByRole('button', { name: 'Conservar reunión' }));
+    expect(cancelAdminMeeting).not.toHaveBeenCalled();
+
+    const llamadasAntes = getRangeMock.mock.calls.length;
+    getRangeMock.mockResolvedValue({ reuniones: [pasada], completo: true });
+    fireEvent.click(panel.getByRole('button', { name: 'Cancelar reunión Seguimiento de cierre' }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Confirmar cancelación' }));
+    await waitFor(() => expect(cancelAdminMeeting).toHaveBeenCalledTimes(1));
+    expect(cancelAdminMeeting).toHaveBeenCalledWith(1);
+    await waitFor(() => expect(getRangeMock.mock.calls.length).toBeGreaterThan(llamadasAntes));
+    await waitFor(() => expect(panel.queryByText('Seguimiento de cierre')).not.toBeInTheDocument());
+    expect(aviso.exito).toHaveBeenCalledWith('Reunión cancelada', 'Se avisará a los equipos convocados.');
   });
 });
