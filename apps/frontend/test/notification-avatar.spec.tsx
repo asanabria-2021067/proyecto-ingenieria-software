@@ -113,19 +113,30 @@ describe('avatar contextual en la fila', () => {
     expect(chip).not.toHaveClass('pill-accent');
   });
 
-  it('no leída: avatar en verde (anillo y contenido) con línea lateral a juego; leída: gris, sin línea y fondo blanco', () => {
-    const { container } = fila(base({ tipoNotificacion: 'PROYECTO_PUBLICADO', datosJson: { projectTitle: 'Plataforma de Tutorías' } }));
-    const a = avatar(container);
-    expect(a).toHaveClass('ring-[1.5px]', 'ring-primary', 'text-primary', 'bg-surface-container');
-    expect(a).not.toHaveClass('bg-tag-neutral');
-    expect(a).toHaveTextContent('PT');
+  it('el avatar lleva el color de su categoría (familia de etiqueta), igual leída o no y sin anillo', () => {
+    const casos = [
+      { tipoNotificacion: 'TAREA_ASIGNADA', datosJson: { projectTitle: 'Plataforma de Tutorías' }, color: ['bg-tag-blue', 'text-on-tag-blue'] },
+      { tipoNotificacion: 'NUEVA_POSTULACION', datosJson: { userName: 'María López' }, color: ['bg-tag-turquoise', 'text-on-tag-turquoise'] },
+      { tipoNotificacion: 'HORAS_ACREDITADAS', datosJson: {}, color: ['bg-tag-amber', 'text-on-tag-amber'] },
+      { tipoNotificacion: 'AMISTAD_ACEPTADA', datosJson: { userName: 'Luis Gómez' }, color: ['bg-tag-violet', 'text-on-tag-violet'] },
+    ];
+    for (const { color, ...aviso } of casos) {
+      for (const leidaEn of [null, AHORA.toISOString()]) {
+        const { container } = fila(base({ ...aviso, leidaEn }));
+        const a = avatar(container);
+        expect(a, `${aviso.tipoNotificacion} ${leidaEn ? 'leída' : 'no leída'}`).toHaveClass(...color);
+        expect(a.className).not.toMatch(/(?:^|\s)ring-/);
+        expect(a).not.toHaveClass('text-primary', 'text-tertiary');
+        cleanup();
+      }
+    }
+  });
+
+  it('superficies de la fila: no leída con línea y fondo apenas teñido; leída blanca y sin línea', () => {
+    fila(base({ tipoNotificacion: 'PROYECTO_PUBLICADO', datosJson: { projectTitle: 'Plataforma de Tutorías' } }));
     expect(screen.getByRole('button')).toHaveClass('border-l-2', 'border-l-primary', 'bg-primary/5');
     cleanup();
-
-    const leida = fila(base({ tipoNotificacion: 'NUEVO_SEGUIDOR', datosJson: { userName: 'Ana Ruiz' }, leidaEn: AHORA.toISOString() }));
-    const b = avatar(leida.container);
-    expect(b).toHaveClass('ring-outline-variant', 'text-tertiary', 'bg-surface-container');
-    expect(b).not.toHaveClass('ring-primary', 'text-primary', 'bg-tag-sage');
+    fila(base({ tipoNotificacion: 'NUEVO_SEGUIDOR', datosJson: { userName: 'Ana Ruiz' }, leidaEn: AHORA.toISOString() }));
     expect(screen.getByRole('button')).toHaveClass('border-l-transparent', 'bg-surface-container-lowest');
   });
 
@@ -150,5 +161,11 @@ describe('avatar en el visor', () => {
     expect(a).toHaveTextContent('AR');
     expect(a).toHaveClass('size-10');
     expect(screen.getByText('Ana Ruiz')).toBeInTheDocument();
+  });
+
+  it('en el visor el avatar también lleva el color de la categoría (calendario: recordatorios)', () => {
+    const { container } = render(<NotificationReaderContent notificacion={base({ tipoNotificacion: 'CALENDARIO_COMPARTIDO', tituloNotificacion: 'Calendario compartido', datosJson: { ownerId: 2, ownerName: 'Ana Ruiz' } })} />);
+    expect(avatar(container)).toHaveAttribute('data-categoria', 'recordatorios');
+    expect(avatar(container)).toHaveClass('bg-tag-orange', 'text-on-tag-orange');
   });
 });

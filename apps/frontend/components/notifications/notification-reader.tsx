@@ -148,7 +148,7 @@ export function NotificationReaderContent({ notificacion: n }: { notificacion: N
         </div>
         <div className="flex items-start gap-inline">
           <span className="mt-0.5 shrink-0">
-            <NotificationAvatar identidad={identidadDeAviso(n)} size="lg" />
+            <NotificationAvatar identidad={identidadDeAviso(n)} categoria={categoriaDeTipo(n.tipoNotificacion)} size="lg" />
           </span>
           <div className="min-w-0 flex-1">
             <h3 id={`notificacion-${n.idNotificacion}-titulo`} className="type-section break-words text-on-surface">

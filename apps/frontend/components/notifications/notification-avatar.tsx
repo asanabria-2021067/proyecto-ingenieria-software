@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import type { IdentidadDeAviso } from '@/lib/notifications/inbox-model';
+import type { NotificationGroupId } from '@/lib/notifications/preference-groups';
 import { cn } from '@/lib/utils';
 
 /**
@@ -19,13 +20,45 @@ const TONO: Record<IdentidadDeAviso['tipo'], string> = {
   sistema: 'rounded-full bg-surface-container text-tertiary',
 };
 
-export function NotificationAvatar({ identidad, size = 'md', className }: { identidad: IdentidadDeAviso; size?: 'md' | 'lg'; className?: string }) {
+/**
+ * Color de la CATEGORÍA del aviso, con la familia de etiqueta que ya la
+ * representa (fondo tag-* suave y tinta on-tag-*, AA en claro y oscuro). Con
+ * `categoria`, el avatar dice de qué trata el aviso y no si está leído: su color
+ * no cambia al leerlo. La forma sigue saliendo del origen (círculo o cuadro).
+ */
+export const COLOR_DE_CATEGORIA: Record<NotificationGroupId, string> = {
+  tareas: 'bg-tag-blue text-on-tag-blue',
+  postulaciones: 'bg-tag-turquoise text-on-tag-turquoise',
+  proyectos: 'bg-tag-sage text-on-tag-sage',
+  horas: 'bg-tag-amber text-on-tag-amber',
+  recordatorios: 'bg-tag-orange text-on-tag-orange',
+  contactos: 'bg-tag-violet text-on-tag-violet',
+  cuenta: 'bg-tag-slate text-on-tag-slate',
+  otras: 'bg-tag-neutral text-on-tag-neutral',
+};
+
+export function NotificationAvatar({
+  identidad,
+  categoria,
+  size = 'md',
+  className,
+}: {
+  identidad: IdentidadDeAviso;
+  categoria?: NotificationGroupId;
+  size?: 'md' | 'lg';
+  className?: string;
+}) {
   const caja = size === 'lg' ? 'size-10' : 'size-9';
   const icono = size === 'lg' ? 'size-5' : 'size-4';
   const letras = size === 'lg' ? 'text-sm' : 'text-[13px]';
 
   return (
-    <Avatar aria-hidden="true" data-identidad={identidad.tipo} className={cn(caja, 'shrink-0', TONO[identidad.tipo], className)}>
+    <Avatar
+      aria-hidden="true"
+      data-identidad={identidad.tipo}
+      data-categoria={categoria}
+      className={cn(caja, 'shrink-0', TONO[identidad.tipo], categoria && COLOR_DE_CATEGORIA[categoria], className)}
+    >
       <AvatarFallback className={cn('rounded-[inherit] bg-transparent font-semibold leading-none', letras)}>
         {'iniciales' in identidad ? identidad.iniciales : createElement(identidad.icon, { className: icono })}
       </AvatarFallback>

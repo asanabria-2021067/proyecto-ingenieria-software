@@ -38,7 +38,8 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
   const identidad = identidadDeAviso(n);
   const origen = origenDeAviso(n);
   const proyecto = proyectoDeAviso(n);
-  const categoria = tituloDeCategoria(categoriaDeTipo(n.tipoNotificacion));
+  const idCategoria = categoriaDeTipo(n.tipoNotificacion);
+  const categoria = tituloDeCategoria(idCategoria);
   const fecha = fechaCompacta(n.creadaEn, ahora);
 
   return (
@@ -59,10 +60,8 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         )}
       >
         <span className="mt-0.5 shrink-0">
-          <NotificationAvatar
-            identidad={identidad}
-            className={cn('bg-surface-container ring-[1.5px]', noLeida ? 'text-primary ring-primary' : 'text-tertiary ring-outline-variant')}
-          />
+          {/* El color del avatar es el de la categoría (igual leída o no); la lectura la dicen el título y el punto. */}
+          <NotificationAvatar identidad={identidad} categoria={idCategoria} />
         </span>
 
         <span className="min-w-0 flex-1">
