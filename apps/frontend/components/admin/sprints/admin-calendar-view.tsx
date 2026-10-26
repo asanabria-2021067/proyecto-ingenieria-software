@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ArrowRight, CalendarDays, CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
+import { AlertCircle, ArrowRight, CalendarDays, CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil } from 'lucide-react';
 import { CALENDAR_DAY_CHIP_CLASS, CalendarMonthGrid } from '@/components/calendar/month-view';
 import { TimeGridView } from '@/components/calendar/time-grid-view';
 import { Button } from '@/components/ui/button';
@@ -71,6 +71,7 @@ export function AdminCalendarView({
   busqueda,
   selectorVista,
   onProgramarReunion,
+  onEditarReunion,
 }: {
   vista: VistaCalendario;
   /** Día actual `YYYY-MM-DD` según el backend. */
@@ -88,6 +89,8 @@ export function AdminCalendarView({
   selectorVista: ReactNode;
   /** Abre «Programar reunión» con el día elegido (solo hoy o días futuros). */
   onProgramarReunion?: (dia: string) => void;
+  /** «Editar reunión» de una reunión que el administrador puede gestionar; recibe el botón para devolverle el foco. */
+  onEditarReunion?: (idReunion: number, boton: HTMLButtonElement) => void;
 }) {
   const ancla = parseFechaSolo(selectedKey);
   const rango = useMemo(() => rangoVisible(vista, parseFechaSolo(selectedKey)), [vista, selectedKey]);
@@ -405,7 +408,7 @@ export function AdminCalendarView({
                   return entrada.origen === 'SPRINT_FINALIZACION' ? (
                     <DiaSprintRow key={clave} clave={clave} item={entrada.sprint} seleccionada={seleccion === clave} />
                   ) : (
-                    <DiaReunionRow key={clave} clave={clave} reunion={entrada.reunion} seleccionada={seleccion === clave} />
+                    <DiaReunionRow key={clave} clave={clave} reunion={entrada.reunion} seleccionada={seleccion === clave} onEditar={onEditarReunion} />
                   );
                 })}
               </ul>
@@ -480,7 +483,17 @@ function DiaSprintRow({ item, clave, seleccionada }: { item: AdminSprintCalendar
  * organizador y proyectos convocados (enlazan al detalle administrativo de
  * cada proyecto). El total de convocados sale de `/participantes`.
  */
-function DiaReunionRow({ reunion, clave, seleccionada }: { reunion: ReunionVisible; clave: string; seleccionada: boolean }) {
+function DiaReunionRow({
+  reunion,
+  clave,
+  seleccionada,
+  onEditar,
+}: {
+  reunion: ReunionVisible;
+  clave: string;
+  seleccionada: boolean;
+  onEditar?: (idReunion: number, boton: HTMLButtonElement) => void;
+}) {
   const { contenido } = reunion;
   const modalidad = MODALIDAD_ESTILO[contenido.modalidad];
   const participantes = useAdminMeetingParticipants(reunion.idReunion);
@@ -565,6 +578,22 @@ function DiaReunionRow({ reunion, clave, seleccionada }: { reunion: ReunionVisib
           </li>
         ))}
       </ul>
+      {/* Acciones según el permiso de la reunión (el backend también lo exige: 403). */}
+      {reunion.canManage && onEditar && (
+        <div className="mt-tight flex flex-wrap gap-tight border-t border-outline-variant/40 pt-tight">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={(e) => onEditar(reunion.idReunion, e.currentTarget)}
+            aria-label={`Editar reunión ${contenido.tituloEvento}`}
+            className="h-8 gap-1.5 rounded-pill px-3 text-xs font-bold"
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+            Editar reunión
+          </Button>
+        </div>
+      )}
     </li>
   );
 }

@@ -170,12 +170,23 @@ export default function AdminSprintsClient() {
   // Semana → Día desde el «+N» de un horario cargado: es otra vista, así que queda en el historial.
   const verDia = (dia: string) => window.history.pushState(null, '', adminSprintsHref('dia', dia));
 
-  // «Programar reunión»: desde el encabezado (sin día) o desde el día elegido en el calendario (a las 09:00).
-  const [programando, setProgramando] = useState<{ dia: Date | undefined } | null>(null);
+  // Diálogo de reunión: «Programar» desde el encabezado (sin día) o desde el día elegido (a las 09:00),
+  // o «Editar» desde la tarjeta de una reunión. Al cerrarse, el foco vuelve al botón que lo abrió.
+  const [dialogo, setDialogo] = useState<{ dia?: Date; idReunion?: number } | null>(null);
   const botonProgramarRef = useRef<HTMLButtonElement>(null);
+  const focoAlCerrarRef = useRef<HTMLElement | null>(null);
+  const programar = () => {
+    focoAlCerrarRef.current = botonProgramarRef.current;
+    setDialogo({});
+  };
   const programarEnDia = (dia: string) => {
     const [y, m, d] = dia.split('-').map(Number);
-    setProgramando({ dia: new Date(y, m - 1, d, 9, 0) });
+    focoAlCerrarRef.current = null;
+    setDialogo({ dia: new Date(y, m - 1, d, 9, 0) });
+  };
+  const editarReunion = (idReunion: number, boton: HTMLButtonElement) => {
+    focoAlCerrarRef.current = boton;
+    setDialogo({ idReunion });
   };
 
   const [busqueda, setBusqueda] = useState('');
@@ -227,7 +238,7 @@ export default function AdminSprintsClient() {
         <Button
           ref={botonProgramarRef}
           type="button"
-          onClick={() => setProgramando({ dia: undefined })}
+          onClick={programar}
           className="h-9 gap-1.5 rounded-pill bg-primary px-4 text-xs font-bold text-on-primary hover:bg-primary/90"
         >
           <CalendarPlus className="size-4" aria-hidden="true" />
@@ -236,10 +247,11 @@ export default function AdminSprintsClient() {
       </header>
 
       <AdminMeetingFormDialog
-        open={programando !== null}
-        onOpenChange={(abierto) => !abierto && setProgramando(null)}
-        initialDate={programando?.dia}
-        restaurarFocoEn={programando?.dia === undefined ? botonProgramarRef : undefined}
+        open={dialogo !== null}
+        onOpenChange={(abierto) => !abierto && setDialogo(null)}
+        initialDate={dialogo?.dia}
+        idReunion={dialogo?.idReunion ?? null}
+        restaurarFocoEn={focoAlCerrarRef}
       />
 
       <div className="@container/sprints flex flex-col gap-stack">
@@ -353,6 +365,7 @@ export default function AdminSprintsClient() {
             busqueda={busqueda}
             selectorVista={<SelectorVista vista={vista} fecha={fecha} />}
             onProgramarReunion={programarEnDia}
+            onEditarReunion={editarReunion}
           />
         ) : (
           <>

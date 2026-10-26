@@ -784,3 +784,20 @@ describe('Calendario administrativo — detalle de la reunión', () => {
     expect(within(rara).queryByText('Enlace')).not.toBeInTheDocument();
   });
 });
+
+describe('Calendario administrativo — editar reunión', () => {
+  it('solo una reunión gestionable ofrece «Editar reunión», que abre el diálogo en modo edición', async () => {
+    const { getAdminMeeting } = await import('../lib/services/admin-meetings');
+    vi.mocked(getAdminMeeting).mockReturnValue(new Promise(() => {}));
+    getRangeMock.mockResolvedValue({ reuniones: [reunion(1, { canManage: true }), reunion(2, { canManage: false, contenido: { ...reunion(2).contenido!, tituloEvento: 'Ajena' } })], completo: true });
+    renderPage('mes', '2026-10-08');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+    const panel = within(detalle());
+    await panel.findByText('Ajena');
+    expect(panel.getAllByRole('button', { name: /^Editar reunión/ })).toHaveLength(1);
+
+    fireEvent.click(panel.getByRole('button', { name: 'Editar reunión Seguimiento de cierre' }));
+    expect(await screen.findByRole('dialog', { name: 'Editar reunión administrativa' })).toBeInTheDocument();
+    expect(getAdminMeeting).toHaveBeenCalledWith(1);
+  });
+});

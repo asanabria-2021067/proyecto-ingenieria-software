@@ -167,3 +167,134 @@ describe('Programar reunión administrativa — diálogo', () => {
     expect(await screen.findByText('No tienes permiso para programar reuniones de Administración.')).toBeInTheDocument();
   });
 });
+
+// ─── Editar reunión (G10) ────────────────────────────────────────────────────
+
+/** Una reunión del 20 de noviembre de 2026 (futura respecto del reloj real de la prueba). */
+function detalle(overrides: Partial<AdminMeetingDetalle> = {}): AdminMeetingDetalle {
+  return {
+    idReunion: 12,
+    version: 2,
+    estado: 'ACTIVA',
+    integridad: 'OK',
+    contenido: {
+      tituloEvento: 'Seguimiento de cierre',
+      descripcionEvento: 'Revisar entregables',
+      fechaInicio: new Date(2026, 10, 20, 16, 0).toISOString(),
+      fechaFin: new Date(2026, 10, 20, 17, 0).toISOString(),
+      antelacionMinutos: 60,
+      modalidad: 'VIRTUAL',
+      ubicacionLat: null,
+      ubicacionLng: null,
+      ubicacionNombre: null,
+      linkSesion: 'https://meet.google.com/abc-defg-hij',
+    },
+    proyectos: [{ idProyecto: 1, idEvento: 41, tituloProyecto: 'Huerto Comunitario', estadoProyecto: 'EN_PROGRESO' }],
+    creador: { idUsuario: 8, nombre: 'Ana', apellido: 'Pérez' },
+    politicaEdicion: 'TODOS_ADMINISTRADORES',
+    editores: [],
+    creadaEn: '2026-10-01T00:00:00.000Z',
+    actualizadaEn: null,
+    canceladaEn: null,
+    canManage: true,
+    motivoGestion: 'POLITICA',
+    puedeCambiarPolitica: false,
+    ...overrides,
+  };
+}
+
+function renderEditar() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <AdminMeetingFormDialog open onOpenChange={onOpenChange} idReunion={12} />
+    </QueryClientProvider>,
+  );
+}
+
+describe('Editar reunión administrativa', () => {
+  it('lee la reunión y precarga título, descripción, horario, modalidad, enlace y proyectos', async () => {
+    servicios.getAdminMeeting.mockResolvedValue(detalle());
+    renderEditar();
+    expect(screen.getByRole('dialog', { name: 'Editar reunión administrativa' })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Título de la reunión')).toHaveValue('Seguimiento de cierre');
+    expect(servicios.getAdminMeeting).toHaveBeenCalledWith(12);
+    expect(screen.getByLabelText('Descripción (opcional)')).toHaveValue('Revisar entregables');
+    expect(screen.getByLabelText('Hora de inicio')).toHaveValue('16:00');
+    expect(screen.getByLabelText('Hora de fin')).toHaveValue('17:00');
+    expect(screen.getByRole('radio', { name: 'Virtual' })).toBeChecked();
+    expect(screen.getByLabelText('Enlace de conexión virtual')).toHaveValue('https://meet.google.com/abc-defg-hij');
+    expect(within(screen.getByRole('list', { name: 'Proyectos seleccionados' })).getByText('Huerto Comunitario')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+  });
+
+  it('guarda con PATCH y la versión leída: reprograma, cambia la modalidad y agrega y quita proyectos', async () => {
+    servicios.getAdminMeeting.mockResolvedValue(detalle());
+    servicios.updateAdminMeeting.mockResolvedValue(detalle({ version: 3 }));
+    renderEditar();
+    await screen.findByLabelText('Título de la reunión');
+    fireEvent.change(screen.getByLabelText('Hora de inicio'), { target: { value: '15:00' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Híbrida' }));
+    await invitar(/Plataforma de Tutorías/);
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar Huerto Comunitario de la reunión' }));
+    // Híbrida exige el lugar: sin él no se envía.
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByText('Marca la ubicación de la sesión en el mapa.')).toBeInTheDocument();
+    expect(servicios.updateAdminMeeting).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Virtual' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(servicios.updateAdminMeeting).toHaveBeenCalledTimes(1));
+    const [id, cuerpo] = servicios.updateAdminMeeting.mock.calls[0];
+    expect(id).toBe(12);
+    expect(cuerpo).toMatchObject({
+      version: 2,
+      proyectos: [2],
+      modalidad: 'VIRTUAL',
+      fechaInicio: new Date(2026, 10, 20, 15, 0).toISOString(),
+      ubicacionLat: null,
+    });
+    // Quien no puede cambiar la política no la envía (el backend respondería 403).
+    expect(cuerpo).not.toHaveProperty('politicaEdicion');
+    expect(cuerpo).not.toHaveProperty('editores');
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(mensajes.aviso.exito).toHaveBeenCalledWith('Reunión actualizada', expect.any(String));
+  });
+
+  it('un 409 no pisa lo escrito: avisa, relee y deja cargar la versión actual antes de volver a guardar', async () => {
+    servicios.getAdminMeeting.mockResolvedValueOnce(detalle()).mockResolvedValue(detalle({ version: 3, contenido: { ...detalle().contenido!, tituloEvento: 'Título de otro admin' } }));
+    servicios.updateAdminMeeting.mockRejectedValueOnce(Object.assign(new Error('Conflict'), { statusCode: 409, body: { versionActual: 3 } }));
+    renderEditar();
+    fireEvent.change(await screen.findByLabelText('Título de la reunión'), { target: { value: 'Mi título' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    expect(await screen.findByText(/Otro administrador modificó esta reunión mientras la editabas/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Título de la reunión')).toHaveValue('Mi título');
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cargar la versión actual' }));
+    expect(screen.getByLabelText('Título de la reunión')).toHaveValue('Título de otro admin');
+    servicios.updateAdminMeeting.mockResolvedValue(detalle({ version: 4 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(servicios.updateAdminMeeting).toHaveBeenLastCalledWith(12, expect.objectContaining({ version: 3 })));
+  });
+
+  it('si el 409 es porque la cancelaron, lo dice y no deja guardar', async () => {
+    servicios.getAdminMeeting.mockResolvedValueOnce(detalle()).mockResolvedValue(detalle({ version: 3, estado: 'CANCELADA', canceladaEn: '2026-10-25T00:00:00.000Z' }));
+    servicios.updateAdminMeeting.mockRejectedValueOnce(Object.assign(new Error('Conflict'), { statusCode: 409 }));
+    renderEditar();
+    await screen.findByLabelText('Título de la reunión');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByText('Esta reunión fue cancelada: ya no se puede editar.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cargar la versión actual' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  });
+
+  it('sin permiso de gestión lo explica y no deja guardar', async () => {
+    servicios.getAdminMeeting.mockResolvedValue(detalle({ canManage: false, motivoGestion: null }));
+    renderEditar();
+    expect(await screen.findByText('No tienes permiso para editar esta reunión.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  });
+});
