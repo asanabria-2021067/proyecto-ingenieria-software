@@ -32,6 +32,8 @@ interface InboxToolbarProps {
 const TODOS = '__ALL__';
 const TRIGGER = `${DASHBOARD_FILTER_TRIGGER_CLASS} h-9.5 py-0 text-[13px]`;
 const ITEM = 'focus:bg-primary focus:text-on-primary';
+/** Mismo fondo blanco que la búsqueda y los selects; activo y hover siguen en verde. */
+const SEGMENTO = cn(SEGMENTED_ITEM_CLASS, 'bg-surface-container-lowest');
 
 /** Buscador con retardo: el servidor recibe el texto 300 ms después de la última tecla. */
 export const BUSQUEDA_DEBOUNCE_MS = 300;
@@ -133,9 +135,9 @@ export function InboxToolbar({ busqueda, onBusqueda, proyecto, onProyecto, proye
           aria-label="Estado de lectura"
           className="min-w-0 flex-1 basis-56"
         >
-          <ToggleGroupItem value="todas" className={SEGMENTED_ITEM_CLASS}>Todas</ToggleGroupItem>
-          <ToggleGroupItem value="no-leidas" className={SEGMENTED_ITEM_CLASS}>No leídas</ToggleGroupItem>
-          <ToggleGroupItem value="leidas" className={SEGMENTED_ITEM_CLASS}>Leídas</ToggleGroupItem>
+          <ToggleGroupItem value="todas" className={SEGMENTO}>Todas</ToggleGroupItem>
+          <ToggleGroupItem value="no-leidas" className={SEGMENTO}>No leídas</ToggleGroupItem>
+          <ToggleGroupItem value="leidas" className={SEGMENTO}>Leídas</ToggleGroupItem>
         </ToggleGroup>
         {/* Orden: un solo botón de dos estados (desc = más recientes primero). */}
         <Button
@@ -145,7 +147,7 @@ export function InboxToolbar({ busqueda, onBusqueda, proyecto, onProyecto, proye
           onClick={() => onOrden(orden === 'desc' ? 'asc' : 'desc')}
           aria-label={orden === 'desc' ? 'Orden: más recientes primero. Cambiar a más antiguas primero' : 'Orden: más antiguas primero. Cambiar a más recientes primero'}
           data-orden={orden}
-          className="ml-auto shrink-0 rounded-md text-[13px] font-semibold"
+          className="ml-auto shrink-0 rounded-md bg-surface-container-lowest text-[13px] font-semibold dark:bg-surface-container-lowest"
         >
           {orden === 'desc' ? <ArrowDownWideNarrow className="size-4" aria-hidden="true" /> : <ArrowUpNarrowWide className="size-4" aria-hidden="true" />}
           {orden === 'desc' ? 'Más recientes' : 'Más antiguas'}
