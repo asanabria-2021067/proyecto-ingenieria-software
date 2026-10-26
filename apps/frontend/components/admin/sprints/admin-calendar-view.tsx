@@ -30,6 +30,7 @@ import {
   formatDiaLargoConAnio,
 } from '@/lib/admin/sprint-calendar';
 import { MODALIDAD_ESTILO } from '@/lib/calendar/modalidad';
+import { safeExternalHref } from '@/lib/security/safe-url';
 import { IconoTipoEvento, TONO_CLASES } from '@/lib/calendar/paleta';
 import { etiquetaRango, navegar, rangoVisible, type VistaCalendario } from '@/lib/calendar/vista';
 import { formatMonthLabel, parseFechaSolo, toDateKey } from '@/lib/calendar/utils';
@@ -474,10 +475,10 @@ function DiaSprintRow({ item, clave, seleccionada }: { item: AdminSprintCalendar
 }
 
 /**
- * Tarjeta de una reunión de Administración: título, fecha, horario, modalidad,
- * equipos y proyectos convocados. Solo consulta: la reunión aún no tiene
- * pantalla propia, así que los únicos enlaces van al detalle administrativo
- * de cada proyecto. El total de convocados sale de `/participantes`.
+ * Tarjeta de una reunión de Administración: título, estado, descripción,
+ * fecha, horario, modalidad con su lugar y enlace, equipos, convocados,
+ * organizador y proyectos convocados (enlazan al detalle administrativo de
+ * cada proyecto). El total de convocados sale de `/participantes`.
  */
 function DiaReunionRow({ reunion, clave, seleccionada }: { reunion: ReunionVisible; clave: string; seleccionada: boolean }) {
   const { contenido } = reunion;
@@ -485,6 +486,7 @@ function DiaReunionRow({ reunion, clave, seleccionada }: { reunion: ReunionVisib
   const participantes = useAdminMeetingParticipants(reunion.idReunion);
   const equipos = reunion.proyectos.length;
   const convocados = participantes.data?.totalDestinatariosUnicos;
+  const enlace = safeExternalHref(contenido.linkSesion ?? null);
   return (
     <li data-entrada={clave} aria-current={seleccionada || undefined} className={`${TARJETA} ${seleccionada ? TARJETA_ELEGIDA : ''}`}>
       <p className="type-body break-words font-semibold text-text-primary">{contenido.tituloEvento}</p>
@@ -495,7 +497,13 @@ function DiaReunionRow({ reunion, clave, seleccionada }: { reunion: ReunionVisib
           </span>
           Reunión administrativa
         </span>
+        <span className={`pill ${reunion.estado === 'ACTIVA' ? 'pill-success' : 'pill-neutral'}`}>
+          {reunion.estado === 'ACTIVA' ? 'Programada' : reunion.estado === 'PASADA' ? 'Realizada' : 'Cancelada'}
+        </span>
       </p>
+      {contenido.descripcionEvento && (
+        <p className="type-meta mt-tight whitespace-pre-line break-words text-text-primary">{contenido.descripcionEvento}</p>
+      )}
       <dl className="mt-tight grid grid-cols-[auto_1fr] gap-x-inline gap-y-micro type-meta">
         <dt>Fecha</dt>
         <dd className="font-medium tabular-nums text-text-primary">{formatDiaConAnio(diaInicioReunion(contenido))}</dd>
@@ -509,6 +517,22 @@ function DiaReunionRow({ reunion, clave, seleccionada }: { reunion: ReunionVisib
             {contenido.ubicacionNombre && <span className="font-normal text-text-secondary"> · {contenido.ubicacionNombre}</span>}
           </span>
         </dd>
+        {enlace && (
+          <>
+            <dt>Enlace</dt>
+            <dd className="min-w-0">
+              <a
+                href={enlace}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex max-w-full items-center gap-micro rounded-control font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                <span className="truncate">{new URL(enlace).hostname}</span>
+                <span className="sr-only"> (se abre en otra pestaña)</span>
+              </a>
+            </dd>
+          </>
+        )}
         <dt>Equipos</dt>
         <dd className="font-medium tabular-nums text-text-primary">{equipos === 1 ? '1 equipo' : `${equipos} equipos`}</dd>
         <dt>Convocados</dt>

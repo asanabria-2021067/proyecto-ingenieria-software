@@ -752,3 +752,35 @@ describe('Calendario administrativo — programar reunión', () => {
     expect(within(pasado).queryByRole('button', { name: 'Programar reunión este día' })).not.toBeInTheDocument();
   });
 });
+
+describe('Calendario administrativo — detalle de la reunión', () => {
+  it('la tarjeta muestra estado, descripción y el enlace de una reunión virtual (abre aparte, sin esquemas peligrosos)', async () => {
+    const virtual = reunion(5, {
+      estado: 'PASADA',
+      contenido: {
+        ...reunion(5).contenido!,
+        tituloEvento: 'Retro de Sprint',
+        descripcionEvento: 'Qué salió bien y qué mejorar.',
+        modalidad: 'VIRTUAL',
+        ubicacionNombre: null,
+        linkSesion: 'https://meet.google.com/abc-defg-hij',
+      },
+    });
+    const peligrosa = reunion(6, { contenido: { ...reunion(6).contenido!, tituloEvento: 'Enlace raro', modalidad: 'VIRTUAL', linkSesion: 'javascript:alert(1)' } });
+    getRangeMock.mockResolvedValue({ reuniones: [virtual, peligrosa], completo: true });
+    renderPage('mes', '2026-10-08');
+    await screen.findByRole('heading', { level: 2, name: 'Octubre 2026' });
+    const panel = within(detalle());
+    const tarjeta = (await panel.findByText('Retro de Sprint')).closest('li') as HTMLElement;
+    expect(within(tarjeta).getByText('Realizada')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('Qué salió bien y qué mejorar.')).toBeInTheDocument();
+    const enlace = within(tarjeta).getByRole('link', { name: /meet\.google\.com/ });
+    expect(enlace).toHaveAttribute('href', 'https://meet.google.com/abc-defg-hij');
+    expect(enlace).toHaveAttribute('target', '_blank');
+    expect(enlace).toHaveAttribute('rel', 'noopener noreferrer');
+
+    const rara = (panel.getByText('Enlace raro')).closest('li') as HTMLElement;
+    expect(within(rara).getByText('Programada')).toBeInTheDocument();
+    expect(within(rara).queryByText('Enlace')).not.toBeInTheDocument();
+  });
+});
