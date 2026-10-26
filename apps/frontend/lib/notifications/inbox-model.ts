@@ -1,6 +1,8 @@
 import {
+  Activity,
   AtSign,
   Award,
+  BadgeCheck,
   Bell,
   CalendarClock,
   ClipboardList,
@@ -8,6 +10,7 @@ import {
   Flag,
   FolderKanban,
   KeyRound,
+  Landmark,
   MessageSquare,
   ShieldAlert,
   ShieldCheck,
@@ -93,6 +96,8 @@ export function etiquetaDeTipo(tipo: string): string {
 const TYPE_ICON_RULES: Array<[string, LucideIcon]> = [
   // HU-200: antes que 'COMENTARIO', que también coincide con MENCION_COMENTARIO.
   ['MENCION', AtSign],
+  // Antes que 'TAREA'/'HITO'/'PROYECTO': COMENTARIO_TAREA es un comentario, no una tarea.
+  ['COMENTARIO', MessageSquare],
   ['POSTULACION', UserCheck],
   ['TAREA', ClipboardList],
   ['HITO', Flag],
@@ -101,7 +106,6 @@ const TYPE_ICON_RULES: Array<[string, LucideIcon]> = [
   ['HORAS', Clock3],
   ['CERTIFICADO', Award],
   ['INSIGNIA', Award],
-  ['COMENTARIO', MessageSquare],
   ['MENSAJE', MessageSquare],
   ['AMISTAD', UserPlus],
   ['SEGUIDOR', UserPlus],
@@ -208,14 +212,107 @@ export function proyectoDeAviso(n: Pick<Notificacion, 'datosJson'>): ProyectoDeA
   return { id, titulo };
 }
 
-/** Quién origina el aviso, cuando el payload o el tipo lo dicen. Nunca ids ni correos. */
-export function origenDeAviso(n: Pick<Notificacion, 'tipoNotificacion' | 'datosJson'>): string | null {
+// ─── Identidad visual del emisor (avatar contextual) ─────────────────────────
+
+/**
+ * Campo del payload que nombra a la PERSONA que originó el aviso, por tipo.
+ * Lista cerrada y verificada contra las plantillas del backend: el mismo
+ * campo puede ser el destinatario en otro tipo (p. ej. `userName` en
+ * CUENTA_VERIFICADA es quien recibe), así que nunca se lee un nombre fuera de
+ * esta tabla, y nunca se extrae del texto del mensaje.
+ */
+const CAMPO_ACTOR: Readonly<Record<string, string>> = {
+  NUEVA_POSTULACION: 'userName',
+  ROL_ABANDONADO: 'userName',
+  ROL_ASIGNADO_LIDER: 'userName',
+  SOLICITUD_AMISTAD: 'userName',
+  AMISTAD_ACEPTADA: 'userName',
+  NUEVO_SEGUIDOR: 'userName',
+  SOLICITUD_RECUPERACION_CONTRASENA: 'userName',
+  CUENTA_PENDIENTE_VERIFICACION: 'userName',
+  APELACION_LIDERAZGO_RECIBIDA: 'leaderName',
+  CALENDARIO_COMPARTIDO: 'ownerName',
+  MENCION_COMENTARIO: 'autorNombre',
+};
+
+/** Decisiones de Administración sin responsable individual en el payload. */
+const TIPOS_INSTITUCIONALES = new Set([
+  'REUNION_PROGRAMADA',
+  'REUNION_ACTUALIZADA',
+  'REUNION_CANCELADA',
+  'PROYECTO_APROBADO',
+  'PROYECTO_OBSERVADO',
+  'CIERRE_APROBADO',
+  'CIERRE_RECHAZADO',
+  'CIERRE_CORRECCION_DOCUMENTAL',
+  'CIERRE_DEVUELTO_A_EJECUCION',
+  'CUENTA_VERIFICADA',
+]);
+
+/** Avisos que emite la plataforma sola (cron, cálculos, umbrales): siempre icono, aunque nombren un proyecto. */
+const ICONO_AUTOMATICO: Readonly<Record<string, LucideIcon>> = {
+  RECORDATORIO_EVENTO: CalendarClock,
+  TAREA_POR_VENCER: CalendarClock,
+  HORAS_CONSOLIDADAS: Clock3,
+  HORAS_ACREDITADAS: BadgeCheck,
+  HORAS_VALIDADAS: BadgeCheck,
+  CERTIFICADO_EMITIDO: Award,
+  INSIGNIA_OBTENIDA: Award,
+  PROYECTO_ADVERTENCIA_INACTIVIDAD: Activity,
+  CAMBIO_ESTADO_PROYECTO: Activity,
+  POSTULACION_RECHAZADA_POR_CIERRE: Activity,
+  ALERTA_SEGURIDAD: ShieldAlert,
+};
+
+export type IdentidadDeAviso =
+  | { tipo: 'persona'; nombre: string; iniciales: string }
+  | { tipo: 'institucion'; nombre: string; icon: LucideIcon }
+  | { tipo: 'proyecto'; nombre: string; iniciales: string }
+  | { tipo: 'sistema'; nombre: string | null; icon: LucideIcon };
+
+const CONECTORES = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'y', 'e', 'en', 'para', 'con', 'a', 'al']);
+
+/** Hasta dos iniciales de las primeras palabras con significado («Plataforma de Tutorías» → «PT»). */
+export function inicialesDe(nombre: string): string {
+  const palabras = nombre.trim().split(/\s+/).filter((p) => /\p{L}|\d/u.test(p));
+  const utiles = palabras.filter((p) => !CONECTORES.has(p.toLowerCase()));
+  const fuente = utiles.length > 0 ? utiles : palabras;
+  return fuente
+    .slice(0, 2)
+    .map((p) => (p.match(/\p{L}|\d/u)?.[0] ?? '').toLocaleUpperCase('es'))
+    .join('');
+}
+
+/**
+ * Quién o qué originó el aviso, en orden fijo y comprobable:
+ *  1. persona identificada por un campo estructurado de su tipo (CAMPO_ACTOR);
+ *  2. Administración, para sus decisiones sin responsable en el payload;
+ *  3. evento automático (icono propio);
+ *  4. proyecto, si el payload trae su nombre;
+ *  5. icono del tipo (Cuenta y seguridad se presenta como la plataforma).
+ * El payload no trae fotos: una persona se muestra con iniciales.
+ */
+export function identidadDeAviso(n: Pick<Notificacion, 'tipoNotificacion' | 'datosJson'>): IdentidadDeAviso {
   const datos = datosDe(n);
-  const nombre = texto(datos, 'userName') ?? texto(datos, 'ownerName') ?? texto(datos, 'leaderName');
-  if (nombre) return nombre;
-  if (n.tipoNotificacion.startsWith('REUNION_')) return 'Administración';
-  if (categoriaDeTipo(n.tipoNotificacion) === 'cuenta') return 'Plataforma UVGenius';
-  return null;
+  const tipo = n.tipoNotificacion;
+  const campoActor = CAMPO_ACTOR[tipo];
+  const actor = campoActor ? texto(datos, campoActor) : null;
+  const inicialesActor = actor ? inicialesDe(actor) : '';
+  if (actor && inicialesActor) return { tipo: 'persona', nombre: actor, iniciales: inicialesActor };
+  if (TIPOS_INSTITUCIONALES.has(tipo)) return { tipo: 'institucion', nombre: 'Administración', icon: Landmark };
+  const automatico = ICONO_AUTOMATICO[tipo];
+  const cuenta = categoriaDeTipo(tipo) === 'cuenta';
+  if (automatico) return { tipo: 'sistema', nombre: cuenta ? 'Plataforma UVGenius' : null, icon: automatico };
+  const proyecto = texto(datos, 'projectTitle');
+  const inicialesProyecto = proyecto ? inicialesDe(proyecto) : '';
+  if (proyecto && inicialesProyecto && !cuenta) return { tipo: 'proyecto', nombre: proyecto, iniciales: inicialesProyecto };
+  return { tipo: 'sistema', nombre: cuenta ? 'Plataforma UVGenius' : null, icon: iconoDeTipo(tipo) };
+}
+
+/** Quién origina el aviso (línea «De:»), la misma identidad que el avatar. Nunca ids ni correos; un proyecto ya va en su chip. */
+export function origenDeAviso(n: Pick<Notificacion, 'tipoNotificacion' | 'datosJson'>): string | null {
+  const identidad = identidadDeAviso(n);
+  return identidad.tipo === 'proyecto' ? null : identidad.nombre;
 }
 
 export interface DetalleDeAviso {

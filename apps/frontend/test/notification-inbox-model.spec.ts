@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Bell, CalendarClock, ClipboardList, Clock3 } from 'lucide-react';
+import { Activity, BadgeCheck, Bell, CalendarClock, ClipboardList, Clock3, Landmark, MessageSquare, ShieldAlert } from 'lucide-react';
 import {
   INBOX_CATEGORIES,
   accionDeAviso,
@@ -11,6 +11,8 @@ import {
   etiquetaDeTipo,
   fechaCompacta,
   iconoDeTipo,
+  identidadDeAviso,
+  inicialesDe,
   origenDeAviso,
   proyectoDeAviso,
 } from '../lib/notifications/inbox-model';
@@ -124,5 +126,62 @@ describe('acción de navegación', () => {
   it('una reunión cancelada no enlaza a un evento que ya no existe; sin destino, nada', () => {
     expect(accionDeAviso(aviso('REUNION_CANCELADA', { meetingId: 1 }))).toBeNull();
     expect(accionDeAviso(aviso('HORAS_VALIDADAS', { projectId: 4 }))).toBeNull();
+  });
+});
+
+describe('identidad visual del emisor (avatares contextuales)', () => {
+  it('persona: solo con el campo estructurado de SU tipo, con iniciales (no hay fotos en el payload)', () => {
+    expect(identidadDeAviso(aviso('MENCION_COMENTARIO', { autorNombre: 'Carlos Mendoza', idProyecto: 4 }))).toEqual({ tipo: 'persona', nombre: 'Carlos Mendoza', iniciales: 'CM' });
+    expect(identidadDeAviso(aviso('CALENDARIO_COMPARTIDO', { ownerId: 1, ownerName: 'Ana Ruiz' }))).toMatchObject({ tipo: 'persona', iniciales: 'AR' });
+    expect(identidadDeAviso(aviso('APELACION_LIDERAZGO_RECIBIDA', { leaderName: 'Luis Gómez', projectTitle: 'Huerto UVG' }))).toMatchObject({ tipo: 'persona', nombre: 'Luis Gómez' });
+  });
+
+  it('nunca atribuye a nadie un comentario sin autor estructurado ni lee nombres del mensaje', () => {
+    const comentario = { tipoNotificacion: 'COMENTARIO_TAREA', datosJson: { idProyecto: 4, idTarea: 9 }, mensajeNotificacion: 'Carlos Mendoza comentó tu tarea' };
+    expect(identidadDeAviso(comentario)).toEqual({ tipo: 'sistema', nombre: null, icon: MessageSquare });
+    expect(origenDeAviso(comentario)).toBeNull();
+  });
+
+  it('un nombre fuera de la lista de su tipo no es el emisor: CUENTA_VERIFICADA nombra al DESTINATARIO', () => {
+    const aprobada = aviso('CUENTA_VERIFICADA', { userName: 'Destinatario Propio' });
+    expect(identidadDeAviso(aprobada)).toEqual({ tipo: 'institucion', nombre: 'Administración', icon: Landmark });
+    expect(origenDeAviso(aprobada)).toBe('Administración');
+    expect(identidadDeAviso(aviso('TAREA_ASIGNADA', { userName: 'Alguien', taskId: 1 })).tipo).toBe('sistema');
+  });
+
+  it('Administración: reuniones y decisiones de revisión o cierre sin responsable individual', () => {
+    for (const tipo of ['REUNION_PROGRAMADA', 'REUNION_ACTUALIZADA', 'REUNION_CANCELADA', 'PROYECTO_APROBADO', 'CIERRE_RECHAZADO']) {
+      expect(identidadDeAviso(aviso(tipo, { projectTitle: 'Huerto UVG' })), tipo).toMatchObject({ tipo: 'institucion', icon: Landmark });
+    }
+  });
+
+  it('automáticos: icono aunque nombren un proyecto (horas, recordatorios, cambios de estado, seguridad)', () => {
+    expect(identidadDeAviso(aviso('HORAS_CONSOLIDADAS', { projectTitle: 'Huerto UVG' }))).toEqual({ tipo: 'sistema', nombre: null, icon: Clock3 });
+    expect(identidadDeAviso(aviso('HORAS_ACREDITADAS', { projectTitle: 'Huerto UVG' }))).toMatchObject({ icon: BadgeCheck });
+    expect(identidadDeAviso(aviso('RECORDATORIO_EVENTO', { projectTitle: 'Huerto UVG' }))).toMatchObject({ icon: CalendarClock });
+    expect(identidadDeAviso(aviso('CAMBIO_ESTADO_PROYECTO', { projectTitle: 'Huerto UVG' }))).toMatchObject({ icon: Activity });
+    expect(identidadDeAviso(aviso('ALERTA_SEGURIDAD', { ip: '10.0.0.1' }))).toEqual({ tipo: 'sistema', nombre: 'Plataforma UVGenius', icon: ShieldAlert });
+  });
+
+  it('proyecto: iniciales del nombre del proyecto, sin confundirlo con su líder; sin nombre, icono del tipo', () => {
+    expect(identidadDeAviso(aviso('PROYECTO_PUBLICADO', { projectId: 3, projectTitle: 'Plataforma de Tutorías UVG' }))).toEqual({ tipo: 'proyecto', nombre: 'Plataforma de Tutorías UVG', iniciales: 'PT' });
+    // ROL_ABANDONADO llega sin userName desde roles.service: no se inventa a la persona.
+    expect(identidadDeAviso(aviso('ROL_ABANDONADO', { projectId: 3, projectTitle: 'Huerto UVG', roleName: 'Diseño' }))).toMatchObject({ tipo: 'proyecto', iniciales: 'HU' });
+    expect(identidadDeAviso(aviso('TAREA_ASIGNADA', { projectId: 3, taskId: 1 }))).toEqual({ tipo: 'sistema', nombre: null, icon: ClipboardList });
+    expect(identidadDeAviso(aviso('TIPO_FUTURO'))).toEqual({ tipo: 'sistema', nombre: null, icon: Bell });
+  });
+
+  it('iniciales: dos como máximo, sin conectores, con acentos y sin símbolos; un nombre vacío no produce persona', () => {
+    expect(inicialesDe('carlos mendoza')).toBe('CM');
+    expect(inicialesDe('María José Pérez')).toBe('MJ');
+    expect(inicialesDe('Ana')).toBe('A');
+    expect(inicialesDe('Sistema de Inventario Verde')).toBe('SI');
+    expect(inicialesDe('  🙂  ')).toBe('');
+    expect(identidadDeAviso(aviso('NUEVO_SEGUIDOR', { userName: '   ' })).tipo).toBe('sistema');
+  });
+
+  it('es determinista: el mismo aviso da siempre la misma identidad', () => {
+    const n = aviso('SOLICITUD_AMISTAD', { userName: 'Ana Ruiz', idAmistad: 2 });
+    expect(identidadDeAviso(n)).toEqual(identidadDeAviso({ ...n }));
   });
 });
