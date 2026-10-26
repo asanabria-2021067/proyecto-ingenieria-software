@@ -124,7 +124,7 @@ export default function MyProjectsPage() {
       <div className={dashboardPage('pt-7 pb-10')}>
         <div className="mb-4.5 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-[28px] leading-8.5 font-bold text-on-surface">
+            <h1 className="type-display">
               Mis Proyectos
             </h1>
             <p className="mt-1 text-[14px] font-normal text-tertiary">
