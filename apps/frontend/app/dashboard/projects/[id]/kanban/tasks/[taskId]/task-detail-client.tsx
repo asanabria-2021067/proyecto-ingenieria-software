@@ -400,7 +400,7 @@ function TaskDetailView({
           )}
         </div>
 
-        <h1 className="mt-4 line-clamp-3 text-[26px] font-bold leading-tight text-on-surface md:text-[28px]">
+        <h1 className="type-display mt-4 line-clamp-3">
           {tarea.tituloTarea}
         </h1>
 
