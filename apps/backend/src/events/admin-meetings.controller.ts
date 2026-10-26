@@ -30,6 +30,12 @@ export class AdminMeetingsController {
     return this.meetings.proyectosElegibles(query);
   }
 
+  /** Equipo que se convocaría de un proyecto (líder e integrantes), para el formulario. */
+  @Get('equipos/:idProyecto')
+  projectTeam(@Param('idProyecto', ParseIntPipe) idProyecto: number) {
+    return this.meetings.equipoDeProyecto(idProyecto);
+  }
+
   @Get(':id')
   detail(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number }) {
     return this.meetings.detalle(id, user.userId);

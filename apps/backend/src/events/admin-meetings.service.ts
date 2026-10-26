@@ -498,6 +498,45 @@ export class AdminMeetingsService {
     const proyecciones = await this.proyeccionesVigentes(this.prisma, reunion);
     const ids = proyecciones.map((p) => p.idProyecto);
     const proyectos = await cargarProyectosParaReunion(this.prisma, ids);
+    const { equipos, detalle } = await this.equiposDetallados(proyectos, ids);
+    return {
+      idReunion,
+      totalDestinatariosUnicos: unionDeEquipos(equipos).size,
+      proyectos: proyecciones.map((proyeccion) => ({
+        idProyecto: proyeccion.idProyecto,
+        tituloProyecto: proyeccion.proyecto.tituloProyecto,
+        estadoProyecto: proyeccion.proyecto.estadoProyecto,
+        ...detalle(proyeccion.idProyecto),
+      })),
+    };
+  }
+
+  /**
+   * El equipo que convocaría un proyecto, antes de que exista la reunión: el
+   * formulario de Administración lo muestra al desplegar «Ver detalles» de
+   * un proyecto invitado. Misma regla y misma forma que `participantes`
+   * (`equiposDeProyectos`), más la descripción del proyecto. No exige que el
+   * proyecto sea elegible (al editar, uno ya convocado puede haber salido de
+   * la ventana); la elegibilidad se valida al guardar.
+   */
+  async equipoDeProyecto(idProyecto: number) {
+    const proyecto = await this.prisma.proyecto.findFirst({
+      where: { idProyecto, eliminadoEn: null },
+      select: { idProyecto: true, tituloProyecto: true, descripcionProyecto: true, estadoProyecto: true },
+    });
+    if (!proyecto) throw new NotFoundException(`Proyecto ${idProyecto} no encontrado`);
+    const proyectos = await cargarProyectosParaReunion(this.prisma, [idProyecto]);
+    const { detalle } = await this.equiposDetallados(proyectos, [idProyecto]);
+    return { ...proyecto, ...detalle(idProyecto) };
+  }
+
+  /**
+   * Líder, integrantes (ACTIVO; en un CERRADO también COMPLETADO, con su rol y
+   * estado de cuenta) y convocados de cada proyecto, con la regla de
+   * `equiposDeProyectos`. Una persona con dos roles en el proyecto aparece una
+   * vez (con el primero). Nunca devuelve correos.
+   */
+  private async equiposDetallados(proyectos: Map<number, ProyectoParaReunion>, ids: number[]) {
     const equipos = await equiposDeProyectos(this.prisma, vigentes(proyectos, ids));
     const participaciones = await this.prisma.participacionProyecto.findMany({
       where: { rolProyecto: { idProyecto: { in: ids } }, estadoParticipacion: { in: ['ACTIVO', 'COMPLETADO'] } },
@@ -519,30 +558,23 @@ export class AdminMeetingsService {
       estadoCuenta: u.estado,
       convocado: equipos.get(idProyecto)?.includes(u.idUsuario) ?? false,
     });
-    return {
-      idReunion,
-      totalDestinatariosUnicos: unionDeEquipos(equipos).size,
-      proyectos: proyecciones.map((proyeccion) => {
-        const proyecto = proyectos.get(proyeccion.idProyecto);
-        const lider = proyecto ? lideres.get(proyecto.creadoPor) : undefined;
-        const admitidos = proyecto?.estadoProyecto === 'CERRADO' ? ['ACTIVO', 'COMPLETADO'] : ['ACTIVO'];
-        // Una persona con dos roles en el proyecto aparece una vez (con el primero).
-        const integrantes = new Map<number, ReturnType<typeof persona> & { rol: string; estadoParticipacion: string }>();
-        for (const p of participaciones) {
-          if (p.rolProyecto.idProyecto !== proyeccion.idProyecto || !admitidos.includes(p.estadoParticipacion)) continue;
-          if (integrantes.has(p.usuario.idUsuario)) continue;
-          integrantes.set(p.usuario.idUsuario, { ...persona(p.usuario, proyeccion.idProyecto), rol: p.rolProyecto.nombreRol, estadoParticipacion: p.estadoParticipacion });
-        }
-        return {
-          idProyecto: proyeccion.idProyecto,
-          tituloProyecto: proyeccion.proyecto.tituloProyecto,
-          estadoProyecto: proyeccion.proyecto.estadoProyecto,
-          lider: lider ? persona(lider, proyeccion.idProyecto) : null,
-          integrantes: [...integrantes.values()],
-          totalConvocados: equipos.get(proyeccion.idProyecto)?.length ?? 0,
-        };
-      }),
+    const detalle = (idProyecto: number) => {
+      const proyecto = proyectos.get(idProyecto);
+      const lider = proyecto ? lideres.get(proyecto.creadoPor) : undefined;
+      const admitidos = proyecto?.estadoProyecto === 'CERRADO' ? ['ACTIVO', 'COMPLETADO'] : ['ACTIVO'];
+      const integrantes = new Map<number, ReturnType<typeof persona> & { rol: string; estadoParticipacion: string }>();
+      for (const p of participaciones) {
+        if (p.rolProyecto.idProyecto !== idProyecto || !admitidos.includes(p.estadoParticipacion)) continue;
+        if (integrantes.has(p.usuario.idUsuario)) continue;
+        integrantes.set(p.usuario.idUsuario, { ...persona(p.usuario, idProyecto), rol: p.rolProyecto.nombreRol, estadoParticipacion: p.estadoParticipacion });
+      }
+      return {
+        lider: lider ? persona(lider, idProyecto) : null,
+        integrantes: [...integrantes.values()],
+        totalConvocados: equipos.get(idProyecto)?.length ?? 0,
+      };
     };
+    return { equipos, detalle };
   }
 
   /**

@@ -70,6 +70,7 @@ describeIntegration('HU-195 G08 — API HTTP de reuniones de Administración (Po
             eligibleProjects: [EligibleMeetingProjectsQueryDto],
             detail: [Number, Object],
             participants: [Number],
+            projectTeam: [Number],
             create: [Object, CreateAdminMeetingDto],
             update: [Number, Object, UpdateAdminMeetingDto],
             cancel: [Number, Object],
@@ -197,6 +198,31 @@ describeIntegration('HU-195 G08 — API HTTP de reuniones de Administración (Po
       expect(res.texto).not.toMatch(/correo|@example\.test/);
       // Solo Administración.
       expect((await pedir('GET', `/admin/reuniones/${creada.idReunion}/participantes`, 'L1')).status).toBe(403);
+    });
+
+    it('equipos/:idProyecto: el equipo que se convocaría, antes de crear la reunión, con la misma regla que participantes', async () => {
+      const res = await pedir('GET', `/admin/reuniones/equipos/${esc.p.P1.idProyecto}`, 'ADMIN');
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ idProyecto: esc.p.P1.idProyecto, tituloProyecto: esc.p.P1.tituloProyecto });
+      expect(res.body).toHaveProperty('descripcionProyecto');
+      expect(res.body.lider).toMatchObject({ idUsuario: esc.id('L1'), convocado: true });
+      const porId = new Map(res.body.integrantes.map((i: { idUsuario: number }) => [i.idUsuario, i]));
+      expect(porId.get(esc.id('INACT'))).toMatchObject({ estadoCuenta: 'INACTIVO', convocado: false });
+      expect(porId.get(esc.id('M1'))).toMatchObject({ estadoCuenta: 'ACTIVO', convocado: true });
+      expect(porId.has(esc.id('RET'))).toBe(false);
+      expect(res.texto).not.toMatch(/correo|@example\.test/);
+      // Mismo equipo que verá `participantes` una vez creada la reunión.
+      const creada = (await pedir('POST', '/admin/reuniones', 'ADMIN', cuerpo([esc.p.P1.idProyecto]))).body;
+      const participantes = (await pedir('GET', `/admin/reuniones/${creada.idReunion}/participantes`, 'ADMIN')).body.proyectos[0];
+      expect({ lider: res.body.lider, integrantes: res.body.integrantes, totalConvocados: res.body.totalConvocados }).toEqual({
+        lider: participantes.lider,
+        integrantes: participantes.integrantes,
+        totalConvocados: participantes.totalConvocados,
+      });
+      // Solo Administración; 404 si no existe y 400 si el id no es numérico.
+      expect((await pedir('GET', `/admin/reuniones/equipos/${esc.p.P1.idProyecto}`, 'L1')).status).toBe(403);
+      expect((await pedir('GET', '/admin/reuniones/equipos/999999999', 'ADMIN')).status).toBe(404);
+      expect((await pedir('GET', '/admin/reuniones/equipos/abc', 'ADMIN')).status).toBe(400);
     });
 
     it('listado paginado: activas por fecha y canceladas en su propio filtro', async () => {
