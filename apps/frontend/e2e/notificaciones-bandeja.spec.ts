@@ -123,10 +123,10 @@ test('pestañas, categoría, búsqueda y orden viajan al servidor y acotan el ma
   await orden.click();
   await expect(orden).toHaveText('Más antiguas');
   await ascendente;
-  const descendente = page.waitForRequest((r) => r.url().includes('/notificaciones?') && !r.url().includes('orden=asc') && r.url().includes('tipos='));
+  // Volver a «desc» reutiliza la consulta ya cacheada con los mismos filtros: no hay petición nueva que esperar.
   await orden.click();
   await expect(orden).toHaveText('Más recientes');
-  await descendente;
+  await expect(orden).toHaveAttribute('data-orden', 'desc');
 
   await lista.getByRole('combobox', { name: 'Filtrar por proyecto' }).click();
   const sinProyecto = page.waitForRequest((r) => r.url().includes('proyecto=ninguno'));
