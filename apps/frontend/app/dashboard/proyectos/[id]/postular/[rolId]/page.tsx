@@ -121,7 +121,7 @@ export default function PostularPage() {
         {proyecto && rol && (
           <>
             <div className="mb-8">
-              <h1 className="font-headline font-extrabold text-2xl text-on-surface mb-1">
+              <h1 className="type-display mb-1">
                 Postularme como {rol.nombreRol}
               </h1>
               <p className="text-tertiary text-sm">
