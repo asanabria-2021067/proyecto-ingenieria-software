@@ -144,9 +144,6 @@ export function InvitedProjectCard({
   return (
     <li className="rounded-control border border-outline-variant/60 bg-surface-container-lowest p-tight">
       <div className="flex items-center gap-tight">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
-          <FolderKanban className="size-4" aria-hidden="true" />
-        </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-on-surface">{titulo}</p>
           <p className="truncate type-meta">
