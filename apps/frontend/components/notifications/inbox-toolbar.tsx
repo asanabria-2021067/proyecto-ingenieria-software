@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SEGMENTED_ITEM_CLASS, ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -23,7 +24,7 @@ interface InboxToolbarProps {
   onOrden: (valor: 'desc' | 'asc') => void;
   lectura: InboxReadTab;
   onLectura: (valor: InboxReadTab) => void;
-  /** Solo en móvil (la sidebar de carpetas no se muestra): categoría activa. */
+  /** Categoría activa (grupos reales de preference-groups.ts); `null` = todas. */
   categoria: NotificationGroupId | null;
   onCategoria: (valor: NotificationGroupId | null) => void;
 }
@@ -36,8 +37,9 @@ const ITEM = 'focus:bg-primary focus:text-on-primary';
 export const BUSQUEDA_DEBOUNCE_MS = 300;
 
 /**
- * Barra de búsqueda y filtros de la bandeja (§3.2–3.5): buscador estándar,
- * proyecto, orden y pestañas de lectura con el segmented control existente.
+ * Barra de búsqueda y filtros de la bandeja: buscador estándar, categoría y
+ * proyecto (selects), pestañas de lectura (segmented control existente) y el
+ * botón de dos estados para el orden. Única fuente del estado de lectura.
  * Sin atajo Ctrl/Cmd+K: ya lo usa el buscador global de UVGenius.
  */
 export function InboxToolbar({ busqueda, onBusqueda, proyecto, onProyecto, proyectos, orden, onOrden, lectura, onLectura, categoria, onCategoria }: InboxToolbarProps) {
@@ -89,9 +91,24 @@ export function InboxToolbar({ busqueda, onBusqueda, proyecto, onProyecto, proye
         )}
       </div>
 
+      {/* Categoría y proyecto en una fila; en anchos estrechos cada uno baja a su propia línea. */}
       <div className="flex flex-wrap items-center gap-tight">
+        <Select value={categoria ?? TODOS} onValueChange={(v) => onCategoria(v === TODOS ? null : (v as NotificationGroupId))}>
+          <SelectTrigger aria-label="Filtrar por categoría" className={cn(TRIGGER, 'min-w-0 flex-1 basis-44')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="z-50">
+            <SelectItem value={TODOS} className={ITEM}>Todas las categorías</SelectItem>
+            {INBOX_CATEGORIES.map((c) => (
+              <SelectItem key={c.id} value={c.id} className={ITEM}>
+                {c.titulo}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Select value={valorProyecto} onValueChange={(v) => onProyecto(v === TODOS ? null : v === SIN_PROYECTO ? SIN_PROYECTO : Number(v))}>
-          <SelectTrigger aria-label="Filtrar por proyecto" className={cn(TRIGGER, 'min-w-0 flex-1 basis-40')}>
+          <SelectTrigger aria-label="Filtrar por proyecto" className={cn(TRIGGER, 'min-w-0 flex-1 basis-44')}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="z-50">
@@ -104,45 +121,36 @@ export function InboxToolbar({ busqueda, onBusqueda, proyecto, onProyecto, proye
             <SelectItem value={SIN_PROYECTO} className={ITEM}>Avisos sin proyecto</SelectItem>
           </SelectContent>
         </Select>
-
-        <Select value={orden} onValueChange={(v) => onOrden(v === 'asc' ? 'asc' : 'desc')}>
-          <SelectTrigger aria-label="Ordenar por fecha" className={cn(TRIGGER, 'w-34 shrink-0')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="z-50">
-            <SelectItem value="desc" className={ITEM}>Más recientes</SelectItem>
-            <SelectItem value="asc" className={ITEM}>Más antiguas</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={categoria ?? TODOS} onValueChange={(v) => onCategoria(v === TODOS ? null : (v as NotificationGroupId))}>
-          <SelectTrigger aria-label="Filtrar por categoría" className={cn(TRIGGER, 'w-full md:hidden')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="z-50">
-            <SelectItem value={TODOS} className={ITEM}>Todas las categorías</SelectItem>
-            {INBOX_CATEGORIES.map((c) => (
-              <SelectItem key={c.id} value={c.id} className={ITEM}>
-                {c.titulo}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
-      <ToggleGroup
-        type="single"
-        variant="outline"
-        size="sm"
-        value={lectura}
-        onValueChange={(v) => v && onLectura(v as InboxReadTab)}
-        aria-label="Estado de lectura"
-        className="w-full"
-      >
-        <ToggleGroupItem value="todas" className={SEGMENTED_ITEM_CLASS}>Todas</ToggleGroupItem>
-        <ToggleGroupItem value="no-leidas" className={SEGMENTED_ITEM_CLASS}>No leídas</ToggleGroupItem>
-        <ToggleGroupItem value="leidas" className={SEGMENTED_ITEM_CLASS}>Leídas</ToggleGroupItem>
-      </ToggleGroup>
+      <div className="flex flex-wrap items-center gap-tight">
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={lectura}
+          onValueChange={(v) => v && onLectura(v as InboxReadTab)}
+          aria-label="Estado de lectura"
+          className="min-w-0 flex-1 basis-56"
+        >
+          <ToggleGroupItem value="todas" className={SEGMENTED_ITEM_CLASS}>Todas</ToggleGroupItem>
+          <ToggleGroupItem value="no-leidas" className={SEGMENTED_ITEM_CLASS}>No leídas</ToggleGroupItem>
+          <ToggleGroupItem value="leidas" className={SEGMENTED_ITEM_CLASS}>Leídas</ToggleGroupItem>
+        </ToggleGroup>
+        {/* Orden: un solo botón de dos estados (desc = más recientes primero). */}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onOrden(orden === 'desc' ? 'asc' : 'desc')}
+          aria-label={orden === 'desc' ? 'Orden: más recientes primero. Cambiar a más antiguas primero' : 'Orden: más antiguas primero. Cambiar a más recientes primero'}
+          data-orden={orden}
+          className="ml-auto shrink-0 rounded-md text-[13px] font-semibold"
+        >
+          {orden === 'desc' ? <ArrowDownWideNarrow className="size-4" aria-hidden="true" /> : <ArrowUpNarrowWide className="size-4" aria-hidden="true" />}
+          {orden === 'desc' ? 'Más recientes' : 'Más antiguas'}
+        </Button>
+      </div>
     </div>
   );
 }
