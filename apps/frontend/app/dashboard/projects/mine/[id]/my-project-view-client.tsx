@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, MessageSquare, Pencil, X, Plus, Send, Save, Eye } from 'lucide-react';
 import { SkeletonDetail } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -90,13 +91,13 @@ function ProjectReadOnlyView({
               Revisa los comentarios de cada sección y aplica las correcciones necesarias.
             </p>
           </div>
-          <button
+          <Button
             onClick={onEdit}
-            className="shrink-0 flex items-center gap-2 rounded-xl bg-on-review px-4 py-2 type-meta font-bold text-review-ink transition-colors dark:text-review hover:bg-on-review/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-review/70"
+            className="h-auto gap-2 rounded-xl bg-on-review px-4 py-2 type-meta font-bold text-review-ink dark:text-review hover:bg-on-review/90 has-[>svg]:px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-review/70"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="size-3.5" />
             Editar y corregir
-          </button>
+          </Button>
         </div>
       )}
 
