@@ -906,15 +906,15 @@ export default function EditarPerfilPage() {
                 <ChevronRight className="w-4 h-4" />
               </Button>
             ) : (
-              <button
+              <Button
                 type="button"
                 onClick={handleSaveAll}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary/95 transition-all cursor-pointer disabled:opacity-50"
+                className="h-auto gap-2 rounded-xl bg-primary px-6 py-2.5 font-bold text-on-primary hover:bg-primary/95 has-[>svg]:px-6 motion-glow-primary"
               >
                 <Save className="w-4 h-4" />
                 {saving ? 'Guardando Perfil...' : 'Guardar y Finalizar'}
-              </button>
+              </Button>
             )}
           </div>
         </div>
