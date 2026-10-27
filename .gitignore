@@ -77,3 +77,9 @@ owasp-wip/
 *.key
 *.p12
 *.pfx
+
+# ── IESUC-568 (RTF 3.7): salida de tsc de las configs de Vitest ──
+# vitest.config.ts es la única fuente; un .js emitido al lado quedaría obsoleto.
+apps/backend/vitest*.config.js
+apps/backend/vitest*.config.js.map
+apps/backend/vitest*.config.d.ts

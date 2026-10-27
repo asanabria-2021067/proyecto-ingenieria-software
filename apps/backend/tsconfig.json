@@ -15,5 +15,6 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true
-  }
+  },
+  "exclude": ["node_modules", "dist", "vitest.config.*", "vitest.integration.config.*"]
 }
