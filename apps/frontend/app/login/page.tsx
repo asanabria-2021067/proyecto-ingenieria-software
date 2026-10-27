@@ -13,6 +13,13 @@ import { AUTH_FIELD_ERROR, AUTH_INPUT, AUTH_LABEL, AUTH_PRIMARY_BUTTON, AuthSpli
 
 import logo from '@/public/logo.png';
 
+/**
+ * IESUC-568 (B4): borde y halo de error del campo con aria-invalid="true". Va en
+ * el contenedor para que el input conserve las clases que comparte con Registro.
+ */
+const CAMPO_CON_ERROR =
+  '[&_input[aria-invalid=true]]:border-error [&_input[aria-invalid=true]]:ring-2 [&_input[aria-invalid=true]]:ring-error/20';
+
 const loginSchema = z.object({
   correo: z
     .string({ required_error: 'El correo es obligatorio' })
@@ -28,6 +35,9 @@ const loginSchema = z.object({
 // si el correo existe o no. El limite de intentos (5/60s, ver
 // auth.controller.ts) se explica aparte para que el bloqueo se sienta como
 // un estado temporal y no como otro error de credenciales.
+/** Único mensaje para credenciales inválidas: no revela si falló el correo o la contraseña. */
+export const MENSAJE_CREDENCIALES = 'No se pudo iniciar sesion. Verifica tu correo y contraseña.';
+
 export function mensajeError(error: (Error & { statusCode?: number }) | null): string {
   if (!error) return '';
   if (error.statusCode === 429) {
@@ -36,7 +46,7 @@ export function mensajeError(error: (Error & { statusCode?: number }) | null): s
   if (error.statusCode === 403) {
     return 'Tu cuenta está pendiente de verificación por administración.';
   }
-  return 'No se pudo iniciar sesion. Verifica tu correo y contraseña.';
+  return MENSAJE_CREDENCIALES;
 }
 
 export default function LoginPage() {
@@ -44,7 +54,14 @@ export default function LoginPage() {
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [errores, setErrores] = useState<{ correo?: string; contrasena?: string }>({});
-  const { mutate, isPending } = useLogin();
+  // IESUC-568 (B4): el 401 se muestra junto a los campos, sin decir cuál falló.
+  const [credencialesInvalidas, setCredencialesInvalidas] = useState(false);
+  const { mutate, isPending } = useLogin({ onCredencialesInvalidas: () => setCredencialesInvalidas(true) });
+  const correoInvalido = Boolean(errores.correo) || credencialesInvalidas;
+  const contrasenaInvalida = Boolean(errores.contrasena) || credencialesInvalidas;
+  const describirCampo = (idErrorCampo: string, tieneErrorCampo: boolean) =>
+    [tieneErrorCampo ? idErrorCampo : null, credencialesInvalidas ? 'login-error' : null].filter(Boolean).join(' ') ||
+    undefined;
   // Sesión ya válida (cookie refresh_token de hasta 30 días todavía viva):
   // no tiene sentido pedir credenciales de nuevo, se manda directo al panel.
   const { data: user, isSuccess } = useCurrentUser();
@@ -75,6 +92,7 @@ export default function LoginPage() {
     }
 
     setErrores({});
+    setCredencialesInvalidas(false);
     mutate(resultado.data);
   }
 
@@ -97,7 +115,7 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
               {/* Email */}
-              <div className="space-y-2">
+              <div className={`space-y-2 ${CAMPO_CON_ERROR}`}>
                 <label htmlFor="correo" className={AUTH_LABEL}>
                   Correo Institucional
                 </label>
@@ -114,8 +132,8 @@ export default function LoginPage() {
                   }}
                   placeholder="usuario@uvg.edu.gt"
                   className={AUTH_INPUT}
-                  aria-invalid={errores.correo ? 'true' : 'false'}
-                  aria-describedby={errores.correo ? 'correo-error' : undefined}
+                  aria-invalid={correoInvalido ? 'true' : 'false'}
+                  aria-describedby={describirCampo('correo-error', Boolean(errores.correo))}
                 />
                 {errores.correo && (
                   <p id="correo-error" role="alert" className={AUTH_FIELD_ERROR}>{errores.correo}</p>
@@ -123,7 +141,7 @@ export default function LoginPage() {
               </div>
 
               {/* Password */}
-              <div className="space-y-2">
+              <div className={`space-y-2 ${CAMPO_CON_ERROR}`}>
                 <div className="flex items-end justify-between">
                   <label htmlFor="contrasena" className={AUTH_LABEL}>
                     Contraseña
@@ -148,16 +166,34 @@ export default function LoginPage() {
                   }}
                   placeholder="Minimo 8 caracteres"
                   className={AUTH_INPUT}
-                  aria-invalid={errores.contrasena ? 'true' : 'false'}
-                  aria-describedby={errores.contrasena ? 'contrasena-error' : undefined}
+                  aria-invalid={contrasenaInvalida ? 'true' : 'false'}
+                  aria-describedby={describirCampo('contrasena-error', Boolean(errores.contrasena))}
                 />
                 {errores.contrasena && (
                   <p id="contrasena-error" role="alert" className={AUTH_FIELD_ERROR}>{errores.contrasena}</p>
                 )}
               </div>
 
-              {/* T-274: el mensaje neutro de exito/error se muestra por SweetAlert
-                  (ver useLogin), no aqui inline. */}
+              {/* T-274: el éxito, el bloqueo por intentos (429) y la cuenta pendiente
+                  (403) siguen en SweetAlert (ver useLogin). IESUC-568 (B4): las
+                  credenciales inválidas se explican aquí, junto a los dos campos, con
+                  el mismo mensaje neutro (nunca se dice si falló el correo o la clave). */}
+              {credencialesInvalidas && (
+                <div
+                  id="login-error"
+                  role="alert"
+                  className="space-y-1.5 rounded-xl border-2 border-error px-4 py-3 text-left text-sm text-on-surface"
+                >
+                  <p className="font-bold text-error">{MENSAJE_CREDENCIALES}</p>
+                  <p>
+                    Revisa que sea tu correo institucional completo y que la contraseña esté bien escrita
+                    (distingue mayúsculas y minúsculas). Si no la recuerdas, puedes crear una nueva.
+                  </p>
+                  <Link href="/recuperar-contrasena" className="inline-block font-bold text-primary underline">
+                    ¿Olvidaste tu contraseña?
+                  </Link>
+                </div>
+              )}
 
               {/* Submit */}
               <button

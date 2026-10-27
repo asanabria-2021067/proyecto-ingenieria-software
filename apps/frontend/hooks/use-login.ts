@@ -25,7 +25,16 @@ function mensajeErrorLogin(error: (Error & { statusCode?: number }) | null): str
 
 // T-221: si la sesión había vencido, vuelve a la ruta desde la que se
 // redirigió al login (`next`) en vez de ir siempre al dashboard.
-export function useLogin() {
+export interface UseLoginOptions {
+  /**
+   * IESUC-568 (B4): si se pasa, un 401 (credenciales inválidas) lo muestra el
+   * formulario junto a los campos en lugar del diálogo. El mensaje sigue
+   * siendo el mismo para correo y contraseña (T-274).
+   */
+  onCredencialesInvalidas?: () => void;
+}
+
+export function useLogin(opciones: UseLoginOptions = {}) {
   const router = useRouter();
 
   return useMutation({
@@ -46,6 +55,10 @@ export function useLogin() {
       setTimeout(() => router.push(destination), 1200);
     },
     onError: (error) => {
+      if (opciones.onCredencialesInvalidas && (error as Error & { statusCode?: number }).statusCode === 401) {
+        opciones.onCredencialesInvalidas();
+        return;
+      }
       uvgSwal.fire({
         icon: 'error',
         title: 'No se pudo iniciar sesión',

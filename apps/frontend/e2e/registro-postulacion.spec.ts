@@ -154,6 +154,9 @@ test('administración rechaza una cuenta nueva y esta no puede iniciar sesión',
   await adminContext.close();
 
   // La cuenta rechazada recibe el error genérico de credenciales, no el de «pendiente».
+  // IESUC-568 (B4): ese error ya no es un diálogo; se muestra junto a los campos.
   await enviarLogin(page, correo);
-  await expectLoginRechazado(page, 'No se pudo iniciar sesion. Verifica tu correo y contraseña.');
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudo iniciar sesion. Verifica tu correo y contraseña.' })).toBeVisible();
+  await expect(page).toHaveURL(/\/login/);
+  await expectSinSesion(page);
 });
