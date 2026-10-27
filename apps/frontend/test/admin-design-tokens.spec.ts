@@ -26,8 +26,6 @@ const LINEA_BASE: Record<string, Medida> = {
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   // HU-191 (T-352): nació ya con los tokens; su línea base es su primera medición.
   '/dashboard/admin/anuncios': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
-  // Catálogo temporal de botones: su único `<button>` propio pinta las muestras en línea.
-  '/dashboard/admin/botones': { px: 0, radio: 0, hex: 0, boton: 1, titular: true },
   '/dashboard/admin/apelaciones': { px: 1, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/apelaciones/[apelacionId]': { px: 1, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/proyectos': { px: 0, radio: 2, hex: 0, boton: 0, titular: true },
@@ -47,7 +45,6 @@ const ESTADO_ACTUAL: Record<string, Medida> = {
   '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/anuncios': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
-  '/dashboard/admin/botones': { px: 0, radio: 0, hex: 0, boton: 1, titular: true },
   '/dashboard/admin/apelaciones': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/apelaciones/[apelacionId]': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/proyectos': { px: 0, radio: 1, hex: 0, boton: 0, titular: true },
