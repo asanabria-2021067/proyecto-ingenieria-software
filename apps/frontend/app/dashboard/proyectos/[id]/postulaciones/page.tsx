@@ -253,13 +253,14 @@ export default function PostulacionesProyectoPage() {
             </div>
 
             <div className="flex gap-3 justify-end">
-              <button
+              <Button
+                variant="outline"
                 onClick={cerrarModal}
                 disabled={isPending}
-                className="px-5 py-2.5 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50"
+                className="h-auto rounded-xl border-outline-variant bg-transparent px-5 py-2.5 text-sm font-semibold text-on-surface shadow-none hover:bg-surface-container hover:text-on-surface dark:border-outline-variant dark:bg-transparent dark:hover:bg-surface-container"
               >
                 Cancelar
-              </button>
+              </Button>
 
               <button
                 onClick={confirmar}
