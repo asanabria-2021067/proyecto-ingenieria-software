@@ -19,6 +19,7 @@ import {
 } from './types';
 import { normalizeUrlInput } from '@/lib/security/safe-url';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 // Estados con edición completa (asistente de 3 pasos) vs. edición PARCIAL
 // (subconjunto seguro: proyecto ya publicado / en progreso). El resto no es
@@ -345,13 +346,13 @@ function NewProjectFormContent() {
                 <X className="h-4 w-4 text-error" />
                 Cancelar
               </button>
-              <button
+              <Button
                 onClick={submitParcial}
                 disabled={saving}
-                className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all duration-200 hover:bg-primary/90 disabled:opacity-60"
+                className="h-auto gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 disabled:opacity-60 motion-glow-primary"
               >
                 {saving ? 'Guardando…' : 'Guardar cambios'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
