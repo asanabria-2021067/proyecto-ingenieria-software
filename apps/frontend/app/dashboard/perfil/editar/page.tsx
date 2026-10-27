@@ -886,15 +886,16 @@ export default function EditarPerfilPage() {
 
           {/* Action buttons */}
           <div className="flex items-center justify-between border-t border-outline-variant/30 mt-8 pt-6">
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={handleBack}
               disabled={step === 0}
-              className="flex items-center gap-2 text-sm font-bold text-tertiary hover:text-on-surface transition-colors cursor-pointer disabled:opacity-40"
+              className="h-auto gap-2 p-0 text-sm font-bold text-tertiary hover:bg-transparent hover:text-on-surface has-[>svg]:px-0 disabled:opacity-40 dark:hover:bg-transparent"
             >
               <ChevronLeft className="w-4 h-4" />
               Anterior
-            </button>
+            </Button>
 
             {step < STEPS.length - 1 ? (
               <Button
