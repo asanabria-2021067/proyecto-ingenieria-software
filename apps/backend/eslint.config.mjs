@@ -33,6 +33,15 @@ export default [
     },
   },
   {
+    // IESUC-568 (RTF 2 · 3.3): sprints, projects y tasks pasan de 1,500 líneas.
+    // Dividirlos queda para después de la entrega; mientras, esta advertencia
+    // evita que cualquier servicio siga creciendo sin que se note.
+    files: ['**/*.service.ts'],
+    rules: {
+      'max-lines': ['warn', { max: 500 }],
+    },
+  },
+  {
     ignores: ['dist/**', 'node_modules/**', '*.js', '*.mjs'],
   },
 ];
