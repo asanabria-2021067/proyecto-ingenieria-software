@@ -117,7 +117,10 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       await page.keyboard.press('Enter');
       await expect(familias.nth(5)).toHaveAttribute('aria-expanded', 'true');
       await familias.nth(3).click();
-      await expect(seccion.getByRole('switch')).toHaveCount(7);
+      // Se abren «Red de contactos» y «Horas y reconocimiento»: aparecen los interruptores que dicen sus
+      // contadores, sin fijar una cifra que cambia cada vez que el backend suma un tipo (T-347 añadió la insignia).
+      const tiposDe = async (n: number) => Number((await familias.nth(n).innerText()).match(/\d+ de (\d+) activas/)?.[1]);
+      await expect(seccion.getByRole('switch')).toHaveCount((await tiposDe(5)) + (await tiposDe(3)));
       await captura(page, 'configuracion-abierta-1440');
       await page.keyboard.press('Space');
       expect(escrituras).toEqual([]);
