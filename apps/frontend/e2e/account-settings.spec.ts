@@ -142,11 +142,31 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       await page.goto('/dashboard/configuracion');
       const seccion = page.getByRole('region', { name: 'Preferencias de notificaciones', exact: true });
       const familia = seccion.locator('[data-slot="accordion-trigger"]', { hasText: 'Recordatorios y calendario' });
-      await familia.click();
-      await expect(familia).toHaveAttribute('aria-expanded', 'true');
+      const abrir = async () => {
+        if ((await familia.getAttribute('aria-expanded')) !== 'true') await familia.click();
+        await expect(familia).toHaveAttribute('aria-expanded', 'true');
+      };
+      await abrir();
       for (const etiqueta of ['Reunión programada', 'Reunión actualizada', 'Reunión cancelada']) {
         await expect(seccion.getByRole('switch', { name: etiqueta, exact: true })).toBeVisible();
       }
+
+      // Se cambia, se guarda en el servidor y sobrevive a la recarga; al final queda como estaba.
+      const cancelada = seccion.getByRole('switch', { name: 'Reunión cancelada', exact: true });
+      const inicial = (await cancelada.getAttribute('aria-checked')) ?? 'true';
+      const cambiado = inicial === 'true' ? 'false' : 'true';
+      const conmutar = async () => {
+        const guardado = page.waitForResponse((r) => r.url().includes('/notificaciones/preferencias') && r.request().method() !== 'GET');
+        await cancelada.click();
+        expect((await guardado).ok()).toBe(true);
+      };
+      await conmutar();
+      await expect(cancelada).toHaveAttribute('aria-checked', cambiado);
+      await page.reload();
+      await abrir();
+      await expect(cancelada).toHaveAttribute('aria-checked', cambiado);
+      await conmutar();
+      await expect(cancelada).toHaveAttribute('aria-checked', inicial);
     } finally {
       await page.context().close();
     }
