@@ -216,6 +216,9 @@ test.describe('HU-204: estados de carga del estudiante', () => {
       // El estado vacío es el de la lista de la bandeja, no otro texto de la página.
       const bandeja = page.getByRole('region', { name: 'Bandeja de entrada' });
       await expect(bandeja.getByText('Todo está al día')).toBeVisible();
+      // Se anuncia con cortesía (aria-live) y no como error: sin alerta en la bandeja.
+      await expect(bandeja.locator('[aria-live="polite"]', { hasText: 'Todo está al día' })).toBeVisible();
+      await expect(bandeja.getByRole('alert')).toHaveCount(0);
       await sinSkeleton(page, 'Cargando notificaciones');
 
       await page.unrouteAll();
