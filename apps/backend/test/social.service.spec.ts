@@ -1,12 +1,12 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { EstadoAmistad } from '@prisma/client';
+import { EstadoAmistad, Prisma } from '@prisma/client';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { SocialService } from '../src/social/social.service';
 
 function makePrisma() {
-  return {
+  const prisma = {
     amistad: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
@@ -35,7 +35,21 @@ function makePrisma() {
     },
     insignia: { findMany: vi.fn().mockResolvedValue([]) },
     $queryRaw: vi.fn().mockResolvedValue([]),
+    // RTF 3.2: el callback recibe el mismo doble como `tx`.
+    $transaction: vi.fn(),
   };
+  prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => Promise<unknown>) =>
+    callback(prisma),
+  );
+  return prisma;
+}
+
+function p2002(modelName: string) {
+  return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+    code: 'P2002',
+    clientVersion: 'test',
+    meta: { modelName, target: 'amistad_par_no_ordenado_key' },
+  });
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
@@ -108,6 +122,61 @@ describe('SocialService — amistades', () => {
       data: { idUsuarioSolicitante: 1, idUsuarioReceptor: 2 },
     });
     expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([2], 'SOLICITUD_AMISTAD', expect.any(Object));
+  });
+
+  it('verifica y escribe dentro de una sola transacción y notifica después (RTF 3.2)', async () => {
+    const prisma = makePrisma();
+    const orden: string[] = [];
+    prisma.$transaction.mockImplementationOnce(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+      orden.push('begin');
+      const result = await callback(prisma);
+      orden.push('commit');
+      return result;
+    });
+    prisma.amistad.findUnique.mockImplementation(async () => {
+      orden.push('check');
+      return null;
+    });
+    prisma.amistad.create.mockImplementation(async () => {
+      orden.push('create');
+      return { idAmistad: 9, estado: EstadoAmistad.PENDIENTE };
+    });
+    const { service, notifications } = makeService(prisma);
+    notifications.notifyFromTemplate.mockImplementation(async () => {
+      orden.push('notify');
+    });
+
+    await service.crearSolicitudAmistad(1, 2);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(orden).toEqual(['begin', 'check', 'check', 'create', 'commit', 'notify']);
+  });
+
+  it('traduce P2002 de Amistad (solicitud concurrente) a 409 y no notifica (RTF 3.2)', async () => {
+    const prisma = makePrisma();
+    prisma.amistad.findUnique.mockResolvedValue(null);
+    prisma.amistad.create.mockRejectedValueOnce(p2002('Amistad'));
+    const { service, notifications } = makeService(prisma);
+
+    const promise = service.crearSolicitudAmistad(1, 2);
+
+    await expect(promise).rejects.toBeInstanceOf(ConflictException);
+    await expect(promise).rejects.toThrow('Ya existe una solicitud o amistad con este usuario');
+    expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
+  });
+
+  it('no enmascara un P2002 de otro modelo ni otros errores (RTF 3.2)', async () => {
+    const prisma = makePrisma();
+    prisma.amistad.findUnique.mockResolvedValue(null);
+    const ajeno = p2002('Seguimiento');
+    prisma.amistad.create.mockRejectedValueOnce(ajeno);
+    const { service } = makeService(prisma);
+
+    await expect(service.crearSolicitudAmistad(1, 2)).rejects.toBe(ajeno);
+
+    const caida = new Error('conexión perdida');
+    prisma.amistad.create.mockRejectedValueOnce(caida);
+    await expect(service.crearSolicitudAmistad(1, 2)).rejects.toBe(caida);
   });
 
   it('rechaza resolver una solicitud ajena (no soy el receptor)', async () => {
