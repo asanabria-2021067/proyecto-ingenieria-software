@@ -111,14 +111,15 @@ export default function PerfilPersonaPage() {
           <ArrowLeft className="size-4" aria-hidden="true" />
           Volver a Personas
         </Link>
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={compartirPerfil}
-          className="inline-flex items-center gap-tight rounded-control border border-outline-variant bg-card px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-container"
+          className="h-auto gap-(--spacing-tight) rounded-[var(--radius-control)] border-outline-variant bg-card px-3 py-1.5 text-sm font-medium text-text-primary shadow-none hover:bg-surface-container hover:text-text-primary has-[>svg]:px-3 dark:border-outline-variant dark:bg-card dark:hover:bg-surface-container"
         >
           <Share2 className="size-4 text-text-secondary" aria-hidden="true" />
           Compartir perfil
-        </button>
+        </Button>
       </div>
 
       <div className="layout-grid">
