@@ -413,6 +413,7 @@ model TokenRefresco {
   @@map("token_refresco")
 }
 
+/// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una fila por par de usuarios sin importar el sentido, vía índice único de expresión `amistad_par_no_ordenado_key` (migración `20261027120000_amistad_par_no_ordenado_unico`).
 model Amistad {
   idAmistad            Int           @id @default(autoincrement()) @map("id_amistad")
   idUsuarioSolicitante Int           @map("id_usuario_solicitante")
