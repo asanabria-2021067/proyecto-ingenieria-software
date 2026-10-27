@@ -43,6 +43,44 @@ Los acentos `review-soft` (bordes y fondos al 10 %) y el texto `review-ink` sobr
    ```
    El resultado en **claro** es `color-contrast [serious] wcag143` en los botones `.bg-review.text-on-review` de la bandeja de publicación. En **oscuro** pasa.
 
+## Alternativas de corrección (sin implementar)
+
+Contrastes recalculados el 26-oct-2026 con la fórmula de WCAG.
+
+### Alternativa A: conservar el fondo salvia y oscurecer el texto
+
+| Par | Fondo | Texto | Contraste |
+|---|---|---|---:|
+| Reposo | `#9ab07e` | `#1f2d18` | 6.14:1 |
+| Hover | `#879d6b` (`review-strong`) | `#1f2d18` | 4.88:1 |
+
+- **Cambio:** solo `--color-on-review` en el tema base, de `#ffffff` a `#1f2d18`. En oscuro ya es negro (8.89:1).
+- **Efecto visual:**
+  - el verde salvia exacto `#9AB07E` se mantiene, que fue la razón de la excepción;
+  - el texto pasa de blanco a verde muy oscuro y el estado se ve algo más «apagado»;
+  - claro y oscuro quedan coherentes: los dos llevan texto oscuro.
+- **Accesibilidad:** cumple AA en reposo y en hover sin tocar ningún otro token.
+- **Revisar:** el botón «Editar y corregir» del banner usa la combinación inversa, `bg-on-review` con `text-review-ink`. Si `on-review` pasa a ser oscuro, ese botón queda oscuro sobre oscuro y su texto debe pasar a un color claro. Hay que decidirlo en la misma corrección.
+
+### Alternativa B: oscurecer el fondo y conservar el texto blanco
+
+| Par | Fondo | Texto | Contraste |
+|---|---|---|---:|
+| Reposo | `#486d3c` (el actual `review-ink`) | `#ffffff` | 5.95:1 |
+
+- **Cambio:**
+  - `--color-review` pasa a `#486d3c`;
+  - el hover (`--color-review-strong`) necesita un tono aún más oscuro, que no está calculado;
+  - `--color-review-soft` debería conservar `#9ab07e` para los bordes y fondos suaves.
+- **Efecto visual:**
+  - se pierde el salvia claro en botones y banner, que pasan a un verde bosque cercano al de `tag-forest`;
+  - el estado «revisión» se parece más a «publicado», que también es verde y ya no se distingue por el tono.
+- **Accesibilidad:** cumple AA con texto blanco. El tono del hover queda por definir y medir.
+
+### Recomendación
+
+**Alternativa A.** Es el cambio más pequeño (un token), mantiene el color de marca del estado y cumple también en hover. Necesita validación visual y una decisión sobre el botón inverso del banner.
+
 ## Defecto relacionado del mismo dominio (H-11)
 
 La misma puerta encontró en Mis proyectos un segundo problema de contraste de un estado. Es la pill animada «En solicitud de cierre» (`pill-forest blink-gold-gray`, en `components/projects/available-project-card.tsx` y `app/global.css`):
