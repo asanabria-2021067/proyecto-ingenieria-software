@@ -70,6 +70,9 @@ test('un integrante menciona a otro con @ y este recibe el aviso con enlace al c
 
     const comentarioB = pageB.locator('li[id^="comentario-"]', { hasText: marca });
     await expect(comentarioB).toBeVisible();
+    // El aviso abierto lleva a este comentario y no a otro: el id de la URL es el del comentario con la marca.
+    const idComentario = new URL(pageB.url()).searchParams.get('comment');
+    await expect(comentarioB).toHaveAttribute('id', `comentario-${idComentario}`);
     await expect(comentarioB).toHaveClass(/comment-spotlight/);
     await expect(comentarioB.getByRole('link', { name: 'Mención a ti (María López), ver perfil' })).toBeVisible();
   } finally {
