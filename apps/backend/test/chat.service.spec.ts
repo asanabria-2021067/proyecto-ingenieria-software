@@ -10,7 +10,9 @@ import { ChatService } from '../src/chat/chat.service';
 // mock de Prisma, sin tener que ejercitar la transacción de cierre en sí.
 
 function makePrisma() {
-  return {
+  const prisma = {
+    // RTF 3.4: el callback recibe el mismo doble como `tx`.
+    $transaction: vi.fn(),
     proyecto: { findFirst: vi.fn() },
     conversacion: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
     conversacionParticipante: { update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
@@ -19,6 +21,8 @@ function makePrisma() {
     apodoConversacion: { findMany: vi.fn().mockResolvedValue([]) },
     mensajeGuardado: { deleteMany: vi.fn(), createMany: vi.fn(), findMany: vi.fn() },
   };
+  prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
+  return prisma;
 }
 
 function makeGateway() {
@@ -83,6 +87,60 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       expect(resultado).toEqual({ ...mensaje, citado: null });
       expect(prisma.mensajeChat.create).toHaveBeenCalled();
       expect(gateway.broadcastMessage).toHaveBeenCalledWith(5, [2], { ...mensaje, citado: null });
+    });
+
+    it('RTF 3.4: crea el mensaje y actualiza ultimaLecturaEn en una sola transacción y emite después del commit', async () => {
+      prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+      const enviadoEn = new Date('2026-10-27T12:00:00Z');
+      const orden: string[] = [];
+      prisma.$transaction.mockImplementationOnce(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+        orden.push('begin');
+        const result = await callback(prisma);
+        orden.push('commit');
+        return result;
+      });
+      prisma.mensajeChat.create.mockImplementation(async () => {
+        orden.push('create');
+        return { idMensaje: 99, idConversacion: 5, contenido: 'hola', enviadoEn, remitente: USUARIO };
+      });
+      prisma.conversacionParticipante.update.mockImplementation(async () => {
+        orden.push('ultimaLectura');
+        return {};
+      });
+      gateway.broadcastMessage.mockImplementation(() => {
+        orden.push('broadcast');
+      });
+
+      await service.createMessage(10, 5, 1, ' hola ');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(orden).toEqual(['begin', 'create', 'ultimaLectura', 'commit', 'broadcast']);
+      expect(prisma.conversacionParticipante.update).toHaveBeenCalledWith({
+        where: { idConversacion_idUsuario: { idConversacion: 5, idUsuario: 1 } },
+        data: { ultimaLecturaEn: enviadoEn },
+      });
+    });
+
+    it('RTF 3.4: si falla la actualización de ultimaLecturaEn no se retransmite nada (rollback)', async () => {
+      prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+      prisma.mensajeChat.create.mockResolvedValue({ idMensaje: 99, enviadoEn: new Date(), remitente: USUARIO });
+      prisma.conversacionParticipante.update.mockRejectedValue(new Error('participante eliminado'));
+
+      await expect(service.createMessage(10, 5, 1, 'hola')).rejects.toThrow('participante eliminado');
+      expect(gateway.broadcastMessage).not.toHaveBeenCalled();
+    });
+
+    it('RTF 3.4: si el commit falla no se retransmite el mensaje', async () => {
+      prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+      prisma.mensajeChat.create.mockResolvedValue({ idMensaje: 99, enviadoEn: new Date(), remitente: USUARIO });
+      prisma.conversacionParticipante.update.mockResolvedValue({});
+      prisma.$transaction.mockImplementationOnce(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+        await callback(prisma);
+        throw new Error('serialización');
+      });
+
+      await expect(service.createMessage(10, 5, 1, 'hola')).rejects.toThrow('serialización');
+      expect(gateway.broadcastMessage).not.toHaveBeenCalled();
     });
   });
 

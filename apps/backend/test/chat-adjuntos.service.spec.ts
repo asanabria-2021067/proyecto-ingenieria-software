@@ -24,6 +24,7 @@ describe('ChatService - adjuntos', () => {
       conversacionParticipante: { update: fn().mockResolvedValue({}) },
       adjuntoMensajeChat: { findFirst: fn(), findMany: fn() },
     };
+    prisma.$transaction = fn((callback: (tx: unknown) => Promise<unknown>) => callback(prisma));
     gateway = { broadcastMessage: fn() };
     storage = {
       upload: fn().mockResolvedValue(undefined),
@@ -77,6 +78,14 @@ describe('ChatService - adjuntos', () => {
 
     it('limpia el archivo remoto si falla guardar el mensaje', async () => {
       prisma.mensajeChat.create.mockRejectedValue(new Error('db'));
+      await expect(service.createMessage(10, 5, 1, '', ARCHIVO)).rejects.toThrow('db');
+      expect(storage.destroy).toHaveBeenCalledWith(storage.upload.mock.calls[0][0]);
+      expect(gateway.broadcastMessage).not.toHaveBeenCalled();
+    });
+
+    it('RTF 3.4: limpia el archivo remoto si falla la lectura del remitente dentro de la transacción', async () => {
+      prisma.mensajeChat.create.mockResolvedValue({ idMensaje: 9, enviadoEn: new Date(), adjunto: { idAdjunto: 3 } });
+      prisma.conversacionParticipante.update.mockRejectedValue(new Error('db'));
       await expect(service.createMessage(10, 5, 1, '', ARCHIVO)).rejects.toThrow('db');
       expect(storage.destroy).toHaveBeenCalledWith(storage.upload.mock.calls[0][0]);
       expect(gateway.broadcastMessage).not.toHaveBeenCalled();

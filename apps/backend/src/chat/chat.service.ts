@@ -588,30 +588,35 @@ export class ChatService {
       };
     }
 
+    // IESUC-568 (RTF 2 · 3.4): el mensaje y la lectura del remitente se
+    // confirman juntos; si cualquiera falla no queda ninguno (ni el adjunto).
     let mensaje;
     try {
-      mensaje = conResumenDeCita(
-        await this.prisma.mensajeChat.create({
-          data: {
-            idConversacion,
-            idRemitente: userId,
-            contenido: contenido.trim(),
-            idMensajeCitado,
-            ...(adjunto ? { adjunto: { create: adjunto } } : {}),
-          },
-          select: MENSAJE_CON_CITA_SELECT,
-        }),
-      );
+      mensaje = await this.prisma.$transaction(async (tx) => {
+        const creado = conResumenDeCita(
+          await tx.mensajeChat.create({
+            data: {
+              idConversacion,
+              idRemitente: userId,
+              contenido: contenido.trim(),
+              idMensajeCitado,
+              ...(adjunto ? { adjunto: { create: adjunto } } : {}),
+            },
+            select: MENSAJE_CON_CITA_SELECT,
+          }),
+        );
+        await tx.conversacionParticipante.update({
+          where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
+          data: { ultimaLecturaEn: creado.enviadoEn },
+        });
+        return creado;
+      });
     } catch (error) {
       if (adjunto) await this.storage.destroy(adjunto.claveAlmacenamiento);
       throw error;
     }
 
-    await this.prisma.conversacionParticipante.update({
-      where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
-      data: { ultimaLecturaEn: mensaje.enviadoEn },
-    });
-
+    // El broadcast por socket sale solo después del commit.
     const destinatarios = conversacion.participantes.map((p) => p.idUsuario).filter((id) => id !== userId);
     this.gateway.broadcastMessage(idConversacion, destinatarios, mensaje);
 
