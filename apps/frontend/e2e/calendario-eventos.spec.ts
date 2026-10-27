@@ -134,6 +134,12 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     await expect(page.getByText('Evento agendado')).toBeVisible();
 
     try {
+      // Se guarda de 22:00 a 01:00 del día siguiente, también cuando ese día cae en otro mes.
+      const [creado] = await eventosConTitulo(page, titulo);
+      const guardado = (iso: string) => [new Date(iso).getMonth(), new Date(iso).getDate(), new Date(iso).getHours()];
+      expect(guardado(creado.fechaInicio)).toEqual([mananaTemprano().getMonth(), mananaTemprano().getDate(), 22]);
+      expect(guardado(creado.fechaFin)).toEqual([fin.getMonth(), fin.getDate(), 1]);
+
       await verDia(page);
       await expect(page.getByRole('button', { name: new RegExp(`^${titulo}, 22:00 a 00:00 del día siguiente`) })).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText('Todo el día')).toHaveCount(0);
