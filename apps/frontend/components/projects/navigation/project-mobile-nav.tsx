@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { ProjectTeamChatButton } from '@/components/chat-dock/project-team-chat-button';
 import { ProjectActionsMenu } from './project-actions-menu';
 import { ProjectNavList } from './project-nav-list';
 import { buildProjectActions, buildProjectNavGroups, flattenNavItems, resolveActiveHref } from './project-nav-model';
@@ -64,6 +65,9 @@ export function ProjectMobileNav({ idProyecto }: { idProyecto: number }) {
       </Sheet>
 
       <p className="min-w-0 flex-1 truncate text-sm font-bold text-on-surface">{titulo}</p>
+
+      {/* IESUC-568 (B2): acceso fijo al chat del equipo en tablet y móvil. */}
+      {nav.actor !== 'visitor' && <ProjectTeamChatButton idProyecto={idProyecto} variant="bar" />}
 
       <ProjectActionsMenu idProyecto={idProyecto} actions={actions} variant="labeled" />
     </div>

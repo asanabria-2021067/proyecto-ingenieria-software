@@ -328,6 +328,11 @@ export function listSavedMessages(page: number): Promise<ListSavedMessagesResult
   return apiFetch(`/chats/mensajes-guardados?page=${page}`);
 }
 
+/** IESUC-568 (B2): canales del proyecto; el backend asegura antes el `#general` del equipo. */
+export function listChannels(idProyecto: number): Promise<ChatCanalCreado[]> {
+  return apiFetch(`/proyectos/${idProyecto}/canales`);
+}
+
 export function createChannel(idProyecto: number, payload: CreateChannelPayload): Promise<ChatCanalCreado> {
   return apiFetch(`/proyectos/${idProyecto}/canales`, {
     method: 'POST',

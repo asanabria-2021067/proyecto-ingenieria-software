@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { MessageSquarePlus, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { NewChatDialog } from '@/components/chat-dock/new-chat-dialog';
+import { ProjectTeamChatButton } from '@/components/chat-dock/project-team-chat-button';
 import { ProjectActionsMenu } from '@/components/projects/navigation/project-actions-menu';
 import { ProjectNavList } from '@/components/projects/navigation/project-nav-list';
 import {
@@ -137,10 +138,11 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
       </nav>
 
       {/* Los chats del proyecto viven en el dock global (esquina inferior
-          derecha, cualquier página del dashboard) — acá solo queda el
-          punto de entrada para iniciar uno nuevo. */}
+          derecha, cualquier página del dashboard). IESUC-568 (B2): aquí queda
+          un acceso fijo al chat del equipo (#general) y el de iniciar uno nuevo. */}
       {puedeChatear && (
-        <div className={collapsed ? 'flex justify-center border-t border-outline-variant py-inline' : 'border-t border-outline-variant px-inline py-inline'}>
+        <div className={collapsed ? 'flex flex-col items-center gap-micro border-t border-outline-variant py-inline' : 'space-y-micro border-t border-outline-variant px-inline py-inline'}>
+          <ProjectTeamChatButton idProyecto={idProyecto} variant={collapsed ? 'compact' : 'sidebar'} />
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
