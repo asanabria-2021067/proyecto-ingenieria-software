@@ -206,14 +206,14 @@ test.describe('HU-204: estados de carga del estudiante', () => {
       if (pagina.data.length > 0) {
         await expect(page.getByText(pagina.data[0].tituloNotificacion).first()).toBeVisible();
       } else {
-        await expect(page.getByText('Todo esta al dia')).toBeVisible();
+        await expect(page.getByText('Todo está al día')).toBeVisible();
       }
     });
 
     test('vacío y error se distinguen de la carga', async ({ page }) => {
       await responder(page, /\/api\/notificaciones\?page=/, 200, { data: [], total: 0, page: 1, totalPages: 0 });
       await page.goto('/dashboard/notificaciones');
-      await expect(page.getByText('Todo esta al dia')).toBeVisible();
+      await expect(page.getByText('Todo está al día')).toBeVisible();
       await sinSkeleton(page, 'Cargando notificaciones');
 
       await page.unrouteAll();
