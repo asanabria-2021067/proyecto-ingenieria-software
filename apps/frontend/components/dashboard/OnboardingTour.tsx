@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { useJoyride, STATUS } from 'react-joyride';
 import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
+import { Button } from '@/components/ui/button';
 
 // Custom Tooltip component for React Joyride
 const CustomTooltip = ({
@@ -46,13 +47,14 @@ const CustomTooltip = ({
       {/* Footer Navigation */}
       <div className="flex items-center justify-between gap-4 border-t border-outline-variant/20 pt-4">
         {/* Skip/Cerrar */}
-        <button
+        <Button
           type="button"
+          variant="ghost"
           {...skipProps}
-          className="text-xs font-bold text-tertiary hover:text-error transition-colors px-3 py-2 rounded-xl hover:bg-error/5 cursor-pointer outline-none"
+          className="h-auto rounded-xl px-3 py-2 text-xs font-bold text-tertiary hover:bg-error/5 hover:text-error dark:hover:bg-error/5"
         >
           {isLastStep ? 'Cerrar' : 'Saltar tour'}
-        </button>
+        </Button>
 
         <div className="flex items-center gap-2">
           {/* Back Button */}
