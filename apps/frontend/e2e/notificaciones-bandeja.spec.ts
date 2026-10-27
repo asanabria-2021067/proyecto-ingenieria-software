@@ -3,6 +3,7 @@ import { test, expect } from './support/test';
 import { login } from './support/auth';
 import { analizarAccesibilidad, violacionesBloqueantes, describirViolaciones } from './support/a11y';
 import { API_URL, desactivarTour } from './support/realtime';
+import { api } from './support/calendario';
 
 /**
  * Sprint 10 — centro de notificaciones como bandeja (lista compacta con sus
@@ -32,6 +33,15 @@ async function abrirBandeja(page: Page) {
   await expect(page.getByRole('region', { name: 'Bandeja de entrada' }).getByText(/\d+ avisos? · \d+ sin leer/)).toBeVisible({ timeout: 20_000 });
 }
 
+/**
+ * Primeros avisos propios desde la API real. Pasa por `api`, que solo reintenta los 429 del límite de
+ * peticiones (acotado): la bandeja acaba de lanzar su ráfaga y una lectura directa recibía 429 sin datos.
+ */
+async function avisos(page: Page, limit: number): Promise<Aviso[]> {
+  const respuesta = await api(page, 'get', `${API}/notificaciones?page=1&limit=${limit}`);
+  return ((await respuesta.json()) as { data: Aviso[] }).data;
+}
+
 const filas = (page: Page) => page.getByRole('region', { name: 'Bandeja de entrada' }).locator('li[data-notificacion]');
 
 test.beforeEach(async ({ page }) => {
@@ -41,7 +51,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('la lista pagina del servidor, el visor abre el aviso y lo lee una sola vez', async ({ page }) => {
-  const propios: Aviso[] = await (await page.request.get(`${API}/notificaciones?page=1&limit=20`)).json().then((r) => r.data);
+  const propios = await avisos(page, 20);
   test.skip(propios.length === 0, 'La cuenta no tiene notificaciones sembradas');
   await abrirBandeja(page);
 
@@ -65,7 +75,7 @@ test('la lista pagina del servidor, el visor abre el aviso y lo lee una sola vez
     await filas(page).first().getByRole('button').click();
     await page.waitForTimeout(400);
     expect(peticionesLeer).toHaveLength(1);
-    const releido: Aviso = await (await page.request.get(`${API}/notificaciones?page=1&limit=1`)).json().then((r) => r.data[0]);
+    const [releido] = await avisos(page, 1);
     expect(releido.leidaEn).not.toBeNull();
   } else {
     expect(peticionesLeer).toHaveLength(0);
@@ -135,7 +145,7 @@ test('pestañas, categoría, búsqueda y orden viajan al servidor y acotan el ma
 });
 
 test('la bandeja se redimensiona con el teclado y restablece su ancho con doble clic', async ({ page }) => {
-  const propios: Aviso[] = await (await page.request.get(`${API}/notificaciones?page=1&limit=1`)).json().then((r) => r.data);
+  const propios = await avisos(page, 1);
   test.skip(propios.length === 0, 'La cuenta no tiene notificaciones sembradas');
   await abrirBandeja(page);
   await filas(page).first().getByRole('button').click();
@@ -154,7 +164,7 @@ test('la bandeja se redimensiona con el teclado y restablece su ancho con doble 
 });
 
 test('en móvil alterna entre la lista y el detalle conservando el aviso', async ({ page }) => {
-  const propios: Aviso[] = await (await page.request.get(`${API}/notificaciones?page=1&limit=1`)).json().then((r) => r.data);
+  const propios = await avisos(page, 1);
   test.skip(propios.length === 0, 'La cuenta no tiene notificaciones sembradas');
   await page.setViewportSize({ width: 390, height: 844 });
   await abrirBandeja(page);
