@@ -81,7 +81,9 @@ Contrastes recalculados el 26-oct-2026 con la fórmula de WCAG.
 
 **Alternativa A.** Es el cambio más pequeño (un token), mantiene el color de marca del estado y cumple también en hover. Necesita validación visual y una decisión sobre el botón inverso del banner.
 
-## Defecto relacionado del mismo dominio (H-11)
+## Defecto relacionado del mismo dominio (H-15)
+
+> Los mensajes de los commits `e61ce06c`, `ba50b903` y `6895fe8a` lo llaman H-11. La auditoría ya usaba H-11 para los E2E intermitentes, así que su identificador correcto es H-15.
 
 La misma puerta encontró en Mis proyectos un segundo problema de contraste de un estado. Es la pill animada «En solicitud de cierre» (`pill-forest blink-gold-gray`, en `components/projects/available-project-card.tsx` y `app/global.css`):
 - Sus dos extremos cumplen: gris `tag-subtle`, 5.21:1, y verde `tag-forest`, 7.60:1.

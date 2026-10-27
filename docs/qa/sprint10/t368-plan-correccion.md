@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Tarea | T-368 (HU-197): etiquetas, pills y estados con contraste ≥ 4.5:1 |
-| Hallazgos | H-07 (estado «revisión», 2.36:1) y H-11 (pill animada «En solicitud de cierre», fotogramas intermedios de hasta unos 1.2:1) |
+| Hallazgos | H-07 (estado «revisión», 2.36:1) y H-15 (pill animada «En solicitud de cierre», fotogramas intermedios de hasta unos 1.2:1) |
 | Estado | **PENDIENTE DE CORRECCIÓN** |
 | Prioridad | Alta: incumple el criterio obligatorio de T-368 y deja en rojo la puerta de axe ampliada (H-09) |
 | Detalle técnico | [t368-contraste-estado-revision.md](t368-contraste-estado-revision.md) |
@@ -15,7 +15,7 @@ En el gate final de correcciones del Sprint 10 se aplazó expresamente la correc
 ## Alternativa recomendada
 
 - **H-07:** Alternativa A. `--color-on-review` pasa a `#1f2d18` en el tema base (6.14:1 en reposo, 4.88:1 en hover), con el fondo salvia `#9ab07e` intacto. Hay que decidir a la vez el texto del botón inverso «Editar y corregir» del banner (`bg-on-review` con `text-review-ink`), que quedaría oscuro sobre oscuro.
-- **H-11:** que la animación de «En solicitud de cierre» no interpole a la vez fondo y texto por tonos de bajo contraste. Opciones:
+- **H-15:** que la animación de «En solicitud de cierre» no interpole a la vez fondo y texto por tonos de bajo contraste. Opciones:
   - animar solo la opacidad de un anillo o un indicador junto a la pill, que conserva su color fijo (verde `tag-forest`, 7.60:1);
   - o cambiar entre los dos extremos sin transición intermedia (`steps`).
   La forma exacta es una decisión de diseño.
@@ -42,7 +42,7 @@ En el gate final de correcciones del Sprint 10 se aplazó expresamente la correc
   scripts/e2e/isolated-stack.sh e2e e2e/accesibilidad.spec.ts
   ```
   Deben pasar `solicitudes-publicacion` y `mis-proyectos`.
-- Repetir `mis-proyectos` varias veces seguidas (`--repeat-each`): mientras exista H-11, su resultado depende del fotograma que mide axe.
+- Repetir `mis-proyectos` varias veces seguidas (`--repeat-each`): mientras exista H-15, su resultado depende del fotograma que mide axe.
 - Vitest completo del frontend (las pruebas de diseño leen los tokens).
 
 ## Condición para declararla PASS
