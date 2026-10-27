@@ -162,9 +162,9 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     await dialogo.getByLabel('Hora de fin').fill('00:00');
     await dialogo.getByRole('checkbox', { name: 'Termina otro día' }).click();
     await dialogo.getByLabel('Fecha de fin').click();
-    const manana = new Date();
-    manana.setDate(manana.getDate() + 2);
-    await page.getByRole('button', { name: new RegExp(`, ${manana.getDate()} de `) }).first().click();
+    const fin = mananaTemprano();
+    fin.setDate(fin.getDate() + 1);
+    await elegirDiaDelSelector(page, fin, mananaTemprano());
     await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
     await expect(page.getByText('Evento agendado')).toBeVisible();
 
