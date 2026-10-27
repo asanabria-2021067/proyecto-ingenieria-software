@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { InboxRow } from '../components/notifications/inbox-list';
 import { NotificationReaderContent } from '../components/notifications/notification-reader';
 import type { Notificacion } from '../lib/services/notifications';
@@ -173,7 +173,7 @@ describe('avatar contextual en la fila', () => {
     expect(container.querySelector('.rounded-full.bg-primary')).not.toBeNull();
   });
 
-  it('seleccionada y leída: conserva el fondo de selección con una barra neutra, sin el lenguaje de no leída', () => {
+  it('seleccionada y leída: fondo de selección con barra verde de 3 px, sin el lenguaje de no leída', () => {
     const { container } = render(
       <ul>
         <InboxRow notificacion={base({ tituloNotificacion: 'Vista', mensajeNotificacion: 'La tarea "Diseño" cambió.', leidaEn: AHORA.toISOString() })} seleccionada onSeleccionar={() => {}} ahora={AHORA} />
@@ -181,8 +181,9 @@ describe('avatar contextual en la fila', () => {
     );
     const boton = screen.getByRole('button');
     expect(boton.className).toContain('var(--color-primary)_8%');
-    expect(boton).toHaveClass('shadow-[inset_3px_0_0_var(--color-outline)]');
-    expect(boton.className).not.toMatch(/inset_\d+px_0_0_(?:var\(--color-primary\)|color-mix)/);
+    expect(boton).toHaveClass('shadow-[inset_3px_0_0_var(--color-primary)]');
+    // No es la barra fusionada de no leída (5 px) ni la suavizada.
+    expect(boton.className).not.toMatch(/inset_5px|color-mix\(in_srgb,var\(--color-primary\)_55%/);
     expect(screen.getByText('Vista')).toHaveClass('font-medium');
     expect(container.querySelector('.rounded-full.bg-primary')).toBeNull();
     expect(screen.getByText('Diseño')).not.toHaveClass('text-primary');
@@ -234,5 +235,46 @@ describe('avatar en el visor', () => {
     const { container } = render(<NotificationReaderContent notificacion={base({ tipoNotificacion: 'CALENDARIO_COMPARTIDO', tituloNotificacion: 'Calendario compartido', datosJson: { ownerId: 2, ownerName: 'Ana Ruiz' } })} />);
     expect(avatar(container)).toHaveAttribute('data-categoria', 'recordatorios');
     expect(avatar(container)).toHaveClass('bg-tag-orange', 'text-on-tag-orange');
+  });
+});
+
+describe('visor como tarjeta', () => {
+  it('va en una tarjeta con la acción contextual y «Marcar como leída» al pie mientras no esté leída', () => {
+    const onMarcarLeida = vi.fn();
+    render(
+      <NotificationReaderContent
+        notificacion={base({ tipoNotificacion: 'TAREA_ASIGNADA', tituloNotificacion: 'Nueva tarea', datosJson: { projectId: 4, taskId: 7, projectTitle: 'Tutorías' } })}
+        onMarcarLeida={onMarcarLeida}
+      />,
+    );
+    const tarjeta = screen.getByRole('article');
+    expect(tarjeta).toHaveClass('card-base');
+    const pie = tarjeta.querySelector('footer')!;
+    expect(within(pie).getByRole('link', { name: 'Ver tarea' })).toHaveAttribute('href', '/dashboard/projects/4/kanban/tasks/7');
+    fireEvent.click(within(pie).getByRole('button', { name: 'Marcar como leída' }));
+    expect(onMarcarLeida).toHaveBeenCalledTimes(1);
+  });
+
+  it('leída: el pie solo conserva la acción contextual', () => {
+    render(
+      <NotificationReaderContent
+        notificacion={base({ tipoNotificacion: 'TAREA_ASIGNADA', datosJson: { projectId: 4, taskId: 7 }, leidaEn: AHORA.toISOString() })}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Marcar como leída' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver tarea' })).toBeInTheDocument();
+  });
+
+  it('los datos estructurados van en columnas separadas por una línea vertical', () => {
+    render(
+      <NotificationReaderContent
+        notificacion={base({ tipoNotificacion: 'HORAS_CONSOLIDADAS', datosJson: { projectId: 4, numeroSprint: 3, horasReportadas: '5.00', horasPropuestas: '5.00' } })}
+      />,
+    );
+    const datos = screen.getByRole('region', { name: 'Detalles' });
+    const celdas = [...datos.querySelectorAll('dl > div')];
+    expect(celdas.length).toBeGreaterThanOrEqual(2);
+    expect(celdas[0]).not.toHaveClass('sm:border-l');
+    expect(celdas[1]).toHaveClass('sm:border-l');
   });
 });

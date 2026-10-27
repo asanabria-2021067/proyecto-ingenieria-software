@@ -266,8 +266,6 @@ export function NotificationInbox() {
       <NotificationReaderToolbar
         onAnterior={irAnterior}
         onSiguiente={irSiguiente}
-        onMarcarLeida={mostrada && mostrada.leidaEn === null ? () => marcarUna.mutate(mostrada.idNotificacion) : undefined}
-        marcando={marcarUna.isPending}
         onMarcarFiltradas={() => marcarFiltradas.mutate()}
         etiquetaMarcarFiltradas={etiquetaMarcado}
         marcarFiltradasDeshabilitado={marcarFiltradas.isPending || pendientesFiltro === 0}
@@ -275,7 +273,12 @@ export function NotificationInbox() {
       />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {mostrada ? (
-          <NotificationReaderContent key={mostrada.idNotificacion} notificacion={mostrada} />
+          <NotificationReaderContent
+            key={mostrada.idNotificacion}
+            notificacion={mostrada}
+            onMarcarLeida={mostrada.leidaEn === null ? () => marcarUna.mutate(mostrada.idNotificacion) : undefined}
+            marcando={marcarUna.isPending}
+          />
         ) : (
           <NotificationReaderEmpty />
         )}

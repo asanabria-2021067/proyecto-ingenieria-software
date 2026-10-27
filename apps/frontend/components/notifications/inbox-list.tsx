@@ -30,12 +30,12 @@ const FONDO_SELECCIONADA = 'bg-[color-mix(in_srgb,var(--color-primary)_8%,var(--
 
 /**
  * Barra izquierda, como en Outlook, dibujada con una sombra interior para que cambiar su grosor no mueva
- * el contenido (y conviva con el anillo de foco, que es otra sombra). Verde = no leída: suavizado de 3 px,
- * y seleccionada y no leída, una sola barra verde plena de 5 px. Seleccionada y leída: barra neutra
- * (outline), para que la selección no se confunda con un aviso pendiente.
+ * el contenido (y conviva con el anillo de foco, que es otra sombra). No leída: verde suavizado de 3 px.
+ * Seleccionada: verde pleno de 3 px (leída, sin punto ni negrita ni cita verde); seleccionada y no leída,
+ * una sola barra verde plena de 5 px.
  */
 const BARRA_NO_LEIDA = 'shadow-[inset_3px_0_0_color-mix(in_srgb,var(--color-primary)_55%,transparent)]';
-const BARRA_SELECCIONADA_LEIDA = 'shadow-[inset_3px_0_0_var(--color-outline)]';
+const BARRA_SELECCIONADA_LEIDA = 'shadow-[inset_3px_0_0_var(--color-primary)]';
 const BARRA_SELECCIONADA_NO_LEIDA = 'shadow-[inset_5px_0_0_var(--color-primary)]';
 
 /**
@@ -68,9 +68,9 @@ interface InboxRowProps {
  * Lógica de Outlook. No leída = barra verde a la izquierda, título en negrita
  * con alto contraste, lo citado en verde, punto verde y un tinte casi
  * imperceptible. Leída = atenuada: fondo blanco, título medium en tono
- * secundario, cita neutra, sin punto ni barra. Seleccionada = verde muy suave;
- * sin leer, su barra y la de no leída son una sola más gruesa; leída, la barra
- * es neutra. El avatar lleva el color de la categoría en cualquier estado.
+ * secundario, cita neutra, sin punto ni barra. Seleccionada = verde muy suave
+ * con barra verde; sin leer, su barra y la de no leída son una sola más gruesa.
+ * El avatar lleva el color de la categoría sin leer y queda gris leído.
  */
 export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }: InboxRowProps) {
   const noLeida = n.leidaEn === null;
