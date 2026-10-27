@@ -39,7 +39,7 @@ import { ProjectFinalizationBannerHost } from '@/components/projects/project-fin
 import { AnuncioBanner } from '@/components/anuncios/anuncio-banner';
 import { ChatDockProvider } from '@/components/chat-dock/chat-dock-context';
 import { ChatDock } from '@/components/chat-dock/chat-dock';
-import { toast } from 'sonner';
+import { mostrarNotificacionEnVivo } from '@/components/notifications/live-notification-toast';
 import logo from '@/public/logo.png';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { FontScaleToggle } from '@/components/font-scale-toggle';
@@ -152,10 +152,11 @@ export default function DashboardLayout({
 
     // HU-200: una mención o un comentario nuevo enlazan al comentario desde el aviso en vivo.
     const href = getNotificationLink(latestNotification) ?? resolveCommentNotificationLink(latestNotification);
-    toast(latestNotification.tituloNotificacion, {
-      description: latestNotification.mensajeNotificacion,
-      duration: 6000,
-      action: href ? { label: 'Ver', onClick: () => router.push(href) } : undefined,
+    // IESUC-568 (B3): aviso de alto contraste, ≥ 8 s y en pausa con puntero o foco.
+    mostrarNotificacionEnVivo({
+      titulo: latestNotification.tituloNotificacion,
+      mensaje: latestNotification.mensajeNotificacion,
+      onVer: href ? () => router.push(href) : undefined,
     });
   }, [latestNotification, queryClient, router]);
 
