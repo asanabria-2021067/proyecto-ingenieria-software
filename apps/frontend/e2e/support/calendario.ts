@@ -56,6 +56,18 @@ export function diaDelSelector(page: Page, fecha: Date) {
 }
 
 /**
+ * Elige `fecha` en el selector ya abierto, que muestra el mes de `desde`: avanza mes a mes si cae en uno
+ * posterior. Busca el día por su nombre completo, nunca un día de relleno de otro mes, sea cual sea la
+ * fecha en que corre la prueba.
+ */
+export async function elegirDiaDelSelector(page: Page, fecha: Date, desde: Date) {
+  const selector = page.locator('[data-slot="popover-content"]');
+  const saltos = (fecha.getFullYear() - desde.getFullYear()) * 12 + fecha.getMonth() - desde.getMonth();
+  for (let i = 0; i < saltos; i += 1) await selector.getByRole('button', { name: /next|siguiente/i }).click();
+  await diaDelSelector(page, fecha).click();
+}
+
+/**
  * Petición a la API real con la sesión de la página. El backend limita por IP
  * (10 por segundo, 50 cada 10 s) y en el stack de pruebas todas las peticiones
  * salen del mismo servidor Next, así que una ráfaga de preparación puede
