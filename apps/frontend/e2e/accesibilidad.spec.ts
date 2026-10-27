@@ -23,13 +23,13 @@ const ADMIN = 'admin@uvg.edu.gt';
 export const PANTALLAS_A11Y = [
   { id: 'dashboard-estudiante', ruta: '/dashboard', correo: ESTUDIANTE },
   { id: 'dashboard-admin', ruta: '/dashboard/admin', correo: ADMIN },
-  { id: 'proyectos-admin', ruta: '/dashboard/admin/proyectos?grupo=activos', correo: ADMIN },
+  { id: 'proyectos-admin', ruta: '/dashboard/admin/proyectos?grupo=activos', correo: ADMIN, etiquetas: true },
   { id: 'calendario', ruta: '/dashboard/calendario', correo: ESTUDIANTE },
   { id: 'perfil-editar', ruta: '/dashboard/perfil/editar', correo: ESTUDIANTE },
   // H-09 (T-369): pantallas con etiquetas y estados que la auditoría de T-316 no incluía.
-  { id: 'explorar-proyectos', ruta: '/dashboard/proyectos', correo: ESTUDIANTE },
-  { id: 'mis-proyectos', ruta: '/dashboard/projects/mine', correo: ESTUDIANTE },
-  { id: 'solicitudes-publicacion', ruta: '/dashboard/projects/admin/reviews', correo: ADMIN },
+  { id: 'explorar-proyectos', ruta: '/dashboard/proyectos', correo: ESTUDIANTE, etiquetas: true },
+  { id: 'mis-proyectos', ruta: '/dashboard/projects/mine', correo: ESTUDIANTE, etiquetas: true },
+  { id: 'solicitudes-publicacion', ruta: '/dashboard/projects/admin/reviews', correo: ADMIN, etiquetas: true },
 ] as const;
 
 async function sesion(browser: Browser, correo: string): Promise<Page> {
@@ -62,6 +62,8 @@ for (const pantalla of PANTALLAS_A11Y) {
         const page = await sesion(browser, pantalla.correo);
         try {
           await abrirEnTema(page, pantalla.ruta, oscuro);
+          // En las pantallas de etiquetas, axe tiene que encontrar pills o badges que evaluar, no una lista vacía.
+          if ('etiquetas' in pantalla) await expect(page.locator('main').locator('.pill, [data-slot="badge"]').first()).toBeVisible();
           const { violaciones, bloqueantes } = await analizarAccesibilidad(page, testInfo, `${pantalla.id}-${tema}`);
 
           // Lo que no bloquea queda a la vista en el reporte, no escondido.
