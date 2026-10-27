@@ -897,14 +897,14 @@ export default function EditarPerfilPage() {
             </button>
 
             {step < STEPS.length - 1 ? (
-              <button
+              <Button
                 type="button"
                 onClick={handleNext}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary/95 transition-all cursor-pointer"
+                className="h-auto gap-2 rounded-xl bg-primary px-6 py-2.5 font-bold text-on-primary hover:bg-primary/95 has-[>svg]:px-6 motion-glow-primary"
               >
                 Siguiente
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </Button>
             ) : (
               <button
                 type="button"
