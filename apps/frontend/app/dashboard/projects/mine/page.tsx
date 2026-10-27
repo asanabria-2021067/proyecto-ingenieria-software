@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/select';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { SkeletonRegion } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 const ESTADO_LABEL: Record<string, string> = {
   BORRADOR: 'Borrador',
@@ -254,13 +255,13 @@ export default function MyProjectsPage() {
             </EmptyHeader>
             {hasActiveFilters && (
               <EmptyContent>
-                <button
+                <Button
                   type="button"
                   onClick={limpiarFiltros}
-                  className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
+                  className="h-auto bg-primary px-5 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 motion-glow-primary"
                 >
                   Limpiar filtros
-                </button>
+                </Button>
               </EmptyContent>
             )}
           </Empty>
