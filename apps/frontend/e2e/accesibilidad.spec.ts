@@ -29,6 +29,7 @@ export const PANTALLAS_A11Y = [
   // H-09 (T-369): pantallas con etiquetas y estados que la auditoría de T-316 no incluía.
   { id: 'explorar-proyectos', ruta: '/dashboard/proyectos', correo: ESTUDIANTE },
   { id: 'mis-proyectos', ruta: '/dashboard/projects/mine', correo: ESTUDIANTE },
+  { id: 'solicitudes-publicacion', ruta: '/dashboard/projects/admin/reviews', correo: ADMIN },
 ] as const;
 
 async function sesion(browser: Browser, correo: string): Promise<Page> {
