@@ -433,13 +433,13 @@ function EdicionComentario({
           >
             Cancelar
           </Button>
-          <button
+          <Button
             type="submit"
             disabled={!contenido || sinCambios || mutation.isPending}
-            className="rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-auto rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-on-primary hover:bg-primary/90 motion-glow-primary"
           >
             {mutation.isPending ? 'Guardando...' : 'Guardar'}
-          </button>
+          </Button>
         </div>
       </div>
     </form>
