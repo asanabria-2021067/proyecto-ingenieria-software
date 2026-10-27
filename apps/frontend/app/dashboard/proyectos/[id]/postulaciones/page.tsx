@@ -193,13 +193,14 @@ export default function PostulacionesProyectoPage() {
 
                   {p.estadoPostulacion === 'PENDIENTE' && (
                     <div className="flex gap-2">
-                      <button
+                      <Button
+                        variant="outline"
                         onClick={() => abrirModal(p.idPostulacion, 'RECHAZADA')}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-error hover:bg-error-container transition-colors"
+                        className="h-auto gap-1.5 rounded-xl border-outline-variant bg-transparent px-4 py-2 text-sm font-semibold text-error shadow-none hover:bg-error-container hover:text-error has-[>svg]:px-4 dark:border-outline-variant dark:bg-transparent dark:hover:bg-error-container"
                       >
                         <XCircle className="w-4 h-4" />
                         Rechazar
-                      </button>
+                      </Button>
                       <Button
                         onClick={() => abrirModal(p.idPostulacion, 'ACEPTADA')}
                         className="h-auto gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary has-[>svg]:px-4 motion-glow-primary"
