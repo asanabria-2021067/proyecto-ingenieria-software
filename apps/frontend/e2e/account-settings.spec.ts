@@ -3,6 +3,7 @@ import type { Browser, Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
 import { desactivarTour } from './support/realtime';
+import { esperarAnimaciones } from './support/accesibilidad';
 
 /**
  * Menú de cuenta único (Mi perfil, Configuración, Cerrar sesión), vista
@@ -54,7 +55,9 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       const menu = page.getByRole('menu');
       await expect(menu).toHaveAttribute('data-side', 'top');
       await expect(menu.getByRole('menuitem')).toHaveText(['Mi perfil', 'Configuración', 'Cerrar sesión']);
-      // Se superpone: abrirlo no mueve el bloque de la cuenta.
+      // Se superpone: abrirlo no mueve el bloque de la cuenta. Se mide al terminar la entrada, que lo desliza
+      // unos píxeles; medido a mitad, el borde inferior aún no ha llegado a su sitio.
+      await esperarAnimaciones(page);
       const cajaMenu = await menu.boundingBox();
       const cajaDisparador = await disparador.boundingBox();
       expect(cajaMenu!.y + cajaMenu!.height).toBeLessThanOrEqual(cajaDisparador!.y + 1);
