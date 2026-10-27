@@ -78,8 +78,8 @@ describe('AdminMeetingsController (HU-195)', () => {
     expect(Reflect.getMetadata(ROLES_METADATA_KEY, AdminMeetingsController)).toEqual(['administrador']);
   });
 
-  it('expone exactamente listar, elegibles, detalle, participantes, crear, editar y cancelar', () => {
+  it('expone exactamente listar, elegibles, equipo de un proyecto, detalle, participantes, crear, editar y cancelar', () => {
     const propios = Object.getOwnPropertyNames(AdminMeetingsController.prototype).filter((n) => n !== 'constructor');
-    expect(propios.sort()).toEqual(['cancel', 'create', 'detail', 'eligibleProjects', 'list', 'participants', 'update']);
+    expect(propios.sort()).toEqual(['cancel', 'create', 'detail', 'eligibleProjects', 'list', 'participants', 'projectTeam', 'update']);
   });
 });
