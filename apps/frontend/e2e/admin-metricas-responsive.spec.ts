@@ -161,6 +161,7 @@ for (const tema of TEMAS) {
           await expect(filtros.getByRole('button', { name: 'Limpiar filtros' })).toBeDisabled();
 
           const detalle = page.getByRole('button', { name: /^Ver detalle:/ }).first();
+          // Se omite si la base no tiene eventos de seguridad: no hay detalle que abrir ni medir.
           test.skip((await detalle.count()) === 0, 'la base no tiene eventos de seguridad');
           await detalle.click();
           const dialogo = page.getByRole('dialog');

@@ -11,6 +11,8 @@ const productionServer = process.env.E2E_PRODUCTION_SERVER === '1';
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
+  // IESUC-568 (RTF 3.9): un test.only olvidado hace fallar la corrida en CI.
+  forbidOnly: !!process.env.CI,
   // En CI todos los specs comparten un único backend/frontend de dev (ver
   // webServer abajo): con más de un worker, tests pesados (dos contextos de
   // navegador, sockets, drag real) compiten por el mismo servidor y unos a

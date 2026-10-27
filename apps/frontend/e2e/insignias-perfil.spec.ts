@@ -43,6 +43,7 @@ test('una insignia nueva aparece en el perfil tras la acción que la otorga', as
   await login(page, CARLOS);
 
   const antes = await comentarios(page);
+  // Se omite si la insignia ya está en el nivel máximo: no hay umbral siguiente que alcanzar.
   test.skip(antes.siguienteUmbral === null, 'La insignia ya está en Diamante: no hay nivel nuevo que provocar.');
 
   const faltan = antes.siguienteUmbral! - antes.progreso;

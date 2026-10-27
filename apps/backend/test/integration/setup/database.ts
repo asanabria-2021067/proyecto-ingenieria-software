@@ -12,6 +12,7 @@ import { PrismaClient } from '@prisma/client';
 
 export const hasIntegrationDatabase = Boolean(process.env.INTEGRATION_DATABASE_URL);
 
+// Se omite sin INTEGRATION_DATABASE_URL: la suite unitaria corre sin PostgreSQL; el CI siempre la define.
 export const describeIntegration = hasIntegrationDatabase ? describe : describe.skip;
 
 export function createIntegrationPrismaClient(): PrismaClient {

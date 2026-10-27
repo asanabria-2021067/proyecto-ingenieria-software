@@ -47,3 +47,31 @@ describe('RTF 3.7: salida compilada de las configs de Vitest fuera del repo', ()
     );
   });
 });
+
+describe('RTF 3.9: sin .only en CI y skips condicionales justificados', () => {
+  it('Playwright prohíbe test.only en CI', () => {
+    expect(readRepoFile('apps/frontend/playwright.config.ts')).toMatch(/^\s*forbidOnly: !!process\.env\.CI,$/m);
+  });
+
+  it.each(['apps/backend/vitest.config.ts', 'apps/backend/vitest.integration.config.ts', 'apps/frontend/vitest.config.ts'])(
+    '%s declara allowOnly: false',
+    (ruta) => {
+      expect(readRepoFile(ruta)).toMatch(/^\s*allowOnly: false,$/m);
+    },
+  );
+
+  it.each([
+    ['apps/backend/test/integration/setup/database.ts', 'describe.skip'],
+    ['apps/backend/test/roles-participation.integration.spec.ts', 'describe.skip'],
+    ['apps/frontend/e2e/admin-metricas-responsive.spec.ts', 'test.skip('],
+    ['apps/frontend/e2e/estados-carga.spec.ts', 'test.skip('],
+    ['apps/frontend/e2e/insignias-perfil.spec.ts', 'test.skip('],
+  ])('cada skip condicional de %s tiene un comentario justo encima', (ruta, marcador) => {
+    const lineas = readRepoFile(ruta).split(/\r?\n/);
+    const indices = lineas.flatMap((linea, i) => (linea.includes(marcador) ? [i] : []));
+    expect(indices.length).toBeGreaterThan(0);
+    for (const i of indices) {
+      expect(lineas[i - 1].trim()).toMatch(/^\/\/ /);
+    }
+  });
+});

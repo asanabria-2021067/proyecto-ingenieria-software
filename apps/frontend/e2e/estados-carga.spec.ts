@@ -145,6 +145,7 @@ test.describe('HU-204: estados de carga del estudiante', () => {
 
     test('filtrar por organización vuelve a mostrar el skeleton mientras carga el filtro', async ({ page }) => {
       const [organizacion] = await leerApi<{ idOrganizacion: number; nombreOrganizacion: string }[]>(page, '/organizaciones');
+      // Se omite si la siembra no trae organizaciones: no hay filtro por organización que probar.
       test.skip(!organizacion, 'La siembra no tiene organizaciones.');
 
       await page.goto('/dashboard/proyectos');

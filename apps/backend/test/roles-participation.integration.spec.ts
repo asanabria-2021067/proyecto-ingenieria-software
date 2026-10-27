@@ -18,6 +18,7 @@ import { ProjectTransactionService } from '../src/common/project-policy/project-
  * para no romper la suite unitaria sin base de datos.
  */
 const DB_URL = process.env.ROLES_IT_DATABASE_URL;
+// Se omite sin ROLES_IT_DATABASE_URL: exige PostgreSQL desechable real; el CI siempre la define.
 const suite = DB_URL ? describe : describe.skip;
 
 // NotificationsService falso: el retiro emite notificaciones best-effort tras

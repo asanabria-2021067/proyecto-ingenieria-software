@@ -12,6 +12,8 @@ export default defineConfig({
     ],
     globals: true,
     clearMocks: true,
+    // IESUC-568 (RTF 3.9): un .only olvidado hace fallar la corrida.
+    allowOnly: false,
     // G01 · OWASP25-C019: JWT_SECRET sintético para todas las suites.
     setupFiles: ['test/helpers/synthetic-jwt-secret.setup.ts'],
     coverage: {

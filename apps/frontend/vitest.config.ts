@@ -12,6 +12,8 @@ export default defineConfig({
     include: ['test/**/*.spec.ts', 'test/**/*.spec.tsx'],
     globals: true,
     clearMocks: true,
+    // IESUC-568 (RTF 3.9): un .only olvidado hace fallar la corrida.
+    allowOnly: false,
     // jsdom acumula memoria entre archivos dentro del mismo worker (~105
     // archivos de test). tinypool reparte archivos entre forks de forma
     // dinámica, no pareja: maxForks:4 + 3072MB cada uno reventó con
