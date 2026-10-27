@@ -714,14 +714,15 @@ export default function MyProjectViewClient({ id }: Props) {
       {isEditing && (
         <div className="shrink-0 border-t border-outline-variant/30 bg-surface px-6 py-4">
           <div className="max-w-3xl mx-auto flex gap-3">
-            <button
+            <Button
+              variant="ghost"
               disabled={saving}
               onClick={() => void submit('BORRADOR')}
-              className="flex items-center justify-center gap-2 rounded-xl bg-surface-container-high px-5 py-3 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-auto gap-2 rounded-xl bg-surface-container-high px-5 py-3 text-sm font-bold text-on-surface hover:bg-primary hover:text-on-primary has-[>svg]:px-5 dark:hover:bg-primary"
             >
               <Save className="h-4 w-4" />
               Guardar cambios
-            </button>
+            </Button>
             <button
               disabled={saving}
               onClick={() => void submit('EN_REVISION')}
