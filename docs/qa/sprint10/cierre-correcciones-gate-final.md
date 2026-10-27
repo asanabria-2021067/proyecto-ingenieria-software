@@ -3,10 +3,10 @@
 ## Estado Git
 
 - **Rama y base:** `sprint10/vernel-workstream`, partiendo de `8a204b8d`.
-- **Commits del gate:** 61 locales, sin push, merge ni rebase.
-  - 30 de botones (B01–B30).
-  - 31 de correcciones, pruebas y documentación.
-  - El último es el de este documento.
+- **Commits del gate:** todos locales, sin push, merge ni rebase.
+  - 30 de botones (B01–B30), uno por botón.
+  - El resto, de correcciones, pruebas y documentación.
+  - La lista completa con SHA está en el informe externo `AUDITORIA_CORRECCIONES_FINALES_SPRINT10_UVGENIUS.md`.
 - **Código:** las pruebas finales se ejecutaron sobre `92dae9bf`. Todo lo posterior es documentación en `docs/qa/sprint10/`, sin cambios de código.
 
 ## Resultados de las pruebas (26-oct-2026, ejecución secuencial)
