@@ -70,13 +70,13 @@ const CustomTooltip = ({
           )}
 
           {/* Next/Last Button */}
-          <button
+          <Button
             type="button"
             {...primaryProps}
-            className="text-xs font-bold text-white bg-primary hover:bg-primary/95 transition-all px-4 py-2 rounded-xl shadow-md cursor-pointer outline-none"
+            className="h-auto rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-primary/95 motion-glow-primary"
           >
             {isLastStep ? 'Finalizar' : 'Siguiente'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
