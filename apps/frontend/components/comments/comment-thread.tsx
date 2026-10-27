@@ -424,14 +424,15 @@ function EdicionComentario({
           <span />
         )}
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={onCancelar}
             disabled={mutation.isPending}
-            className="rounded-xl px-3 py-1.5 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container"
+            className="h-auto rounded-xl px-3 py-1.5 text-xs font-semibold text-on-surface-variant hover:bg-surface-container hover:text-on-surface-variant dark:hover:bg-surface-container"
           >
             Cancelar
-          </button>
+          </Button>
           <button
             type="submit"
             disabled={!contenido || sinCambios || mutation.isPending}
