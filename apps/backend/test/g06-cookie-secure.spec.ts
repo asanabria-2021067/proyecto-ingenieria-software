@@ -12,10 +12,10 @@ import { appThrottlerOptions, startAuthHarness, type HarnessApp } from './helper
 import { loadWorkflow, readRepoFile } from './helpers/workflow-yaml';
 
 /**
- * G06-C07 · OWASP25-C049 parcial. COOKIE_SECURE: default false (cookies como
+ * G06-C07 · OWASP25-C049 parcial. COOKIE_SECURE: default false en código (cookies como
  * hoy); true añade Secure conservando HttpOnly, SameSite=Lax y Path=/. El
- * validador y el deploy solo aceptan true|false. Activarlo en producción es
- * del Gate Admin.
+ * validador y el deploy solo aceptan true|false. Desde IESUC-568 (RTF 3.8) el
+ * deploy usa true por defecto y producción no arranca sin true.
  */
 
 let harness: HarnessApp | undefined;
@@ -73,6 +73,21 @@ describe('G06-C07: COOKIE_SECURE', () => {
     expect(() => validateEnvironment({ ...base, COOKIE_SECURE: 'yes' })).toThrow(/COOKIE_SECURE/);
   });
 
+  // IESUC-568 (RTF 2 · 3.8): en producción Secure es obligatorio.
+  it.each([undefined, '', 'false'])('NODE_ENV=production con COOKIE_SECURE=%j falla al arrancar', (value) => {
+    const base = { FRONTEND_URL: 'http://localhost:3000', JWT_SECRET: 'x'.repeat(48), NODE_ENV: 'production' };
+    const raw = value === undefined ? base : { ...base, COOKIE_SECURE: value };
+    expect(() => validateEnvironment(raw)).toThrow('COOKIE_SECURE must be true when NODE_ENV=production');
+  });
+
+  it('NODE_ENV=production con COOKIE_SECURE=true arranca; fuera de producción false sigue permitido', () => {
+    const base = { FRONTEND_URL: 'http://localhost:3000', JWT_SECRET: 'x'.repeat(48) };
+    expect(validateEnvironment({ ...base, NODE_ENV: 'production', COOKIE_SECURE: 'true' }).app.cookieSecure).toBe(true);
+    for (const nodeEnv of ['development', 'test']) {
+      expect(validateEnvironment({ ...base, NODE_ENV: nodeEnv, COOKIE_SECURE: 'false' }).app.cookieSecure).toBe(false);
+    }
+  });
+
   it.each([undefined, 'false'])('COOKIE_SECURE=%j: cookies actuales (HttpOnly, SameSite=Lax, Path=/, sin Secure)', async (value) => {
     const cookies = await loginCookies(value);
     expect(cookies.map((cookie) => cookie.split('=')[0])).toEqual(['access_token', 'refresh_token']);
@@ -99,10 +114,10 @@ describe('G06-C07: COOKIE_SECURE', () => {
   describe('deploy', () => {
     const step = loadWorkflow('deploy.yml').jobs.deploy.steps?.find((s) => s.name === 'Transferir .env de produccion por stdin');
 
-    it("flag con default 'false' escrito en el .env y documentado", () => {
-      expect(step?.env?.COOKIE_SECURE).toBe("${{ vars.COOKIE_SECURE || 'false' }}");
+    it("flag con default 'true' escrito en el .env y documentado (IESUC-568, RTF 3.8)", () => {
+      expect(step?.env?.COOKIE_SECURE).toBe("${{ vars.COOKIE_SECURE || 'true' }}");
       expect(step?.run).toContain(`printf 'COOKIE_SECURE=%s\\n' "$COOKIE_SECURE"`);
-      expect(readRepoFile('.env.example')).toMatch(/^COOKIE_SECURE=false$/m);
+      expect(readRepoFile('.env.example')).toMatch(/^COOKIE_SECURE=true$/m);
     });
 
     it.each(['TRUE', 'yes', 'true; rm -rf /'])('rechaza COOKIE_SECURE=%j antes de escribir el .env', (value) => {

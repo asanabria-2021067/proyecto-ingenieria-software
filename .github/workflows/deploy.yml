@@ -353,9 +353,9 @@ jobs:
           # loopback que activa el administrador (solo esos dos valores).
           BACKEND_BIND: ${{ vars.BACKEND_BIND || '0.0.0.0' }}
           FRONTEND_BIND: ${{ vars.FRONTEND_BIND || '0.0.0.0' }}
-          # G06 (OWASP25-C049 parcial): 'false' reproduce las cookies actuales.
-          # 'true' (Secure) solo cuando todo el trafico sea HTTPS: Gate Admin.
-          COOKIE_SECURE: ${{ vars.COOKIE_SECURE || 'false' }}
+          # G06 (OWASP25-C049 parcial) + IESUC-568 (RTF 3.8): por defecto 'true'
+          # (Secure). El backend no arranca con NODE_ENV=production sin 'true'.
+          COOKIE_SECURE: ${{ vars.COOKIE_SECURE || 'true' }}
           # G05 (OWASP25-C038): 'false' deja las alertas de seguridad inertes;
           # activarlas es decision del administrador.
           SECURITY_ALERTS_ENABLED: ${{ vars.SECURITY_ALERTS_ENABLED || 'false' }}

@@ -179,6 +179,16 @@ export function parseCookieSecure(value: string | undefined): boolean {
   throw new Error(`${COOKIE_SECURE_VARIABLE} must be true or false`);
 }
 
+/**
+ * IESUC-568 (RTF 2 · 3.8): en producción las cookies de sesión siempre llevan
+ * Secure. NODE_ENV=production sin COOKIE_SECURE=true impide arrancar.
+ */
+export function assertCookieSecureInProduction(app: Pick<AppEnvironment, 'nodeEnv' | 'cookieSecure'>): void {
+  if (app.nodeEnv === 'production' && !app.cookieSecure) {
+    throw new Error(`${COOKIE_SECURE_VARIABLE} must be true when NODE_ENV=production`);
+  }
+}
+
 export const SECURITY_ALERTS_ENABLED_VARIABLE = 'SECURITY_ALERTS_ENABLED';
 
 /** G05 (OWASP25-C038): solo `true` o `false` (ausente o vacío = false); otro valor falla el arranque. */
@@ -340,6 +350,7 @@ function deriveClosureAvailability(raw: RawEnvironment): ClosureAvailability {
 
 export function validateEnvironment(raw: RawEnvironment): ValidatedEnvironment {
   const app = deriveAppEnvironment(raw);
+  assertCookieSecureInProduction(app);
   // G01 · OWASP25-C019: sin un JWT_SECRET válido el backend no arranca.
   assertJwtSecret(raw[JWT_SECRET_VARIABLE]);
   const closure = deriveClosureAvailability(raw);
