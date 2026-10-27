@@ -198,12 +198,13 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
       {/* Footer */}
       <div className="shrink-0 border-t border-outline-variant/30 bg-surface px-6 py-4">
         <div className="max-w-3xl mx-auto">
-          <button
+          <Button
+            variant="ghost"
             onClick={onClose}
-            className="w-full rounded-control bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+            className="h-auto w-full rounded-[var(--radius-control)] bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface hover:bg-primary hover:text-on-primary dark:hover:bg-primary"
           >
             Cerrar
-          </button>
+          </Button>
         </div>
       </div>
     </div>
