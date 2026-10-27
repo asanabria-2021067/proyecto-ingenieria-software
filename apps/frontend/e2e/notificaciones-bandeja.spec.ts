@@ -39,6 +39,8 @@ async function abrirBandeja(page: Page) {
  */
 async function avisos(page: Page, limit: number): Promise<Aviso[]> {
   const respuesta = await api(page, 'get', `${API}/notificaciones?page=1&limit=${limit}`);
+  // Un 401, 403 o 500 (o un 429 que no cede) se informa como tal, no como un `data` indefinido.
+  expect(respuesta.status(), `GET /notificaciones: ${await respuesta.text()}`).toBe(200);
   return ((await respuesta.json()) as { data: Aviso[] }).data;
 }
 
