@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { GUARDS_METADATA, MODULE_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { RequestMethod } from '@nestjs/common';
+import { GUARDS_METADATA, METHOD_METADATA, MODULE_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 vi.hoisted(() => {
   process.env.FRONTEND_URL ??= 'http://localhost:3000';
 });
@@ -81,5 +82,17 @@ describe('AdminMeetingsController (HU-195)', () => {
   it('expone exactamente listar, elegibles, equipo de un proyecto, detalle, participantes, crear, editar y cancelar', () => {
     const propios = Object.getOwnPropertyNames(AdminMeetingsController.prototype).filter((n) => n !== 'constructor');
     expect(propios.sort()).toEqual(['cancel', 'create', 'detail', 'eligibleProjects', 'list', 'participants', 'projectTeam', 'update']);
+  });
+
+  it('el equipo de un proyecto es GET equipos/:idProyecto y ningún método relaja la protección de la clase', () => {
+    const equipo = AdminMeetingsController.prototype.projectTeam;
+    expect(Reflect.getMetadata(PATH_METADATA, equipo)).toBe('equipos/:idProyecto');
+    expect(Reflect.getMetadata(METHOD_METADATA, equipo)).toBe(RequestMethod.GET);
+    // Las guardas y el rol se declaran solo en la clase: un método con los suyos podría abrir la ruta.
+    for (const nombre of Object.getOwnPropertyNames(AdminMeetingsController.prototype).filter((n) => n !== 'constructor')) {
+      const metodo = AdminMeetingsController.prototype[nombre as keyof AdminMeetingsController];
+      expect(Reflect.getMetadata(GUARDS_METADATA, metodo), nombre).toBeUndefined();
+      expect(Reflect.getMetadata(ROLES_METADATA_KEY, metodo), nombre).toBeUndefined();
+    }
   });
 });
