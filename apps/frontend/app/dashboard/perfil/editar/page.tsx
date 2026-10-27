@@ -774,14 +774,14 @@ export default function EditarPerfilPage() {
                     </select>
                   </div>
                   <div className="flex items-end">
-                    <button
+                    <Button
                       type="button"
                       onClick={handleAddExperiencia}
-                      className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary/95 transition-all cursor-pointer"
+                      className="h-auto w-full gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:bg-primary/95 has-[>svg]:px-4 motion-glow-primary"
                     >
                       <Plus className="w-4 h-4" />
                       Agregar Experiencia
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
