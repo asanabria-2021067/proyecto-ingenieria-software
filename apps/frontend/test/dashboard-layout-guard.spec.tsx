@@ -13,7 +13,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
  * shell REALES; solo se sustituyen la sesión y las piezas ajenas a la decisión.
  */
 
-type Sesion = { data: { idUsuario: number; roles: string[] } | undefined; isLoading: boolean; isError: boolean };
+type Sesion = {
+  data: { idUsuario: number; roles: string[] } | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  error?: unknown;
+  refetch?: () => unknown;
+  isFetching?: boolean;
+};
 
 const navegacion = vi.hoisted(() => ({ pathname: '/dashboard/mis-proyectos' }));
 const replaceMock = vi.hoisted(() => vi.fn());
@@ -54,7 +61,8 @@ const CONTENIDO = 'listado protegido de proyectos';
 const ESTUDIANTE: Sesion = { data: { idUsuario: 18, roles: ['estudiante'] }, isLoading: false, isError: false };
 const ADMIN: Sesion = { data: { idUsuario: 1, roles: ['administrador'] }, isLoading: false, isError: false };
 const CARGANDO: Sesion = { data: undefined, isLoading: true, isError: false };
-const SIN_SESION: Sesion = { data: undefined, isLoading: false, isError: true };
+// IESUC-568 (C2): «sin sesión» es un 401 (apiFetch ya intentó el refresh).
+const SIN_SESION: Sesion = { data: undefined, isLoading: false, isError: true, error: { statusCode: 401 } };
 
 function arbol() {
   return (
@@ -161,5 +169,54 @@ describe('GPI01-C03: la exclusión es de estas rutas, no de todo el shell', () =
       cleanup();
       replaceMock.mockClear();
     }
+  });
+});
+
+describe('IESUC-568 (C2): error al cargar /usuarios/me', () => {
+  function errorTras(error: unknown, refetch = vi.fn()): Sesion {
+    return { data: undefined, isLoading: false, isError: true, error, refetch, isFetching: false };
+  }
+
+  it('un 401 manda al login', async () => {
+    abrir('/dashboard', errorTras({ statusCode: 401 }));
+
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/login'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['un 429 (límite de peticiones)', { statusCode: 429, retryAfterMs: 2000 }],
+    ['un fallo de red', new TypeError('Failed to fetch')],
+    ['un 500', { statusCode: 500 }],
+  ])('tras agotar los reintentos, %s muestra el error con «Reintentar» y no va al login', async (_caso, error) => {
+    abrir('/dashboard', errorTras(error));
+
+    const alerta = await screen.findByRole('alert');
+    expect(alerta).toHaveTextContent('No fue posible cargar tu sesión.');
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeEnabled();
+    expect(screen.queryByText(CONTENIDO)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Cargando UVGenius')).not.toBeInTheDocument();
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it('«Reintentar» vuelve a pedir la sesión y se deshabilita mientras tanto', () => {
+    const refetch = vi.fn();
+    const vista = abrir('/dashboard', errorTras({ statusCode: 429 }, refetch));
+
+    screen.getByRole('button', { name: 'Reintentar' }).click();
+    expect(refetch).toHaveBeenCalledTimes(1);
+
+    sesionMock.mockReturnValue({ ...errorTras({ statusCode: 429 }, refetch), isFetching: true });
+    vista.rerender(arbol());
+    expect(screen.getByRole('button', { name: 'Reintentando…' })).toBeDisabled();
+  });
+
+  it('si el reintento funciona, aparece el contenido', () => {
+    const vista = abrir('/dashboard', errorTras({ statusCode: 429 }));
+    sesionMock.mockReturnValue(ESTUDIANTE);
+    vista.rerender(arbol());
+
+    expect(screen.getByText(CONTENIDO)).toBeInTheDocument();
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 });

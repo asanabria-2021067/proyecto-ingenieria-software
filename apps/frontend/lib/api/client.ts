@@ -121,6 +121,11 @@ async function buildApiError(res: Response, method: string | undefined, path: st
   if (typeof body.code === 'string') {
     (error as any).code = body.code;
   }
+  // IESUC-568 (C2): un 429/503 puede decir cuánto esperar antes de reintentar.
+  const retryAfterMs = parseRetryAfter(res.headers?.get('Retry-After') ?? null);
+  if (retryAfterMs !== null) {
+    (error as any).retryAfterMs = retryAfterMs;
+  }
   (error as any).method = (method ?? 'GET').toUpperCase();
   (error as any).endpoint = stripQuery(path);
   logApiError(error);
@@ -133,6 +138,15 @@ async function buildApiError(res: Response, method: string | undefined, path: st
  * backend: nunca el cuerpo de la petición (contraseñas), headers ni cookies
  * (tokens), y el endpoint va sin query string (búsquedas del usuario).
  */
+/** Retry-After en segundos o como fecha HTTP; `null` si falta o no se entiende. */
+export function parseRetryAfter(value: string | null, now = Date.now()): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed) * 1000;
+  const fecha = Date.parse(trimmed);
+  return Number.isNaN(fecha) ? null : Math.max(0, fecha - now);
+}
+
 function stripQuery(path: string): string {
   return path.split('?')[0];
 }

@@ -18,6 +18,7 @@ import {
   Users,
   Archive,
   Search as SearchIcon,
+  AlertCircle,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
@@ -43,6 +44,9 @@ import logo from '@/public/logo.png';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { FontScaleToggle } from '@/components/font-scale-toggle';
 import { ShellSkeleton } from '@/components/layout/shell-skeleton';
+import { Button } from '@/components/ui/button';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { esErrorDeSesion } from '@/lib/api/query-retry';
 
 // T-293: la guía solo se muestra a quien entra por primera vez, pero react-joyride viajaba en el
 // JS inicial de todas las rutas del estudiante. Se carga aparte; no pinta nada hasta arrancar.
@@ -114,7 +118,11 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: user, isLoading, isError } = useCurrentUser();
+  const { data: user, isLoading, isError, error, refetch, isFetching } = useCurrentUser();
+  // IESUC-568 (C2): solo un 401 es «sin sesión». Un 429 o un fallo de red ya se
+  // reintentaron con espera (useCurrentUser); si siguen fallando no es motivo
+  // para mandar al login, cuyo middleware devolvería aquí y dejaría el skeleton.
+  const sinSesion = isError && esErrorDeSesion(error);
   const { latestNotification, isConnected: notificationsConnected } =
     useRealtimeNotifications(!!user);
   const handleLogout = useLogout();
@@ -131,10 +139,10 @@ export default function DashboardLayout({
   // tras el reintento silencioso en apiFetch): de vuelta al login en vez de
   // quedarse atascado en el spinner de isLoading.
   useEffect(() => {
-    if (!isLoading && isError) {
+    if (!isLoading && sinSesion) {
       router.replace('/login');
     }
-  }, [isLoading, isError, router]);
+  }, [isLoading, sinSesion, router]);
 
   useEffect(() => {
     if (!latestNotification) return;
@@ -151,7 +159,30 @@ export default function DashboardLayout({
     });
   }, [latestNotification, queryClient, router]);
 
-  if (isLoading || isError || (!allowAdmin && isAdminUser(user))) {
+  if (isError && !sinSesion) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-page p-section">
+        <Empty tone="danger" className="surface-enter max-w-md" role="alert">
+          <EmptyMedia variant="icon">
+            <AlertCircle aria-hidden="true" className="h-7 w-7" />
+          </EmptyMedia>
+          <EmptyHeader>
+            <EmptyTitle>No fue posible cargar tu sesión.</EmptyTitle>
+            <EmptyDescription>
+              El servidor está ocupado o no hay conexión. Tu sesión sigue abierta: vuelve a intentarlo en unos segundos.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button type="button" onClick={() => refetch()} disabled={isFetching}>
+              {isFetching ? 'Reintentando…' : 'Reintentar'}
+            </Button>
+          </EmptyContent>
+        </Empty>
+      </main>
+    );
+  }
+
+  if (isLoading || sinSesion || (!allowAdmin && isAdminUser(user))) {
     return <ShellSkeleton />;
   }
 
