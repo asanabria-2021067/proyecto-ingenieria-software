@@ -1,3 +1,9 @@
+## Ticket o HU relacionado (IESUC-xxx / HU-xxx / T-xxx)
+
+<!-- OBLIGATORIO: identificador del ticket o la historia que atiende este PR. -->
+
+Ticket:
+
 ## Descripcion
 
 <!-- Breve descripcion de los cambios realizados -->
