@@ -136,6 +136,22 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
     }
   });
 
+  test('Configuración: «Recordatorios y calendario» incluye las tres reuniones de Administración (HU-195)', async ({ browser }) => {
+    const page = await sesion(browser, ESTUDIANTE);
+    try {
+      await page.goto('/dashboard/configuracion');
+      const seccion = page.getByRole('region', { name: 'Preferencias de notificaciones', exact: true });
+      const familia = seccion.locator('[data-slot="accordion-trigger"]', { hasText: 'Recordatorios y calendario' });
+      await familia.click();
+      await expect(familia).toHaveAttribute('aria-expanded', 'true');
+      for (const etiqueta of ['Reunión programada', 'Reunión actualizada', 'Reunión cancelada']) {
+        await expect(seccion.getByRole('switch', { name: etiqueta, exact: true })).toBeVisible();
+      }
+    } finally {
+      await page.context().close();
+    }
+  });
+
   test('el perfil ya no muestra las preferencias y conserva sus secciones', async ({ browser }) => {
     const page = await sesion(browser, ESTUDIANTE);
     try {
