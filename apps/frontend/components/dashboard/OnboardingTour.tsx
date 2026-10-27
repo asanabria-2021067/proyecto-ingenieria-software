@@ -59,13 +59,14 @@ const CustomTooltip = ({
         <div className="flex items-center gap-2">
           {/* Back Button */}
           {index > 0 && (
-            <button
+            <Button
               type="button"
+              variant="outline"
               {...backProps}
-              className="text-xs font-bold text-primary border border-primary hover:bg-primary/5 transition-all px-4 py-2 rounded-xl cursor-pointer outline-none"
+              className="h-auto rounded-xl border-primary bg-transparent px-4 py-2 text-xs font-bold text-primary shadow-none hover:bg-primary/5 hover:text-primary dark:border-primary dark:bg-transparent dark:hover:bg-primary/5"
             >
               Anterior
-            </button>
+            </Button>
           )}
 
           {/* Next/Last Button */}
