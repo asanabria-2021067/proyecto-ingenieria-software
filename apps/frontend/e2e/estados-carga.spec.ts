@@ -225,6 +225,11 @@ test.describe('HU-204: estados de carga del estudiante', () => {
       await responder(page, /\/api\/notificaciones\?page=/, 500, { message: 'fallo inducido' });
       await page.goto('/dashboard/notificaciones');
       await expect(page.getByText('No se pudieron cargar las notificaciones')).toBeVisible(TRAS_REINTENTOS);
+      // El fallo es una alerta con su reintento, y ya no dice que todo está al día.
+      const alerta = bandeja.getByRole('alert');
+      await expect(alerta).toContainText('No se pudieron cargar las notificaciones');
+      await expect(alerta.getByRole('button', { name: 'Reintentar' })).toBeVisible();
+      await expect(bandeja.getByText('Todo está al día')).toHaveCount(0);
       await sinSkeleton(page, 'Cargando notificaciones');
     });
   });
