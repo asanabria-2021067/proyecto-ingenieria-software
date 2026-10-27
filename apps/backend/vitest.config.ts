@@ -37,11 +37,18 @@ export default defineConfig({
       // medido en CI) y bloqueaba cualquier PR sin que ningún test fallara.
       // Bajado para reflejar la realidad actual, con margen; branches ya
       // pasaba, se deja igual.
+      //
+      // IESUC-568 (RTF 2 · 3.1): con las pruebas de project-closure-review y
+      // task-hour-adjustments la cobertura medida en CI quedó en 75.69% lines /
+      // 72.96% functions / 90.20% branches / 75.69% statements; el umbral es el
+      // entero inmediatamente inferior. Plan de subida gradual: +2 puntos por
+      // sprint en lines/functions/statements (priorizando los servicios con
+      // menos cobertura) hasta 80%, sin bajar nunca un umbral ya alcanzado.
       thresholds: {
-        lines: 60,
-        functions: 60,
-        branches: 80,
-        statements: 60,
+        lines: 75,
+        functions: 72,
+        branches: 90,
+        statements: 75,
       },
     },
   },
