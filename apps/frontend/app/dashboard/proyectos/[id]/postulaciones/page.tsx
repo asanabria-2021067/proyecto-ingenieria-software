@@ -262,13 +262,14 @@ export default function PostulacionesProyectoPage() {
                 Cancelar
               </Button>
 
-              <button
+              <Button
+                variant={modal.accion === 'ACEPTADA' ? 'default' : 'destructive'}
                 onClick={confirmar}
                 disabled={isPending}
-                className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${
+                className={`h-auto rounded-xl px-5 py-2.5 text-sm font-bold ${
                   modal.accion === 'ACEPTADA'
-                    ? 'bg-primary text-on-primary hover:shadow-md hover:scale-[1.02] active:scale-95'
-                    : 'bg-error text-on-error hover:shadow-md hover:scale-[1.02] active:scale-95'
+                    ? 'bg-primary text-on-primary hover:bg-primary motion-glow-primary'
+                    : 'bg-error text-on-error hover:bg-error dark:bg-error'
                 }`}
               >
                 {isPending
@@ -276,7 +277,7 @@ export default function PostulacionesProyectoPage() {
                   : modal.accion === 'ACEPTADA'
                   ? 'Sí, aceptar'
                   : 'Sí, rechazar'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
