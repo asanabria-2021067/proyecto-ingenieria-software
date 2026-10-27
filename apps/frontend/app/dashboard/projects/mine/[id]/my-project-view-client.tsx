@@ -355,13 +355,14 @@ export default function MyProjectViewClient({ id }: Props) {
       <div className="shrink-0 flex items-center gap-4 border-b border-outline-variant/30 bg-surface px-6 py-4">
         {isEditing ? (
           <>
-            <button
+            <Button
+              variant="ghost"
               onClick={cancelEdit}
-              className="flex items-center gap-2 rounded-md bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface motion-control motion-focus hover:bg-primary hover:text-on-primary"
+              className="h-auto gap-2 bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface hover:bg-primary hover:text-on-primary has-[>svg]:px-3 dark:hover:bg-primary"
             >
               <ArrowLeft className="h-4 w-4" />
               Cancelar
-            </button>
+            </Button>
             <div className="h-5 w-px bg-outline-variant/40" />
             <div className="flex-1 min-w-0">
               <p className="type-meta font-black uppercase tracking-widest text-text-primary">
