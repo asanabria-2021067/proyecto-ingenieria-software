@@ -326,13 +326,14 @@ export default function AdminUsuariosPage() {
 
           {/* Clear */}
           {(search || rol || estado || year) && (
-            <button
+            <Button
+              variant="ghost"
               onClick={clearFilters}
-              className="flex items-center gap-1.5 rounded-md px-3 py-2.5 text-sm font-medium text-tertiary hover:bg-surface-container-high motion-control motion-focus"
+              className="h-auto gap-1.5 px-3 py-2.5 text-sm font-medium text-tertiary hover:bg-surface-container-high hover:text-tertiary has-[>svg]:px-3 dark:hover:bg-surface-container-high"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="size-3.5" />
               Limpiar filtros
-            </button>
+            </Button>
           )}
         </div>
 

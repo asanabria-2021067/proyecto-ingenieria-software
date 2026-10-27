@@ -24,7 +24,7 @@ const EXCEPCIONES: Record<string, string[]> = {
   'app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-md', 'text-[13px]'],
   'app/dashboard/admin/proyectos/admin-projects-client.tsx': ['rounded-lg'],
   'app/dashboard/admin/solicitudes-recuperacion/page.tsx': ['rounded-lg', 'rounded-lg', 'rounded-md'],
-  'app/dashboard/admin/usuarios/page.tsx': ['rounded-md', 'rounded-md'],
+  'app/dashboard/admin/usuarios/page.tsx': ['rounded-md'],
   'components/admin/AdminLayout.tsx': ['rounded-lg', 'rounded-md'],
   'components/admin/ConfirmActionDialog.tsx': ['rounded-md', 'rounded-md', 'rounded-md', 'rounded-md'],
   'components/admin/ProjectFeedbackSheet.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-md'],
