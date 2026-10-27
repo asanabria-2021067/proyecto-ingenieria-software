@@ -32,14 +32,14 @@ const features = [
     icon: GraduationCap,
     title: "Oportunidades de boca en boca",
     description:
-      "Actualmente, las oportunidades (horas beca, extension y proyectos) se comparten principalmente por amistades y contactos. No todos se enteran a tiempo.",
+      "Actualmente, las oportunidades (horas beca, extensión y proyectos) se comparten principalmente por amistades y contactos. No todos se enteran a tiempo.",
     variant: "light" as const,
   },
   {
     icon: HeartHandshake,
     title: "Acceso desigual",
     description:
-      "El acceso a oportunidades depende de a quien conoces, no de tu experiencia. La plataforma busca que la decision se base en tu perfil y en el interes de cada proyecto.",
+      "El acceso a oportunidades depende de a quién conoces, no de tu experiencia. La plataforma busca que la decisión se base en tu perfil y en el interés de cada proyecto.",
     variant: "primary" as const,
   },
   {
@@ -88,7 +88,7 @@ export default function FeaturesGrid() {
                 damping: 36,
               }}
             >
-              Que problema resolvemos?
+              ¿Qué problema resolvemos?
             </VerticalCutReveal>
           </h2>
         </div>

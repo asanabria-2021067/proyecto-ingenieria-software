@@ -6,15 +6,15 @@ const steps = [
     number: '01',
     title: 'Descubre o Crea',
     description:
-      'Explora los proyectos disponibles o crea el tuyo. Podes crear proyectos individuales o una organizacion con miembros fijos (como GitHub).',
+      'Explora los proyectos disponibles o crea el tuyo. Puedes crear proyectos individuales o una organización con miembros fijos (como GitHub).',
     style: 'bg-surface text-primary',
     offset: '',
   },
   {
     number: '02',
-    title: 'Postulate',
+    title: 'Postúlate',
     description:
-      'Aplica a los proyectos que te interesen. Los duenos del proyecto revisan postulaciones y aceptan colaboradores.',
+      'Aplica a los proyectos que te interesen. Los dueños del proyecto revisan postulaciones y aceptan colaboradores.',
     style: 'bg-on-primary text-primary shadow-lg',
     offset: 'md:mt-16',
   },
@@ -57,10 +57,10 @@ export default function HowItWorks() {
       <div className="bg-primary px-4 py-20 text-on-primary sm:px-6 md:px-10 md:py-28 lg:px-8">
         <div className="mb-20 text-center">
           <h2 className="font-headline text-4xl font-extrabold tracking-tight text-on-primary">
-            Como funciona paso a paso
+            Cómo funciona paso a paso
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-on-primary">
-            Pasa de la improvisacion al orden: descubri proyectos, postula y gestiona el
+            Pasa de la improvisación al orden: descubre proyectos, postula y gestiona el
             progreso con hitos y tareas.
           </p>
         </div>

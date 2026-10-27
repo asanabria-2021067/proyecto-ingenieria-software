@@ -10,8 +10,8 @@ import logoDark from '@/public/Logo claro.png';
 
 const navLinks = [
   { label: 'El Problema', href: '#el-problema' },
-  { label: 'La Solucion', href: '#la-solucion' },
-  { label: 'Como Funciona', href: '#como-funciona' },
+  { label: 'La Solución', href: '#la-solucion' },
+  { label: 'Cómo Funciona', href: '#como-funciona' },
 ];
 
 export default function Navbar() {
@@ -68,7 +68,7 @@ export default function Navbar() {
               href="/login"
               className="rounded-lg px-4 py-2 text-sm font-semibold uppercase tracking-wider text-on-surface transition-all duration-200 hover:bg-white/15"
             >
-              Iniciar Sesion
+              Iniciar Sesión
             </Link>
             <Link
               href="/registro"
@@ -84,7 +84,7 @@ export default function Navbar() {
               type="button"
               className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-on-surface"
               onClick={() => setMenuOpen((prev) => !prev)}
-              aria-label="Abrir menu"
+              aria-label="Abrir menú"
             >
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -108,7 +108,7 @@ export default function Navbar() {
                 className="rounded-lg px-2 py-2 text-sm font-semibold uppercase tracking-wider text-primary hover:bg-primary/10"
                 onClick={() => setMenuOpen(false)}
               >
-                Iniciar Sesion
+                Iniciar Sesión
               </Link>
               <Link
                 href="/registro"
