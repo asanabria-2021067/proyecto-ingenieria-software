@@ -23,6 +23,8 @@ export interface TaskHoursSectionProps {
   /** Id del usuario autenticado: solo para marcar «Propio»; los permisos vienen del servidor. */
   idUsuarioActual: number | null;
   enabled?: boolean;
+  /** IESUC-568 (B1): id fijo del campo Horas para que la cabecera de la tarea lo enfoque. */
+  idInputHoras?: string;
 }
 
 const NO_CREAR_REASON =
@@ -193,7 +195,13 @@ function formFromRecord(record: RegistroTiempoTareaDTO): FormState {
  * en línea (registrar / editar) y tabla de registros con acciones propias.
  * Los tres flags del servidor gobiernan la UI; nada se infiere localmente.
  */
-export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled = true }: TaskHoursSectionProps) {
+export function TaskHoursSection({
+  idProyecto,
+  idTarea,
+  idUsuarioActual,
+  enabled = true,
+  idInputHoras,
+}: TaskHoursSectionProps) {
   const baseId = useId();
   const { registros, resumen, isLoading, isError, error, refetch, registrar, editar, revocar } = useTaskHours(
     idProyecto,
@@ -351,7 +359,7 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
     );
   }
 
-  const idHoras = `${baseId}-horas`;
+  const idHoras = idInputHoras ?? `${baseId}-horas`;
   const idFecha = `${baseId}-fecha`;
   const idNota = `${baseId}-nota`;
   const idJustificacion = `${baseId}-justificacion`;

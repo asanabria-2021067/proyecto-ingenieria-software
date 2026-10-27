@@ -67,6 +67,7 @@ import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useProjectLabels } from '@/hooks/use-project-labels';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useTaskHours } from '@/hooks/use-task-hours';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 import type { EstadoTarea, TareaPublicaDTO } from '@/lib/types/tasks';
 
@@ -84,6 +85,9 @@ function formatTiempo(horas: number): string {
 }
 
 const CARD = 'rounded-[11px] border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-sm';
+
+/** IESUC-568 (B1): campo Horas del formulario, destino del botón «Registrar horas» de la cabecera. */
+const ID_INPUT_HORAS = 'tarea-registrar-horas';
 
 function SeccionTitulo({ icon: Icon, children }: { icon?: typeof Tag; children: React.ReactNode }) {
   return (
@@ -217,6 +221,16 @@ function TaskDetailView({
   const cambiarEstado = (nuevo: EstadoTarea) => {
     if (nuevo === tarea.estadoTarea) return;
     cambiarEstadoTarea.mutate({ taskId: tarea.idTarea, input: { estadoTarea: nuevo } });
+  };
+
+  // IESUC-568 (B1, NeuroLab): registrar horas costaba encontrarlo (quedaba bajo
+  // el pliegue). El permiso lo decide el resumen del backend, igual que la sección.
+  const { resumen: resumenHoras } = useTaskHours(idProyecto, tarea.idTarea);
+  const puedeRegistrarHoras = resumenHoras?.puedeCrear ?? false;
+  const irARegistrarHoras = () => {
+    const campo = document.getElementById(ID_INPUT_HORAS);
+    campo?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    campo?.focus({ preventScroll: true });
   };
 
   const solicitarEliminar = async () => {
@@ -427,6 +441,60 @@ function TaskDetailView({
             </span>
           )}
         </div>
+
+        {/* IESUC-568 (B1): estado y horas a la vista, junto al título y sin hacer scroll. */}
+        {(puedeCambiarEstado || puedeRegistrarHoras) && (
+          <div
+            role="group"
+            aria-label="Acciones de la tarea"
+            className="mt-4 flex flex-wrap items-end gap-3 border-t border-outline-variant/40 pt-4"
+          >
+            {puedeCambiarEstado && (
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-tertiary">Estado</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <Select
+                    value={tarea.estadoTarea}
+                    disabled={estadoPending}
+                    onValueChange={(valor) => cambiarEstado(valor as EstadoTarea)}
+                  >
+                    <SelectTrigger
+                      aria-label={`Cambiar estado de ${tarea.tituloTarea}`}
+                      className="h-9.5 w-55 max-w-full bg-surface-container-lowest text-sm"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COLUMNAS_TABLERO.map((columna) => (
+                        <SelectItem key={columna.estado} value={columna.estado}>
+                          {ESTADO_LABEL[columna.estado]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {estadoPending && (
+                    <Loader2 className="size-4 shrink-0 animate-spin text-tertiary" aria-hidden="true" />
+                  )}
+                </div>
+              </div>
+            )}
+            {puedeRegistrarHoras && (
+              <Button
+                type="button"
+                onClick={irARegistrarHoras}
+                className="h-9.5 gap-1.5 rounded-md bg-primary px-4 text-sm font-bold text-on-primary hover:bg-primary/90"
+              >
+                <Clock className="size-4" aria-hidden="true" />
+                Registrar horas
+              </Button>
+            )}
+            {estadoError && (
+              <p role="alert" className="w-full type-meta text-destructive">
+                {estadoError}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* LAYOUT PRINCIPAL (Sección 15-16) */}
@@ -449,40 +517,9 @@ function TaskDetailView({
           <section className={CARD}>
             <SeccionTitulo icon={Tag}>Organización</SeccionTitulo>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* El cambio de estado vive en la cabecera (B1); aquí solo se informa. */}
               <DatoOrganizacion icon={Workflow} label="Estado">
-                {puedeCambiarEstado ? (
-                  <div className="mt-1 flex items-center gap-2">
-                    <Select
-                      value={tarea.estadoTarea}
-                      disabled={estadoPending}
-                      onValueChange={(valor) => cambiarEstado(valor as EstadoTarea)}
-                    >
-                      <SelectTrigger
-                        aria-label={`Cambiar estado de ${tarea.tituloTarea}`}
-                        className="h-9 w-full max-w-55 bg-surface-container-lowest text-sm"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COLUMNAS_TABLERO.map((columna) => (
-                          <SelectItem key={columna.estado} value={columna.estado}>
-                            {ESTADO_LABEL[columna.estado]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {estadoPending && (
-                      <Loader2 className="size-4 shrink-0 animate-spin text-tertiary" aria-hidden="true" />
-                    )}
-                  </div>
-                ) : (
-                  ESTADO_LABEL[tarea.estadoTarea]
-                )}
-                {estadoError && (
-                  <p role="alert" className="mt-1 type-meta text-destructive">
-                    {estadoError}
-                  </p>
-                )}
+                {ESTADO_LABEL[tarea.estadoTarea]}
               </DatoOrganizacion>
 
               <DatoOrganizacion icon={Tag} label="Rol">
@@ -551,6 +588,7 @@ function TaskDetailView({
               idProyecto={idProyecto}
               idTarea={tarea.idTarea}
               idUsuarioActual={currentUser?.idUsuario ?? null}
+              idInputHoras={ID_INPUT_HORAS}
               enabled
             />
           </section>
