@@ -10,6 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import {
   getHabilidades,
   getIntereses,
@@ -828,18 +829,18 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
           ) : (
             <div />
           )}
-          <button
+          <Button
             type="button"
             onClick={saveStep}
             disabled={saving}
-            className="flex items-center gap-1 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-on-primary shadow-sm transition-all hover:bg-primary-container active:scale-[0.98] disabled:opacity-60"
+            className="h-auto gap-1 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-on-primary shadow-sm hover:bg-primary-container has-[>svg]:px-6 disabled:opacity-60 motion-glow-primary"
           >
             {saving
               ? 'Guardando...'
               : step === 4
                 ? <>Finalizar <Check className="h-4 w-4" /></>
                 : <>Siguiente <ChevronRight className="h-4 w-4" /></>}
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
