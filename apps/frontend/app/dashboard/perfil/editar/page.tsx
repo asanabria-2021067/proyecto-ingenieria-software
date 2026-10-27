@@ -30,6 +30,7 @@ import { normalizeUrlInput } from '@/lib/security/safe-url';
 import { createHabilidad, createInteres, createCualidad } from '@/lib/services/catalogs';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { SkeletonDetail } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 const STEPS = [
   { title: 'Personal', icon: UserIcon, desc: 'Datos básicos y académicos' },
@@ -545,14 +546,14 @@ export default function EditarPerfilPage() {
                     </select>
                   </div>
                   <div className="flex items-end">
-                    <button
+                    <Button
                       type="button"
                       onClick={handleAddHabilidad}
-                      className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/95 transition-all cursor-pointer"
+                      className="h-auto w-full gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/95 has-[>svg]:px-4 motion-glow-primary"
                     >
                       <Plus className="w-4 h-4" />
                       Añadir habilidad
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
