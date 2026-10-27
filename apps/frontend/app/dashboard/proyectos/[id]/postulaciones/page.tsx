@@ -13,6 +13,7 @@ import { useRequireCan } from '@/hooks/use-can';
 import { projectAllPostulationsQueryKey } from '@/lib/query-keys/applications';
 import { EstadoPostulacion, PostulacionRecibida } from '@/types';
 import { SkeletonList } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 
 type ModalState = {
@@ -199,13 +200,13 @@ export default function PostulacionesProyectoPage() {
                         <XCircle className="w-4 h-4" />
                         Rechazar
                       </button>
-                      <button
+                      <Button
                         onClick={() => abrirModal(p.idPostulacion, 'ACEPTADA')}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-semibold hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all"
+                        className="h-auto gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary has-[>svg]:px-4 motion-glow-primary"
                       >
                         <CheckCircle className="w-4 h-4" />
                         Aceptar
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
