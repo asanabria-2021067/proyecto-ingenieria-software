@@ -455,12 +455,8 @@ test.describe('Calendario: ciclo de vida completo del evento (HU-184, G05-C10)',
     fin.setDate(inicio.getDate() + 2);
     const elegir = async (campo: string, fecha: Date, desde: Date) => {
       await dialogo.getByLabel(campo, { exact: true }).click();
-      const selector = page.locator('[data-slot="popover-content"]');
-      // Navegar el selector mes a mes hasta el de la fecha (si cae en el siguiente).
-      const saltos = (fecha.getFullYear() - desde.getFullYear()) * 12 + fecha.getMonth() - desde.getMonth();
-      for (let i = 0; i < saltos; i += 1) await selector.getByRole('button', { name: /next|siguiente/i }).click();
-      await diaDelSelector(page, fecha).click();
-      await expect(selector).toBeHidden();
+      await elegirDiaDelSelector(page, fecha, desde);
+      await expect(page.locator('[data-slot="popover-content"]')).toBeHidden();
     };
     await elegir('Fecha', inicio, mananaTemprano());
     await dialogo.getByRole('checkbox', { name: 'Termina otro día' }).click();
