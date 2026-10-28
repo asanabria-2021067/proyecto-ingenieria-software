@@ -14,7 +14,7 @@ export const TIPOS_BACKEND: string[] = (() => {
   const cuerpo = schema.slice(schema.indexOf('enum TipoNotificacion {'));
   return cuerpo
     .slice(cuerpo.indexOf('{') + 1, cuerpo.indexOf('}'))
-    .split('\n')
+    .split(/\r?\n/)
     .map((linea) => linea.replace(/\/\/.*$/, '').trim())
     .filter(Boolean);
 })();
