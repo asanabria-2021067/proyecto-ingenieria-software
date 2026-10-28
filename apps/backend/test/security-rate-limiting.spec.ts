@@ -134,7 +134,7 @@ describe('X-Forwarded-For y TRUST_PROXY_HOPS', () => {
     expect(firstThrottled(await statuses(url, 'login', ROUTE_LIMITS.login + 1, same))).toBe(ROUTE_LIMITS.login + 1);
   });
 
-  it('el bloqueo por cuenta complementa al de IP: con IPs distintas la cuenta igual queda bloqueada', async () => {
+  it('el bloqueo es por cuenta e IP: intentos fallidos desde otras IPs no bloquean al titular', async () => {
     const hash = bcrypt.hashSync('Correcta123', 4);
     const prisma = {
       usuario: {
@@ -156,10 +156,10 @@ describe('X-Forwarded-For y TRUST_PROXY_HOPS', () => {
     for (let i = 0; i < 5; i += 1) {
       expect((await login('Incorrecta1', i)).status).toBe(401);
     }
-    // Sexta IP distinta y contraseña correcta: el throttler por IP no la frena, el bloqueo por cuenta sí.
-    const locked = await login('Correcta123', 5);
-    expect(locked.status).toBe(401);
-    expect(prisma.tokenRefresco.create).not.toHaveBeenCalled();
+    // Sexta IP distinta y contraseña correcta: el contador es de correo + IP, así que un tercero no puede bloquear la cuenta.
+    const permitido = await login('Correcta123', 5);
+    expect(permitido.status).toBe(201);
+    expect(prisma.tokenRefresco.create).toHaveBeenCalledTimes(1);
   });
 });
 

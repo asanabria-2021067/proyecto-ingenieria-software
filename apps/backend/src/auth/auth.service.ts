@@ -44,8 +44,8 @@ export const UNKNOWN_USER_PASSWORD_HASH = "$2b$10$aIZFrVp.yjl7jr05RXCHVeqgnl4MBv
  * G04 (OWASP25-C036): clave del contador por cuenta. Mayúsculas y espacios no
  * abren un contador nuevo para la misma cuenta.
  */
-export function accountAttemptKey(correo: string): string {
-  return correo.trim().toLowerCase();
+export function accountAttemptKey(correo: string, ip?: string | null): string {
+  return `${correo.trim().toLowerCase()}|${ip ?? ''}`;
 }
 
 export const MENSAJE_CUENTA_PENDIENTE = "Tu cuenta está pendiente de verificación por administración";
@@ -112,7 +112,7 @@ export class AuthService {
   async login(loginDto: LoginDto, origen?: SecurityRequestContext) {
     // G04 (OWASP25-C036): una cuenta bloqueada sigue el MISMO camino (búsqueda
     // + bcrypt) y recibe la MISMA respuesta que unas credenciales inválidas.
-    const cuenta = accountAttemptKey(loginDto.correo);
+    const cuenta = accountAttemptKey(loginDto.correo, origen?.ip);
     const bloqueada = this.attempts.lockedUntil(cuenta) !== null;
 
     const usuario = await this.prisma.usuario.findUnique({
@@ -238,7 +238,7 @@ export class AuthService {
     return { idUsuario: usuario.idUsuario, estado: EstadoUsuario.PENDIENTE_VERIFICACION };
   }
 
-  async forgotPassword(carne: string, correo: string) {
+  async forgotPassword(carne: string, correo: string, origen?: SecurityRequestContext) {
     const genericResponse = {
       mensaje:
         "Si los datos son correctos, tu solicitud fue registrada y un administrador se pondrá en contacto contigo",
@@ -247,7 +247,7 @@ export class AuthService {
     // G04 (OWASP25-C036/C014): acota las solicitudes por carné. Pasado el
     // límite no se crea registro ni se notifica a los administradores, y la
     // respuesta pública es exactamente la misma (no revela nada del carné).
-    const cuenta = `recuperacion:${carne.trim().toLowerCase()}`;
+    const cuenta = `recuperacion:${carne.trim().toLowerCase()}|${origen?.ip ?? ""}`;
     if (this.recoveryAttempts.lockedUntil(cuenta) !== null) {
       return genericResponse;
     }
