@@ -24,6 +24,8 @@ test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
 const CARLOS = 'carlos.mendoza@uvg.edu.gt';
 const MARIA = 'maria.lopez@uvg.edu.gt';
+// Otra integrante de Tutorías: sus avisos no entran en el «marcar todas» de María.
+const JOSE = 'jose.ramirez@uvg.edu.gt';
 
 interface Aviso {
   idNotificacion: number;
@@ -233,20 +235,26 @@ test('B · abrir: el visor muestra el aviso elegido y abrirlo lo marca como leí
   }
 });
 
-test('C · marcar todas: sin filtros lee todos los avisos propios y la interfaz lo refleja', async ({ browser }, testInfo) => {
+test('C · marcar todas: sin filtros lee todos los avisos propios, persiste y no toca los de otra cuenta', async ({ browser }, testInfo) => {
   const etiqueta = marca(testInfo, 'T372 todas');
   const lider = await sesion(browser, CARLOS);
   const maria = await sesion(browser, MARIA);
+  const jose = await sesion(browser, JOSE);
   const idProyecto = await idProyectoPorTitulo(lider.page, PROYECTO_TUTORIAS);
   let tareas: TareaCreada[] = [];
   try {
     const idMaria = await idIntegrante(lider.page, idProyecto, MARIA);
+    const idJose = await idIntegrante(lider.page, idProyecto, JOSE);
     tareas = await asignarTareas(lider.page, idProyecto, [
       { titulo: `${etiqueta} uno`, idUsuario: idMaria },
       { titulo: `${etiqueta} dos`, idUsuario: idMaria },
+      { titulo: `${etiqueta} ajena`, idUsuario: idJose },
     ]);
     const propios = await esperarAvisos(maria.page, etiqueta, 2);
     expect(propios.every((a) => a.leidaEn === null), 'los avisos de la prueba nacen sin leer').toBe(true);
+    const [ajeno] = await esperarAvisos(jose.page, etiqueta, 1);
+    expect(ajeno.leidaEn).toBeNull();
+    const pendientesJose = await noLeidas(jose.page);
     const pendientes = await noLeidas(maria.page);
     expect(pendientes).toBeGreaterThanOrEqual(2);
 
@@ -274,8 +282,21 @@ test('C · marcar todas: sin filtros lee todos los avisos propios y la interfaz 
     await expect(bandeja(page).getByText(/^\d+ nuevas?$/)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Notificaciones, no hay pendientes' }).first()).toBeVisible();
     await expect(marcar).toBeDisabled();
+
+    // Persiste: tras recargar, la bandeja y la API siguen sin pendientes.
+    await page.reload();
+    await abrirCentro(page);
+    await expect(bandeja(page).getByText(/· 0 sin leer$/)).toBeVisible();
+    await expect(bandeja(page).locator('li[data-leida="false"]')).toHaveCount(0);
+    expect(await noLeidas(page)).toBe(0);
+    expect((await avisosCon(page, etiqueta)).every((a) => a.leidaEn !== null), 'los avisos de la prueba quedaron leídos').toBe(true);
+
+    // La otra cuenta conserva su aviso sin leer y su contador intacto.
+    const [ajenoDespues] = await avisosCon(jose.page, etiqueta);
+    expect(ajenoDespues.leidaEn, 'el aviso de otra cuenta sigue sin leer').toBeNull();
+    expect(await noLeidas(jose.page)).toBe(pendientesJose);
   } finally {
     await eliminarTareas(lider.page, idProyecto, tareas);
-    await Promise.all([lider.contexto.close(), maria.contexto.close()]);
+    await Promise.all([lider.contexto.close(), maria.contexto.close(), jose.contexto.close()]);
   }
 });
