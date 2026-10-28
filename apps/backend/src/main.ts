@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 import helmet from 'helmet';
 import { getFrontendUrl } from './common/utils/cookie';
 import { originGuard } from './common/origin-guard';
+import { SocketIoAdapter } from './common/socket-io.adapter';
 import { applyTrustProxy } from './config/trust-proxy';
 import { API_HELMET_OPTIONS } from './config/security-headers';
 const cookieParser = require('cookie-parser');
@@ -12,6 +13,7 @@ const cookieParser = require('cookie-parser');
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+  app.useWebSocketAdapter(new SocketIoAdapter(app, getFrontendUrl()));
   app.setGlobalPrefix('api');
 
   // G04 (OWASP25-C021 + D2): 0 por defecto = no se confía en X-Forwarded-For.
