@@ -19,6 +19,7 @@ import {
   Archive,
   Compass,
   Network,
+  LifeBuoy,
   Search as SearchIcon,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
@@ -273,6 +274,14 @@ export default function DashboardLayout({
               />
             )}
             <NotificationsBell onlyIcon />
+            <Link
+              href="/contacto"
+              aria-label="Contacto y soporte"
+              title="Contacto y soporte"
+              className="flex size-10 items-center justify-center rounded-control bg-muted text-text-secondary transition-colors hover:bg-surface-container-high hover:text-text-primary"
+            >
+              <LifeBuoy className="size-5" aria-hidden="true" />
+            </Link>
             <button
               type="button"
               onClick={() =>

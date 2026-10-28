@@ -279,6 +279,8 @@ enum TipoNotificacion {
   REUNION_PROGRAMADA
   REUNION_ACTUALIZADA
   REUNION_CANCELADA
+  // HU-205 (T-394): solicitud enviada desde la página de contacto, solo para administradores.
+  SOLICITUD_CONTACTO
 }
 
 enum EstadoAmistad {
