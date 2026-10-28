@@ -108,8 +108,8 @@ describe('G06-C07: COOKIE_SECURE', () => {
   describe('deploy', () => {
     const step = loadWorkflow('deploy.yml').jobs.deploy.steps?.find((s) => s.name === 'Transferir .env de produccion por stdin');
 
-    it("flag con default 'false' escrito en el .env y documentado", () => {
-      expect(step?.env?.COOKIE_SECURE).toBe("${{ vars.COOKIE_SECURE || 'false' }}");
+    it("flag con default 'true' escrito en el .env y documentado", () => {
+      expect(step?.env?.COOKIE_SECURE).toBe("${{ vars.COOKIE_SECURE || 'true' }}");
       expect(step?.run).toContain(`printf 'COOKIE_SECURE=%s\\n' "$COOKIE_SECURE"`);
       expect(readRepoFile('.env.example')).toMatch(/^COOKIE_SECURE=false$/m);
     });
@@ -121,7 +121,7 @@ describe('G06-C07: COOKIE_SECURE', () => {
         for (const key of Object.keys(step?.env ?? {})) {
           env[key] = `synthetic-${key.toLowerCase()}`;
         }
-        Object.assign(env, { TRUST_PROXY_HOPS: '0', BACKEND_BIND: '0.0.0.0', FRONTEND_BIND: '0.0.0.0', COOKIE_SECURE: value });
+        Object.assign(env, { TRUST_PROXY_HOPS: '1', BACKEND_BIND: '0.0.0.0', FRONTEND_BIND: '0.0.0.0', COOKIE_SECURE: value });
         const result = spawnSync('bash', ['-c', step?.run ?? 'exit 99'], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
         expect(result.status).toBe(1);
         expect(result.stderr).toContain('COOKIE_SECURE solo admite true o false');

@@ -103,8 +103,8 @@ describe('G04-C08: contrato TRUST_PROXY_HOPS', () => {
     expect(apply).toBeLessThan(main.indexOf('await app.listen('));
   });
 
-  it('el default versionado es 0 en deploy.yml y .env.example', () => {
-    expect(readRepoFile('.github/workflows/deploy.yml')).toContain("TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '0' }}");
+  it('el default de deploy.yml es 1 (un proxy) y el de .env.example sigue en 0', () => {
+    expect(readRepoFile('.github/workflows/deploy.yml')).toContain("TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '1' }}");
     expect(readRepoFile('.env.example')).toMatch(/^TRUST_PROXY_HOPS=0$/m);
   });
 

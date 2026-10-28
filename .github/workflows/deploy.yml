@@ -344,26 +344,25 @@ jobs:
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           BACKEND_IMAGE: ${{ steps.vars.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ steps.vars.outputs.frontend_image }}
-          # G04 (OWASP25-C021 + D2): '0' reproduce el comportamiento actual. Subirlo
-          # a 1 (nginx del host) es una decision del administrador tras cerrar
-          # los puertos publicos 3000/3001.
-          TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '0' }}
+          # G04 (OWASP25-C021 + D2): '1' = un proxy (nginx del host) delante del
+          # backend; el backend se niega a arrancar en produccion con 0.
+          TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '1' }}
           # G04 (OWASP25-C021 + P5/T19): interfaz publicada de backend/frontend.
           # '0.0.0.0' reproduce la exposicion actual; '127.0.0.1' es la variante
           # loopback que activa el administrador (solo esos dos valores).
           BACKEND_BIND: ${{ vars.BACKEND_BIND || '0.0.0.0' }}
           FRONTEND_BIND: ${{ vars.FRONTEND_BIND || '0.0.0.0' }}
-          # G06 (OWASP25-C049 parcial): 'false' reproduce las cookies actuales.
-          # 'true' (Secure) solo cuando todo el trafico sea HTTPS: Gate Admin.
-          COOKIE_SECURE: ${{ vars.COOKIE_SECURE || 'false' }}
+          # G06 (OWASP25-C049): cookies Secure por defecto; 'false' solo si el
+          # trafico no fuera HTTPS.
+          COOKIE_SECURE: ${{ vars.COOKIE_SECURE || 'true' }}
           # G05 (OWASP25-C038): 'false' deja las alertas de seguridad inertes;
           # activarlas es decision del administrador.
           SECURITY_ALERTS_ENABLED: ${{ vars.SECURITY_ALERTS_ENABLED || 'false' }}
         run: |
           set -euo pipefail
           umask 077
-          if ! printf '%s' "$TRUST_PROXY_HOPS" | grep -Eq '^[0-9]+$'; then
-            echo "TRUST_PROXY_HOPS debe ser un entero >= 0" >&2
+          if ! printf '%s' "$TRUST_PROXY_HOPS" | grep -Eq '^[1-9][0-9]*$'; then
+            echo "TRUST_PROXY_HOPS debe ser un entero >= 1 (el backend no arranca en produccion con 0)" >&2
             exit 1
           fi
           case "$COOKIE_SECURE" in
