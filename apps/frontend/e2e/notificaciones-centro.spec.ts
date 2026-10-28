@@ -232,3 +232,50 @@ test('B · abrir: el visor muestra el aviso elegido y abrirlo lo marca como leí
     await Promise.all([lider.contexto.close(), maria.contexto.close()]);
   }
 });
+
+test('C · marcar todas: sin filtros lee todos los avisos propios y la interfaz lo refleja', async ({ browser }, testInfo) => {
+  const etiqueta = marca(testInfo, 'T372 todas');
+  const lider = await sesion(browser, CARLOS);
+  const maria = await sesion(browser, MARIA);
+  const idProyecto = await idProyectoPorTitulo(lider.page, PROYECTO_TUTORIAS);
+  let tareas: TareaCreada[] = [];
+  try {
+    const idMaria = await idIntegrante(lider.page, idProyecto, MARIA);
+    tareas = await asignarTareas(lider.page, idProyecto, [
+      { titulo: `${etiqueta} uno`, idUsuario: idMaria },
+      { titulo: `${etiqueta} dos`, idUsuario: idMaria },
+    ]);
+    const propios = await esperarAvisos(maria.page, etiqueta, 2);
+    expect(propios.every((a) => a.leidaEn === null), 'los avisos de la prueba nacen sin leer').toBe(true);
+    const pendientes = await noLeidas(maria.page);
+    expect(pendientes).toBeGreaterThanOrEqual(2);
+
+    const page = maria.page;
+    await abrirCentro(page);
+    await expect(bandeja(page).getByText(new RegExp(`· ${pendientes} sin leer$`))).toBeVisible();
+    await expect(bandeja(page).getByText(`${pendientes} nuevas`, { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: `Notificaciones, ${pendientes} sin leer` }).first()).toBeVisible();
+    for (const aviso of propios) await expect(fila(page, aviso.idNotificacion)).toHaveAttribute('data-leida', 'false');
+
+    // Sin filtros, el botón abarca todas las propias.
+    const marcar = page.getByRole('button', { name: 'Marcar todas como leídas' });
+    await expect(marcar).toBeEnabled();
+    const respuesta = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/notificaciones/leer-todas'));
+    await marcar.click();
+    const leerTodas = await respuesta;
+    expect(leerTodas.status()).toBe(200);
+    expect(new URL(leerTodas.url()).search, 'sin filtros el marcado no se acota').toBe('');
+    expect(((await leerTodas.json()) as { actualizadas: number }).actualizadas).toBe(pendientes);
+
+    await expect(page.getByText(`${pendientes} avisos marcados como leídos`)).toBeVisible();
+    await expect(bandeja(page).locator('li[data-leida="false"]')).toHaveCount(0);
+    for (const aviso of propios) await expect(fila(page, aviso.idNotificacion)).toHaveAttribute('data-leida', 'true');
+    await expect(bandeja(page).getByText(/· 0 sin leer$/)).toBeVisible();
+    await expect(bandeja(page).getByText(/^\d+ nuevas?$/)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Notificaciones, no hay pendientes' }).first()).toBeVisible();
+    await expect(marcar).toBeDisabled();
+  } finally {
+    await eliminarTareas(lider.page, idProyecto, tareas);
+    await Promise.all([lider.contexto.close(), maria.contexto.close()]);
+  }
+});
