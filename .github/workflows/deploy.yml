@@ -345,6 +345,7 @@ jobs:
           NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           BACKEND_IMAGE: ${{ steps.vars.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ steps.vars.outputs.frontend_image }}
           # G04 (OWASP25-C021 + D2): '1' = un proxy (nginx del host) delante del
@@ -403,6 +404,9 @@ jobs:
             printf 'NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=%s\n' "$NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME"
             printf 'NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=%s\n' "$NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"
             printf 'FRONTEND_URL=%s\n' "$FRONTEND_URL"
+            if [ -n "$CLOUDINARY_CLOUD_NAME" ]; then
+              printf 'CLOUDINARY_CLOUD_NAME=%s\n' "$CLOUDINARY_CLOUD_NAME"
+            fi
             printf 'BACKEND_IMAGE=%s\n' "$BACKEND_IMAGE"
             printf 'FRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE"
             printf 'TRUST_PROXY_HOPS=%s\n' "$TRUST_PROXY_HOPS"
