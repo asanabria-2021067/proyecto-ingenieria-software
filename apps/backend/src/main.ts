@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
 import { getFrontendUrl } from './common/utils/cookie';
+import { originGuard } from './common/origin-guard';
 import { applyTrustProxy } from './config/trust-proxy';
 import { API_HELMET_OPTIONS } from './config/security-headers';
 const cookieParser = require('cookie-parser');
@@ -19,6 +20,9 @@ async function bootstrap() {
   // Security headers. G06 (NBD-1 + C008): HSTS explícito (1 año,
   // includeSubDomains, sin preload); el resto de Helmet con sus defaults.
   app.use(helmet(API_HELMET_OPTIONS));
+
+  // Anti-CSRF: Origin / Sec-Fetch-Site / Content-Type antes de leer cookies.
+  app.use(originGuard(getFrontendUrl()));
 
   // Cookie parser
   app.use(cookieParser());
