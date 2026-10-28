@@ -297,6 +297,24 @@ const proyectoDetalleSelect = {
 // (51 KB con 236 tareas, sin importar el Sprint); el tablero las pide aparte.
 const { tareas: _tareasDetalle, ...proyectoDetallePublicoSelect } = proyectoDetalleSelect;
 
+// Sin sesión no se exponen datos de contacto (correo del líder ni de la organización).
+const { correo: _correoCreador, ...creadorAnonimoSelect } = proyectoDetallePublicoSelect.creador.select;
+const {
+  correoContacto: _correoContacto,
+  telefonoContacto: _telefonoContacto,
+  ...organizacionAnonimaSelect
+} = proyectoDetallePublicoSelect.organizaciones.select.organizacion.select;
+const proyectoDetalleAnonimoSelect = {
+  ...proyectoDetallePublicoSelect,
+  creador: { select: creadorAnonimoSelect },
+  organizaciones: {
+    select: {
+      ...proyectoDetallePublicoSelect.organizaciones.select,
+      organizacion: { select: organizacionAnonimaSelect },
+    },
+  },
+} as const;
+
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -576,14 +594,14 @@ export class ProjectsService {
     };
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, conSesion: boolean) {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: {
         idProyecto: id,
         estadoProyecto: { in: ESTADOS_CON_DETALLE },
         eliminadoEn: null,
       },
-      select: proyectoDetallePublicoSelect,
+      select: conSesion ? proyectoDetallePublicoSelect : proyectoDetalleAnonimoSelect,
     });
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);

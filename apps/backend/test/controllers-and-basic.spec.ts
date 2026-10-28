@@ -86,7 +86,7 @@ describe('Controllers and basic services', () => {
     projects.findMine({ userId: 1 });
     projects.findMineLegacy({ userId: 1 });
     projects.findAsContributor({ userId: 1 });
-    projects.findOne(1);
+    projects.findOne(1, undefined);
     projects.findOneOwner(1, { userId: 1 });
     projects.create({} as Parameters<ProjectsController['create']>[0], { userId: 1 });
     projects.update(1, {} as Parameters<ProjectsController['update']>[1], { userId: 1 });

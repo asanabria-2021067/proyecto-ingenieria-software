@@ -108,8 +108,12 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.projectsService.findOne(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user?: { userId: number },
+  ) {
+    return this.projectsService.findOne(id, Boolean(user?.userId));
   }
 
   @Get(':id/admin')

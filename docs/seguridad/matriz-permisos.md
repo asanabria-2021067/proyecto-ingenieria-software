@@ -118,7 +118,7 @@ protección actual ya es correcta.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/proyectos` | Explorar proyectos publicados | ✅ | ✅ | ✅ | ✅ | ✅ | `OptJWT` | — |
 | GET | `/proyectos/destacados` | Proyectos destacados | ✅ | ✅ | ✅ | ✅ | ✅ | `Público` | — |
-| GET | `/proyectos/:id` | Detalle público (solo estados con detalle público) | ✅ | ✅ | ✅ | ✅ | ✅ | `Público` (filtra por estado) | — |
+| GET | `/proyectos/:id` | Detalle público (solo estados con detalle público) | ✅ | ✅ | ✅ | ✅ | ✅ | `OptJWT` (filtra por estado; sin sesión omite correo del líder y contacto de la organización) | — |
 | GET | `/proyectos/mine`, `/proyectos/mis-proyectos`, `/proyectos/contributor` | Proyectos propios / en los que participa | ✅ | ✅ | ✅ | ✅ | ✅ | `JWT` + `S:self` | — |
 | GET | `/proyectos/:id/admin` | Vista administrativa del proyecto | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `R:resumen` + `S:admin` | ✅ Corregido en T-286 (H-01) |
 | GET | `/proyectos/:id/owner` | Vista del dueño (editor) | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `R:resumen` + `S:owner` | — |
