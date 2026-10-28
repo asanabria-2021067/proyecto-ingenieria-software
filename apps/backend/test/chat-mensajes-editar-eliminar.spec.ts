@@ -113,6 +113,17 @@ describe('ChatService - editar y eliminar mensajes propios', () => {
       expect(gateway.broadcastMessageChange.mock.calls[0][3].contenido).toBe('');
     });
 
+    it('al eliminar un mensaje con archivo, el adjunto sale null en la respuesta y en el evento', async () => {
+      const adjunto = { idAdjunto: 3, nombreOriginal: 'secreto.pdf', mime: 'application/pdf', tamanoBytes: 10 };
+      prisma.mensajeChat.update.mockResolvedValue(mensajeRow({ eliminadoEn: new Date(), adjunto }));
+
+      const resultado = await service.deleteMessage(10, 5, 7, 1);
+
+      expect(resultado.adjunto).toBeNull();
+      expect(gateway.broadcastMessageChange.mock.calls[0][3].adjunto).toBeNull();
+      expect(JSON.stringify(resultado)).not.toContain('secreto.pdf');
+    });
+
     it('al eliminar, quien lo citaba deja de ver su contenido: la cita lleva eliminado y extracto vacio', async () => {
       const citado = { idMensaje: 3, contenido: 'secreto', eliminadoEn: new Date(), remitente: USUARIO };
       prisma.mensajeChat.update.mockResolvedValue(mensajeRow({ eliminadoEn: new Date(), citado }));
@@ -147,6 +158,19 @@ describe('ChatService - editar y eliminar mensajes propios', () => {
       const resultado = await service.getMessages(10, 5, 1);
 
       expect(resultado.map((m) => m.contenido)).toEqual(['visible', '']);
+    });
+
+    it('el historial no expone el adjunto de un mensaje eliminado', async () => {
+      const adjunto = { idAdjunto: 3, nombreOriginal: 'secreto.pdf', mime: 'application/pdf', tamanoBytes: 10 };
+      prisma.mensajeChat.findMany.mockResolvedValue([
+        mensajeRow({ idMensaje: 8, eliminadoEn: new Date(), adjunto }),
+        mensajeRow({ idMensaje: 7, adjunto }),
+      ]);
+
+      const [visible, eliminado] = await service.getMessages(10, 5, 1);
+
+      expect(visible.adjunto).toEqual(adjunto);
+      expect(eliminado.adjunto).toBeNull();
     });
 
     it('si el mensaje citado fue eliminado, la cita no trae su contenido y se marca eliminado', async () => {
