@@ -94,7 +94,7 @@ describe('GlobalSearchService.buscarPersonas', () => {
         where: expect.objectContaining({
           idUsuario: { in: [9, 42] },
           rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } },
-          estado: { not: 'PENDIENTE_VERIFICACION' },
+          estado: 'ACTIVO',
         }),
       }),
     );

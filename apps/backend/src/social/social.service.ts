@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoAmistad, EstadoUsuario, Prisma } from '@prisma/client';
+import { EstadoAmistad, EstadoProyecto, EstadoUsuario, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { listarInsigniasUsuario } from '../insignias/insignias.service';
@@ -27,6 +27,12 @@ const USUARIO_BUSQUEDA_SELECT = {
   habilidades: { select: { habilidad: { select: { nombreHabilidad: true } } } },
   intereses: { select: { interes: { select: { nombreInteres: true } } } },
 } as const;
+
+/** Directorio de personas: solo estudiantes activos (sin administradores). */
+export const FILTRO_DIRECTORIO: Prisma.UsuarioWhereInput = {
+  rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } },
+  estado: EstadoUsuario.ACTIVO,
+};
 
 @Injectable()
 export class SocialService {
@@ -267,8 +273,8 @@ export class SocialService {
    * de relación que `buscarUsuarios`, pero para un solo id, con la lista real
    * de amigos en común (no solo el conteo) y sus participaciones activas. */
   async obtenerPerfilPublico(idUsuarioActual: number, idUsuarioObjetivo: number) {
-    const usuario = await this.prisma.usuario.findUnique({
-      where: { idUsuario: idUsuarioObjetivo },
+    const usuario = await this.prisma.usuario.findFirst({
+      where: { idUsuario: idUsuarioObjetivo, ...FILTRO_DIRECTORIO },
       select: { ...USUARIO_BUSQUEDA_SELECT, correo: true },
     });
     if (!usuario) {
@@ -292,7 +298,18 @@ export class SocialService {
         this.getAmigoIds(idUsuarioActual),
         this.getAmigoIds(idUsuarioObjetivo),
         this.prisma.participacionProyecto.findMany({
-          where: { idUsuario: idUsuarioObjetivo, estadoParticipacion: 'ACTIVO' },
+          where: {
+            idUsuario: idUsuarioObjetivo,
+            estadoParticipacion: 'ACTIVO',
+            rolProyecto: {
+              proyecto: {
+                eliminadoEn: null,
+                estadoProyecto: {
+                  in: [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO, EstadoProyecto.EN_SOLICITUD_CIERRE],
+                },
+              },
+            },
+          },
           select: {
             rolProyecto: {
               select: {
@@ -361,10 +378,7 @@ export class SocialService {
 
     const condiciones: Prisma.UsuarioWhereInput[] = [
       { idUsuario: { not: idUsuario } },
-      // El directorio de personas es entre estudiantes: los administradores
-      // no aparecen como resultado de búsqueda ni como sugerencia.
-      { rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } } },
-      { estado: { not: EstadoUsuario.PENDIENTE_VERIFICACION } },
+      FILTRO_DIRECTORIO,
     ];
 
     if (query) {
