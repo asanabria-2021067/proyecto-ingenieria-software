@@ -1,5 +1,6 @@
 import type { Socket } from 'socket.io';
 import { PrismaService } from '../prisma/prisma.service';
+import { puedeEntrarAConversacion } from './chat-acceso';
 
 /** Rooms por conversación: el cliente solo entra si participa en ella. */
 export class ChatRoomsHandler {
@@ -20,11 +21,7 @@ export class ChatRoomsHandler {
     const userId = client.data.userId;
     if (!userId || !data?.idConversacion) return { joined: false };
 
-    const participa = await this.prisma.conversacionParticipante.findUnique({
-      where: { idConversacion_idUsuario: { idConversacion: data.idConversacion, idUsuario: userId } },
-      select: { idUsuario: true },
-    });
-    if (!participa) return { joined: false };
+    if (!(await puedeEntrarAConversacion(this.prisma, data.idConversacion, userId))) return { joined: false };
 
     client.join(`conversation:${data.idConversacion}`);
     return { joined: true };

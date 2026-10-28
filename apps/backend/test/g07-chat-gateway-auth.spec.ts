@@ -31,10 +31,13 @@ function makeSocket(token?: string) {
 
 function makeGateway(options: { estado?: EstadoUsuario | null; participa?: boolean } = {}) {
   const estado = options.estado === undefined ? EstadoUsuario.ACTIVO : options.estado;
-  const participante = vi.fn().mockResolvedValue(options.participa ? { idUsuario: 7 } : null);
+  const participante = vi
+    .fn()
+    .mockResolvedValue(options.participa ? { esCanal: false, idProyecto: null, proyecto: null } : null);
   const prisma = {
     usuario: { findUnique: vi.fn().mockResolvedValue(estado ? { estado } : null) },
-    conversacionParticipante: { findUnique: participante },
+    conversacion: { findFirst: participante },
+    participacionProyecto: { findFirst: vi.fn().mockResolvedValue(null) },
   } as unknown as PrismaService;
   const gateway = new ChatGateway(new WsAuthService(new JwtService({ secret: SYNTHETIC_JWT_SECRET }), prisma), prisma);
   return { gateway, participante };
@@ -100,10 +103,11 @@ describe('G07-C03: el gateway de chat exige la política de acceso', () => {
       await gateway.handleConnection(socket as never);
       const ack = await gateway.joinConversation(socket as never, { idConversacion: 3 });
 
-      expect(participante).toHaveBeenCalledWith({
-        where: { idConversacion_idUsuario: { idConversacion: 3, idUsuario: 7 } },
-        select: { idUsuario: true },
-      });
+      expect(participante).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { idConversacion: 3, eliminadaEn: null, participantes: { some: { idUsuario: 7 } } },
+        }),
+      );
       expect(socket.join).toHaveBeenCalledWith('conversation:3');
       expect(ack).toEqual({ joined: true });
     });
