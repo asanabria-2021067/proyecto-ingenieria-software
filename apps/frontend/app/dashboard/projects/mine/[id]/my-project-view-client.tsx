@@ -93,7 +93,7 @@ function ProjectReadOnlyView({
           </div>
           <Button
             onClick={onEdit}
-            className="h-auto gap-2 rounded-xl bg-white px-4 py-2 type-meta font-bold text-review-ink hover:bg-white/90 dark:bg-on-review dark:text-review dark:hover:bg-on-review/90 has-[>svg]:px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-review/70"
+            className="h-auto gap-2 rounded-xl bg-surface-container-lowest px-4 py-2 type-meta font-bold text-review-ink hover:bg-surface-container-lowest/90 dark:bg-on-review dark:text-review dark:hover:bg-on-review/90 has-[>svg]:px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-review/70"
           >
             <Pencil className="size-3.5" />
             Editar y corregir
