@@ -96,6 +96,7 @@ function makeService(opts: {
   relations?: ReturnType<typeof makeRelations>;
   notifications?: ReturnType<typeof makeNotifications>;
   context?: ReturnType<typeof makeContext>;
+  policy?: ReturnType<typeof makeProjectPolicyDouble>;
 } = {}) {
   const tx = makeTx();
   const prisma = opts.prisma ?? makePrisma(tx);
@@ -103,11 +104,50 @@ function makeService(opts: {
   const relations = opts.relations ?? makeRelations();
   const notifications = opts.notifications ?? makeNotifications();
   const context = opts.context ?? makeContext();
-  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
-  return { tx: prisma.tx, prisma, auth, relations, notifications, context, service };
+  const policy = opts.policy ?? makeProjectPolicyDouble();
+  const service = new TasksService(prisma, auth, relations, notifications, context, new ProjectTransactionService(prisma as unknown as PrismaService), policy, makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
+  return { tx: prisma.tx, prisma, auth, relations, notifications, context, policy, service };
 }
 
 describe('TasksService.update', () => {
+  describe('idsEtiquetas exige la familia ETIQUETA_TAREA (solo líder)', () => {
+    it('participante con idsEtiquetas: Forbidden y no toca etiquetas ni tarea', async () => {
+      const policy = makeProjectPolicyDouble();
+      policy.assertWriteTx.mockImplementation(async (_tx: unknown, _p: unknown, familia: string) => {
+        if (familia === 'ETIQUETA_TAREA') {
+          throw new ForbiddenException('Solo el líder');
+        }
+      });
+      const { tx, service } = makeService({ policy });
+
+      await expect(service.update(5, 42, 2, { idsEtiquetas: [1] })).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(tx.tareaEtiqueta.deleteMany).not.toHaveBeenCalled();
+      expect(tx.tarea.update).not.toHaveBeenCalled();
+    });
+
+    it('líder con idsEtiquetas (incluso []): pasa por ETIQUETA_TAREA y actualiza', async () => {
+      const policy = makeProjectPolicyDouble();
+      const { tx, service } = makeService({ policy });
+      tx.tarea.findFirst.mockResolvedValue(tareaRow());
+
+      await service.update(5, 42, 1, { idsEtiquetas: [] });
+
+      expect(policy.assertWriteTx).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'ETIQUETA_TAREA', 1, expect.anything());
+      expect(tx.tarea.update).toHaveBeenCalled();
+    });
+
+    it('sin idsEtiquetas no se exige ETIQUETA_TAREA', async () => {
+      const policy = makeProjectPolicyDouble();
+      const { tx, service } = makeService({ policy });
+      tx.tarea.findFirst.mockResolvedValue(tareaRow());
+
+      await service.update(5, 42, 2, { tituloTarea: 'x' });
+
+      expect(policy.assertWriteTx).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), 'ETIQUETA_TAREA', expect.anything(), expect.anything());
+    });
+  });
+
   describe('payload vacío', () => {
     it('{} lanza BadRequestException y no abre una transacción', async () => {
       const { prisma, service } = makeService();

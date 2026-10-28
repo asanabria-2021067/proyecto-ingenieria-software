@@ -483,6 +483,11 @@ export class TasksService {
       // C040: política de escritura tras el lock (P/E, Sprint ambiente ACTIVO);
       // crear no tiene una entidad previa que exigir.
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId);
+      if (dto.idsEtiquetas !== undefined) {
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ETIQUETA_TAREA', userId, {
+          sprintId: sprintActivo.idSprint,
+        });
+      }
 
       // C086: la asignación inicial al crear una tarea pasa por la misma
       // decisión de elegibilidad que una asignación posterior.
@@ -655,6 +660,11 @@ export class TasksService {
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId, {
         sprintId: tareaAntes?.idSprint ?? null,
       });
+      if (Object.prototype.hasOwnProperty.call(dto, 'idsEtiquetas')) {
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ETIQUETA_TAREA', userId, {
+          sprintId: tareaAntes?.idSprint ?? null,
+        });
+      }
 
       const relacionesInput: RelatedResourcesInput = {};
       if (Object.prototype.hasOwnProperty.call(dto, 'idHito')) {
