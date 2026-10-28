@@ -44,7 +44,10 @@ function makePrisma(tx = makeTx()) {
 }
 
 function makeAuthorization() {
-  const authorization = { assertCanCreateTask: vi.fn().mockResolvedValue(undefined) };
+  const authorization = {
+    assertCanCreateTask: vi.fn().mockResolvedValue(undefined),
+    assertCanAssignOnCreate: vi.fn().mockResolvedValue(undefined),
+  };
   return authorization as typeof authorization & TasksAuthorizationService;
 }
 
@@ -414,7 +417,7 @@ describe('TasksService.create', () => {
       const orden: string[] = [];
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const authLiteral = { assertCanCreateTask: vi.fn(async () => { orden.push('autorizacion'); }) };
+      const authLiteral = { assertCanCreateTask: vi.fn(async () => { orden.push('autorizacion'); }), assertCanAssignOnCreate: vi.fn().mockResolvedValue(undefined) };
       const auth = authLiteral as typeof authLiteral & TasksAuthorizationService;
       const relationsLiteral = {
         validateCreateTaskRelations: vi.fn(async () => {

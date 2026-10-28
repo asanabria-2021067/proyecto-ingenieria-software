@@ -456,6 +456,14 @@ export class TasksService {
     const row = await this.projectTx.run(projectId, userId, 'tasks.create', async (ctx) => {
       const { tx } = ctx;
       await this.tasksAuthorization.assertCanCreateTask(projectId, userId, tx);
+      if (dto.idUsuarioAsignado !== undefined) {
+        await this.tasksAuthorization.assertCanAssignOnCreate(
+          projectId,
+          userId,
+          dto.idRolProyecto ?? null,
+          tx,
+        );
+      }
 
       // El proyecto solo admite tareas nuevas mientras tenga un Sprint
       // ACTIVO (contrato Sprint 6): EN_FINALIZACION, CERRADO o la ausencia

@@ -761,4 +761,63 @@ describe('TasksAuthorizationService', () => {
       expect(ctx.assertActiveProjectParticipant).toHaveBeenCalledWith(1, PARTICIPANTE_ID, tx);
     });
   });
+
+  describe('assertCanAssignOnCreate', () => {
+    const conProyecto = () => {
+      const ctx = makeContext();
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
+      return ctx;
+    };
+
+    it('permite al lider aunque la tarea tenga rol, sin consultar participacion', async () => {
+      const ctx = conProyecto();
+      const service = new TasksAuthorizationService(ctx);
+
+      await expect(service.assertCanAssignOnCreate(1, LIDER_ID, ROL_TAREA)).resolves.toBeUndefined();
+      expect(ctx.getActiveParticipationInRole).not.toHaveBeenCalled();
+    });
+
+    it('permite al lider sin rol', async () => {
+      const service = new TasksAuthorizationService(conProyecto());
+
+      await expect(service.assertCanAssignOnCreate(1, LIDER_ID, null)).resolves.toBeUndefined();
+    });
+
+    it('permite al participante activo del mismo rol', async () => {
+      const ctx = conProyecto();
+      ctx.getActiveParticipationInRole.mockResolvedValue({ idParticipacion: 1 });
+      const service = new TasksAuthorizationService(ctx);
+
+      await expect(service.assertCanAssignOnCreate(1, PARTICIPANTE_ID, ROL_TAREA)).resolves.toBeUndefined();
+      expect(ctx.getActiveParticipationInRole).toHaveBeenCalledWith(1, PARTICIPANTE_ID, ROL_TAREA, undefined);
+    });
+
+    it('rechaza al participante de otro rol', async () => {
+      const ctx = conProyecto();
+      ctx.getActiveParticipationInRole.mockResolvedValue(null);
+      const service = new TasksAuthorizationService(ctx);
+
+      await expect(service.assertCanAssignOnCreate(1, PARTICIPANTE_ID, ROL_TAREA)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rechaza al no lider cuando la tarea no tiene rol, sin consultar participacion', async () => {
+      const ctx = conProyecto();
+      const service = new TasksAuthorizationService(ctx);
+
+      await expect(service.assertCanAssignOnCreate(1, PARTICIPANTE_ID, null)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(ctx.getActiveParticipationInRole).not.toHaveBeenCalled();
+    });
+
+    it('traslada el cliente transaccional', async () => {
+      const ctx = conProyecto();
+      ctx.getActiveParticipationInRole.mockResolvedValue({ idParticipacion: 1 });
+      const tx = { marker: 'tx' } as unknown as Prisma.TransactionClient;
+      const service = new TasksAuthorizationService(ctx);
+
+      await service.assertCanAssignOnCreate(1, PARTICIPANTE_ID, ROL_TAREA, tx);
+
+      expect(ctx.getProjectOrThrow).toHaveBeenCalledWith(1, tx);
+      expect(ctx.getActiveParticipationInRole).toHaveBeenCalledWith(1, PARTICIPANTE_ID, ROL_TAREA, tx);
+    });
+  });
 });
