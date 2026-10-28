@@ -42,4 +42,23 @@ describe('extraerEnlaces', () => {
     extraerEnlaces('.'.repeat(1_000_000));
     expect(Date.now() - inicio).toBeLessThan(1000);
   });
+
+  it('procesa una url con miles de ")" finales en menos de 5 ms', () => {
+    const inicio = performance.now();
+    extraerEnlaces('http://a' + ')'.repeat(3990));
+    expect(performance.now() - inicio).toBeLessThan(5);
+  });
+
+  it('descarta urls de mas de 2048 caracteres', () => {
+    expect(extraerEnlaces('https://a.com/' + 'x'.repeat(2100))).toEqual([]);
+    expect(extraerEnlaces('https://a.com/' + 'x'.repeat(2000))).toHaveLength(1);
+  });
+
+  it('parentesis balanceado seguido de puntuacion', () => {
+    expect(extraerEnlaces('https://x.com/a_(b)).')).toEqual(['https://x.com/a_(b)']);
+  });
+
+  it('quita ")" y "." finales sobrantes', () => {
+    expect(extraerEnlaces('https://x.com).')).toEqual(['https://x.com/']);
+  });
 });
