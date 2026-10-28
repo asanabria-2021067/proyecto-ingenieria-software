@@ -34,6 +34,7 @@ test('un visitante escribe desde la navbar y administración recibe la notificac
     const mensaje = admin.getByText(`escribió sobre "${asunto}"`, { exact: false });
     await expect(mensaje).toBeVisible({ timeout: 15_000 });
     await expect(mensaje).toContainText('Visitante E2E (visitante.e2e@example.com)');
+    await mensaje.click();
     await expect(admin.getByRole('heading', { name: 'Nueva solicitud de contacto' }).first()).toBeVisible();
   } finally {
     await contextoAdmin.close();
