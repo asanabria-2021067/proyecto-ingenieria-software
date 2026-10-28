@@ -73,6 +73,8 @@ describe('parseMetadata con entradas hostiles', () => {
     ['<meta con 60000 caracteres', '<meta ' + 'a'.repeat(60000)],
     ['100000 "<meta " repetidos', '<meta '.repeat(100000)],
     ['100000 "<title " repetidos', '<title '.repeat(100000)],
+    ['16 etiquetas <meta con 4089 letras sin "="', ('<meta ' + 'a'.repeat(4089) + '>').repeat(16)],
+    ['16 etiquetas <meta con "a-" repetido', ('<meta ' + 'a-'.repeat(2040) + '>').repeat(16)],
     ['og:description con 100k "<"', `<meta property="og:description" content="${'<'.repeat(100000)}">`],
   ])('termina en menos de 50 ms: %s', (_nombre, html) => {
     expect(medir(html)).toBeLessThan(MAX_MS);

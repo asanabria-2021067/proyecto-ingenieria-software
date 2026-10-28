@@ -41,7 +41,7 @@ function metaTags(html: string): Map<string, string> {
     if (end - found.index > MAX_TAG) continue;
     const tag = html.slice(found.index, end + 1);
     const attrs = new Map<string, string>();
-    for (const m of tag.matchAll(/([a-zA-Z:_-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g)) {
+    for (const m of tag.matchAll(/(?<![a-zA-Z:_-])([a-zA-Z:_-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g)) {
       attrs.set(m[1].toLowerCase(), m[2] ?? m[3] ?? m[4] ?? '');
     }
     const key = (attrs.get('property') ?? attrs.get('name'))?.toLowerCase();
