@@ -219,6 +219,14 @@ test('B · abrir: el visor muestra el aviso elegido y abrirlo lo marca como leí
     const [releido] = await avisosCon(page, etiqueta);
     expect(releido.leidaEn).not.toBeNull();
     await expect.poll(() => noLeidas(page)).toBe(pendientesAntes - 1);
+
+    // Destino según el tipo: una TAREA_ASIGNADA lleva a la vista de SU tarea en el Kanban.
+    const destino = `/dashboard/projects/${idProyecto}/kanban/tasks/${tareas[0].idTarea}`;
+    const verTarea = visor.getByRole('link', { name: 'Ver tarea' });
+    await expect(verTarea).toHaveAttribute('href', destino);
+    await verTarea.click();
+    await expect(page).toHaveURL(new RegExp(`${destino}(\\?|$)`));
+    await expect(page.getByText(tareas[0].tituloTarea).first()).toBeVisible({ timeout: 20_000 });
   } finally {
     await eliminarTareas(lider.page, idProyecto, tareas);
     await Promise.all([lider.contexto.close(), maria.contexto.close()]);
