@@ -138,7 +138,6 @@ interface MineEstadoConfig {
   buttonLabel: string;
   buttonHref: string;
   buttonClassName: string;
-  buttonAnimated: boolean;
   buttonIcon?: typeof Pencil;
   showDelete: boolean;
   /** Icono decorativo que ocupa el lugar del botón de eliminar cuando este no aplica. */
@@ -178,7 +177,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         buttonLabel: 'Seguir editando proyecto',
         buttonHref: `/dashboard/projects/mine/form?id=${idProyecto}`,
         buttonClassName: 'bg-[#E6E9ED] text-[#414850] border border-[#CCD2D8] hover:bg-[#D9DDE2] dark:bg-surface-container-high dark:text-on-surface-variant dark:border-outline-variant dark:hover:bg-surface-container-highest',
-        buttonAnimated: false,
         showDelete: true,
       };
     case 'EN_REVISION':
@@ -187,7 +185,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         buttonLabel: 'Ver mi solicitud',
         buttonHref: `/dashboard/projects/mine/${idProyecto}`,
         buttonClassName: BOTON_EN_REVISION,
-        buttonAnimated: false,
         showDelete: false,
         secondaryIcon: Clock,
         secondaryIconClassName: 'text-[#414850] dark:text-on-surface-variant',
@@ -198,7 +195,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         buttonLabel: 'Editar',
         buttonHref: `/dashboard/projects/mine/${idProyecto}?edit=true`,
         buttonClassName: 'bg-review text-on-review hover:bg-review-strong',
-        buttonAnimated: false,
         buttonIcon: Pencil,
         showDelete: true,
       };
@@ -208,7 +204,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         buttonLabel: 'Ver proyecto',
         buttonHref: `/dashboard/proyectos/${idProyecto}`,
         buttonClassName: 'bg-primary text-on-primary hover:bg-primary/90',
-        buttonAnimated: false,
         showDelete: false,
         secondaryIcon: Check,
         secondaryIconClassName: 'text-primary',
@@ -220,7 +215,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         buttonLabel: 'Ver proyecto',
         buttonHref: `/dashboard/proyectos/${idProyecto}`,
         buttonClassName: 'bg-primary text-on-primary hover:bg-primary/90',
-        buttonAnimated: false,
         showDelete: false,
         secondaryIcon: Check,
         secondaryIconClassName: 'text-primary',
@@ -233,7 +227,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         buttonLabel: 'Ver proyecto',
         buttonHref: `/dashboard/proyectos/${idProyecto}`,
         buttonClassName: BOTON_CERRADO,
-        buttonAnimated: false,
         showDelete: false,
         secondaryIcon: Lock,
         secondaryIconClassName: 'text-[#4A6B5D] dark:text-[#ffd873]',
@@ -245,11 +238,10 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         buttonHref: `/dashboard/proyectos/${idProyecto}`,
         // Botón principal sólido: invita a revisar; solo la etiqueta y el reloj parpadean.
         buttonClassName: BOTON_CIERRE_SOLICITADO,
-        buttonAnimated: false,
         showDelete: false,
         secondaryIcon: Clock,
-        // El reloj también parpadea entre gris y dorado, sincronizado con el badge/botón.
-        secondaryIconClassName: 'blink-gold-gray',
+        // El reloj parpadea con opacidad, sincronizado con el anillo del badge.
+        secondaryIconClassName: 'text-tag-forest dark:text-on-tag-forest blink-opacity',
       };
     default:
       // Estados fuera de este flujo (p. ej. Cancelado): acción neutral de
@@ -259,7 +251,6 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         buttonLabel: 'Ver proyecto',
         buttonHref: `/dashboard/proyectos/${idProyecto}`,
         buttonClassName: 'bg-primary text-on-primary hover:bg-primary/90',
-        buttonAnimated: false,
         showDelete: false,
         secondaryIcon: Eye,
         secondaryIconClassName: 'text-primary',
@@ -318,7 +309,7 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
 
   // «En solicitud de cierre» parpadea solo en «Mis Proyectos»; en el resto es la etiqueta neutral fija.
   const estadoStyle =
-    props.context === 'mine' && estadoProyecto === 'EN_SOLICITUD_CIERRE' ? 'pill-forest blink-gold-gray' : estadoBadgeStyle(estadoProyecto);
+    props.context === 'mine' && estadoProyecto === 'EN_SOLICITUD_CIERRE' ? 'pill-forest pill-pulse' : estadoBadgeStyle(estadoProyecto);
   let estadoLabelText: string;
   let metadataExtra: React.ReactNode = null;
   let footerLeft: React.ReactNode = null;
@@ -351,7 +342,7 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
         <Button
           asChild
           className={`h-9.5 w-56 min-w-0 shrink gap-1.5 rounded-md px-4.5 text-[13px] font-semibold shadow-none ${
-            cfg.buttonAnimated ? 'blink-gold-gray' : cfg.buttonClassName
+            cfg.buttonClassName
           }`}
         >
           <Link href={cfg.buttonHref}>
