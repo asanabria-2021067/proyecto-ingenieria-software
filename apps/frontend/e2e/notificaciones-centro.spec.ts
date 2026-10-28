@@ -2,7 +2,7 @@ import type { Browser, BrowserContext, Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
 import { marca } from './support/calendario';
-import { desactivarTour } from './support/realtime';
+import { desactivarTour, noLeidas } from './support/realtime';
 import { crearTareas, eliminarTareas, idProyectoPorTitulo, pedir, PROYECTO_TUTORIAS, type TareaCreada } from './support/kanban';
 
 /**
@@ -173,6 +173,52 @@ test('A · filtrar: la búsqueda, la lectura y la categoría acotan la lista a l
     await expect(bandeja(page).getByText('Sin resultados')).toBeVisible();
     await expect(bandeja(page).locator('li[data-notificacion]')).toHaveCount(0);
     await expect(bandeja(page).getByText('0 avisos · 0 sin leer')).toBeVisible();
+  } finally {
+    await eliminarTareas(lider.page, idProyecto, tareas);
+    await Promise.all([lider.contexto.close(), maria.contexto.close()]);
+  }
+});
+
+test('B · abrir: el visor muestra el aviso elegido y abrirlo lo marca como leído', async ({ browser }, testInfo) => {
+  const etiqueta = marca(testInfo, 'T372 abrir');
+  const lider = await sesion(browser, CARLOS);
+  const maria = await sesion(browser, MARIA);
+  const idProyecto = await idProyectoPorTitulo(lider.page, PROYECTO_TUTORIAS);
+  let tareas: TareaCreada[] = [];
+  try {
+    const idMaria = await idIntegrante(lider.page, idProyecto, MARIA);
+    tareas = await asignarTareas(lider.page, idProyecto, [{ titulo: `${etiqueta} tarea`, idUsuario: idMaria }]);
+    const [aviso] = await esperarAvisos(maria.page, etiqueta, 1);
+    expect(aviso.tipoNotificacion).toBe('TAREA_ASIGNADA');
+    expect(aviso.leidaEn, 'el aviso recién creado está sin leer').toBeNull();
+    const pendientesAntes = await noLeidas(maria.page);
+
+    const page = maria.page;
+    await abrirCentro(page);
+    await buscar(page, etiqueta);
+    await expect.poll(() => idsVisibles(page)).toEqual(ordenados(aviso));
+    await expect(fila(page, aviso.idNotificacion)).toHaveAttribute('data-leida', 'false');
+
+    const lecturas: string[] = [];
+    page.on('request', (r) => {
+      if (r.method() === 'PATCH' && r.url().includes(`/notificaciones/${aviso.idNotificacion}/leer`)) lecturas.push(r.url());
+    });
+    await fila(page, aviso.idNotificacion).getByRole('button').click();
+
+    // El visor muestra ESTE aviso: su título y su mensaje con la tarea de la prueba.
+    const visor = page.getByRole('article');
+    await expect(visor.getByRole('heading', { level: 3 })).toHaveText(aviso.tituloNotificacion);
+    await expect(visor).toContainText(`${etiqueta} tarea`);
+    await expect(fila(page, aviso.idNotificacion).getByRole('button')).toHaveAttribute('aria-current', 'true');
+
+    // Abrirlo lo lee una vez: la fila y el visor pierden el estado de no leída y la API lo confirma.
+    await expect.poll(() => lecturas.length).toBe(1);
+    await expect(fila(page, aviso.idNotificacion)).toHaveAttribute('data-leida', 'true');
+    await expect(visor.getByText('No leída', { exact: true })).toHaveCount(0);
+    await expect(visor.getByRole('button', { name: 'Marcar como leída' })).toHaveCount(0);
+    const [releido] = await avisosCon(page, etiqueta);
+    expect(releido.leidaEn).not.toBeNull();
+    await expect.poll(() => noLeidas(page)).toBe(pendientesAntes - 1);
   } finally {
     await eliminarTareas(lider.page, idProyecto, tareas);
     await Promise.all([lider.contexto.close(), maria.contexto.close()]);
