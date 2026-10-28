@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { JwtService } from '@nestjs/jwt';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuthService } from '../src/auth/auth.service';
+import { ACCOUNT_ACCESS_REVOKED } from '../src/ws-auth/account-access.events';
 
 /**
  * G04-C04 · OWASP25-C024. El reset consume el token con un UPDATE condicional
@@ -14,7 +16,7 @@ import { AuthService } from '../src/auth/auth.service';
 
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
 
-function makeService(consumidas: number) {
+function makeService(consumidas: number, verify?: () => unknown) {
   const tx = {
     solicitudRecuperacion: { updateMany: vi.fn().mockResolvedValue({ count: consumidas }) },
     usuario: { update: vi.fn().mockResolvedValue({}) },
@@ -24,13 +26,20 @@ function makeService(consumidas: number) {
     usuario: { findUnique: vi.fn().mockResolvedValue({ idUsuario: 9 }) },
     $transaction: vi.fn(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)),
   };
-  const jwtService = { verify: vi.fn().mockReturnValue({ tipo: 'reset', idSolicitud: 4, sub: 9, correo: 'e@uvg.edu.gt' }) };
+  const jwtService = {
+    verify: vi.fn(verify ?? (() => ({ tipo: 'reset', idSolicitud: 4, sub: 9, correo: 'e@uvg.edu.gt' }))),
+  };
+  const events = { emit: vi.fn() };
   const service = new AuthService(
     prisma as unknown as PrismaService,
     jwtService as unknown as JwtService,
     {} as NotificationsService,
+    undefined,
+    undefined,
+    undefined,
+    events as unknown as EventEmitter2,
   );
-  return { service, prisma, tx };
+  return { service, prisma, tx, events };
 }
 
 describe('G04-C04: reset atómico con revocación de sesiones', () => {
@@ -59,5 +68,26 @@ describe('G04-C04: reset atómico con revocación de sesiones', () => {
     await expect(service.resetPassword('token', 'NuevaClave123')).rejects.toBeInstanceOf(BadRequestException);
     expect(tx.usuario.update).not.toHaveBeenCalled();
     expect(tx.tokenRefresco.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('emite ACCOUNT_ACCESS_REVOKED una vez con el idUsuario tras un reset valido', async () => {
+    const { service, events } = makeService(1);
+    await service.resetPassword('token', 'NuevaClave123');
+    expect(events.emit).toHaveBeenCalledTimes(1);
+    expect(events.emit).toHaveBeenCalledWith(ACCOUNT_ACCESS_REVOKED, { idUsuario: 9 });
+  });
+
+  it('no emite con token ya consumido (reutilizado)', async () => {
+    const { service, events } = makeService(0);
+    await expect(service.resetPassword('token', 'NuevaClave123')).rejects.toBeInstanceOf(BadRequestException);
+    expect(events.emit).not.toHaveBeenCalled();
+  });
+
+  it('no emite con token invalido o expirado', async () => {
+    const { service, events } = makeService(1, () => {
+      throw new Error('jwt expired');
+    });
+    await expect(service.resetPassword('token', 'NuevaClave123')).rejects.toBeInstanceOf(BadRequestException);
+    expect(events.emit).not.toHaveBeenCalled();
   });
 });

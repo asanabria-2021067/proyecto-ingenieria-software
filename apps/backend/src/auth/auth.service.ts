@@ -2,12 +2,14 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Optional,
   UnauthorizedException,
   ConflictException,
   BadRequestException,
   NotFoundException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import * as bcrypt from "bcryptjs";
 import { createHash, randomUUID } from "crypto";
 import { EstadoUsuario } from "@prisma/client";
@@ -27,6 +29,7 @@ import { SecurityEventsService } from "../security-events/security-events.servic
 import { TipoEventoSeguridad } from "../security-events/tipos-evento-seguridad";
 import { accountReference } from "../security-events/account-reference";
 import type { SecurityRequestContext } from "../security-events/request-context";
+import { ACCOUNT_ACCESS_REVOKED, type AccountAccessRevokedEvent } from "../ws-auth/account-access.events";
 
 /**
  * G04 (OWASP25-C023): hash bcrypt (cost 10, el mismo de registro y reset) de
@@ -68,6 +71,7 @@ export class AuthService {
     private readonly recoveryAttempts: AccountAttemptsService = new AccountAttemptsService(RECOVERY_ATTEMPT_POLICY),
     // G05: writer best-effort; el default (tests) usa el mismo PrismaService.
     private readonly securityEvents: SecurityEventsService = new SecurityEventsService(prisma),
+    @Optional() private readonly events?: EventEmitter2,
   ) {
     const refreshSecret = process.env.JWT_REFRESH_SECRET;
     if (!refreshSecret) {
@@ -339,6 +343,9 @@ export class AuthService {
       idUsuarioAfectado: usuario.idUsuario,
       detalle: { idSolicitud: payload.idSolicitud, sesionesRevocadas },
     });
+
+    // Cierra los sockets abiertos de la cuenta: las sesiones de refresh ya quedaron revocadas.
+    this.events?.emit(ACCOUNT_ACCESS_REVOKED, { idUsuario: usuario.idUsuario } satisfies AccountAccessRevokedEvent);
 
     return { mensaje: "Contraseña actualizada exitosamente" };
   }
