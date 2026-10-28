@@ -38,14 +38,18 @@ interface Aviso {
 interface Sesion {
   contexto: BrowserContext;
   page: Page;
+  /** Errores no capturados de la página: cada escenario termina exigiendo que no haya ninguno. */
+  errores: string[];
 }
 
 async function sesion(browser: Browser, correo: string): Promise<Sesion> {
   const contexto = await browser.newContext();
   const page = await contexto.newPage();
+  const errores: string[] = [];
+  page.on('pageerror', (error) => errores.push(String(error.message).slice(0, 200)));
   await desactivarTour(page);
   await login(page, correo);
-  return { contexto, page };
+  return { contexto, page, errores };
 }
 
 /** Avisos propios cuyo título o mensaje contiene `texto`, leídos de la API real con la sesión de `page`. */
@@ -175,6 +179,7 @@ test('A · filtrar: la búsqueda, la lectura y la categoría acotan la lista a l
     await expect(bandeja(page).getByText('Sin resultados')).toBeVisible();
     await expect(bandeja(page).locator('li[data-notificacion]')).toHaveCount(0);
     await expect(bandeja(page).getByText('0 avisos · 0 sin leer')).toBeVisible();
+    expect(maria.errores, 'errores de página al filtrar').toEqual([]);
   } finally {
     await eliminarTareas(lider.page, idProyecto, tareas);
     await Promise.all([lider.contexto.close(), maria.contexto.close()]);
@@ -229,6 +234,7 @@ test('B · abrir: el visor muestra el aviso elegido y abrirlo lo marca como leí
     await verTarea.click();
     await expect(page).toHaveURL(new RegExp(`${destino}(\\?|$)`));
     await expect(page.getByText(tareas[0].tituloTarea).first()).toBeVisible({ timeout: 20_000 });
+    expect(maria.errores, 'errores de página al abrir el aviso').toEqual([]);
   } finally {
     await eliminarTareas(lider.page, idProyecto, tareas);
     await Promise.all([lider.contexto.close(), maria.contexto.close()]);
@@ -295,6 +301,7 @@ test('C · marcar todas: sin filtros lee todos los avisos propios, persiste y no
     const [ajenoDespues] = await avisosCon(jose.page, etiqueta);
     expect(ajenoDespues.leidaEn, 'el aviso de otra cuenta sigue sin leer').toBeNull();
     expect(await noLeidas(jose.page)).toBe(pendientesJose);
+    expect(maria.errores, 'errores de página al marcar todas').toEqual([]);
   } finally {
     await eliminarTareas(lider.page, idProyecto, tareas);
     await Promise.all([lider.contexto.close(), maria.contexto.close(), jose.contexto.close()]);
