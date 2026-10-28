@@ -251,6 +251,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: [test, frontend-variant, build-frontend, build-backend]
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
       packages: read
