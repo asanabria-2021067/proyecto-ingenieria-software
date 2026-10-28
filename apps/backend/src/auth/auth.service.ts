@@ -252,11 +252,12 @@ export class AuthService {
     const perfil = await this.prisma.perfilEstudiante.findUnique({
       where: { carne },
       select: {
-        usuario: { select: { idUsuario: true, nombre: true, apellido: true } },
+        usuario: { select: { idUsuario: true, nombre: true, apellido: true, correo: true } },
       },
     });
 
-    if (!perfil) {
+    // El correo declarado debe ser el de la cuenta: misma respuesta genérica si no coincide.
+    if (!perfil || normalizarCorreo(correo) !== perfil.usuario.correo.toLowerCase()) {
       return genericResponse;
     }
 
@@ -264,7 +265,7 @@ export class AuthService {
       data: {
         idUsuario: perfil.usuario.idUsuario,
         carneReferencia: carne,
-        correoReferencia: correo,
+        correoReferencia: perfil.usuario.correo,
       },
     });
 

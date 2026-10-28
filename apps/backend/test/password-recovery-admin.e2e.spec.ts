@@ -69,7 +69,7 @@ function createFakePrisma() {
         const idUsuario = perfiles.get(where.carne);
         if (idUsuario === undefined) return null;
         const u = usuarios.get(idUsuario)!;
-        return { usuario: { idUsuario: u.idUsuario, nombre: u.nombre, apellido: u.apellido } };
+        return { usuario: { idUsuario: u.idUsuario, nombre: u.nombre, apellido: u.apellido, correo: u.correo } };
       },
     },
     usuario: {
