@@ -34,6 +34,7 @@ test('un visitante escribe desde la navbar y administración recibe la notificac
     const mensaje = admin.getByText(`escribió sobre "${asunto}"`, { exact: false });
     await expect(mensaje).toBeVisible({ timeout: 15_000 });
     await expect(mensaje).toContainText('Visitante E2E (visitante.e2e@example.com)');
+    // En la bandeja el título de la fila no es un encabezado: se abre el aviso y su título se lee en el visor.
     await mensaje.click();
     await expect(admin.getByRole('article').getByRole('heading', { level: 3, name: 'Nueva solicitud de contacto' })).toBeVisible();
   } finally {
