@@ -68,12 +68,13 @@ describeIntegration('HU-195 G02 — migraciones de reuniones de Administración'
     expect(MIGRACIONES.map((n) => nombres.indexOf(n))).toEqual([...MIGRACIONES.map((n) => nombres.indexOf(n))].sort((a, b) => a - b));
   });
 
-  it('el enum de notificaciones contiene los tres tipos de reunión al final, sin reordenar los existentes', async () => {
+  it('el enum de notificaciones contiene los tres tipos de reunión contiguos tras MENCION_COMENTARIO, sin reordenar los existentes', async () => {
     const valores = await prisma.$queryRaw<{ v: string }[]>`
       SELECT e.enumlabel AS v FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname = 'TipoNotificacion' ORDER BY e.enumsortorder`;
     const lista = valores.map((f) => f.v);
-    expect(lista.slice(-3)).toEqual(['REUNION_PROGRAMADA', 'REUNION_ACTUALIZADA', 'REUNION_CANCELADA']);
-    expect(lista.indexOf('MENCION_COMENTARIO')).toBe(lista.length - 4);
+    const i = lista.indexOf('REUNION_PROGRAMADA');
+    expect(lista.slice(i, i + 3)).toEqual(['REUNION_PROGRAMADA', 'REUNION_ACTUALIZADA', 'REUNION_CANCELADA']);
+    expect(lista[i - 1]).toBe('MENCION_COMENTARIO');
   });
 
   it('una reunión nace con política TODOS_ADMINISTRADORES y versión 1', async () => {
