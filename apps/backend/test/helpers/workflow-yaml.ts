@@ -37,6 +37,7 @@ export interface WorkflowConcurrency {
 export interface WorkflowJob {
   name?: string;
   if?: string;
+  environment?: string | { name?: string };
   permissions?: WorkflowPermissions;
   concurrency?: string | WorkflowConcurrency;
   needs?: string | string[];
