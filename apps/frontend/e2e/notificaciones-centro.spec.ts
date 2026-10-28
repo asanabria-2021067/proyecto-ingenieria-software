@@ -155,6 +155,24 @@ test('A · filtrar: la búsqueda, la lectura y la categoría acotan la lista a l
 
     await lectura.getByRole('radio', { name: 'Todas' }).click();
     await expect.poll(() => idsVisibles(page)).toEqual(ordenados(pendiente, revisada));
+
+    // Categoría que abarca TAREA_ASIGNADA: siguen las dos, cada una con su categoría.
+    const categoria = bandeja(page).getByRole('combobox', { name: 'Filtrar por categoría' });
+    await categoria.click();
+    await page.getByRole('option', { name: 'Tareas e hitos' }).click();
+    await expect(categoria).toHaveText('Tareas e hitos');
+    await expect.poll(() => idsVisibles(page)).toEqual(ordenados(pendiente, revisada));
+    for (const aviso of [pendiente, revisada]) {
+      await expect(fila(page, aviso.idNotificacion).getByText('Tareas e hitos', { exact: true })).toBeVisible();
+    }
+
+    // Otra categoría: los avisos de tarea no cumplen el criterio y no aparecen.
+    await categoria.click();
+    await page.getByRole('option', { name: 'Recordatorios y calendario' }).click();
+    await expect(categoria).toHaveText('Recordatorios y calendario');
+    await expect(bandeja(page).getByText('Sin resultados')).toBeVisible();
+    await expect(bandeja(page).locator('li[data-notificacion]')).toHaveCount(0);
+    await expect(bandeja(page).getByText('0 avisos · 0 sin leer')).toBeVisible();
   } finally {
     await eliminarTareas(lider.page, idProyecto, tareas);
     await Promise.all([lider.contexto.close(), maria.contexto.close()]);
