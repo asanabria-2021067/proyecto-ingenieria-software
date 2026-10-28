@@ -62,7 +62,7 @@ describe('AdminSolicitudesRecuperacionPage', () => {
       new Date(Date.now() + 30 * 60 * 1000),
     );
 
-    expect(screen.getByText(new RegExp(`Válido hasta las ${vigenciaEsperada}`))).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`Válido hasta las ${vigenciaEsperada.replace(/\s/g, ' ')}`))).toBeInTheDocument();
     expect(screen.queryByText(/Válido por 1 hora/i)).not.toBeInTheDocument();
   });
 
