@@ -26,6 +26,7 @@ function makeSocket(token?: string) {
     leave: vi.fn(),
     emit: vi.fn(),
     disconnect: vi.fn(),
+    once: vi.fn(),
   };
 }
 
@@ -118,5 +119,42 @@ describe('G07-C03: el gateway de chat exige la política de acceso', () => {
       expect(ack).toEqual({ joined: false });
       expect(socket.join).not.toHaveBeenCalledWith('conversation:3');
     });
+  });
+});
+
+describe('G07-C03: el socket de chat se cierra cuando vence su access token', () => {
+  it('se desconecta al llegar exp y no antes, y deja exp en client.data', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const { gateway } = makeGateway();
+      const socket = makeSocket(sign({ sub: 7, correo: 'c@uvg.edu.gt', tipo: 'access' }));
+
+      await gateway.handleConnection(socket as never);
+
+      vi.advanceTimersByTime(3_599_000);
+      expect(socket.disconnect).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(2_000);
+      expect(socket.disconnect).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('el timer se limpia al desconectarse el socket', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const { gateway } = makeGateway();
+      const socket = makeSocket(access());
+
+      await gateway.handleConnection(socket as never);
+      expect(vi.getTimerCount()).toBe(1);
+      const [evento, limpiar] = socket.once.mock.calls[0];
+      expect(evento).toBe('disconnect');
+      limpiar();
+
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

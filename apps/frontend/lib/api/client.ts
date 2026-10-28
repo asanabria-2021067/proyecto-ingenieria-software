@@ -48,7 +48,7 @@ function joinUrl(base: string, prefix: string, path: string): string {
 // true en el backend, ya configurado).
 let refreshPromise: Promise<boolean> | null = null;
 
-function refreshSession(): Promise<boolean> {
+export function refreshSession(): Promise<boolean> {
   if (!refreshPromise) {
     refreshPromise = fetch(joinUrl(getApiUrl(), API_PREFIX, '/auth/refresh'), {
       method: 'POST',

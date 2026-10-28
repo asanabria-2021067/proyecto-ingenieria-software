@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { EstadoUsuario } from '@prisma/client';
@@ -6,7 +6,7 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { ChatModule } from '../src/chat/chat.module';
 import { NotificationsModule } from '../src/notifications/notifications.module';
-import { extractWsToken, WsAuthService, type WsHandshake } from '../src/ws-auth/ws-auth.service';
+import { disconnectOnExpiry, extractWsToken, WsAuthService, type WsHandshake } from '../src/ws-auth/ws-auth.service';
 import { SYNTHETIC_JWT_SECRET } from './helpers/synthetic-jwt-secret';
 
 /**
@@ -52,7 +52,13 @@ describe('G07-C01: política compartida de autenticación WebSocket', () => {
     it.each(['auth', 'bearer', 'cookie'] as const)('se acepta por %s y devuelve el usuario del token', async (via) => {
       const { policy, findUnique } = makePolicy();
 
-      await expect(policy.authenticate(handshake(accessToken(), via))).resolves.toEqual({ ok: true, userId: 7 });
+      const token = accessToken();
+
+      await expect(policy.authenticate(handshake(token, via))).resolves.toEqual({
+        ok: true,
+        userId: 7,
+        exp: (jwt.decode(token) as { exp: number }).exp,
+      });
       expect(findUnique).toHaveBeenCalledWith({ where: { idUsuario: 7 }, select: { estado: true } });
     });
   });
@@ -108,7 +114,7 @@ describe('G07-C01: política compartida de autenticación WebSocket', () => {
       const { policy, estados } = makePolicy();
       const token = accessToken();
 
-      await expect(policy.authenticate(handshake(token))).resolves.toEqual({ ok: true, userId: 7 });
+      await expect(policy.authenticate(handshake(token))).resolves.toMatchObject({ ok: true, userId: 7 });
       estados[7] = EstadoUsuario.BLOQUEADO;
       await expect(policy.authenticate(handshake(token))).resolves.toEqual({ ok: false, motivo: 'CUENTA_NO_ACTIVA' });
     });
@@ -149,6 +155,81 @@ describe('G07-C01: política compartida de autenticación WebSocket', () => {
         motivo: 'TOKEN_INVALIDO',
       });
       expect(findUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('vencimiento del access token (exp)', () => {
+    afterEach(() => vi.useRealTimers());
+
+    function fakeSocket() {
+      const handlers: Record<string, () => void> = {};
+      return {
+        data: {} as Record<string, unknown>,
+        disconnect: vi.fn(),
+        once: vi.fn((evento: string, fn: () => void) => {
+          handlers[evento] = fn;
+        }),
+        handlers,
+      };
+    }
+
+    it('authenticate devuelve el exp del token en segundos', async () => {
+      const { policy } = makePolicy();
+      const token = sign({ sub: 7, tipo: 'access' }, { expiresIn: 120 });
+
+      const res = await policy.authenticate(handshake(token));
+
+      expect(res).toEqual({ ok: true, userId: 7, exp: (jwt.decode(token) as { exp: number }).exp });
+    });
+
+    it('desconecta el socket al llegar exp y no antes', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      const exp = Math.floor(Date.now() / 1000) + 60;
+      const socket = fakeSocket();
+
+      disconnectOnExpiry(socket as never, exp);
+
+      vi.advanceTimersByTime(59_000);
+      expect(socket.disconnect).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1_000);
+      expect(socket.disconnect).toHaveBeenCalledTimes(1);
+      expect(socket.disconnect).toHaveBeenCalledWith(true);
+    });
+
+    it('un exp ya vencido desconecta de inmediato', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      const socket = fakeSocket();
+
+      disconnectOnExpiry(socket as never, Math.floor(Date.now() / 1000) - 5);
+      vi.advanceTimersByTime(0);
+
+      expect(socket.disconnect).toHaveBeenCalledTimes(1);
+    });
+
+    it('exp null no programa nada', () => {
+      vi.useFakeTimers();
+      const socket = fakeSocket();
+
+      disconnectOnExpiry(socket as never, null);
+
+      expect(vi.getTimerCount()).toBe(0);
+      expect(socket.once).not.toHaveBeenCalled();
+    });
+
+    it('el timer se limpia cuando el socket se desconecta', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      const socket = fakeSocket();
+
+      disconnectOnExpiry(socket as never, Math.floor(Date.now() / 1000) + 60);
+      expect(vi.getTimerCount()).toBe(1);
+      socket.handlers.disconnect();
+
+      expect(vi.getTimerCount()).toBe(0);
+      vi.advanceTimersByTime(120_000);
+      expect(socket.disconnect).not.toHaveBeenCalled();
     });
   });
 

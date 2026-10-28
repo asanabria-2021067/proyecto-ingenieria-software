@@ -8,7 +8,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { getFrontendUrl } from '../common/utils/cookie';
-import { WsAuthService } from '../ws-auth/ws-auth.service';
+import { WsAuthService, disconnectOnExpiry } from '../ws-auth/ws-auth.service';
 import { ACCOUNT_ACCESS_REVOKED, type AccountAccessRevokedEvent } from '../ws-auth/account-access.events';
 
 /**
@@ -60,6 +60,7 @@ export class NotificationsGateway
       const userId = auth.userId;
 
       client.data.userId = userId;
+      disconnectOnExpiry(client, auth.exp);
       client.join(`user:${userId}`);
 
       this.logger.log(`Client ${client.id} connected as user ${userId}`);

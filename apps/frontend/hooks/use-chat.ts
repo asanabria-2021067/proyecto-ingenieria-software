@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { refreshSession } from '@/lib/api/client';
 import {
   activarSonidoConversation,
   addChannelMembers,
@@ -717,10 +718,26 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       }
     };
 
-    const handleDisconnect = () => {
+    // El servidor cierra el socket al vencer el access token: se reconecta una
+    // vez con la cookie vigente. Solo si la sesión se había autenticado
+    // ('connected'), para no entrar en bucle cuando el handshake es rechazado.
+    let authenticated = false;
+    let cerrado = false;
+    const handleAuthenticated = () => {
+      authenticated = true;
+    };
+    const handleDisconnect = (reason: string) => {
       setIsConnected(false);
+      if (reason === 'io server disconnect' && authenticated) {
+        authenticated = false;
+        // La cookie vence junto con el socket: se renueva la sesión antes de reconectar.
+        void refreshSession().then((ok) => {
+          if (ok && !cerrado) socket.connect();
+        });
+      }
     };
 
+    socket.on('connected', handleAuthenticated);
     socket.on('newMessage', handleNewMessage);
     socket.on('reactionUpdated', handleReactionUpdated);
     socket.on('messageUpdated', handleMessageChanged);
@@ -732,6 +749,8 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
     socket.on('disconnect', handleDisconnect);
 
     return () => {
+      cerrado = true;
+      socket.off('connected', handleAuthenticated);
       socket.off('newMessage', handleNewMessage);
       socket.off('reactionUpdated', handleReactionUpdated);
       socket.off('messageUpdated', handleMessageChanged);
