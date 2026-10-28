@@ -251,7 +251,7 @@ de la VM.
 
 ### 3.1) URL publica (hosteado)
 
-- Aplicacion: http://158.23.57.118/
+- Aplicacion: https://158.23.57.118.nip.io/
 
 ### 4) Desarrollo local (sin contenedores de app)
 
