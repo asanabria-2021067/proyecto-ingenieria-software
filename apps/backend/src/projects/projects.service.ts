@@ -1177,9 +1177,6 @@ export class ProjectsService {
       data: {
         estadoProyecto: nuevoEstado as EstadoProyecto,
         fechaActualizacion: new Date(),
-        ...(nuevoEstado === EstadoProyectoCreador.PUBLICADO && {
-          fechaPublicacion: new Date(),
-        }),
       },
       select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
     });
@@ -1199,10 +1196,7 @@ export class ProjectsService {
       effects,
     );
 
-    if (
-      nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
-      nuevoEstado === EstadoProyectoCreador.EN_PROGRESO
-    ) {
+    if (nuevoEstado === EstadoProyectoCreador.EN_PROGRESO) {
       const participaciones = await tx.participacionProyecto.findMany({
         where: {
           estadoParticipacion: 'ACTIVO',
@@ -1224,23 +1218,7 @@ export class ProjectsService {
       }
     }
 
-    if (nuevoEstado === EstadoProyectoCreador.PUBLICADO) {
-      await this.notifications.persistTemplateTx(
-        tx,
-        [proyecto.creadoPor],
-        'PROYECTO_PUBLICADO',
-        {
-          projectTitle: actualizado.tituloProyecto,
-          projectId: actualizado.idProyecto,
-        },
-        effects,
-      );
-    }
-
-    if (
-      nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
-      estadoAnterior === EstadoProyecto.PUBLICADO
-    ) {
+    if (estadoAnterior === EstadoProyecto.PUBLICADO) {
       // I/O de caché fuera del lock: efecto post-commit.
       effects.add({ key: 'cache:projects:featured', publish: () => this._invalidateFeaturedCache() });
     }

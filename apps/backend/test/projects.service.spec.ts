@@ -79,7 +79,7 @@ function makeService(
   return new ProjectsService(
     prisma as unknown as PrismaService,
     notificationsDouble,
-    {} as unknown as Cache,
+    { del: vi.fn().mockResolvedValue(undefined) } as unknown as Cache,
     makeProjectTransactionDouble({ tx: prisma }),
     makeProjectPolicyDouble(),
     makeProjectReadPolicyDouble(),
@@ -349,8 +349,47 @@ describe('ProjectsService', () => {
       creadoPor: 1,
     });
     const service = makeService(prisma);
-    await expect(service.changeEstado(1, 1, EstadoProyectoCreador.PUBLICADO)).rejects.toBeInstanceOf(
-      BadRequestException,
+    await expect(
+      service.changeEstado(1, 1, 'PUBLICADO' as unknown as EstadoProyectoCreador),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('changeEstado: el líder no puede publicar un BORRADOR (solo la revisión administrativa publica)', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({
+      idProyecto: 1,
+      estadoProyecto: EstadoProyecto.BORRADOR,
+      creadoPor: 1,
+    });
+    const service = makeService(prisma);
+
+    await expect(
+      service.changeEstado(1, 1, 'PUBLICADO' as unknown as EstadoProyectoCreador),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.proyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('changeEstado: PUBLICADO -> EN_PROGRESO sigue funcionando', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({
+      idProyecto: 1,
+      estadoProyecto: EstadoProyecto.PUBLICADO,
+      creadoPor: 1,
+    });
+    prisma.proyecto.update.mockResolvedValue({
+      idProyecto: 1,
+      estadoProyecto: EstadoProyecto.EN_PROGRESO,
+      tituloProyecto: 'P',
+    });
+    prisma.participacionProyecto.findMany.mockResolvedValue([]);
+    const service = makeService(prisma);
+
+    await service.changeEstado(1, 1, EstadoProyectoCreador.EN_PROGRESO);
+
+    expect(prisma.proyecto.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ estadoProyecto: EstadoProyecto.EN_PROGRESO }),
+      }),
     );
   });
 
