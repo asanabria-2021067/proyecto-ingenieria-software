@@ -697,7 +697,7 @@ export class TimeRecordsService {
 
     const [tramos, sprintAmbiente, sprintEntidad] = await Promise.all([
       this.prisma.asignacionTarea.findMany({
-        where: { idTarea: tarea.idTarea },
+        where: { idTarea: tarea.idTarea, ...(decision.ownOnly ? { idUsuario: userId } : {}) },
         orderBy: { idAsignacion: 'asc' },
         select: {
           idAsignacion: true,
