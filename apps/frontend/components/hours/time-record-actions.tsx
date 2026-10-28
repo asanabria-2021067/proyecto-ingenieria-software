@@ -67,7 +67,7 @@ export function TimeRecordActions({
           size="sm"
           onClick={() => onEdit(record)}
           aria-label={`Editar registro de ${record.horas} h del ${record.fecha}`}
-          className="h-8 gap-1.5 rounded-md border-outline-variant text-xs font-semibold"
+          className="h-8 gap-1.5 rounded-md border-outline-variant text-xs font-semibold hover:border-outline"
         >
           <Pencil className="size-3.5" aria-hidden="true" />
           {editLabel}
@@ -83,7 +83,7 @@ export function TimeRecordActions({
           disabled={revoking}
           onClick={() => onRevoke(record)}
           aria-label={`Revocar registro de ${record.horas} h del ${record.fecha}`}
-          className="h-8 gap-1.5 rounded-md border-error/40 text-xs font-semibold text-error hover:bg-error/10 hover:text-error"
+          className="h-8 gap-1.5 rounded-md border-error/40 text-xs font-semibold text-error hover:border-error hover:bg-error/10 hover:text-error"
         >
           {revoking ? (
             <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />

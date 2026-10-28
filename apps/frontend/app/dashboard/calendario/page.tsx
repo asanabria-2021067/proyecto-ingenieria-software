@@ -67,6 +67,7 @@ import { CalendarFilterMenu } from '@/components/calendar/calendar-filter-menu';
 import { iniciales } from '@/components/calendar/invitados-field';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { idUsuarioSeguro } from '@/lib/services/notifications';
+import { SkeletonList } from '@/components/ui/skeleton';
 
 const VISTAS: { value: VistaCalendario; label: string }[] = [
   { value: 'dia', label: 'Día' },
@@ -664,7 +665,7 @@ export default function CalendarioPage() {
                 <RadioGroupPrimitive.Item
                   key={opcion.value}
                   value={opcion.value}
-                  className={`rounded-pill px-3 py-1 text-xs font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
+                  className={`rounded-pill px-3 py-1 text-xs font-bold outline-none motion-select focus-visible:ring-2 focus-visible:ring-primary/60 ${
                     vista === opcion.value ? 'bg-surface-container-lowest text-on-surface shadow-card' : 'text-on-surface-variant'
                   }`}
                 >
@@ -792,6 +793,9 @@ export default function CalendarioPage() {
               )}
             </>
           )}
+
+          {/* La región de estado de arriba ya anuncia la carga; esto solo guarda el hueco de la agenda. */}
+          {vista === 'mes' && isLoading && <SkeletonList count={3} lines={2} />}
 
           {vista === 'mes' && !isLoading && !isError && (
             <div className="space-y-tight">

@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import { AlertCircle, BarChart3, CheckCircle2, Clock, Flag, ListChecks } from 'lucide-react';
 import { useSprintAnalytics, useSprintBurndown } from '@/hooks/use-project-sprints';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Empty,
   EmptyContent,
@@ -177,7 +177,11 @@ function BurndownSection({ idProyecto, idSprint }: { idProyecto: number; idSprin
   const { burndown, isLoading, isError, error, refetch } = useSprintBurndown(idProyecto, idSprint);
 
   if (isLoading) {
-    return <Skeleton className="h-[340px] w-full rounded-xl" />;
+    return (
+      <SkeletonRegion label="Cargando burndown">
+        <Skeleton className="h-[340px] w-full rounded-xl" />
+      </SkeletonRegion>
+    );
   }
 
   if (isError) {
@@ -221,11 +225,11 @@ export default function SprintAnalyticsPage() {
       />
 
       {isLoading && (
-        <div className="space-y-4">
+        <SkeletonRegion label="Cargando analíticas del sprint" className="space-y-4">
           <Skeleton className="h-24 w-full rounded-xl" />
           <Skeleton className="h-48 w-full rounded-xl" />
           <Skeleton className="h-40 w-full rounded-xl" />
-        </div>
+        </SkeletonRegion>
       )}
 
       {!isLoading && isError && (

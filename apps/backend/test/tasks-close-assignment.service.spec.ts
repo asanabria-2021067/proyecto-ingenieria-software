@@ -111,7 +111,7 @@ function makeContext(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeService(options: { prisma?: ReturnType<typeof makePrisma>; context?: ReturnType<typeof makeContext> } = {}) {
+function makeService(options: { prisma?: ReturnType<typeof makePrisma>; context?: ReturnType<typeof makeContext>; events?: { emit: ReturnType<typeof vi.fn> } } = {}) {
   const prisma = options.prisma ?? makePrisma();
   const context = options.context ?? makeContext();
   const service = new TasksService(
@@ -122,7 +122,7 @@ function makeService(options: { prisma?: ReturnType<typeof makePrisma>; context?
     context as unknown as TasksContextService,
     new ProjectTransactionService(prisma as unknown as PrismaService),
     makeProjectPolicyDouble(),
-    makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
+    makeProjectReadPolicyDouble(), makeTimeRecordsDouble(), undefined, options.events as never);
   return { context, prisma, service, tx: prisma.tx };
 }
 
@@ -192,6 +192,21 @@ describe('TasksService.closeAssignment', () => {
     });
     expect(result.estadoTarea).toBe('HECHO');
     expect(result.asignacionActiva).toBeNull();
+  });
+
+  it('emite el recálculo de insignias de la tarea solo cuando marcarComoHecha=true (HU-190)', async () => {
+    const events = { emit: vi.fn() };
+    const { service, tx } = makeService({ events });
+    tx.tarea.findFirst.mockResolvedValue(tareaRow({ estadoTarea: 'HECHO' }));
+
+    await service.closeAssignment(PROJECT_ID, TASK_ID, ASSIGNMENT_ID, ACTOR_ID, VALID_DTO);
+    expect(events.emit).toHaveBeenCalledTimes(1);
+    expect(events.emit).toHaveBeenCalledWith('insignias.recalcular', { claves: ['tareas', 'sprints'], idTarea: TASK_ID });
+
+    events.emit.mockClear();
+    const otro = makeService({ events });
+    await otro.service.closeAssignment(PROJECT_ID, TASK_ID, ASSIGNMENT_ID, ACTOR_ID, { contenidoAvance: LONG_CONTENT, marcarComoHecha: false });
+    expect(events.emit).not.toHaveBeenCalled();
   });
 
   it('cierra el tramo sin forzar HECHO cuando marcarComoHecha=false u omitido', async () => {

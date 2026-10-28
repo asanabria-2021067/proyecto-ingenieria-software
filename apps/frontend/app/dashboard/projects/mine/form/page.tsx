@@ -18,6 +18,8 @@ import {
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from './types';
 import { normalizeUrlInput } from '@/lib/security/safe-url';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 // Estados con edición completa (asistente de 3 pasos) vs. edición PARCIAL
 // (subconjunto seguro: proyecto ya publicado / en progreso). El resto no es
@@ -299,16 +301,7 @@ function NewProjectFormContent() {
   if (denegado) return null;
 
   if (loadingExistente) {
-    return (
-      <>
-        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 text-tertiary text-sm">
-            Cargando proyecto...
-          </div>
-        </div>
-      </>
-    );
+    return <FormularioSkeleton label="Cargando proyecto" />;
   }
 
   if (proyectoExistente && !ALLOWED_EDIT_STATES.includes(proyectoExistente.estadoProyecto)) {
@@ -353,13 +346,13 @@ function NewProjectFormContent() {
                 <X className="h-4 w-4 text-error" />
                 Cancelar
               </button>
-              <button
+              <Button
                 onClick={submitParcial}
                 disabled={saving}
-                className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all duration-200 hover:bg-primary/90 disabled:opacity-60"
+                className="h-auto gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 disabled:opacity-60 motion-glow-primary"
               >
                 {saving ? 'Guardando…' : 'Guardar cambios'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -419,7 +412,7 @@ function NewProjectFormContent() {
             ) : (
               <button
                 onClick={() => goTo(step - 1)}
-                className="flex items-center gap-2 text-sm font-bold text-tertiary hover:text-on-surface transition-all duration-200"
+                className="flex items-center gap-2 text-sm font-bold text-tertiary hover:text-on-surface motion-control motion-focus"
               >
                 <ChevronLeft className="w-4 h-4" />
                 Anterior
@@ -430,7 +423,7 @@ function NewProjectFormContent() {
             {step < 2 ? (
               <button
                 onClick={() => goTo(step + 1)}
-                className="flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-all duration-200"
+                className="flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-md text-sm font-bold hover:bg-primary/90 motion-action motion-glow-primary motion-focus"
               >
                 Siguiente
                 <ChevronRight className="w-4 h-4" />
@@ -445,19 +438,38 @@ function NewProjectFormContent() {
   );
 }
 
+/** Mismo modal que el formulario real, con sus campos en esqueleto. */
+function FormularioSkeleton({ label }: { label: string }) {
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4">
+        <SkeletonRegion
+          label={label}
+          className="w-full max-w-2xl space-y-stack rounded-2xl border border-outline-variant bg-surface px-8 py-8 shadow-2xl"
+        >
+          <Skeleton className="h-6 w-1/2" />
+          <Skeleton className="h-4 w-3/4" />
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="space-y-tight pt-tight">
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-10 w-full rounded-control" />
+            </div>
+          ))}
+          <div className="flex justify-end gap-tight pt-stack">
+            <Skeleton className="h-10 w-24 rounded-control" />
+            <Skeleton className="h-10 w-32 rounded-control" />
+          </div>
+        </SkeletonRegion>
+      </div>
+    </>
+  );
+}
+
 export default function NewProjectFormPage() {
   return (
     <Suspense
-      fallback={
-        <>
-          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 text-tertiary text-sm">
-              Cargando formulario...
-            </div>
-          </div>
-        </>
-      }
+      fallback={<FormularioSkeleton label="Cargando formulario" />}
     >
       <NewProjectFormContent />
     </Suspense>

@@ -108,7 +108,7 @@ export function Step2({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className={`${labelClass} mb-0`}>Habilidades requeridas</label>
-              <button onClick={() => onAddRequisito(rol.id)} className="flex items-center gap-1 text-xs text-primary font-bold hover:underline">
+              <button onClick={() => onAddRequisito(rol.id)} className="flex items-center gap-1 text-xs text-primary font-bold motion-link">
                 <Plus className="w-3 h-3" /> Agregar habilidad
               </button>
             </div>
@@ -170,7 +170,7 @@ export function Step2({
         );
       })}
 
-      <button onClick={onAddRol} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-outline-variant text-sm font-bold text-primary hover:border-primary hover:bg-primary/5 transition-all duration-200">
+      <button onClick={onAddRol} className="w-full flex items-center justify-center gap-2 py-3 rounded-md border-2 border-dashed border-outline-variant text-sm font-bold text-primary hover:border-primary hover:bg-primary/5 motion-control motion-focus">
         <Plus className="w-4 h-4" /> Agregar rol
       </button>
     </div>

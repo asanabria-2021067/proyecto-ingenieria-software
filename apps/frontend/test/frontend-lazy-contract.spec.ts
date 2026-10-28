@@ -71,7 +71,9 @@ describe('T-293: imports estáticos de librerías pesadas', () => {
 
 describe('T-293: módulos ya diferidos', () => {
   it('el mapa de lugar del evento se carga con next/dynamic y sin SSR', () => {
-    const src = readFileSync(join(ROOT, 'components/calendar/event-form-dialog.tsx'), 'utf8');
+    // El campo de ubicación vive en las piezas compartidas del diálogo (evento de proyecto y reunión de Administración).
+    const src = readFileSync(join(ROOT, 'components/calendar/event-form-fields.tsx'), 'utf8');
+    expect(readFileSync(join(ROOT, 'components/calendar/event-form-dialog.tsx'), 'utf8')).not.toMatch(/event-location-picker/);
     expect(src).toMatch(/dynamic\(\(\) => import\('\.\/event-location-picker'\)/);
     expect(src).toMatch(/ssr:\s*false/);
     expect(src).not.toMatch(/^import .*from '\.\/event-location-picker'/m);
@@ -93,7 +95,8 @@ describe('T-293: secciones secundarias diferidas', () => {
 
   it('el hueco de la página de Tendencias reserva el sitio de las cinco tarjetas y se anuncia como carga', () => {
     const loading = metricasPage.slice(metricasPage.indexOf('loading: () => ('), metricasPage.indexOf('/**'));
-    expect(loading).toContain('role="status"');
+    // SkeletonRegion (HU-204) pinta role="status" con su etiqueta.
+    expect(loading).toMatch(/role="status"|<SkeletonRegion[^>]*label="Cargando/);
     expect(loading).toContain('length: 5');
     expect(loading).toContain('h-96');
   });

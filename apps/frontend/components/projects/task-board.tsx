@@ -65,6 +65,7 @@ import type { EstadoTarea, TareaPublicaDTO } from '@/lib/types/tasks';
 import type { useProjectTasks } from '@/hooks/use-project-tasks';
 import type { useProjectLabels } from '@/hooks/use-project-labels';
 import type { MiembroProyecto } from '@/hooks/use-project-members';
+import type { TaskSelectionControl } from '@/hooks/use-task-selection';
 
 type ProjectTasksHook = ReturnType<typeof useProjectTasks>;
 type ProjectLabelsHook = ReturnType<typeof useProjectLabels>;
@@ -112,6 +113,8 @@ interface TaskBoardProps {
   onFiltroRolChange?: (value: string) => void;
   onFiltroHitoChange?: (value: string) => void;
   mostrarToolbar?: boolean;
+  /** Selección múltiple (HU-202/T-382); solo se pasa al líder. */
+  seleccion?: TaskSelectionControl;
 }
 
 const MOBILE_BREAKPOINT = 768;
@@ -263,6 +266,7 @@ export function TaskBoard({
   onFiltroRolChange,
   onFiltroHitoChange,
   mostrarToolbar = true,
+  seleccion,
 }: TaskBoardProps) {
   const [filtroRolInterno, setFiltroRolInterno] = useState(FILTRO_TODOS);
   const [filtroHitoInterno, setFiltroHitoInterno] = useState(FILTRO_TODOS);
@@ -302,6 +306,18 @@ export function TaskBoard({
     () => filtrarTareas(tasks, filtroRol, filtroHito),
     [tasks, filtroRol, filtroHito],
   );
+
+  // Orden visible de cada columna: el rango de Shift+clic (HU-202/T-382) se
+  // calcula dentro de la columna de la tarjeta pulsada, en este mismo orden.
+  const ordenPorEstado = useMemo(() => {
+    const orden = {} as Record<EstadoTarea, number[]>;
+    for (const columna of COLUMNAS_TABLERO) {
+      orden[columna.estado] = ordenarTareas(
+        tareasFiltradas.filter((t) => t.estadoTarea === columna.estado),
+      ).map((t) => t.idTarea);
+    }
+    return orden;
+  }, [tareasFiltradas]);
 
   const hayFiltrosActivos = filtroRol !== FILTRO_TODOS || filtroHito !== FILTRO_TODOS;
   const sinCoincidencias = tasks.length > 0 && tareasFiltradas.length === 0 && hayFiltrosActivos;
@@ -384,6 +400,13 @@ export function TaskBoard({
         resaltada={focusTaskId === tarea.idTarea}
         onRegistrarCardRef={registrarCardRef}
         onRegistrarHandleRef={registrarHandleRef}
+        onAlternarSeleccion={
+          seleccion
+            ? (rango) => seleccion.alternar(tarea.idTarea, { rango, orden: ordenPorEstado[tarea.estadoTarea] })
+            : undefined
+        }
+        seleccionada={seleccion?.estaSeleccionada(tarea.idTarea) ?? false}
+        modoSeleccion={seleccion?.activa ?? false}
       />
     );
   }

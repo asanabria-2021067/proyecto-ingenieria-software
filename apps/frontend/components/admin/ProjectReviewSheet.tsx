@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle2, SendHorizonal, MessageSquare, Eye } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SkeletonDetail } from '@/components/ui/skeleton';
 import { getAdminProjectById, getProjectRevisions, resolverRevision } from '@/lib/services/projects';
 import { TIPO_LABEL, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
@@ -246,11 +246,7 @@ export function ProjectReviewSheet({
       {/* Body */}
       <div className="flex-1 overflow-y-auto">
         {isLoading && (
-          <div className="max-w-3xl mx-auto px-6 py-8 space-y-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-11 w-full rounded-control" />
-            ))}
-          </div>
+          <SkeletonDetail label="Cargando proyecto" sections={3} className="max-w-3xl mx-auto px-6 py-8" />
         )}
 
         {proyecto && (

@@ -29,6 +29,8 @@ import { AlertCircle, Bookmark, FolderOpen, SearchX } from 'lucide-react';
 import { useState } from 'react';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
+import { SkeletonRegion } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 type OrganizacionFiltro = {
   idOrganizacion: number;
@@ -134,7 +136,7 @@ export default function ProyectosPage() {
         </div>
 
         {/* Buscador y filtros */}
-        <div className="card-base mb-section space-y-stack">
+        <div className="mb-section space-y-stack">
           <div className="flex flex-col gap-stack sm:flex-row">
             <DashboardSearchField
               containerClassName="flex-1"
@@ -209,7 +211,7 @@ export default function ProyectosPage() {
                 type="button"
                 onClick={() => setTipoFiltro('')}
                 aria-pressed={tipoFiltro === ''}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold motion-select ${
                   tipoFiltro === '' ? 'bg-primary text-on-primary' : 'bg-surface-container text-text-secondary hover:bg-surface-container-high'
                 }`}
               >
@@ -223,7 +225,7 @@ export default function ProyectosPage() {
                     type="button"
                     onClick={() => setTipoFiltro((actual) => (actual === tipo ? '' : tipo))}
                     aria-pressed={tipoFiltro === tipo}
-                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold motion-select ${
                       tipoFiltro === tipo ? 'bg-primary text-on-primary' : 'bg-surface-container text-text-secondary hover:bg-surface-container-high'
                     }`}
                   >
@@ -241,11 +243,11 @@ export default function ProyectosPage() {
         )}
 
         {isLoading && (
-          <div className={PROJECT_CARD_GRID} role="status" aria-label="Cargando proyectos">
+          <SkeletonRegion className={PROJECT_CARD_GRID} label="Cargando proyectos">
             {Array.from({ length: 6 }).map((_, i) => (
               <AvailableProjectCardSkeleton key={i} />
             ))}
-          </div>
+          </SkeletonRegion>
         )}
 
         {!isLoading && isError && (
@@ -260,7 +262,7 @@ export default function ProyectosPage() {
               <button
                 type="button"
                 onClick={() => refetch()}
-                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
               >
                 Reintentar
               </button>
@@ -289,13 +291,13 @@ export default function ProyectosPage() {
             </EmptyHeader>
             {hasActiveFilters && (
               <EmptyContent>
-                <button
+                <Button
                   type="button"
                   onClick={limpiarFiltros}
-                  className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                  className="h-auto bg-primary px-5 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 motion-glow-primary"
                 >
                   Limpiar filtros
-                </button>
+                </Button>
               </EmptyContent>
             )}
           </Empty>

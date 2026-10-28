@@ -25,6 +25,12 @@ function makePrisma(preferencias: Pref[] = []) {
         guardadas.push(...data);
         return { count: data.length };
       }),
+      // Simula UNIQUE(id_usuario, clave_idempotencia) con skipDuplicates.
+      createManyAndReturn: vi.fn(async ({ data }: { data: Prisma.NotificacionCreateManyInput[] }) => {
+        const nuevas = data.filter((fila) => !guardadas.some((g) => g.idUsuario === fila.idUsuario && g.claveIdempotencia === fila.claveIdempotencia));
+        guardadas.push(...nuevas);
+        return nuevas.map((fila) => ({ idUsuario: fila.idUsuario }));
+      }),
     },
     preferenciaNotificacion: {
       findMany: vi.fn(async ({ where }: { where: PrefWhere }) =>
@@ -208,5 +214,35 @@ describe('persistUsersTx respeta las preferencias (T-327)', () => {
     expect(result).toEqual({ count: 0 });
     expect(tx.notificacion.createMany).not.toHaveBeenCalled();
     expect(effects).toEqual([]);
+  });
+});
+
+describe('persistUsersTx con clave de idempotencia (HU-195)', () => {
+  const REUNION = { ...TAREA, tipoNotificacion: TipoNotificacion.REUNION_PROGRAMADA };
+  const CLAVE = { claveIdempotencia: 'reunion:7:v1:programada' };
+
+  it('guarda la clave en cada fila y solo emite a quien se insertó de verdad', async () => {
+    const tx = makePrisma();
+    const { gateway, salas } = makeGateway();
+    const service = new NotificationsService(tx, gateway);
+    const effects: PostCommitEffect[] = [];
+    const sink = { add: (e: PostCommitEffect) => effects.push(e) };
+
+    expect(await service.persistUsersTx(tx as unknown as Prisma.TransactionClient, [1, 2], REUNION, sink, CLAVE)).toEqual({ count: 2 });
+    // Reintento de la misma operación lógica, con un destinatario nuevo.
+    expect(await service.persistUsersTx(tx as unknown as Prisma.TransactionClient, [1, 2, 3], REUNION, sink, CLAVE)).toEqual({ count: 1 });
+    await service.publishEffects(effects);
+
+    expect(tx.guardadas.map((f) => [f.idUsuario, f.claveIdempotencia])).toEqual([[1, CLAVE.claveIdempotencia], [2, CLAVE.claveIdempotencia], [3, CLAVE.claveIdempotencia]]);
+    expect(salas).toEqual(['user:1', 'user:2', 'user:3']);
+    expect(tx.notificacion.createManyAndReturn).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true }));
+    expect(tx.notificacion.createMany).not.toHaveBeenCalled();
+  });
+
+  it('sigue respetando preferencias antes de aplicar la clave', async () => {
+    const tx = makePrisma([{ idUsuario: 2, tipoNotificacion: TipoNotificacion.REUNION_PROGRAMADA, activa: false }]);
+    const result = await new NotificationsService(tx, undefined as never).persistUsersTx(tx as unknown as Prisma.TransactionClient, [1, 2], REUNION, undefined, CLAVE);
+    expect(result).toEqual({ count: 1 });
+    expect(notificados(tx)).toEqual([1]);
   });
 });

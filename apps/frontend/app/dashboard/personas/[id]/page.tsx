@@ -11,8 +11,7 @@ import {
   Share2,
   Users,
 } from 'lucide-react';
-import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,6 +30,7 @@ import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { useAccionesAmistad, usePerfilUsuario } from '@/hooks/use-social';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
 import { aviso } from '@/lib/mensajes';
+import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
 
 function compartirPerfil() {
   navigator.clipboard
@@ -49,16 +49,17 @@ function motivoAfinidad(mismaCarrera: boolean, amigosEnComun: number): string | 
 
 function PerfilSkeleton() {
   return (
-    <SkeletonTheme baseColor="var(--color-surface-container)" highlightColor="var(--color-surface-container-high)">
-      <div className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page">
-        <Skeleton width={140} height={20} className="mb-section" />
-        <div className="card-base flex flex-col items-center gap-tight py-section">
-          <Skeleton circle width={80} height={80} />
-          <Skeleton width={200} height={24} />
-          <Skeleton width={140} height={16} />
-        </div>
+    <SkeletonRegion
+      label="Cargando perfil"
+      className="mx-auto max-w-content px-stack py-section lg:px-section lg:py-page"
+    >
+      <Skeleton className="mb-section h-5 w-36" />
+      <div className="card-base flex flex-col items-center gap-tight py-section" aria-hidden="true">
+        <Skeleton className="size-20 rounded-full" />
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-4 w-36" />
       </div>
-    </SkeletonTheme>
+    </SkeletonRegion>
   );
 }
 
@@ -110,14 +111,15 @@ export default function PerfilPersonaPage() {
           <ArrowLeft className="size-4" aria-hidden="true" />
           Volver a Personas
         </Link>
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={compartirPerfil}
-          className="inline-flex items-center gap-tight rounded-control border border-outline-variant bg-card px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-container"
+          className="h-auto gap-(--spacing-tight) rounded-[var(--radius-control)] border-outline-variant bg-card px-3 py-1.5 text-sm font-medium text-text-primary shadow-none hover:bg-surface-container hover:text-text-primary has-[>svg]:px-3 dark:border-outline-variant dark:bg-card dark:hover:bg-surface-container"
         >
           <Share2 className="size-4 text-text-secondary" aria-hidden="true" />
           Compartir perfil
-        </button>
+        </Button>
       </div>
 
       <div className="layout-grid">
@@ -146,10 +148,10 @@ export default function PerfilPersonaPage() {
               </div>
 
               <div className="mt-tight grid w-full max-w-sm grid-cols-2 gap-tight">
-                <Button variant={amistad.variant} disabled={amistad.disabled} onClick={amistad.onClick}>
+                <Button variant={amistad.variant} disabled={amistad.disabled} onClick={amistad.onClick} className="h-9.5 rounded-md px-4.5 text-[13px] font-semibold">
                   {amistad.label}
                 </Button>
-                <Button variant="outline" disabled={seguimiento.disabled} onClick={seguimiento.onClick}>
+                <Button variant="outline" disabled={seguimiento.disabled} onClick={seguimiento.onClick} className="h-9.5 rounded-md px-4.5 text-[13px] font-semibold">
                   {seguimiento.label}
                 </Button>
               </div>
@@ -187,6 +189,8 @@ export default function PerfilPersonaPage() {
               )}
             </section>
           )}
+
+          <InsigniasVitrina insignias={perfil.insignias} publica />
 
           {/* Proyectos activos */}
           <section className="card-base">

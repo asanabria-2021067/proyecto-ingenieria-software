@@ -12,6 +12,7 @@ const navLinks = [
   { label: 'El Problema', href: '#el-problema' },
   { label: 'La Solucion', href: '#la-solucion' },
   { label: 'Como Funciona', href: '#como-funciona' },
+  { label: 'Contacto', href: '/contacto' },
 ];
 
 export default function Navbar() {

@@ -16,6 +16,8 @@ interface ConfirmActionDialogProps {
   title: string;
   description: string;
   actionLabel: string;
+  /** Texto del botón que descarta la acción (por defecto «Cancelar»). */
+  cancelLabel?: string;
   variant?: 'destructive' | 'warning' | 'default';
   isPending?: boolean;
   onConfirm: () => void;
@@ -24,11 +26,11 @@ interface ConfirmActionDialogProps {
 
 const actionClasses: Record<string, string> = {
   destructive:
-    'bg-error text-on-error hover:bg-error/90 rounded-control px-4 py-2 text-sm font-bold transition-colors',
+    'motion-glow-danger bg-error text-on-error hover:bg-error/90 rounded-md px-4 py-2 text-sm font-bold',
   warning:
-    'bg-amber-600 text-white hover:bg-amber-700 rounded-control px-4 py-2 text-sm font-bold transition-colors',
+    'motion-glow-warning bg-amber-600 text-white hover:bg-amber-700 rounded-md px-4 py-2 text-sm font-bold',
   default:
-    'bg-primary text-on-primary hover:bg-primary/90 rounded-control px-4 py-2 text-sm font-bold transition-colors',
+    'motion-glow-primary bg-primary text-on-primary hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-bold',
 };
 
 export function ConfirmActionDialog({
@@ -36,6 +38,7 @@ export function ConfirmActionDialog({
   title,
   description,
   actionLabel,
+  cancelLabel = 'Cancelar',
   variant = 'default',
   isPending = false,
   onConfirm,
@@ -53,9 +56,9 @@ export function ConfirmActionDialog({
         <AlertDialogFooter>
           <AlertDialogCancel
             onClick={onCancel}
-            className="rounded-control border-outline-variant text-on-surface hover:bg-surface-container-high"
+            className="rounded-md border-outline-variant text-on-surface hover:bg-surface-container-high"
           >
-            Cancelar
+            {cancelLabel}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}

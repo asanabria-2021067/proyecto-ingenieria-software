@@ -30,7 +30,7 @@ import {
   estadoBadgeStyle,
 } from '@/components/projects/available-project-card';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
@@ -54,7 +54,7 @@ const CARD = 'rounded-xl border border-outline-variant/30 bg-surface-container-l
 
 function PreparationSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-5 py-6 md:px-7" aria-busy="true">
+    <SkeletonRegion label="Cargando preparación del cierre" className="mx-auto w-full max-w-[1400px] px-5 py-6 md:px-7">
       <Skeleton className="mb-4 h-4 w-72" />
       <Skeleton className="mb-4 h-28 w-full rounded-xl" />
       <Skeleton className="mb-4 h-24 w-full rounded-xl" />
@@ -63,7 +63,7 @@ function PreparationSkeleton() {
         <Skeleton className="h-56 rounded-xl" />
         <Skeleton className="h-56 rounded-xl" />
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -277,7 +277,7 @@ function ClosurePreparationView({ proyecto }: { proyecto: ProyectoDetalleDTO }) 
           <FileText className="size-8" />
         </span>
         <div className="min-w-0 space-y-2">
-          <h1 className="line-clamp-2 text-2xl font-bold leading-tight text-on-surface md:text-[28px]">
+          <h1 className="type-display line-clamp-2">
             {proyecto.tituloProyecto}
           </h1>
           <p className="text-sm text-tertiary">

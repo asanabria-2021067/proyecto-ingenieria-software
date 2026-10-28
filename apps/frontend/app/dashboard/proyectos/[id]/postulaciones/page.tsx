@@ -12,6 +12,8 @@ import { getApiErrorStatus } from '@/components/projects/api-error';
 import { useRequireCan } from '@/hooks/use-can';
 import { projectAllPostulationsQueryKey } from '@/lib/query-keys/applications';
 import { EstadoPostulacion, PostulacionRecibida } from '@/types';
+import { SkeletonList } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 
 type ModalState = {
@@ -98,7 +100,7 @@ export default function PostulacionesProyectoPage() {
         </Link>
 
         <div className="mb-8">
-          <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
+          <h1 className="type-display mb-1">
             Postulaciones recibidas
           </h1>
           <p className="text-tertiary text-sm">
@@ -107,7 +109,7 @@ export default function PostulacionesProyectoPage() {
         </div>
 
         {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm">Cargando postulaciones...</div>
+          <SkeletonList label="Cargando postulaciones" count={3} lines={2} avatar="circle" trailing={1} />
         )}
 
         {isError && (
@@ -191,20 +193,21 @@ export default function PostulacionesProyectoPage() {
 
                   {p.estadoPostulacion === 'PENDIENTE' && (
                     <div className="flex gap-2">
-                      <button
+                      <Button
+                        variant="outline"
                         onClick={() => abrirModal(p.idPostulacion, 'RECHAZADA')}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-outline-variant text-sm font-semibold text-error hover:bg-error-container transition-colors"
+                        className="h-auto gap-1.5 rounded-xl border-outline-variant bg-transparent px-4 py-2 text-sm font-semibold text-error shadow-none hover:bg-error-container hover:text-error has-[>svg]:px-4 dark:border-outline-variant dark:bg-transparent dark:hover:bg-error-container"
                       >
                         <XCircle className="w-4 h-4" />
                         Rechazar
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => abrirModal(p.idPostulacion, 'ACEPTADA')}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-semibold hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all"
+                        className="h-auto gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary has-[>svg]:px-4 motion-glow-primary"
                       >
                         <CheckCircle className="w-4 h-4" />
                         Aceptar
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -250,21 +253,23 @@ export default function PostulacionesProyectoPage() {
             </div>
 
             <div className="flex gap-3 justify-end">
-              <button
+              <Button
+                variant="outline"
                 onClick={cerrarModal}
                 disabled={isPending}
-                className="px-5 py-2.5 rounded-xl border border-outline-variant text-sm font-semibold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50"
+                className="h-auto rounded-xl border-outline-variant bg-transparent px-5 py-2.5 text-sm font-semibold text-on-surface shadow-none hover:bg-surface-container hover:text-on-surface dark:border-outline-variant dark:bg-transparent dark:hover:bg-surface-container"
               >
                 Cancelar
-              </button>
+              </Button>
 
-              <button
+              <Button
+                variant={modal.accion === 'ACEPTADA' ? 'default' : 'destructive'}
                 onClick={confirmar}
                 disabled={isPending}
-                className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${
+                className={`h-auto rounded-xl px-5 py-2.5 text-sm font-bold ${
                   modal.accion === 'ACEPTADA'
-                    ? 'bg-primary text-on-primary hover:shadow-md hover:scale-[1.02] active:scale-95'
-                    : 'bg-error text-on-error hover:shadow-md hover:scale-[1.02] active:scale-95'
+                    ? 'bg-primary text-on-primary hover:bg-primary motion-glow-primary'
+                    : 'bg-error text-on-error hover:bg-error dark:bg-error'
                 }`}
               >
                 {isPending
@@ -272,7 +277,7 @@ export default function PostulacionesProyectoPage() {
                   : modal.accion === 'ACEPTADA'
                   ? 'Sí, aceptar'
                   : 'Sí, rechazar'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

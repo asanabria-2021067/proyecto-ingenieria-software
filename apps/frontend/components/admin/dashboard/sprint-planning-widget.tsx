@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { AlertCircle, ArrowRight, CalendarClock, RotateCw } from 'lucide-react';
 import { MiniCalendar } from '@/components/calendar/mini-calendar';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { useAdminSprintCalendar } from '@/hooks/use-admin-sprint-calendar';
 import {
   SITUACION_SPRINT_LABEL,
@@ -75,11 +75,11 @@ const TARJETA = 'card-base flex flex-col gap-stack xl:gap-tight xl:p-stack';
 
 function SprintPlanningSkeleton() {
   return (
-    <div role="status" aria-label="Cargando la planificación de Sprints" className="flex flex-col gap-stack">
+    <SkeletonRegion label="Cargando la planificación de Sprints" className="flex flex-col gap-stack">
       <Skeleton className="h-20 rounded-control" />
       <Skeleton className="mx-auto h-56 w-full max-w-sm rounded-control" />
       <Skeleton className="h-20 rounded-control" />
-    </div>
+    </SkeletonRegion>
   );
 }
 

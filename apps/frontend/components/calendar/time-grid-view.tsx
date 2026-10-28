@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { Fragment, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import type { CalendarDay } from '@/lib/calendar/utils';
 import { agendaItemKey, type AgendaItem } from '@/lib/calendar/agenda';
@@ -104,6 +104,7 @@ export function TimeGridView({
   itemsByDay,
   onSelectEvento,
   onVerDia,
+  renderTodoElDia,
   ahora,
 }: {
   days: CalendarDay[];
@@ -112,6 +113,12 @@ export function TimeGridView({
   onSelectEvento: (item: EventoItem) => void;
   /** Semana: el "+N" de un horario muy cargado abre ese día en la vista Día. */
   onVerDia?: (dayKey: string) => void;
+  /**
+   * Ficha propia de un ítem de la franja "Todo el día" (calendario
+   * administrativo: finalización de un Sprint). `undefined` usa la ficha por
+   * defecto; el calendario del estudiante no la pasa.
+   */
+  renderTodoElDia?: (item: AgendaItem) => React.ReactNode | undefined;
   ahora: Date;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -141,7 +148,11 @@ export function TimeGridView({
   return (
     <div className="card-base overflow-hidden p-0">
       <div className={days.length > 1 ? 'overflow-x-auto' : ''} data-testid="cuadricula-semana">
-      <div className={`grid border-b border-outline-variant/40 ${anchoMinimo}`} style={plantilla}>
+      {/* Columnas alineadas: el cuerpo tiene scroll vertical y, con barras clásicas (Chrome/Firefox en
+          Linux o Windows), la barra le quitaba ~15 px y sus columnas quedaban corridas respecto de la
+          cabecera. Cuerpo, cabecera y «Todo el día» reservan el mismo canal (`scrollbar-gutter: stable`):
+          las tres filas tienen el mismo ancho útil con cualquier tipo de barra. */}
+      <div className={`grid overflow-hidden border-b border-outline-variant/40 [scrollbar-gutter:stable] ${anchoMinimo}`} style={plantilla}>
         <div />
         {days.map((day) => {
           const isToday = day.key === todayKey;
@@ -170,7 +181,7 @@ export function TimeGridView({
       </div>
 
       {hayTodoElDia && (
-        <div className={`grid border-b border-outline-variant/40 ${anchoMinimo}`} style={plantilla}>
+        <div className={`grid overflow-hidden border-b border-outline-variant/40 [scrollbar-gutter:stable] ${anchoMinimo}`} style={plantilla}>
           <div className="type-meta flex items-start justify-end px-1 py-1 text-right leading-tight">Todo el día</div>
           {columnas.map(({ day, todoElDia }) => {
             // G02 (UI-13): en Día hay sitio para todas (con scroll acotado); en
@@ -185,7 +196,9 @@ export function TimeGridView({
                 }`}
               >
                 {todoElDia.slice(0, limite).map((item) => (
-                  <ChipTodoElDia key={agendaItemKey(item)} item={item} onSelectEvento={onSelectEvento} />
+                  <Fragment key={agendaItemKey(item)}>
+                    {renderTodoElDia?.(item) ?? <ChipTodoElDia item={item} onSelectEvento={onSelectEvento} />}
+                  </Fragment>
                 ))}
                 {ocultos > 0 && (
                   <button
@@ -214,7 +227,7 @@ export function TimeGridView({
         tabIndex={0}
         role="group"
         aria-label={days.length > 1 ? 'Horario de la semana por horas' : 'Horario del día por horas'}
-        className={`relative h-[min(34rem,70dvh)] overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${anchoMinimo}`}
+        className={`relative h-[min(34rem,70dvh)] overflow-y-auto overscroll-contain outline-none [scrollbar-gutter:stable] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${anchoMinimo}`}
         data-testid="cuadricula-horas"
       >
         <div className="grid" style={{ ...plantilla, height: 24 * HORA_ALTO_PX }}>

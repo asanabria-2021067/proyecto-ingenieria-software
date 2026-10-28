@@ -25,12 +25,8 @@ export default defineConfig({
     // NODE_OPTIONS no llega de forma confiable a los workers de tinypool,
     // así que el límite se pasa directo como flag de proceso via execArgv.
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        maxForks: 2,
-        execArgv: ['--max-old-space-size=6144'],
-      },
-    },
+    maxWorkers: 2,
+    execArgv: ['--max-old-space-size=6144'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov', 'json-summary'],

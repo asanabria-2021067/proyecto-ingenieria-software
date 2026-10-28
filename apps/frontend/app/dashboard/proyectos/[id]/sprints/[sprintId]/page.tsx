@@ -21,7 +21,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DATA_TABLE_CARD,
@@ -114,13 +114,13 @@ function agruparParticipantes(tareas: SprintDetailTareaDto[]): ParticipanteContr
 
 function DetailSkeleton() {
   return (
-    <div className="space-y-6">
+    <SkeletonRegion label="Cargando sprint" className="space-y-6">
       <Skeleton className="h-24 w-full rounded-2xl" />
       <Skeleton className="h-16 w-full rounded-2xl" />
       <Skeleton className="h-56 w-full rounded-xl" />
       <Skeleton className="h-40 w-full rounded-xl" />
       <Skeleton className="h-40 w-full rounded-xl" />
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -310,7 +310,7 @@ export default function SprintDetailPage() {
                 <button
                   type="button"
                   onClick={() => refetch()}
-                  className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                  className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
                 >
                   Reintentar
                 </button>

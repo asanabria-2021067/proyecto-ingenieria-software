@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, MessageSquare, Pencil, X, Plus, Send, Save, Eye } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SkeletonDetail } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -44,13 +45,7 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 function ViewSkeleton() {
-  return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-4">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <Skeleton key={i} className="h-11 w-full rounded-xl" />
-      ))}
-    </div>
-  );
+  return <SkeletonDetail label="Cargando proyecto" sections={3} className="max-w-3xl mx-auto px-6 py-8" />;
 }
 
 function parseComments(raw: string | null | undefined): { general: string; roles: string } {
@@ -96,13 +91,13 @@ function ProjectReadOnlyView({
               Revisa los comentarios de cada sección y aplica las correcciones necesarias.
             </p>
           </div>
-          <button
+          <Button
             onClick={onEdit}
-            className="shrink-0 flex items-center gap-2 rounded-xl bg-on-review px-4 py-2 type-meta font-bold text-review-ink transition-colors dark:text-review hover:bg-on-review/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-review/70"
+            className="h-auto gap-2 rounded-xl bg-on-review px-4 py-2 type-meta font-bold text-review-ink dark:text-review hover:bg-on-review/90 has-[>svg]:px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-review/70"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="size-3.5" />
             Editar y corregir
-          </button>
+          </Button>
         </div>
       )}
 
@@ -360,13 +355,14 @@ export default function MyProjectViewClient({ id }: Props) {
       <div className="shrink-0 flex items-center gap-4 border-b border-outline-variant/30 bg-surface px-6 py-4">
         {isEditing ? (
           <>
-            <button
+            <Button
+              variant="ghost"
               onClick={cancelEdit}
-              className="flex items-center gap-2 rounded-xl bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+              className="h-auto gap-2 bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface hover:bg-primary hover:text-on-primary has-[>svg]:px-3 dark:hover:bg-primary"
             >
               <ArrowLeft className="h-4 w-4" />
               Cancelar
-            </button>
+            </Button>
             <div className="h-5 w-px bg-outline-variant/40" />
             <div className="flex-1 min-w-0">
               <p className="type-meta font-black uppercase tracking-widest text-text-primary">
@@ -381,7 +377,7 @@ export default function MyProjectViewClient({ id }: Props) {
           <>
             <Link
               href={volverHref}
-              className="flex items-center gap-2 rounded-xl bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+              className="flex items-center gap-2 rounded-md bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface motion-control motion-focus hover:bg-primary hover:text-on-primary"
             >
               <ArrowLeft className="h-4 w-4" />
               Volver
@@ -718,14 +714,15 @@ export default function MyProjectViewClient({ id }: Props) {
       {isEditing && (
         <div className="shrink-0 border-t border-outline-variant/30 bg-surface px-6 py-4">
           <div className="max-w-3xl mx-auto flex gap-3">
-            <button
+            <Button
+              variant="ghost"
               disabled={saving}
               onClick={() => void submit('BORRADOR')}
-              className="flex items-center justify-center gap-2 rounded-xl bg-surface-container-high px-5 py-3 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-auto gap-2 rounded-xl bg-surface-container-high px-5 py-3 text-sm font-bold text-on-surface hover:bg-primary hover:text-on-primary has-[>svg]:px-5 dark:hover:bg-primary"
             >
               <Save className="h-4 w-4" />
               Guardar cambios
-            </button>
+            </Button>
             <button
               disabled={saving}
               onClick={() => void submit('EN_REVISION')}

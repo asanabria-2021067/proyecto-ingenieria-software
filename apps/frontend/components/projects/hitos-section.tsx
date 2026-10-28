@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type KeyboardEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
   ArrowDown,
@@ -13,6 +13,7 @@ import {
   ChevronUp,
   Circle,
   MessageCircle,
+  MessageSquare,
   Minus,
   UserRound,
 } from 'lucide-react';
@@ -21,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CreateMilestoneDialog } from '@/components/projects/create-milestone-dialog';
 import { AssignMilestoneDialog } from '@/components/projects/assign-milestone-dialog';
+import { MilestoneCommentsSheet, useMilestoneCommentCounts } from '@/components/projects/milestone-comments';
 import { ESTADO_HITO_STYLE } from '@/components/projects/sprint-status.utils';
 import {
   ESTADO_COLUMNA_STYLE,
@@ -292,6 +294,8 @@ function MilestoneCard({
   onOpenTask,
   onOpenComments,
   onVerTodas,
+  cantidadComentarios,
+  onOpenHitoComments,
 }: {
   hito: Hito;
   index: number;
@@ -300,6 +304,9 @@ function MilestoneCard({
   onOpenTask: (tarea: TareaPublicaDTO, tab: DetalleTab) => void;
   onOpenComments: (tarea: TareaPublicaDTO) => void;
   onVerTodas?: (idHito: number) => void;
+  /** HU-200: comentarios del hito (no de sus tareas). */
+  cantidadComentarios: number;
+  onOpenHitoComments: () => void;
 }) {
   const stats = calcularStats(tareasTotales);
   const estado = estadoHitoConfig(stats.estado);
@@ -358,14 +365,27 @@ function MilestoneCard({
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => onVerTodas?.(hito.idHito)}
-        aria-label={`Ver todas las tareas del hito ${hito.tituloHito}`}
-        className="mt-3 min-h-10 border-t border-outline-variant/30 pt-2 text-center text-[12px] font-semibold text-primary transition-colors hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-      >
-        Ver todas las tareas ({tareasTotales.length})
-      </button>
+      <div className="mt-3 flex items-stretch gap-1 border-t border-outline-variant/30 pt-2">
+        <button
+          type="button"
+          onClick={() => onVerTodas?.(hito.idHito)}
+          aria-label={`Ver todas las tareas del hito ${hito.tituloHito}`}
+          className="min-h-10 flex-1 rounded-md text-center text-[12px] font-semibold text-primary transition-colors hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        >
+          Ver todas las tareas ({tareasTotales.length})
+        </button>
+        <span className="my-2 w-px bg-outline-variant/40" aria-hidden="true" />
+        <button
+          type="button"
+          onClick={onOpenHitoComments}
+          aria-label={`Comentarios del hito ${hito.tituloHito} (${cantidadComentarios})`}
+          title="Comentarios del hito"
+          className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        >
+          <MessageSquare className="size-3.5" aria-hidden="true" />
+          {cantidadComentarios}
+        </button>
+      </div>
     </article>
   );
 }
@@ -519,6 +539,16 @@ export function HitosSection({
   // pulsar una tarea o sus comentarios navega hacia ella, no abre un Sheet.
   const router = useRouter();
 
+  // HU-200: los comentarios del HITO sí se abren en un panel lateral. Con
+  // ?hito=N(&comment=M) (enlace de una notificación) el panel abre solo.
+  const searchParams = useSearchParams();
+  const leerId = (valor: string | null) => (valor && /^\d+$/.test(valor) ? Number(valor) : null);
+  const hitoParam = leerId(searchParams.get('hito'));
+  const comentarioParam = leerId(searchParams.get('comment'));
+  const [idHitoComentarios, setIdHitoComentarios] = useState<number | null>(hitoParam);
+  const hitoComentarios = hitos.find((h) => h.idHito === idHitoComentarios) ?? null;
+  const conteoComentarios = useMilestoneCommentCounts(idProyecto);
+
   const idsHitosCargados = useMemo(() => new Set(hitos.map((h) => h.idHito)), [hitos]);
   const hitosOrdenados = useMemo(
     () => [...hitos].sort((a, b) => a.orden - b.orden || (a.fechaLimite ?? '9999-12-31').localeCompare(b.fechaLimite ?? '9999-12-31') || a.idHito - b.idHito),
@@ -586,6 +616,8 @@ export function HitosSection({
               onOpenTask={abrirDetalle}
               onOpenComments={(tarea) => abrirDetalle(tarea, 'comentarios')}
               onVerTodas={onVerTodasLasTareas}
+              cantidadComentarios={conteoComentarios.get(hito.idHito) ?? 0}
+              onOpenHitoComments={() => setIdHitoComentarios(hito.idHito)}
             />
           ))}
         </div>
@@ -628,6 +660,15 @@ export function HitosSection({
         puedeCrear={puedeCrear}
         crearHito={crearHito}
         asignarHitoTareas={asignarHitoTareas}
+      />
+
+      <MilestoneCommentsSheet
+        idProyecto={idProyecto}
+        hito={hitoComentarios}
+        onOpenChange={(open) => {
+          if (!open) setIdHitoComentarios(null);
+        }}
+        comentarioDestacado={hitoComentarios?.idHito === hitoParam ? comentarioParam : null}
       />
     </div>
   );

@@ -10,7 +10,10 @@ const abrirChat = vi.fn();
 vi.mock('@/components/chat-dock/chat-dock-context', () => ({ useChatDock: () => ({ abrirChat }) }));
 
 const listAllConversationsMock = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/services/chat', () => ({ listAllConversations: (...args: unknown[]) => listAllConversationsMock(...args) }));
+vi.mock('@/lib/services/chat', () => ({
+  listAllConversations: (...args: unknown[]) => listAllConversationsMock(...args),
+  getMiEstado: () => Promise.resolve(null),
+}));
 
 import { ChatListPopover } from '../components/chat-dock/chat-list-popover';
 import type { ChatConversacionGlobal } from '../lib/types/chat';
@@ -23,6 +26,7 @@ function conversacion(overrides: Partial<ChatConversacionGlobal> = {}): ChatConv
     tipo: 'INDIVIDUAL',
     nombre: null,
     nombrePersonalizado: null,
+    esCanal: false,
     participantes: [
       { idUsuario: 1, nombre: 'Yo', apellido: 'Usuario', fotoUrl: null },
       { idUsuario: 2, nombre: 'Rosa', apellido: 'Fuentes', fotoUrl: null },
@@ -33,7 +37,11 @@ function conversacion(overrides: Partial<ChatConversacionGlobal> = {}): ChatConv
     esFavorita: false,
     archivadaManual: false,
     silenciada: false,
+    silenciadaPorMi: false,
+    silenciadaHasta: null,
+    silenciadaSiempre: false,
     esPrioritaria: true,
+    temaColor: null,
     ...overrides,
   };
 }
@@ -51,12 +59,48 @@ afterEach(() => {
 });
 
 describe('ChatListPopover', () => {
+  it('un chat silenciado muestra el indicador y oculta el contador de no leidos', async () => {
+    listAllConversationsMock.mockResolvedValue([conversacion({ noLeidos: 4, silenciadaSiempre: true })]);
+    renderPopover();
+
+    expect(await screen.findByText('Silenciado')).toBeInTheDocument();
+    expect(screen.queryByText('4')).not.toBeInTheDocument();
+  });
+
+  it('un silencio vencido vuelve a mostrar el contador', async () => {
+    listAllConversationsMock.mockResolvedValue([
+      conversacion({ noLeidos: 4, silenciadaHasta: new Date(Date.now() - 1000).toISOString() }),
+    ]);
+    renderPopover();
+
+    expect(await screen.findByText('4')).toBeInTheDocument();
+    expect(screen.queryByText('Silenciado')).not.toBeInTheDocument();
+  });
+
   it('lista los chats prioritarios por defecto y muestra el badge de proyecto', async () => {
     listAllConversationsMock.mockResolvedValue([conversacion()]);
     renderPopover();
 
     expect(await screen.findByText('Rosa Fuentes')).toBeInTheDocument();
     expect(screen.getByText('Feria de Ciencias')).toBeInTheDocument();
+  });
+
+  it('muestra el estado vigente de la otra persona y no el vencido', async () => {
+    const participantes = (estado: ChatConversacionGlobal['participantes'][number]['estado']) => [
+      { idUsuario: 1, nombre: 'Yo', apellido: 'Usuario', fotoUrl: null },
+      { idUsuario: 2, nombre: 'Rosa', apellido: 'Fuentes', fotoUrl: null, estado },
+    ];
+    listAllConversationsMock.mockResolvedValue([
+      conversacion({ participantes: participantes({ tipo: 'EN_CLASE', texto: null, venceEn: null }) }),
+      conversacion({
+        idConversacion: 2,
+        participantes: participantes({ tipo: 'OCUPADO', texto: null, venceEn: new Date(Date.now() - 1000).toISOString() }),
+      }),
+    ]);
+    renderPopover();
+
+    expect(await screen.findByText('En clase')).toBeInTheDocument();
+    expect(screen.queryByText('Ocupado')).not.toBeInTheDocument();
   });
 
   it('la pestaña Otros filtra por esPrioritaria: false', async () => {
@@ -102,5 +146,25 @@ describe('ChatListPopover', () => {
 
     expect(abrirChat).toHaveBeenCalledWith(7, 42);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('el boton de mensajes guardados abre el dialogo y cierra el popover', async () => {
+    const onClose = vi.fn();
+    const onOpenSaved = vi.fn();
+    listAllConversationsMock.mockResolvedValue([]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client }, createElement(ChatListPopover, { onClose, onOpenSaved })));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver mensajes guardados' }));
+
+    expect(onOpenSaved).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('sin onOpenSaved no muestra el boton de guardados', async () => {
+    listAllConversationsMock.mockResolvedValue([]);
+    renderPopover();
+
+    expect(screen.queryByRole('button', { name: 'Ver mensajes guardados' })).not.toBeInTheDocument();
   });
 });

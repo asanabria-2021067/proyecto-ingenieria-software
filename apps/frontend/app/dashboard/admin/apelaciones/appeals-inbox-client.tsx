@@ -18,7 +18,7 @@ import {
 } from '@/components/dashboard/data-table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
@@ -85,7 +85,7 @@ function tituloProyecto(a: ApelacionItemDto): string {
 
 function TablaSkeleton() {
   return (
-    <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando apelaciones">
+    <SkeletonRegion className={DATA_TABLE_CARD} label="Cargando apelaciones">
       <div className={`${DATA_TABLE_HEAD_ROW} px-stack py-tight`}>
         <Skeleton className="h-4 w-40" />
       </div>
@@ -101,7 +101,7 @@ function TablaSkeleton() {
           </div>
         ))}
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -145,7 +145,7 @@ function FilaApelacion({ apelacion: a, filtro, page }: { apelacion: ApelacionIte
         <Link
           href={appealDetailHref(a.idApelacion, filtro, page)}
           aria-label={`${accion}: apelación #${a.idApelacion}, ${a.asunto}`}
-          className="ml-auto flex min-h-11 w-fit min-w-11 items-center justify-center gap-micro whitespace-nowrap rounded-control px-tight type-meta font-semibold text-primary hover:underline"
+          className="ml-auto flex min-h-11 w-fit min-w-11 items-center justify-center gap-micro whitespace-nowrap rounded-control px-tight type-meta font-semibold text-primary motion-link"
         >
           <span className="hidden @2xl/bandeja:inline">{accion}</span>
           <ChevronRight className="size-4 @2xl/bandeja:size-3.5" aria-hidden="true" />

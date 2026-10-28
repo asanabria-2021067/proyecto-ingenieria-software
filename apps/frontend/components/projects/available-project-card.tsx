@@ -154,8 +154,15 @@ interface MineEstadoConfig {
 export const BOTON_CERRADO =
   'bg-[#64756C] text-white hover:bg-[#57675F] dark:bg-[#453405] dark:text-[#ffd873] dark:hover:bg-[#5a4408]';
 
+/**
+ * «Ver mi solicitud» de un proyecto en revisión: neutro claro con borde. Lo
+ * comparte «Solicitud enviada» de las tarjetas de Personas (misma espera).
+ */
+export const BOTON_EN_REVISION =
+  'bg-[#F4F5F6] text-[#414850] border border-[#CBD1D6] hover:bg-[#E9EBEC] dark:bg-surface-container-high dark:text-on-surface-variant dark:border-outline-variant dark:hover:bg-surface-container-highest';
+
 /** «Ver proyecto» de un proyecto con cierre solicitado: verde oscuro de marca. */
-const BOTON_CIERRE_SOLICITADO = 'bg-[#0A4232] text-white hover:bg-[#08352A] dark:bg-primary dark:text-on-primary dark:hover:bg-primary/90';
+const BOTON_CIERRE_SOLICITADO = 'text-[13px] font-semibold motion-glow-primary bg-[#0A4232] text-white hover:bg-[#08352A] dark:bg-primary dark:text-on-primary dark:hover:bg-primary/90';
 
 /**
  * Función central para "Mis Proyectos": a partir del estado real determina
@@ -179,7 +186,7 @@ function mineEstadoConfig(estadoProyecto: string, idProyecto: number): MineEstad
         estadoLabel: 'En revisión',
         buttonLabel: 'Ver mi solicitud',
         buttonHref: `/dashboard/projects/mine/${idProyecto}`,
-        buttonClassName: 'bg-[#F4F5F6] text-[#414850] border border-[#CBD1D6] hover:bg-[#E9EBEC] dark:bg-surface-container-high dark:text-on-surface-variant dark:border-outline-variant dark:hover:bg-surface-container-highest',
+        buttonClassName: BOTON_EN_REVISION,
         buttonAnimated: false,
         showDelete: false,
         secondaryIcon: Clock,

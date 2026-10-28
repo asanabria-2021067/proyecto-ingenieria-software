@@ -4,6 +4,7 @@ import { ArrowLeft, MessageSquare } from 'lucide-react';
 import { TIPO_LABEL, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
 import type { RevisionProyectoDTO } from '@/lib/dto/project.dto';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   revision: RevisionProyectoDTO;
@@ -71,13 +72,14 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
     <div className="fixed inset-0 z-60 flex flex-col bg-surface overflow-hidden animate-in slide-in-from-right-full duration-300">
       {/* Header */}
       <div className="shrink-0 flex items-center gap-4 border-b border-outline-variant/30 bg-surface px-6 py-4">
-        <button
+        <Button
+          variant="ghost"
           onClick={onClose}
-          className="flex items-center gap-2 rounded-control bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+          className="h-auto gap-2 rounded-[var(--radius-control)] bg-surface-container-high px-3 py-2 text-sm font-bold text-on-surface hover:bg-primary hover:text-on-primary has-[>svg]:px-3 dark:hover:bg-primary"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver
-        </button>
+        </Button>
         <div className="h-5 w-px bg-outline-variant/40" />
         <div className="flex-1 min-w-0">
           <p className="type-micro font-black uppercase tracking-widest text-primary">
@@ -196,12 +198,13 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
       {/* Footer */}
       <div className="shrink-0 border-t border-outline-variant/30 bg-surface px-6 py-4">
         <div className="max-w-3xl mx-auto">
-          <button
+          <Button
+            variant="ghost"
             onClick={onClose}
-            className="w-full rounded-control bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+            className="h-auto w-full rounded-[var(--radius-control)] bg-surface-container-high px-4 py-3 text-sm font-bold text-on-surface hover:bg-primary hover:text-on-primary dark:hover:bg-primary"
           >
             Cerrar
-          </button>
+          </Button>
         </div>
       </div>
     </div>

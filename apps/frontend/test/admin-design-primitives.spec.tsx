@@ -38,9 +38,9 @@ describe('FG07-C02: primitivas de página', () => {
     const conEntrada = Object.values(VISTAS_ADMIN).filter((archivo) => leer(archivo).includes('className={ADMIN_PAGE_LEAD}'));
     // Incluye la vista de cuentas pendientes (HU-179, PR #270), migrada a las primitivas al integrarla,
     // y la página propia de «Tendencias de uso». El catálogo temporal de etiquetas, que también usaba
-    // el titular, se retiró del proyecto.
-    expect(conTitular).toHaveLength(10);
-    expect(conEntrada).toHaveLength(9);
+    // el titular, se retiró del proyecto; el de botones, que también lo usaba, después.
+    expect(conTitular).toHaveLength(11);
+    expect(conEntrada).toHaveLength(10);
     for (const archivo of Object.values(VISTAS_ADMIN)) {
       expect(leer(archivo), archivo).not.toContain('className="type-display text-balance"');
       expect(leer(archivo), archivo).not.toMatch(/className="mt-(2|tight) max-w-2xl text-base text-tertiary"/);
@@ -65,7 +65,7 @@ describe('FG07-C02: primitivas que ya compartían las bandejas (sin cambios)', (
     expect(screen.getByRole('navigation', { name: 'Paginación de prueba' })).toHaveClass('card-base');
     expect(screen.getByRole('button', { name: 'Página anterior' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Página siguiente' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Página siguiente' })).toHaveClass('rounded-control');
+    expect(screen.getByRole('button', { name: 'Página siguiente' })).toHaveClass('rounded-md');
   });
 
   it('la etiqueta estándar mantiene forma, tono y tamaño', () => {

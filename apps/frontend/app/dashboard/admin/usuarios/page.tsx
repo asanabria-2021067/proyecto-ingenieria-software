@@ -19,7 +19,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { UserDetailSheet } from '@/components/admin/UserDetailSheet';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Table,
   TableHeader,
@@ -110,7 +110,7 @@ interface PendingAction {
 
 function TablaSkeleton() {
   return (
-    <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando usuarios">
+    <SkeletonRegion className={DATA_TABLE_CARD} label="Cargando usuarios">
       <div className={`${DATA_TABLE_HEAD_ROW} px-stack py-tight`}>
         <Skeleton className="h-4 w-40" />
       </div>
@@ -127,7 +127,7 @@ function TablaSkeleton() {
           </div>
         ))}
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -145,7 +145,7 @@ function UserActions({
       <button
         type="button"
         onClick={() => onViewProfile(user.idUsuario)}
-        className="flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-tag bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface transition-all hover:bg-primary hover:text-on-primary"
+        className="flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-surface-container-high px-3 py-1.5 text-xs font-bold text-on-surface motion-control motion-focus hover:bg-primary hover:text-on-primary"
         aria-label={`Ver perfil de ${user.nombre} ${user.apellido}`}
       >
         <Eye className="h-3.5 w-3.5" aria-hidden="true" />
@@ -326,13 +326,14 @@ export default function AdminUsuariosPage() {
 
           {/* Clear */}
           {(search || rol || estado || year) && (
-            <button
+            <Button
+              variant="ghost"
               onClick={clearFilters}
-              className="flex items-center gap-1.5 rounded-control px-3 py-2.5 text-sm font-medium text-tertiary hover:bg-surface-container-high transition-colors"
+              className="h-auto gap-1.5 px-3 py-2.5 text-sm font-medium text-tertiary hover:bg-surface-container-high hover:text-tertiary has-[>svg]:px-3 dark:hover:bg-surface-container-high"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="size-3.5" />
               Limpiar filtros
-            </button>
+            </Button>
           )}
         </div>
 

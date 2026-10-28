@@ -38,13 +38,15 @@ afterEach(() => {
 });
 
 const FAMILIAS = [
-  ['Tareas e hitos', 7],
+  // HU-200: + MENCION_COMENTARIO.
+  ['Tareas e hitos', 8],
   ['Postulaciones y equipo', 7],
   ['Proyectos', 17],
-  ['Horas y reconocimiento', 4],
-  ['Recordatorios y calendario', 2],
+  ['Horas y reconocimiento', 5],
+  // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA.
+  ['Recordatorios y calendario', 5],
   ['Red de contactos', 3],
-  ['Cuenta y seguridad', 4],
+  ['Cuenta y seguridad', 5],
 ] as const;
 
 const familia = (titulo: string) => screen.getByRole('button', { name: new RegExp(`^${titulo}`) });
@@ -87,7 +89,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
 
     fireEvent.click(familia('Red de contactos'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getAllByRole('switch')).toHaveLength(4);
+    expect(screen.getAllByRole('switch')).toHaveLength(5);
   });
 
   it('el disparador es un botón dentro de un encabezado: se alcanza y se acciona con teclado', async () => {
@@ -125,7 +127,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     guardado.resolver(preferencias(['NUEVO_SEGUIDOR']));
     await waitFor(() => expect(familia('Red de contactos')).toHaveTextContent('2 de 3 activas'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'true');
-    expect(familia('Tareas e hitos')).toHaveTextContent('7 de 7 activas');
+    expect(familia('Tareas e hitos')).toHaveTextContent('8 de 8 activas');
   });
 
   it('si el guardado falla, el contador no se mueve', async () => {

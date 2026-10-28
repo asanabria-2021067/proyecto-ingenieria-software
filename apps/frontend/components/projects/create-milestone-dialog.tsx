@@ -196,7 +196,7 @@ export function CreateMilestoneDialog({
             <Button
               type="submit"
               disabled={crearHito.isPending}
-              className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
+              className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90 motion-glow-primary"
             >
               {crearHito.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
               {crearHito.isPending

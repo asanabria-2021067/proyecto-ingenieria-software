@@ -1264,6 +1264,23 @@ describe('SprintsService', () => {
       });
     });
 
+    it('HU-190: tras cerrar emite el recálculo de insignias de sprints del equipo, fuera de la transacción', async () => {
+      const tx = makeTx();
+      const sprint = sprintEnFinalizacion();
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanCloseSprint.mockResolvedValue(sprint);
+      tx.sprint.updateMany.mockResolvedValue({ count: 1 });
+      tx.sprint.findFirst.mockResolvedValue({ ...sprint, estado: 'CERRADO', fechaCierre: new Date(), cerradoPor: LIDER_ID });
+      const prisma = makePrisma(tx);
+      const events = { emit: vi.fn() };
+      const service = new SprintsService(prisma, makeSprintsContext(), authorization, makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), undefined, undefined, undefined, undefined, events as never);
+
+      await service.closeSprint(PROJECT_ID, SPRINT_ID, LIDER_ID);
+
+      expect(events.emit).toHaveBeenCalledTimes(1);
+      expect(events.emit).toHaveBeenCalledWith('insignias.recalcular', { claves: ['sprints'], idProyecto: PROJECT_ID });
+    });
+
     it('T-239 (HU-160): congela cumplimiento parcial, puntos de historia e hitos distintos al cerrar con pendientes', async () => {
       const tx = makeTx();
       const sprint = sprintEnFinalizacion();

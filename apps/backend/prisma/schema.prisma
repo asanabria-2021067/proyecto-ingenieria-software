@@ -271,6 +271,16 @@ enum TipoNotificacion {
   CALENDARIO_COMPARTIDO
   // HU-186 (T-330): recordatorio de una tarea próxima a vencer (24 h / 48 h).
   TAREA_POR_VENCER
+  // HU-190 (T-347): el usuario alcanzó un nuevo nivel de una insignia.
+  INSIGNIA_OBTENIDA
+  // HU-200 (T-377): alguien mencionó al usuario con @ en un comentario de tarea, proyecto o hito.
+  MENCION_COMENTARIO
+  // HU-195 (T-364): ciclo de vida de una reunión de Administración con el equipo del usuario.
+  REUNION_PROGRAMADA
+  REUNION_ACTUALIZADA
+  REUNION_CANCELADA
+  // HU-205 (T-394): solicitud enviada desde la página de contacto, solo para administradores.
+  SOLICITUD_CONTACTO
 }
 
 enum EstadoAmistad {
@@ -320,6 +330,7 @@ model Usuario {
   fechaUltimaSesion DateTime?     @map("fecha_ultima_sesion")
 
   telefonos                        UsuarioTelefono[]
+  preferenciaNoMolestar            PreferenciaNoMolestar?
   perfil                           PerfilEstudiante?
   habilidades                      UsuarioHabilidad[]
   intereses                        UsuarioInteres[]
@@ -344,10 +355,12 @@ model Usuario {
   solicitudesRecuperacion          SolicitudRecuperacion[]    @relation("SolicitudRecuperacionUsuario")
   solicitudesRecuperacionAtendidas SolicitudRecuperacion[]    @relation("SolicitudRecuperacionAdmin")
   rolesAcceso                      UsuarioRolAcceso[]
+  anunciosCerrados                 AnuncioCierre[]
   auditorias                       BitacoraAuditoria[]
   configuracionesActualizadas      ConfiguracionSistema[]
   revisionesProyectoRealizadas     RevisionProyecto[]         @relation("RevisionesProyectoRealizadas")
   comentariosEscritos              Comentario[]
+  mencionesRecibidas               MencionComentario[]
   mensajesRevisionEnviados         MensajeRevisionProyecto[]  @relation("MensajesEnviados")
   solicitudesSalidaSolicitadas     SolicitudSalidaProyecto[]  @relation("SolicitudSalidaSolicitante")
   solicitudesSalidaResueltas       SolicitudSalidaProyecto[]  @relation("SolicitudSalidaResolutor")
@@ -373,13 +386,22 @@ model Usuario {
   conversacionesCreadas            Conversacion[]             @relation("ConversacionesCreadas")
   conversacionesParticipa          ConversacionParticipante[]
   mensajesChatEnviados             MensajeChat[]              @relation("MensajesChatEnviados")
+  apodosDefinidos                  ApodoConversacion[]        @relation("ApodosDefinidos")
+  apodosRecibidos                  ApodoConversacion[]        @relation("ApodosRecibidos")
+  mensajesProgramadosChat          MensajeProgramado[]        @relation("MensajesProgramadosChat")
   tokensRefresco                   TokenRefresco[]
   proyectosGuardados               ProyectoGuardado[]
+  estadoChat                       EstadoChatUsuario?
   actividadesCreadas               ActividadProyecto[]
   asistencias                      AsistenciaActividad[]      @relation("AsistenciaUsuario")
   asistenciasConfirmadas           AsistenciaActividad[]      @relation("AsistenciaConfirmador")
   calendariosCompartidosPorMi      CalendarioCompartido[]     @relation("CalendarioPropietario")
   calendariosCompartidosConmigo    CalendarioCompartido[]     @relation("CalendarioInvitado")
+  insignias                        InsigniaUsuario[]
+  reaccionesChat                   ReaccionMensajeChat[]
+  mensajesGuardados                MensajeGuardado[]
+  reunionesAdministracionCreadas   ReunionAdministracion[]    @relation("ReunionesAdministracionCreadas")
+  reunionesAdministracionEditables ReunionAdministradorEditor[] @relation("ReunionesAdministracionEditables")
 
   @@index([estado, fechaCreacion])
   @@map("usuario")
@@ -695,14 +717,64 @@ model EventoProyecto {
   /// proyecto. Si tiene valores, solo ellos y el líder ven el evento y
   /// reciben el recordatorio.
   invitados             Int[]           @default([]) @map("invitados")
+  /// HU-195: null = evento normal del líder. Con valor, proyección de una
+  /// reunión de Administración: solo Administración la edita o cancela.
+  idReunion             Int?            @map("id_reunion")
 
-  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto])
-  creador  Usuario  @relation(fields: [idCreador], references: [idUsuario])
+  proyecto Proyecto               @relation(fields: [idProyecto], references: [idProyecto])
+  creador  Usuario                @relation(fields: [idCreador], references: [idUsuario])
+  reunion  ReunionAdministracion? @relation(fields: [idReunion], references: [idReunion], onDelete: Restrict)
 
+  @@unique([idReunion, idProyecto])
   @@index([idProyecto, eliminadoEn])
   @@index([fechaInicio])
   @@index([eliminadoEn, recordatorioEnviadoEn, fechaInicio])
   @@map("evento_proyecto")
+}
+
+/// HU-195 (T-362): reunión de Administración con uno o varios proyectos. Es la
+/// fuente de verdad de identidad, autoría, versión y cancelación. El contenido
+/// del calendario (título, fechas, modalidad, lugar o enlace) vive en sus
+/// EventoProyecto, uno por proyecto, que se escriben idénticos en una sola
+/// transacción; aquí no se duplica.
+model ReunionAdministracion {
+  idReunion       Int                    @id @default(autoincrement()) @map("id_reunion")
+  idCreador       Int                    @map("id_creador")
+  politicaEdicion PoliticaEdicionReunion @default(TODOS_ADMINISTRADORES) @map("politica_edicion")
+  /// Control optimista: cada cambio material la incrementa; un PATCH con otra versión es 409.
+  version         Int                    @default(1)
+  creadaEn        DateTime               @default(now()) @map("creada_en")
+  actualizadaEn   DateTime?              @map("actualizada_en")
+  canceladaEn     DateTime?              @map("cancelada_en")
+
+  creador  Usuario                      @relation("ReunionesAdministracionCreadas", fields: [idCreador], references: [idUsuario])
+  editores ReunionAdministradorEditor[]
+  eventos  EventoProyecto[]
+
+  @@index([canceladaEn, creadaEn])
+  @@map("reunion_administracion")
+}
+
+/// HU-195: quién, además del creador, gestiona una reunión de Administración.
+/// Ser administrador al momento de cada acción se valida aparte: TODOS_ADMINISTRADORES,
+/// cualquier administrador; SOLO_CREADOR, el creador; ADMINISTRADORES_SELECCIONADOS,
+/// el creador y los administradores de ReunionAdministradorEditor.
+enum PoliticaEdicionReunion {
+  TODOS_ADMINISTRADORES
+  SOLO_CREADOR
+  ADMINISTRADORES_SELECCIONADOS
+}
+
+model ReunionAdministradorEditor {
+  idReunion Int @map("id_reunion")
+  idUsuario Int @map("id_usuario")
+
+  reunion ReunionAdministracion @relation(fields: [idReunion], references: [idReunion], onDelete: Restrict)
+  usuario Usuario               @relation("ReunionesAdministracionEditables", fields: [idUsuario], references: [idUsuario])
+
+  @@id([idReunion, idUsuario])
+  @@index([idUsuario])
+  @@map("reunion_administrador_editor")
 }
 
 /// HU-184: un usuario comparte su calendario (eventos y fechas límite de
@@ -1456,9 +1528,14 @@ model Notificacion {
   datosJson           Json?            @map("datos_json")
   creadaEn            DateTime         @default(now()) @map("creada_en")
   leidaEn             DateTime?        @map("leida_en")
+  /// HU-195: operación lógica que originó el aviso (p. ej. `reunion:7:v2:actualizada`).
+  /// Con UNIQUE(idUsuario, clave), un reintento o una carrera no persisten un segundo
+  /// aviso al mismo usuario. Null para los avisos que no lo necesitan.
+  claveIdempotencia   String?          @map("clave_idempotencia") @db.VarChar(160)
 
   usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
 
+  @@unique([idUsuario, claveIdempotencia])
   @@index([idUsuario, leidaEn])
   @@index([idUsuario, creadaEn])
   @@index([tipoNotificacion])
@@ -1594,13 +1671,31 @@ model Comentario {
   editadoEn    DateTime? @map("editado_en")
   eliminadoEn  DateTime? @map("eliminado_en")
 
-  autor    Usuario   @relation(fields: [idAutor], references: [idUsuario])
-  proyecto Proyecto? @relation(fields: [idProyecto], references: [idProyecto])
-  tarea    Tarea?    @relation(fields: [idTarea], references: [idTarea])
-  hito     Hito?     @relation(fields: [idHito], references: [idHito])
+  autor     Usuario             @relation(fields: [idAutor], references: [idUsuario])
+  proyecto  Proyecto?           @relation(fields: [idProyecto], references: [idProyecto])
+  tarea     Tarea?              @relation(fields: [idTarea], references: [idTarea])
+  hito      Hito?               @relation(fields: [idHito], references: [idHito])
+  menciones MencionComentario[]
 
   @@index([idTarea])
   @@map("comentario")
+}
+
+// HU-200 (T-376): integrante mencionado con @ en un comentario. El texto guarda
+// el token `@[Nombre](idUsuario)`; esta fila es la mención ya validada (solo
+// líder o participantes activos del proyecto), una por usuario y comentario.
+model MencionComentario {
+  idMencion    Int      @id @default(autoincrement()) @map("id_mencion")
+  idComentario Int      @map("id_comentario")
+  idUsuario    Int      @map("id_usuario")
+  creadaEn     DateTime @default(now()) @map("creada_en")
+
+  comentario Comentario @relation(fields: [idComentario], references: [idComentario], onDelete: Cascade)
+  usuario    Usuario    @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@unique([idComentario, idUsuario])
+  @@index([idUsuario])
+  @@map("mencion_comentario")
 }
 
 model MensajeRevisionProyecto {
@@ -1644,12 +1739,21 @@ model Conversacion {
   silenciada    Boolean   @default(false) @map("silenciada")
   esPrioritaria Boolean   @default(true) @map("es_prioritaria")
   eliminadaEn   DateTime? @map("eliminada_en")
+  // Canales del proyecto (#general + los que crea el líder). `nombreCanal` es
+  // el nombre normalizado (minúsculas, sin #); NULL en chats que no son canal,
+  // así el unique solo aplica a canales.
+  esCanal     Boolean @default(false) @map("es_canal")
+  nombreCanal String? @map("nombre_canal") @db.VarChar(40)
 
   proyecto      Proyecto                   @relation(fields: [idProyecto], references: [idProyecto])
   creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario])
   participantes ConversacionParticipante[]
   mensajes      MensajeChat[]
+  adjuntos      AdjuntoMensajeChat[]
+  apodos        ApodoConversacion[]
+  mensajesProgramados MensajeProgramado[]
 
+  @@unique([idProyecto, nombreCanal])
   @@index([idProyecto])
   @@map("conversacion")
 }
@@ -1659,6 +1763,10 @@ model ConversacionParticipante {
   idUsuario       Int       @map("id_usuario")
   agregadoEn      DateTime  @default(now()) @map("agregado_en")
   ultimaLecturaEn DateTime? @map("ultima_lectura_en")
+  // Silencio por usuario: hasta una fecha, o siempre.
+  silenciadaHasta   DateTime? @map("silenciada_hasta")
+  silenciadaSiempre Boolean   @default(false) @map("silenciada_siempre")
+  temaColor       String?   @map("tema_color") @db.VarChar(20)
 
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
   usuario      Usuario      @relation(fields: [idUsuario], references: [idUsuario])
@@ -1668,16 +1776,245 @@ model ConversacionParticipante {
   @@map("conversacion_participante")
 }
 
-model MensajeChat {
-  idMensaje      Int      @id @default(autoincrement()) @map("id_mensaje")
-  idConversacion Int      @map("id_conversacion")
-  idRemitente    Int      @map("id_remitente")
-  contenido      String   @db.Text
-  enviadoEn      DateTime @default(now()) @map("enviado_en")
+// Modo no molestar del chat, por horario y por usuario. dias_semana usa 0 = domingo ... 6 = sabado
+// y se interpreta en la zona horaria indicada; el rango puede cruzar la medianoche.
+model PreferenciaNoMolestar {
+  idPreferencia Int      @id @default(autoincrement()) @map("id_preferencia")
+  idUsuario     Int      @unique @map("id_usuario")
+  activo        Boolean  @default(false)
+  horaInicio    String   @default("22:00") @map("hora_inicio") @db.VarChar(5)
+  horaFin       String   @default("07:00") @map("hora_fin") @db.VarChar(5)
+  diasSemana    Int[]    @default([0, 1, 2, 3, 4, 5, 6]) @map("dias_semana")
+  zona          String   @default("America/Guatemala") @db.VarChar(64)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
 
-  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
-  remitente    Usuario      @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario])
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@map("preferencia_no_molestar")
+}
+
+model MensajeChat {
+  idMensaje       Int      @id @default(autoincrement()) @map("id_mensaje")
+  idConversacion  Int      @map("id_conversacion")
+  idRemitente     Int      @map("id_remitente")
+  contenido       String   @db.Text
+  enviadoEn       DateTime @default(now()) @map("enviado_en")
+  editadoEn       DateTime? @map("editado_en")
+  eliminadoEn     DateTime? @map("eliminado_en")
+  idMensajeCitado Int?     @map("id_mensaje_citado")
+
+  conversacion Conversacion       @relation(fields: [idConversacion], references: [idConversacion])
+  remitente    Usuario            @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario])
+  adjunto      AdjuntoMensajeChat?
+  citado       MensajeChat?       @relation("MensajeCitado", fields: [idMensajeCitado], references: [idMensaje], onDelete: SetNull)
+  respuestas   MensajeChat[]      @relation("MensajeCitado")
+  reacciones   ReaccionMensajeChat[]
+  guardadoPor  MensajeGuardado[]
 
   @@index([idConversacion, enviadoEn])
   @@map("mensaje_chat")
+}
+
+/// Archivo adjunto de un mensaje del chat (uno por mensaje). El binario vive en
+/// Cloudinary en modo autenticado; aqui solo hay metadatos y la clave remota.
+model AdjuntoMensajeChat {
+  idAdjunto           Int      @id @default(autoincrement()) @map("id_adjunto")
+  idMensaje           Int      @unique @map("id_mensaje")
+  idConversacion      Int      @map("id_conversacion")
+  nombreOriginal      String   @map("nombre_original") @db.VarChar(255)
+  mime                String   @db.VarChar(100)
+  tamanoBytes         Int      @map("tamano_bytes")
+  claveAlmacenamiento String   @map("clave_almacenamiento") @db.VarChar(255)
+  creadoEn            DateTime @default(now()) @map("creado_en")
+
+  mensaje      MensajeChat  @relation(fields: [idMensaje], references: [idMensaje])
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
+
+  @@index([idConversacion, idMensaje])
+  @@map("adjunto_mensaje_chat")
+}
+
+/// Reacción con emoji de un usuario a un mensaje del chat (una por mensaje+usuario+emoji).
+model ReaccionMensajeChat {
+  idReaccion Int      @id @default(autoincrement()) @map("id_reaccion")
+  idMensaje  Int      @map("id_mensaje")
+  idUsuario  Int      @map("id_usuario")
+  emoji      String   @db.VarChar(16)
+  creadaEn   DateTime @default(now()) @map("creada_en")
+
+  mensaje MensajeChat @relation(fields: [idMensaje], references: [idMensaje], onDelete: Cascade)
+  usuario Usuario     @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@unique([idMensaje, idUsuario, emoji])
+  @@index([idMensaje])
+  @@map("reaccion_mensaje_chat")
+}
+
+// Apodos por chat: cada usuario define como ve a otro participante; es privado
+// (solo lo ve quien lo define).
+model ApodoConversacion {
+  idApodo           Int      @id @default(autoincrement()) @map("id_apodo")
+  idConversacion    Int      @map("id_conversacion")
+  idUsuarioDefine   Int      @map("id_usuario_define")
+  idUsuarioObjetivo Int      @map("id_usuario_objetivo")
+  apodo             String   @db.VarChar(40)
+
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Cascade)
+  define       Usuario      @relation("ApodosDefinidos", fields: [idUsuarioDefine], references: [idUsuario])
+  objetivo     Usuario      @relation("ApodosRecibidos", fields: [idUsuarioObjetivo], references: [idUsuario])
+
+  @@unique([idConversacion, idUsuarioDefine, idUsuarioObjetivo])
+  @@index([idUsuarioDefine])
+  @@map("apodo_conversacion")
+}
+
+// Estado personalizado del usuario en el chat. Vencido (venceEn <= ahora) se trata
+// como inexistente al leer; no hay job de limpieza.
+enum TipoEstadoChat {
+  EN_CLASE
+  OCUPADO
+  DISPONIBLE
+  PERSONALIZADO
+}
+
+model EstadoChatUsuario {
+  idUsuario Int           @id @map("id_usuario")
+  tipo      TipoEstadoChat
+  texto     String?       @db.VarChar(60)
+  venceEn   DateTime?     @map("vence_en")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@map("estado_chat_usuario")
+}
+
+/// Marcador personal de un mensaje de chat: privado, solo lo ve quien guarda.
+model MensajeGuardado {
+  idUsuario  Int      @map("id_usuario")
+  idMensaje  Int      @map("id_mensaje")
+  guardadoEn DateTime @default(now()) @map("guardado_en")
+
+  usuario Usuario     @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  mensaje MensajeChat @relation(fields: [idMensaje], references: [idMensaje], onDelete: Cascade)
+
+  @@id([idUsuario, idMensaje])
+  @@index([idUsuario, guardadoEn])
+  @@map("mensaje_guardado")
+}
+
+enum EstadoMensajeProgramado {
+  PENDIENTE
+  ENVIADO
+  CANCELADO
+  FALLIDO
+}
+
+// Mensaje de chat para enviar a una hora futura (job cada minuto).
+model MensajeProgramado {
+  idMensajeProgramado Int                     @id @default(autoincrement()) @map("id_mensaje_programado")
+  idConversacion      Int                     @map("id_conversacion")
+  idRemitente         Int                     @map("id_remitente")
+  contenido           String                  @db.Text
+  enviarEn            DateTime                @map("enviar_en")
+  estado              EstadoMensajeProgramado @default(PENDIENTE)
+  creadoEn            DateTime                @default(now()) @map("creado_en")
+  enviadoEn           DateTime?               @map("enviado_en")
+  idMensaje           Int?                    @map("id_mensaje")
+
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
+  remitente    Usuario      @relation("MensajesProgramadosChat", fields: [idRemitente], references: [idUsuario])
+
+  @@index([estado, enviarEn])
+  @@index([idConversacion, idRemitente])
+  @@map("mensaje_programado")
+}
+
+// HU-190 (T-346): niveles de una insignia. Sin nivel (null) = aún sin umbral alcanzado.
+enum NivelInsignia {
+  BRONCE
+  PLATA
+  ORO
+  DIAMANTE
+}
+
+/// HU-190 (T-346): catálogo de logros. `metrica` identifica la regla de cálculo
+/// (ver InsigniasMetricsService); los umbrales son el valor mínimo de la métrica
+/// para cada nivel.
+model Insignia {
+  idInsignia     Int    @id @default(autoincrement()) @map("id_insignia")
+  clave          String @unique @db.VarChar(40)
+  nombre         String @db.VarChar(100)
+  descripcion    String @db.VarChar(255)
+  icono          String @db.VarChar(40)
+  metrica        String @db.VarChar(40)
+  umbralBronce   Int    @map("umbral_bronce")
+  umbralPlata    Int    @map("umbral_plata")
+  umbralOro      Int    @map("umbral_oro")
+  umbralDiamante Int    @map("umbral_diamante")
+
+  usuarios InsigniaUsuario[]
+
+  @@map("insignia")
+}
+
+/// HU-190 (T-346): progreso y nivel de un usuario en una insignia. `progreso` es
+/// el máximo histórico de la métrica: los niveles ya otorgados nunca bajan.
+model InsigniaUsuario {
+  idInsigniaUsuario Int            @id @default(autoincrement()) @map("id_insignia_usuario")
+  idUsuario         Int            @map("id_usuario")
+  idInsignia        Int            @map("id_insignia")
+  nivel             NivelInsignia?
+  progreso          Int            @default(0)
+  fechaBronce       DateTime?      @map("fecha_bronce")
+  fechaPlata        DateTime?      @map("fecha_plata")
+  fechaOro          DateTime?      @map("fecha_oro")
+  fechaDiamante     DateTime?      @map("fecha_diamante")
+
+  usuario  Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  insignia Insignia @relation(fields: [idInsignia], references: [idInsignia], onDelete: Cascade)
+
+  @@unique([idUsuario, idInsignia])
+  @@map("insignia_usuario")
+}
+
+enum NivelAnuncio {
+  INFO
+  ADVERTENCIA
+  URGENTE
+}
+
+enum AudienciaAnuncio {
+  TODOS
+  ESTUDIANTES
+}
+
+model Anuncio {
+  idAnuncio     Int              @id @default(autoincrement()) @map("id_anuncio")
+  titulo        String           @db.VarChar(120)
+  mensaje       String           @db.Text
+  nivel         NivelAnuncio     @default(INFO)
+  audiencia     AudienciaAnuncio @default(TODOS)
+  fechaInicio   DateTime         @map("fecha_inicio")
+  fechaFin      DateTime         @map("fecha_fin")
+  activo        Boolean          @default(true)
+  fechaCreacion DateTime         @default(now()) @map("fecha_creacion")
+
+  cierres AnuncioCierre[]
+
+  @@index([activo, fechaInicio, fechaFin])
+  @@map("anuncio")
+}
+
+model AnuncioCierre {
+  idAnuncioCierre Int      @id @default(autoincrement()) @map("id_anuncio_cierre")
+  idAnuncio       Int      @map("id_anuncio")
+  idUsuario       Int      @map("id_usuario")
+  cerradoEn       DateTime @default(now()) @map("cerrado_en")
+
+  anuncio Anuncio @relation(fields: [idAnuncio], references: [idAnuncio], onDelete: Cascade)
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@unique([idAnuncio, idUsuario])
+  @@index([idUsuario])
+  @@map("anuncio_cierre")
 }

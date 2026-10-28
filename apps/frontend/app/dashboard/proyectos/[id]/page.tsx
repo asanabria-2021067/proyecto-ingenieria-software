@@ -3,7 +3,7 @@
 import { ESTADO_REVISION_LABEL } from '@/components/projects/closure-review-status.utils';
 import type { EstadoRevisionCierre } from '@/lib/types/closure';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -27,6 +27,7 @@ import {
   Users,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
+import { ProjectCommentsCard } from '@/components/projects/detail/project-comments-card';
 import { Postulacion, Proyecto, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 import {
   MODALIDAD_ICON,
@@ -35,7 +36,7 @@ import {
   formatFechaCorta,
   getIniciales,
 } from '@/components/projects/available-project-card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Empty,
   EmptyContent,
@@ -215,7 +216,7 @@ export default function ProyectoDetallePage() {
           <EmptyContent>
             <Link
               href="/dashboard/proyectos"
-              className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
             >
               Volver a proyectos
             </Link>
@@ -409,6 +410,13 @@ export default function ProyectoDetallePage() {
             </div>
           )}
           </section>
+
+          {/* HU-200: conversación del proyecto para los integrantes activos. */}
+          {esParticipante && (
+            <Suspense fallback={null}>
+              <ProjectCommentsCard idProyecto={projectId} />
+            </Suspense>
+          )}
         </ProjectGridMain>
 
         <ProjectGridAside aria-label="Información del proyecto">
@@ -493,7 +501,7 @@ export default function ProyectoDetallePage() {
               <button
                 type="button"
                 onClick={() => refetch()}
-                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
               >
                 Reintentar
               </button>
@@ -513,7 +521,7 @@ export default function ProyectoDetallePage() {
             <EmptyContent>
               <Link
                 href="/dashboard/proyectos"
-                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
               >
                 Volver a proyectos
               </Link>
@@ -546,7 +554,7 @@ function DetalleRow({
 
 function ProyectoDetalleSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
+    <SkeletonRegion label="Cargando proyecto" className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
       <div className="space-y-4">
         <div className="rounded-card border border-outline-variant/40 bg-surface-container-lowest p-6">
           <div className="flex gap-2">
@@ -573,7 +581,7 @@ function ProyectoDetalleSkeleton() {
           <Skeleton key={i} className="h-32 rounded-card" />
         ))}
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -675,7 +683,7 @@ function HistoricalProjectPage({
               </span>
             )}
           </div>
-          <h1 className="mt-3.5 text-[26px] leading-8 font-bold text-on-surface line-clamp-2">{resumen.tituloProyecto}</h1>
+          <h1 className="type-display mt-3.5 line-clamp-2">{resumen.tituloProyecto}</h1>
           <p className="mt-2 text-[14px] leading-5.25 text-on-surface-variant">
             {resumen.descripcionProyecto || 'Sin descripción disponible.'}
           </p>

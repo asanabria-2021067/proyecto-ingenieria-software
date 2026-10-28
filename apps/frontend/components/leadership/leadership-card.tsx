@@ -125,7 +125,7 @@ export function LeadershipCard({
 
   if (isLoading) {
     return (
-      <section className={`${CARD} ${className}`} aria-busy="true" aria-label="Cargando liderazgo">
+      <section className={`${CARD} ${className}`} role="status" aria-busy="true" aria-label="Cargando liderazgo">
         <Skeleton className="h-5 w-32" />
         <div className="mt-4 flex items-center gap-3">
           <Skeleton className="size-14 rounded-full" />

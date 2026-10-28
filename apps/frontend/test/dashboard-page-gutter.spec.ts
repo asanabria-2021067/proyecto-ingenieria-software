@@ -8,6 +8,8 @@ import { DASHBOARD_PAGE_CLASS, dashboardPage } from '../components/layout/dashbo
 // (1400 px centrado, 32 px de gutter) y ningún wrapper local que vuelva a
 // fijar su propio ancho máximo o su propio gutter.
 
+// Sprint 10: /dashboard/notificaciones pasó a ser un workspace a pantalla completa (patrón de
+// projects/[id]/layout.tsx, sin gutter), igual que las vistas internas del proyecto.
 const VISTAS = [
   'app/dashboard/proyectos/page.tsx',
   'app/dashboard/page.tsx',
@@ -18,7 +20,6 @@ const VISTAS = [
   'app/dashboard/calendario/page.tsx',
   'app/dashboard/mis-postulaciones/page.tsx',
   'app/dashboard/chats/archivados/page.tsx',
-  'app/dashboard/notificaciones/page.tsx',
   'app/dashboard/perfil/page.tsx',
 ];
 

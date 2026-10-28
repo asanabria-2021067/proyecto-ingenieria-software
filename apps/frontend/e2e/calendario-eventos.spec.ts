@@ -9,6 +9,7 @@ import {
   borrarEventosConTitulo,
   capturar,
   diaDelSelector,
+  elegirDiaDelSelector,
   eventosConTitulo,
   fijarRelojMananaTemprano,
   idDelProyecto,
@@ -125,13 +126,20 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
 
     await dialogo.getByRole('checkbox', { name: 'Termina otro día' }).click();
     await dialogo.getByLabel('Fecha de fin').click();
-    const manana = new Date();
-    manana.setDate(manana.getDate() + 2); // el reloj fijo es "mañana": el día siguiente a la fecha propuesta
-    await page.getByRole('button', { name: new RegExp(`, ${manana.getDate()} de `) }).first().click();
+    // El reloj fijo es "mañana" y es la fecha propuesta: el fin cae el día siguiente.
+    const fin = mananaTemprano();
+    fin.setDate(fin.getDate() + 1);
+    await elegirDiaDelSelector(page, fin, mananaTemprano());
     await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
     await expect(page.getByText('Evento agendado')).toBeVisible();
 
     try {
+      // Se guarda de 22:00 a 01:00 del día siguiente, también cuando ese día cae en otro mes.
+      const [creado] = await eventosConTitulo(page, titulo);
+      const guardado = (iso: string) => [new Date(iso).getMonth(), new Date(iso).getDate(), new Date(iso).getHours()];
+      expect(guardado(creado.fechaInicio)).toEqual([mananaTemprano().getMonth(), mananaTemprano().getDate(), 22]);
+      expect(guardado(creado.fechaFin)).toEqual([fin.getMonth(), fin.getDate(), 1]);
+
       await verDia(page);
       await expect(page.getByRole('button', { name: new RegExp(`^${titulo}, 22:00 a 00:00 del día siguiente`) })).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText('Todo el día')).toHaveCount(0);
@@ -160,9 +168,9 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     await dialogo.getByLabel('Hora de fin').fill('00:00');
     await dialogo.getByRole('checkbox', { name: 'Termina otro día' }).click();
     await dialogo.getByLabel('Fecha de fin').click();
-    const manana = new Date();
-    manana.setDate(manana.getDate() + 2);
-    await page.getByRole('button', { name: new RegExp(`, ${manana.getDate()} de `) }).first().click();
+    const fin = mananaTemprano();
+    fin.setDate(fin.getDate() + 1);
+    await elegirDiaDelSelector(page, fin, mananaTemprano());
     await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
     await expect(page.getByText('Evento agendado')).toBeVisible();
 
@@ -453,12 +461,8 @@ test.describe('Calendario: ciclo de vida completo del evento (HU-184, G05-C10)',
     fin.setDate(inicio.getDate() + 2);
     const elegir = async (campo: string, fecha: Date, desde: Date) => {
       await dialogo.getByLabel(campo, { exact: true }).click();
-      const selector = page.locator('[data-slot="popover-content"]');
-      // Navegar el selector mes a mes hasta el de la fecha (si cae en el siguiente).
-      const saltos = (fecha.getFullYear() - desde.getFullYear()) * 12 + fecha.getMonth() - desde.getMonth();
-      for (let i = 0; i < saltos; i += 1) await selector.getByRole('button', { name: /next|siguiente/i }).click();
-      await diaDelSelector(page, fecha).click();
-      await expect(selector).toBeHidden();
+      await elegirDiaDelSelector(page, fecha, desde);
+      await expect(page.locator('[data-slot="popover-content"]')).toBeHidden();
     };
     await elegir('Fecha', inicio, mananaTemprano());
     await dialogo.getByRole('checkbox', { name: 'Termina otro día' }).click();

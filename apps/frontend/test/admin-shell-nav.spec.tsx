@@ -283,6 +283,7 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Calendario de Sprints',
     'Apelaciones',
     'Tendencias de uso',
+    'Anuncios',
     'Cuentas pendientes',
     'Eventos de seguridad',
   ];
@@ -354,7 +355,7 @@ describe('AdminLayout — «Actualizar» en la barra superior', () => {
     expect(boton.querySelector('svg')).not.toBeNull();
     expect(boton).toHaveTextContent('');
     // Mismo botón de icono de la barra del estudiante.
-    expect(boton).toHaveClass('size-10', 'rounded-control', 'bg-muted');
+    expect(boton).toHaveClass('size-10', 'rounded-md', 'bg-muted');
     expect(boton.previousElementSibling).toBe(screen.getByTestId('bell'));
     expect(boton.nextElementSibling).toBe(screen.getByTestId('theme'));
   });
@@ -507,7 +508,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
   const grupos = () =>
     adminNavEntries.map((e) => ('type' in e && e.type === 'group' ? { grupo: e.label, items: e.items.map((i) => i.label) } : { enlace: e.label }));
 
-  it('el orden es estable: panel, usuarios, proyectos, gobernanza, métricas y verificación', () => {
+  it('el orden es estable: panel, usuarios, proyectos, gobernanza, métricas, comunicación y verificación', () => {
     expect(grupos()).toEqual([
       { enlace: 'Panel Admin' },
       { grupo: 'Usuarios', items: ['Gestión de Usuarios', 'Recuperación de contraseña'] },
@@ -517,6 +518,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
       },
       { grupo: 'Gobernanza', items: ['Apelaciones'] },
       { grupo: 'Métricas', items: ['Tendencias de uso'] },
+      { grupo: 'Comunicación', items: ['Anuncios'] },
       { grupo: 'Verificación y seguridad', items: ['Cuentas pendientes', 'Eventos de seguridad'] },
     ]);
   });
@@ -525,11 +527,17 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
     expect(adminNavEntries.some((e) => 'type' in e && e.type === 'group' && e.label === 'Administración')).toBe(false);
   });
 
-  it('el catálogo temporal de etiquetas se retiró del proyecto: ni página, ni destino, ni grupo «Diagnóstico»', () => {
+  it('el catálogo temporal de etiquetas se retiró del proyecto: ni página ni destino', () => {
     const destinos = flattenNavEntries(adminNavEntries);
     expect(destinos.filter((d) => /etiquetas/i.test(`${d.label} ${d.href}`))).toEqual([]);
-    expect(adminNavEntries.some((e) => 'type' in e && e.type === 'group' && e.label === 'Diagnóstico')).toBe(false);
     expect(existsSync(join(__dirname, '../app/dashboard/admin/etiquetas'))).toBe(false);
+  });
+
+  it('el catálogo temporal de botones se retiró del proyecto: ni página, ni destino, ni grupo «Diagnóstico»', () => {
+    const destinos = flattenNavEntries(adminNavEntries);
+    expect(destinos.filter((d) => /botones/i.test(`${d.label} ${d.href}`))).toEqual([]);
+    expect(adminNavEntries.some((e) => 'type' in e && e.type === 'group' && e.label === 'Diagnóstico')).toBe(false);
+    expect(existsSync(join(__dirname, '../app/dashboard/admin/botones'))).toBe(false);
   });
 
   it('no enlaza pantallas que no existen: cuentas pendientes (HU-179) y métricas (HU-178) solo porque sus páginas existen', () => {
@@ -560,6 +568,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
     ['/dashboard/admin/metricas', 'Métricas', 'Tendencias de uso'],
     ['/dashboard/admin/cuentas-pendientes', 'Verificación y seguridad', 'Cuentas pendientes'],
     ['/dashboard/admin/seguridad', 'Verificación y seguridad', 'Eventos de seguridad'],
+    ['/dashboard/admin/anuncios', 'Comunicación', 'Anuncios'],
   ])('en %s se abre «%s» y «%s» es el único destino activo', (ruta, grupo, destino) => {
     pathnameMock.mockReturnValue(ruta);
     renderShell();
@@ -614,6 +623,7 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
     ['app/dashboard/admin/solicitudes-recuperacion/page.tsx', '/dashboard/admin/solicitudes-recuperacion', 'Recuperación de contraseña'],
     ['app/dashboard/admin/cuentas-pendientes/page.tsx', '/dashboard/admin/cuentas-pendientes', 'Cuentas pendientes'],
     ['app/dashboard/admin/seguridad/page.tsx', '/dashboard/admin/seguridad', 'Eventos de seguridad'],
+    ['app/dashboard/admin/anuncios/page.tsx', '/dashboard/admin/anuncios', 'Anuncios'],
     ['app/dashboard/admin/metricas/page.tsx', '/dashboard/admin/metricas', 'Tendencias de uso'],
     ['app/dashboard/admin/apelaciones/appeals-inbox-client.tsx', '/dashboard/admin/apelaciones', 'Apelaciones'],
     ['app/dashboard/projects/admin/reviews/page.tsx', '/dashboard/projects/admin/reviews', 'Solicitudes de publicación'],

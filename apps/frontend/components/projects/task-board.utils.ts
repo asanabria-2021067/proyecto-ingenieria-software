@@ -131,6 +131,23 @@ export const PRIORIDAD_COLOR: Record<Prioridad, string> = {
   BAJA: 'text-text-secondary',
 };
 
+/**
+ * HU-201/T-380: franja vertical de prioridad en el borde izquierdo de la
+ * tarjeta del Kanban. Rojo de error, lima del acento (el mismo de la columna
+ * En progreso) y gris del contorno. Es solo refuerzo visual: el icono y el
+ * texto (`PRIORIDAD_ICON`, `PRIORIDAD_LABEL`) siguen comunicando la prioridad.
+ */
+export const PRIORIDAD_FRANJA: Record<Prioridad, string> = {
+  ALTA: 'bg-destructive',
+  MEDIA: 'bg-accent',
+  BAJA: 'bg-outline-variant',
+};
+
+/** Texto para lector de pantalla ("Prioridad alta"): no depende del color ni del icono. */
+export function prioridadTextoAccesible(prioridad: Prioridad): string {
+  return `Prioridad ${PRIORIDAD_LABEL[prioridad].toLowerCase()}`;
+}
+
 const PRIORIDAD_ORDEN: Record<Prioridad, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
 
 /**

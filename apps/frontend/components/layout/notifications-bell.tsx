@@ -11,6 +11,7 @@ import {
 } from '@/hooks/use-notifications';
 import { getNotificationLink, type Notificacion } from '@/lib/services/notifications';
 import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
+import { resolveCommentNotificationLink } from '@/components/notifications/comment-notification-link';
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -56,7 +57,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
                 ? `Notificaciones, ${unread} sin leer`
                 : 'Notificaciones, no hay pendientes'
             }
-            className="relative flex items-center justify-center h-10 w-10 rounded-xl text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+            className="relative flex items-center justify-center h-10 w-10 rounded-md text-on-surface hover:bg-surface-container-high motion-icon cursor-pointer"
           >
             <div className="relative">
               <Bell className="w-5 h-5 shrink-0" />
@@ -151,7 +152,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
             <ul className="divide-y divide-outline-variant/50">
               {recientes.map((n) => {
                 const isUnread = n.leidaEn === null;
-                const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n);
+                const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n) ?? resolveCommentNotificationLink(n);
 
                 const content = (
                   <div className="flex items-start gap-2">
@@ -163,7 +164,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
                         {n.tituloNotificacion}
                       </p>
                       {n.mensajeNotificacion && (
-                        <p className="text-xs text-tertiary mt-0.5 line-clamp-2">
+                        <p className="text-xs text-tertiary mt-0.5 line-clamp-2 break-words">
                           {n.mensajeNotificacion}
                         </p>
                       )}

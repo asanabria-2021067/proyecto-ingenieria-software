@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,7 +117,7 @@ function DatoOrganizacion({
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 function TaskDetailSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-360 px-6 pb-12 pt-5 md:px-7">
+    <SkeletonRegion label="Cargando tarea" className="mx-auto w-full max-w-360 px-6 pb-12 pt-5 md:px-7">
       <Skeleton className="mb-4 h-4 w-80" />
       <Skeleton className="mb-4 h-28 w-full rounded-[11px]" />
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.8fr)_minmax(340px,1fr)]">
@@ -129,7 +129,7 @@ function TaskDetailSkeleton() {
         </div>
         <Skeleton className="h-130 w-full rounded-[11px]" />
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -146,6 +146,9 @@ function TaskDetailView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const enfocarComentarios = searchParams.get('section') === 'comments';
+  // HU-200 (T-377): ?comment=N llega desde una notificación de comentario o mención.
+  const comentarioParam = searchParams.get('comment');
+  const comentarioDestacado = comentarioParam && /^\d+$/.test(comentarioParam) ? Number(comentarioParam) : null;
 
   const { data: currentUser } = useCurrentUser();
   const { cambiarEstadoTarea, eliminarTarea, crearTarea, editarTarea, asignarTarea, desasignarTarea } =
@@ -397,7 +400,7 @@ function TaskDetailView({
           )}
         </div>
 
-        <h1 className="mt-4 line-clamp-3 text-[26px] font-bold leading-tight text-on-surface md:text-[28px]">
+        <h1 className="type-display mt-4 line-clamp-3">
           {tarea.tituloTarea}
         </h1>
 
@@ -590,6 +593,7 @@ function TaskDetailView({
               idTarea={tarea.idTarea}
               enabled
               scroll
+              comentarioDestacado={comentarioDestacado}
             />
           </section>
         </div>

@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { INSIGNIAS_EVENTO } from '../insignias/insignias.catalog';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService, type PostCommitEffect } from '../notifications/notifications.service';
 import { ApplicationCreatedEvent } from '../notifications/events/application-created.event';
@@ -17,6 +18,8 @@ import {
 } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { ChatCanalesService } from '../chat/chat-canales.service';
+import { AdminMeetingsService } from '../events/admin-meetings.service';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
 
@@ -38,6 +41,9 @@ export class ApplicationsService {
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
     private readonly readPolicy: ProjectReadPolicyService,
+    private readonly chatCanales?: ChatCanalesService,
+    // HU-195: convocatoria a las reuniones de Administración futuras del proyecto al que entra.
+    private readonly adminMeetings?: AdminMeetingsService,
   ) {}
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -420,6 +426,12 @@ export class ApplicationsService {
           postulacion.idRolProyecto,
           id,
         );
+        await this.adminMeetings?.notificarIngresoTx(
+          tx,
+          postulacion.idUsuarioPostulante,
+          postulacion.rolProyecto.proyecto.idProyecto,
+          { add: (effect) => effects.push(effect) },
+        );
       }
 
       // C043: la notificación al postulante se persiste en la MISMA
@@ -453,6 +465,10 @@ export class ApplicationsService {
     );
 
     await this.notificationsService.publishEffects(effects);
+
+    // El nuevo integrante entra a #general (y a ningún otro canal).
+    if (esAceptada) await this.chatCanales?.sincronizarSinFallar(postulacion.rolProyecto.proyecto.idProyecto);
+    if (esAceptada) this.eventEmitter.emit(INSIGNIAS_EVENTO, { claves: ['postulaciones'], idUsuarios: [postulacion.idUsuarioPostulante] });
 
     return postulacionActualizada;
   }

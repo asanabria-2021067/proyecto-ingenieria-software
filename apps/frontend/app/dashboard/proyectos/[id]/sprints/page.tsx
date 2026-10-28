@@ -10,7 +10,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useFinalizeSprint, useProjectSprints } from '@/hooks/use-project-sprints';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import uvgSwal from '@/lib/swal';
 import {
   Empty,
@@ -57,14 +57,14 @@ function SprintMetric({ label, value }: { label: string; value: string }) {
 
 function SprintsSkeleton() {
   return (
-    <div className="flex flex-col gap-section" aria-busy="true" aria-label="Cargando Sprints">
+    <SkeletonRegion label="Cargando Sprints" className="flex flex-col gap-section">
       <div className="grid grid-cols-1 gap-grid @xl/project:grid-cols-3">
         {[0, 1, 2].map((i) => (
           <Skeleton key={i} className="h-24 w-full rounded-card" />
         ))}
       </div>
       <Skeleton className="h-44 w-full rounded-card" />
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -287,7 +287,7 @@ export default function SprintListPage() {
             {terminal ? (
               <Link
                 href="/dashboard/proyectos"
-                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
               >
                 Volver a proyectos
               </Link>
@@ -295,7 +295,7 @@ export default function SprintListPage() {
               <button
                 type="button"
                 onClick={() => recargarProyecto()}
-                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
               >
                 Reintentar
               </button>
@@ -353,7 +353,7 @@ export default function SprintListPage() {
               <button
                 type="button"
                 onClick={() => refetch()}
-                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
               >
                 Reintentar
               </button>

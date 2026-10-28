@@ -23,7 +23,7 @@ import { useProjectTeam } from '@/hooks/use-project-team';
 import { useProjectPendingExitRequests } from '@/hooks/use-exit-request';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   DATA_TABLE_CARD,
   DATA_TABLE_HEAD_ROW,
@@ -483,14 +483,14 @@ export default function MiembrosProyectoPage() {
             <button
               type="button"
               onClick={() => refetch()}
-              className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
             >
               Reintentar
             </button>
           </EmptyContent>
         </Empty>
       ) : isLoading ? (
-        <div className={DATA_TABLE_CARD}>
+        <SkeletonRegion label="Cargando integrantes" className={DATA_TABLE_CARD}>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -510,7 +510,7 @@ export default function MiembrosProyectoPage() {
               </TableBody>
             </Table>
           </div>
-        </div>
+        </SkeletonRegion>
       ) : (
         <div className="space-y-8">
           <MembersGroupSection

@@ -303,6 +303,28 @@ describe('ApplicationsService', () => {
     expect(notifications.publishEffects).toHaveBeenCalledTimes(1);
   });
 
+  it('updateEstado (ACEPTADA) emite el recálculo de insignias de postulaciones del postulante; RECHAZADA no (HU-190)', async () => {
+    const prisma = makePrisma();
+    mockPostulacionPendiente(prisma);
+    prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'ACEPTADA' });
+    const eventEmitter = { emit: vi.fn() };
+    const service = makeService(prisma, makeNotifications(), eventEmitter);
+
+    await service.updateEstado(1, { estadoPostulacion: 'ACEPTADA' } as UpdateEstadoPostulacionDto, 9);
+    expect(eventEmitter.emit).toHaveBeenCalledWith('insignias.recalcular', { claves: ['postulaciones'], idUsuarios: [4] });
+
+    const prisma2 = makePrisma();
+    mockPostulacionPendiente(prisma2);
+    prisma2._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: 'RECHAZADA' });
+    const emitter2 = { emit: vi.fn() };
+    await makeService(prisma2, makeNotifications(), emitter2).updateEstado(
+      1,
+      { estadoPostulacion: 'RECHAZADA' } as UpdateEstadoPostulacionDto,
+      9,
+    );
+    expect(emitter2.emit).not.toHaveBeenCalledWith('insignias.recalcular', expect.anything());
+  });
+
   it('updateEstado (ACEPTADA) reactiva una participación RETIRADO existente en vez de duplicarla', async () => {
     const prisma = makePrisma();
     mockPostulacionPendiente(prisma);

@@ -39,7 +39,7 @@ export function useMarcarLeida() {
 export function useMarcarTodasLeidas() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: marcarTodasLeidas,
+    mutationFn: () => marcarTodasLeidas(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
       queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });

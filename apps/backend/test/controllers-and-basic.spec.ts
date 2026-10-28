@@ -123,7 +123,7 @@ describe('Controllers and basic services', () => {
     notifications.findAll({ userId: 1 }, {});
     notifications.findUnreadForUser({ userId: 1 });
     notifications.getUnreadCount({ userId: 1 });
-    notifications.markAllAsRead({ userId: 1 });
+    notifications.markAllAsRead({ userId: 1 }, {});
     notifications.markAsRead(1, { userId: 1 });
 
     const revisiones = new RevisionesController(

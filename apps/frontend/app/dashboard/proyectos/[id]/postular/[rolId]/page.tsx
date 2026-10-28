@@ -9,7 +9,9 @@ import { z } from 'zod';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
+import { Button } from '@/components/ui/button';
 import { Postulacion, Proyecto } from '@/types';
+import { SkeletonCard, SkeletonDetail } from '@/components/ui/skeleton';
 
 export const postulacionSchema = z.object({
   justificacion: z
@@ -115,14 +117,12 @@ export default function PostularPage() {
           Volver al proyecto
         </Link>
 
-        {isLoading && (
-          <div className="text-center py-16 text-tertiary text-sm">Cargando...</div>
-        )}
+        {isLoading && <SkeletonDetail label="Cargando el rol" sections={2} />}
 
         {proyecto && rol && (
           <>
             <div className="mb-8">
-              <h1 className="font-headline font-extrabold text-2xl text-on-surface mb-1">
+              <h1 className="type-display mb-1">
                 Postularme como {rol.nombreRol}
               </h1>
               <p className="text-tertiary text-sm">
@@ -149,9 +149,13 @@ export default function PostularPage() {
             )}
 
             {isLoadingPostulaciones ? (
-              <div className="text-center py-12 text-tertiary text-sm">
-                Validando tus postulaciones existentes...
-              </div>
+              <SkeletonCard
+                label="Validando tus postulaciones existentes"
+                count={1}
+                lines={3}
+                footer
+                className="md:grid-cols-1 lg:grid-cols-1"
+              />
             ) : postulacionActiva ? (
               <div className="space-y-4 bg-surface-container-low border border-outline-variant rounded-2xl p-6">
                 <div className="flex items-start gap-3 text-primary">
@@ -226,13 +230,13 @@ export default function PostularPage() {
                   >
                     Cancelar
                   </Link>
-                  <button
+                  <Button
                     type="submit"
                     disabled={mutation.isPending}
-                    className="flex-1 bg-primary text-on-primary px-5 py-3 rounded-xl text-sm font-bold hover:shadow-md hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-60 disabled:scale-100 disabled:shadow-none"
+                    className="h-auto flex-1 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary hover:bg-primary disabled:opacity-60 motion-glow-primary"
                   >
                     {mutation.isPending ? 'Enviando...' : 'Enviar Postulación'}
-                  </button>
+                  </Button>
                 </div>
               </form>
             )}

@@ -57,6 +57,21 @@ describe('resolveTaskNotificationLink', () => {
     ).toBe('/dashboard/projects/12/kanban');
   });
 
+  it('el aviso agrupado de una acción masiva (HU-202) abre el tablero; con una sola tarea, la tarea', () => {
+    expect(
+      resolveTaskNotificationLink({
+        tipoNotificacion: 'TAREA_ACTUALIZADA',
+        datosJson: { projectId: 5, accion: 'MOVER', taskIds: [9, 10] },
+      }),
+    ).toBe('/dashboard/projects/5/kanban');
+    expect(
+      resolveTaskNotificationLink({
+        tipoNotificacion: 'TAREA_ASIGNADA',
+        datosJson: { projectId: 5, accion: 'ASIGNAR', taskIds: [9], taskId: 9, taskTitle: 'Una' },
+      }),
+    ).toBe('/dashboard/projects/5/kanban/tasks/9');
+  });
+
   it('resuelve ROL_ABANDONADO al workspace Kanban (sin taskId, consolidada)', () => {
     expect(
       resolveTaskNotificationLink({

@@ -13,7 +13,7 @@ import {
 } from '@/components/dashboard/data-table';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
   Table,
   TableHeader,
@@ -82,7 +82,7 @@ const META_FECHA = '@2xl/bandeja:hidden';
 
 function TablaSkeleton() {
   return (
-    <div className={DATA_TABLE_CARD} role="status" aria-label="Cargando solicitudes de recuperación">
+    <SkeletonRegion className={DATA_TABLE_CARD} label="Cargando solicitudes de recuperación">
       <div className={`${DATA_TABLE_HEAD_ROW} px-stack py-tight`}>
         <Skeleton className="h-4 w-40" />
       </div>
@@ -98,7 +98,7 @@ function TablaSkeleton() {
           </div>
         ))}
       </div>
-    </div>
+    </SkeletonRegion>
   );
 }
 
@@ -309,7 +309,7 @@ export default function AdminSolicitudesRecuperacionPage() {
                           onClick={() => generateMutation.mutate(s.idSolicitud)}
                           disabled={generateMutation.isPending}
                           aria-label={`Generar enlace para ${s.usuario.nombre} ${s.usuario.apellido}`}
-                          className="ml-auto flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-tag bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition-all hover:bg-primary/90 disabled:opacity-50"
+                          className="ml-auto flex min-h-8 items-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90 disabled:opacity-50"
                         >
                           <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
                           {/* En tarjetas estrechas queda solo el icono: el nombre accesible ya lo dice. */}

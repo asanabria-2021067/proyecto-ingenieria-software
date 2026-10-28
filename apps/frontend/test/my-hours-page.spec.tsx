@@ -311,7 +311,7 @@ describe('MisHorasPage — disposición por contenedor', () => {
     render(<MisHorasPage />);
 
     const esqueleto = screen.getByLabelText('Cargando tus horas');
-    expect(esqueleto.firstElementChild).toHaveClass('@2xl/mis-horas:grid-cols-3');
+    expect(esqueleto.querySelector(':scope > .grid')).toHaveClass('@2xl/mis-horas:grid-cols-3');
     expect(esqueleto.closest('[class*="@container/mis-horas"]')).not.toBeNull();
   });
 

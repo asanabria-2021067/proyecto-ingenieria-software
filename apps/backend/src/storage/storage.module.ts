@@ -4,6 +4,8 @@ import { ClosureCryptoService } from './closure-crypto.service';
 import { ClosureTicketService } from './closure-ticket.service';
 import { ClosurePdfValidationService } from './closure-pdf-validation.service';
 import { CLOUDINARY_CLOSURE_PORT } from './closure-storage.port';
+import { CloudinaryChatStorageAdapter } from './cloudinary-chat-storage.adapter';
+import { CHAT_STORAGE_PORT } from './chat-storage.port';
 
 /**
  * C103 (06 v2 §38/§39): módulo de almacenamiento de cierre.
@@ -23,8 +25,11 @@ import { CLOUDINARY_CLOSURE_PORT } from './closure-storage.port';
     ClosureTicketService,
     ClosurePdfValidationService,
     { provide: CLOUDINARY_CLOSURE_PORT, useExisting: CloudinaryClosureStorageAdapter },
+    CloudinaryChatStorageAdapter,
+    { provide: CHAT_STORAGE_PORT, useExisting: CloudinaryChatStorageAdapter },
   ],
   exports: [
+    CHAT_STORAGE_PORT,
     CLOUDINARY_CLOSURE_PORT,
     CloudinaryClosureStorageAdapter,
     ClosureCryptoService,

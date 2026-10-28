@@ -23,14 +23,17 @@ const EXCEPCIONES: Record<string, string[]> = {
   'app/dashboard/admin/proyectos/[id]/admin-project-detail-client.tsx': ['rounded-lg', 'rounded-md'],
   'app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-md', 'text-[13px]'],
   'app/dashboard/admin/proyectos/admin-projects-client.tsx': ['rounded-lg'],
-  'app/dashboard/admin/solicitudes-recuperacion/page.tsx': ['rounded-lg', 'rounded-lg'],
-  'app/dashboard/admin/sprints/admin-sprints-client.tsx': ['rounded-md'],
-  'components/admin/AdminLayout.tsx': ['rounded-lg'],
-  'components/admin/ProjectFeedbackSheet.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg'],
+  'app/dashboard/admin/solicitudes-recuperacion/page.tsx': ['rounded-lg', 'rounded-lg', 'rounded-md'],
+  'app/dashboard/admin/usuarios/page.tsx': ['rounded-md'],
+  'components/admin/AdminLayout.tsx': ['rounded-lg', 'rounded-md'],
+  'components/admin/ConfirmActionDialog.tsx': ['rounded-md', 'rounded-md', 'rounded-md', 'rounded-md'],
+  'components/admin/ProjectFeedbackSheet.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg', 'rounded-md'],
   'components/admin/ProjectReviewSheet.tsx': ['rounded-lg', 'rounded-lg', 'rounded-lg'],
   'components/admin/RevisionHistoryPanel.tsx': ['rounded-lg'],
   'components/admin/UserDetailSheet.tsx': ['rounded-md'],
-  'components/admin/sprints/sprint-month-view.tsx': ['text-[15px]'],
+  'components/admin/security/security-events-filters.tsx': ['rounded-md'],
+  'components/admin/security/security-events-table.tsx': ['rounded-md'],
+  'components/admin/sprints/admin-calendar-view.tsx': ['text-[15px]'],
 };
 
 const literales = (fuente: string) =>
@@ -51,11 +54,16 @@ describe('FG07-C04: regresión del diseño administrativo', () => {
     expect([...valores].sort()).toEqual(['rounded-lg', 'rounded-md', 'text-[13px]', 'text-[15px]']);
   });
 
-  it('29 de los 40 archivos del árbol quedan sin ningún literal', () => {
+  it('31 de los 45 archivos del árbol quedan sin ningún literal', () => {
     // 40 al cerrar T-320; entró la página propia de «Tendencias de uso» y salió el catálogo temporal de
-    // etiquetas, ninguna de las dos con literales.
-    expect(ARBOL).toHaveLength(40);
-    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(29);
+    // etiquetas, ninguna de las dos con literales; después entraron la pantalla de anuncios (HU-191) y el
+    // catálogo temporal de botones, tampoco con literales. Luego entró la lista de reuniones del
+    // calendario administrativo (`meeting-list-view.tsx`), sin literales. El selector de vistas del
+    // calendario de Sprints pasó al control segmentado del estudiante (`rounded-pill`) y perdió su `rounded-md`.
+    // HU-195 (T-363): entran el campo de proyectos invitados, los permisos de gestión y el diálogo de la
+    // reunión de Administración, sin literales. Al final salió el catálogo temporal de botones.
+    expect(ARBOL).toHaveLength(45);
+    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(31);
   });
 });
 
@@ -72,7 +80,7 @@ describe('FG07-C04: el inventario registra el antes y el después', () => {
 
   it('declara los totales medidos del árbol completo, antes y después', () => {
     expect(inventario).toContain('| Tamaños literales | 47 | 2 |');
-    expect(inventario).toContain('| Radios literales | 68 | 20 |');
+    expect(inventario).toContain('| Radios literales | 68 | 30 |');
   });
 
   it('enumera cada excepción que esta prueba fija', () => {

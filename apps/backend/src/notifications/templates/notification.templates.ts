@@ -257,6 +257,35 @@ export interface NotificationTemplateData {
     ownerId: number;
     ownerName: string;
   };
+
+  // HU-195 (T-364): reunión de Administración con el equipo del destinatario.
+  // `projectId`/`eventId` son los de la proyección que ESE usuario ve; nunca
+  // se nombran otros proyectos de la misma reunión.
+  REUNION_PROGRAMADA: {
+    meetingId: number;
+    eventId: number;
+    projectId: number;
+    projectTitle: string;
+    eventTitle: string;
+    fechaInicioTexto: string;
+    fechaInicioIso: string;
+  };
+  REUNION_ACTUALIZADA: {
+    meetingId: number;
+    eventId: number;
+    projectId: number;
+    projectTitle: string;
+    eventTitle: string;
+    fechaInicioTexto: string;
+    fechaInicioIso: string;
+  };
+  // Sin proyecto: también la reciben convocados que ya no pertenecen al equipo.
+  REUNION_CANCELADA: {
+    meetingId: number;
+    eventTitle: string;
+    fechaInicioTexto: string;
+    fechaInicioIso: string;
+  };
   // HU-186 (T-330): aviso de vencimiento emitido por TasksDueReminderService
   // al responsable de la tarea. taskId/projectId viajan en datosJson para el
   // enlace del centro de notificaciones; el texto no los muestra.
@@ -269,6 +298,34 @@ export interface NotificationTemplateData {
     horasAntes: 24 | 48;
     /** fechaLimite ya formateada por el emisor (es-GT), lista para mostrar. */
     fechaLimiteTexto: string;
+  };
+  // HU-190 (T-347): subida de nivel de una insignia. `nivel` es el valor del enum
+  // (el front lo usa para el color) y `nivelNombre` el texto legible.
+  INSIGNIA_OBTENIDA: {
+    insigniaClave: string;
+    insigniaNombre: string;
+    nivel: string;
+    nivelNombre: string;
+  };
+  // HU-200 (T-377): mención con @ en un comentario. Las claves de ids son las
+  // mismas que ya usan COMENTARIO_TAREA/PROYECTO/HITO, para que el enlace del
+  // centro de notificaciones resuelva los cuatro tipos con una sola regla.
+  MENCION_COMENTARIO: {
+    autorNombre: string;
+    contexto: 'TAREA' | 'PROYECTO' | 'HITO';
+    tituloContexto: string;
+    idProyecto: number;
+    idComentario: number;
+    idTarea: number | null;
+    idHito: number | null;
+  };
+
+  SOLICITUD_CONTACTO: {
+    nombre: string;
+    correo: string;
+    asunto: string;
+    mensaje: string;
+    idUsuario: number | null;
   };
 }
 
@@ -504,12 +561,50 @@ export const NOTIFICATION_TEMPLATES = {
       `${data.ownerName} compartió su calendario contigo. Actívalo en tu calendario para ver sus actividades.`,
   },
 
+  REUNION_PROGRAMADA: {
+    title: 'Nueva reunión de Administración',
+    message: (data: NotificationTemplateData['REUNION_PROGRAMADA']) =>
+      `Administración convocó a tu equipo de "${data.projectTitle}" a "${data.eventTitle}" el ${data.fechaInicioTexto}.`,
+  },
+
+  REUNION_ACTUALIZADA: {
+    title: 'Reunión de Administración actualizada',
+    message: (data: NotificationTemplateData['REUNION_ACTUALIZADA']) =>
+      `Cambió la reunión "${data.eventTitle}" con tu equipo de "${data.projectTitle}". Ahora es el ${data.fechaInicioTexto}.`,
+  },
+
+  REUNION_CANCELADA: {
+    title: 'Reunión de Administración cancelada',
+    message: (data: NotificationTemplateData['REUNION_CANCELADA']) =>
+      `Administración canceló la reunión "${data.eventTitle}" del ${data.fechaInicioTexto}.`,
+  },
+
   TAREA_POR_VENCER: {
     title: (data: NotificationTemplateData['TAREA_POR_VENCER']) =>
       data.horasAntes === 24 ? 'Tu tarea vence mañana' : 'Tu tarea vence en 2 días',
     message: (data: NotificationTemplateData['TAREA_POR_VENCER']) =>
       `La tarea "${data.taskTitle}" del proyecto "${data.projectTitle}" vence el ${data.fechaLimiteTexto}. ` +
       `Este es tu recordatorio de ${data.horasAntes} horas.`,
+  },
+
+  INSIGNIA_OBTENIDA: {
+    title: 'Nueva insignia',
+    message: (data: NotificationTemplateData['INSIGNIA_OBTENIDA']) =>
+      `Obtuviste la insignia "${data.insigniaNombre}" nivel ${data.nivelNombre}.`,
+  },
+
+  MENCION_COMENTARIO: {
+    title: 'Te mencionaron en un comentario',
+    message: (data: NotificationTemplateData['MENCION_COMENTARIO']) => {
+      const donde = { TAREA: 'la tarea', PROYECTO: 'el proyecto', HITO: 'el hito' }[data.contexto];
+      return `${data.autorNombre} te mencionó en un comentario de ${donde} "${data.tituloContexto}".`;
+    },
+  },
+
+  SOLICITUD_CONTACTO: {
+    title: 'Nueva solicitud de contacto',
+    message: (data: NotificationTemplateData['SOLICITUD_CONTACTO']) =>
+      `${data.nombre} (${data.correo}) escribió sobre "${data.asunto}": ${data.mensaje}`,
   },
 } as const;
 

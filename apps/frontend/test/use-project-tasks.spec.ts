@@ -12,6 +12,7 @@ vi.mock('../lib/services/tasks', () => ({
   assignTask: vi.fn(),
   unassignTask: vi.fn(),
   deleteTask: vi.fn(),
+  bulkTaskAction: vi.fn(),
 }));
 
 vi.mock('../lib/services/labels', () => ({
@@ -20,9 +21,10 @@ vi.mock('../lib/services/labels', () => ({
 }));
 
 import { useProjectTasks } from '../hooks/use-project-tasks';
-import { projectTasksQueryKey } from '../lib/query-keys/tasks';
+import { projectAvanceQueryKey, projectTasksQueryKey } from '../lib/query-keys/tasks';
 import {
   assignTask,
+  bulkTaskAction,
   createTask,
   deleteTask,
   getProjectTasks,
@@ -138,6 +140,20 @@ describe('useProjectTasks', () => {
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectTasksQueryKey(7) }),
     );
+  });
+
+  it('accionMasiva usa el projectId del hook e invalida tareas y avance al éxito (HU-202)', async () => {
+    (getProjectTasks as any).mockResolvedValue([]);
+    (bulkTaskAction as any).mockResolvedValue({ accion: 'DESASIGNAR', tareas: [], idsActualizadas: [3] });
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useProjectTasks(7), { wrapper });
+
+    await result.current.accionMasiva.mutateAsync({ idsTareas: [3, 4], accion: 'DESASIGNAR' });
+
+    expect(bulkTaskAction).toHaveBeenCalledWith(7, { idsTareas: [3, 4], accion: 'DESASIGNAR' });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectTasksQueryKey(7) });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectAvanceQueryKey(7) });
   });
 
   it('una mutation fallida no invalida como éxito', async () => {

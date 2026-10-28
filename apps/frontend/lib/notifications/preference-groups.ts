@@ -42,7 +42,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroupId, { titulo: str
   postulaciones: { titulo: 'Postulaciones y equipo', descripcion: 'Postulaciones, roles y participación en proyectos.' },
   proyectos: { titulo: 'Proyectos', descripcion: 'Publicación, revisión, liderazgo y cierre de proyectos.' },
   horas: { titulo: 'Horas y reconocimiento', descripcion: 'Validación y acreditación de tus horas.' },
-  recordatorios: { titulo: 'Recordatorios y calendario', descripcion: 'Eventos próximos y calendarios compartidos.' },
+  recordatorios: { titulo: 'Recordatorios y calendario', descripcion: 'Eventos próximos, reuniones de Administración y calendarios compartidos.' },
   contactos: { titulo: 'Red de contactos', descripcion: 'Solicitudes de amistad y seguidores.' },
   cuenta: { titulo: 'Cuenta y seguridad', descripcion: 'Avisos sobre accesos y recuperación de contraseñas.' },
   otras: { titulo: 'Otras notificaciones', descripcion: 'Tipos que la plataforma añadió y aún no tienen una descripción propia.' },
@@ -61,6 +61,11 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   HITO_ACTUALIZADO: { grupo: 'tareas', etiqueta: 'Hito actualizado', descripcion: 'Cambia un hito de tu proyecto.' },
   COMENTARIO_TAREA: { grupo: 'tareas', etiqueta: 'Comentario en una tarea', descripcion: 'Alguien comenta una tarea tuya.' },
   COMENTARIO_HITO: { grupo: 'tareas', etiqueta: 'Comentario en un hito', descripcion: 'Alguien comenta un hito de tu proyecto.' },
+  MENCION_COMENTARIO: {
+    grupo: 'tareas',
+    etiqueta: 'Menciones en comentarios',
+    descripcion: 'Alguien te menciona con @ en un comentario de tarea, hito o proyecto.',
+  },
   EVIDENCIA_REVISADA: { grupo: 'tareas', etiqueta: 'Evidencia revisada', descripcion: 'Revisan una evidencia que entregaste.' },
   TAREA_POR_VENCER: { grupo: 'tareas', etiqueta: 'Tarea por vencer', descripcion: 'Una tarea tuya está cerca de su fecha límite.' },
 
@@ -110,9 +115,14 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   HORAS_CONSOLIDADAS: { grupo: 'horas', etiqueta: 'Horas consolidadas', descripcion: 'Se consolidan tus horas de un Sprint.' },
   HORAS_ACREDITADAS: { grupo: 'horas', etiqueta: 'Horas acreditadas', descripcion: 'Se acreditan tus horas al cerrar un proyecto.' },
   CERTIFICADO_EMITIDO: { grupo: 'horas', etiqueta: 'Certificado emitido', descripcion: 'Se emite un certificado a tu nombre.' },
+  INSIGNIA_OBTENIDA: { grupo: 'horas', etiqueta: 'Insignia obtenida', descripcion: 'Subes de nivel en una insignia.' },
 
   RECORDATORIO_EVENTO: { grupo: 'recordatorios', etiqueta: 'Recordatorio de evento', descripcion: 'Un evento de tu calendario está por empezar.' },
   CALENDARIO_COMPARTIDO: { grupo: 'recordatorios', etiqueta: 'Calendario compartido', descripcion: 'Alguien comparte su calendario contigo.' },
+  // HU-195: reuniones que Administración convoca con el equipo de tus proyectos.
+  REUNION_PROGRAMADA: { grupo: 'recordatorios', etiqueta: 'Reunión programada', descripcion: 'Administración convoca a tu equipo a una reunión.' },
+  REUNION_ACTUALIZADA: { grupo: 'recordatorios', etiqueta: 'Reunión actualizada', descripcion: 'Cambia la fecha, el lugar o el enlace de una reunión de tu equipo.' },
+  REUNION_CANCELADA: { grupo: 'recordatorios', etiqueta: 'Reunión cancelada', descripcion: 'Administración cancela una reunión de tu equipo.' },
 
   SOLICITUD_AMISTAD: { grupo: 'contactos', etiqueta: 'Solicitud de amistad', descripcion: 'Recibes una solicitud de amistad.' },
   AMISTAD_ACEPTADA: { grupo: 'contactos', etiqueta: 'Amistad aceptada', descripcion: 'Aceptan tu solicitud de amistad.' },
@@ -130,6 +140,11 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   },
   CUENTA_VERIFICADA: { grupo: 'cuenta', etiqueta: 'Cuenta verificada', descripcion: 'Administración verifica tu cuenta.' },
   ALERTA_SEGURIDAD: { grupo: 'cuenta', etiqueta: 'Alerta de seguridad', descripcion: 'La plataforma detecta actividad inusual de acceso.' },
+  SOLICITUD_CONTACTO: {
+    grupo: 'cuenta',
+    etiqueta: 'Solicitud de contacto',
+    descripcion: 'Alguien escribe a administración desde la página de contacto.',
+  },
 };
 
 export interface NotificationPreferenceItem extends NotificationPreference {

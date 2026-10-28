@@ -13,6 +13,8 @@ import {
   FileSearch,
   FolderKanban,
   FolderOpen,
+  BellRing,
+  Megaphone,
   Gavel,
   KeyRound,
   LayoutDashboard,
@@ -41,6 +43,7 @@ import {
 import { useAdminSidebarCollapsed } from '@/components/dashboard/use-dashboard-sidebar-collapsed';
 import { ThemeToggle } from '@/components/theme-toggle';
 import logo from '@/public/logo.png';
+import { ShellSkeleton } from '@/components/layout/shell-skeleton';
 
 export const ADMIN_CUENTAS_PENDIENTES_HREF = '/dashboard/admin/cuentas-pendientes';
 
@@ -99,6 +102,12 @@ export const adminNavEntries: NavEntry[] = [
       // HU-178: las métricas de uso tienen página propia; el Panel Admin solo conserva un resumen.
       { href: ADMIN_METRICS_ROUTE, label: 'Tendencias de uso', icon: TrendingUp },
     ],
+  },
+  {
+    type: 'group',
+    label: 'Comunicación',
+    icon: Megaphone,
+    items: [{ href: '/dashboard/admin/anuncios', label: 'Anuncios', icon: BellRing }],
   },
   {
     type: 'group',
@@ -186,11 +195,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [isLoading, isError, esAdmin, router]);
 
   if (isLoading || isError || !esAdmin) {
-    return (
-      <div className="h-screen bg-surface flex items-center justify-center">
-        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
+    return <ShellSkeleton />;
   }
 
   return (
@@ -268,7 +273,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               disabled={actualizando}
               aria-label="Actualizar"
               title="Actualizar"
-              className="flex size-10 items-center justify-center rounded-control bg-muted text-text-secondary outline-none transition-colors hover:bg-surface-container-high hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
+              className="flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary outline-none motion-icon hover:bg-surface-container-high hover:text-text-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
             >
               <RotateCcw
                 className={`size-5 ${actualizando ? 'motion-safe:animate-spin [animation-direction:reverse]' : ''}`}

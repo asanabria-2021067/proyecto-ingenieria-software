@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,20 +10,43 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
+  StreamableFile,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
+import { ADJUNTO_MAX_BYTES, type ArchivoSubido } from './chat-adjuntos';
+import { LinkPreviewDto } from './dto/link-preview.dto';
+import { LinkPreviewService } from './link-preview/link-preview.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { EditMessageDto } from './dto/edit-message.dto';
+import { ListLinksQueryDto } from './dto/list-links-query.dto';
+import { SendFileMessageDto } from './dto/send-file-message.dto';
+import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
+import { SetApodoDto } from './dto/set-apodo.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { SilenciarConversationDto } from './dto/silenciar-conversation.dto';
+import { ToggleReactionDto } from './dto/toggle-reaction.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
+import { UpdateChatThemeDto } from './dto/update-chat-theme.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+
+// parts: busboy corta al ALCANZAR el limite, asi que file + contenido = 2 -> 3.
+export const CHAT_UPLOAD_LIMITS = { files: 1, fields: 1, parts: 3, fileSize: ADJUNTO_MAX_BYTES };
 
 @Controller('proyectos/:projectId/conversaciones')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
-  constructor(private chatService: ChatService) {}
+  constructor(
+    private chatService: ChatService,
+    private linkPreviewService: LinkPreviewService,
+  ) {}
 
   @Get()
   findAll(
@@ -53,6 +77,26 @@ export class ChatController {
     return this.chatService.getMessages(projectId, conversationId, user.userId, cursorId);
   }
 
+  @Get(':conversationId/enlaces')
+  findLinks(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Query() query: ListLinksQueryDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.getLinks(projectId, conversationId, user.userId, query);
+  }
+
+  @Get(':conversationId/mensajes/buscar')
+  searchMessages(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Query() query: SearchMessagesQueryDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.searchMessages(projectId, conversationId, user.userId, query);
+  }
+
   @Post(':conversationId/mensajes')
   @HttpCode(HttpStatus.CREATED)
   sendMessage(
@@ -61,7 +105,111 @@ export class ChatController {
     @CurrentUser() user: { userId: number },
     @Body() dto: SendMessageDto,
   ) {
-    return this.chatService.createMessage(projectId, conversationId, user.userId, dto.contenido);
+    return this.chatService.createMessage(projectId, conversationId, user.userId, dto.contenido, undefined, dto.idMensajeCitado);
+  }
+
+  @Get(':conversationId/archivos')
+  findFiles(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Query() query: ListLinksQueryDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.getArchivos(projectId, conversationId, user.userId, query);
+  }
+
+  @Get(':conversationId/archivos/:attachmentId/url')
+  fileUrl(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.getAdjuntoUrl(projectId, conversationId, attachmentId, user.userId);
+  }
+
+  @Get(':conversationId/archivos/:attachmentId/miniatura')
+  async thumbnail(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    const { datos, mime } = await this.chatService.getAdjuntoImagen(projectId, conversationId, attachmentId, user.userId);
+    return new StreamableFile(datos, { type: mime, disposition: 'inline' });
+  }
+
+  /** Un archivo por mensaje, con o sin texto. El tamano se corta en multer. */
+  @Post(':conversationId/mensajes/archivo')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor('file', { limits: CHAT_UPLOAD_LIMITS }))
+  sendFileMessage(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: SendFileMessageDto,
+    @UploadedFile() file?: ArchivoSubido,
+  ) {
+    if (!file) throw new BadRequestException('No se recibió el archivo');
+    return this.chatService.createMessage(projectId, conversationId, user.userId, dto.contenido ?? '', file);
+  }
+
+  @Post(':conversationId/mensajes/:messageId/reacciones')
+  @HttpCode(HttpStatus.OK)
+  toggleReaction(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: ToggleReactionDto,
+  ) {
+    return this.chatService.toggleReaction(projectId, conversationId, messageId, user.userId, dto.emoji);
+  }
+
+  @Post(':conversationId/mensajes/:messageId/guardado')
+  @HttpCode(HttpStatus.OK)
+  toggleSaved(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.toggleSavedMessage(projectId, conversationId, messageId, user.userId);
+  }
+
+  // Solo participantes; consulta externa, por eso un limite propio mas estricto que el global.
+  @Post(':conversationId/vista-previa')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ medium: { limit: 20, ttl: 10000 } })
+  async linkPreview(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: LinkPreviewDto,
+  ) {
+    await this.chatService.assertConversationParticipant(projectId, conversationId, user.userId);
+    return this.linkPreviewService.preview(dto.url);
+  }
+
+  @Patch(':conversationId/mensajes/:messageId')
+  editMessage(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: EditMessageDto,
+  ) {
+    return this.chatService.editMessage(projectId, conversationId, messageId, user.userId, dto.contenido);
+  }
+
+  @Delete(':conversationId/mensajes/:messageId')
+  deleteMessage(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.deleteMessage(projectId, conversationId, messageId, user.userId);
   }
 
   @Patch(':conversationId')
@@ -74,6 +222,17 @@ export class ChatController {
     return this.chatService.updateConversation(projectId, conversationId, user.userId, dto);
   }
 
+  @Patch(':conversationId/tema')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  updateTheme(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: UpdateChatThemeDto,
+  ) {
+    return this.chatService.updateTheme(projectId, conversationId, user.userId, dto);
+  }
+
   @Delete(':conversationId')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
@@ -84,6 +243,15 @@ export class ChatController {
     return this.chatService.deleteConversation(projectId, conversationId, user.userId);
   }
 
+  @Get(':conversationId/lecturas')
+  readReceipts(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.getReadReceipts(projectId, conversationId, user.userId);
+  }
+
   @Post(':conversationId/leido')
   @HttpCode(HttpStatus.OK)
   markRead(
@@ -92,5 +260,49 @@ export class ChatController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.chatService.markRead(projectId, conversationId, user.userId);
+  }
+
+  @Put(':conversationId/silencio')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  silenciar(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: SilenciarConversationDto,
+  ) {
+    return this.chatService.silenciar(projectId, conversationId, user.userId, dto.duracion);
+  }
+
+  @Delete(':conversationId/silencio')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  activarSonido(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.activarSonido(projectId, conversationId, user.userId);
+  }
+
+  @Put(':conversationId/apodos/:targetUserId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  setApodo(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('targetUserId', ParseIntPipe) targetUserId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: SetApodoDto,
+  ) {
+    return this.chatService.setApodo(projectId, conversationId, user.userId, targetUserId, dto.apodo);
+  }
+
+  @Delete(':conversationId/apodos/:targetUserId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeApodo(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('targetUserId', ParseIntPipe) targetUserId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.removeApodo(projectId, conversationId, user.userId, targetUserId);
   }
 }

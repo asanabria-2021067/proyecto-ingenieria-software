@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { describirCandidato } from '@/components/leadership/leadership-appeal-sheet';
@@ -186,7 +186,9 @@ export function LeadershipChangeDialog({
               Líder actual
             </h3>
             {candidatesQuery.isPending ? (
-              <Skeleton className="mt-2 h-14 w-full rounded-xl" />
+              <SkeletonRegion label="Cargando candidatos" className="mt-2">
+                <Skeleton className="h-14 w-full rounded-xl" />
+              </SkeletonRegion>
             ) : contexto ? (
               <div className="mt-2 flex items-center gap-3 rounded-xl border border-outline-variant/40 p-3">
                 <Avatar className="size-11">
@@ -315,7 +317,7 @@ export function LeadershipChangeDialog({
             variant="outline"
             onClick={() => cerrar(false)}
             disabled={transfer.isPending}
-            className="h-10 w-full rounded-lg border-outline-variant text-sm font-semibold sm:w-auto"
+            className="h-10 w-full rounded-md border-outline-variant text-sm font-semibold sm:w-auto"
           >
             Cancelar
           </Button>
@@ -323,7 +325,7 @@ export function LeadershipChangeDialog({
             type="button"
             onClick={confirmar}
             disabled={!puedeConfirmar}
-            className="h-10 w-full gap-1.5 rounded-lg text-sm font-bold sm:w-auto"
+            className="h-10 w-full gap-1.5 rounded-md text-sm font-bold sm:w-auto"
           >
             {transfer.isPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <UserCog className="size-4" aria-hidden="true" />}
             {confirmLabel}

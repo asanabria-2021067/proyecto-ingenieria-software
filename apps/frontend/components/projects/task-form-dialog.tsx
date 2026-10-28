@@ -226,7 +226,7 @@ function TaskFormDialogContent({
           </DialogDescription>
           <DialogClose
             aria-label={closeAriaLabel}
-            className="absolute right-4 top-4 inline-flex size-9 items-center justify-center rounded-md text-tertiary transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="absolute right-4 top-4 inline-flex size-9 items-center justify-center rounded-md text-tertiary motion-icon hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             <X className="size-4" aria-hidden="true" />
           </DialogClose>
