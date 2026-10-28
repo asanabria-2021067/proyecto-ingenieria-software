@@ -75,17 +75,6 @@ describe('MensajesProgramadosService', () => {
       expect(prisma.mensajeProgramado.create).not.toHaveBeenCalled();
     });
 
-    it('rechaza con 20 pendientes en la conversacion aunque los propios sean 5', async () => {
-      prisma.mensajeProgramado.count.mockImplementation(async ({ where }: any) =>
-        where.idConversacion === undefined ? 5 : 20,
-      );
-      await expect(
-        service.programar(10, 5, 1, { contenido: 'x', enviarEn: enMs(MIN) }, AHORA),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(prisma.mensajeProgramado.count.mock.calls.some(([a]) => a.where.idConversacion === 5)).toBe(true);
-      expect(prisma.mensajeProgramado.create).not.toHaveBeenCalled();
-    });
-
     it('con 19 pendientes crea normalmente', async () => {
       prisma.mensajeProgramado.count.mockResolvedValue(19);
       prisma.mensajeProgramado.create.mockResolvedValue({ idMensajeProgramado: 1 });

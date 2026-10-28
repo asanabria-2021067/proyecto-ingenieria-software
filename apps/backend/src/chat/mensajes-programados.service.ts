@@ -82,19 +82,12 @@ export class MensajesProgramadosService {
       throw new BadRequestException('La hora de envío no puede superar los 30 días');
     }
 
-    const pendientes = { idRemitente: userId, estado: EstadoMensajeProgramado.PENDIENTE };
-    const [propios, enConversacion] = await Promise.all([
-      this.prisma.mensajeProgramado.count({ where: pendientes }),
-      this.prisma.mensajeProgramado.count({ where: { ...pendientes, idConversacion } }),
-    ]);
+    const propios = await this.prisma.mensajeProgramado.count({
+      where: { idRemitente: userId, estado: EstadoMensajeProgramado.PENDIENTE },
+    });
     if (propios >= MAX_PENDIENTES) {
       throw new BadRequestException(
         'Ya tienes 20 mensajes programados pendientes. Cancela alguno para programar otro.',
-      );
-    }
-    if (enConversacion >= MAX_PENDIENTES) {
-      throw new BadRequestException(
-        'Ya tienes 20 mensajes programados pendientes en esta conversación. Cancela alguno para programar otro.',
       );
     }
 
