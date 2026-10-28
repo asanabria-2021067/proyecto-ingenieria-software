@@ -141,6 +141,20 @@ test('A · filtrar: la búsqueda, la lectura y la categoría acotan la lista a l
     await expect(bandeja(page).getByText('2 avisos · 1 sin leer')).toBeVisible();
     await expect(fila(page, pendiente.idNotificacion)).toHaveAttribute('data-leida', 'false');
     await expect(fila(page, revisada.idNotificacion)).toHaveAttribute('data-leida', 'true');
+
+    // «No leídas»: queda solo la pendiente y ninguna fila visible está leída.
+    const lectura = bandeja(page);
+    await lectura.getByRole('radio', { name: 'No leídas' }).click();
+    await expect.poll(() => idsVisibles(page)).toEqual(ordenados(pendiente));
+    await expect(bandeja(page).locator('li[data-leida="true"]')).toHaveCount(0);
+
+    // «Leídas»: queda solo la revisada y ninguna fila visible está sin leer.
+    await lectura.getByRole('radio', { name: 'Leídas', exact: true }).click();
+    await expect.poll(() => idsVisibles(page)).toEqual(ordenados(revisada));
+    await expect(bandeja(page).locator('li[data-leida="false"]')).toHaveCount(0);
+
+    await lectura.getByRole('radio', { name: 'Todas' }).click();
+    await expect.poll(() => idsVisibles(page)).toEqual(ordenados(pendiente, revisada));
   } finally {
     await eliminarTareas(lider.page, idProyecto, tareas);
     await Promise.all([lider.contexto.close(), maria.contexto.close()]);
