@@ -59,6 +59,12 @@ describe('G02-C02: permisos mínimos y concurrencia', () => {
     expect(deploy.jobs.deploy.permissions).toEqual({ contents: 'read', packages: 'read' });
   });
 
+  it('k6.yml: solo lectura por defecto y ningun job escribe', () => {
+    const k6 = loadWorkflow('k6.yml');
+    expect(k6.permissions).toEqual({ contents: 'read' });
+    expect(permissionFindings(k6, [])).toEqual([]);
+  });
+
   it('CI cancela corridas obsoletas; el deploy productivo se serializa sin cancelar el que está en curso', () => {
     expect(loadWorkflow('ci.yml').concurrency).toEqual({ group: 'ci-${{ github.ref }}', 'cancel-in-progress': true });
     expect(loadWorkflow('deploy.yml').concurrency).toEqual({ group: 'deploy-production', 'cancel-in-progress': false });
