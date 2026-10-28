@@ -4,6 +4,7 @@ import { ProjectPolicyModule } from '../common/project-policy/project-policy.mod
 import { EligibilityModule } from '../eligibility/eligibility.module';
 import { BitacoraModule } from '../bitacora/bitacora.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ChatModule } from '../chat/chat.module';
 import { LeadershipAdminController } from './leadership-admin.controller';
 import { LeadershipController } from './leadership.controller';
 import { LeadershipReadService } from './leadership-read.service';
@@ -18,7 +19,7 @@ import { LeadershipService } from './leadership.service';
  * NO se registra todavía en `AppModule`: en C091 la superficie es cero.
  */
 @Module({
-  imports: [PrismaModule, ProjectPolicyModule, EligibilityModule, BitacoraModule, NotificationsModule],
+  imports: [PrismaModule, ProjectPolicyModule, EligibilityModule, BitacoraModule, NotificationsModule, ChatModule],
   controllers: [LeadershipController, LeadershipAdminController],
   providers: [LeadershipService, LeadershipReadService],
   exports: [LeadershipReadService],
