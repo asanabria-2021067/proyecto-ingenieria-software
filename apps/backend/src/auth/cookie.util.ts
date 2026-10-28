@@ -10,11 +10,11 @@ function cookieOptions(maxAge: number) {
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
-    // Deploy actual sirve también por HTTP plano; una cookie `secure` en ese
-    // caso el navegador la descarta y la sesión nunca prende. Activar con
-    // COOKIE_SECURE=true cuando todo el tráfico sea HTTPS (Gate Admin).
+    // En producción `secure` es el valor por defecto (COOKIE_SECURE=false lo
+    // desactiva): una cookie `secure` sobre HTTP plano la descarta el navegador
+    // y la sesión nunca prende, así que todo el tráfico debe llegar por HTTPS.
     // G06: mismo parser estricto que el validador del arranque.
-    secure: parseCookieSecure(process.env.COOKIE_SECURE?.trim()),
+    secure: parseCookieSecure(process.env.COOKIE_SECURE?.trim(), process.env.NODE_ENV?.trim()),
     path: '/',
     maxAge,
   };

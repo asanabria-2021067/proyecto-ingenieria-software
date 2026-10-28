@@ -73,6 +73,15 @@ describe('G06-C07: COOKIE_SECURE', () => {
     expect(() => validateEnvironment({ ...base, COOKIE_SECURE: 'yes' })).toThrow(/COOKIE_SECURE/);
   });
 
+  it('NODE_ENV=production: Secure por defecto; COOKIE_SECURE explícito manda', () => {
+    const base = { FRONTEND_URL: 'http://localhost:3000', JWT_SECRET: 'x'.repeat(48), NODE_ENV: 'production', TRUST_PROXY_HOPS: '1' };
+    expect(validateEnvironment(base).app.cookieSecure).toBe(true);
+    expect(validateEnvironment({ ...base, COOKIE_SECURE: 'false' }).app.cookieSecure).toBe(false);
+    expect(parseCookieSecure(undefined, 'production')).toBe(true);
+    expect(parseCookieSecure('', 'production')).toBe(true);
+    expect(parseCookieSecure(undefined, 'development')).toBe(false);
+  });
+
   it.each([undefined, 'false'])('COOKIE_SECURE=%j: cookies actuales (HttpOnly, SameSite=Lax, Path=/, sin Secure)', async (value) => {
     const cookies = await loginCookies(value);
     expect(cookies.map((cookie) => cookie.split('=')[0])).toEqual(['access_token', 'refresh_token']);
