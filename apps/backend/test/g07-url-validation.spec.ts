@@ -97,8 +97,18 @@ describe('G07-C08: esquemas de URL permitidos en los cinco campos', () => {
     expect(message).toBe('githubUrl debe ser una URL http:// o https://');
   });
 
-  it('fotoUrl (imagen subida a Cloudinary, fuera de los cinco campos) conserva su contrato actual', async () => {
-    expect(await validateField(UpdateProfileDto, 'fotoUrl', 'https://res.cloudinary.com/demo/image/upload/v1/foto.png')).toEqual([]);
+  it('fotoUrl acepta una URL https de Cloudinary', async () => {
+    expect(await validateField(UpdateProfileDto, 'fotoUrl', 'https://res.cloudinary.com/demo/image/upload/v1/a.png')).toEqual([]);
+  });
+
+  it.each([
+    'https://evil.example/x.png',
+    'http://res.cloudinary.com/demo/image/upload/v1/a.png',
+    'javascript:alert(1)',
+    'data:image/png;base64,AAAA',
+    `https://res.cloudinary.com/demo/image/upload/${'a'.repeat(500)}.png`,
+  ])('fotoUrl=%j → 400', async (value) => {
+    expect((await validateField(UpdateProfileDto, 'fotoUrl', value)).length).toBeGreaterThan(0);
   });
 
   it('isHttpUrl exige host y esquema http(s) tal como los interpreta el navegador', () => {

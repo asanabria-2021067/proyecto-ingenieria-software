@@ -17,6 +17,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsHttpUrl } from '../../common/validators/http-url.validator';
+import { IsCloudinaryUrl } from '../../common/validators/cloudinary-url.validator';
 
 export class HabilidadInputDto {
   @IsInt()
@@ -158,6 +159,8 @@ export class UpdateProfileDto {
   // ==================== ENLACES Y ARCHIVOS ====================
   @IsOptional()
   @IsString()
+  @MaxLength(500)
+  @IsCloudinaryUrl()
   fotoUrl?: string;
 
   // G07 (OWASP25-C027): los enlaces que escribe el usuario solo admiten http(s)
