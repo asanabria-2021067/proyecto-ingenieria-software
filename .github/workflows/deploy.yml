@@ -332,6 +332,8 @@ jobs:
       - name: Transferir .env de produccion por stdin
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST_FINGERPRINT: ${{ secrets.SSH_HOST_FINGERPRINT }}
           SERVER_IP: ${{ secrets.SERVER_IP }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
           DB_USER: ${{ secrets.DB_USER }}
@@ -362,6 +364,9 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
+          # Un fingerprint vacio degrada en silencio appleboy/ssh-action a no
+          # verificar la clave del host; sin known_hosts ssh no tiene a quien creer.
+          [ -n "$SSH_KNOWN_HOSTS" ] && [ -n "$SSH_HOST_FINGERPRINT" ] || { echo "faltan SSH_KNOWN_HOSTS o SSH_HOST_FINGERPRINT" >&2; exit 1; }
           if ! printf '%s' "$TRUST_PROXY_HOPS" | grep -Eq '^[1-9][0-9]*$'; then
             echo "TRUST_PROXY_HOPS debe ser un entero >= 1 (el backend no arranca en produccion con 0)" >&2
             exit 1
@@ -384,6 +389,7 @@ jobs:
           mkdir -p "$work"
           trap 'rm -rf "$work"' EXIT
           printf '%s\n' "$SSH_PRIVATE_KEY" > "$work/key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$work/known_hosts"
           {
             printf 'NODE_ENV=production\n'
             printf 'DB_USER=%s\n' "$DB_USER"
@@ -405,7 +411,7 @@ jobs:
             printf 'COOKIE_SECURE=%s\n' "$COOKIE_SECURE"
             printf 'SECURITY_ALERTS_ENABLED=%s\n' "$SECURITY_ALERTS_ENABLED"
           } > "$work/env"
-          ssh -i "$work/key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+          ssh -i "$work/key" -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$work/known_hosts" "$SERVER_USER@$SERVER_IP" \
             'umask 077 && mkdir -p ~/.uvg-deploy && chmod 700 ~/.uvg-deploy && cat > ~/.uvg-deploy/env.incoming' \
             < "$work/env"
@@ -416,6 +422,7 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
           command_timeout: 60m
           script: |
             set -e

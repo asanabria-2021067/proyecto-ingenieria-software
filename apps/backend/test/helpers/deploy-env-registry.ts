@@ -51,4 +51,10 @@ export const DEPLOY_ENV_REGISTRY: Record<string, DeployEnvEntry> = {
 };
 
 /** Variables del paso de transferencia que solo sirven para la conexión SSH (no van al .env). */
-export const DEPLOY_TRANSPORT_ONLY = ['SSH_PRIVATE_KEY', 'SERVER_IP', 'SERVER_USER'];
+export const DEPLOY_TRANSPORT_ONLY = [
+  'SSH_PRIVATE_KEY',
+  'SSH_KNOWN_HOSTS',
+  'SSH_HOST_FINGERPRINT',
+  'SERVER_IP',
+  'SERVER_USER',
+];
