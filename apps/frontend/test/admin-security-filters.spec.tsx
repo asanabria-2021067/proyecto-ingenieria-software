@@ -169,10 +169,10 @@ describe('Filtros con el aspecto del dashboard, sin cambiar lo que hacen', () =>
     expect(limpiar).toHaveAttribute('type', 'button');
     expect(limpiar).toBeDisabled();
     // Mismo botón compacto que «Ver perfil» en Gestión de Usuarios.
-    expect(limpiar).toHaveClass('min-h-8', 'rounded-tag', 'bg-surface-container-high', 'px-3', 'py-1.5', 'text-xs', 'font-bold', 'text-on-surface');
+    expect(limpiar).toHaveClass('min-h-8', 'rounded-md', 'bg-surface-container-high', 'px-3', 'py-1.5', 'text-xs', 'font-bold', 'text-on-surface');
     const verPerfil = readFileSync(join(__dirname, '../app/dashboard/admin/usuarios/page.tsx'), 'utf8').match(/className="([^"]*)"\s*aria-label=\{`Ver perfil de/)?.[1] ?? '';
     for (const clase of verPerfil.split(' ').filter((c) => c && !c.startsWith('hover:'))) expect(limpiar, clase).toHaveClass(clase);
-    expect(verPerfil).toContain('rounded-tag');
+    expect(verPerfil).toContain('rounded-md');
 
     fireEvent.change(filtros.getByLabelText('ID de usuario'), { target: { value: '8' } });
     await waitFor(() => expect(limpiar).toBeEnabled());

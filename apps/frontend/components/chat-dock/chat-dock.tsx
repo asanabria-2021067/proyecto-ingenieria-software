@@ -78,7 +78,7 @@ export function ChatDock() {
           onClick={() => setListOpen((open) => !open)}
           aria-label={`Mensajes${enNoMolestar ? ', no molestar activo' : ''}${totalNoLeidos > 0 ? `, ${totalNoLeidos} sin leer` : ''}`}
           aria-expanded={listOpen}
-          className="flex h-12 w-72 items-center gap-2 rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest px-5 text-sm font-semibold text-on-surface shadow-raised transition-colors hover:bg-surface-container-high"
+          className="flex h-12 w-72 items-center gap-2 rounded-t-md border border-b-0 border-outline-variant bg-surface-container-lowest px-5 text-sm font-semibold text-on-surface shadow-raised motion-control hover:border-outline hover:bg-surface-container-high hover:shadow-lg"
         >
           <span className="relative">
             <MessageCircle className="size-4" aria-hidden="true" />

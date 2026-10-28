@@ -355,7 +355,7 @@ describe('AdminLayout — «Actualizar» en la barra superior', () => {
     expect(boton.querySelector('svg')).not.toBeNull();
     expect(boton).toHaveTextContent('');
     // Mismo botón de icono de la barra del estudiante.
-    expect(boton).toHaveClass('size-10', 'rounded-control', 'bg-muted');
+    expect(boton).toHaveClass('size-10', 'rounded-md', 'bg-muted');
     expect(boton.previousElementSibling).toBe(screen.getByTestId('bell'));
     expect(boton.nextElementSibling).toBe(screen.getByTestId('theme'));
   });
@@ -527,11 +527,17 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
     expect(adminNavEntries.some((e) => 'type' in e && e.type === 'group' && e.label === 'Administración')).toBe(false);
   });
 
-  it('el catálogo temporal de etiquetas se retiró del proyecto: ni página, ni destino, ni grupo «Diagnóstico»', () => {
+  it('el catálogo temporal de etiquetas se retiró del proyecto: ni página ni destino', () => {
     const destinos = flattenNavEntries(adminNavEntries);
     expect(destinos.filter((d) => /etiquetas/i.test(`${d.label} ${d.href}`))).toEqual([]);
-    expect(adminNavEntries.some((e) => 'type' in e && e.type === 'group' && e.label === 'Diagnóstico')).toBe(false);
     expect(existsSync(join(__dirname, '../app/dashboard/admin/etiquetas'))).toBe(false);
+  });
+
+  it('el catálogo temporal de botones se retiró del proyecto: ni página, ni destino, ni grupo «Diagnóstico»', () => {
+    const destinos = flattenNavEntries(adminNavEntries);
+    expect(destinos.filter((d) => /botones/i.test(`${d.label} ${d.href}`))).toEqual([]);
+    expect(adminNavEntries.some((e) => 'type' in e && e.type === 'group' && e.label === 'Diagnóstico')).toBe(false);
+    expect(existsSync(join(__dirname, '../app/dashboard/admin/botones'))).toBe(false);
   });
 
   it('no enlaza pantallas que no existen: cuentas pendientes (HU-179) y métricas (HU-178) solo porque sus páginas existen', () => {

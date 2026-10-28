@@ -30,6 +30,7 @@ import { normalizeUrlInput } from '@/lib/security/safe-url';
 import { createHabilidad, createInteres, createCualidad } from '@/lib/services/catalogs';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { SkeletonDetail } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 const STEPS = [
   { title: 'Personal', icon: UserIcon, desc: 'Datos básicos y académicos' },
@@ -360,7 +361,7 @@ export default function EditarPerfilPage() {
             <ChevronLeft className="w-4 h-4" />
             Volver al perfil
           </button>
-          <h1 className="text-3xl md:text-4xl font-black tracking-tight text-on-surface font-headline">
+          <h1 className="type-display">
             Editar Perfil Profesional
           </h1>
           <p className="mt-1 text-sm text-on-surface-variant">
@@ -545,14 +546,14 @@ export default function EditarPerfilPage() {
                     </select>
                   </div>
                   <div className="flex items-end">
-                    <button
+                    <Button
                       type="button"
                       onClick={handleAddHabilidad}
-                      className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/95 transition-all cursor-pointer"
+                      className="h-auto w-full gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/95 has-[>svg]:px-4 motion-glow-primary"
                     >
                       <Plus className="w-4 h-4" />
                       Añadir habilidad
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -773,14 +774,14 @@ export default function EditarPerfilPage() {
                     </select>
                   </div>
                   <div className="flex items-end">
-                    <button
+                    <Button
                       type="button"
                       onClick={handleAddExperiencia}
-                      className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary/95 transition-all cursor-pointer"
+                      className="h-auto w-full gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:bg-primary/95 has-[>svg]:px-4 motion-glow-primary"
                     >
                       <Plus className="w-4 h-4" />
                       Agregar Experiencia
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -885,35 +886,36 @@ export default function EditarPerfilPage() {
 
           {/* Action buttons */}
           <div className="flex items-center justify-between border-t border-outline-variant/30 mt-8 pt-6">
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={handleBack}
               disabled={step === 0}
-              className="flex items-center gap-2 text-sm font-bold text-tertiary hover:text-on-surface transition-colors cursor-pointer disabled:opacity-40"
+              className="h-auto gap-2 p-0 text-sm font-bold text-tertiary hover:bg-transparent hover:text-on-surface has-[>svg]:px-0 disabled:opacity-40 dark:hover:bg-transparent"
             >
               <ChevronLeft className="w-4 h-4" />
               Anterior
-            </button>
+            </Button>
 
             {step < STEPS.length - 1 ? (
-              <button
+              <Button
                 type="button"
                 onClick={handleNext}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary/95 transition-all cursor-pointer"
+                className="h-auto gap-2 rounded-xl bg-primary px-6 py-2.5 font-bold text-on-primary hover:bg-primary/95 has-[>svg]:px-6 motion-glow-primary"
               >
                 Siguiente
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 type="button"
                 onClick={handleSaveAll}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary/95 transition-all cursor-pointer disabled:opacity-50"
+                className="h-auto gap-2 rounded-xl bg-primary px-6 py-2.5 font-bold text-on-primary hover:bg-primary/95 has-[>svg]:px-6 motion-glow-primary"
               >
                 <Save className="w-4 h-4" />
                 {saving ? 'Guardando Perfil...' : 'Guardar y Finalizar'}
-              </button>
+              </Button>
             )}
           </div>
         </div>

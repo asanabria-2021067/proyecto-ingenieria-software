@@ -101,6 +101,7 @@ export function useBuscarUsuarios(filtros: Omit<BuscarUsuariosFiltros, 'page'>) 
     hasMore: Boolean(query.hasNextPage),
     isLoading: query.isLoading,
     isError: query.isError,
+    reintentar: () => query.refetch(),
     cargarMas: () => query.fetchNextPage(),
     cargandoMas: query.isFetchingNextPage,
   };

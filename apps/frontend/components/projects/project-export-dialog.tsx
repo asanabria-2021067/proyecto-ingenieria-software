@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ColorPicker } from '@/components/ui/color-picker';
+import { Button } from '@/components/ui/button';
 import {
   DEFAULT_EXPORT_OPTIONS,
   FUENTE_OPCIONES,
@@ -221,15 +222,15 @@ export function ProjectExportDialog({
           >
             Cancelar
           </button>
-          <button
+          <Button
             type="button"
             onClick={confirmar}
             disabled={isPending || error !== null}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-auto gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:bg-primary/90 has-[>svg]:px-4 disabled:opacity-60 motion-glow-primary"
           >
             {isPending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
             {isPending ? 'Generando…' : `Descargar ${etiqueta}`}
-          </button>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

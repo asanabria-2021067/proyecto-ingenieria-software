@@ -102,7 +102,7 @@ export default function MisPostulacionesPage() {
       <div className={dashboardPage('py-8')}>
         <div className="mb-6 flex flex-col gap-stack lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-1">
+            <h1 className="type-display mb-1">
               Mis Postulaciones
             </h1>
             <p className="text-tertiary text-sm">
@@ -194,7 +194,7 @@ export default function MisPostulacionesPage() {
               <button
                 type="button"
                 onClick={() => refetch()}
-                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
               >
                 Reintentar
               </button>
@@ -244,7 +244,7 @@ export default function MisPostulacionesPage() {
                   setBusqueda('');
                   setEstadoFiltro('');
                 }}
-                className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
               >
                 Limpiar filtros
               </button>

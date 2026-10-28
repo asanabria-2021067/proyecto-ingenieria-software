@@ -452,7 +452,7 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
       <div className="mb-4 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm md:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
-            <h1 className="line-clamp-2 text-2xl font-bold leading-tight text-on-surface md:text-[28px]">
+            <h1 className="type-display line-clamp-2">
               {proyecto.tituloProyecto}
             </h1>
             <p className="text-sm text-tertiary">Workspace del proyecto</p>

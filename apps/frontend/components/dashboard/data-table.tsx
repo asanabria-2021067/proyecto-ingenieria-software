@@ -52,7 +52,6 @@ export function DataTablePager({
         disabled={pagina <= 1}
         onClick={() => onPagina(Math.max(1, pagina - 1))}
         aria-label="Página anterior"
-        className="rounded-control"
       >
         Anterior
       </Button>
@@ -66,7 +65,6 @@ export function DataTablePager({
         disabled={pagina >= totalPaginas}
         onClick={() => onPagina(Math.min(totalPaginas, pagina + 1))}
         aria-label="Página siguiente"
-        className="rounded-control"
       >
         Siguiente
       </Button>

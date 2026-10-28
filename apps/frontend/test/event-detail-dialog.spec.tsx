@@ -127,6 +127,20 @@ describe('EventDetailDialog (HU-184 T-324)', () => {
     expect(onEditar).toHaveBeenCalledWith(expect.objectContaining({ idEvento: 7 }));
   });
 
+  it('HU-195: una reunión de Administración es de solo lectura incluso para el líder (sin Editar ni Eliminar)', () => {
+    const onEditar = vi.fn();
+    render(
+      <EventDetailDialog evento={evento({ origen: 'ADMINISTRACION', idReunion: 12, tipoEvento: 'REUNION' })} open onOpenChange={vi.fn()} editable onEditar={onEditar} />,
+      { wrapper },
+    );
+
+    expect(screen.getByText('Convocada por Administración · solo lectura')).toBeInTheDocument();
+    expect(screen.getByText('Equipos de los proyectos convocados')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Editar evento/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Eliminar evento/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver proyecto' })).toBeInTheDocument();
+  });
+
   it('el líder puede eliminar el evento tras confirmar', async () => {
     mensajesMock.confirmar.mockResolvedValueOnce(true);
     eventsMock.deleteEvent.mockResolvedValueOnce(undefined);

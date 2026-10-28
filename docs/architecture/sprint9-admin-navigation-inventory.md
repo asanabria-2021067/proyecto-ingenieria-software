@@ -47,7 +47,7 @@ El menú se agrupa por tema de trabajo. «Panel Admin» va suelto arriba y los g
 
 Antes de Sprint 9 existía un grupo genérico «Administración» que mezclaba cuentas, seguridad y la página temporal
 de etiquetas; se repartió entre «Usuarios», «Verificación y seguridad» y «Diagnóstico». Ninguna ruta cambió: solo
-el grupo en que aparece. El grupo «Diagnóstico» desapareció después, al retirarse su único destino (sección 9). El rótulo «Administración» que encabeza la barra lateral es el título del menú, no un grupo.
+el grupo en que aparece. El grupo «Diagnóstico» desapareció después, al retirarse su único destino (sección 9), volvió con el catálogo temporal de botones (sección 10) y desapareció de nuevo al retirarse este. El rótulo «Administración» que encabeza la barra lateral es el título del menú, no un grupo.
 
 «Métricas» enlaza una página propia (`/dashboard/admin/metricas`): al entrar en ella, también por la URL o al
 recargar, el grupo se abre solo y «Tendencias de uso» es el destino marcado como actual. Ningún destino del menú
@@ -143,3 +143,13 @@ revisión de diseño, no parte del producto. Se retiró del proyecto al cierre d
 menú y el grupo «Diagnóstico», que solo la contenía a ella. La página y su prueba se conservan fuera del
 repositorio como paquete «etiquetas temporal legacy», con un parche para restaurarlas si vuelve a hacer falta el
 catálogo. Los componentes y tonos de etiqueta que mostraba siguen en el proyecto: no se tocaron.
+
+## 10. Página temporal de botones
+
+`/dashboard/admin/botones` no era parte del producto: era el catálogo de diagnóstico de las familias de botones, con
+la misma organización que tenía el de etiquetas. Las familias compartidas importaban el componente o la constante
+real; las escritas en línea copiaban sus clases en `apps/frontend/lib/admin/button-catalog.ts`, y
+`test/button-catalog.spec.ts` comprobaba que cada clase seguía, literal, en su archivo. Se retiró del proyecto en
+Sprint 10, junto con su módulo de datos, su prueba, su entrada del menú y el grupo «Diagnóstico», que solo la
+contenía a ella. Los tres archivos se conservan fuera del repositorio como paquete «botones temporal legacy», con
+un parche para restaurarlos. Los botones que mostraba siguen en el proyecto: no se tocaron.

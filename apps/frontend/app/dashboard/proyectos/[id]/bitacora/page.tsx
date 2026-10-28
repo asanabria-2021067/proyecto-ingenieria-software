@@ -557,7 +557,7 @@ export default function BitacoraPage() {
                 <button
                   type="button"
                   onClick={() => refetch()}
-                  className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                  className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-on-primary motion-action motion-glow-primary motion-focus hover:bg-primary/90"
                 >
                   Reintentar
                 </button>
@@ -577,13 +577,13 @@ export default function BitacoraPage() {
                 </EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
-                <button
+                <Button
                   type="button"
                   onClick={limpiarFiltros}
-                  className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-all hover:bg-primary/90"
+                  className="h-auto bg-primary px-5 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 motion-glow-primary"
                 >
                   Limpiar todo
-                </button>
+                </Button>
               </EmptyContent>
             </Empty>
           )}
@@ -618,7 +618,7 @@ export default function BitacoraPage() {
                     type="button"
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page <= 1}
-                    className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface disabled:opacity-40"
+                    className="rounded-md border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface motion-control motion-focus hover:border-outline hover:bg-surface-container-low disabled:opacity-40"
                   >
                     Anterior
                   </button>
@@ -629,7 +629,7 @@ export default function BitacoraPage() {
                     type="button"
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page >= totalPages}
-                    className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface disabled:opacity-40"
+                    className="rounded-md border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface motion-control motion-focus hover:border-outline hover:bg-surface-container-low disabled:opacity-40"
                   >
                     Siguiente
                   </button>

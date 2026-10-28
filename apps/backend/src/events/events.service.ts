@@ -30,7 +30,32 @@ const EVENT_SELECT = {
   rolesDestino: true,
   tipoEvento: true,
   invitados: true,
+  // HU-195: null = evento del proyecto; con valor, reunión de Administración (ver `origen`).
+  idReunion: true,
 } as const;
+
+export type OrigenEvento = 'PROYECTO' | 'ADMINISTRACION';
+
+/** HU-195 (T-360): marca de dónde viene el evento; el cliente no ofrece editar los de Administración. */
+function conOrigen<T extends { idReunion?: number | null }>(evento: T): T & { origen: OrigenEvento } {
+  return { ...evento, origen: typeof evento.idReunion === 'number' ? 'ADMINISTRACION' : 'PROYECTO' };
+}
+
+/**
+ * HU-195: una reunión de Administración se proyecta una vez por proyecto; quien
+ * está en dos de esos proyectos la vería dos veces. Se conserva la proyección
+ * del menor idProyecto (la misma a la que enlaza su aviso) y los eventos
+ * ordinarios pasan intactos.
+ */
+function unaPorReunion<T extends { idReunion?: number | null; idProyecto: number }>(eventos: T[]): T[] {
+  const elegida = new Map<number, number>();
+  for (const e of eventos) {
+    if (typeof e.idReunion !== 'number') continue;
+    const actual = elegida.get(e.idReunion);
+    if (actual === undefined || e.idProyecto < actual) elegida.set(e.idReunion, e.idProyecto);
+  }
+  return eventos.filter((e) => typeof e.idReunion !== 'number' || elegida.get(e.idReunion) === e.idProyecto);
+}
 
 /**
  * G01 (UI-01): única `select` permitida para un evento visto desde un
@@ -47,6 +72,8 @@ export const EVENT_SHARED_SELECT = {
   tipoEvento: true,
   modalidad: true,
   proyecto: { select: { idProyecto: true, tituloProyecto: true } },
+  // Solo para no repetir una reunión multiproyecto; `proyectarEventoCompartido` nunca lo copia.
+  idReunion: true,
 } as const satisfies Prisma.EventoProyectoSelect;
 
 export type EventoCompartidoFila = Prisma.EventoProyectoGetPayload<{ select: typeof EVENT_SHARED_SELECT }>;
@@ -110,34 +137,62 @@ export class EventsService {
 
   async findAllForProject(projectId: number, userId: number) {
     await this.assertCanRead(projectId, userId);
-    return this.prisma.eventoProyecto.findMany({
+    const eventos = await this.prisma.eventoProyecto.findMany({
       where: { idProyecto: projectId, eliminadoEn: null, ...filtroVisibilidadEvento(userId) },
       select: EVENT_SELECT,
       orderBy: { fechaInicio: 'asc' },
     });
+    return eventos.map(conOrigen);
   }
 
   /** GET /usuarios/me/eventos?desde&hasta — misma vista global que /usuarios/me/tareas. */
   async findForUserInRange(userId: number, desde: string, hasta: string) {
     const idsProyectos = await this.projectIdsForUser(userId);
-    if (idsProyectos.length === 0) return [];
+    // Solapamiento con [desde, hasta]: el evento empieza antes de que
+    // termine el rango y termina después de que empiece.
+    const rango = { fechaInicio: { lte: new Date(hasta) }, fechaFin: { gte: new Date(desde) } };
+    const select = { ...EVENT_SELECT, proyecto: { select: { idProyecto: true, tituloProyecto: true } } } as const;
 
-    return this.prisma.eventoProyecto.findMany({
-      where: {
-        idProyecto: { in: idsProyectos },
-        eliminadoEn: null,
-        // Solapamiento con [desde, hasta]: el evento empieza antes de que
-        // termine el rango y termina después de que empiece.
-        fechaInicio: { lte: new Date(hasta) },
-        fechaFin: { gte: new Date(desde) },
-        ...filtroVisibilidadEvento(userId),
-      },
-      select: {
-        ...EVENT_SELECT,
-        proyecto: { select: { idProyecto: true, tituloProyecto: true } },
-      },
+    const ordinarios = idsProyectos.length === 0 ? [] : await this.prisma.eventoProyecto.findMany({
+      where: { idProyecto: { in: idsProyectos }, eliminadoEn: null, ...rango, ...filtroVisibilidadEvento(userId) },
+      select,
       orderBy: { fechaInicio: 'asc' },
     });
+    const historicos = (await this.tieneEquipoCerrado(userId))
+      ? await this.prisma.eventoProyecto.findMany({ where: { ...this.filtroReunionHistorica(userId, idsProyectos), ...rango }, select, orderBy: { fechaInicio: 'asc' } })
+      : [];
+
+    return unaPorReunion([...ordinarios, ...historicos])
+      .sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
+      .map(conOrigen);
+  }
+
+  /**
+   * HU-195 (T-360/T-364): el equipo histórico de un proyecto CERRADO (sus
+   * COMPLETADO) ve las reuniones de Administración convocadas para ese
+   * proyecto, y SOLO esas: no se reabren los eventos ordinarios del proyecto
+   * cerrado ni se amplía la regla de lectura de proyectos cerrados.
+   */
+  private filtroReunionHistorica(userId: number, excluir: number[]): Prisma.EventoProyectoWhereInput {
+    return {
+      idReunion: { not: null },
+      eliminadoEn: null,
+      reunion: { canceladaEn: null },
+      idProyecto: { notIn: excluir },
+      proyecto: {
+        eliminadoEn: null,
+        estadoProyecto: EstadoProyecto.CERRADO,
+        roles: { some: { participaciones: { some: { idUsuario: userId, estadoParticipacion: 'COMPLETADO' } } } },
+      },
+    };
+  }
+
+  private async tieneEquipoCerrado(userId: number): Promise<boolean> {
+    const fila = await this.prisma.participacionProyecto.findFirst({
+      where: { idUsuario: userId, estadoParticipacion: 'COMPLETADO', rolProyecto: { proyecto: { estadoProyecto: EstadoProyecto.CERRADO, eliminadoEn: null } } },
+      select: { idParticipacion: true },
+    });
+    return !!fila;
   }
 
   /**
@@ -168,7 +223,7 @@ export class EventsService {
       orderBy: { fechaInicio: 'asc' },
     });
     const comunes = new Set(idsReceptor);
-    return filas.map((fila) => proyectarEventoCompartido(fila, comunes.has(fila.idProyecto)));
+    return unaPorReunion(filas).map((fila) => proyectarEventoCompartido(fila, comunes.has(fila.idProyecto)));
   }
 
   async create(projectId: number, userId: number, dto: CreateEventDto) {
@@ -181,7 +236,7 @@ export class EventsService {
     this.assertFechaInicioNoPasada(dto.fechaInicio);
     const invitados = await this.normalizarInvitados(projectId, proyecto.creadoPor, dto.invitados);
 
-    return this.prisma.eventoProyecto.create({
+    return conOrigen(await this.prisma.eventoProyecto.create({
       data: {
         idProyecto: projectId,
         idCreador: userId,
@@ -200,13 +255,14 @@ export class EventsService {
         invitados,
       },
       select: EVENT_SELECT,
-    });
+    }));
   }
 
   async update(projectId: number, eventId: number, userId: number, dto: UpdateEventDto) {
     const proyecto = await this.getProjectOrThrow(projectId);
     this.assertLeader(proyecto, userId);
     const actual = await this.getEventOrThrow(projectId, eventId);
+    this.assertNoEsReunionAdministracion(actual);
 
     if (dto.fechaInicio !== undefined || dto.fechaFin !== undefined) {
       this.assertFechaFinPosterior(
@@ -272,18 +328,18 @@ export class EventsService {
       data.fechaInicio = nuevaFechaInicio;
     }
 
-    return this.prisma.eventoProyecto.update({
+    return conOrigen(await this.prisma.eventoProyecto.update({
       where: { idEvento: eventId },
       data,
       select: EVENT_SELECT,
-    });
+    }));
   }
 
   /** DELETE = cancelar (soft delete). T-265: excluye el evento de cualquier recordatorio pendiente. */
   async remove(projectId: number, eventId: number, userId: number): Promise<void> {
     const proyecto = await this.getProjectOrThrow(projectId);
     this.assertLeader(proyecto, userId);
-    await this.getEventOrThrow(projectId, eventId);
+    this.assertNoEsReunionAdministracion(await this.getEventOrThrow(projectId, eventId));
 
     await this.prisma.eventoProyecto.update({
       where: { idEvento: eventId },
@@ -367,6 +423,13 @@ export class EventsService {
   private assertLeader(proyecto: { creadoPor: number }, userId: number): void {
     if (proyecto.creadoPor !== userId) {
       throw new ForbiddenException('No eres el líder de este proyecto');
+    }
+  }
+
+  /** HU-195: la proyección de una reunión de Administración solo se gestiona desde /admin/reuniones. */
+  private assertNoEsReunionAdministracion(evento: { idReunion: number | null }): void {
+    if (typeof evento.idReunion === 'number') {
+      throw new ForbiddenException('Es una reunión de Administración: solo Administración puede modificarla o cancelarla');
     }
   }
 

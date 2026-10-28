@@ -38,8 +38,8 @@ const LINEA_BASE: Record<string, Medida> = {
 /** Estado tras FG07-C03: lo que queda son las excepciones que el inventario explica. */
 const ESTADO_ACTUAL: Record<string, Medida> = {
   '/dashboard/admin': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
-  '/dashboard/admin/usuarios': { px: 0, radio: 0, hex: 0, boton: 2, titular: true },
-  '/dashboard/admin/solicitudes-recuperacion': { px: 0, radio: 2, hex: 0, boton: 2, titular: true },
+  '/dashboard/admin/usuarios': { px: 0, radio: 1, hex: 0, boton: 1, titular: true },
+  '/dashboard/admin/solicitudes-recuperacion': { px: 0, radio: 3, hex: 0, boton: 2, titular: true },
   // Al pasar a la tabla compartida perdió su radio literal y sus tres `<button>` propios.
   '/dashboard/admin/cuentas-pendientes': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
@@ -50,7 +50,8 @@ const ESTADO_ACTUAL: Record<string, Medida> = {
   '/dashboard/admin/proyectos': { px: 0, radio: 1, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/proyectos/[id]': { px: 0, radio: 2, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/proyectos/[id]/cierre': { px: 1, radio: 5, hex: 0, boton: 0, titular: true },
-  '/dashboard/admin/sprints': { px: 0, radio: 1, hex: 0, boton: 0, titular: true },
+  // El selector de vistas usa el control segmentado del calendario del estudiante (`rounded-pill`).
+  '/dashboard/admin/sprints': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/projects/admin/reviews': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
 };
 

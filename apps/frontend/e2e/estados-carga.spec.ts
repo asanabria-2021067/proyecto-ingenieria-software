@@ -206,20 +206,30 @@ test.describe('HU-204: estados de carga del estudiante', () => {
       if (pagina.data.length > 0) {
         await expect(page.getByText(pagina.data[0].tituloNotificacion).first()).toBeVisible();
       } else {
-        await expect(page.getByText('Todo esta al dia')).toBeVisible();
+        await expect(page.getByText('Todo está al día')).toBeVisible();
       }
     });
 
     test('vacío y error se distinguen de la carga', async ({ page }) => {
       await responder(page, /\/api\/notificaciones\?page=/, 200, { data: [], total: 0, page: 1, totalPages: 0 });
       await page.goto('/dashboard/notificaciones');
-      await expect(page.getByText('Todo esta al dia')).toBeVisible();
+      // El estado vacío es el de la lista de la bandeja, no otro texto de la página.
+      const bandeja = page.getByRole('region', { name: 'Bandeja de entrada' });
+      await expect(bandeja.getByText('Todo está al día')).toBeVisible();
+      // Se anuncia con cortesía (aria-live) y no como error: sin alerta en la bandeja.
+      await expect(bandeja.locator('[aria-live="polite"]', { hasText: 'Todo está al día' })).toBeVisible();
+      await expect(bandeja.getByRole('alert')).toHaveCount(0);
       await sinSkeleton(page, 'Cargando notificaciones');
 
       await page.unrouteAll();
       await responder(page, /\/api\/notificaciones\?page=/, 500, { message: 'fallo inducido' });
       await page.goto('/dashboard/notificaciones');
       await expect(page.getByText('No se pudieron cargar las notificaciones')).toBeVisible(TRAS_REINTENTOS);
+      // El fallo es una alerta con su reintento, y ya no dice que todo está al día.
+      const alerta = bandeja.getByRole('alert');
+      await expect(alerta).toContainText('No se pudieron cargar las notificaciones');
+      await expect(alerta.getByRole('button', { name: 'Reintentar' })).toBeVisible();
+      await expect(bandeja.getByText('Todo está al día')).toHaveCount(0);
       await sinSkeleton(page, 'Cargando notificaciones');
     });
   });

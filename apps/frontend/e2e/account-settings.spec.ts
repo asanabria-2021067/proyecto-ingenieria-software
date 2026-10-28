@@ -3,6 +3,7 @@ import type { Browser, Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
 import { desactivarTour } from './support/realtime';
+import { esperarAnimaciones } from './support/accesibilidad';
 
 /**
  * Menú de cuenta único (Mi perfil, Configuración, Cerrar sesión), vista
@@ -54,7 +55,9 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       const menu = page.getByRole('menu');
       await expect(menu).toHaveAttribute('data-side', 'top');
       await expect(menu.getByRole('menuitem')).toHaveText(['Mi perfil', 'Configuración', 'Cerrar sesión']);
-      // Se superpone: abrirlo no mueve el bloque de la cuenta.
+      // Se superpone: abrirlo no mueve el bloque de la cuenta. Se mide al terminar la entrada, que lo desliza
+      // unos píxeles; medido a mitad, el borde inferior aún no ha llegado a su sitio.
+      await esperarAnimaciones(page);
       const cajaMenu = await menu.boundingBox();
       const cajaDisparador = await disparador.boundingBox();
       expect(cajaMenu!.y + cajaMenu!.height).toBeLessThanOrEqual(cajaDisparador!.y + 1);
@@ -117,7 +120,10 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       await page.keyboard.press('Enter');
       await expect(familias.nth(5)).toHaveAttribute('aria-expanded', 'true');
       await familias.nth(3).click();
-      await expect(seccion.getByRole('switch')).toHaveCount(7);
+      // Se abren «Red de contactos» y «Horas y reconocimiento»: aparecen los interruptores que dicen sus
+      // contadores, sin fijar una cifra que cambia cada vez que el backend suma un tipo (T-347 añadió la insignia).
+      const tiposDe = async (n: number) => Number((await familias.nth(n).innerText()).match(/\d+ de (\d+) activas/)?.[1]);
+      await expect(seccion.getByRole('switch')).toHaveCount((await tiposDe(5)) + (await tiposDe(3)));
       await captura(page, 'configuracion-abierta-1440');
       await page.keyboard.press('Space');
       expect(escrituras).toEqual([]);
@@ -128,6 +134,42 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       while ((await cerradas.count()) > 0) await cerradas.first().click();
       await expect(seccion.getByRole('switch')).toHaveCount(total);
       expect(escrituras).toEqual([]);
+    } finally {
+      await page.context().close();
+    }
+  });
+
+  test('Configuración: «Recordatorios y calendario» incluye las tres reuniones de Administración (HU-195)', async ({ browser }) => {
+    const page = await sesion(browser, ESTUDIANTE);
+    try {
+      await page.goto('/dashboard/configuracion');
+      const seccion = page.getByRole('region', { name: 'Preferencias de notificaciones', exact: true });
+      const familia = seccion.locator('[data-slot="accordion-trigger"]', { hasText: 'Recordatorios y calendario' });
+      const abrir = async () => {
+        if ((await familia.getAttribute('aria-expanded')) !== 'true') await familia.click();
+        await expect(familia).toHaveAttribute('aria-expanded', 'true');
+      };
+      await abrir();
+      for (const etiqueta of ['Reunión programada', 'Reunión actualizada', 'Reunión cancelada']) {
+        await expect(seccion.getByRole('switch', { name: etiqueta, exact: true })).toBeVisible();
+      }
+
+      // Se cambia, se guarda en el servidor y sobrevive a la recarga; al final queda como estaba.
+      const cancelada = seccion.getByRole('switch', { name: 'Reunión cancelada', exact: true });
+      const inicial = (await cancelada.getAttribute('aria-checked')) ?? 'true';
+      const cambiado = inicial === 'true' ? 'false' : 'true';
+      const conmutar = async () => {
+        const guardado = page.waitForResponse((r) => r.url().includes('/notificaciones/preferencias') && r.request().method() !== 'GET');
+        await cancelada.click();
+        expect((await guardado).ok()).toBe(true);
+      };
+      await conmutar();
+      await expect(cancelada).toHaveAttribute('aria-checked', cambiado);
+      await page.reload();
+      await abrir();
+      await expect(cancelada).toHaveAttribute('aria-checked', cambiado);
+      await conmutar();
+      await expect(cancelada).toHaveAttribute('aria-checked', inicial);
     } finally {
       await page.context().close();
     }

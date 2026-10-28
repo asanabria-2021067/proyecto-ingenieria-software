@@ -27,5 +27,5 @@ export function RequestInboxDetails({ titulo, tipo, children }: { titulo: string
  * acciones de solo consulta van en verde salvia claro.
  */
 export const REQUEST_INBOX_BUTTON = 'text-xs font-semibold';
-export const REQUEST_INBOX_BUTTON_GREEN = 'bg-primary text-on-primary hover:bg-primary/90';
-export const REQUEST_INBOX_BUTTON_CONSULT = 'bg-consult text-on-consult hover:bg-consult-strong';
+export const REQUEST_INBOX_BUTTON_GREEN = 'motion-glow-primary bg-primary text-on-primary hover:bg-primary/90';
+export const REQUEST_INBOX_BUTTON_CONSULT = 'motion-glow-sage bg-consult text-on-consult hover:bg-consult-strong';

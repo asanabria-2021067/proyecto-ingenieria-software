@@ -72,12 +72,97 @@ describe('FG10-C01 · A11Y-01: rótulos sobre `primary` en el dashboard del estu
     }
   });
 
-  it('el dashboard usa el token y ya no la opacidad del 70 %', () => {
+  it('el dashboard ya no pinta rótulos con la opacidad del 70 % ni fija colores por instancia', () => {
     const pagina = leer('app/dashboard/page.tsx');
     expect(pagina).not.toContain('text-on-primary/70');
-    expect(pagina.match(/text-on-primary-muted/g)?.length).toBe(10);
-    // No se fijó ningún color por instancia.
     expect(pagina).not.toMatch(/#[0-9a-fA-F]{6}\b/);
+  });
+});
+
+describe('Paleta salvia del estudiante: sidebar y tarjeta de bienvenida', () => {
+  const AA_GRAFICO = 3;
+
+  it('la tarjeta de bienvenida y sus KPI usan los tokens salvia, no `primary`', () => {
+    const pagina = leer('app/dashboard/page.tsx');
+    const tarjeta = pagina.slice(pagina.indexOf('{/* Welcome + Stats */}'), pagina.indexOf('<div className="layout-grid">'));
+    const kpi = pagina.slice(pagina.indexOf('function HorasKpiCard({'), pagina.indexOf('\n}\n', pagina.indexOf('function HorasKpiCard({')));
+    for (const bloque of [tarjeta, kpi]) {
+      expect(bloque).not.toMatch(/\b(bg|text|border)-(primary|on-primary|accent)\b/);
+      expect(bloque).toContain('text-sage-ink-muted');
+    }
+    expect(tarjeta).toContain('bg-sage-welcome');
+    expect(tarjeta.match(/bg-sage-kpi\b/g)?.length).toBe(3);
+    expect(kpi).toContain('bg-sage-kpi');
+  });
+
+  it.each([
+    ['ink', 'surface'],
+    ['ink-soft', 'surface'],
+    ['ink-muted', 'surface'],
+    ['ink', 'active'],
+    ['ink', 'hover'],
+    ['ink', 'welcome'],
+    ['ink-soft', 'welcome'],
+    ['ink-muted', 'welcome'],
+    ['ink', 'kpi'],
+    ['ink-muted', 'kpi'],
+    ['on-avatar', 'avatar'],
+  ] as const)('texto %s sobre %s alcanza AA en claro y en oscuro', (texto, fondo) => {
+    for (const tema of ['claro', 'oscuro'] as const) {
+      expect(contraste(rgb(token(`sage-${texto}`, tema)), rgb(token(`sage-${fondo}`, tema))), tema).toBeGreaterThanOrEqual(AA_TEXTO_NORMAL);
+    }
+  });
+
+  it.each([
+    ['accent', 'surface'],
+    ['accent', 'kpi'],
+    ['accent', 'track'],
+    ['accent', 'open'],
+  ] as const)('acento (iconos, barra activa y progreso) %s sobre %s alcanza 3:1 en claro y en oscuro', (color, fondo) => {
+    for (const tema of ['claro', 'oscuro'] as const) {
+      expect(contraste(rgb(token(`sage-${color}`, tema)), rgb(token(`sage-${fondo}`, tema))), tema).toBeGreaterThanOrEqual(AA_GRAFICO);
+    }
+  });
+
+  // «Neutro elegante» (solo claro): en oscuro los `sage-nav-*` son referencias a los `sage-*` ya medidos.
+  it.each([
+    ['ink', 'surface'],
+    ['ink', 'header'],
+    ['ink', 'open'],
+    ['ink', 'hover'],
+    ['ink', 'active'],
+    ['ink-soft', 'surface'],
+    ['ink-soft', 'open'],
+    ['ink-soft', 'active'],
+    ['ink-muted', 'surface'],
+    ['ink-muted', 'header'],
+    ['ink-muted', 'open'],
+    ['ink-muted', 'active'],
+  ] as const)('sidebar neutra: texto %s sobre %s alcanza AA en claro', (texto, fondo) => {
+    expect(contraste(rgb(token(`sage-nav-${texto}`, 'claro')), rgb(token(`sage-nav-${fondo}`, 'claro')))).toBeGreaterThanOrEqual(AA_TEXTO_NORMAL);
+  });
+
+  it.each([
+    ['icon', 'surface'],
+    ['icon', 'open'],
+    ['icon', 'hover'],
+    ['icon', 'active'],
+    ['accent', 'surface'],
+    ['accent', 'active'],
+  ] as const)('sidebar neutra: %s sobre %s alcanza 3:1 en claro', (color, fondo) => {
+    expect(contraste(rgb(token(`sage-nav-${color}`, 'claro')), rgb(token(`sage-nav-${fondo}`, 'claro')))).toBeGreaterThanOrEqual(AA_GRAFICO);
+  });
+
+  it('en oscuro la sidebar del estudiante conserva la paleta salvia', () => {
+    const oscuro = css.slice(css.indexOf('\n.dark {'));
+    expect(oscuro).toContain('--color-sage-nav-surface: var(--color-sage-surface);');
+    expect(oscuro).toContain('--color-sage-nav-active: var(--color-sage-active);');
+  });
+
+  it('la sidebar del estudiante solo reasigna los tokens `--admin-*` dentro de su propia clase', () => {
+    expect(leer('components/dashboard/DashboardLayout.tsx')).toMatch(/admin-sidebar student-sidebar/);
+    expect(leer('components/admin/AdminLayout.tsx')).not.toContain('student-');
+    expect(css).toMatch(/\.student-sidebar,\n\.student-account-menu \{[^}]*--admin-bg: var\(--color-sage-nav-surface\);/);
   });
 });
 

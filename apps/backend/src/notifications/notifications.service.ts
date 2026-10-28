@@ -13,6 +13,46 @@ type TxClient = Prisma.TransactionClient;
 /** T-292: tamaño de página por defecto de GET /notificaciones?page=N. */
 const NOTIFICATIONS_PAGE_SIZE = 20;
 
+export interface FiltroNotificaciones {
+  tipos?: TipoNotificacion[];
+  leida?: boolean;
+  /** Sprint 10 (bandeja): texto parcial, sin distinguir mayúsculas, sobre título y mensaje. */
+  q?: string;
+  /** Id referenciado por el payload (`projectId` o `idProyecto`) o `ninguno` = sin proyecto. */
+  proyecto?: number | 'ninguno';
+}
+
+/** Claves con las que los payloads de notificación referencian un proyecto. */
+const CLAVES_PROYECTO = ['projectId', 'idProyecto'] as const;
+
+function filtroProyecto(proyecto: number | 'ninguno'): Prisma.NotificacionWhereInput {
+  if (proyecto === 'ninguno') {
+    // Clave ausente o nula en todas las variantes: aviso sin proyecto.
+    return { AND: CLAVES_PROYECTO.map((clave) => ({ datosJson: { path: [clave], equals: Prisma.AnyNull } })) };
+  }
+  return { OR: CLAVES_PROYECTO.map((clave) => ({ datosJson: { path: [clave], equals: proyecto } })) };
+}
+
+/** HU-198: siempre con el usuario de la sesión; los filtros solo acotan dentro de lo suyo. */
+function filtroNotificaciones(userId: number, { tipos, leida, q, proyecto }: FiltroNotificaciones): Prisma.NotificacionWhereInput {
+  const condiciones: Prisma.NotificacionWhereInput[] = [];
+  if (q) {
+    condiciones.push({
+      OR: [
+        { tituloNotificacion: { contains: q, mode: 'insensitive' } },
+        { mensajeNotificacion: { contains: q, mode: 'insensitive' } },
+      ],
+    });
+  }
+  if (proyecto !== undefined) condiciones.push(filtroProyecto(proyecto));
+  return {
+    idUsuario: userId,
+    ...(tipos ? { tipoNotificacion: { in: [...new Set(tipos)] } } : {}),
+    ...(leida === undefined ? {} : { leidaEn: leida ? { not: null } : null }),
+    ...(condiciones.length > 0 ? { AND: condiciones } : {}),
+  };
+}
+
 /**
  * Sprint 7 (06 v2 §16/§40/§44/§45): efecto diferido al post-commit. Tipo
  * estructural compatible con `EffectBuffer` del runner de proyecto sin
@@ -64,31 +104,42 @@ export class NotificationsService {
    * si se recibe un sink, un efecto post-commit por destinatario (clave
    * `notification:<usuario>:<tipo>`, deduplicada por el buffer). Con lista
    * vacía no escribe ni registra nada.
+   *
+   * HU-195: con `claveIdempotencia` (la operación lógica, p. ej.
+   * `reunion:7:v2:actualizada`), el índice único (usuario, clave) descarta a
+   * quien ya tiene ese aviso —reintento o carrera— y solo se emite a quien se
+   * insertó de verdad.
    */
   async persistUsersTx(
     tx: TxClient,
     userIds: number[],
     payload: NotificationInput,
     effects?: PostCommitEffectSink,
+    opciones: { claveIdempotencia?: string } = {},
   ): Promise<{ count: number }> {
     const recipients = await this.filterEnabledRecipients(tx, [...new Set(userIds)], payload.tipoNotificacion);
     if (recipients.length === 0) {
       return { count: 0 };
     }
 
-    const created = await tx.notificacion.createMany({
-      data: recipients.map((idUsuario) => ({
-        idUsuario,
-        tipoNotificacion: payload.tipoNotificacion,
-        tituloNotificacion: payload.tituloNotificacion,
-        mensajeNotificacion: payload.mensajeNotificacion,
-        datosJson: payload.datosJson,
-      })),
-      skipDuplicates: false,
-    });
+    const data = recipients.map((idUsuario) => ({
+      idUsuario,
+      tipoNotificacion: payload.tipoNotificacion,
+      tituloNotificacion: payload.tituloNotificacion,
+      mensajeNotificacion: payload.mensajeNotificacion,
+      datosJson: payload.datosJson,
+      claveIdempotencia: opciones.claveIdempotencia,
+    }));
+    let delivered = recipients;
+    if (opciones.claveIdempotencia) {
+      const rows = await tx.notificacion.createManyAndReturn({ data, skipDuplicates: true, select: { idUsuario: true } });
+      delivered = rows.map((row) => row.idUsuario);
+    } else {
+      await tx.notificacion.createMany({ data, skipDuplicates: false });
+    }
 
     if (effects) {
-      for (const idUsuario of recipients) {
+      for (const idUsuario of delivered) {
         effects.add({
           key: `notification:${idUsuario}:${payload.tipoNotificacion}`,
           publish: () => this.emitNotification([idUsuario], payload),
@@ -96,7 +147,7 @@ export class NotificationsService {
       }
     }
 
-    return { count: created.count };
+    return { count: delivered.length };
   }
 
   /** Igual que `persistUsersTx`, construyendo título/mensaje desde la plantilla catalogada. */
@@ -106,8 +157,9 @@ export class NotificationsService {
     templateKey: K,
     data: NotificationTemplateData[K],
     effects?: PostCommitEffectSink,
+    opciones: { claveIdempotencia?: string } = {},
   ): Promise<{ count: number }> {
-    return this.persistUsersTx(tx, userIds, this.payloadFromTemplate(templateKey, data), effects);
+    return this.persistUsersTx(tx, userIds, this.payloadFromTemplate(templateKey, data), effects, opciones);
   }
 
   /**
@@ -223,9 +275,9 @@ export class NotificationsService {
     }
   }
 
-  findAll(userId?: number) {
+  findAll(userId?: number, filtros: FiltroNotificaciones = {}) {
     return this.prisma.notificacion.findMany({
-      where: userId ? { idUsuario: userId } : undefined,
+      where: userId ? filtroNotificaciones(userId, filtros) : undefined,
       orderBy: { creadaEn: 'desc' },
       take: 100,
     });
@@ -234,13 +286,23 @@ export class NotificationsService {
   /**
    * T-292 (HU-176): página de notificaciones del usuario, de la más reciente a
    * la más antigua. Misma forma que el listado paginado de proyectos.
+   * HU-198 (T-370): `data` y `total` usan el MISMO filtro (tipos, leída), siempre
+   * acotado al usuario de la sesión; filtrar en memoria tras paginar daría páginas vacías.
    */
-  async findPage(userId: number, page: number, limit = NOTIFICATIONS_PAGE_SIZE) {
-    const where = { idUsuario: userId };
+  async findPage(
+    userId: number,
+    page: number,
+    limit = NOTIFICATIONS_PAGE_SIZE,
+    filtros: FiltroNotificaciones = {},
+    orden: 'asc' | 'desc' = 'desc',
+  ) {
+    const where = filtroNotificaciones(userId, filtros);
     const [data, total] = await Promise.all([
       this.prisma.notificacion.findMany({
         where,
-        orderBy: [{ creadaEn: 'desc' }, { idNotificacion: 'desc' }],
+        // Sprint 10: el desempate sigue la misma dirección que la fecha, así
+        // ascendente y descendente son el reverso exacto uno del otro.
+        orderBy: [{ creadaEn: orden }, { idNotificacion: orden }],
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -256,11 +318,25 @@ export class NotificationsService {
     });
   }
 
-  async getUnreadCount(userId: number): Promise<{ total: number }> {
-    const total = await this.prisma.notificacion.count({
+  /**
+   * Sprint 10 (bandeja): además del total, el desglose por tipo (`porTipo`),
+   * con el que la bandeja pinta el contador de cada categoría en UNA sola
+   * petición en vez de una por categoría (la ráfaga chocaba con el límite de
+   * 10 req/s). Solo tipos con al menos una no leída; el total es su suma.
+   */
+  async getUnreadCount(userId: number): Promise<{ total: number; porTipo: Record<string, number> }> {
+    const filas = await this.prisma.notificacion.groupBy({
+      by: ['tipoNotificacion'],
       where: { idUsuario: userId, leidaEn: null },
+      _count: { _all: true },
     });
-    return { total };
+    const porTipo: Record<string, number> = {};
+    let total = 0;
+    for (const fila of filas) {
+      porTipo[fila.tipoNotificacion] = fila._count._all;
+      total += fila._count._all;
+    }
+    return { total, porTipo };
   }
 
   async markAsRead(id: number, userId: number) {
@@ -288,12 +364,46 @@ export class NotificationsService {
     });
   }
 
-  async markAllAsRead(userId: number): Promise<{ actualizadas: number }> {
+  /**
+   * HU-198 (N-01): con `tipos` marca solo esas no leídas del usuario (la
+   * categoría filtrada); sin `tipos`, todas las suyas, como siempre.
+   * `actualizadas` cuenta las que pasaron a leídas: las ya leídas no se tocan.
+   */
+  async markAllAsRead(
+    userId: number,
+    filtros?: TipoNotificacion[] | Omit<FiltroNotificaciones, 'leida'>,
+  ): Promise<{ actualizadas: number }> {
+    const { tipos, q, proyecto } = Array.isArray(filtros) ? { tipos: filtros } : (filtros ?? {});
     const result = await this.prisma.notificacion.updateMany({
-      where: { idUsuario: userId, leidaEn: null },
+      where: { ...filtroNotificaciones(userId, { tipos, q, proyecto }), leidaEn: null },
       data: { leidaEn: new Date() },
     });
     return { actualizadas: result.count };
+  }
+
+  /**
+   * Sprint 10 (bandeja): proyectos que aparecen en los avisos del usuario de la
+   * sesión, para el desplegable «Todos los proyectos». Solo ids que ya viajan en
+   * sus propios payloads: no se consultan membresías ni proyectos ajenos. El
+   * título sale de la tabla de proyectos; un id sin proyecto (borrado) se omite.
+   */
+  async findProjectsReferenced(userId: number): Promise<{ idProyecto: number; tituloProyecto: string }[]> {
+    const filas = await this.prisma.$queryRaw<{ id: number | null }[]>(Prisma.sql`
+      SELECT DISTINCT COALESCE(
+        NULLIF(datos_json->>'projectId', '')::bigint,
+        NULLIF(datos_json->>'idProyecto', '')::bigint
+      ) AS id
+      FROM notificacion
+      WHERE id_usuario = ${userId}
+        AND (jsonb_typeof(datos_json->'projectId') = 'number' OR jsonb_typeof(datos_json->'idProyecto') = 'number')
+    `);
+    const ids = filas.map((fila) => Number(fila.id)).filter((id) => Number.isSafeInteger(id) && id > 0);
+    if (ids.length === 0) return [];
+    return this.prisma.proyecto.findMany({
+      where: { idProyecto: { in: ids } },
+      select: { idProyecto: true, tituloProyecto: true },
+      orderBy: { tituloProyecto: 'asc' },
+    });
   }
 
   /** HU-185 (T-326): un tipo sin fila guardada se reporta como activo. */

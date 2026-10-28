@@ -42,6 +42,7 @@ motivo de comentario» de `docs/design-system.md`.
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/metricas/page.tsx` |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/seguridad/page.tsx` |
 | `/dashboard/admin/anuncios` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/anuncios/page.tsx` |
+| `/dashboard/admin/botones` | sí | 0 | 0 | 1 | 0 | `app/dashboard/admin/botones/page.tsx` |
 | `/dashboard/admin/etiquetas` | sí | 0 | 0 | 0 | 6 | `app/dashboard/admin/etiquetas/page.tsx` |
 | `/dashboard/admin/apelaciones` | sí | 1 | 0 | 0 | 0 | `app/dashboard/admin/apelaciones/appeals-inbox-client.tsx` |
 | `/dashboard/admin/apelaciones/[apelacionId]` | sí | 1 | 0 | 0 | 0 | `app/dashboard/admin/apelaciones/[apelacionId]/appeal-review-client.tsx` |
@@ -111,22 +112,25 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin/proyectos` | sí | 0 | 1 | 0 | 0 |
 | `/dashboard/admin/proyectos/[id]` | sí | 0 | 2 | 0 | 0 |
 | `/dashboard/admin/proyectos/[id]/cierre` | sí | 1 | 5 | 0 | 0 |
-| `/dashboard/admin/sprints` | sí | 0 | 1 | 0 | 0 |
+| `/dashboard/admin/sprints` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/projects/admin/reviews` | sí | 0 | 0 | 0 | 0 |
 
 Árbol administrativo completo (las 13 vistas de T-320 más sus componentes: 40 archivos, sin `AdminMetricsSection`;
 incluye la vista de cuentas pendientes del PR #270 y `metric-trend-plot.tsx`, que T-293 separó de
 `AdminMetricsSection`). La página propia de «Tendencias de uso» (`app/dashboard/admin/metricas/page.tsx`) es el
 archivo 41: se creó después, sin literales, y no altera los totales. Al retirarse el catálogo temporal de
-etiquetas (`app/dashboard/admin/etiquetas/page.tsx`, que tampoco tenía literales de tamaño o radio) el árbol vuelve
-a 40 archivos:
+etiquetas (`app/dashboard/admin/etiquetas/page.tsx`, que tampoco tenía literales de tamaño o radio) el árbol volvió
+a 40 archivos. Después entraron la pantalla de anuncios (HU-191) y el catálogo temporal de botones
+(`app/dashboard/admin/botones/page.tsx`, con un solo `<button>` propio para pintar las muestras), los dos sin
+literales: el árbol quedó en 42 archivos. Al retirarse el catálogo temporal de botones (Sprint 10), que no tenía
+literales, sale uno y queda en 41.
 
 | Medida | Antes | Después |
 |---|---:|---:|
 | Tamaños literales | 47 | 2 |
-| Radios literales | 68 | 20 |
+| Radios literales | 68 | 30 |
 | Titulares fuera de la escala | 2 | 0 |
-| Archivos sin ningún literal de tamaño o radio | — | 29 de 40 |
+| Archivos sin ningún literal de tamaño o radio | — | 26 de 41 |
 
 Qué se hizo con cada diferencia de la sección 4:
 
@@ -150,14 +154,17 @@ actualizarla, hace fallar la prueba.
 | `app/dashboard/admin/proyectos/[id]/admin-project-detail-client.tsx` | `rounded-lg`, `rounded-md` | Sin token de igual valor |
 | `app/dashboard/admin/proyectos/[id]/cierre/closure-review-client.tsx` | 4 × `rounded-lg`, `rounded-md`, `text-[13px]` | Sin token de igual valor; el texto de 13 px es el de los botones de acción en móvil, donde 14 px no cabe |
 | `app/dashboard/admin/proyectos/admin-projects-client.tsx` | `rounded-lg` | Sin token de igual valor |
-| `app/dashboard/admin/solicitudes-recuperacion/page.tsx` | 2 × `rounded-lg` | Sin token de igual valor |
-| `app/dashboard/admin/sprints/admin-sprints-client.tsx` | `rounded-md` | Sin token de igual valor |
-| `components/admin/AdminLayout.tsx` | `rounded-lg` | Tarjeta del logotipo |
-| `components/admin/ProjectFeedbackSheet.tsx` | 3 × `rounded-lg` | Sin token de igual valor |
+| `app/dashboard/admin/solicitudes-recuperacion/page.tsx` | 2 × `rounded-lg`, `rounded-md` | Sin token de igual valor |
+| `app/dashboard/admin/usuarios/page.tsx` | 2 × `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
+| `components/admin/AdminLayout.tsx` | `rounded-lg`, `rounded-md` | Tarjeta del logotipo |
+| `components/admin/ConfirmActionDialog.tsx` | 4 × `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
+| `components/admin/ProjectFeedbackSheet.tsx` | 3 × `rounded-lg`, `rounded-md` | Sin token de igual valor |
 | `components/admin/ProjectReviewSheet.tsx` | 3 × `rounded-lg` | Sin token de igual valor |
 | `components/admin/RevisionHistoryPanel.tsx` | `rounded-lg` | Sin token de igual valor |
 | `components/admin/UserDetailSheet.tsx` | `rounded-md` | Sin token de igual valor |
-| `components/admin/sprints/sprint-month-view.tsx` | `text-[15px]` | Texto denso del calendario de Sprints |
+| `components/admin/security/security-events-filters.tsx` | `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
+| `components/admin/security/security-events-table.tsx` | `rounded-md` | Radio normalizado de botón (`rounded-md`, Diagnóstico → Botones) |
+| `components/admin/sprints/admin-calendar-view.tsx` | `text-[15px]` | Texto denso del calendario de Sprints |
 
 Otras excepciones:
 

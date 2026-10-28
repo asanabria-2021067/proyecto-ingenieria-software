@@ -6,8 +6,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils';
 import type { ProjectNavGroup } from './project-nav-model';
 
+/** Un grupo de destinos de cualquier navegación secundaria (Proyecto, Personas…). */
+export type NavListGroup = Omit<ProjectNavGroup, 'id'> & { id: string };
+
 interface ProjectNavListProps {
-  groups: ProjectNavGroup[];
+  groups: NavListGroup[];
   activeHref: string | null;
   /**
    * `full`: grupos con encabezado y etiquetas visibles (sidebar expandida y
@@ -17,6 +20,12 @@ interface ProjectNavListProps {
   /** Se llama al elegir un destino (el Sheet móvil lo usa para cerrarse). */
   onNavigate?: () => void;
   id?: string;
+  /**
+   * `neutral` (por defecto, Proyecto): velo del color del texto. `sage`: el
+   * activo de la sidebar global y de las carpetas de Notificaciones, verde
+   * suave con indicador lateral.
+   */
+  activeTone?: 'neutral' | 'sage';
 }
 
 /**
@@ -25,6 +34,7 @@ interface ProjectNavListProps {
  * sobre el blanco del Sheet móvil, sin acentos de color.
  */
 const ACTIVE_CLASS = 'bg-on-surface/8 font-semibold text-text-primary';
+const ACTIVE_SAGE_CLASS = 'bg-sage-nav-active font-semibold text-sage-nav-ink shadow-[inset_3px_0_0_var(--color-sage-nav-accent)]';
 const INACTIVE_CLASS = 'font-medium text-text-secondary hover:bg-on-surface/5 hover:text-text-primary';
 
 /**
@@ -32,7 +42,8 @@ const INACTIVE_CLASS = 'font-medium text-text-secondary hover:bg-on-surface/5 ho
  * sidebar (expandida y colapsada) y el Sheet móvil pintan exactamente los
  * grupos que les pasa `buildProjectNavGroups`, sin listas propias.
  */
-export function ProjectNavList({ groups, activeHref, variant, onNavigate, id }: ProjectNavListProps) {
+export function ProjectNavList({ groups, activeHref, variant, onNavigate, id, activeTone = 'neutral' }: ProjectNavListProps) {
+  const activeClass = activeTone === 'sage' ? ACTIVE_SAGE_CLASS : ACTIVE_CLASS;
   if (variant === 'rail') {
     return (
       <ul id={id} className="flex flex-col items-center gap-micro">
@@ -53,7 +64,7 @@ export function ProjectNavList({ groups, activeHref, variant, onNavigate, id }: 
                         onClick={onNavigate}
                         className={cn(
                           'flex size-10 items-center justify-center rounded-control transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-                          active ? ACTIVE_CLASS : INACTIVE_CLASS,
+                          active ? activeClass : INACTIVE_CLASS,
                         )}
                       >
                         <Icon className="size-4.5" aria-hidden="true" />
@@ -98,7 +109,7 @@ export function ProjectNavList({ groups, activeHref, variant, onNavigate, id }: 
                     onClick={onNavigate}
                     className={cn(
                       'flex items-center gap-inline rounded-control px-inline py-tight text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-                      active ? ACTIVE_CLASS : INACTIVE_CLASS,
+                      active ? activeClass : INACTIVE_CLASS,
                     )}
                   >
                     <Icon className="size-4.5 shrink-0" aria-hidden="true" />

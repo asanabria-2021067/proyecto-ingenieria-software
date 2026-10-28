@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface ReporteCard {
   icono: React.ElementType;
@@ -119,13 +120,14 @@ export function SprintReportsDialog({ open, onOpenChange, idProyecto, idSprintBu
 
 export function ReportsDialogTrigger({ onClick }: { onClick: () => void }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="secondary"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-control bg-primary-container px-4 py-2 text-sm font-semibold text-on-primary-container transition-colors hover:bg-primary-container/80"
+      className="h-auto gap-1.5 rounded-[var(--radius-control)] bg-primary-container px-4 py-2 text-sm font-semibold text-on-primary-container hover:bg-primary-container/80 has-[>svg]:px-4"
     >
       Ver informes
       <ChevronDown className="h-4 w-4" aria-hidden="true" />
-    </button>
+    </Button>
   );
 }

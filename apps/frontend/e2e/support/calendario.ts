@@ -56,6 +56,18 @@ export function diaDelSelector(page: Page, fecha: Date) {
 }
 
 /**
+ * Elige `fecha` en el selector ya abierto, que muestra el mes de `desde`: avanza mes a mes si cae en uno
+ * posterior. Busca el día por su nombre completo, nunca un día de relleno de otro mes, sea cual sea la
+ * fecha en que corre la prueba.
+ */
+export async function elegirDiaDelSelector(page: Page, fecha: Date, desde: Date) {
+  const selector = page.locator('[data-slot="popover-content"]');
+  const saltos = (fecha.getFullYear() - desde.getFullYear()) * 12 + fecha.getMonth() - desde.getMonth();
+  for (let i = 0; i < saltos; i += 1) await selector.getByRole('button', { name: /next|siguiente/i }).click();
+  await diaDelSelector(page, fecha).click();
+}
+
+/**
  * Petición a la API real con la sesión de la página. El backend limita por IP
  * (10 por segundo, 50 cada 10 s) y en el stack de pruebas todas las peticiones
  * salen del mismo servidor Next, así que una ráfaga de preparación puede
@@ -139,9 +151,10 @@ const ORIGENES_DEL_MAPA: Record<string, RegExp> = {
   'connect-src': /^https:\/\/nominatim\.openstreetmap\.org$/,
 };
 
-export function retirarDeudaCspDelMapa(cspViolations: CspCollector): string[] {
+export function retirarDeudaCspDelMapa(cspViolations: CspCollector, pagina = '/dashboard/calendario'): string[] {
   const todas = cspViolations.drain();
-  const ajenas = todas.filter((v) => !(ORIGENES_DEL_MAPA[v.directive]?.test(v.blocked) && v.disposition === 'report' && v.page === '/dashboard/calendario'));
+  // `pagina`: la ruta que abre el mapa (el calendario del estudiante o, en HU-195, el de Administración).
+  const ajenas = todas.filter((v) => !(ORIGENES_DEL_MAPA[v.directive]?.test(v.blocked) && v.disposition === 'report' && v.page === pagina));
   expect(ajenas, 'violaciones CSP que no son la deuda conocida del mapa').toEqual([]);
   return [...new Set(todas.map((v) => `${v.directive} ${v.blocked}`))].sort();
 }

@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { AlertCircle, ArrowRight, CalendarRange, SearchX } from 'lucide-react';
+import { AlertCircle, ArrowRight, CalendarPlus, CalendarRange, SearchX } from 'lucide-react';
 import { SprintListView } from '@/components/admin/sprints/sprint-list-view';
-import { SprintMonthView } from '@/components/admin/sprints/sprint-month-view';
+import { AdminCalendarView } from '@/components/admin/sprints/admin-calendar-view';
+import { MeetingListView } from '@/components/admin/sprints/meeting-list-view';
+import { AdminMeetingFormDialog } from '@/components/admin/meetings/admin-meeting-form-dialog';
 import { DASHBOARD_FILTER_TRIGGER_CLASS, DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import {
   Breadcrumb,
@@ -16,65 +18,93 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { useAdminSprintCalendar } from '@/hooks/use-admin-sprint-calendar';
 import {
   SITUACION_SPRINT_LABEL_CORTA,
+  VISTAS_ADMIN_CALENDARIO,
   adminSprintsHref,
   filterSprintsBySituacion,
   groupSprintsByPlannedDay,
   parseFechaParam,
+  parseVistaParam,
   searchSprints,
   sortSprintsForSupervision,
+  type VistaAdminCalendario,
 } from '@/lib/admin/sprint-calendar';
+import { IconoTipoEvento } from '@/lib/calendar/paleta';
 import type { AdminSprintSituacion } from '@/lib/types/admin-sprints';
 import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
 
 /**
  * Calendario administrativo de Sprints: supervisión temporal de los Sprints
- * operables de los proyectos activos.
+ * operables de los proyectos activos y de las reuniones de Administración.
  *
- * Todo sale de UNA consulta (`useAdminSprintCalendar`, la misma del widget
- * del panel): la búsqueda, el filtro, el cambio de mes y el cambio de vista
- * trabajan sobre ese payload, sin pedir nada más. Qué Sprint venció, vence
- * hoy o sigue en curso lo dice el backend (`situacion`). El administrador
- * supervisa: la única acción es abrir el detalle administrativo del proyecto.
+ * Los Sprints salen de UNA consulta (`useAdminSprintCalendar`, la misma del
+ * widget del panel): la búsqueda, el filtro, el cambio de periodo y el cambio
+ * de vista trabajan sobre ese payload. Qué Sprint venció, vence hoy o sigue en
+ * curso lo dice el backend (`situacion`). Las reuniones se leen aparte, por el
+ * rango visible (Día, Semana, Mes) o la agenda activa (Lista). El
+ * administrador supervisa: las únicas acciones abren el detalle
+ * administrativo de un proyecto; aquí no se agenda ni se gestiona nada.
  *
- * La vista y el día seleccionado viven en la URL (`?vista=mes|lista&fecha=
- * YYYY-MM-DD`; Mes y el «hoy» del servidor por defecto): el mini calendario
- * del panel enlaza a un día concreto. La búsqueda y el filtro son estado local
- * y se conservan al cambiar de vista.
+ * La vista y el día seleccionado viven en la URL (`?vista=dia|semana|mes|lista
+ * &fecha=YYYY-MM-DD`; Mes y el «hoy» del servidor por defecto): el mini
+ * calendario del panel enlaza a un día concreto. La búsqueda y el filtro son
+ * estado local y se conservan al cambiar de vista.
  */
 
-type Vista = 'mes' | 'lista';
 const FILTRO_TODAS = 'TODAS';
+const ETIQUETA_VISTA: Record<VistaAdminCalendario, string> = { dia: 'Día', semana: 'Semana', mes: 'Mes', lista: 'Lista' };
 
 /**
- * Selector Mes | Lista, con el mismo grupo de botones del calendario del
- * estudiante. Son enlaces: la vista es navegable, compartible y sobrevive a
- * la recarga.
+ * Selector Día | Semana | Mes | Lista con el control segmentado del
+ * calendario del estudiante (mismas clases que su `RadioGroup`). Aquí son
+ * enlaces: la vista es navegable, compartible y sobrevive a la recarga; todas
+ * conservan el día elegido. Abre la barra que va justo encima del calendario.
  */
-function SelectorVista({ vista, fecha }: { vista: Vista; fecha: string | null }) {
+function SelectorVista({ vista, fecha }: { vista: VistaAdminCalendario; fecha: string | null }) {
   return (
-    <nav aria-label="Vista del calendario">
-      <ButtonGroup>
-        {(['mes', 'lista'] as const).map((opcion) => (
-          <Button
-            key={opcion}
-            asChild
-            variant={opcion === vista ? 'default' : 'outline'}
-            className="h-9 rounded-md text-xs font-bold"
-          >
-            <Link href={adminSprintsHref(opcion, fecha)} aria-current={opcion === vista ? 'page' : undefined}>
-              {opcion === 'mes' ? 'Mes' : 'Lista'}
-            </Link>
-          </Button>
-        ))}
-      </ButtonGroup>
+    <nav aria-label="Vista del calendario" className="flex w-fit rounded-pill bg-surface-container p-1">
+      {VISTAS_ADMIN_CALENDARIO.map((opcion) => (
+        <Link
+          key={opcion}
+          href={adminSprintsHref(opcion, fecha)}
+          aria-current={opcion === vista ? 'page' : undefined}
+          className={`rounded-pill px-3 py-1 text-xs font-bold outline-none motion-select focus-visible:ring-2 focus-visible:ring-primary/60 ${
+            opcion === vista
+              ? 'bg-surface-container-lowest text-on-surface shadow-card'
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          {ETIQUETA_VISTA[opcion]}
+        </Link>
+      ))}
     </nav>
+  );
+}
+
+/** Leyenda de las marcas del calendario (Día, Semana y Mes). */
+function LeyendaCalendario() {
+  return (
+    <div className="flex flex-wrap items-center gap-tight">
+      <span className="flex items-center gap-1 type-meta">
+        <span className="h-1.5 w-1.5 rounded-pill bg-primary" aria-hidden="true" />
+        Finalización
+      </span>
+      <span className="flex items-center gap-1 type-meta">
+        <span className="h-1.5 w-1.5 rounded-pill bg-attention" aria-hidden="true" />
+        Con plan vencido
+      </span>
+      <span className="flex items-center gap-1 type-meta">
+        <span aria-hidden="true">
+          <IconoTipoEvento tipo="REUNION" tono={3} />
+        </span>
+        Reunión administrativa
+      </span>
+    </div>
   );
 }
 
@@ -119,7 +149,7 @@ function ListaSkeleton() {
 
 export default function AdminSprintsClient() {
   const searchParams = useSearchParams();
-  const vista: Vista = searchParams.get('vista') === 'lista' ? 'lista' : 'mes';
+  const vista = parseVistaParam(searchParams.get('vista'));
   const { data, isPending, isError, isFetching, refetch } = useAdminSprintCalendar();
 
   // Día elegido. Arranca en `?fecha=` (validada) y, si falta o no sirve, se
@@ -135,7 +165,28 @@ export default function AdminSprintsClient() {
   }
   const seleccionarDia = (dia: string) => {
     setFecha(dia);
-    window.history.replaceState(null, '', adminSprintsHref('mes', dia));
+    window.history.replaceState(null, '', adminSprintsHref(vista, dia));
+  };
+  // Semana → Día desde el «+N» de un horario cargado: es otra vista, así que queda en el historial.
+  const verDia = (dia: string) => window.history.pushState(null, '', adminSprintsHref('dia', dia));
+
+  // Diálogo de reunión: «Programar» desde el encabezado (sin día) o desde el día elegido (a las 09:00),
+  // o «Editar» desde la tarjeta de una reunión. Al cerrarse, el foco vuelve al botón que lo abrió.
+  const [dialogo, setDialogo] = useState<{ dia?: Date; idReunion?: number } | null>(null);
+  const botonProgramarRef = useRef<HTMLButtonElement>(null);
+  const focoAlCerrarRef = useRef<HTMLElement | null>(null);
+  const programar = () => {
+    focoAlCerrarRef.current = botonProgramarRef.current;
+    setDialogo({});
+  };
+  const programarEnDia = (dia: string) => {
+    const [y, m, d] = dia.split('-').map(Number);
+    focoAlCerrarRef.current = null;
+    setDialogo({ dia: new Date(y, m - 1, d, 9, 0) });
+  };
+  const editarReunion = (idReunion: number, boton: HTMLButtonElement) => {
+    focoAlCerrarRef.current = boton;
+    setDialogo({ idReunion });
   };
 
   const [busqueda, setBusqueda] = useState('');
@@ -174,32 +225,34 @@ export default function AdminSprintsClient() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-x-section gap-y-stack">
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-x-section gap-y-stack">
         <div className="min-w-0">
           <h1 className={ADMIN_PAGE_TITLE}>
             Calendario de Sprints
           </h1>
           <p className={ADMIN_PAGE_LEAD}>
-            Supervisa las fechas planificadas de finalización de los Sprints activos.
+            Supervisa las fechas planificadas de finalización de los Sprints activos y las reuniones administrativas.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-gap">
-          {/* Leyenda junto al selector, como en el calendario del estudiante. */}
-          {vista === 'mes' && (
-            <div className="flex items-center gap-tight">
-              <span className="flex items-center gap-1 type-meta">
-                <span className="h-1.5 w-1.5 rounded-pill bg-primary" aria-hidden="true" />
-                Finalización
-              </span>
-              <span className="flex items-center gap-1 type-meta">
-                <span className="h-1.5 w-1.5 rounded-pill bg-attention" aria-hidden="true" />
-                Con plan vencido
-              </span>
-            </div>
-          )}
-          <SelectorVista vista={vista} fecha={fecha} />
-        </div>
+        {/* Mismo botón que «Agendar actividad» del calendario del estudiante. */}
+        <Button
+          ref={botonProgramarRef}
+          type="button"
+          onClick={programar}
+          className="h-9 gap-1.5 rounded-pill bg-primary px-4 text-xs font-bold text-on-primary hover:bg-primary/90"
+        >
+          <CalendarPlus className="size-4" aria-hidden="true" />
+          Programar reunión
+        </Button>
       </header>
+
+      <AdminMeetingFormDialog
+        open={dialogo !== null}
+        onOpenChange={(abierto) => !abierto && setDialogo(null)}
+        initialDate={dialogo?.dia}
+        idReunion={dialogo?.idReunion ?? null}
+        restaurarFocoEn={focoAlCerrarRef}
+      />
 
       <div className="@container/sprints flex flex-col gap-stack">
         <section aria-label="Filtros de Sprints" className="grid grid-cols-1 gap-stack @2xl/sprints:flex">
@@ -234,24 +287,30 @@ export default function AdminSprintsClient() {
           </Select>
         </section>
 
-        {data && total > 0 && (
+        {/* Leyenda y métricas: separadas de la barra de navegación, que va justo encima del calendario. */}
+        {((data && total > 0) || vista !== 'lista') && (
           <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-inline gap-y-micro">
-            <p className="type-body text-text-secondary" role="status" aria-live="polite">
-              {hayFiltros ? (
-                <>
-                  <span className="font-semibold tabular-nums text-text-primary">{filtrados.length}</span> de{' '}
-                  <span className="tabular-nums">{total}</span> Sprints
-                </>
-              ) : (
-                <>
-                  <span className="font-semibold tabular-nums text-text-primary">{total}</span>{' '}
-                  {total === 1 ? 'Sprint operable' : 'Sprints operables'}
-                </>
+            <div className="flex flex-wrap items-center gap-x-section gap-y-micro">
+              {data && total > 0 && (
+                <p className="type-body text-text-secondary" role="status" aria-live="polite">
+                  {hayFiltros ? (
+                    <>
+                      <span className="font-semibold tabular-nums text-text-primary">{filtrados.length}</span> de{' '}
+                      <span className="tabular-nums">{total}</span> Sprints
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold tabular-nums text-text-primary">{total}</span>{' '}
+                      {total === 1 ? 'Sprint operable' : 'Sprints operables'}
+                    </>
+                  )}
+                </p>
               )}
-            </p>
+              {vista !== 'lista' && <LeyendaCalendario />}
+            </div>
             <div className="flex flex-wrap items-center gap-x-inline gap-y-micro">
-              {/* Un Sprint sin fecha no cae en ningún día: en Mes se avisa y se lleva a la Lista. */}
-              {vista === 'mes' && sinFecha > 0 && (
+              {/* Un Sprint sin fecha no cae en ningún día: en el calendario se avisa y se lleva a la Lista. */}
+              {data && vista !== 'lista' && sinFecha > 0 && (
                 <Link
                   href={adminSprintsHref('lista', fecha)}
                   onClick={() => setSituacion('SIN_FECHA')}
@@ -270,6 +329,10 @@ export default function AdminSprintsClient() {
           </div>
         )}
 
+        {/* En Día, Semana y Mes el selector abre la barra del calendario junto a Hoy y las flechas;
+            en Lista, mientras carga o si falla, va solo en ese mismo sitio. */}
+        {(vista === 'lista' || isPending || isError) && <SelectorVista vista={vista} fecha={fecha} />}
+
         {isError ? (
           <Empty tone="danger" role="alert">
             <EmptyMedia variant="icon">
@@ -287,44 +350,57 @@ export default function AdminSprintsClient() {
           </Empty>
         ) : isPending ? (
           <SkeletonRegion label="Cargando el calendario de Sprints">
-            {vista === 'mes' ? <MesSkeleton /> : <ListaSkeleton />}
+            {vista === 'lista' ? <ListaSkeleton /> : <MesSkeleton />}
           </SkeletonRegion>
-        ) : total === 0 ? (
-          <Empty tone="muted" role="status">
-            <EmptyMedia variant="icon">
-              <CalendarRange aria-hidden="true" className="size-7" />
-            </EmptyMedia>
-            <EmptyHeader>
-              <EmptyTitle>No hay Sprints operables para supervisar.</EmptyTitle>
-              <EmptyDescription>
-                Cuando un proyecto activo inicie un Sprint, su finalización esperada aparecerá aquí.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : filtrados.length === 0 ? (
-          <Empty role="status">
-            <EmptyMedia variant="icon">
-              <SearchX aria-hidden="true" className="size-7" />
-            </EmptyMedia>
-            <EmptyHeader>
-              <EmptyTitle>No se encontraron Sprints con estos filtros.</EmptyTitle>
-              <EmptyDescription>Prueba con otro texto o con otra situación.</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button type="button" variant="outline" size="sm" onClick={limpiarFiltros}>
-                Limpiar filtros
-              </Button>
-            </EmptyContent>
-          </Empty>
-        ) : vista === 'mes' ? (
-          <SprintMonthView
+        ) : vista !== 'lista' ? (
+          // El calendario se pinta aunque no haya Sprints (o ninguno pase el filtro): las reuniones
+          // también viven en él, y el resumen del periodo ya dice cuántas finalizaciones hay.
+          <AdminCalendarView
+            vista={vista}
             hoy={data.hoy}
             selectedKey={fecha ?? data.hoy}
             onSelectDay={seleccionarDia}
+            onVerDia={verDia}
             itemsByDay={itemsByDay}
+            busqueda={busqueda}
+            selectorVista={<SelectorVista vista={vista} fecha={fecha} />}
+            onProgramarReunion={programarEnDia}
+            onEditarReunion={editarReunion}
           />
         ) : (
-          <SprintListView items={ordenados} />
+          <>
+            {total === 0 ? (
+              <Empty tone="muted" role="status">
+                <EmptyMedia variant="icon">
+                  <CalendarRange aria-hidden="true" className="size-7" />
+                </EmptyMedia>
+                <EmptyHeader>
+                  <EmptyTitle>No hay Sprints operables para supervisar.</EmptyTitle>
+                  <EmptyDescription>
+                    Cuando un proyecto activo inicie un Sprint, su finalización esperada aparecerá aquí.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : filtrados.length === 0 ? (
+              <Empty role="status">
+                <EmptyMedia variant="icon">
+                  <SearchX aria-hidden="true" className="size-7" />
+                </EmptyMedia>
+                <EmptyHeader>
+                  <EmptyTitle>No se encontraron Sprints con estos filtros.</EmptyTitle>
+                  <EmptyDescription>Prueba con otro texto o con otra situación.</EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button type="button" variant="outline" size="sm" onClick={limpiarFiltros}>
+                    Limpiar filtros
+                  </Button>
+                </EmptyContent>
+              </Empty>
+            ) : (
+              <SprintListView items={ordenados} />
+            )}
+            <MeetingListView busqueda={busqueda} />
+          </>
         )}
       </div>
     </div>

@@ -53,15 +53,26 @@ test('un integrante menciona a otro con @ y este recibe el aviso con enlace al c
     // T-377: María recibe el aviso en vivo, sin recargar.
     await expect(pageB.getByText('Te mencionaron en un comentario').first()).toBeVisible({ timeout: 15_000 });
 
-    // Desde el centro de notificaciones, el enlace abre el comentario resaltado.
+    // Desde el centro de notificaciones: se elige el aviso en la bandeja, se lee en el visor y su acción
+    // «Ver comentario» abre el comentario resaltado. La fila ya no es un enlace (bandeja de Sprint 10).
     await pageB.goto('/dashboard/notificaciones');
-    await pageB.getByRole('link', { name: /Te mencionaron en un comentario/ }).first().click();
+    const fila = pageB
+      .getByRole('region', { name: 'Bandeja de entrada' })
+      .locator('li[data-notificacion]', { hasText: 'Te mencionaron en un comentario' })
+      .first();
+    await fila.getByRole('button').click();
+    const visor = pageB.getByRole('article');
+    await expect(visor.getByRole('heading', { level: 3 })).toHaveText('Te mencionaron en un comentario');
+    await visor.getByRole('link', { name: 'Ver comentario' }).click();
     await pageB.waitForURL(
       new RegExp(`/dashboard/projects/${PROYECTO_ID}/kanban/tasks/${TAREA_ID}\\?section=comments&comment=\\d+`),
     );
 
     const comentarioB = pageB.locator('li[id^="comentario-"]', { hasText: marca });
     await expect(comentarioB).toBeVisible();
+    // El aviso abierto lleva a este comentario y no a otro: el id de la URL es el del comentario con la marca.
+    const idComentario = new URL(pageB.url()).searchParams.get('comment');
+    await expect(comentarioB).toHaveAttribute('id', `comentario-${idComentario}`);
     await expect(comentarioB).toHaveClass(/comment-spotlight/);
     await expect(comentarioB.getByRole('link', { name: 'Mención a ti (María López), ver perfil' })).toBeVisible();
   } finally {

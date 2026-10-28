@@ -27,3 +27,20 @@ describe('notificación CALENDARIO_COMPARTIDO (HU-184, G03-C11 UI-40)', () => {
     expect(linkCalendarioCompartido('42')).toBe('/dashboard/calendario?compartido=42');
   });
 });
+
+describe('notificaciones de reuniones de Administración (HU-195)', () => {
+  const programada = { meetingId: 12, eventId: 41, projectId: 3, projectTitle: 'Huerto UVG', eventTitle: 'Seguimiento', fechaInicioTexto: 'x', fechaInicioIso: '2026-11-20T16:00:00.000Z' };
+
+  it.each(['REUNION_PROGRAMADA', 'REUNION_ACTUALIZADA'])('%s abre el calendario, sin ids del aviso en la URL', (tipoNotificacion) => {
+    expect(getNotificationLink({ tipoNotificacion, datosJson: programada })).toBe('/dashboard/calendario');
+  });
+
+  it('REUNION_CANCELADA abre el calendario aunque el evento ya no exista (el aviso no trae proyecto)', () => {
+    expect(getNotificationLink({ tipoNotificacion: 'REUNION_CANCELADA', datosJson: { meetingId: 12, eventTitle: 'Seguimiento', fechaInicioTexto: 'x', fechaInicioIso: 'y' } })).toBe('/dashboard/calendario');
+  });
+
+  it('los demás tipos conservan su destino (o ninguno)', () => {
+    expect(getNotificationLink({ tipoNotificacion: 'RECORDATORIO_EVENTO', datosJson: { eventId: 41, projectId: 3 } })).toBeNull();
+    expect(getNotificationLink({ tipoNotificacion: 'POSTULACION_RESUELTA', datosJson: {} })).toBe('/dashboard/mis-postulaciones');
+  });
+});

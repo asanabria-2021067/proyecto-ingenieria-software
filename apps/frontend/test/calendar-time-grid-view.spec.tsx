@@ -68,6 +68,31 @@ describe('TimeGridView (HU-184 T-324)', () => {
     expect(screen.getByText('20:00')).toBeInTheDocument();
   });
 
+  it('cabecera, «Todo el día» y horas reservan el mismo canal de scroll: las columnas quedan alineadas', () => {
+    render(
+      <TimeGridView
+        days={semana()}
+        todayKey="2026-10-06"
+        itemsByDay={new Map([['2026-10-06', [tarea(1, '2026-10-06')]]])}
+        onSelectEvento={() => {}}
+        ahora={AHORA}
+      />,
+    );
+    const semanaGrid = screen.getByTestId('cuadricula-semana');
+    const filas = [...semanaGrid.children] as HTMLElement[];
+    // Cabecera de días, «Todo el día» y la zona de horas (que es la que tiene scroll vertical).
+    expect(filas).toHaveLength(3);
+    const cuerpo = screen.getByTestId('cuadricula-horas');
+    expect(filas[2]).toBe(cuerpo);
+    for (const fila of filas) expect(fila).toHaveClass('[scrollbar-gutter:stable]');
+    expect(filas[0]).toHaveClass('overflow-hidden');
+    expect(filas[1]).toHaveClass('overflow-hidden');
+    // Las tres usan la misma plantilla de columnas.
+    const plantilla = filas[0].style.gridTemplateColumns;
+    expect(filas[1].style.gridTemplateColumns).toBe(plantilla);
+    expect((cuerpo.firstElementChild as HTMLElement).style.gridTemplateColumns).toBe(plantilla);
+  });
+
   it('el evento se ubica por hora con su color de tipo y abre su detalle al hacer clic', () => {
     const onSelectEvento = vi.fn();
     const key = '2026-10-07';
@@ -631,5 +656,24 @@ describe('TimeGridView — texto de los bloques medible por axe (WCAG 1.4.3)', (
     const compacto = screen.getByRole('button', { name: /^Breve, 12:00 a 12:15/ });
     expect(compacto.querySelector('span > span')).toHaveClass('text-current/90');
     expect(compacto.querySelector('span > span')).toHaveTextContent('12:00');
+  });
+});
+
+describe('TimeGridView — ficha propia de "Todo el día" (calendario administrativo)', () => {
+  it('renderTodoElDia reemplaza la ficha de su ítem y, si devuelve undefined, deja la ficha por defecto', () => {
+    const key = '2026-10-07';
+    render(
+      <TimeGridView
+        days={semana()}
+        todayKey="2026-10-06"
+        itemsByDay={new Map([[key, [tarea(1, key), tarea(2, key)]]])}
+        onSelectEvento={() => {}}
+        renderTodoElDia={(item) => (item.id === 1 ? <button type="button">Ficha propia</button> : undefined)}
+        ahora={AHORA}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Ficha propia' })).toBeInTheDocument();
+    expect(screen.queryByText('Tarea 1')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Tarea 2/ })).toHaveAttribute('href', '/dashboard/projects/1/kanban/tasks/2');
   });
 });

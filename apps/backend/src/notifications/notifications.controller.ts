@@ -13,7 +13,7 @@ import { NotificationsService } from './notifications.service';
 import { UpdatePreferenciaNotificacionDto } from './dto/update-preferencia-notificacion.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
+import { ListNotificationsQueryDto, NotificationTypesFilterDto } from './dto/list-notifications-query.dto';
 
 @Controller('notificaciones')
 @UseGuards(JwtAuthGuard)
@@ -22,10 +22,11 @@ export class NotificationsController {
 
   @Get()
   findAll(@CurrentUser() user: { userId: number }, @Query() query: ListNotificationsQueryDto) {
+    const filtros = { tipos: query.tipos, leida: query.leida, q: query.q, proyecto: query.proyecto };
     if (query.page !== undefined) {
-      return this.notificationsService.findPage(user.userId, query.page, query.limit);
+      return this.notificationsService.findPage(user.userId, query.page, query.limit, filtros, query.orden);
     }
-    return this.notificationsService.findAll(user.userId);
+    return this.notificationsService.findAll(user.userId, filtros);
   }
 
   @Get('mias/no-leidas')
@@ -36,6 +37,12 @@ export class NotificationsController {
   @Get('mias/conteo-no-leidas')
   getUnreadCount(@CurrentUser() user: { userId: number }) {
     return this.notificationsService.getUnreadCount(user.userId);
+  }
+
+  /** Sprint 10 (bandeja): proyectos referenciados por los avisos propios, para el filtro por proyecto. */
+  @Get('mias/proyectos')
+  findProjectsReferenced(@CurrentUser() user: { userId: number }) {
+    return this.notificationsService.findProjectsReferenced(user.userId);
   }
 
   @Get('preferencias')
@@ -51,9 +58,13 @@ export class NotificationsController {
     return this.notificationsService.updatePreference(user.userId, dto.tipo, dto.activa);
   }
 
+  /**
+   * HU-198: `?tipos=A,B` acota el marcado a la categoría filtrada; sin él, todas las propias.
+   * Sprint 10: `q` y `proyecto` acotan igual que en la lista, así «marcar filtradas» coincide con lo listado.
+   */
   @Patch('leer-todas')
-  markAllAsRead(@CurrentUser() user: { userId: number }) {
-    return this.notificationsService.markAllAsRead(user.userId);
+  markAllAsRead(@CurrentUser() user: { userId: number }, @Query() query: NotificationTypesFilterDto) {
+    return this.notificationsService.markAllAsRead(user.userId, { tipos: query.tipos, q: query.q, proyecto: query.proyecto });
   }
 
   @Patch(':id/leer')

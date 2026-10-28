@@ -44,11 +44,8 @@ import { searchProjects } from '@/lib/services/projects';
 import type { ProyectoListItemDTO } from '@/lib/dto/project.dto';
 import type { EstadoPostulacion, ProyectoResumen, TipoProyecto } from '@/types';
 import { apiFetch } from '@/lib/api/client';
-import {
-  estadoBadgeLabel,
-  tipoBadgeLabel,
-  tipoBadgeStyle,
-} from '@/components/projects/available-project-card';
+import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
+import { TipoBadge } from '@/components/projects/tipo-badge';
 import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
 import { Skeleton, SkeletonCard, SkeletonRegion } from '@/components/ui/skeleton';
 import { useFeedSocial } from '@/hooks/use-social';
@@ -91,17 +88,17 @@ function HorasKpiCard({
       id={id}
       role="group"
       aria-label={titulo}
-      className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack"
+      className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-sage-kpi-border bg-sage-kpi p-stack"
     >
       <div className="relative z-10 flex items-start justify-between gap-tight">
-        <span className="type-meta flex items-center gap-tight uppercase tracking-wider text-on-primary-muted">
+        <span className="type-meta flex items-center gap-tight uppercase tracking-wider text-sage-ink-muted">
           {titulo}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
                 aria-label={`Qué significa: ${titulo}`}
-                className="rounded-pill text-on-primary-muted hover:text-on-primary"
+                className="rounded-pill text-sage-ink-muted hover:text-sage-ink"
               >
                 <Info className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
@@ -109,19 +106,19 @@ function HorasKpiCard({
             <TooltipContent className="max-w-xs">{ayuda}</TooltipContent>
           </Tooltip>
         </span>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-on-primary/15 text-on-primary">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-sage-open text-sage-accent">
           <Icon className="h-4 w-4" />
         </div>
       </div>
       <div className="relative z-10 mt-tight">
         {valor === null ? (
-          <span className="type-subtitle block text-on-primary-muted">
+          <span className="type-subtitle block text-sage-ink-muted">
             No disponible por ahora
           </span>
         ) : (
           <div className="flex items-baseline gap-1">
-            <span className="type-section text-on-primary">{valor}</span>
-            <span className="type-body font-medium text-on-primary-muted">h</span>
+            <span className="type-section text-sage-ink">{valor}</span>
+            <span className="type-body font-medium text-sage-ink-muted">h</span>
           </div>
         )}
       </div>
@@ -268,10 +265,8 @@ function DashboardProjectCard({
     <article className="card-base group flex min-h-52 flex-col">
       <div className="mb-stack flex items-start justify-between gap-tight">
         <div className="flex flex-wrap items-center gap-tight">
-          <span className="pill pill-neutral">
-            {tipoBadgeLabel(project.tipoProyecto)}
-          </span>
-          <span className="pill pill-neutral">
+          <TipoBadge tipo={project.tipoProyecto} />
+          <span className={`pill ${estadoBadgeStyle(project.estadoProyecto)}`}>
             {estadoBadgeLabel(project.estadoProyecto)}
           </span>
         </div>
@@ -291,7 +286,7 @@ function DashboardProjectCard({
           <Clock className="size-4" aria-hidden="true" />
           {project.modalidadProyecto}
         </span>
-        <Button asChild size="sm">
+        <Button asChild size="sm" className="text-[13px] font-semibold">
           <Link
             href={`/dashboard/proyectos/${project.idProyecto}`}
             aria-label={`Ver ${project.tituloProyecto}`}
@@ -413,18 +408,18 @@ export default function DashboardPage() {
 
       <div className={dashboardPage('py-section lg:py-page')}>
         {/* Welcome + Stats */}
-        <section className="relative mb-section overflow-hidden rounded-card bg-primary p-card text-on-primary shadow-card">
-          <div className="absolute -right-10 -bottom-10 h-56 w-56 rounded-full bg-on-primary/10 blur-3xl" />
+        <section className="relative mb-section overflow-hidden rounded-card bg-sage-welcome p-card text-sage-ink shadow-card">
+          <div className="absolute -right-10 -bottom-10 h-56 w-56 rounded-full bg-sage-accent/10 blur-3xl" />
           <div className="relative z-10 max-w-prose">
-            <span className="pill mb-tight bg-on-primary/15 text-on-primary">
+            <span className="pill mb-tight bg-sage-active text-sage-ink">
               Bienvenido de vuelta
             </span>
-            <h1 className="type-display text-on-primary">
+            <h1 className="type-display text-sage-ink">
               ¡Hola, {user?.nombre ?? ''}! 👋
             </h1>
-            <p className="type-body mt-tight text-on-primary/80">
+            <p className="type-body mt-tight text-sage-ink-soft">
               Tu progreso académico este semestre. Tienes{' '}
-              <span className="font-semibold text-on-primary">
+              <span className="font-semibold text-sage-ink">
                 {projects.length} proyectos
               </span>{' '}
               disponibles listos para postularte hoy.
@@ -438,26 +433,26 @@ export default function DashboardPage() {
           >
             {/* Horas Beca */}
             {requiereHorasBeca && (
-              <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack">
+              <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-sage-kpi-border bg-sage-kpi p-stack">
                 <div className="flex items-start justify-between gap-tight">
-                  <span className="type-meta uppercase tracking-wider text-on-primary-muted">
+                  <span className="type-meta uppercase tracking-wider text-sage-ink-muted">
                     Horas Beca Acumuladas
                   </span>
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-on-primary/15 text-on-primary">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-sage-open text-sage-accent">
                     <GraduationCap className="h-4 w-4" />
                   </div>
                 </div>
                 <div className="mt-tight flex items-baseline gap-tight">
-                  <span className="type-section text-on-primary">
+                  <span className="type-section text-sage-ink">
                     {horasBeca}
                   </span>
-                  <span className="type-body text-on-primary-muted">
+                  <span className="type-body text-sage-ink-muted">
                     / {horasBecaRequeridas}
                   </span>
                 </div>
-                <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-on-primary/20">
+                <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-sage-track">
                   <div
-                    className="h-full rounded-pill bg-accent"
+                    className="h-full rounded-pill bg-sage-accent"
                     style={{ width: `${progressBeca}%` }}
                   />
                 </div>
@@ -466,26 +461,26 @@ export default function DashboardPage() {
 
             {/* Horas Extension */}
             {requiereHorasExtension && (
-              <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack">
+              <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-sage-kpi-border bg-sage-kpi p-stack">
                 <div className="flex items-start justify-between gap-tight">
-                  <span className="type-meta uppercase tracking-wider text-on-primary-muted">
+                  <span className="type-meta uppercase tracking-wider text-sage-ink-muted">
                     Horas de Extension
                   </span>
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-on-primary/15 text-on-primary">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-sage-open text-sage-accent">
                     <HeartHandshake className="h-4 w-4" />
                   </div>
                 </div>
                 <div className="mt-tight flex items-baseline gap-tight">
-                  <span className="type-section text-on-primary">
+                  <span className="type-section text-sage-ink">
                     {horasExtension}
                   </span>
-                  <span className="type-body text-on-primary-muted">
+                  <span className="type-body text-sage-ink-muted">
                     / {horasExtensionRequeridas}
                   </span>
                 </div>
-                <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-on-primary/20">
+                <div className="mt-stack h-2 w-full overflow-hidden rounded-pill bg-sage-track">
                   <div
-                    className="h-full rounded-pill bg-accent"
+                    className="h-full rounded-pill bg-sage-accent"
                     style={{ width: `${progressExtension}%` }}
                   />
                 </div>
@@ -493,21 +488,21 @@ export default function DashboardPage() {
             )}
 
             {/* Proyectos Activos */}
-            <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-on-primary/10 bg-on-primary/10 p-stack">
+            <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-sage-kpi-border bg-sage-kpi p-stack">
               <div className="flex items-start justify-between gap-tight">
-                <span className="type-meta uppercase tracking-wider text-on-primary-muted">
+                <span className="type-meta uppercase tracking-wider text-sage-ink-muted">
                   Proyectos Activos
                 </span>
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-on-primary/15 text-on-primary">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-sage-open text-sage-accent">
                   <Zap className="h-4 w-4" />
                 </div>
               </div>
               <div className="mt-tight">
-                <span className="type-section text-on-primary">
+                <span className="type-section text-sage-ink">
                   {String(proyectosActivos).padStart(2, '0')}
                 </span>
               </div>
-              <div className="type-meta mt-stack flex items-center gap-tight text-on-primary-muted">
+              <div className="type-meta mt-stack flex items-center gap-tight text-sage-ink-muted">
                 <Calendar className="h-3.5 w-3.5" />
                 <span>En curso actual</span>
               </div>
@@ -580,7 +575,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => setProjectTab('destacados')}
-                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors ${projectTab === 'destacados'
+                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold motion-select ${projectTab === 'destacados'
                         ? 'bg-action text-on-action'
                         : 'text-text-secondary hover:text-text-primary'
                         }`}
@@ -598,7 +593,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => setProjectTab('disponibles')}
-                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold transition-colors ${projectTab === 'disponibles'
+                      className={`type-meta flex items-center gap-tight rounded-pill px-inline py-micro font-semibold motion-select ${projectTab === 'disponibles'
                         ? 'bg-action text-on-action'
                         : 'text-text-secondary hover:text-text-primary'
                         }`}
@@ -616,7 +611,7 @@ export default function DashboardPage() {
                   </div>
                   <Link
                     href="/dashboard/proyectos"
-                    className="type-body font-medium text-primary hover:underline"
+                    className="type-body font-medium text-primary motion-link"
                   >
                     Ver todos
                   </Link>

@@ -275,6 +275,10 @@ enum TipoNotificacion {
   INSIGNIA_OBTENIDA
   // HU-200 (T-377): alguien mencionó al usuario con @ en un comentario de tarea, proyecto o hito.
   MENCION_COMENTARIO
+  // HU-195 (T-364): ciclo de vida de una reunión de Administración con el equipo del usuario.
+  REUNION_PROGRAMADA
+  REUNION_ACTUALIZADA
+  REUNION_CANCELADA
   // HU-205 (T-394): solicitud enviada desde la página de contacto, solo para administradores.
   SOLICITUD_CONTACTO
 }
@@ -396,6 +400,8 @@ model Usuario {
   insignias                        InsigniaUsuario[]
   reaccionesChat                   ReaccionMensajeChat[]
   mensajesGuardados                MensajeGuardado[]
+  reunionesAdministracionCreadas   ReunionAdministracion[]    @relation("ReunionesAdministracionCreadas")
+  reunionesAdministracionEditables ReunionAdministradorEditor[] @relation("ReunionesAdministracionEditables")
 
   @@index([estado, fechaCreacion])
   @@map("usuario")
@@ -711,14 +717,64 @@ model EventoProyecto {
   /// proyecto. Si tiene valores, solo ellos y el líder ven el evento y
   /// reciben el recordatorio.
   invitados             Int[]           @default([]) @map("invitados")
+  /// HU-195: null = evento normal del líder. Con valor, proyección de una
+  /// reunión de Administración: solo Administración la edita o cancela.
+  idReunion             Int?            @map("id_reunion")
 
-  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto])
-  creador  Usuario  @relation(fields: [idCreador], references: [idUsuario])
+  proyecto Proyecto               @relation(fields: [idProyecto], references: [idProyecto])
+  creador  Usuario                @relation(fields: [idCreador], references: [idUsuario])
+  reunion  ReunionAdministracion? @relation(fields: [idReunion], references: [idReunion], onDelete: Restrict)
 
+  @@unique([idReunion, idProyecto])
   @@index([idProyecto, eliminadoEn])
   @@index([fechaInicio])
   @@index([eliminadoEn, recordatorioEnviadoEn, fechaInicio])
   @@map("evento_proyecto")
+}
+
+/// HU-195 (T-362): reunión de Administración con uno o varios proyectos. Es la
+/// fuente de verdad de identidad, autoría, versión y cancelación. El contenido
+/// del calendario (título, fechas, modalidad, lugar o enlace) vive en sus
+/// EventoProyecto, uno por proyecto, que se escriben idénticos en una sola
+/// transacción; aquí no se duplica.
+model ReunionAdministracion {
+  idReunion       Int                    @id @default(autoincrement()) @map("id_reunion")
+  idCreador       Int                    @map("id_creador")
+  politicaEdicion PoliticaEdicionReunion @default(TODOS_ADMINISTRADORES) @map("politica_edicion")
+  /// Control optimista: cada cambio material la incrementa; un PATCH con otra versión es 409.
+  version         Int                    @default(1)
+  creadaEn        DateTime               @default(now()) @map("creada_en")
+  actualizadaEn   DateTime?              @map("actualizada_en")
+  canceladaEn     DateTime?              @map("cancelada_en")
+
+  creador  Usuario                      @relation("ReunionesAdministracionCreadas", fields: [idCreador], references: [idUsuario])
+  editores ReunionAdministradorEditor[]
+  eventos  EventoProyecto[]
+
+  @@index([canceladaEn, creadaEn])
+  @@map("reunion_administracion")
+}
+
+/// HU-195: quién, además del creador, gestiona una reunión de Administración.
+/// Ser administrador al momento de cada acción se valida aparte: TODOS_ADMINISTRADORES,
+/// cualquier administrador; SOLO_CREADOR, el creador; ADMINISTRADORES_SELECCIONADOS,
+/// el creador y los administradores de ReunionAdministradorEditor.
+enum PoliticaEdicionReunion {
+  TODOS_ADMINISTRADORES
+  SOLO_CREADOR
+  ADMINISTRADORES_SELECCIONADOS
+}
+
+model ReunionAdministradorEditor {
+  idReunion Int @map("id_reunion")
+  idUsuario Int @map("id_usuario")
+
+  reunion ReunionAdministracion @relation(fields: [idReunion], references: [idReunion], onDelete: Restrict)
+  usuario Usuario               @relation("ReunionesAdministracionEditables", fields: [idUsuario], references: [idUsuario])
+
+  @@id([idReunion, idUsuario])
+  @@index([idUsuario])
+  @@map("reunion_administrador_editor")
 }
 
 /// HU-184: un usuario comparte su calendario (eventos y fechas límite de
@@ -1472,9 +1528,14 @@ model Notificacion {
   datosJson           Json?            @map("datos_json")
   creadaEn            DateTime         @default(now()) @map("creada_en")
   leidaEn             DateTime?        @map("leida_en")
+  /// HU-195: operación lógica que originó el aviso (p. ej. `reunion:7:v2:actualizada`).
+  /// Con UNIQUE(idUsuario, clave), un reintento o una carrera no persisten un segundo
+  /// aviso al mismo usuario. Null para los avisos que no lo necesitan.
+  claveIdempotencia   String?          @map("clave_idempotencia") @db.VarChar(160)
 
   usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
 
+  @@unique([idUsuario, claveIdempotencia])
   @@index([idUsuario, leidaEn])
   @@index([idUsuario, creadaEn])
   @@index([tipoNotificacion])

@@ -53,7 +53,7 @@ export function AnuncioBanner() {
         aria-label={`Cerrar anuncio: ${anuncio.titulo}`}
         disabled={cerrar.isPending}
         onClick={() => cerrar.mutate(anuncio.idAnuncio)}
-        className="flex size-8 shrink-0 items-center justify-center rounded-control hover:bg-black/10 focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:bg-white/10"
+        className="motion-icon flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-black/10 focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:bg-white/10"
       >
         <X className="size-5" aria-hidden="true" />
       </button>

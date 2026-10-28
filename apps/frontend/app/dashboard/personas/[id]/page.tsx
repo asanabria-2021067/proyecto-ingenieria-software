@@ -111,14 +111,15 @@ export default function PerfilPersonaPage() {
           <ArrowLeft className="size-4" aria-hidden="true" />
           Volver a Personas
         </Link>
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={compartirPerfil}
-          className="inline-flex items-center gap-tight rounded-control border border-outline-variant bg-card px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-container"
+          className="h-auto gap-(--spacing-tight) rounded-[var(--radius-control)] border-outline-variant bg-card px-3 py-1.5 text-sm font-medium text-text-primary shadow-none hover:bg-surface-container hover:text-text-primary has-[>svg]:px-3 dark:border-outline-variant dark:bg-card dark:hover:bg-surface-container"
         >
           <Share2 className="size-4 text-text-secondary" aria-hidden="true" />
           Compartir perfil
-        </button>
+        </Button>
       </div>
 
       <div className="layout-grid">
@@ -147,10 +148,10 @@ export default function PerfilPersonaPage() {
               </div>
 
               <div className="mt-tight grid w-full max-w-sm grid-cols-2 gap-tight">
-                <Button variant={amistad.variant} disabled={amistad.disabled} onClick={amistad.onClick}>
+                <Button variant={amistad.variant} disabled={amistad.disabled} onClick={amistad.onClick} className="h-9.5 rounded-md px-4.5 text-[13px] font-semibold">
                   {amistad.label}
                 </Button>
-                <Button variant="outline" disabled={seguimiento.disabled} onClick={seguimiento.onClick}>
+                <Button variant="outline" disabled={seguimiento.disabled} onClick={seguimiento.onClick} className="h-9.5 rounded-md px-4.5 text-[13px] font-semibold">
                   {seguimiento.label}
                 </Button>
               </div>

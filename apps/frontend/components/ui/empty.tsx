@@ -20,9 +20,19 @@ const emptyVariants = cva(
         flush:
           'rounded-none border-0 bg-transparent px-0 py-8 text-on-surface shadow-none md:px-0 md:py-10',
       },
+      size: {
+        default: '',
+        // Banda horizontal (~80–100 px): ícono a la izquierda, texto al centro y acción a la
+        // derecha. Bajo `md` la acción baja bajo el texto, sin separar nunca ícono y texto.
+        // Reacomoda las piezas por su `data-slot`: se usan las mismas EmptyMedia/EmptyHeader/
+        // EmptyContent. `text-pretty` en vez de `text-balance`, que partía el título en dos.
+        compact:
+          'grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 gap-y-3 px-5 py-4 text-left text-pretty md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center md:px-6 md:py-4 [&>[data-slot=empty-icon]]:mb-0 [&>[data-slot=empty-header]]:max-w-none [&>[data-slot=empty-header]]:items-start [&>[data-slot=empty-header]]:gap-1 [&>[data-slot=empty-header]]:text-left [&>[data-slot=empty-content]]:col-start-2 [&>[data-slot=empty-content]]:w-auto [&>[data-slot=empty-content]]:max-w-none [&>[data-slot=empty-content]]:items-start md:[&>[data-slot=empty-content]]:col-start-3',
+      },
     },
     defaultVariants: {
       tone: 'default',
+      size: 'default',
     },
   },
 )
@@ -30,12 +40,13 @@ const emptyVariants = cva(
 function Empty({
   className,
   tone = 'default',
+  size = 'default',
   ...props
 }: React.ComponentProps<'section'> & VariantProps<typeof emptyVariants>) {
   return (
     <section
       data-slot="empty"
-      className={cn(emptyVariants({ tone, className }))}
+      className={cn(emptyVariants({ tone, size, className }))}
       {...props}
     />
   )

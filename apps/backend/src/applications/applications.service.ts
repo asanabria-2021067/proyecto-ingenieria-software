@@ -19,6 +19,7 @@ import {
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { ChatCanalesService } from '../chat/chat-canales.service';
+import { AdminMeetingsService } from '../events/admin-meetings.service';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
 
@@ -41,6 +42,8 @@ export class ApplicationsService {
     private readonly policy: ProjectPolicyService,
     private readonly readPolicy: ProjectReadPolicyService,
     private readonly chatCanales?: ChatCanalesService,
+    // HU-195: convocatoria a las reuniones de Administración futuras del proyecto al que entra.
+    private readonly adminMeetings?: AdminMeetingsService,
   ) {}
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -422,6 +425,12 @@ export class ApplicationsService {
           postulacion.idUsuarioPostulante,
           postulacion.idRolProyecto,
           id,
+        );
+        await this.adminMeetings?.notificarIngresoTx(
+          tx,
+          postulacion.idUsuarioPostulante,
+          postulacion.rolProyecto.proyecto.idProyecto,
+          { add: (effect) => effects.push(effect) },
         );
       }
 

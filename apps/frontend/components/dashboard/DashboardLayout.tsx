@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
@@ -17,6 +17,8 @@ import {
   RotateCcw,
   Users,
   Archive,
+  Compass,
+  Network,
   LifeBuoy,
   Search as SearchIcon,
 } from 'lucide-react';
@@ -56,7 +58,19 @@ const navEntries: NavEntry[] = [
     icon: LayoutDashboard,
     exact: true,
   },
-  { href: '/dashboard/personas', label: 'Personas', icon: Users },
+  {
+    type: 'group',
+    label: 'Personas',
+    icon: Users,
+    // La barra inferior móvil no tiene sitio para tres destinos: conserva uno solo.
+    mobile: { href: '/dashboard/personas', label: 'Personas', icon: Users },
+    items: [
+      // Sin `exact`: el perfil de una persona (/dashboard/personas/:id) sigue dentro del grupo.
+      { href: '/dashboard/personas', label: 'Descubrir personas', icon: Compass },
+      { href: '/dashboard/personas?seccion=amigos', label: 'Mis amigos', icon: Users },
+      { href: '/dashboard/personas?seccion=amigos-de-amigos', label: 'Amigos de amigos', icon: Network },
+    ],
+  },
   {
     type: 'group',
     label: 'Proyectos',
@@ -104,6 +118,12 @@ const navEntries: NavEntry[] = [
 ];
 
 const navItemsMobile = flattenNavEntries(navEntries);
+
+/** `useSearchParams` exige un límite de Suspense en el prerender: se aísla aquí (mismo patrón que AdminLayout). */
+function DashboardSidebarNav({ idUsuario }: { idUsuario: number | null }) {
+  const searchParams = useSearchParams();
+  return <SidebarNav entries={navEntries} idUsuario={idUsuario} search={searchParams?.toString() ?? ''} />;
+}
 
 export default function DashboardLayout({
   children,
@@ -163,26 +183,39 @@ export default function DashboardLayout({
         Saltar al contenido principal
       </a>
 
-      {/* Sidebar - Desktop Only */}
+      {/* Sidebar - Desktop Only. Misma barra que AdminLayout (`admin-sidebar`) con la paleta salvia del
+          estudiante (`student-sidebar`): marca sobre tarjeta marfil, grupos desplegables y transición de ancho al plegarla.
+          Conserva su ancho con escala de fuente (`sidebar-scale-lock*`). */}
       <aside
-        className={`${sidebarCollapsed ? 'sidebar-scale-lock-collapsed' : 'sidebar-scale-lock'} hidden h-full shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-outline-variant bg-card md:flex`}
+        data-slot="dashboard-sidebar"
+        data-collapsed={sidebarCollapsed || undefined}
+        className={`admin-sidebar student-sidebar ${sidebarCollapsed ? 'sidebar-scale-lock-collapsed' : 'sidebar-scale-lock'} hidden h-full shrink-0 flex-col overflow-y-auto overflow-x-hidden overscroll-contain transition-[width] duration-200 md:flex`}
       >
+        {/* h-16 = alto de la topbar: el divisor de la marca continúa su borde inferior. */}
         <div
-          className={`flex items-center gap-inline border-b border-outline-variant py-stack ${sidebarCollapsed ? 'justify-center px-tight' : 'px-card'}`}
+          className={`admin-sidebar-brand flex h-16 shrink-0 items-center gap-3 ${sidebarCollapsed ? 'justify-center px-2' : 'px-5'}`}
         >
-          <Image src={logo} alt="UVGENIUS" className="h-10 w-auto shrink-0" />
-          {!sidebarCollapsed && <span className="type-section text-text-primary">UVGenius</span>}
-          {!sidebarCollapsed && <DashboardSidebarCollapseButton />}
+          <span className="admin-brand-logo flex size-13 shrink-0 items-center justify-center rounded-lg border p-1.5">
+            <Image src={logo} alt="UVGENIUS" className="h-full w-auto object-contain" />
+          </span>
+          {!sidebarCollapsed && (
+            <>
+              <span className="admin-sidebar-brand-name font-headline text-xl font-bold tracking-tight">UVGenius</span>
+              <DashboardSidebarCollapseButton />
+            </>
+          )}
         </div>
 
-        <SidebarNav entries={navEntries} idUsuario={user?.idUsuario ?? null} />
+        <Suspense fallback={<SidebarNav entries={navEntries} idUsuario={user?.idUsuario ?? null} />}>
+          <DashboardSidebarNav idUsuario={user?.idUsuario ?? null} />
+        </Suspense>
 
         {/* Único acceso a la cuenta en escritorio y tableta; en móvil está en la barra inferior. */}
         <div
           id="dashboard-account-menu"
-          className={`border-t border-outline-variant py-stack ${sidebarCollapsed ? 'flex justify-center px-tight' : 'px-inline'}`}
+          className={`admin-sidebar-footer py-4 ${sidebarCollapsed ? 'flex justify-center px-2' : 'px-3'}`}
         >
-          <UserMenu user={user} onLogout={handleLogout} variant={sidebarCollapsed ? 'compact' : 'sidebar'} />
+          <UserMenu user={user} onLogout={handleLogout} variant={sidebarCollapsed ? 'compact' : 'sidebar'} theme="admin" menuClassName="student-account-menu" />
         </div>
       </aside>
 
@@ -255,7 +288,7 @@ export default function DashboardLayout({
                 window.dispatchEvent(new Event('start-onboarding-tour'))
               }
               aria-label="Repetir tour de bienvenida"
-              className="flex size-10 items-center justify-center rounded-control bg-muted text-text-secondary transition-colors hover:bg-surface-container-high hover:text-text-primary"
+              className="flex size-10 items-center justify-center rounded-md bg-muted text-text-secondary motion-icon hover:bg-surface-container-high hover:text-text-primary"
             >
               <RotateCcw className="size-5" aria-hidden="true" />
             </button>

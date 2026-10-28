@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { Pencil, Send, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { CommentContent } from '@/components/comments/comment-content';
@@ -237,14 +238,14 @@ export function CommentThread({
                 Escribe <span className="font-semibold text-on-surface-variant">@</span> para mencionar a un integrante.
               </p>
             )}
-            <button
+            <Button
               type="submit"
               disabled={!puedeEnviar}
-              className="inline-flex shrink-0 items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-auto gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:bg-primary/90 has-[>svg]:px-4 motion-glow-primary"
             >
               <Send className="size-3.5" />
               {crearMutation.isPending ? 'Enviando...' : 'Comentar'}
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -423,21 +424,22 @@ function EdicionComentario({
           <span />
         )}
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={onCancelar}
             disabled={mutation.isPending}
-            className="rounded-xl px-3 py-1.5 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container"
+            className="h-auto rounded-xl px-3 py-1.5 text-xs font-semibold text-on-surface-variant hover:bg-surface-container hover:text-on-surface-variant dark:hover:bg-surface-container"
           >
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={!contenido || sinCambios || mutation.isPending}
-            className="rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-auto rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-on-primary hover:bg-primary/90 motion-glow-primary"
           >
             {mutation.isPending ? 'Guardando...' : 'Guardar'}
-          </button>
+          </Button>
         </div>
       </div>
     </form>
