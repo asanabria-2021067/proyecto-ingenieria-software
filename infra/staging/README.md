@@ -62,7 +62,7 @@ El frontend del arnés se construye con la **variante same-origin** (`NEXT_PUBLI
 | T14-07 | Un refresh token no abre sockets |
 | T14-08 | Chat en vivo: conversación nueva, `joinConversation` con ack, `newMessage`; un ajeno no se une ni recibe |
 | T14-09 | Al BLOQUEAR una cuenta sus sockets abiertos se cierran (G07-C04), la reconexión se rechaza y las demás cuentas siguen conectadas |
-| T14-10 | Lo mismo al INACTIVAR |
+| T14-10 | Reactivar no resucita el access token anterior al bloqueo (versión de sesión): hace falta un login nuevo; con él conecta, y al INACTIVAR sus sockets se cierran y la reconexión se rechaza |
 
 Usa cuatro registros sintéticos (el límite de `/auth/register` es 5/min y T18 ya usa uno), el rol `administrador` y un proyecto con un participante insertados por SQL en la base efímera. Nunca imprime tokens, cookies ni correos.
 
