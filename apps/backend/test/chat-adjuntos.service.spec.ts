@@ -102,7 +102,11 @@ describe('ChatService - adjuntos', () => {
         mime: 'application/pdf',
       });
       const res = await service.getAdjuntoUrl(10, 5, 3, 1);
-      expect(prisma.adjuntoMensajeChat.findFirst.mock.calls[0][0].where).toEqual({ idAdjunto: 3, idConversacion: 5 });
+      expect(prisma.adjuntoMensajeChat.findFirst.mock.calls[0][0].where).toEqual({
+        idAdjunto: 3,
+        idConversacion: 5,
+        mensaje: { eliminadoEn: null },
+      });
       expect(storage.signedUrl).toHaveBeenCalledWith('chat/5/a.pdf', 60);
       expect(res).toMatchObject({ url: 'https://firmada.example/x', nombreOriginal: 'a.pdf', expiraEnSegundos: 60 });
     });
@@ -110,6 +114,13 @@ describe('ChatService - adjuntos', () => {
     it('un no participante no obtiene URL ni consulta el adjunto', async () => {
       await expect(service.getAdjuntoUrl(10, 5, 3, 99)).rejects.toThrow(ForbiddenException);
       expect(prisma.adjuntoMensajeChat.findFirst).not.toHaveBeenCalled();
+      expect(storage.signedUrl).not.toHaveBeenCalled();
+    });
+
+    it('adjunto de un mensaje eliminado: 404 sin firmar URL', async () => {
+      prisma.adjuntoMensajeChat.findFirst.mockResolvedValue(null);
+      await expect(service.getAdjuntoUrl(10, 5, 3, 1)).rejects.toThrow(NotFoundException);
+      expect(prisma.adjuntoMensajeChat.findFirst.mock.calls[0][0].where.mensaje).toEqual({ eliminadoEn: null });
       expect(storage.signedUrl).not.toHaveBeenCalled();
     });
 
@@ -138,6 +149,15 @@ describe('ChatService - adjuntos', () => {
       const fetchMock = fn();
       vi.stubGlobal('fetch', fetchMock);
       await expect(service.getAdjuntoImagen(10, 5, 3, 99)).rejects.toThrow(ForbiddenException);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('adjunto de un mensaje eliminado: 404 y no descarga nada', async () => {
+      const fetchMock = fn();
+      vi.stubGlobal('fetch', fetchMock);
+      prisma.adjuntoMensajeChat.findFirst.mockResolvedValue(null);
+      await expect(service.getAdjuntoImagen(10, 5, 3, 1)).rejects.toThrow(NotFoundException);
+      expect(prisma.adjuntoMensajeChat.findFirst.mock.calls[0][0].where.mensaje).toEqual({ eliminadoEn: null });
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
@@ -183,7 +203,7 @@ describe('ChatService - adjuntos', () => {
       prisma.adjuntoMensajeChat.findMany.mockResolvedValue([fila(8), fila(7)]);
       const res = await service.getArchivos(10, 5, 1, { cursor: 9, limite: 2 });
       expect(prisma.adjuntoMensajeChat.findMany.mock.calls[0][0]).toMatchObject({
-        where: { idConversacion: 5, idAdjunto: { lt: 9 } },
+        where: { idConversacion: 5, mensaje: { eliminadoEn: null }, idAdjunto: { lt: 9 } },
         take: 2,
       });
       expect(res.items.map((i) => i.idAdjunto)).toEqual([8, 7]);
@@ -196,7 +216,10 @@ describe('ChatService - adjuntos', () => {
       prisma.adjuntoMensajeChat.findMany.mockResolvedValue([fila(1)]);
       const res = await service.getArchivos(10, 5, 1);
       expect(res.nextCursor).toBeNull();
-      expect(prisma.adjuntoMensajeChat.findMany.mock.calls[0][0].where).toEqual({ idConversacion: 5 });
+      expect(prisma.adjuntoMensajeChat.findMany.mock.calls[0][0].where).toEqual({
+        idConversacion: 5,
+        mensaje: { eliminadoEn: null },
+      });
     });
   });
 });

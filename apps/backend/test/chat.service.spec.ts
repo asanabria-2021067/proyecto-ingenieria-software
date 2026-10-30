@@ -385,6 +385,15 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       expect(prisma.mensajeGuardado.createMany).not.toHaveBeenCalled();
     });
 
+    it('mensaje eliminado: 404 y no toca los guardados', async () => {
+      prisma.mensajeChat.findFirst.mockResolvedValue(null);
+
+      await expect(service.toggleSavedMessage(10, 5, 7, 1)).rejects.toThrow(NotFoundException);
+      expect(prisma.mensajeChat.findFirst.mock.calls[0][0].where).toMatchObject({ eliminadoEn: null });
+      expect(prisma.mensajeGuardado.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.mensajeGuardado.createMany).not.toHaveBeenCalled();
+    });
+
     it('rechaza a quien no participa en la conversacion', async () => {
       await expect(service.toggleSavedMessage(10, 5, 7, 99)).rejects.toThrow(ForbiddenException);
       expect(prisma.mensajeGuardado.deleteMany).not.toHaveBeenCalled();
@@ -395,7 +404,31 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       prisma.mensajeChat.findFirst.mockResolvedValue(null);
 
       await expect(service.toggleSavedMessage(10, 5, 8, 1)).rejects.toThrow(NotFoundException);
-      expect(prisma.mensajeChat.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { idMensaje: 8, idConversacion: 5 } }));
+      expect(prisma.mensajeChat.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { idMensaje: 8, idConversacion: 5, eliminadoEn: null } }));
+    });
+  });
+
+  describe('toggleReaction', () => {
+    it('mensaje eliminado: 404 y no crea ni borra reacciones', async () => {
+      const reaccion = { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), findMany: vi.fn() };
+      (prisma as any).reaccionMensajeChat = reaccion;
+      prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+      prisma.mensajeChat.findFirst.mockResolvedValue(null);
+
+      await expect(service.toggleReaction(10, 5, 7, 1, '👍')).rejects.toThrow(NotFoundException);
+      expect(prisma.mensajeChat.findFirst.mock.calls[0][0].where).toEqual({ idMensaje: 7, idConversacion: 5, eliminadoEn: null });
+      expect(reaccion.create).not.toHaveBeenCalled();
+      expect(reaccion.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getConversacionOrThrow - conversacion eliminada', () => {
+    it('filtra eliminadaEn:null y responde 404 si la conversacion fue eliminada', async () => {
+      prisma.conversacion.findFirst.mockResolvedValue(null);
+
+      await expect(service.getMessages(10, 5, 1)).rejects.toThrow(NotFoundException);
+      expect(prisma.conversacion.findFirst.mock.calls[0][0].where).toEqual({ idConversacion: 5, idProyecto: 10, eliminadaEn: null });
+      expect(prisma.mensajeChat.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -426,10 +459,19 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       const args = prisma.mensajeGuardado.findMany.mock.calls[0][0];
       expect(args.where).toEqual({
         idUsuario: 1,
-        mensaje: { conversacion: { eliminadaEn: null, participantes: { some: { idUsuario: 1 } } } },
+        mensaje: { eliminadoEn: null, conversacion: { eliminadaEn: null, participantes: { some: { idUsuario: 1 } } } },
       });
       expect(r.items[0]).toMatchObject({ idMensaje: 1, contenido: 'msg 1', conversacion: { idConversacion: 5, idProyecto: 10 } });
       expect(r.hasMore).toBe(false);
+    });
+
+    it('no devuelve guardados de mensajes eliminados (el where los excluye)', async () => {
+      prisma.mensajeGuardado.findMany.mockResolvedValue([]);
+
+      const r = await service.listSavedMessages(1);
+
+      expect(prisma.mensajeGuardado.findMany.mock.calls[0][0].where.mensaje).toMatchObject({ eliminadoEn: null });
+      expect(r.items).toEqual([]);
     });
 
     it('pagina de a 20 y marca hasMore con un elemento extra', async () => {

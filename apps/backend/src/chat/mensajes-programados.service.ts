@@ -15,6 +15,7 @@ import { ScheduleMessageDto } from './dto/schedule-message.dto';
 const MIN_ANTELACION_MS = 60_000;
 const MAX_ANTELACION_MS = 30 * 24 * 60 * 60 * 1000;
 const LOTE_MAXIMO = 100;
+const MAX_PENDIENTES = 20;
 
 const PROGRAMADO_SELECT = {
   idMensajeProgramado: true,
@@ -79,6 +80,15 @@ export class MensajesProgramadosService {
     }
     if (antelacion > MAX_ANTELACION_MS) {
       throw new BadRequestException('La hora de envío no puede superar los 30 días');
+    }
+
+    const propios = await this.prisma.mensajeProgramado.count({
+      where: { idRemitente: userId, estado: EstadoMensajeProgramado.PENDIENTE },
+    });
+    if (propios >= MAX_PENDIENTES) {
+      throw new BadRequestException(
+        'Ya tienes 20 mensajes programados pendientes. Cancela alguno para programar otro.',
+      );
     }
 
     return this.prisma.mensajeProgramado.create({

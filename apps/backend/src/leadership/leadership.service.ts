@@ -16,6 +16,7 @@ import {
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectEligibilityService } from '../eligibility/project-eligibility.service';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
+import { ChatCanalesService } from '../chat/chat-canales.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { CreateLeadershipAppealDto } from './dto/create-leadership-appeal.dto';
 import { DenyAppealDto } from './dto/deny-appeal.dto';
@@ -101,6 +102,7 @@ export class LeadershipService {
     private readonly eligibility: ProjectEligibilityService,
     private readonly notifications: NotificationsService,
     private readonly bitacoraEventos: BitacoraEventosService,
+    private readonly chatCanales?: ChatCanalesService,
   ) {}
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -471,6 +473,12 @@ export class LeadershipService {
             origen,
           },
         ),
+    });
+
+    // El canal del chat depende de quién lidera: se resincroniza tras el commit.
+    ctx.effects.add({
+      key: `chat:sync:${input.projectId}`,
+      publish: () => this.chatCanales?.sincronizarSinFallar(input.projectId),
     });
 
     return {

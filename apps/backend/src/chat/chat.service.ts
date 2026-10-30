@@ -114,7 +114,8 @@ function reaccionesParaUsuario(grupos: ReturnType<typeof agruparReacciones>, use
 
 /** El contenido de un mensaje eliminado nunca sale del servidor. */
 function ocultarEliminado<T extends { contenido: string; eliminadoEn: Date | null }>(mensaje: T): T {
-  return mensaje.eliminadoEn ? { ...mensaje, contenido: '' } : mensaje;
+  if (!mensaje.eliminadoEn) return mensaje;
+  return { ...mensaje, contenido: '', ...('adjunto' in mensaje ? { adjunto: null } : {}) };
 }
 
 const ARCHIVADOS_PAGE_SIZE = 20;
@@ -170,7 +171,7 @@ export class ChatService {
 
   private async getConversacionOrThrow(idProyecto: number, idConversacion: number, userId: number) {
     const conversacion = await this.prisma.conversacion.findFirst({
-      where: { idConversacion, idProyecto },
+      where: { idConversacion, idProyecto, eliminadaEn: null },
       include: {
         participantes: { select: { idUsuario: true } },
         proyecto: { select: { estadoProyecto: true } },
@@ -386,7 +387,7 @@ export class ChatService {
       throw new ForbiddenException('Esta conversación está archivada: no se puede reaccionar.');
     }
     const mensaje = await this.prisma.mensajeChat.findFirst({
-      where: { idMensaje, idConversacion },
+      where: { idMensaje, idConversacion, eliminadoEn: null },
       select: { idMensaje: true },
     });
     if (!mensaje) {
@@ -452,7 +453,7 @@ export class ChatService {
     await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     const limite = query.limite ?? 20;
     const filas = await this.prisma.adjuntoMensajeChat.findMany({
-      where: { idConversacion, ...(query.cursor ? { idAdjunto: { lt: query.cursor } } : {}) },
+      where: { idConversacion, mensaje: { eliminadoEn: null }, ...(query.cursor ? { idAdjunto: { lt: query.cursor } } : {}) },
       orderBy: { idAdjunto: 'desc' },
       take: limite,
       select: {
@@ -474,7 +475,7 @@ export class ChatService {
   async getAdjuntoUrl(idProyecto: number, idConversacion: number, idAdjunto: number, userId: number) {
     await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     const adjunto = await this.prisma.adjuntoMensajeChat.findFirst({
-      where: { idAdjunto, idConversacion },
+      where: { idAdjunto, idConversacion, mensaje: { eliminadoEn: null } },
       select: { claveAlmacenamiento: true, nombreOriginal: true, mime: true },
     });
     if (!adjunto) throw new NotFoundException('Archivo no encontrado');
@@ -490,7 +491,7 @@ export class ChatService {
   async getAdjuntoImagen(idProyecto: number, idConversacion: number, idAdjunto: number, userId: number) {
     await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     const adjunto = await this.prisma.adjuntoMensajeChat.findFirst({
-      where: { idAdjunto, idConversacion },
+      where: { idAdjunto, idConversacion, mensaje: { eliminadoEn: null } },
       select: { claveAlmacenamiento: true, mime: true, tamanoBytes: true },
     });
     if (!adjunto) throw new NotFoundException('Archivo no encontrado');
@@ -843,7 +844,7 @@ export class ChatService {
   async toggleSavedMessage(idProyecto: number, idConversacion: number, idMensaje: number, userId: number) {
     await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     const mensaje = await this.prisma.mensajeChat.findFirst({
-      where: { idMensaje, idConversacion },
+      where: { idMensaje, idConversacion, eliminadoEn: null },
       select: { idMensaje: true },
     });
     if (!mensaje) {
@@ -866,7 +867,7 @@ export class ChatService {
     const guardados = await this.prisma.mensajeGuardado.findMany({
       where: {
         idUsuario: userId,
-        mensaje: { conversacion: { eliminadaEn: null, participantes: { some: { idUsuario: userId } } } },
+        mensaje: { eliminadoEn: null, conversacion: { eliminadaEn: null, participantes: { some: { idUsuario: userId } } } },
       },
       orderBy: [{ guardadoEn: 'desc' }, { idMensaje: 'desc' }],
       skip: (page - 1) * GUARDADOS_PAGE_SIZE,
