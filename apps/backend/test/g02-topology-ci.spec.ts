@@ -77,8 +77,9 @@ describe('G02-C18: el job no publica, no despliega y no alcanza producción', ()
   });
 
   it('sin acciones de login/publicación, sin secretos y sin escritura en el token', () => {
-    const uses = steps.map((step) => step.uses).filter(Boolean);
-    expect(uses).toEqual(['actions/checkout@v4', 'actions/setup-node@v4']);
+    // La versión va fijada a SHA (workflow-actions-pinned.spec.ts); aquí solo importa QUÉ acciones corren.
+    const uses = steps.map((step) => step.uses?.split('@')[0]).filter(Boolean);
+    expect(uses).toEqual(['actions/checkout', 'actions/setup-node']);
     expect(JSON.stringify(topology)).not.toMatch(/secrets\.|docker push|docker\/login-action|build-push-action|ssh|appleboy/);
     expect(topology.permissions).toBeUndefined();
     expect(ci.permissions).toEqual({ contents: 'read' });

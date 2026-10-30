@@ -33,10 +33,10 @@ services:
       - app
     restart: unless-stopped
     # G04 (OWASP25-C021 + P5/T19): la interfaz publicada es configurable. El
-    # default 0.0.0.0 conserva la exposicion actual; 127.0.0.1 deja el backend
-    # solo detras de nginx (activacion: administrador, via deploy).
+    # default 127.0.0.1 deja el backend solo detras de nginx; 0.0.0.0 lo expone
+    # en todas las interfaces y se pide explicitamente con BACKEND_BIND.
     ports:
-      - "${BACKEND_BIND:-0.0.0.0}:3001:3001"
+      - "${BACKEND_BIND:-127.0.0.1}:3001:3001"
     env_file: .env
     environment:
       - NODE_ENV=${NODE_ENV:-development}
@@ -81,7 +81,7 @@ services:
     restart: unless-stopped
     # G04 (OWASP25-C021 + P5/T19): igual que el backend.
     ports:
-      - "${FRONTEND_BIND:-0.0.0.0}:3000:3000"
+      - "${FRONTEND_BIND:-127.0.0.1}:3000:3000"
     env_file: .env
     environment:
       - NODE_ENV=${NODE_ENV:-development}

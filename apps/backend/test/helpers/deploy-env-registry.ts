@@ -39,9 +39,9 @@ export const DEPLOY_ENV_REGISTRY: Record<string, DeployEnvEntry> = {
   FRONTEND_IMAGE: { kind: 'config', consumer: 'docker-compose.yml' },
   // G04-C08 (OWASP25-C021 + D2): 1 = un proxy delante (nginx del host); el backend exige >=1 en produccion.
   TRUST_PROXY_HOPS: { kind: 'flag', consumer: 'apps/backend/src/config/environment.validation.ts', defaultValue: '1' },
-  // G04-C10 (OWASP25-C021 + P5/T19): 0.0.0.0 = exposición actual; 127.0.0.1 = solo detrás de nginx.
-  BACKEND_BIND: { kind: 'flag', consumer: 'docker-compose.yml', defaultValue: '0.0.0.0' },
-  FRONTEND_BIND: { kind: 'flag', consumer: 'docker-compose.yml', defaultValue: '0.0.0.0' },
+  // G04-C10 (OWASP25-C021 + P5/T19): 127.0.0.1 = solo detrás de nginx (default); 0.0.0.0 se pide explícitamente.
+  BACKEND_BIND: { kind: 'flag', consumer: 'docker-compose.yml', defaultValue: '127.0.0.1' },
+  FRONTEND_BIND: { kind: 'flag', consumer: 'docker-compose.yml', defaultValue: '127.0.0.1' },
   // G06-C07 (OWASP25-C049): true = cookies Secure por defecto; false solo si el trafico no fuera HTTPS.
   COOKIE_SECURE: { kind: 'flag', consumer: 'apps/backend/src/auth/cookie.util.ts', defaultValue: 'true' },
   // G05-C12 (OWASP25-C038): false = alertas de ráfaga inertes.

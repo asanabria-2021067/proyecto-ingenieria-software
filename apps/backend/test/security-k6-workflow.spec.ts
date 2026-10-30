@@ -53,6 +53,11 @@ describe('k6.yml: permisos, ref, environment y secretos', () => {
     expect(k6WorkflowFindings(loadWorkflow('k6.yml'))).toEqual([]);
   });
 
+  it('la URL base de k6 por defecto es https: las credenciales del fixture no viajan en claro', () => {
+    const baseUrl = /K6_BASE_URL: \$\{\{[^}]*\|\| '([^']+)' \}\}/.exec(source)?.[1];
+    expect(baseUrl).toMatch(/^https:\/\//);
+  });
+
   it('la clave SSH y known_hosts se escriben con printf desde env, con verificacion estricta del host', () => {
     expect(source).toContain(`printf '%s\\n' "$SSH_KEY" > ~/.ssh/deploy_key`);
     expect(source).toContain(`printf '%s\\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts`);

@@ -85,7 +85,7 @@ Los jobs `deploy` (deploy.yml) y `k6` (k6.yml) declaran `environment: production
 ### k6
 
 - `K6_FIXTURE_PASSWORD`: no existe todavia; crealo.
-- `PUBLIC_APP_URL` (usado como `K6_BASE_URL`): con `BACKEND_BIND=127.0.0.1` (valor definido hoy en GitHub; el default de `deploy.yml` es `0.0.0.0`) el puerto 3001 no es alcanzable desde un runner. Usa `https://158.23.57.118.nip.io`; ojo: el `K6_BASE_URL` por defecto de `k6.yml` (`http://158.23.57.118:3001`) sigue sin funcionar y un 301 rompería los POST de login, por eso debe ser https.
+- `PUBLIC_APP_URL` (usado como `K6_BASE_URL`): con `BACKEND_BIND=127.0.0.1` (valor definido hoy en GitHub y ahora también el default de `deploy.yml` y de `docker-compose.yml`) el puerto 3001 no es alcanzable desde un runner. Usa `https://158.23.57.118.nip.io`; el `K6_BASE_URL` por defecto de `k6.yml` ya es esa URL https (un 301 rompería los POST de login y mandaría la contraseña en claro).
 - `k6.yml` usa el mismo `SSH_KNOWN_HOSTS` para el tunel a Postgres.
 
 ### Orden de aplicacion
