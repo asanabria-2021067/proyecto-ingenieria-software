@@ -114,7 +114,7 @@ jobs:
     steps:
       - name: Checkout repository
         if: inputs.mode != 'config-only'
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Docker Buildx
         if: inputs.mode != 'config-only'
@@ -192,7 +192,7 @@ jobs:
     steps:
       - name: Checkout repository
         if: inputs.mode != 'config-only'
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Docker Buildx
         if: inputs.mode != 'config-only'
@@ -352,10 +352,12 @@ jobs:
           # backend; el backend se niega a arrancar en produccion con 0.
           TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '1' }}
           # G04 (OWASP25-C021 + P5/T19): interfaz publicada de backend/frontend.
-          # '0.0.0.0' reproduce la exposicion actual; '127.0.0.1' es la variante
-          # loopback que activa el administrador (solo esos dos valores).
-          BACKEND_BIND: ${{ vars.BACKEND_BIND || '0.0.0.0' }}
-          FRONTEND_BIND: ${{ vars.FRONTEND_BIND || '0.0.0.0' }}
+          # Default '127.0.0.1': backend y frontend solo detras de nginx. '0.0.0.0'
+          # los expone en todas las interfaces y debe pedirse con la variable
+          # (solo esos dos valores). Con TRUST_PROXY_HOPS=1 un backend alcanzable
+          # directo permite falsear X-Forwarded-For y evadir el rate limit.
+          BACKEND_BIND: ${{ vars.BACKEND_BIND || '127.0.0.1' }}
+          FRONTEND_BIND: ${{ vars.FRONTEND_BIND || '127.0.0.1' }}
           # G06 (OWASP25-C049): cookies Secure por defecto; 'false' solo si el
           # trafico no fuera HTTPS.
           COOKIE_SECURE: ${{ vars.COOKIE_SECURE || 'true' }}
