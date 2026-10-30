@@ -17,7 +17,7 @@ const HASH = bcrypt.hashSync(PASSWORD, 4);
 const PENDIENTE = 'PENDIENTE_VERIFICACION';
 
 function makeAuth(estado: string) {
-  const usuario = { idUsuario: 5, correo: 'san24725@uvg.edu.gt', contrasena: HASH, estado };
+  const usuario = { idUsuario: 5, correo: 'san24725@uvg.edu.gt', contrasena: HASH, estado, sesionVersion: 0 };
   const tx = {
     usuario: { create: vi.fn().mockResolvedValue({ idUsuario: 9, correo: 'san24725@uvg.edu.gt' }) },
     perfilEstudiante: { create: vi.fn().mockResolvedValue({}) },
@@ -31,7 +31,7 @@ function makeAuth(estado: string) {
     tokenRefresco: {
       create: vi.fn().mockResolvedValue({}),
       findUnique: vi.fn().mockResolvedValue({ idTokenRefresco: 'r1', revocadoEn: null, expiraEn: new Date(Date.now() + 60_000) }),
-      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     bitacoraAuditoria: { create: eventos },
     $transaction: vi.fn(async (cb: (client: unknown) => unknown) => cb(tx)),
@@ -99,30 +99,27 @@ describe('acceso de una cuenta pendiente de verificación', () => {
     expect(prisma.usuario.update).not.toHaveBeenCalled();
   });
 
-  it('login con una contraseña incorrecta responde exactamente lo mismo', async () => {
-    const correcta = makeAuth(PENDIENTE);
+  it('login con una contraseña incorrecta responde el 401 genérico: el aviso de cuenta pendiente exige la contraseña correcta', async () => {
     const incorrecta = makeAuth(PENDIENTE);
 
-    const conCorrecta = await correcta.service
-      .login({ correo: 'san24725@uvg.edu.gt', contrasena: PASSWORD })
-      .catch((error: ForbiddenException) => error);
-    const conIncorrecta = await incorrecta.service
+    const resultado = await incorrecta.service
       .login({ correo: 'san24725@uvg.edu.gt', contrasena: 'Otra12345' })
-      .catch((error: ForbiddenException) => error);
+      .catch((error: Error) => error);
 
-    expect(conIncorrecta).toBeInstanceOf(ForbiddenException);
-    expect((conIncorrecta as ForbiddenException).getResponse()).toEqual((conCorrecta as ForbiddenException).getResponse());
+    expect(resultado).toBeInstanceOf(UnauthorizedException);
+    expect(resultado).not.toBeInstanceOf(ForbiddenException);
   });
 
   it('una contraseña incorrecta sigue contando para el bloqueo temporal, igual que en una cuenta activa', async () => {
     const { service } = makeAuth(PENDIENTE);
-    const intento = () =>
-      service.login({ correo: 'san24725@uvg.edu.gt', contrasena: 'Otra12345' }).catch((error: Error) => error);
+    const intento = (contrasena: string) =>
+      service.login({ correo: 'san24725@uvg.edu.gt', contrasena }).catch((error: Error) => error);
 
     for (let i = 0; i < 5; i += 1) {
-      expect(await intento()).toBeInstanceOf(ForbiddenException);
+      expect(await intento('Otra12345')).toBeInstanceOf(UnauthorizedException);
     }
-    expect(await intento()).toBeInstanceOf(UnauthorizedException);
+    // Bloqueada: ni siquiera la contraseña correcta llega al aviso de cuenta pendiente.
+    expect(await intento(PASSWORD)).toBeInstanceOf(UnauthorizedException);
   });
 
   it('registra el intento como LOGIN_FAILED con el motivo de cuenta pendiente', async () => {
@@ -140,8 +137,8 @@ describe('acceso de una cuenta pendiente de verificación', () => {
     const { service, prisma } = makeAuth(PENDIENTE);
 
     await expect(service.refreshToken('refresh-viejo')).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(prisma.tokenRefresco.update).toHaveBeenCalledWith({
-      where: { idTokenRefresco: 'r1' },
+    expect(prisma.tokenRefresco.updateMany).toHaveBeenCalledWith({
+      where: { idTokenRefresco: 'r1', revocadoEn: null },
       data: { revocadoEn: expect.any(Date) },
     });
     expect(prisma.tokenRefresco.create).not.toHaveBeenCalled();

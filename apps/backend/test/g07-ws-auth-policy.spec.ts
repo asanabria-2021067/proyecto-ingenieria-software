@@ -24,9 +24,12 @@ function sign(payload: Record<string, unknown>, options: { secret?: string; expi
   return jwt.sign(payload, { secret: options.secret ?? SYNTHETIC_JWT_SECRET, expiresIn: options.expiresIn ?? 3600 });
 }
 
-function makePolicy(estados: Record<number, EstadoUsuario> = { 7: EstadoUsuario.ACTIVO }) {
+function makePolicy(
+  estados: Record<number, EstadoUsuario> = { 7: EstadoUsuario.ACTIVO },
+  versiones: Record<number, number> = {},
+) {
   const findUnique = vi.fn(async ({ where }: { where: { idUsuario: number } }) =>
-    estados[where.idUsuario] ? { estado: estados[where.idUsuario] } : null,
+    estados[where.idUsuario] ? { estado: estados[where.idUsuario], sesionVersion: versiones[where.idUsuario] ?? 0 } : null,
   );
   const prisma = { usuario: { findUnique } } as unknown as PrismaService;
   return { policy: new WsAuthService(new JwtService({ secret: SYNTHETIC_JWT_SECRET }), prisma), findUnique, estados };
@@ -59,7 +62,16 @@ describe('G07-C01: política compartida de autenticación WebSocket', () => {
         userId: 7,
         exp: (jwt.decode(token) as { exp: number }).exp,
       });
-      expect(findUnique).toHaveBeenCalledWith({ where: { idUsuario: 7 }, select: { estado: true } });
+      expect(findUnique).toHaveBeenCalledWith({ where: { idUsuario: 7 }, select: { estado: true, sesionVersion: true } });
+    });
+
+    it('rechaza un access token de una versión de sesión anterior (reset de contraseña o cuenta dejada no ACTIVO)', async () => {
+      const { policy } = makePolicy({ 7: EstadoUsuario.ACTIVO }, { 7: 2 });
+      const viejo = sign({ sub: 7, correo: 'ws@uvg.edu.gt', tipo: 'access', sv: 1 });
+      const vigente = sign({ sub: 7, correo: 'ws@uvg.edu.gt', tipo: 'access', sv: 2 });
+
+      await expect(policy.authenticate(handshake(viejo))).resolves.toEqual({ ok: false, motivo: 'CUENTA_NO_ACTIVA' });
+      await expect(policy.authenticate(handshake(vigente))).resolves.toMatchObject({ ok: true });
     });
   });
 

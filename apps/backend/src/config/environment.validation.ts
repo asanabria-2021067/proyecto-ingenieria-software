@@ -1,6 +1,6 @@
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { EstadoUsuario, type Prisma } from '@prisma/client';
-import { assertJwtSecret, JWT_SECRET_VARIABLE } from './jwt-secret';
+import { assertJwtSecret, JWT_SECRET_MIN_LENGTH, JWT_SECRET_VARIABLE } from './jwt-secret';
 
 /**
  * Validador único y puro de environment (06 v2 §51.1 y §51.2). Conserva las
@@ -349,6 +349,17 @@ export function validateEnvironment(raw: RawEnvironment): ValidatedEnvironment {
   const app = deriveAppEnvironment(raw);
   // G01 · OWASP25-C019: sin un JWT_SECRET válido el backend no arranca.
   assertJwtSecret(raw[JWT_SECRET_VARIABLE]);
+  if (app.nodeEnv === 'production') {
+    // El refresh token firmado con un secreto débil o igual al del access token
+    // se podría forjar o confundir entre sí.
+    const refreshSecret = readString(raw, 'JWT_REFRESH_SECRET');
+    if (!refreshSecret || refreshSecret.length < JWT_SECRET_MIN_LENGTH) {
+      throw new Error(`JWT_REFRESH_SECRET must be at least ${JWT_SECRET_MIN_LENGTH} characters long`);
+    }
+    if (refreshSecret === raw[JWT_SECRET_VARIABLE]) {
+      throw new Error('JWT_REFRESH_SECRET must differ from JWT_SECRET');
+    }
+  }
   const closure = deriveClosureAvailability(raw);
 
   if (!closure.disponible) {

@@ -11,7 +11,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
 describe('Infra', () => {
   it('JwtStrategy validate mapea payload de usuario activo', async () => {
     const prisma = {
-      usuario: { findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }) },
+      usuario: { findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO', sesionVersion: 0 }) },
     };
     const strategy = new JwtStrategy(prisma as unknown as PrismaService);
     await expect(strategy.validate({ sub: 7, correo: 'a@uvg.edu', tipo: 'access' })).resolves.toEqual({

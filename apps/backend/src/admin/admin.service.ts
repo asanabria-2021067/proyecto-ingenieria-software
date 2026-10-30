@@ -675,9 +675,13 @@ export class AdminService {
       );
     }
 
+    // Dejar de estar ACTIVO invalida los access tokens ya emitidos (sesionVersion)
+    // y los refresh tokens vivos; reactivar la cuenta no los resucita.
+    const dejaDeEstarActivo = estado !== EstadoUsuario.ACTIVO && user.estado !== estado;
+
     const updated = await this.prisma.usuario.update({
       where: { idUsuario: targetId },
-      data: { estado },
+      data: { estado, ...(dejaDeEstarActivo ? { sesionVersion: { increment: 1 } } : {}) },
       select: {
         idUsuario: true,
         nombre: true,
@@ -690,6 +694,15 @@ export class AdminService {
         },
       },
     });
+
+    // La revocación va DESPUÉS del update: un refresh concurrente ve la cuenta no ACTIVO o una
+    // versión de sesión distinta (refreshToken compara `sv`) y no recibe tokens.
+    if (dejaDeEstarActivo) {
+      await this.prisma.tokenRefresco.updateMany({
+        where: { idUsuario: targetId, revocadoEn: null },
+        data: { revocadoEn: new Date() },
+      });
+    }
 
     // G05 (OWASP25-C037): cambio privilegiado de estado de cuenta. Solo actor,
     // cuenta y transición; el log técnico de AuditInterceptor no guarda el

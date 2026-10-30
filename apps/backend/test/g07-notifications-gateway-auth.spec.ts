@@ -30,7 +30,7 @@ function makeSocket(token?: string) {
 
 function makeGateway(estado: EstadoUsuario | null = EstadoUsuario.ACTIVO) {
   const prisma = {
-    usuario: { findUnique: vi.fn().mockResolvedValue(estado ? { estado } : null) },
+    usuario: { findUnique: vi.fn().mockResolvedValue(estado ? { estado, sesionVersion: 0 } : null) },
   } as unknown as PrismaService;
   return new NotificationsGateway(new WsAuthService(new JwtService({ secret: SYNTHETIC_JWT_SECRET }), prisma));
 }

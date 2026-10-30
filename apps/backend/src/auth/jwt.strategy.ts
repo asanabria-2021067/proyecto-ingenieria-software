@@ -10,6 +10,7 @@ interface JwtPayload {
   sub: number;
   correo: string;
   tipo?: string;
+  sv?: number;
 }
 
 function extractFromCookie(req: Request): string | null {
@@ -36,10 +37,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const usuario = await this.prisma.usuario.findUnique({
       where: { idUsuario: payload.sub },
-      select: { estado: true },
+      select: { estado: true, sesionVersion: true },
     });
 
-    if (!usuario || usuario.estado !== EstadoUsuario.ACTIVO) {
+    // Tokens anteriores a `sv` cuentan como versión 0, igual que la columna por defecto.
+    if (!usuario || usuario.estado !== EstadoUsuario.ACTIVO || (payload.sv ?? 0) !== usuario.sesionVersion) {
       throw new UnauthorizedException('Usuario no activo');
     }
 

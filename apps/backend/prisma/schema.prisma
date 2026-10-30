@@ -328,6 +328,8 @@ model Usuario {
   estado            EstadoUsuario @default(ACTIVO)
   fechaCreacion     DateTime      @default(now()) @map("fecha_creacion")
   fechaUltimaSesion DateTime?     @map("fecha_ultima_sesion")
+  // Se incrementa al resetear la contraseña o dejar la cuenta no ACTIVO: invalida los access tokens ya emitidos (claim `sv`).
+  sesionVersion     Int           @default(0) @map("sesion_version")
 
   telefonos                        UsuarioTelefono[]
   preferenciaNoMolestar            PreferenciaNoMolestar?

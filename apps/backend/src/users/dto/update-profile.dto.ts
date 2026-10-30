@@ -3,12 +3,10 @@ import {
 } from '@prisma/client';
 import {
   IsArray,
-  IsEmail,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
-  Matches,
   Max,
   MaxLength,
   Min,
@@ -88,14 +86,6 @@ export class UpdateProfileDto {
   @IsString()
   @MinLength(2)
   nombreCompleto?: string;
-
-  // ==================== CORREO INSTITUCIONAL ====================
-  @IsOptional()
-  @IsEmail()
-  @Matches(/@uvg\.edu\.gt$/, {
-    message: 'Debe ser un correo institucional @uvg.edu.gt',
-  })
-  correoInstitucional?: string;
 
   // ==================== CARRERA Y SEMESTRE ====================
   @IsOptional()

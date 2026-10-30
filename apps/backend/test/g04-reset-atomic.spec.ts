@@ -55,7 +55,8 @@ describe('G04-C04: reset atómico con revocación de sesiones', () => {
       where: { idSolicitud: 4, idUsuario: 9, tokenUtilizadoEn: null },
       data: { tokenUtilizadoEn: expect.any(Date) },
     });
-    expect(tx.usuario.update).toHaveBeenCalledWith({ where: { idUsuario: 9 }, data: { contrasena: expect.any(String) } });
+    expect(tx.usuario.update).toHaveBeenCalledWith({ where: { idUsuario: 9 }, data: { contrasena: expect.any(String), sesionVersion: { increment: 1 } },
+    });
     expect(tx.tokenRefresco.updateMany).toHaveBeenCalledWith({
       where: { idUsuario: 9, revocadoEn: null },
       data: { revocadoEn: expect.any(Date) },

@@ -228,10 +228,6 @@ export class UsersService {
           if (dto.apellido !== undefined) updateUsuarioData.apellido = dto.apellido;
         }
 
-        if (dto.correoInstitucional !== undefined) {
-          updateUsuarioData.correo = dto.correoInstitucional;
-        }
-
         if (Object.keys(updateUsuarioData).length > 0) {
           await tx.usuario.update({
             where: { idUsuario: userId },

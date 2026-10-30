@@ -20,7 +20,7 @@ const HASH = bcrypt.hashSync(PASSWORD, 4);
 const ESTADOS_SIN_ACCESO = ['BLOQUEADO', 'INACTIVO'] as const;
 
 function makeService(estado: string, registro: Record<string, unknown> | null = null) {
-  const usuario = { idUsuario: 5, correo: 'a@uvg.edu.gt', contrasena: HASH, estado };
+  const usuario = { idUsuario: 5, correo: 'a@uvg.edu.gt', contrasena: HASH, estado, sesionVersion: 0 };
   const prisma = {
     usuario: {
       findUnique: vi.fn().mockResolvedValue(usuario),
@@ -29,7 +29,7 @@ function makeService(estado: string, registro: Record<string, unknown> | null = 
     tokenRefresco: {
       create: vi.fn().mockResolvedValue({}),
       findUnique: vi.fn().mockResolvedValue(registro),
-      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
   };
   const jwtService = {
@@ -96,8 +96,8 @@ describe('G04-C03: tokens solo para usuarios ACTIVO', () => {
     const { service, prisma } = makeService(estado, registroVigente);
 
     await expect(service.refreshToken('refresh-viejo')).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(prisma.tokenRefresco.update).toHaveBeenCalledWith({
-      where: { idTokenRefresco: 'r1' },
+    expect(prisma.tokenRefresco.updateMany).toHaveBeenCalledWith({
+      where: { idTokenRefresco: 'r1', revocadoEn: null },
       data: { revocadoEn: expect.any(Date) },
     });
     expect(prisma.tokenRefresco.create).not.toHaveBeenCalled();

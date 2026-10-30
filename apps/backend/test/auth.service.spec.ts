@@ -53,6 +53,46 @@ describe('AuthService', () => {
     );
   });
 
+  it('login de una cuenta pendiente con contraseña incorrecta responde 401 genérico (no revela que la cuenta existe)', async () => {
+    const prisma = {
+      usuario: {
+        findUnique: vi.fn().mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu', contrasena: 'hash', estado: 'PENDIENTE_VERIFICACION' }),
+      },
+    };
+    (bcrypt.compare as Mock).mockResolvedValue(false);
+    const service = new AuthService(
+      prisma as unknown as PrismaService,
+      { sign: vi.fn() } as unknown as JwtService,
+      { notifyAdminsFromTemplate: vi.fn() } as unknown as NotificationsService,
+    );
+
+    await expect(service.login({ correo: 'a@uvg.edu', contrasena: 'mala' })).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('login firma el access token con la versión de sesión de la cuenta', async () => {
+    const prisma = {
+      usuario: {
+        findUnique: vi.fn().mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu', contrasena: 'hash', estado: 'ACTIVO', sesionVersion: 4 }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      tokenRefresco: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const jwtService = { sign: vi.fn().mockReturnValue('jwt-token') };
+    (bcrypt.compare as Mock).mockResolvedValue(true);
+    const service = new AuthService(
+      prisma as unknown as PrismaService,
+      jwtService as unknown as JwtService,
+      { notifyAdminsFromTemplate: vi.fn() } as unknown as NotificationsService,
+    );
+
+    await service.login({ correo: 'a@uvg.edu', contrasena: '123456' });
+
+    expect(jwtService.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ tipo: 'access', sv: 4 }),
+      expect.anything(),
+    );
+  });
+
   it('register crea usuario y perfil pendientes de verificación, sin tokens', async () => {
     const tx = {
       usuario: { create: vi.fn().mockResolvedValue({ idUsuario: 7, correo: 'n@uvg.edu' }) },
@@ -136,6 +176,8 @@ describe('AuthService', () => {
       verifyReturn?: Record<string, unknown>;
       verifyThrows?: boolean;
       registro?: Record<string, unknown> | null;
+      rotacionGanada?: boolean;
+      sesionVersionCuenta?: number;
     }) {
       const jwtService = {
         verify: opts.verifyThrows
@@ -148,11 +190,13 @@ describe('AuthService', () => {
       const prisma = {
         // G04-C03: el refresh relee el estado del usuario antes de renovar.
         usuario: {
-          findUnique: vi.fn().mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu', estado: 'ACTIVO' }),
+          findUnique: vi
+            .fn()
+            .mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu', estado: 'ACTIVO', sesionVersion: opts.sesionVersionCuenta ?? 0 }),
         },
         tokenRefresco: {
           findUnique: vi.fn().mockResolvedValue(opts.registro ?? null),
-          update: vi.fn().mockResolvedValue({}),
+          updateMany: vi.fn().mockResolvedValue({ count: opts.rotacionGanada === false ? 0 : 1 }),
           create: vi.fn().mockResolvedValue({}),
         },
       };
@@ -183,11 +227,77 @@ describe('AuthService', () => {
 
       const result = await service.refreshToken('token-viejo');
 
-      expect(prisma.tokenRefresco.update).toHaveBeenCalledWith({
-        where: { idTokenRefresco: 42 },
+      expect(prisma.tokenRefresco.updateMany).toHaveBeenCalledWith({
+        where: { idTokenRefresco: 42, revocadoEn: null },
         data: { revocadoEn: expect.any(Date) },
       });
       expect(result).toEqual({ accessToken: 'token-nuevo', refreshToken: 'token-nuevo' });
+    });
+
+    it('si dos refresh llegan a la vez con el mismo token solo gana uno: el perdedor no recibe tokens', async () => {
+      const { service, prisma } = makeService({
+        verifyReturn: { sub: 1, correo: 'a@uvg.edu', tipo: 'refresh' },
+        registro: { idTokenRefresco: 42, idUsuario: 1, revocadoEn: null, expiraEn: new Date(Date.now() + 60_000) },
+        rotacionGanada: false,
+      });
+
+      await expect(service.refreshToken('token-viejo')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(prisma.tokenRefresco.create).not.toHaveBeenCalled();
+    });
+
+    it('reusar un token ya rotado hace rato revoca todas las sesiones de la cuenta', async () => {
+      const { service, prisma } = makeService({
+        verifyReturn: { sub: 1, correo: 'a@uvg.edu', tipo: 'refresh' },
+        registro: {
+          idTokenRefresco: 42,
+          idUsuario: 7,
+          revocadoEn: new Date(Date.now() - 60_000),
+          expiraEn: new Date(Date.now() + 60_000),
+        },
+      });
+
+      await expect(service.refreshToken('token-robado')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(prisma.tokenRefresco.updateMany).toHaveBeenCalledWith({
+        where: { idUsuario: 7, revocadoEn: null },
+        data: { revocadoEn: expect.any(Date) },
+      });
+    });
+
+    it('un refresh vigente de una versión de sesión anterior no renueva credenciales (carrera con un reset o bloqueo)', async () => {
+      const { service, prisma } = makeService({
+        verifyReturn: { sub: 1, correo: 'a@uvg.edu', tipo: 'refresh', sv: 1 },
+        registro: { idTokenRefresco: 42, idUsuario: 1, revocadoEn: null, expiraEn: new Date(Date.now() + 60_000) },
+        sesionVersionCuenta: 2,
+      });
+
+      await expect(service.refreshToken('refresh-previo-al-reset')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(prisma.tokenRefresco.create).not.toHaveBeenCalled();
+    });
+
+    it('un refresh revocado por reset o bloqueo (versión de sesión anterior) no tumba la sesión nueva al reusarse', async () => {
+      const { service, prisma } = makeService({
+        verifyReturn: { sub: 1, correo: 'a@uvg.edu', tipo: 'refresh', sv: 1 },
+        registro: {
+          idTokenRefresco: 42,
+          idUsuario: 7,
+          revocadoEn: new Date(Date.now() - 60_000),
+          expiraEn: new Date(Date.now() + 60_000),
+        },
+        sesionVersionCuenta: 2,
+      });
+
+      await expect(service.refreshToken('pestana-vieja')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(prisma.tokenRefresco.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('el reuso dentro de la ventana de carrera entre pestañas solo da 401, sin cerrar las demás sesiones', async () => {
+      const { service, prisma } = makeService({
+        verifyReturn: { sub: 1, correo: 'a@uvg.edu', tipo: 'refresh' },
+        registro: { idTokenRefresco: 42, idUsuario: 7, revocadoEn: new Date(), expiraEn: new Date(Date.now() + 60_000) },
+      });
+
+      await expect(service.refreshToken('token-hace-un-instante')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(prisma.tokenRefresco.updateMany).not.toHaveBeenCalled();
     });
 
     it('rechaza un refresh ya revocado', async () => {

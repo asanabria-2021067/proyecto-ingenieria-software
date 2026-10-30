@@ -1,0 +1,1 @@
+ALTER TABLE "usuario" ADD COLUMN "sesion_version" INTEGER NOT NULL DEFAULT 0;

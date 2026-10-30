@@ -14,6 +14,7 @@ function setup(estadoActual: string, esAdminCaller = true) {
   const create = vi.fn().mockResolvedValue({});
   const persona = { idUsuario: 5, nombre: 'Ana', apellido: 'Pérez', correo: 'ana@uvg.edu.gt', fechaCreacion: new Date('2026-01-01T00:00:00Z'), rolesAcceso: [] };
   const update = vi.fn(async ({ data }: { data: { estado: string } }) => ({ ...persona, estado: data.estado }));
+  const revocar = vi.fn().mockResolvedValue({ count: 0 });
   const prisma = {
     usuarioRolAcceso: { findFirst: vi.fn().mockResolvedValue(esAdminCaller ? { idUsuario: 1 } : null) },
     usuario: {
@@ -21,9 +22,30 @@ function setup(estadoActual: string, esAdminCaller = true) {
       update,
     },
     bitacoraAuditoria: { create },
+    tokenRefresco: { updateMany: revocar },
   };
-  return { admin: new AdminService(prisma as unknown as PrismaService, new JwtService({})), create, update };
+  return { admin: new AdminService(prisma as unknown as PrismaService, new JwtService({})), create, update, revocar };
 }
+
+describe('cierre de sesiones al dejar la cuenta no ACTIVO', () => {
+  it('ACTIVO → BLOQUEADO revoca los refresh vivos y sube la versión de sesión', async () => {
+    const { admin, update, revocar } = setup('ACTIVO');
+
+    await admin.updateUsuarioEstado(1, 5, 'BLOQUEADO' as never);
+
+    expect(revocar).toHaveBeenCalledWith({ where: { idUsuario: 5, revocadoEn: null }, data: { revocadoEn: expect.any(Date) } });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: { estado: 'BLOQUEADO', sesionVersion: { increment: 1 } } }));
+  });
+
+  it('BLOQUEADO → ACTIVO no toca refresh ni versión: lo emitido antes del bloqueo ya murió', async () => {
+    const { admin, update, revocar } = setup('BLOQUEADO');
+
+    await admin.updateUsuarioEstado(1, 5, 'ACTIVO' as never);
+
+    expect(revocar).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: { estado: 'ACTIVO' } }));
+  });
+});
 
 describe('G05-C07: cambios administrativos de estado de cuenta', () => {
   it.each([
