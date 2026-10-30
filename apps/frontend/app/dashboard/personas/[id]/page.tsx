@@ -264,15 +264,15 @@ export default function PerfilPersonaPage() {
             )}
           </div>
 
-          <div className="card-base space-y-tight">
-            <h2 className="type-meta uppercase tracking-wide">Contacto</h2>
-            {perfil.carrera && (
+          {perfil.carrera && (
+            <div className="card-base space-y-tight">
+              <h2 className="type-meta uppercase tracking-wide">Carrera</h2>
               <p className="type-body flex items-center gap-tight text-text-primary">
                 <GraduationCap className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
                 <span className="truncate">{perfil.carrera}</span>
               </p>
-            )}
-          </div>
+            </div>
+          )}
         </aside>
       </div>
 

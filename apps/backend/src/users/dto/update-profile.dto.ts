@@ -61,9 +61,11 @@ export class ReplaceCualidadesDto {
 
 export class CreateExperienciaDto {
   @IsString()
+  @MaxLength(255)
   tituloProyectoExperiencia!: string;
 
   @IsString()
+  @MaxLength(255)
   rolDesempenado!: string;
 
   @IsOptional()
