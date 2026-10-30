@@ -177,6 +177,12 @@ describe('Cabeceras y validación global (main.ts)', () => {
     expect(match[1]).toMatch(/forbidNonWhitelisted:\s*true/);
   });
 
+  it('main.ts aplica originGuard antes de cookieParser y registra SocketIoAdapter', () => {
+    expect(MAIN_SOURCE).toContain('originGuard(');
+    expect(MAIN_SOURCE).toContain('SocketIoAdapter');
+    expect(MAIN_SOURCE.indexOf('originGuard(')).toBeLessThan(MAIN_SOURCE.indexOf('cookieParser()'));
+  });
+
   it('CORS no permite cualquier origen ("*")', () => {
     const match = MAIN_SOURCE.match(/app\.enableCors\(\{([\s\S]*?)\}\)/);
     expect(match).not.toBeNull();
