@@ -387,7 +387,12 @@ export class HistoricalProjectReadService {
       this.hours.forProject(undefined, projectId),
     ]);
 
-    const contribucionesEliminadas = await this.deletedContributionsTx(projectId);
+    // ownOnly (ex-integrante de un proyecto vivo): solo sus propios hechos, no los del equipo.
+    const contribucionesEliminadas = this.soloLoPropio(
+      await this.deletedContributionsTx(projectId),
+      decision.ownOnly,
+      actorId,
+    );
     // §7: `tamanoBytes` es BigInt en la base y nunca se serializa como tal.
     const documentoPublico = (documento: {
       idDocumentoCierre: number;
@@ -409,7 +414,7 @@ export class HistoricalProjectReadService {
         .filter((vinculo) => vinculo.documento.idDocumentoCierre === revision.idDocumentoOficial)
         .map((vinculo) => vinculo.documento),
     );
-    const documentoOficial = oficiales.length > 0 ? documentoPublico(oficiales[0]) : null;
+    const documentoOficial = !decision.ownOnly && oficiales.length > 0 ? documentoPublico(oficiales[0]) : null;
 
     return {
       projectId,
@@ -424,7 +429,12 @@ export class HistoricalProjectReadService {
         fechaInicio: proyecto.fechaInicio,
         fechaFinEstimada: proyecto.fechaFinEstimada,
       },
-      liderazgo: { liderActual: proyecto.creador, historial: liderazgo },
+      liderazgo: {
+        liderActual: proyecto.creador,
+        historial: decision.ownOnly
+          ? liderazgo.map(({ motivo: _motivo, idAdminResponsable: _admin, ...resto }) => resto)
+          : liderazgo,
+      },
       miembrosHistoricos: participaciones.map((fila) => ({
         idParticipacion: fila.idParticipacion,
         usuario: fila.usuario,
@@ -441,9 +451,12 @@ export class HistoricalProjectReadService {
         propuestasPendientes: totales.propuestasPendientes,
         acreditadas: totales.acreditadas,
         tareasDistintas: totales.tareasDistintas,
-        porUsuario: totales.porUsuario,
+        porUsuario: decision.ownOnly
+          ? totales.porUsuario.filter((fila) => fila.idUsuario === actorId)
+          : totales.porUsuario,
       },
-      revisiones: revisiones.map((revision) => ({
+      // Las revisiones de un cierre en curso (comentarios del revisor, huellas) no son de un ex-integrante.
+      revisiones: (decision.ownOnly ? [] : revisiones).map((revision) => ({
         idRevisionCierre: revision.idRevisionCierre,
         numeroRevision: revision.numeroRevision,
         estadoRevision: revision.estadoRevision,
@@ -482,13 +495,23 @@ export class HistoricalProjectReadService {
     actorId: number,
     sprintId?: number,
   ): Promise<Array<Record<string, unknown>>> {
-    await this.readPolicy.assertRead(undefined, {
+    const decision = await this.readPolicy.assertRead(undefined, {
       projectId,
       actorId,
       scope: 'historico',
       ...(sprintId === undefined ? {} : { entitySprintId: sprintId }),
     });
-    return this.deletedContributionsTx(projectId, sprintId);
+    return this.soloLoPropio(await this.deletedContributionsTx(projectId, sprintId), decision.ownOnly, actorId);
+  }
+
+  private soloLoPropio(
+    contribuciones: Array<Record<string, unknown>>,
+    ownOnly: boolean,
+    actorId: number,
+  ): Array<Record<string, unknown>> {
+    return ownOnly
+      ? contribuciones.filter((c) => (c.usuario as { idUsuario: number }).idUsuario === actorId)
+      : contribuciones;
   }
 
   /**

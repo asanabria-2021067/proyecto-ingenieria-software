@@ -3,12 +3,10 @@ import {
 } from '@prisma/client';
 import {
   IsArray,
-  IsEmail,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
-  Matches,
   Max,
   MaxLength,
   Min,
@@ -61,14 +59,23 @@ export class ReplaceCualidadesDto {
 
 export class CreateExperienciaDto {
   @IsString()
+  @MaxLength(255)
   tituloProyectoExperiencia!: string;
 
   @IsString()
+  @MaxLength(255)
   rolDesempenado!: string;
 
   @IsOptional()
   @IsEnum(TipoExperiencia)
   tipoExperiencia?: TipoExperiencia;
+}
+
+export class ReplaceExperienciasDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateExperienciaDto)
+  experiencias!: CreateExperienciaDto[];
 }
 
 export class UpdateProfileDto {
@@ -88,14 +95,6 @@ export class UpdateProfileDto {
   @IsString()
   @MinLength(2)
   nombreCompleto?: string;
-
-  // ==================== CORREO INSTITUCIONAL ====================
-  @IsOptional()
-  @IsEmail()
-  @Matches(/@uvg\.edu\.gt$/, {
-    message: 'Debe ser un correo institucional @uvg.edu.gt',
-  })
-  correoInstitucional?: string;
 
   // ==================== CARRERA Y SEMESTRE ====================
   @IsOptional()
@@ -159,7 +158,7 @@ export class UpdateProfileDto {
   // ==================== ENLACES Y ARCHIVOS ====================
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(255) // Usuario.fotoUrl es VarChar(255): más largo daría 500 en la base
   @IsCloudinaryUrl()
   fotoUrl?: string;
 

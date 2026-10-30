@@ -74,7 +74,7 @@ describe('G06-C07: COOKIE_SECURE', () => {
   });
 
   it('NODE_ENV=production: Secure por defecto; COOKIE_SECURE explícito manda', () => {
-    const base = { FRONTEND_URL: 'http://localhost:3000', JWT_SECRET: 'x'.repeat(48), NODE_ENV: 'production', TRUST_PROXY_HOPS: '1' };
+    const base = { FRONTEND_URL: 'http://localhost:3000', JWT_SECRET: 'x'.repeat(48), JWT_REFRESH_SECRET: 'y'.repeat(48), NODE_ENV: 'production', TRUST_PROXY_HOPS: '1' };
     expect(validateEnvironment(base).app.cookieSecure).toBe(true);
     expect(validateEnvironment({ ...base, COOKIE_SECURE: 'false' }).app.cookieSecure).toBe(false);
     expect(parseCookieSecure(undefined, 'production')).toBe(true);

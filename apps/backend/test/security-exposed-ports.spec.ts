@@ -130,16 +130,19 @@ describe('G04-C10: binds de backend/frontend parametrizados', () => {
   const root = COMPOSE_FILES.find((f) => f.relativePath === 'docker-compose.yml')!;
   const mappingOf = (service: string) => extractPortMappings(root.source).filter((m) => m.service === service);
 
-  it('backend y frontend publican su puerto con BACKEND_BIND / FRONTEND_BIND y default 0.0.0.0', () => {
-    expect(mappingOf('backend').map((m) => m.raw)).toEqual(['${BACKEND_BIND:-0.0.0.0}:3001:3001']);
-    expect(mappingOf('frontend').map((m) => m.raw)).toEqual(['${FRONTEND_BIND:-0.0.0.0}:3000:3000']);
+  it('backend y frontend publican su puerto con BACKEND_BIND / FRONTEND_BIND y default 127.0.0.1', () => {
+    expect(mappingOf('backend').map((m) => m.raw)).toEqual(['${BACKEND_BIND:-127.0.0.1}:3001:3001']);
+    expect(mappingOf('frontend').map((m) => m.raw)).toEqual(['${FRONTEND_BIND:-127.0.0.1}:3000:3000']);
   });
 
-  it('sin variables (o vacías) se conserva la exposición actual en todas las interfaces', () => {
+  it('sin variables (o vacías) backend y frontend quedan solo en loopback; 0.0.0.0 hay que pedirlo', () => {
     for (const env of [{}, { BACKEND_BIND: '', FRONTEND_BIND: '' }]) {
-      expect(mappingOf('backend').map((m) => resolveComposeValue(m.raw, env))).toEqual(['0.0.0.0:3001:3001']);
-      expect(mappingOf('frontend').map((m) => resolveComposeValue(m.raw, env))).toEqual(['0.0.0.0:3000:3000']);
+      expect(mappingOf('backend').map((m) => resolveComposeValue(m.raw, env))).toEqual(['127.0.0.1:3001:3001']);
+      expect(mappingOf('frontend').map((m) => resolveComposeValue(m.raw, env))).toEqual(['127.0.0.1:3000:3000']);
     }
+    const abierto = { BACKEND_BIND: '0.0.0.0', FRONTEND_BIND: '0.0.0.0' };
+    expect(mappingOf('backend').map((m) => resolveComposeValue(m.raw, abierto))).toEqual(['0.0.0.0:3001:3001']);
+    expect(mappingOf('frontend').map((m) => resolveComposeValue(m.raw, abierto))).toEqual(['0.0.0.0:3000:3000']);
   });
 
   it('la variante 127.0.0.1 deja ambos servicios solo en loopback', () => {
@@ -153,9 +156,9 @@ describe('G04-C10: binds de backend/frontend parametrizados', () => {
   describe('deploy: flags con default actual y valores acotados', () => {
     const step = loadWorkflow('deploy.yml').jobs.deploy.steps?.find((s) => s.name === 'Transferir .env de produccion por stdin');
 
-    it('los flags existen con default 0.0.0.0 y se escriben en el .env', () => {
-      expect(step?.env?.BACKEND_BIND).toBe("${{ vars.BACKEND_BIND || '0.0.0.0' }}");
-      expect(step?.env?.FRONTEND_BIND).toBe("${{ vars.FRONTEND_BIND || '0.0.0.0' }}");
+    it('los flags existen con default 127.0.0.1 y se escriben en el .env', () => {
+      expect(step?.env?.BACKEND_BIND).toBe("${{ vars.BACKEND_BIND || '127.0.0.1' }}");
+      expect(step?.env?.FRONTEND_BIND).toBe("${{ vars.FRONTEND_BIND || '127.0.0.1' }}");
       expect(step?.run).toContain(`printf 'BACKEND_BIND=%s\\n' "$BACKEND_BIND"`);
       expect(step?.run).toContain(`printf 'FRONTEND_BIND=%s\\n' "$FRONTEND_BIND"`);
     });
@@ -182,9 +185,9 @@ describe('G04-C10: binds de backend/frontend parametrizados', () => {
       }
     });
 
-    it('ningún test exige que producción ya use loopback: el default versionado sigue siendo 0.0.0.0', () => {
-      expect(readFileSync(join(REPO_ROOT, '.env.example'), 'utf-8')).toMatch(/^BACKEND_BIND=0\.0\.0\.0$/m);
-      expect(readFileSync(join(REPO_ROOT, '.env.example'), 'utf-8')).toMatch(/^FRONTEND_BIND=0\.0\.0\.0$/m);
+    it('el default versionado (.env.example) es loopback, igual que compose y deploy', () => {
+      expect(readFileSync(join(REPO_ROOT, '.env.example'), 'utf-8')).toMatch(/^BACKEND_BIND=127\.0\.0\.1$/m);
+      expect(readFileSync(join(REPO_ROOT, '.env.example'), 'utf-8')).toMatch(/^FRONTEND_BIND=127\.0\.0\.1$/m);
     });
   });
 });

@@ -32,8 +32,8 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
 // G01 · OWASP25-C019: secreto sintético del setupFile; sin fallback predecible.
 const SECRET = SYNTHETIC_JWT_SECRET;
 
-function makeStrategy(usuario: { estado: string } | null = { estado: 'ACTIVO' }) {
-  const prisma = { usuario: { findUnique: vi.fn().mockResolvedValue(usuario) } };
+function makeStrategy(usuario: { estado: string; sesionVersion?: number } | null = { estado: 'ACTIVO' }) {
+  const prisma = { usuario: { findUnique: vi.fn().mockResolvedValue(usuario && { sesionVersion: 0, ...usuario }) } };
   return { strategy: new JwtStrategy(prisma as unknown as PrismaService), prisma };
 }
 
@@ -76,6 +76,20 @@ describe('JwtStrategy — seguridad de tokens', () => {
 
     expect(result.ok).toBe(true);
     expect(result.user).toEqual({ userId: 1, correo: 'a@uvg.edu.gt' });
+  });
+
+  it('rechaza un access token emitido antes de que la cuenta cambiara de versión de sesión', async () => {
+    const { strategy } = makeStrategy({ estado: 'ACTIVO', sesionVersion: 3 });
+
+    expect((await runAuthenticate(strategy, signValidAccessToken({ sv: 2 }))).ok).toBe(false);
+    expect((await runAuthenticate(strategy, signValidAccessToken())).ok).toBe(false);
+    expect((await runAuthenticate(strategy, signValidAccessToken({ sv: 3 }))).ok).toBe(true);
+  });
+
+  it('un token sin claim sv sigue valiendo mientras la cuenta esté en la versión 0 (tokens previos al despliegue)', async () => {
+    const { strategy } = makeStrategy({ estado: 'ACTIVO', sesionVersion: 0 });
+
+    expect((await runAuthenticate(strategy, signValidAccessToken())).ok).toBe(true);
   });
 
   it('rechaza un token con la firma alterada', async () => {

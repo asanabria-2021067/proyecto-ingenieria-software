@@ -27,7 +27,7 @@ function makeGateway(prismaOverrides: { findFirst?: ReturnType<typeof vi.fn>; pa
     conversacion: { findFirst: prismaOverrides.findFirst ?? vi.fn() },
     participacionProyecto: { findFirst: prismaOverrides.participacion ?? vi.fn().mockResolvedValue(null) },
     // G07-C03: la política del handshake consulta el estado de la cuenta.
-    usuario: { findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }) },
+    usuario: { findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO', sesionVersion: 0 }) },
   };
   const gateway = new ChatGateway(
     new WsAuthService(jwtService as unknown as JwtService, prisma as unknown as PrismaService),

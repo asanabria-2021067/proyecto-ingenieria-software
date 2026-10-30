@@ -430,14 +430,18 @@ export async function realtimeChecks(ctx) {
     (othersAlive && !memberChat.socket.closed && !ownerNotif.socket.closed && !adminNotif.socket.closed) || 'se cerraron sockets de otras cuentas',
   ]);
 
-  // T14-10: INACTIVO → igual (reactivar, reconectar, inactivar).
+  // T14-10: INACTIVO → igual (reactivar, iniciar sesion de nuevo, conectar, inactivar).
+  // Reactivar NO resucita el access token anterior al bloqueo (version de sesion): hace falta un login nuevo.
   await request(ctx, 'PATCH', `/api/admin/usuarios/${outsider.id}/estado`, { cookie: cookieOf(admin), body: { estado: 'ACTIVO' } });
-  const reactivated = await connect('/chat', outsider.access, outsider.id);
+  const staleAfterReactivation = await connect('/chat', outsider.access, outsider.id);
+  const relogged = await loginUser(ctx, outsider);
+  const reactivated = await connect('/chat', relogged.access, relogged.id);
   const inactive = await request(ctx, 'PATCH', `/api/admin/usuarios/${outsider.id}/estado`, { cookie: cookieOf(admin), body: { estado: 'INACTIVO' } });
   const inactiveClosed = await until(() => reactivated.socket.closed);
-  const inactiveAgain = await connect('/chat', outsider.access, outsider.id);
+  const inactiveAgain = await connect('/chat', relogged.access, relogged.id);
   check('T14-10', 'INACTIVO: socket abierto cerrado y reconexion rechazada', [
-    reactivated.outcome === 'aceptado' || `reactivado: ${reactivated.outcome}`,
+    staleAfterReactivation.outcome === 'rechazado' || `token previo al bloqueo tras reactivar: ${staleAfterReactivation.outcome}`,
+    reactivated.outcome === 'aceptado' || `reactivado con login nuevo: ${reactivated.outcome}`,
     inactive.status === 200 || `inactivar ${inactive.status}`,
     inactiveClosed || 'el socket del inactivado sigue vivo',
     inactiveAgain.outcome === 'rechazado' || `reconexion inactivo: ${inactiveAgain.outcome}`,

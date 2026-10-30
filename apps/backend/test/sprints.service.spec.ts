@@ -120,7 +120,7 @@ function makeSprintsAuthorization() {
     assertCanViewSprintHistory: vi.fn().mockResolvedValue(undefined),
     assertCanViewSprintAnalytics: vi.fn().mockResolvedValue(undefined),
     assertCanListSprintAnalytics: vi.fn().mockResolvedValue(undefined),
-    assertCanManageSprintSnapshot: vi.fn().mockResolvedValue(undefined),
+    assertCanManageSprintSnapshot: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }),
   };
   return authorization as typeof authorization & SprintsAuthorizationService;
 }
@@ -529,6 +529,32 @@ describe('SprintsService', () => {
       );
       expect(snapshots.generarInstantaneaDelDia).toHaveBeenCalledWith(SPRINT_ID);
       expect(resultado).toEqual({ idInstantanea: 1 });
+    });
+
+    it('un Sprint CERRADO no regenera su instantánea (409) y no escribe nada', async () => {
+      const tx = makeTx();
+      const prisma = makePrisma(tx);
+      const authorization = makeSprintsAuthorization();
+      authorization.assertCanManageSprintSnapshot.mockResolvedValue({ estado: 'CERRADO' });
+      const snapshots = makeSnapshots();
+      const service = new SprintsService(
+        prisma,
+        makeSprintsContext(),
+        authorization,
+        makeNotifications(),
+        new ProjectTransactionService(prisma as unknown as PrismaService),
+        makeProjectPolicyDouble(),
+        makeProjectReadPolicyDouble(),
+        undefined,
+        undefined,
+        undefined,
+        snapshots as any,
+      );
+
+      await expect(service.regenerarInstantaneaDeHoy(PROJECT_ID, SPRINT_ID, LIDER_ID)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(snapshots.generarInstantaneaDelDia).not.toHaveBeenCalled();
     });
 
     it('propaga el rechazo de autorización sin llamar a SprintSnapshotsService', async () => {

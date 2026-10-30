@@ -229,9 +229,7 @@ export class EventsService {
   async create(projectId: number, userId: number, dto: CreateEventDto) {
     const proyecto = await this.getProjectOrThrow(projectId);
     this.assertLeader(proyecto, userId);
-    if (proyecto.estadoProyecto === EstadoProyecto.CERRADO) {
-      throw new ConflictException('No se puede crear un evento en un proyecto cerrado');
-    }
+    this.assertProyectoNoCerrado(proyecto, 'No se puede crear un evento en un proyecto cerrado');
     this.assertFechaFinPosterior(dto.fechaInicio, dto.fechaFin);
     this.assertFechaInicioNoPasada(dto.fechaInicio);
     const invitados = await this.normalizarInvitados(projectId, proyecto.creadoPor, dto.invitados);
@@ -261,6 +259,7 @@ export class EventsService {
   async update(projectId: number, eventId: number, userId: number, dto: UpdateEventDto) {
     const proyecto = await this.getProjectOrThrow(projectId);
     this.assertLeader(proyecto, userId);
+    this.assertProyectoNoCerrado(proyecto);
     const actual = await this.getEventOrThrow(projectId, eventId);
     this.assertNoEsReunionAdministracion(actual);
 
@@ -339,6 +338,7 @@ export class EventsService {
   async remove(projectId: number, eventId: number, userId: number): Promise<void> {
     const proyecto = await this.getProjectOrThrow(projectId);
     this.assertLeader(proyecto, userId);
+    this.assertProyectoNoCerrado(proyecto);
     this.assertNoEsReunionAdministracion(await this.getEventOrThrow(projectId, eventId));
 
     await this.prisma.eventoProyecto.update({
@@ -407,6 +407,15 @@ export class EventsService {
       select: { idProyecto: true },
     });
     return proyectos.map((p) => p.idProyecto);
+  }
+
+  private assertProyectoNoCerrado(
+    proyecto: { estadoProyecto: EstadoProyecto },
+    mensaje = 'No se puede modificar un evento de un proyecto cerrado',
+  ): void {
+    if (proyecto.estadoProyecto === EstadoProyecto.CERRADO) {
+      throw new ConflictException(mensaje);
+    }
   }
 
   private async getProjectOrThrow(projectId: number) {

@@ -65,7 +65,7 @@ export class WsAuthService {
       return { ok: false, motivo: 'SIN_TOKEN' };
     }
 
-    let payload: { sub?: unknown; tipo?: unknown; exp?: unknown };
+    let payload: { sub?: unknown; tipo?: unknown; exp?: unknown; sv?: unknown };
     try {
       payload = await this.jwtService.verifyAsync(token);
     } catch {
@@ -82,9 +82,9 @@ export class WsAuthService {
 
     const usuario = await this.prisma.usuario.findUnique({
       where: { idUsuario: userId },
-      select: { estado: true },
+      select: { estado: true, sesionVersion: true },
     });
-    if (!usuario || usuario.estado !== EstadoUsuario.ACTIVO) {
+    if (!usuario || usuario.estado !== EstadoUsuario.ACTIVO || (payload.sv ?? 0) !== usuario.sesionVersion) {
       return { ok: false, motivo: 'CUENTA_NO_ACTIVA' };
     }
 

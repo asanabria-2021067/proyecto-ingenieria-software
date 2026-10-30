@@ -49,7 +49,7 @@ function prismaDoble() {
           where.idUsuario === DESACTIVADO.idUsuario
             ? { estado: 'INACTIVO' }
             : [ADMIN.idUsuario, ESTUDIANTE.idUsuario].includes(where.idUsuario)
-              ? { estado: 'ACTIVO' }
+              ? { estado: 'ACTIVO', sesionVersion: 0 }
               : null,
         ),
       ),
