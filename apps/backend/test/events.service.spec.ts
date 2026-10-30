@@ -98,6 +98,18 @@ describe('EventsService — creación (T-263)', () => {
     expect(prisma.eventoProyecto.create).not.toHaveBeenCalled();
   });
 
+  it('en un proyecto CERRADO no se edita ni se cancela un evento (409), sin escribir', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo({ estadoProyecto: 'CERRADO' }));
+    const service = new EventsService(prisma);
+
+    await expect(service.update(PROJECT_ID, EVENT_ID, LEADER_ID, { tituloEvento: 'Nuevo' })).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    await expect(service.remove(PROJECT_ID, EVENT_ID, LEADER_ID)).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.eventoProyecto.update).not.toHaveBeenCalled();
+  });
+
   it('fechaFin <= fechaInicio produce 400 con mensaje legible, sin crear', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(proyectoActivo());

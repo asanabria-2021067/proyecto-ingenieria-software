@@ -429,7 +429,11 @@ export class SprintsService {
    * estado del Sprint.
    */
   async regenerarInstantaneaDeHoy(projectId: number, sprintId: number, userId: number) {
-    await this.sprintsAuthorization.assertCanManageSprintSnapshot(projectId, sprintId, userId);
+    const sprint = await this.sprintsAuthorization.assertCanManageSprintSnapshot(projectId, sprintId, userId);
+    // La historia de un Sprint cerrado está congelada: agregarle un punto de hoy reescribe su burndown.
+    if (sprint.estado === EstadoSprint.CERRADO) {
+      throw new ConflictException('El Sprint está cerrado: su instantánea ya no se regenera');
+    }
     if (!this.snapshots) {
       throw new Error('SprintSnapshotsService no está disponible');
     }
