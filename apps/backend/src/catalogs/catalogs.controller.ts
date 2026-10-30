@@ -8,6 +8,7 @@ export class CatalogsController {
   constructor(private catalogsService: CatalogsService) {}
 
   @Get('catalogs')
+  @UseGuards(JwtAuthGuard)
   findAll() {
     return this.catalogsService.findAll();
   }
@@ -18,21 +19,25 @@ export class CatalogsController {
   }
 
   @Get('habilidades')
+  @UseGuards(JwtAuthGuard)
   findHabilidades() {
     return this.catalogsService.findHabilidades();
   }
 
   @Get('intereses')
+  @UseGuards(JwtAuthGuard)
   findIntereses() {
     return this.catalogsService.findIntereses();
   }
 
   @Get('cualidades')
+  @UseGuards(JwtAuthGuard)
   findCualidades() {
     return this.catalogsService.findCualidades();
   }
 
   @Get('organizaciones')
+  @UseGuards(JwtAuthGuard)
   findOrganizaciones() {
     return this.catalogsService.findOrganizaciones();
   }
