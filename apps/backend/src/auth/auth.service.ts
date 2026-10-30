@@ -130,7 +130,8 @@ export class AuthService {
 
     // G04 (OWASP25-C023): una cuenta BLOQUEADO o INACTIVO no recibe tokens
     // aunque la contraseña sea correcta; la respuesta es la misma genérica.
-    const pendiente = usuario?.estado === EstadoUsuario.PENDIENTE_VERIFICACION;
+    // Solo con la contraseña correcta se revela que la cuenta está pendiente (no es un oráculo de existencia).
+    const pendiente = usuario?.estado === EstadoUsuario.PENDIENTE_VERIFICACION && contrasenaValida;
 
     if (bloqueada || !usuario || !contrasenaValida || usuario.estado !== EstadoUsuario.ACTIVO) {
       // Cuenta inexistente o contraseña incorrecta suman al contador por igual.

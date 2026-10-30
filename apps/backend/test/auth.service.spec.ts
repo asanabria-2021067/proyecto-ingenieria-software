@@ -53,6 +53,22 @@ describe('AuthService', () => {
     );
   });
 
+  it('login de una cuenta pendiente con contraseña incorrecta responde 401 genérico (no revela que la cuenta existe)', async () => {
+    const prisma = {
+      usuario: {
+        findUnique: vi.fn().mockResolvedValue({ idUsuario: 1, correo: 'a@uvg.edu', contrasena: 'hash', estado: 'PENDIENTE_VERIFICACION' }),
+      },
+    };
+    (bcrypt.compare as Mock).mockResolvedValue(false);
+    const service = new AuthService(
+      prisma as unknown as PrismaService,
+      { sign: vi.fn() } as unknown as JwtService,
+      { notifyAdminsFromTemplate: vi.fn() } as unknown as NotificationsService,
+    );
+
+    await expect(service.login({ correo: 'a@uvg.edu', contrasena: 'mala' })).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
   it('login firma el access token con la versión de sesión de la cuenta', async () => {
     const prisma = {
       usuario: {
