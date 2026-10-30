@@ -28,6 +28,9 @@ on:
     # ventana; el objetivo es "una vez por semana", no un horario exacto.
     - cron: '0 6 * * 1'
 
+permissions:
+  contents: read
+
 concurrency:
   group: k6-load
   cancel-in-progress: false
@@ -35,13 +38,13 @@ concurrency:
 jobs:
   k6:
     name: Escenarios k6 contra el entorno desplegado
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: production
     defaults:
       run:
         working-directory: apps/backend
     env:
-      DATABASE_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
-      DIRECT_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
       K6_BASE_URL: ${{ secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001' }}
       K6_FIXTURE_PASSWORD: ${{ secrets.K6_FIXTURE_PASSWORD }}
     steps:
@@ -62,16 +65,24 @@ jobs:
         run: npx prisma generate
 
       - name: Instalar k6
-        uses: grafana/setup-k6-action@v1
+        uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
 
       - name: Abrir tunel SSH hacia Postgres de la VM (127.0.0.1:5432 -> runner:5432)
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
+          set -euo pipefail
+          test -n "$SSH_KNOWN_HOSTS" || { echo "falta SSH_KNOWN_HOSTS" >&2; exit 1; }
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+          umask 077
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes \
             -fNT -L 5432:127.0.0.1:5432 \
-            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}"
+            "$SERVER_USER@$SERVER_IP"
 
       # Los tres pasos de k6 corren prisma/seed-k6-fixture.ts antes de cada
       # `k6 run` (ver apps/backend/scripts/run-k6.js): ese fixture siempre
@@ -80,10 +91,19 @@ jobs:
       # (k6/scenarios/project-listing.js), así que el proyecto fixture queda
       # visible en el listado público de la app desplegada, no aislado.
       - name: Listado de proyectos (HTTP solo GET; el fixture previo sí escribe)
+        env:
+          DATABASE_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
+          DIRECT_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
         run: npm run k6:project-listing
 
       - name: Operaciones de kanban (escribe en el proyecto k6.*)
+        env:
+          DATABASE_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
+          DIRECT_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
         run: npm run k6:kanban
 
       - name: Conexion Socket.IO
+        env:
+          DATABASE_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
+          DIRECT_URL: postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@localhost:5432/uvg_collab?schema=public
         run: npm run k6:socket-io

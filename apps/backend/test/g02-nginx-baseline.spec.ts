@@ -21,7 +21,10 @@ interface ManifestEntry {
   excludedComments?: string[];
 }
 
-const manifest = JSON.parse(readRepoFile('infra/nginx/manifest.json')) as { files: ManifestEntry[] };
+const manifest = JSON.parse(readRepoFile('infra/nginx/manifest.json')) as {
+  files: ManifestEntry[];
+  pendingLiveChanges: Array<{ gate: string; appliedInProduction: boolean }>;
+};
 const entry = (mode: ManifestEntry['mode']) => {
   const found = manifest.files.find((file) => file.mode === mode);
   if (!found) {
@@ -62,13 +65,16 @@ describe('G02-C16: baseline nginx versionado', () => {
     for (const file of manifest.files) {
       expect(sha256(readRepoFile(`infra/nginx/${file.path}`)), file.path).toBe(file.versionedSha256);
     }
-    expect(entry('verbatim').versionedSha256).toBe(entry('verbatim').liveSha256);
+    // Con cambios pendientes sin aplicar, el versionado es el estado objetivo y deja de ser verbatim de la VM.
+    if (!manifest.pendingLiveChanges.some((change) => !change.appliedInProduction)) {
+      expect(entry('verbatim').versionedSha256).toBe(entry('verbatim').liveSha256);
+    }
   });
 
   it('el site versionado contiene solo los locations del proyecto y ninguno ajeno', () => {
     const locations = [...SITE.matchAll(/^\s*location\s+(\S+)\s*\{/gm)].map((match) => match[1]);
-    // G04-C11 añade /socket.io/ (P1).
-    expect(locations).toEqual(['/.well-known/acme-challenge/', '/', '/socket.io/', '/api']);
+    // G04-C11 añade /socket.io/ (P1); G06-H4 añade el server del puerto 80 (acme y / propios).
+    expect(locations).toEqual(['/.well-known/acme-challenge/', '/', '/.well-known/acme-challenge/', '/', '/socket.io/', '/api']);
     for (const excluded of exclusions.excludedLocations) {
       expect(SITE).not.toContain(`location ${excluded}`);
     }
@@ -91,11 +97,27 @@ describe('G02-C16: baseline nginx versionado', () => {
     expect(Number(/proxy_read_timeout (\d+)s;/.exec(socket)?.[1])).toBeGreaterThanOrEqual(60);
     expect(SITE).toContain('proxy_pass http://127.0.0.1:3000;');
     expect(SITE).not.toContain('proxy_pass http://localhost');
-    expect(SITE).toContain('listen 443 ssl;');
-    expect(SITE).not.toMatch(/add_header|return 301/);
-    const pending = (manifest as unknown as { pendingLiveChanges?: Array<{ gate: string; appliedInProduction: boolean }> })
-      .pendingLiveChanges;
-    expect(pending).toEqual([expect.objectContaining({ gate: 'G04-C11', appliedInProduction: true })]);
+    expect(manifest.pendingLiveChanges).toEqual([
+      expect.objectContaining({ gate: 'G04-C11', appliedInProduction: true }),
+      expect.objectContaining({ gate: 'G06-H4', appliedInProduction: false }),
+      expect.objectContaining({ gate: 'G06-H7', appliedInProduction: false }),
+    ]);
+  });
+
+  it('G06-H4/H7: redireccion 80->443 en server propio, HSTS unico y TLS 1.2+ (pendientes de aplicar)', () => {
+    const [port80, port443] = SITE.split(/^server \{/m).slice(1);
+    expect(port80).toContain('listen 80;');
+    expect(port80).not.toContain('listen 443');
+    // El return va dentro de location / para no redirigir el desafio ACME.
+    expect(port80).toContain('    location / {\n        return 301 https://158.23.57.118.nip.io$request_uri;\n    }');
+    expect(port80).not.toMatch(/^ {4}return /m);
+    expect(port443).toContain('listen 443 ssl;');
+    expect(port443).not.toContain('listen 80;');
+    expect(port443).toContain('add_header Strict-Transport-Security "max-age=31536000" always;');
+    expect(port443).not.toMatch(/includeSubDomains|preload/);
+    expect(port443.split('    location /api {')[1]).toContain('proxy_hide_header Strict-Transport-Security;');
+    expect(SITE.match(/server_tokens off;/g)).toHaveLength(2);
+    expect(readRepoFile('infra/nginx/nginx.conf')).toContain('ssl_protocols TLSv1.2 TLSv1.3;');
   });
 
   it('G04-C11: contra la configuración viva previa a P1, el comparador reporta la diferencia (no la esconde)', () => {

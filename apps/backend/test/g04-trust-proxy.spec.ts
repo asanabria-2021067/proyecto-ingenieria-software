@@ -71,6 +71,15 @@ describe('G04-C08: contrato TRUST_PROXY_HOPS', () => {
     expect(() => validateEnvironment({ ...base, TRUST_PROXY_HOPS: '-1' })).toThrow(/TRUST_PROXY_HOPS/);
   });
 
+  it('NODE_ENV=production exige TRUST_PROXY_HOPS >= 1; sin NODE_ENV se permite 0', () => {
+    const base = { FRONTEND_URL: 'http://localhost:3000', JWT_SECRET: 'x'.repeat(48) };
+    const production = { ...base, NODE_ENV: 'production' };
+    expect(() => validateEnvironment(production)).toThrow(/TRUST_PROXY_HOPS must be at least 1/);
+    expect(() => validateEnvironment({ ...production, TRUST_PROXY_HOPS: '0' })).toThrow(/TRUST_PROXY_HOPS must be at least 1/);
+    expect(validateEnvironment({ ...production, TRUST_PROXY_HOPS: '1' }).app.trustProxyHops).toBe(1);
+    expect(validateEnvironment({ ...base, TRUST_PROXY_HOPS: '0' }).app.trustProxyHops).toBe(0);
+  });
+
   it('hops 0: X-Forwarded-For se ignora; rotarlo no evita el 429', async () => {
     const url = await startWithHops(0);
     const statuses = await loginStatuses(url, (i) => `203.0.113.${i + 1}`, LOGIN_LIMIT + 1);
@@ -94,8 +103,8 @@ describe('G04-C08: contrato TRUST_PROXY_HOPS', () => {
     expect(apply).toBeLessThan(main.indexOf('await app.listen('));
   });
 
-  it('el default versionado es 0 en deploy.yml y .env.example', () => {
-    expect(readRepoFile('.github/workflows/deploy.yml')).toContain("TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '0' }}");
+  it('el default de deploy.yml es 1 (un proxy) y el de .env.example sigue en 0', () => {
+    expect(readRepoFile('.github/workflows/deploy.yml')).toContain("TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '1' }}");
     expect(readRepoFile('.env.example')).toMatch(/^TRUST_PROXY_HOPS=0$/m);
   });
 

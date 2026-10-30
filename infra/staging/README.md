@@ -23,7 +23,7 @@ infra/staging/run-harness.sh
 
 Ejecuta el guard, genera el TLS, construye y levanta todo (`--wait`), corre `characterize.mjs` y destruye contenedores, volúmenes, imágenes locales del proyecto y el TLS, también si algo falla. Puertos: `127.0.0.1:${HARNESS_HTTP_PORT:-8080}` y `127.0.0.1:${HARNESS_HTTPS_PORT:-8443}`.
 
-`characterize.mjs` fija el comportamiento **actual** (HARN-01…05: HSTS/Helmet en `/api`, 403 con `Accept: text/html`, `/socket.io` → backend con P1 (G04-C11; antes 308 del frontend), `/` con las cabeceras base del frontend y sin HSTS (G06-C02; antes sin ninguna), HTTP sin redirección). Los gates que cambien ese comportamiento a propósito actualizan la expectativa en su propio commit. Además, T13 (G04-C12) exige que Socket.IO atraviese nginx: el polling responde 200 con el paquete OPEN y su `sid` (T13-01) y ese `sid` pasa a WebSocket con 101 (T13-02). T16 (G04-C13): el backend del arnés corre con `TRUST_PROXY_HOPS=1` y seis logins con un `X-Forwarded-For` falso distinto cada uno siguen recibiendo 429 en el sexto (T16-01); solo se imprimen códigos HTTP. El script rechaza cualquier host que no sea local.
+`characterize.mjs` fija el comportamiento **actual** (HARN-01…05: HSTS del borde (`max-age=31536000`, un solo valor) y Helmet en `/api`, 403 con `Accept: text/html`, `/socket.io` → backend con P1 (G04-C11; antes 308 del frontend), `/` con las cabeceras base del frontend y el HSTS del borde (G06-C02/H7), HTTP plano con 301 a HTTPS (G06-H4; antes 200 sin redirección)). Los gates que cambien ese comportamiento a propósito actualizan la expectativa en su propio commit. Además, T13 (G04-C12) exige que Socket.IO atraviese nginx: el polling responde 200 con el paquete OPEN y su `sid` (T13-01) y ese `sid` pasa a WebSocket con 101 (T13-02). T16 (G04-C13): el backend del arnés corre con `TRUST_PROXY_HOPS=1` y seis logins con un `X-Forwarded-For` falso distinto cada uno siguen recibiendo 429 en el sexto (T16-01); solo se imprimen códigos HTTP. El script rechaza cualquier host que no sea local.
 
 ## En CI (G02-C18)
 
@@ -44,8 +44,8 @@ Job `topology` de `ci.yml` («Topologia - arnes efimero (nginx + TLS)»):
 
 Sobre HTTPS local (certificado autofirmado efímero):
 
-- **T17**: `/` y `/login` llevan exactamente las cabeceras base del frontend (nosniff, `X-Frame-Options: DENY`, Referrer-Policy, Permissions-Policy, CSP `frame-ancestors 'none'`), la CSP Report-Only con sus directivas clave, sin `X-Powered-By` y sin HSTS.
-- **T21**: `/api` y `/api/proyectos` devuelven exactamente `max-age=31536000; includeSubDomains`, nunca `preload`.
+- **T17**: `/` y `/login` llevan exactamente las cabeceras base del frontend (nosniff, `X-Frame-Options: DENY`, Referrer-Policy, Permissions-Policy, CSP `frame-ancestors 'none'`), la CSP Report-Only con sus directivas clave, el HSTS del borde y sin `X-Powered-By`.
+- **T21**: `/api` y `/api/proyectos` devuelven exactamente `max-age=31536000` (el de nginx; `proxy_hide_header` oculta el de Helmet para no duplicarlo), nunca `preload`.
 - **T18**: `run-harness.sh` inserta **una** carrera sintética en la base efímera. Un registro vía nginx debe responder 201 **sin** cookies de sesión (la cuenta queda pendiente de verificación) y el login de esa cuenta debe responder 403 con el mensaje de cuenta pendiente, también sin cookies. Ese login cuenta para el límite de 5/min, así que T16 espera su 429 un intento antes. Los atributos `Secure`, `HttpOnly`, `SameSite=Lax` y `Path=/` de las cookies ya no se comprueban en el arnés: requieren una sesión de una cuenta aprobada. Solo se reportan estados y nombres, nunca valores.
 
 ## T14 (G07-C12)

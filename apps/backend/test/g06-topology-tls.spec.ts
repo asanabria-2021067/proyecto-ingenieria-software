@@ -31,7 +31,7 @@ describe('G06-C08: T17/T18/T21 en el arnés TLS', () => {
   });
 
   it('T21: el HSTS contractual pasa', () => {
-    expect(verifyHsts({ 'strict-transport-security': 'max-age=31536000; includeSubDomains' })).toEqual([]);
+    expect(verifyHsts({ 'strict-transport-security': 'max-age=31536000' })).toEqual([]);
   });
 
   it('T18: cookies con Secure, HttpOnly, SameSite=Lax y Path=/ pasan', () => {
@@ -63,13 +63,15 @@ describe('G06-C08: T17/T18/T21 en el arnés TLS', () => {
   });
 
   describe('fixtures negativos', () => {
-    it('T17: cabecera ausente, valor cambiado, X-Powered-By o HSTS en el frontend', () => {
+    it('T17: cabecera ausente, valor cambiado, X-Powered-By o HSTS ausente/distinto en el frontend', () => {
       const { 'x-frame-options': _xfo, ...sinXfo } = goodFrontend;
       expect(verifyFrontendHeaders(sinXfo)).toEqual(['x-frame-options=ausente']);
       expect(verifyFrontendHeaders({ ...goodFrontend, 'referrer-policy': 'unsafe-url' })).toEqual(['referrer-policy=unsafe-url']);
+      const { 'strict-transport-security': _hsts, ...sinHsts } = goodFrontend;
+      expect(verifyFrontendHeaders(sinHsts)).toEqual(['strict-transport-security=ausente']);
       expect(
         verifyFrontendHeaders({ ...goodFrontend, 'x-powered-by': 'Next.js', 'strict-transport-security': 'max-age=1' }),
-      ).toEqual(['x-powered-by presente', 'strict-transport-security presente']);
+      ).toEqual(['strict-transport-security=max-age=1', 'x-powered-by presente']);
     });
 
     it('T17: la Report-Only sin una directiva clave', () => {
@@ -79,9 +81,12 @@ describe('G06-C08: T17/T18/T21 en el arnés TLS', () => {
     });
 
     it('T21: preload, otro max-age o ausencia', () => {
-      expect(verifyHsts({ 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload' })).toEqual([
-        'HSTS=max-age=31536000; includeSubDomains; preload',
+      expect(verifyHsts({ 'strict-transport-security': 'max-age=31536000; preload' })).toEqual([
+        'HSTS=max-age=31536000; preload',
         'HSTS con preload',
+      ]);
+      expect(verifyHsts({ 'strict-transport-security': 'max-age=31536000; includeSubDomains' })).toEqual([
+        'HSTS=max-age=31536000; includeSubDomains',
       ]);
       expect(verifyHsts({ 'strict-transport-security': 'max-age=0' })).toEqual(['HSTS=max-age=0']);
       expect(verifyHsts({})).toEqual(['HSTS=ausente']);

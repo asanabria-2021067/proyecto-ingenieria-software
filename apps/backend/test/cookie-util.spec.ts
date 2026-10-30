@@ -12,9 +12,22 @@ function fakeResponse() {
 describe('cookie.util (T-210)', () => {
   const originalSecure = process.env.COOKIE_SECURE;
 
+  const originalNodeEnv = process.env.NODE_ENV;
+
   afterEach(() => {
     if (originalSecure === undefined) delete process.env.COOKIE_SECURE;
     else process.env.COOKIE_SECURE = originalSecure;
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  it('con NODE_ENV=production y COOKIE_SECURE sin definir las cookies llevan secure:true', () => {
+    delete process.env.COOKIE_SECURE;
+    process.env.NODE_ENV = 'production';
+    const res = fakeResponse();
+    setAuthCookies(res, 'a', 'r');
+    expect(res.cookie).toHaveBeenCalledWith('access_token', 'a', expect.objectContaining({ secure: true }));
+    expect(res.cookie).toHaveBeenCalledWith('refresh_token', 'r', expect.objectContaining({ secure: true }));
   });
 
   it('setAuthCookies pone access_token y refresh_token como httpOnly y sameSite=lax', () => {

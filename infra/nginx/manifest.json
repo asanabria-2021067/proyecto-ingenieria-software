@@ -14,7 +14,7 @@
       "livePath": "/etc/nginx/nginx.conf",
       "liveMode": "644 root:root",
       "liveSha256": "48c6a4ec1e1fd28ccf968490f07e34a1d7f755793b2108a3ed8670b1ee2a0aa2",
-      "versionedSha256": "48c6a4ec1e1fd28ccf968490f07e34a1d7f755793b2108a3ed8670b1ee2a0aa2",
+      "versionedSha256": "83be11c5f75fe2afa7695052dda0ba8b2f2b5d97ce154bd9d60eecf5675659de",
       "mode": "verbatim",
       "owner": "host compartido (configuracion global por defecto de la distro); referencia de solo lectura"
     },
@@ -23,7 +23,7 @@
       "livePath": "/etc/nginx/sites-enabled/uvg-collab",
       "liveMode": "644 root:root",
       "liveSha256": "d3ca2793be22d244d53f27b8ad6ab4a36cf0a6521aed2488a03e8cb96a42fb8d",
-      "versionedSha256": "9365ad3e149a09b8373ab6828873c101475e413815afe3655f0ca23a9992f301",
+      "versionedSha256": "767a595bd73c2cd3ba5789ffada81b479e7b45a299808b3d064d368224006b88",
       "mode": "sanitized",
       "owner": "UVG Collab (locations /, /api y /.well-known/acme-challenge/ del server compartido)",
       "excludedLocations": ["/angel/", "/derek/", "/vernel/"],
@@ -39,6 +39,20 @@
       "appliedDate": "2026-10-04",
       "backupPath": "/etc/nginx/sites-enabled/uvg-collab.bak-20261004-0753",
       "owner": "Gate Admin (sudoer con copia fechada, nginx -t y reload)"
+    },
+    {
+      "gate": "G06-H4",
+      "change": "redireccion 80->443 en server propio",
+      "appliedInProduction": false,
+      "owner": "Gate Admin",
+      "requires": "REQUIRES_TEAM_APPROVAL"
+    },
+    {
+      "gate": "G06-H7",
+      "change": "HSTS, server_tokens off y TLS 1.2+",
+      "appliedInProduction": false,
+      "owner": "Gate Admin",
+      "requires": "REQUIRES_TEAM_APPROVAL"
     }
   ]
 }

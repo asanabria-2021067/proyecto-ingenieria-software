@@ -105,7 +105,9 @@ function main(argv) {
   failures.push(...siteDiff.map((finding) => `${site.path}: ${finding}`));
   if (liveConfPath) {
     const conf = manifest.files.find((entry) => entry.mode === 'verbatim');
-    if (sha256(readFileSync(liveConfPath, 'utf8')) !== conf.versionedSha256) {
+    // Con cambios pendientes sin aplicar el versionado es el estado objetivo: la copia viva debe seguir siendo la capturada.
+    const pending = (manifest.pendingLiveChanges ?? []).some((change) => !change.appliedInProduction);
+    if (sha256(readFileSync(liveConfPath, 'utf8')) !== (pending ? conf.liveSha256 : conf.versionedSha256)) {
       failures.push(`${conf.path}: la copia viva difiere del baseline verbatim`);
     }
   }

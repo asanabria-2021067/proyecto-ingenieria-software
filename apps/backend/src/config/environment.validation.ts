@@ -165,13 +165,15 @@ export function parseTrustProxyHops(value: string | undefined): number {
 export const COOKIE_SECURE_VARIABLE = 'COOKIE_SECURE';
 
 /**
- * G06 (OWASP25-C049 parcial): contrato de COOKIE_SECURE. Solo `true` o `false`
- * (ausente o vacío = false, comportamiento actual). Cualquier otro valor falla
- * el arranque en lugar de dejar cookies sin Secure en silencio.
+ * G06 (OWASP25-C049 parcial): contrato de COOKIE_SECURE. Solo `true` o `false`.
+ * Ausente o vacío = `nodeEnv === 'production'` (Secure por defecto en
+ * producción); un valor explícito siempre manda (válvula deliberada, p. ej. la
+ * pila E2E aislada sirve HTTP plano con NODE_ENV=production). Cualquier otro
+ * valor falla el arranque en lugar de dejar cookies sin Secure en silencio.
  */
-export function parseCookieSecure(value: string | undefined): boolean {
+export function parseCookieSecure(value: string | undefined, nodeEnv?: string): boolean {
   if (value === undefined || value === '') {
-    return false;
+    return nodeEnv === 'production';
   }
   if (value === 'true' || value === 'false') {
     return value === 'true';
@@ -193,16 +195,21 @@ export function parseSecurityAlertsEnabled(value: string | undefined): boolean {
 }
 
 function deriveAppEnvironment(raw: RawEnvironment): AppEnvironment {
+  const nodeEnv = readString(raw, 'NODE_ENV') ?? 'development';
+  const trustProxyHops = parseTrustProxyHops(readString(raw, TRUST_PROXY_HOPS_VARIABLE));
+  if (nodeEnv === 'production' && trustProxyHops === 0) {
+    throw new Error(`${TRUST_PROXY_HOPS_VARIABLE} must be at least 1 when NODE_ENV=production`);
+  }
   return {
-    nodeEnv: readString(raw, 'NODE_ENV') ?? 'development',
+    nodeEnv,
     port: parsePort(raw, 'PORT', 3001),
     frontendUrl: assertFrontendUrl(readString(raw, 'FRONTEND_URL')),
-    cookieSecure: parseCookieSecure(readString(raw, COOKIE_SECURE_VARIABLE)),
+    cookieSecure: parseCookieSecure(readString(raw, COOKIE_SECURE_VARIABLE), nodeEnv),
     redis: {
       host: readString(raw, 'REDIS_HOST') ?? 'localhost',
       port: parsePort(raw, 'REDIS_PORT', 6379),
     },
-    trustProxyHops: parseTrustProxyHops(readString(raw, TRUST_PROXY_HOPS_VARIABLE)),
+    trustProxyHops,
     securityAlertsEnabled: parseSecurityAlertsEnabled(readString(raw, SECURITY_ALERTS_ENABLED_VARIABLE)),
   };
 }

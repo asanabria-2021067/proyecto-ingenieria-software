@@ -118,11 +118,11 @@ jobs:
 
       - name: Set up Docker Buildx
         if: inputs.mode != 'config-only'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to GitHub Container Registry
         if: inputs.mode != 'config-only'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -165,7 +165,7 @@ jobs:
 
       - name: Build and push frontend image
         if: inputs.mode != 'config-only' && steps.existing.outputs.exists == 'false'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: ./apps/frontend
           push: true
@@ -196,11 +196,11 @@ jobs:
 
       - name: Set up Docker Buildx
         if: inputs.mode != 'config-only'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to GitHub Container Registry
         if: inputs.mode != 'config-only'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -236,7 +236,7 @@ jobs:
 
       - name: Build and push backend image
         if: inputs.mode != 'config-only' && steps.existing.outputs.exists == 'false'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: ./apps/backend
           push: true
@@ -251,6 +251,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: [test, frontend-variant, build-frontend, build-backend]
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
       packages: read
@@ -293,10 +294,10 @@ jobs:
           echo "backend_image=ghcr.io/${owner}/${repo_name}-backend:${image_sha}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -331,6 +332,8 @@ jobs:
       - name: Transferir .env de produccion por stdin
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST_FINGERPRINT: ${{ secrets.SSH_HOST_FINGERPRINT }}
           SERVER_IP: ${{ secrets.SERVER_IP }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
           DB_USER: ${{ secrets.DB_USER }}
@@ -342,28 +345,31 @@ jobs:
           NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           BACKEND_IMAGE: ${{ steps.vars.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ steps.vars.outputs.frontend_image }}
-          # G04 (OWASP25-C021 + D2): '0' reproduce el comportamiento actual. Subirlo
-          # a 1 (nginx del host) es una decision del administrador tras cerrar
-          # los puertos publicos 3000/3001.
-          TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '0' }}
+          # G04 (OWASP25-C021 + D2): '1' = un proxy (nginx del host) delante del
+          # backend; el backend se niega a arrancar en produccion con 0.
+          TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '1' }}
           # G04 (OWASP25-C021 + P5/T19): interfaz publicada de backend/frontend.
           # '0.0.0.0' reproduce la exposicion actual; '127.0.0.1' es la variante
           # loopback que activa el administrador (solo esos dos valores).
           BACKEND_BIND: ${{ vars.BACKEND_BIND || '0.0.0.0' }}
           FRONTEND_BIND: ${{ vars.FRONTEND_BIND || '0.0.0.0' }}
-          # G06 (OWASP25-C049 parcial): 'false' reproduce las cookies actuales.
-          # 'true' (Secure) solo cuando todo el trafico sea HTTPS: Gate Admin.
-          COOKIE_SECURE: ${{ vars.COOKIE_SECURE || 'false' }}
+          # G06 (OWASP25-C049): cookies Secure por defecto; 'false' solo si el
+          # trafico no fuera HTTPS.
+          COOKIE_SECURE: ${{ vars.COOKIE_SECURE || 'true' }}
           # G05 (OWASP25-C038): 'false' deja las alertas de seguridad inertes;
           # activarlas es decision del administrador.
           SECURITY_ALERTS_ENABLED: ${{ vars.SECURITY_ALERTS_ENABLED || 'false' }}
         run: |
           set -euo pipefail
           umask 077
-          if ! printf '%s' "$TRUST_PROXY_HOPS" | grep -Eq '^[0-9]+$'; then
-            echo "TRUST_PROXY_HOPS debe ser un entero >= 0" >&2
+          # Un fingerprint vacio degrada en silencio appleboy/ssh-action a no
+          # verificar la clave del host; sin known_hosts ssh no tiene a quien creer.
+          [ -n "$SSH_KNOWN_HOSTS" ] && [ -n "$SSH_HOST_FINGERPRINT" ] || { echo "faltan SSH_KNOWN_HOSTS o SSH_HOST_FINGERPRINT" >&2; exit 1; }
+          if ! printf '%s' "$TRUST_PROXY_HOPS" | grep -Eq '^[1-9][0-9]*$'; then
+            echo "TRUST_PROXY_HOPS debe ser un entero >= 1 (el backend no arranca en produccion con 0)" >&2
             exit 1
           fi
           case "$COOKIE_SECURE" in
@@ -384,6 +390,7 @@ jobs:
           mkdir -p "$work"
           trap 'rm -rf "$work"' EXIT
           printf '%s\n' "$SSH_PRIVATE_KEY" > "$work/key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$work/known_hosts"
           {
             printf 'NODE_ENV=production\n'
             printf 'DB_USER=%s\n' "$DB_USER"
@@ -397,6 +404,9 @@ jobs:
             printf 'NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=%s\n' "$NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME"
             printf 'NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=%s\n' "$NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"
             printf 'FRONTEND_URL=%s\n' "$FRONTEND_URL"
+            if [ -n "$CLOUDINARY_CLOUD_NAME" ]; then
+              printf 'CLOUDINARY_CLOUD_NAME=%s\n' "$CLOUDINARY_CLOUD_NAME"
+            fi
             printf 'BACKEND_IMAGE=%s\n' "$BACKEND_IMAGE"
             printf 'FRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE"
             printf 'TRUST_PROXY_HOPS=%s\n' "$TRUST_PROXY_HOPS"
@@ -405,17 +415,18 @@ jobs:
             printf 'COOKIE_SECURE=%s\n' "$COOKIE_SECURE"
             printf 'SECURITY_ALERTS_ENABLED=%s\n' "$SECURITY_ALERTS_ENABLED"
           } > "$work/env"
-          ssh -i "$work/key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+          ssh -i "$work/key" -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$work/known_hosts" "$SERVER_USER@$SERVER_IP" \
             'umask 077 && mkdir -p ~/.uvg-deploy && chmod 700 ~/.uvg-deploy && cat > ~/.uvg-deploy/env.incoming' \
             < "$work/env"
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
           command_timeout: 60m
           script: |
             set -e
@@ -509,11 +520,11 @@ jobs:
     steps:
       - name: Set up Docker Buildx
         if: inputs.mode != 'config-only'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to GitHub Container Registry
         if: inputs.mode != 'config-only'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}

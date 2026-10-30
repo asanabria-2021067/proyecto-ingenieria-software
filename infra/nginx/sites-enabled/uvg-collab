@@ -1,6 +1,25 @@
+# [G06-H4] Puerto 80 en server propio: solo el desafio ACME y la redireccion a HTTPS.
+# El return va DENTRO de location / para no redirigir /.well-known/acme-challenge/.
 server {
     listen 80;
+    server_tokens off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 301 https://158.23.57.118.nip.io$request_uri;
+    }
+}
+
+# [G06-H7] HSTS sin includeSubDomains ni preload (el dominio es un nip.io compartido).
+# Los location ajenos (/angel/ /derek/ /vernel/) del host real quedan en este server;
+# si alguno define su propio add_header, anula la herencia del HSTS (verificar en la VM).
+server {
     listen 443 ssl;
+    server_tokens off;
+    add_header Strict-Transport-Security "max-age=31536000" always;
     ssl_certificate /etc/letsencrypt/live/158.23.57.118.nip.io/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/158.23.57.118.nip.io/privkey.pem;
 
@@ -48,6 +67,9 @@ server {
         if ($http_accept ~* "text/html") {
             return 403;
         }
+
+        # Helmet ya manda su HSTS; se oculta para dejar solo el del borde.
+        proxy_hide_header Strict-Transport-Security;
 
         proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
