@@ -36,7 +36,7 @@ function makeGateway(options: { estado?: EstadoUsuario | null; participa?: boole
     .fn()
     .mockResolvedValue(options.participa ? { esCanal: false, idProyecto: null, proyecto: null } : null);
   const prisma = {
-    usuario: { findUnique: vi.fn().mockResolvedValue(estado ? { estado } : null) },
+    usuario: { findUnique: vi.fn().mockResolvedValue(estado ? { estado, sesionVersion: 0 } : null) },
     conversacion: { findFirst: participante },
     participacionProyecto: { findFirst: vi.fn().mockResolvedValue(null) },
   } as unknown as PrismaService;

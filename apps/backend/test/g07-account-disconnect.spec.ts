@@ -29,6 +29,7 @@ function adminSetup(estadoActual: string, options: { esAdminCaller?: boolean; ev
       update: vi.fn(async ({ data }: { data: { estado: string } }) => ({ ...persona, estado: data.estado })),
     },
     bitacoraAuditoria: { create },
+    tokenRefresco: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
   };
   const events = options.events ?? { emit: vi.fn() };
   const admin = new AdminService(prisma as unknown as PrismaService, new JwtService({}), undefined, events as EventEmitter2);

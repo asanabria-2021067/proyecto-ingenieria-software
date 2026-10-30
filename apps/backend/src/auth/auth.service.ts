@@ -57,6 +57,9 @@ interface ResetTokenPayload {
   correo: string;
 }
 
+/** Dos pestañas pueden refrescar con la misma cookie a la vez: dentro de esta ventana el segundo solo recibe 401. */
+const REFRESH_REUSE_GRACE_MS = 10_000;
+
 @Injectable()
 export class AuthService {
   private readonly refreshSecret: string;
@@ -85,16 +88,16 @@ export class AuthService {
   }
 
   /** Firma el par de tokens y persiste el hash del refresh token para poder revocarlo (logout, rotación). */
-  private async issueTokens(usuario: { idUsuario: number; correo: string }) {
+  private async issueTokens(usuario: { idUsuario: number; correo: string; sesionVersion: number }) {
     const accessToken = this.jwtService.sign(
-      { sub: usuario.idUsuario, correo: usuario.correo, tipo: "access" },
+      { sub: usuario.idUsuario, correo: usuario.correo, tipo: "access", sv: usuario.sesionVersion },
       { secret: getJwtSecret(), expiresIn: ACCESS_TOKEN_TTL },
     );
     const refreshToken = this.jwtService.sign(
       // jti: dos refresh tokens del mismo usuario firmados dentro del mismo
       // segundo (iat idéntico) producirían el mismo JWT y por lo tanto el
       // mismo tokenHash, chocando con la unicidad de la columna.
-      { sub: usuario.idUsuario, correo: usuario.correo, tipo: "refresh", jti: randomUUID() },
+      { sub: usuario.idUsuario, correo: usuario.correo, tipo: "refresh", jti: randomUUID(), sv: usuario.sesionVersion },
       { secret: this.refreshSecret, expiresIn: REFRESH_TOKEN_TTL },
     );
 
@@ -324,7 +327,7 @@ export class AuthService {
 
       await tx.usuario.update({
         where: { idUsuario: usuario.idUsuario },
-        data: { contrasena: contrasenaHash },
+        data: { contrasena: contrasenaHash, sesionVersion: { increment: 1 } },
       });
 
       const revocadas = await tx.tokenRefresco.updateMany({
@@ -351,7 +354,7 @@ export class AuthService {
   }
 
   async refreshToken(refreshToken: string) {
-    let payload: { sub: number; correo: string; tipo?: string };
+    let payload: { sub: number; correo: string; tipo?: string; sv?: number };
     try {
       payload = this.jwtService.verify(refreshToken, { secret: this.refreshSecret });
     } catch {
@@ -365,28 +368,51 @@ export class AuthService {
     const tokenHash = this.hashToken(refreshToken);
     const registro = await this.prisma.tokenRefresco.findUnique({ where: { tokenHash } });
 
+    // Reuso de un token ya rotado fuera de la ventana de carrera entre pestañas:
+    // alguien más lo tiene, así que se cierran todas las sesiones de la cuenta.
+    // Solo cuenta si el token es de la versión de sesión vigente: uno revocado por
+    // un reset de contraseña o un bloqueo (versión anterior) es una pestaña vieja,
+    // no un robo, y no debe tumbar la sesión nueva del usuario.
+    if (registro?.revocadoEn && Date.now() - registro.revocadoEn.getTime() > REFRESH_REUSE_GRACE_MS) {
+      const dueno = await this.prisma.usuario.findUnique({
+        where: { idUsuario: registro.idUsuario },
+        select: { sesionVersion: true },
+      });
+      if (dueno && (payload.sv ?? 0) === dueno.sesionVersion) {
+        await this.prisma.tokenRefresco.updateMany({
+          where: { idUsuario: registro.idUsuario, revocadoEn: null },
+          data: { revocadoEn: new Date() },
+        });
+      }
+    }
+
     if (!registro || registro.revocadoEn || registro.expiraEn < new Date()) {
       throw new UnauthorizedException("Token de refresco inválido o expirado");
     }
 
-    // Rotación: el token usado queda inválido, uno reintentando reutilizarlo
-    // (robado o duplicado) se topa con `revocadoEn` ya seteado en el siguiente refresh.
-    await this.prisma.tokenRefresco.update({
-      where: { idTokenRefresco: registro.idTokenRefresco },
+    // Rotación atómica: el UPDATE condicional deja pasar a un solo refresh por
+    // token aunque lleguen dos a la vez; el perdedor no recibe tokens.
+    const rotado = await this.prisma.tokenRefresco.updateMany({
+      where: { idTokenRefresco: registro.idTokenRefresco, revocadoEn: null },
       data: { revocadoEn: new Date() },
     });
+    if (rotado.count !== 1) {
+      throw new UnauthorizedException("Token de refresco inválido o expirado");
+    }
 
     // G04 (OWASP25-C023): el refresh tampoco renueva credenciales de una
     // cuenta que dejó de estar ACTIVO; el token presentado ya quedó revocado.
     const usuario = await this.prisma.usuario.findUnique({
       where: { idUsuario: payload.sub },
-      select: { idUsuario: true, correo: true, estado: true },
+      select: { idUsuario: true, correo: true, estado: true, sesionVersion: true },
     });
-    if (!usuario || usuario.estado !== EstadoUsuario.ACTIVO) {
+    // Un refresh de otra versión de sesión (reset de contraseña, bloqueo) tampoco renueva: cubre la
+    // carrera con un reset o un bloqueo que confirmó después de leer el token pero antes de rotarlo.
+    if (!usuario || usuario.estado !== EstadoUsuario.ACTIVO || (payload.sv ?? 0) !== usuario.sesionVersion) {
       throw new UnauthorizedException("Token de refresco inválido o expirado");
     }
 
-    return this.issueTokens({ idUsuario: usuario.idUsuario, correo: usuario.correo });
+    return this.issueTokens(usuario);
   }
 
   async logout(refreshToken?: string) {

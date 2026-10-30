@@ -71,9 +71,17 @@ describe('G04-C08: contrato TRUST_PROXY_HOPS', () => {
     expect(() => validateEnvironment({ ...base, TRUST_PROXY_HOPS: '-1' })).toThrow(/TRUST_PROXY_HOPS/);
   });
 
+  it('NODE_ENV=production exige un JWT_REFRESH_SECRET fuerte y distinto de JWT_SECRET', () => {
+    const production = { FRONTEND_URL: 'http://localhost:3000', JWT_SECRET: 'x'.repeat(48), NODE_ENV: 'production', TRUST_PROXY_HOPS: '1' };
+    expect(() => validateEnvironment(production)).toThrow(/JWT_REFRESH_SECRET must be at least 32/);
+    expect(() => validateEnvironment({ ...production, JWT_REFRESH_SECRET: 'corto' })).toThrow(/JWT_REFRESH_SECRET must be at least 32/);
+    expect(() => validateEnvironment({ ...production, JWT_REFRESH_SECRET: 'x'.repeat(48) })).toThrow(/must differ from JWT_SECRET/);
+    expect(validateEnvironment({ ...production, JWT_REFRESH_SECRET: 'y'.repeat(48) }).app.nodeEnv).toBe('production');
+  });
+
   it('NODE_ENV=production exige TRUST_PROXY_HOPS >= 1; sin NODE_ENV se permite 0', () => {
     const base = { FRONTEND_URL: 'http://localhost:3000', JWT_SECRET: 'x'.repeat(48) };
-    const production = { ...base, NODE_ENV: 'production' };
+    const production = { ...base, NODE_ENV: 'production', JWT_REFRESH_SECRET: 'y'.repeat(48) };
     expect(() => validateEnvironment(production)).toThrow(/TRUST_PROXY_HOPS must be at least 1/);
     expect(() => validateEnvironment({ ...production, TRUST_PROXY_HOPS: '0' })).toThrow(/TRUST_PROXY_HOPS must be at least 1/);
     expect(validateEnvironment({ ...production, TRUST_PROXY_HOPS: '1' }).app.trustProxyHops).toBe(1);
