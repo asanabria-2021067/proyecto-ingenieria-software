@@ -197,6 +197,21 @@ describe('SocialService — destinatarios fuera del directorio', () => {
     expect(prisma.seguimiento.create).not.toHaveBeenCalled();
     expect(prisma.amistad.create).not.toHaveBeenCalled();
   });
+
+  it('el perfil público no incluye el correo (equivale al carné)', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findFirst.mockResolvedValue({ idUsuario: 2, nombre: 'Carla', apellido: 'Ruiz', fotoUrl: null, perfil: null, habilidades: [], intereses: [] });
+    prisma.amistad.findFirst.mockResolvedValue(null);
+    prisma.seguimiento.findUnique.mockResolvedValue(null);
+    prisma.perfilEstudiante.findUnique.mockResolvedValue(null);
+    prisma.amistad.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    const perfil = await service.obtenerPerfilPublico(1, 2);
+
+    expect(perfil).not.toHaveProperty('correo');
+    expect(prisma.usuario.findFirst.mock.calls[0][0].select).not.toHaveProperty('correo');
+  });
 });
 
 describe('SocialService — seguimientos', () => {
@@ -576,7 +591,6 @@ describe('SocialService — obtenerPerfilPublico', () => {
       idUsuario: 2,
       nombre: 'Carla',
       apellido: 'Ruiz',
-      correo: 'carla@uvg.edu.gt',
       esAmigo: false,
       solicitudPendiente: { direccion: 'enviada' },
       idAmistad: 42,

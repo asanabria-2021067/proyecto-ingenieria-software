@@ -48,7 +48,6 @@ export interface ProyectoParticipacionResumenDto {
 /** Perfil público de un usuario (GET /social/usuarios/:id). A diferencia de
  * `UsuarioBusquedaDto`, `amigosEnComun` viene como lista (no solo conteo). */
 export interface UsuarioPerfilDto extends UsuarioResumenDto {
-  correo: string;
   esAmigo: boolean;
   solicitudPendiente: { direccion: 'enviada' | 'recibida' } | null;
   idAmistad: number | null;

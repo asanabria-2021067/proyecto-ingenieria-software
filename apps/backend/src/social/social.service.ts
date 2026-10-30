@@ -288,7 +288,7 @@ export class SocialService {
   async obtenerPerfilPublico(idUsuarioActual: number, idUsuarioObjetivo: number) {
     const usuario = await this.prisma.usuario.findFirst({
       where: { idUsuario: idUsuarioObjetivo, ...FILTRO_DIRECTORIO },
-      select: { ...USUARIO_BUSQUEDA_SELECT, correo: true },
+      select: USUARIO_BUSQUEDA_SELECT,
     });
     if (!usuario) {
       throw new NotFoundException(`Usuario con id ${idUsuarioObjetivo} no encontrado`);
@@ -362,7 +362,6 @@ export class SocialService {
       nombre: usuario.nombre,
       apellido: usuario.apellido,
       fotoUrl: usuario.fotoUrl,
-      correo: usuario.correo,
       esAmigo,
       solicitudPendiente,
       idAmistad,

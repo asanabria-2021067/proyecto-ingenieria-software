@@ -7,7 +7,6 @@ import {
   Briefcase,
   Code2,
   GraduationCap,
-  Mail,
   Share2,
   Users,
 } from 'lucide-react';
@@ -267,10 +266,6 @@ export default function PerfilPersonaPage() {
 
           <div className="card-base space-y-tight">
             <h2 className="type-meta uppercase tracking-wide">Contacto</h2>
-            <p className="type-body flex items-center gap-tight text-text-primary">
-              <Mail className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
-              <span className="truncate">{perfil.correo}</span>
-            </p>
             {perfil.carrera && (
               <p className="type-body flex items-center gap-tight text-text-primary">
                 <GraduationCap className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
