@@ -41,10 +41,22 @@ export class SocialService {
     private readonly notifications: NotificationsService,
   ) {}
 
+  /** Solo se sigue o se le escribe a quien el directorio también muestra (ACTIVO y no administrador). */
+  private async assertVisibleEnElDirectorio(idUsuario: number) {
+    const visible = await this.prisma.usuario.findFirst({
+      where: { idUsuario, ...FILTRO_DIRECTORIO },
+      select: { idUsuario: true },
+    });
+    if (!visible) {
+      throw new NotFoundException(`Usuario con id ${idUsuario} no encontrado`);
+    }
+  }
+
   async crearSolicitudAmistad(idUsuario: number, idReceptor: number) {
     if (idUsuario === idReceptor) {
       throw new BadRequestException('No puedes enviarte una solicitud de amistad a ti mismo');
     }
+    await this.assertVisibleEnElDirectorio(idReceptor);
 
     const [directa, inversa] = await Promise.all([
       this.prisma.amistad.findUnique({
@@ -211,6 +223,7 @@ export class SocialService {
     if (idUsuario === idSeguido) {
       throw new BadRequestException('No puedes seguirte a ti mismo');
     }
+    await this.assertVisibleEnElDirectorio(idSeguido);
 
     const existente = await this.prisma.seguimiento.findUnique({
       where: { idSeguidor_idSeguido: { idSeguidor: idUsuario, idSeguido } },

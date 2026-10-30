@@ -17,6 +17,7 @@ import {
   ReplaceInteresesDto,
   ReplaceCualidadesDto,
   CreateExperienciaDto,
+  ReplaceExperienciasDto,
 } from './dto/update-profile.dto';
 import { GetMisTareasQueryDto } from './dto/get-mis-tareas-query.dto';
 
@@ -96,7 +97,7 @@ export class UsersController {
   @Put('me/experiencias')
   replaceExperiencias(
     @CurrentUser() user: { userId: number },
-    @Body() dto: { experiencias: CreateExperienciaDto[] },
+    @Body() dto: ReplaceExperienciasDto,
   ) {
     return this.usersService.replaceExperiencias(user.userId, dto.experiencias);
   }

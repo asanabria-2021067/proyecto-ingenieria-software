@@ -71,6 +71,13 @@ export class CreateExperienciaDto {
   tipoExperiencia?: TipoExperiencia;
 }
 
+export class ReplaceExperienciasDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateExperienciaDto)
+  experiencias!: CreateExperienciaDto[];
+}
+
 export class UpdateProfileDto {
   // ==================== CAMPOS DE NOMBRE ====================
   @IsOptional()
@@ -159,7 +166,7 @@ export class UpdateProfileDto {
   // ==================== ENLACES Y ARCHIVOS ====================
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(255) // Usuario.fotoUrl es VarChar(255): más largo daría 500 en la base
   @IsCloudinaryUrl()
   fotoUrl?: string;
 

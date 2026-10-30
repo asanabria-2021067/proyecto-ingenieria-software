@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { EstadoAmistad } from '@prisma/client';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
-import { SocialService } from '../src/social/social.service';
+import { FILTRO_DIRECTORIO, SocialService } from '../src/social/social.service';
 
 function makePrisma() {
   return {
@@ -24,7 +24,8 @@ function makePrisma() {
     usuario: {
       findUniqueOrThrow: vi.fn().mockResolvedValue({ nombre: 'Ana', apellido: 'Pérez' }),
       findUnique: vi.fn(),
-      findFirst: vi.fn(),
+      // Por defecto el destinatario existe en el directorio (ACTIVO y no administrador).
+      findFirst: vi.fn().mockResolvedValue({ idUsuario: 2 }),
       findMany: vi.fn(),
     },
     perfilEstudiante: {
@@ -177,6 +178,24 @@ describe('SocialService — amistades', () => {
     const { service } = makeService(prisma);
 
     await expect(service.eliminarAmistad(99, 3)).rejects.toThrow(ForbiddenException);
+  });
+});
+
+describe('SocialService — destinatarios fuera del directorio', () => {
+  it.each([
+    ['seguirUsuario', (s: SocialService) => s.seguirUsuario(1, 2)],
+    ['crearSolicitudAmistad', (s: SocialService) => s.crearSolicitudAmistad(1, 2)],
+  ])('%s responde 404 si el destino es administrador, está bloqueado o no existe, sin escribir nada', async (_n, accion) => {
+    const prisma = makePrisma();
+    prisma.usuario.findFirst.mockResolvedValue(null);
+    const { service } = makeService(prisma);
+
+    await expect(accion(service)).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.usuario.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ idUsuario: 2, ...FILTRO_DIRECTORIO }) }),
+    );
+    expect(prisma.seguimiento.create).not.toHaveBeenCalled();
+    expect(prisma.amistad.create).not.toHaveBeenCalled();
   });
 });
 
