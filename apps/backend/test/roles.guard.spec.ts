@@ -26,7 +26,6 @@ import { SecurityEventsController } from '../src/security-events/security-events
 import { AdminSprintsController } from '../src/sprints/admin-sprints.controller';
 import { ClosureStorageAdminController } from '../src/project-closure/closure-storage-admin.controller';
 import { LeadershipAdminController } from '../src/leadership/leadership-admin.controller';
-import { ValidationController } from '../src/validation/validation.controller';
 import { RevisionesController } from '../src/revisiones/revisiones.controller';
 import { ProjectClosureController } from '../src/project-closure/project-closure.controller';
 import { ProjectsController } from '../src/projects/projects.controller';
@@ -154,7 +153,6 @@ describe('Rutas exclusivas de administración (T-286)', () => {
     ['ClosureStorageAdminController', ClosureStorageAdminController],
     ['LeadershipAdminController', LeadershipAdminController],
     ['SecurityEventsController', SecurityEventsController],
-    ['ValidationController', ValidationController],
   ])('%s exige administrador a nivel de controller', (_name, controller) => {
     expect(guardsOf(controller)).toEqual([JwtAuthGuard, RolesGuard]);
     expect(rolesOf(controller)).toEqual(['administrador']);

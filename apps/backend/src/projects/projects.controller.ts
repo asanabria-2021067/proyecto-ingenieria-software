@@ -22,7 +22,6 @@ import { AssignHitoTasksDto } from './dto/assign-hito-tasks.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
@@ -53,7 +52,7 @@ export class ProjectsController {
   constructor(private projectsService: ProjectsService) {}
 
   @Get()
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   findAll(
     @Query('q') q?: string,
     @Query('tipoProyecto') tipoProyecto?: string,
@@ -80,7 +79,7 @@ export class ProjectsController {
 
     // T-251/T-252: sin filtros de página es el catálogo corto que usa el
     // dashboard ("Proyectos Disponibles"); ahí sí se pondera por amistad y
-    // carrera cuando hay sesión (OptionalJwtAuthGuard nunca bloquea anónimos).
+    // carrera (la ruta exige sesión).
     return this.projectsService.findAll(filters, user?.userId);
   }
 
@@ -103,12 +102,13 @@ export class ProjectsController {
   }
 
   @Get('destacados')
+  @UseGuards(JwtAuthGuard)
   findFeatured() {
     return this.projectsService.findFeatured();
   }
 
   @Get(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   findOne(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user?: { userId: number },
