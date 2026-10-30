@@ -224,7 +224,7 @@ describe('RolesGuard junto con JwtAuthGuard (HTTP)', () => {
 
     const prisma = {
       ...makePrisma({ [ADMIN_ID]: ['administrador'], [ESTUDIANTE_ID]: ['estudiante'] }),
-      usuario: { findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }) },
+      usuario: { findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO', sesionVersion: 0 }) },
     };
     // El transform de Vitest no emite design:paramtypes (ver auth-http-harness.ts).
     Reflect.defineMetadata(PARAMTYPES_METADATA, [PrismaService], JwtStrategy);

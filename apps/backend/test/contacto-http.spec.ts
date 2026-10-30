@@ -54,7 +54,7 @@ async function start(estadoUsuario: string | null = 'ACTIVO') {
   definirParamtypes();
   const contacto = { enviar: vi.fn().mockResolvedValue({ mensaje: MENSAJE_CONTACTO_ENVIADO }) };
   const prisma = {
-    usuario: { findUnique: vi.fn().mockResolvedValue(estadoUsuario ? { estado: estadoUsuario } : null) },
+    usuario: { findUnique: vi.fn().mockResolvedValue(estadoUsuario ? { estado: estadoUsuario, sesionVersion: 0 } : null) },
   };
 
   @Module({
