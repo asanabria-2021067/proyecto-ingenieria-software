@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { refreshSession } from '@/lib/api/client';
 import { projectSprintsQueryKey, sprintClosingSummaryQueryKey } from '@/lib/query-keys/sprints';
 import { currentExitRequestQueryKey, exitPreparationSummaryQueryKey } from '@/lib/query-keys/exit-requests';
 import {
@@ -103,11 +104,24 @@ export function useRealtimeNotifications(enabled: boolean) {
       queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
     };
 
-    const handleDisconnect = () => {
+    // El servidor cierra el socket al vencer el access token: se reconecta una
+    // vez con la cookie vigente. Solo si la sesión se había autenticado
+    // ('connected'), para no entrar en bucle cuando el handshake es rechazado.
+    let authenticated = false;
+    let cerrado = false;
+    const handleDisconnect = (reason: string) => {
       setIsConnected(false);
+      if (reason === 'io server disconnect' && authenticated) {
+        authenticated = false;
+        // La cookie vence junto con el socket: se renueva la sesión antes de reconectar.
+        void refreshSession().then((ok) => {
+          if (ok && !cerrado) newSocket.connect();
+        });
+      }
     };
 
     const handleConnected = (data: unknown) => {
+      authenticated = true;
       console.log('WebSocket connected:', data);
     };
 
@@ -217,6 +231,7 @@ export function useRealtimeNotifications(enabled: boolean) {
     const timeoutId = window.setTimeout(() => setSocket(newSocket), 0);
 
     return () => {
+      cerrado = true;
       window.clearTimeout(timeoutId);
       newSocket.off('connect', handleConnect);
       newSocket.off('disconnect', handleDisconnect);

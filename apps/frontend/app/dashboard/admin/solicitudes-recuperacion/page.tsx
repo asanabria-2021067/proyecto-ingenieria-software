@@ -290,7 +290,7 @@ export default function AdminSolicitudesRecuperacionPage() {
                         <p className="type-body break-words font-semibold text-text-primary">
                           {s.usuario.nombre} {s.usuario.apellido}
                         </p>
-                        <p className={`type-meta break-all ${META_CORREO}`}>{s.correoReferencia}</p>
+                        <p className={`type-meta break-all ${META_CORREO}`}>{s.usuario.correo}</p>
                         <p className={`type-meta ${META_CARNE}`}>Carné {s.carneReferencia}</p>
                         <p className={`type-meta ${META_FECHA}`}>{formatFecha(s.creadaEn)}</p>
                       </TableCell>
@@ -298,7 +298,7 @@ export default function AdminSolicitudesRecuperacionPage() {
                         <span className="type-body tabular-nums text-text-secondary">{s.carneReferencia}</span>
                       </TableCell>
                       <TableCell className={`${TD} hidden ${COL_CORREO}`}>
-                        <span className="type-body break-all text-text-secondary">{s.correoReferencia}</span>
+                        <span className="type-body break-all text-text-secondary">{s.usuario.correo}</span>
                       </TableCell>
                       <TableCell className={`${TD} hidden ${COL_FECHA}`}>
                         <span className="type-body text-text-secondary">{formatFecha(s.creadaEn)}</span>

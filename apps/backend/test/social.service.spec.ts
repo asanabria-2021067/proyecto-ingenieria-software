@@ -24,6 +24,7 @@ function makePrisma() {
     usuario: {
       findUniqueOrThrow: vi.fn().mockResolvedValue({ nombre: 'Ana', apellido: 'Pérez' }),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
     },
     perfilEstudiante: {
@@ -228,7 +229,7 @@ describe('SocialService — buscarUsuarios', () => {
     );
   });
 
-  it('excluye del directorio las cuentas pendientes de verificación', async () => {
+  it('solo lista cuentas ACTIVO (excluye PENDIENTE_VERIFICACION, BLOQUEADO e INACTIVO)', async () => {
     const prisma = makePrisma();
     prisma.usuario.findMany.mockResolvedValue([]);
     const { service } = makeService(prisma);
@@ -238,7 +239,7 @@ describe('SocialService — buscarUsuarios', () => {
     expect(prisma.usuario.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          AND: expect.arrayContaining([{ estado: { not: 'PENDIENTE_VERIFICACION' } }]),
+          AND: expect.arrayContaining([expect.objectContaining({ estado: 'ACTIVO' })]),
         },
       }),
     );
@@ -255,7 +256,9 @@ describe('SocialService — buscarUsuarios', () => {
       expect.objectContaining({
         where: {
           AND: expect.arrayContaining([
-            { rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } } },
+            expect.objectContaining({
+              rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } },
+            }),
           ]),
         },
       }),
@@ -471,15 +474,49 @@ describe('SocialService — buscarUsuarios', () => {
 describe('SocialService — obtenerPerfilPublico', () => {
   it('lanza 404 si el usuario objetivo no existe', async () => {
     const prisma = makePrisma();
-    prisma.usuario.findUnique.mockResolvedValue(null);
+    prisma.usuario.findFirst.mockResolvedValue(null);
     const { service } = makeService(prisma);
 
     await expect(service.obtenerPerfilPublico(1, 999)).rejects.toThrow(NotFoundException);
   });
 
+  it('el usuario se busca con el filtro del directorio: ACTIVO y sin rol administrador (404 si no cumple)', async () => {
+    const prisma = makePrisma();
+    // Si el código aún leyera por id sin filtro, devolvería a este administrador.
+    prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 5, nombre: 'Admin', apellido: 'X', fotoUrl: null, correo: 'a@x.com', perfil: null, habilidades: [], intereses: [] });
+    prisma.usuario.findFirst.mockResolvedValue(null);
+    const { service } = makeService(prisma);
+
+    await expect(service.obtenerPerfilPublico(1, 5)).rejects.toThrow(NotFoundException);
+
+    expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
+    const where = prisma.usuario.findFirst.mock.calls[0][0].where;
+    expect(where).toMatchObject({ idUsuario: 5 });
+    const json = JSON.stringify(where);
+    expect(json).toContain('"estado":"ACTIVO"');
+    expect(json).toContain('"nombrePerfil":"administrador"');
+  });
+
+  it('proyectosActivos solo considera proyectos no eliminados en PUBLICADO/EN_PROGRESO/EN_SOLICITUD_CIERRE', async () => {
+    const prisma = makePrisma();
+    prisma.usuario.findFirst.mockResolvedValue({ idUsuario: 2, nombre: 'Carla', apellido: 'Ruiz', fotoUrl: null, correo: 'c@uvg.edu.gt', perfil: null, habilidades: [], intereses: [] });
+    prisma.amistad.findFirst.mockResolvedValue(null);
+    prisma.seguimiento.findUnique.mockResolvedValue(null);
+    prisma.perfilEstudiante.findUnique.mockResolvedValue(null);
+    prisma.amistad.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const { service } = makeService(prisma);
+
+    await service.obtenerPerfilPublico(1, 2);
+
+    const where = prisma.participacionProyecto.findMany.mock.calls[0][0].where;
+    const proyecto = where.rolProyecto.proyecto;
+    expect(proyecto.eliminadoEn).toBeNull();
+    expect([...proyecto.estadoProyecto.in].sort()).toEqual(['EN_PROGRESO', 'EN_SOLICITUD_CIERRE', 'PUBLICADO']);
+  });
+
   it('arma el perfil con relación, amigos en común y proyectos activos', async () => {
     const prisma = makePrisma();
-    prisma.usuario.findUnique.mockResolvedValue({
+    prisma.usuario.findFirst.mockResolvedValue({
       idUsuario: 2,
       nombre: 'Carla',
       apellido: 'Ruiz',
@@ -542,7 +579,7 @@ describe('SocialService — obtenerPerfilPublico', () => {
 
   it('incluye solo las insignias obtenidas del usuario consultado (sin las bloqueadas ni las de otros) (HU-190)', async () => {
     const prisma = makePrisma();
-    prisma.usuario.findUnique.mockResolvedValue({
+    prisma.usuario.findFirst.mockResolvedValue({
       idUsuario: 2,
       nombre: 'Carla',
       apellido: 'Ruiz',
@@ -581,7 +618,7 @@ describe('SocialService — obtenerPerfilPublico', () => {
 
   it('sin amigos en común no consulta usuario.findMany para armar la lista', async () => {
     const prisma = makePrisma();
-    prisma.usuario.findUnique.mockResolvedValue({
+    prisma.usuario.findFirst.mockResolvedValue({
       idUsuario: 2,
       nombre: 'Carla',
       apellido: 'Ruiz',

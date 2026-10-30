@@ -384,4 +384,26 @@ describe('TimeRecordsService — justificaciones de exceso y revocación', () =>
     const { service: comoAutor } = setupResumen('PARTICIPANTE_ACTIVO');
     expect((await comoAutor.getTaskHoursSummary(PROJECT_ID, TASK_ID, ASSIGNEE_ID)).horasReportadasTarea).toBe('3.00');
   });
+
+  it('con ownOnly=true el resumen solo consulta los tramos del propio usuario', async () => {
+    const { service, prisma, readPolicy } = setupResumen('PARTICIPANTE_ACTIVO');
+    (readPolicy.assertRead as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      profile: 'PARTICIPANTE_ACTIVO', sprintEstados: null, ownOnly: true, isAdmin: false,
+      project: { estadoProyecto: 'EN_PROGRESO' },
+    });
+
+    await service.getTaskHoursSummary(PROJECT_ID, TASK_ID, ASSIGNEE_ID);
+
+    const findMany = (prisma as unknown as { asignacionTarea: { findMany: ReturnType<typeof vi.fn> } }).asignacionTarea.findMany;
+    expect(findMany.mock.calls[0][0].where).toEqual({ idTarea: TASK_ID, idUsuario: ASSIGNEE_ID });
+  });
+
+  it('con ownOnly=false el resumen consulta todos los tramos de la tarea', async () => {
+    const { service, prisma } = setupResumen('LIDER');
+
+    await service.getTaskHoursSummary(PROJECT_ID, TASK_ID, LEADER_ID);
+
+    const findMany = (prisma as unknown as { asignacionTarea: { findMany: ReturnType<typeof vi.fn> } }).asignacionTarea.findMany;
+    expect(findMany.mock.calls[0][0].where).toEqual({ idTarea: TASK_ID });
+  });
 });

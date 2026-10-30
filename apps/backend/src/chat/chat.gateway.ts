@@ -12,7 +12,7 @@ import { Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { getFrontendUrl } from '../common/utils/cookie';
-import { WsAuthService } from '../ws-auth/ws-auth.service';
+import { WsAuthService, disconnectOnExpiry } from '../ws-auth/ws-auth.service';
 import { ChatRoomsHandler } from './chat-rooms.handler';
 import { ChatIndicatorsHandler } from './chat-indicators.handler';
 import { ChatBroadcaster } from './chat-broadcaster';
@@ -57,6 +57,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const userId = auth.userId;
 
       client.data.userId = userId;
+      disconnectOnExpiry(client, auth.exp);
       client.join(`user:${userId}`);
 
       this.logger.log(`Client ${client.id} connected as user ${userId}`);

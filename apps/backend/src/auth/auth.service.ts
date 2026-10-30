@@ -2,12 +2,14 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Optional,
   UnauthorizedException,
   ConflictException,
   BadRequestException,
   NotFoundException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import * as bcrypt from "bcryptjs";
 import { createHash, randomUUID } from "crypto";
 import { EstadoUsuario } from "@prisma/client";
@@ -27,6 +29,7 @@ import { SecurityEventsService } from "../security-events/security-events.servic
 import { TipoEventoSeguridad } from "../security-events/tipos-evento-seguridad";
 import { accountReference } from "../security-events/account-reference";
 import type { SecurityRequestContext } from "../security-events/request-context";
+import { ACCOUNT_ACCESS_REVOKED, type AccountAccessRevokedEvent } from "../ws-auth/account-access.events";
 
 /**
  * G04 (OWASP25-C023): hash bcrypt (cost 10, el mismo de registro y reset) de
@@ -41,8 +44,8 @@ export const UNKNOWN_USER_PASSWORD_HASH = "$2b$10$aIZFrVp.yjl7jr05RXCHVeqgnl4MBv
  * G04 (OWASP25-C036): clave del contador por cuenta. Mayúsculas y espacios no
  * abren un contador nuevo para la misma cuenta.
  */
-export function accountAttemptKey(correo: string): string {
-  return correo.trim().toLowerCase();
+export function accountAttemptKey(correo: string, ip?: string | null): string {
+  return `${correo.trim().toLowerCase()}|${ip ?? ''}`;
 }
 
 export const MENSAJE_CUENTA_PENDIENTE = "Tu cuenta está pendiente de verificación por administración";
@@ -68,6 +71,7 @@ export class AuthService {
     private readonly recoveryAttempts: AccountAttemptsService = new AccountAttemptsService(RECOVERY_ATTEMPT_POLICY),
     // G05: writer best-effort; el default (tests) usa el mismo PrismaService.
     private readonly securityEvents: SecurityEventsService = new SecurityEventsService(prisma),
+    @Optional() private readonly events?: EventEmitter2,
   ) {
     const refreshSecret = process.env.JWT_REFRESH_SECRET;
     if (!refreshSecret) {
@@ -108,7 +112,7 @@ export class AuthService {
   async login(loginDto: LoginDto, origen?: SecurityRequestContext) {
     // G04 (OWASP25-C036): una cuenta bloqueada sigue el MISMO camino (búsqueda
     // + bcrypt) y recibe la MISMA respuesta que unas credenciales inválidas.
-    const cuenta = accountAttemptKey(loginDto.correo);
+    const cuenta = accountAttemptKey(loginDto.correo, origen?.ip);
     const bloqueada = this.attempts.lockedUntil(cuenta) !== null;
 
     const usuario = await this.prisma.usuario.findUnique({
@@ -234,7 +238,7 @@ export class AuthService {
     return { idUsuario: usuario.idUsuario, estado: EstadoUsuario.PENDIENTE_VERIFICACION };
   }
 
-  async forgotPassword(carne: string, correo: string) {
+  async forgotPassword(carne: string, correo: string, origen?: SecurityRequestContext) {
     const genericResponse = {
       mensaje:
         "Si los datos son correctos, tu solicitud fue registrada y un administrador se pondrá en contacto contigo",
@@ -243,7 +247,7 @@ export class AuthService {
     // G04 (OWASP25-C036/C014): acota las solicitudes por carné. Pasado el
     // límite no se crea registro ni se notifica a los administradores, y la
     // respuesta pública es exactamente la misma (no revela nada del carné).
-    const cuenta = `recuperacion:${carne.trim().toLowerCase()}`;
+    const cuenta = `recuperacion:${carne.trim().toLowerCase()}|${origen?.ip ?? ""}`;
     if (this.recoveryAttempts.lockedUntil(cuenta) !== null) {
       return genericResponse;
     }
@@ -252,11 +256,12 @@ export class AuthService {
     const perfil = await this.prisma.perfilEstudiante.findUnique({
       where: { carne },
       select: {
-        usuario: { select: { idUsuario: true, nombre: true, apellido: true } },
+        usuario: { select: { idUsuario: true, nombre: true, apellido: true, correo: true } },
       },
     });
 
-    if (!perfil) {
+    // El correo declarado debe ser el de la cuenta: misma respuesta genérica si no coincide.
+    if (!perfil || normalizarCorreo(correo) !== perfil.usuario.correo.toLowerCase()) {
       return genericResponse;
     }
 
@@ -264,7 +269,7 @@ export class AuthService {
       data: {
         idUsuario: perfil.usuario.idUsuario,
         carneReferencia: carne,
-        correoReferencia: correo,
+        correoReferencia: perfil.usuario.correo,
       },
     });
 
@@ -338,6 +343,9 @@ export class AuthService {
       idUsuarioAfectado: usuario.idUsuario,
       detalle: { idSolicitud: payload.idSolicitud, sesionesRevocadas },
     });
+
+    // Cierra los sockets abiertos de la cuenta: las sesiones de refresh ya quedaron revocadas.
+    this.events?.emit(ACCOUNT_ACCESS_REVOKED, { idUsuario: usuario.idUsuario } satisfies AccountAccessRevokedEvent);
 
     return { mensaje: "Contraseña actualizada exitosamente" };
   }

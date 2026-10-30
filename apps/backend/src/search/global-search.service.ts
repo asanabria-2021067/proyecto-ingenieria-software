@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { EstadoParticipacion, EstadoProyecto, EstadoUsuario, Prisma } from '@prisma/client';
+import { EstadoParticipacion, EstadoProyecto, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserNameSearchService } from '../common/search/user-name-search.service';
+import { FILTRO_DIRECTORIO } from '../social/social.service';
 
 export const GLOBAL_SEARCH_LIMIT = 5;
 
@@ -84,10 +85,8 @@ export class GlobalSearchService {
     const usuarios = await this.prisma.usuario.findMany({
       where: {
         idUsuario: { in: ids },
-        // Mismo criterio que el directorio de SocialService.buscarUsuarios:
-        // los administradores no aparecen como resultado de búsqueda.
-        rolesAcceso: { none: { rolAcceso: { nombrePerfil: 'administrador' } } },
-        estado: { not: EstadoUsuario.PENDIENTE_VERIFICACION },
+        // Mismo criterio que el directorio y el perfil público (sin administradores, solo ACTIVO).
+        ...FILTRO_DIRECTORIO,
       },
       select: {
         idUsuario: true,
