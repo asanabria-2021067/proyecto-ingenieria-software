@@ -77,7 +77,7 @@ export class TeamService {
    * de la participación ya determina.
    */
   async findTeam(idProyecto: number, actorId: number) {
-    await this.readPolicy.assertRead(undefined, {
+    const decision = await this.readPolicy.assertRead(undefined, {
       projectId: idProyecto,
       actorId,
       scope: 'equipo',
@@ -86,6 +86,7 @@ export class TeamService {
     const participaciones = await this.prisma.participacionProyecto.findMany({
       where: {
         rolProyecto: { idProyecto },
+        ...(decision.ownOnly ? { idUsuario: actorId } : {}),
       },
       select: {
         idParticipacion: true,

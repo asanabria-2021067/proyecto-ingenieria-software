@@ -29,7 +29,7 @@ function setup(store?: AttemptBackingStore) {
   const prisma = {
     perfilEstudiante: {
       findUnique: vi.fn(async ({ where }: { where: { carne: string } }) =>
-        where.carne.trim() === CARNE ? { usuario: { idUsuario: 2, nombre: 'Est', apellido: 'Udiante' } } : null,
+        where.carne.trim() === CARNE ? { usuario: { idUsuario: 2, nombre: 'Est', apellido: 'Udiante', correo: 'e@uvg.edu.gt' } } : null,
       ),
     },
     solicitudRecuperacion: { create: vi.fn().mockResolvedValue({ idSolicitud: 1 }) },
@@ -79,6 +79,28 @@ describe('G04-C07: recuperación acotada por cuenta', () => {
     const acotado = await service.forgotPassword(CARNE, 'e@uvg.edu.gt');
     expect(existente).toEqual(inexistente);
     expect(acotado).toEqual(inexistente);
+  });
+
+  it('correo distinto al de la cuenta: sin registro ni aviso y respuesta identica a la de exito', async () => {
+    const { service, prisma, notifications } = setup();
+    const exito = await service.forgotPassword(CARNE, 'e@uvg.edu.gt');
+    prisma.solicitudRecuperacion.create.mockClear();
+    notifications.notifyAdminsFromTemplate.mockClear();
+
+    const ajeno = await service.forgotPassword(CARNE, 'otro@uvg.edu.gt');
+
+    expect(prisma.solicitudRecuperacion.create).not.toHaveBeenCalled();
+    expect(notifications.notifyAdminsFromTemplate).not.toHaveBeenCalled();
+    expect(ajeno).toEqual(exito);
+  });
+
+  it('correo con mayusculas y espacios coincidente: crea con el correo de la cuenta como referencia', async () => {
+    const { service, prisma } = setup();
+    await service.forgotPassword(CARNE, '  E@UVG.edu.gt ');
+    expect(prisma.solicitudRecuperacion.create).toHaveBeenCalledTimes(1);
+    expect(prisma.solicitudRecuperacion.create).toHaveBeenCalledWith({
+      data: { idUsuario: 2, carneReferencia: CARNE, correoReferencia: 'e@uvg.edu.gt' },
+    });
   });
 
   it('fail-open: con el almacén caído la solicitud se registra igual', async () => {

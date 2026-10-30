@@ -73,6 +73,15 @@ describe('G06-C07: COOKIE_SECURE', () => {
     expect(() => validateEnvironment({ ...base, COOKIE_SECURE: 'yes' })).toThrow(/COOKIE_SECURE/);
   });
 
+  it('NODE_ENV=production: Secure por defecto; COOKIE_SECURE explícito manda', () => {
+    const base = { FRONTEND_URL: 'http://localhost:3000', JWT_SECRET: 'x'.repeat(48), NODE_ENV: 'production', TRUST_PROXY_HOPS: '1' };
+    expect(validateEnvironment(base).app.cookieSecure).toBe(true);
+    expect(validateEnvironment({ ...base, COOKIE_SECURE: 'false' }).app.cookieSecure).toBe(false);
+    expect(parseCookieSecure(undefined, 'production')).toBe(true);
+    expect(parseCookieSecure('', 'production')).toBe(true);
+    expect(parseCookieSecure(undefined, 'development')).toBe(false);
+  });
+
   it.each([undefined, 'false'])('COOKIE_SECURE=%j: cookies actuales (HttpOnly, SameSite=Lax, Path=/, sin Secure)', async (value) => {
     const cookies = await loginCookies(value);
     expect(cookies.map((cookie) => cookie.split('=')[0])).toEqual(['access_token', 'refresh_token']);
@@ -99,8 +108,8 @@ describe('G06-C07: COOKIE_SECURE', () => {
   describe('deploy', () => {
     const step = loadWorkflow('deploy.yml').jobs.deploy.steps?.find((s) => s.name === 'Transferir .env de produccion por stdin');
 
-    it("flag con default 'false' escrito en el .env y documentado", () => {
-      expect(step?.env?.COOKIE_SECURE).toBe("${{ vars.COOKIE_SECURE || 'false' }}");
+    it("flag con default 'true' escrito en el .env y documentado", () => {
+      expect(step?.env?.COOKIE_SECURE).toBe("${{ vars.COOKIE_SECURE || 'true' }}");
       expect(step?.run).toContain(`printf 'COOKIE_SECURE=%s\\n' "$COOKIE_SECURE"`);
       expect(readRepoFile('.env.example')).toMatch(/^COOKIE_SECURE=false$/m);
     });
@@ -112,7 +121,7 @@ describe('G06-C07: COOKIE_SECURE', () => {
         for (const key of Object.keys(step?.env ?? {})) {
           env[key] = `synthetic-${key.toLowerCase()}`;
         }
-        Object.assign(env, { TRUST_PROXY_HOPS: '0', BACKEND_BIND: '0.0.0.0', FRONTEND_BIND: '0.0.0.0', COOKIE_SECURE: value });
+        Object.assign(env, { TRUST_PROXY_HOPS: '1', BACKEND_BIND: '0.0.0.0', FRONTEND_BIND: '0.0.0.0', COOKIE_SECURE: value });
         const result = spawnSync('bash', ['-c', step?.run ?? 'exit 99'], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
         expect(result.status).toBe(1);
         expect(result.stderr).toContain('COOKIE_SECURE solo admite true o false');

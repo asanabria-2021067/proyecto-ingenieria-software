@@ -55,6 +55,13 @@ describe('AdminSolicitudesRecuperacionPage', () => {
     cleanup();
   });
 
+  it('la fila muestra el correo de la cuenta (usuario.correo), no correoReferencia', async () => {
+    renderPage();
+    await screen.findByRole('button', { name: /generar enlace/i });
+    expect(screen.getAllByText('ana@uvg.edu.gt').length).toBeGreaterThan(0);
+    expect(screen.queryByText('estudiante@uvg.edu.gt')).not.toBeInTheDocument();
+  });
+
   it('muestra la vigencia real del token (no un texto fijo de "1 hora")', async () => {
     await generarEnlace();
 
@@ -62,7 +69,7 @@ describe('AdminSolicitudesRecuperacionPage', () => {
       new Date(Date.now() + 30 * 60 * 1000),
     );
 
-    expect(screen.getByText(new RegExp(`Válido hasta las ${vigenciaEsperada}`))).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`Válido hasta las ${vigenciaEsperada.replace(/\s/g, ' ')}`))).toBeInTheDocument();
     expect(screen.queryByText(/Válido por 1 hora/i)).not.toBeInTheDocument();
   });
 

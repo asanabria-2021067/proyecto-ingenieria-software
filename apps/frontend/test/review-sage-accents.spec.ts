@@ -39,13 +39,32 @@ describe('Acentos de revisión en verde salvia', () => {
     expect(token('review').toLowerCase()).toBe('#9ab07e');
     expect(token('review-soft').toLowerCase()).toBe('#9ab07e');
     expect(contraste(token('review-ink'), '#ffffff')).toBeGreaterThanOrEqual(4.5);
-    // Texto blanco sobre el salvia: decisión de diseño explícita (2.4:1, bajo AA).
-    // `on-review` se declara dos veces: negro en `.dark` y blanco en el tema base.
-    const oscuro = css.slice(css.indexOf('.dark {'), css.indexOf('}', css.indexOf('.dark {')));
-    expect(oscuro).toMatch(/--color-on-review:\s*#000000/);
-    expect(css.replace(oscuro, '')).toMatch(/--color-on-review:\s*#ffffff/);
     // «Aprobar» (primary) y «Revisar» (review) no deben confundirse
     expect(token('review').toLowerCase()).not.toBe('#006735');
+  });
+
+  it('on-review es texto oscuro en claro y en oscuro', () => {
+    const css = leer('app/global.css');
+    const token = (nombre: string) => css.match(new RegExp(`--color-${nombre}:\\s*(#[0-9a-fA-F]{6})`))![1];
+    const oscuro = css.slice(css.indexOf('.dark {'), css.indexOf('}', css.indexOf('.dark {')));
+    expect(oscuro).toMatch(/--color-on-review:\s*#000000/);
+    const base = css.replace(oscuro, '');
+    expect(base).toMatch(/--color-on-review:\s*#1f2d18/);
+    const onClaro = base.match(/--color-on-review:\s*(#[0-9a-fA-F]{6})/)![1];
+    for (const fondo of [token('review'), token('review-strong')]) {
+      expect(contraste(fondo, onClaro)).toBeGreaterThanOrEqual(4.5);
+      expect(contraste(fondo, '#000000')).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('la pill pulsa con un anillo de opacidad, sin animar color ni fondo', () => {
+    const css = leer('app/global.css');
+    expect(css).not.toContain('blink-gold-gray');
+    const regla = (sel: string) => css.match(new RegExp(`${sel.replace(/[.:]/g, '\\$&')}\\s*\\{([^}]*)\\}`))![1];
+    const anim = regla('.pill-pulse::after').match(/animation:\s*([\w-]+)/)![1];
+    const kf = css.match(new RegExp(`@keyframes ${anim}\\s*\\{[\\s\\S]*?\\n\\}`))![0];
+    expect(kf).not.toMatch(/background-color|(?<![-\w])color\s*:/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.pill-pulse::after\s*\{[^}]*animation:\s*none/);
   });
 
   it('la bandeja de cierres conserva su tono propio: solo publicación usa el tono salvia', () => {

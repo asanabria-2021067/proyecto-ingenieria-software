@@ -25,6 +25,34 @@ export class TasksAuthorizationService {
   }
 
   /**
+   * Asignación inicial al crear: misma autoridad que asignar (líder, o
+   * participación activa del actor en el rol de la tarea). Sin rol, solo el líder.
+   */
+  async assertCanAssignOnCreate(
+    projectId: number,
+    userId: number,
+    idRolProyecto: number | null,
+    tx?: TxClient,
+  ): Promise<void> {
+    const proyecto = await this.tasksContext.getProjectOrThrow(projectId, tx);
+    if (proyecto.creadoPor === userId) {
+      return;
+    }
+    if (idRolProyecto !== null) {
+      const participacionActiva = await this.tasksContext.getActiveParticipationInRole(
+        projectId,
+        userId,
+        idRolProyecto,
+        tx,
+      );
+      if (participacionActiva) {
+        return;
+      }
+    }
+    throw new ForbiddenException('No tienes permiso para realizar esta acción sobre la tarea');
+  }
+
+  /**
    * Editar tarea (HU-141): líder del proyecto, o participante con
    * participación activa en el MISMO rol que la tarea.
    */

@@ -86,11 +86,11 @@ describe('Controllers and basic services', () => {
     projects.findMine({ userId: 1 });
     projects.findMineLegacy({ userId: 1 });
     projects.findAsContributor({ userId: 1 });
-    projects.findOne(1);
+    projects.findOne(1, undefined);
     projects.findOneOwner(1, { userId: 1 });
     projects.create({} as Parameters<ProjectsController['create']>[0], { userId: 1 });
     projects.update(1, {} as Parameters<ProjectsController['update']>[1], { userId: 1 });
-    projects.changeEstado(1, { nuevoEstado: 'PUBLICADO' } as Parameters<ProjectsController['changeEstado']>[1], { userId: 1 });
+    projects.changeEstado(1, { nuevoEstado: 'EN_PROGRESO' } as Parameters<ProjectsController['changeEstado']>[1], { userId: 1 });
     projects.submitForReview(1, { userId: 1 });
     projects.resubmit(1, { userId: 1 });
     projects.findPostulaciones(1, { userId: 1 });

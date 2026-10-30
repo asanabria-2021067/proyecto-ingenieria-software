@@ -32,12 +32,12 @@ describe('G02-C17: guard de representatividad', () => {
     expect(checkAll()).toEqual([]);
   });
 
-  it('las sustituciones son mínimas y todas de entorno (usuario, TLS y upstreams)', () => {
+  it('las sustituciones son mínimas y todas de entorno (usuario, TLS, upstreams y host de la redirección)', () => {
     const substitutions = loadSubstitutions() as Array<{ from: string; to: string; reason: string }>;
-    expect(substitutions).toHaveLength(5);
+    expect(substitutions).toHaveLength(6);
     for (const substitution of substitutions) {
       expect(substitution.reason.length).toBeGreaterThan(10);
-      expect(substitution.to).toMatch(/^(user nginx;|\s+ssl_certificate(_key)? \/etc\/nginx\/harness-tls\/|\s+proxy_pass http:\/\/(frontend|backend):300[01];)/);
+      expect(substitution.to).toMatch(/^(user nginx;|\s+ssl_certificate(_key)? \/etc\/nginx\/harness-tls\/|\s+proxy_pass http:\/\/(frontend|backend):300[01];|\s+return 301 https:\/\/\$host\$request_uri;)/);
     }
   });
 
@@ -113,7 +113,7 @@ describe('G02-C17: contrato del arnés', () => {
 
   it('la caracterización cubre la línea base exigida y rechaza hosts no locales', () => {
     expect(CHECKS.map((check: { id: string }) => check.id)).toEqual(['HARN-01', 'HARN-02', 'HARN-03', 'HARN-04', 'HARN-05']);
-    expect(EXPECTED_HSTS).toBe('max-age=31536000; includeSubDomains');
+    expect(EXPECTED_HSTS).toBe('max-age=31536000');
     expect(() => assertLocalHost('127.0.0.1')).not.toThrow();
     for (const host of ['158.23.57.118', '158.23.57.118.nip.io', 'example.com']) {
       expect(() => assertLocalHost(host)).toThrow();

@@ -33,15 +33,17 @@ export const DEPLOY_ENV_REGISTRY: Record<string, DeployEnvEntry> = {
   NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: { kind: 'config', consumer: 'apps/frontend/lib/cloudinary.ts' },
   NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: { kind: 'config', consumer: 'apps/frontend/lib/cloudinary.ts' },
   FRONTEND_URL: { kind: 'config', consumer: 'apps/backend/src/config/environment.validation.ts' },
+  // Opcional: solo se escribe si no esta vacio (validador de fotoUrl y adaptadores de Cloudinary).
+  CLOUDINARY_CLOUD_NAME: { kind: 'config', consumer: 'apps/backend/src/config/environment.validation.ts' },
   BACKEND_IMAGE: { kind: 'config', consumer: 'docker-compose.yml' },
   FRONTEND_IMAGE: { kind: 'config', consumer: 'docker-compose.yml' },
-  // G04-C08 (OWASP25-C021 + D2): 0 = comportamiento actual (no confiar en XFF).
-  TRUST_PROXY_HOPS: { kind: 'flag', consumer: 'apps/backend/src/config/environment.validation.ts', defaultValue: '0' },
+  // G04-C08 (OWASP25-C021 + D2): 1 = un proxy delante (nginx del host); el backend exige >=1 en produccion.
+  TRUST_PROXY_HOPS: { kind: 'flag', consumer: 'apps/backend/src/config/environment.validation.ts', defaultValue: '1' },
   // G04-C10 (OWASP25-C021 + P5/T19): 0.0.0.0 = exposición actual; 127.0.0.1 = solo detrás de nginx.
   BACKEND_BIND: { kind: 'flag', consumer: 'docker-compose.yml', defaultValue: '0.0.0.0' },
   FRONTEND_BIND: { kind: 'flag', consumer: 'docker-compose.yml', defaultValue: '0.0.0.0' },
-  // G06-C07 (OWASP25-C049 parcial): false = cookies actuales; true añade Secure.
-  COOKIE_SECURE: { kind: 'flag', consumer: 'apps/backend/src/auth/cookie.util.ts', defaultValue: 'false' },
+  // G06-C07 (OWASP25-C049): true = cookies Secure por defecto; false solo si el trafico no fuera HTTPS.
+  COOKIE_SECURE: { kind: 'flag', consumer: 'apps/backend/src/auth/cookie.util.ts', defaultValue: 'true' },
   // G05-C12 (OWASP25-C038): false = alertas de ráfaga inertes.
   SECURITY_ALERTS_ENABLED: {
     kind: 'flag',
@@ -51,4 +53,10 @@ export const DEPLOY_ENV_REGISTRY: Record<string, DeployEnvEntry> = {
 };
 
 /** Variables del paso de transferencia que solo sirven para la conexión SSH (no van al .env). */
-export const DEPLOY_TRANSPORT_ONLY = ['SSH_PRIVATE_KEY', 'SERVER_IP', 'SERVER_USER'];
+export const DEPLOY_TRANSPORT_ONLY = [
+  'SSH_PRIVATE_KEY',
+  'SSH_KNOWN_HOSTS',
+  'SSH_HOST_FINGERPRINT',
+  'SERVER_IP',
+  'SERVER_USER',
+];

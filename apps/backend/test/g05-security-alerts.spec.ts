@@ -143,7 +143,7 @@ describe('G05-C12: alertas de seguridad a admins detrás de flag', () => {
           env[key] = `synthetic-${key.toLowerCase()}`;
         }
         Object.assign(env, {
-          TRUST_PROXY_HOPS: '0',
+          TRUST_PROXY_HOPS: '1',
           COOKIE_SECURE: 'false',
           BACKEND_BIND: '0.0.0.0',
           FRONTEND_BIND: '0.0.0.0',

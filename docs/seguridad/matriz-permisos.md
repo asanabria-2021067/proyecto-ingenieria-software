@@ -118,14 +118,14 @@ protección actual ya es correcta.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/proyectos` | Explorar proyectos publicados | ✅ | ✅ | ✅ | ✅ | ✅ | `OptJWT` | — |
 | GET | `/proyectos/destacados` | Proyectos destacados | ✅ | ✅ | ✅ | ✅ | ✅ | `Público` | — |
-| GET | `/proyectos/:id` | Detalle público (solo estados con detalle público) | ✅ | ✅ | ✅ | ✅ | ✅ | `Público` (filtra por estado) | — |
+| GET | `/proyectos/:id` | Detalle público (solo estados con detalle público) | ✅ | ✅ | ✅ | ✅ | ✅ | `OptJWT` (filtra por estado; sin sesión omite correo del líder y contacto de la organización) | — |
 | GET | `/proyectos/mine`, `/proyectos/mis-proyectos`, `/proyectos/contributor` | Proyectos propios / en los que participa | ✅ | ✅ | ✅ | ✅ | ✅ | `JWT` + `S:self` | — |
 | GET | `/proyectos/:id/admin` | Vista administrativa del proyecto | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `R:resumen` + `S:admin` | ✅ Corregido en T-286 (H-01) |
 | GET | `/proyectos/:id/owner` | Vista del dueño (editor) | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `R:resumen` + `S:owner` | — |
 | GET | `/proyectos/:id/avance` | Avance del proyecto | ⚠️ participante | ✅ | ⚠️ participante | ⚠️ participante | ⚠️ según `R:resumen` | `JWT` + `R:resumen` + check en service | — |
 | POST | `/proyectos` | Crear proyecto (el creador queda como líder) | ✅ | ✅ | ✅ | ✅ | ⚠️ ver H-06 | `JWT` | Decisión de producto (H-06) |
 | PUT/PATCH | `/proyectos/:id` | Editar proyecto | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `PWG` + `W:PROYECTO_EDICION→LIDER` | — |
-| PATCH | `/proyectos/:id/estado` | Cambiar estado (B→P, P→E) | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `PWG` + `W:PROYECTO_EDICION→LIDER` | — |
+| PATCH | `/proyectos/:id/estado` | Iniciar proyecto (P→E); PUBLICADO solo vía `POST /revisiones/proyectos/:id/resolver` (admin) | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `PWG` + `W:PROYECTO_EDICION→LIDER` | — |
 | POST | `/proyectos/:id/enviar-revision`, `/proyectos/:id/reenviar` | Enviar/reenviar a revisión de publicación | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `PWG` + `W:PUBLICACION_ENVIO→LIDER` | — |
 | POST | `/proyectos/:id/hitos`, `/proyectos/:id/hitos/:idHito/tareas` | Crear hito / asignarle tareas | ⚠️ participante activo | ✅ | ⚠️ participante activo | ⚠️ participante activo | ❌ | `JWT` + `PWG` + `W:HITO_CREATE→LIDER_O_PARTICIPANTE_ACTIVO` | — |
 | DELETE | `/proyectos/:id` | Eliminar proyecto (B/O) | ❌ | ✅ | ❌ | ❌ | ❌ | `JWT` + `PWG` + `S:owner` + `W:PROYECTO_EDICION→LIDER` | — |

@@ -20,9 +20,21 @@ import { extractCookie } from '../common/utils/cookie';
 
 export type WsAuthRejection = 'SIN_TOKEN' | 'TOKEN_INVALIDO' | 'TIPO_NO_ACCESS' | 'CUENTA_NO_ACTIVA';
 
-export type WsAuthResult = { ok: true; userId: number } | { ok: false; motivo: WsAuthRejection };
+export type WsAuthResult =
+  | { ok: true; userId: number; exp: number | null }
+  | { ok: false; motivo: WsAuthRejection };
 
 export type WsHandshake = Pick<Socket['handshake'], 'auth' | 'headers'>;
+
+/** Cierra el socket cuando vence el access token con el que se autenticó (exp en segundos). */
+export function disconnectOnExpiry(client: Socket, exp: number | null): void {
+  if (exp === null) {
+    return;
+  }
+  const timer = setTimeout(() => client.disconnect(true), Math.max(exp * 1000 - Date.now(), 0));
+  timer.unref();
+  client.once('disconnect', () => clearTimeout(timer));
+}
 
 /** Mismas fuentes y mismo orden que usaban los gateways: `auth.token`, `Authorization: Bearer` y la cookie httpOnly. */
 export function extractWsToken(handshake: WsHandshake): string | null {
@@ -53,7 +65,7 @@ export class WsAuthService {
       return { ok: false, motivo: 'SIN_TOKEN' };
     }
 
-    let payload: { sub?: unknown; tipo?: unknown };
+    let payload: { sub?: unknown; tipo?: unknown; exp?: unknown };
     try {
       payload = await this.jwtService.verifyAsync(token);
     } catch {
@@ -76,6 +88,6 @@ export class WsAuthService {
       return { ok: false, motivo: 'CUENTA_NO_ACTIVA' };
     }
 
-    return { ok: true, userId };
+    return { ok: true, userId, exp: typeof payload.exp === 'number' ? payload.exp : null };
   }
 }

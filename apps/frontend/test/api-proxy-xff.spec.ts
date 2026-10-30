@@ -52,6 +52,15 @@ describe('G04-C14: el proxy Next no reenvía X-Forwarded-For del cliente', () =>
     expect(sent.get('content-type')).toBe('application/json');
   });
 
+  it('buildUpstreamHeaders reenvía origin y sec-fetch-site para que el backend valide el origen', () => {
+    const sent = buildUpstreamHeaders(
+      new Headers({ origin: 'https://evil.example', 'sec-fetch-site': 'cross-site', 'x-forwarded-for': '203.0.113.1' }),
+    );
+    expect(sent.get('origin')).toBe('https://evil.example');
+    expect(sent.get('sec-fetch-site')).toBe('cross-site');
+    expect(sent.has('x-forwarded-for')).toBe(false);
+  });
+
   it('buildUpstreamHeaders también descarta host y connection y no inventa una IP propia', () => {
     const sent = buildUpstreamHeaders(
       new Headers({ host: 'evil.example', connection: 'keep-alive', 'X-Forwarded-For': '203.0.113.1', accept: 'application/json' }),

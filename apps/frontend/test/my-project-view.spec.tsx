@@ -245,7 +245,7 @@ describe('MyProjectViewClient — vista actual vs panel histórico', () => {
     expect(aviso.className).not.toMatch(/status-warning|attention|amber/);
 
     const corregir = within(aviso).getByRole('button', { name: /editar y corregir/i });
-    expect(corregir).toHaveClass('bg-on-review', 'text-review-ink');
+    expect(corregir).toHaveClass('bg-surface-container-lowest', 'text-review-ink');
 
     fireEvent.click(corregir);
     const enviar = await screen.findByRole('button', { name: /enviar correcciones/i });

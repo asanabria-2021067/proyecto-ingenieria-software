@@ -127,7 +127,7 @@ describe('TasksService — notificaciones de creación (Tarea 34)', () => {
   function makeCreateSetup(opts: { rowOverrides?: Record<string, unknown>; dto?: Record<string, unknown> } = {}) {
     const tx = makeTx();
     const prisma = makePrisma(tx);
-    const auth = { assertCanCreateTask: vi.fn().mockResolvedValue(undefined) };
+    const auth = { assertCanCreateTask: vi.fn().mockResolvedValue(undefined), assertCanAssignOnCreate: vi.fn().mockResolvedValue(undefined) };
     const relations = {
       validateCreateTaskRelations: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
     };
@@ -754,7 +754,7 @@ describe('TasksService — orden verificable: nunca se notifica mientras la tran
       return resultado;
       },
     );
-    const auth = { assertCanCreateTask: vi.fn().mockResolvedValue(undefined) };
+    const auth = { assertCanCreateTask: vi.fn().mockResolvedValue(undefined), assertCanAssignOnCreate: vi.fn().mockResolvedValue(undefined) };
     const relations = {
       validateCreateTaskRelations: vi.fn().mockResolvedValue({ hito: undefined, rolProyecto: undefined, etiquetas: undefined }),
     };

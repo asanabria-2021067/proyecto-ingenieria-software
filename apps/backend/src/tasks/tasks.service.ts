@@ -456,6 +456,14 @@ export class TasksService {
     const row = await this.projectTx.run(projectId, userId, 'tasks.create', async (ctx) => {
       const { tx } = ctx;
       await this.tasksAuthorization.assertCanCreateTask(projectId, userId, tx);
+      if (dto.idUsuarioAsignado !== undefined) {
+        await this.tasksAuthorization.assertCanAssignOnCreate(
+          projectId,
+          userId,
+          dto.idRolProyecto ?? null,
+          tx,
+        );
+      }
 
       // El proyecto solo admite tareas nuevas mientras tenga un Sprint
       // ACTIVO (contrato Sprint 6): EN_FINALIZACION, CERRADO o la ausencia
@@ -475,6 +483,11 @@ export class TasksService {
       // C040: política de escritura tras el lock (P/E, Sprint ambiente ACTIVO);
       // crear no tiene una entidad previa que exigir.
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId);
+      if (dto.idsEtiquetas !== undefined) {
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ETIQUETA_TAREA', userId, {
+          sprintId: sprintActivo.idSprint,
+        });
+      }
 
       // C086: la asignación inicial al crear una tarea pasa por la misma
       // decisión de elegibilidad que una asignación posterior.
@@ -647,6 +660,11 @@ export class TasksService {
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId, {
         sprintId: tareaAntes?.idSprint ?? null,
       });
+      if (Object.prototype.hasOwnProperty.call(dto, 'idsEtiquetas')) {
+        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ETIQUETA_TAREA', userId, {
+          sprintId: tareaAntes?.idSprint ?? null,
+        });
+      }
 
       const relacionesInput: RelatedResourcesInput = {};
       if (Object.prototype.hasOwnProperty.call(dto, 'idHito')) {

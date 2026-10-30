@@ -22,6 +22,12 @@
     },
     {
       "file": "sites-enabled/uvg-collab",
+      "from": "        return 301 https://158.23.57.118.nip.io$request_uri;",
+      "to": "        return 301 https://$host$request_uri;",
+      "reason": "En produccion se redirige al nombre canonico (el certificado solo cubre ese host); el arnes responde en su propio host y conserva $host."
+    },
+    {
+      "file": "sites-enabled/uvg-collab",
       "from": "        proxy_pass http://127.0.0.1:3000;",
       "to": "        proxy_pass http://frontend:3000;",
       "reason": "En la VM nginx corre en el host y llega al contenedor por el puerto publicado; en el arnes llega por la red interna de compose."

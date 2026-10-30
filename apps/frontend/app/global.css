@@ -221,7 +221,7 @@
   --color-sage-nav-ink-soft: var(--color-sage-ink-soft);
   --color-sage-nav-ink-muted: var(--color-sage-ink-muted);
 
-  /* Sobre el salvia de revisión: texto blanco en claro, negro en oscuro. */
+  /* Sobre el salvia de revisión: texto oscuro en ambos temas. */
   --color-on-review: #000000;
   --color-primary: #72dc93;
   --color-on-primary: #003918;
@@ -464,13 +464,13 @@
 
   /* Revisión / corrección de solicitudes de publicación: verde salvia
      #9AB07E exacto, en botones (`review`) y en bordes, puntos y fondos
-     suaves (`review-soft`). Sobre él el texto (`on-review`) va en blanco en modo
-     claro por decisión de diseño (2.4:1, bajo AA) y en negro en modo oscuro. `review-strong` es el
+     suaves (`review-soft`). Sobre él el texto (`on-review`) va en #1f2d18 en claro
+     (6.1:1; 4.9:1 en hover) y en negro en oscuro. `review-strong` es el
      hover y `review-ink` el salvia oscuro para texto sobre superficies claras. */
   --color-review: #9ab07e;
   --color-review-strong: #879d6b;
   --color-review-soft: #9ab07e;
-  --color-on-review: #ffffff;
+  --color-on-review: #1f2d18;
   --color-review-ink: #486d3c;
 
   /* Verde salvia claro de las acciones de consulta en las bandejas de
@@ -719,38 +719,44 @@ html {
   }
 }
 
-:root {
-  /* Parpadeo de «En solicitud de cierre»: entre el tono sutil y el bosque
-     de las etiquetas, así sigue al tema sin valores propios. */
-  --blink-gray-bg: var(--color-tag-subtle);
-  --blink-gray-text: var(--color-on-tag-subtle);
-  --blink-gold-bg: var(--color-tag-forest);
-  --blink-gold-text: var(--color-on-tag-forest);
-}
-
-@keyframes blink-gold-gray {
+/* La pill de "En solicitud de cierre" conserva tag-forest y solo un anillo
+   pulsa con opacidad; el contraste del texto no cambia. */
+@keyframes blink-opacity {
   0%,
   100% {
-    background-color: var(--blink-gray-bg);
-    color: var(--blink-gray-text);
+    opacity: 1;
   }
   50% {
-    background-color: var(--blink-gold-bg);
-    color: var(--blink-gold-text);
+    opacity: 0.35;
   }
 }
 
-.blink-gold-gray {
-  animation: blink-gold-gray 2.8s ease-in-out infinite;
+.pill-pulse {
+  position: relative;
 }
 
-/* "En solicitud de cierre" queda dorado estático (sin parpadeo) cuando el
-   usuario prefiere menos movimiento. */
+.pill-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 2px solid var(--color-tag-forest);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: blink-opacity 2.8s ease-in-out infinite;
+}
+
+.blink-opacity {
+  animation: blink-opacity 2.8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .blink-gold-gray {
+  .pill-pulse::after {
     animation: none;
-    background-color: var(--blink-gold-bg);
-    color: var(--blink-gold-text);
+    opacity: 0.6;
+  }
+
+  .blink-opacity {
+    animation: none;
   }
 }
 

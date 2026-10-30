@@ -35,7 +35,7 @@ describe('NotificationsGateway', () => {
      * ws-auth.service.spec.ts — para no volver a probar la consulta a la
      * base de datos aquí.
      */
-    function makeWsAuth(result: { ok: true; userId: number } | { ok: false; motivo: string }) {
+    function makeWsAuth(result: { ok: true; userId: number; exp: number | null } | { ok: false; motivo: string }) {
       return { authenticate: vi.fn().mockResolvedValue(result) };
     }
 
@@ -67,7 +67,7 @@ describe('NotificationsGateway', () => {
     });
 
     it('con un access token válido, une al cliente a su room user:{id} y confirma la conexión', async () => {
-      const gateway = new NotificationsGateway(makeWsAuth({ ok: true, userId: 7 }) as any);
+      const gateway = new NotificationsGateway(makeWsAuth({ ok: true, userId: 7, exp: null }) as any);
       const socket = makeSocket({ auth: { token: 'token-valido' } });
 
       await gateway.handleConnection(socket as any);

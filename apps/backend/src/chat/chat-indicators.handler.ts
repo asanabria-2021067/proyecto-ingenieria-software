@@ -1,5 +1,6 @@
 import type { Socket } from 'socket.io';
 import { PrismaService } from '../prisma/prisma.service';
+import { puedeEntrarAConversacion } from './chat-acceso';
 
 /** Indicadores efímeros del chat (no se persisten). */
 export class ChatIndicatorsHandler {
@@ -14,11 +15,7 @@ export class ChatIndicatorsHandler {
     const idConversacion = data?.idConversacion;
     if (!userId || !Number.isInteger(idConversacion)) return { ok: false };
 
-    const participa = await this.prisma.conversacionParticipante.findUnique({
-      where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
-      select: { idUsuario: true },
-    });
-    if (!participa) return { ok: false };
+    if (!(await puedeEntrarAConversacion(this.prisma, idConversacion, userId))) return { ok: false };
 
     client.to(`conversation:${idConversacion}`).emit('typing', { idConversacion, idUsuario: userId });
     return { ok: true };

@@ -26,15 +26,19 @@ function makeSocket(token?: string) {
     leave: vi.fn(),
     emit: vi.fn(),
     disconnect: vi.fn(),
+    once: vi.fn(),
   };
 }
 
 function makeGateway(options: { estado?: EstadoUsuario | null; participa?: boolean } = {}) {
   const estado = options.estado === undefined ? EstadoUsuario.ACTIVO : options.estado;
-  const participante = vi.fn().mockResolvedValue(options.participa ? { idUsuario: 7 } : null);
+  const participante = vi
+    .fn()
+    .mockResolvedValue(options.participa ? { esCanal: false, idProyecto: null, proyecto: null } : null);
   const prisma = {
     usuario: { findUnique: vi.fn().mockResolvedValue(estado ? { estado } : null) },
-    conversacionParticipante: { findUnique: participante },
+    conversacion: { findFirst: participante },
+    participacionProyecto: { findFirst: vi.fn().mockResolvedValue(null) },
   } as unknown as PrismaService;
   const gateway = new ChatGateway(new WsAuthService(new JwtService({ secret: SYNTHETIC_JWT_SECRET }), prisma), prisma);
   return { gateway, participante };
@@ -100,10 +104,11 @@ describe('G07-C03: el gateway de chat exige la política de acceso', () => {
       await gateway.handleConnection(socket as never);
       const ack = await gateway.joinConversation(socket as never, { idConversacion: 3 });
 
-      expect(participante).toHaveBeenCalledWith({
-        where: { idConversacion_idUsuario: { idConversacion: 3, idUsuario: 7 } },
-        select: { idUsuario: true },
-      });
+      expect(participante).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { idConversacion: 3, eliminadaEn: null, participantes: { some: { idUsuario: 7 } } },
+        }),
+      );
       expect(socket.join).toHaveBeenCalledWith('conversation:3');
       expect(ack).toEqual({ joined: true });
     });
@@ -118,5 +123,42 @@ describe('G07-C03: el gateway de chat exige la política de acceso', () => {
       expect(ack).toEqual({ joined: false });
       expect(socket.join).not.toHaveBeenCalledWith('conversation:3');
     });
+  });
+});
+
+describe('G07-C03: el socket de chat se cierra cuando vence su access token', () => {
+  it('se desconecta al llegar exp y no antes, y deja exp en client.data', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const { gateway } = makeGateway();
+      const socket = makeSocket(sign({ sub: 7, correo: 'c@uvg.edu.gt', tipo: 'access' }));
+
+      await gateway.handleConnection(socket as never);
+
+      vi.advanceTimersByTime(3_599_000);
+      expect(socket.disconnect).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(2_000);
+      expect(socket.disconnect).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('el timer se limpia al desconectarse el socket', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const { gateway } = makeGateway();
+      const socket = makeSocket(access());
+
+      await gateway.handleConnection(socket as never);
+      expect(vi.getTimerCount()).toBe(1);
+      const [evento, limpiar] = socket.once.mock.calls[0];
+      expect(evento).toBe('disconnect');
+      limpiar();
+
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

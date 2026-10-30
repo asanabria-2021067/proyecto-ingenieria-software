@@ -297,6 +297,24 @@ const proyectoDetalleSelect = {
 // (51 KB con 236 tareas, sin importar el Sprint); el tablero las pide aparte.
 const { tareas: _tareasDetalle, ...proyectoDetallePublicoSelect } = proyectoDetalleSelect;
 
+// Sin sesión no se exponen datos de contacto (correo del líder ni de la organización).
+const { correo: _correoCreador, ...creadorAnonimoSelect } = proyectoDetallePublicoSelect.creador.select;
+const {
+  correoContacto: _correoContacto,
+  telefonoContacto: _telefonoContacto,
+  ...organizacionAnonimaSelect
+} = proyectoDetallePublicoSelect.organizaciones.select.organizacion.select;
+const proyectoDetalleAnonimoSelect = {
+  ...proyectoDetallePublicoSelect,
+  creador: { select: creadorAnonimoSelect },
+  organizaciones: {
+    select: {
+      ...proyectoDetallePublicoSelect.organizaciones.select,
+      organizacion: { select: organizacionAnonimaSelect },
+    },
+  },
+} as const;
+
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -576,14 +594,14 @@ export class ProjectsService {
     };
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, conSesion: boolean) {
     const proyecto = await this.prisma.proyecto.findFirst({
       where: {
         idProyecto: id,
         estadoProyecto: { in: ESTADOS_CON_DETALLE },
         eliminadoEn: null,
       },
-      select: proyectoDetallePublicoSelect,
+      select: conSesion ? proyectoDetallePublicoSelect : proyectoDetalleAnonimoSelect,
     });
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
@@ -1159,9 +1177,6 @@ export class ProjectsService {
       data: {
         estadoProyecto: nuevoEstado as EstadoProyecto,
         fechaActualizacion: new Date(),
-        ...(nuevoEstado === EstadoProyectoCreador.PUBLICADO && {
-          fechaPublicacion: new Date(),
-        }),
       },
       select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
     });
@@ -1181,10 +1196,7 @@ export class ProjectsService {
       effects,
     );
 
-    if (
-      nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
-      nuevoEstado === EstadoProyectoCreador.EN_PROGRESO
-    ) {
+    if (nuevoEstado === EstadoProyectoCreador.EN_PROGRESO) {
       const participaciones = await tx.participacionProyecto.findMany({
         where: {
           estadoParticipacion: 'ACTIVO',
@@ -1206,23 +1218,7 @@ export class ProjectsService {
       }
     }
 
-    if (nuevoEstado === EstadoProyectoCreador.PUBLICADO) {
-      await this.notifications.persistTemplateTx(
-        tx,
-        [proyecto.creadoPor],
-        'PROYECTO_PUBLICADO',
-        {
-          projectTitle: actualizado.tituloProyecto,
-          projectId: actualizado.idProyecto,
-        },
-        effects,
-      );
-    }
-
-    if (
-      nuevoEstado === EstadoProyectoCreador.PUBLICADO ||
-      estadoAnterior === EstadoProyecto.PUBLICADO
-    ) {
+    if (estadoAnterior === EstadoProyecto.PUBLICADO) {
       // I/O de caché fuera del lock: efecto post-commit.
       effects.add({ key: 'cache:projects:featured', publish: () => this._invalidateFeaturedCache() });
     }

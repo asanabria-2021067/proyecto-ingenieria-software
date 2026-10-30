@@ -79,7 +79,7 @@ function makeService(
   return new ProjectsService(
     prisma as unknown as PrismaService,
     notificationsDouble,
-    {} as unknown as Cache,
+    { del: vi.fn().mockResolvedValue(undefined) } as unknown as Cache,
     makeProjectTransactionDouble({ tx: prisma }),
     makeProjectPolicyDouble(),
     makeProjectReadPolicyDouble(),
@@ -112,7 +112,7 @@ describe('ProjectsService', () => {
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5 });
     const service = makeService(prisma);
 
-    await service.findOne(5);
+    await service.findOne(5, true);
 
     const select = prisma.proyecto.findFirst.mock.calls[0][0].select as Record<string, unknown>;
     expect(select).not.toHaveProperty('tareas');
@@ -121,11 +121,40 @@ describe('ProjectsService', () => {
     expect(select).toHaveProperty('hitos');
   });
 
+  it('findOne sin sesión usa el select anónimo: sin correo del líder ni contacto de la organización', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5 });
+    const service = makeService(prisma);
+
+    await service.findOne(5, false);
+
+    const select = prisma.proyecto.findFirst.mock.calls[0][0].select;
+    const json = JSON.stringify(select);
+    expect(json).not.toContain('correo');
+    expect(json).not.toContain('telefonoContacto');
+    expect(select.creador.select).not.toHaveProperty('correo');
+    expect(select.creador.select).toHaveProperty('nombre');
+    expect(select.organizaciones.select.organizacion.select).not.toHaveProperty('correoContacto');
+    expect(select.organizaciones.select.organizacion.select).not.toHaveProperty('telefonoContacto');
+  });
+
+  it('findOne con sesión conserva creador.correo y el contacto de la organización', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 5 });
+    const service = makeService(prisma);
+
+    await service.findOne(5, true);
+
+    const select = prisma.proyecto.findFirst.mock.calls[0][0].select;
+    expect(select.creador.select.correo).toBe(true);
+    expect(select.organizaciones.select.organizacion.select.correoContacto).toBe(true);
+  });
+
   it('findOne falla cuando no existe', async () => {
     const prisma = makePrisma();
     prisma.proyecto.findFirst.mockResolvedValue(null);
     const service = makeService(prisma);
-    await expect(service.findOne(999)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findOne(999, false)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   /**
@@ -139,7 +168,7 @@ describe('ProjectsService', () => {
     prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 57, estadoProyecto: 'EN_SOLICITUD_CIERRE' });
     const service = makeService(prisma);
 
-    await service.findOne(57);
+    await service.findOne(57, false);
 
     const where = prisma.proyecto.findFirst.mock.calls[0][0].where as {
       estadoProyecto: { in: string[] };
@@ -320,8 +349,47 @@ describe('ProjectsService', () => {
       creadoPor: 1,
     });
     const service = makeService(prisma);
-    await expect(service.changeEstado(1, 1, EstadoProyectoCreador.PUBLICADO)).rejects.toBeInstanceOf(
-      BadRequestException,
+    await expect(
+      service.changeEstado(1, 1, 'PUBLICADO' as unknown as EstadoProyectoCreador),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('changeEstado: el líder no puede publicar un BORRADOR (solo la revisión administrativa publica)', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({
+      idProyecto: 1,
+      estadoProyecto: EstadoProyecto.BORRADOR,
+      creadoPor: 1,
+    });
+    const service = makeService(prisma);
+
+    await expect(
+      service.changeEstado(1, 1, 'PUBLICADO' as unknown as EstadoProyectoCreador),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.proyecto.update).not.toHaveBeenCalled();
+  });
+
+  it('changeEstado: PUBLICADO -> EN_PROGRESO sigue funcionando', async () => {
+    const prisma = makePrisma();
+    prisma.proyecto.findFirst.mockResolvedValue({
+      idProyecto: 1,
+      estadoProyecto: EstadoProyecto.PUBLICADO,
+      creadoPor: 1,
+    });
+    prisma.proyecto.update.mockResolvedValue({
+      idProyecto: 1,
+      estadoProyecto: EstadoProyecto.EN_PROGRESO,
+      tituloProyecto: 'P',
+    });
+    prisma.participacionProyecto.findMany.mockResolvedValue([]);
+    const service = makeService(prisma);
+
+    await service.changeEstado(1, 1, EstadoProyectoCreador.EN_PROGRESO);
+
+    expect(prisma.proyecto.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ estadoProyecto: EstadoProyecto.EN_PROGRESO }),
+      }),
     );
   });
 

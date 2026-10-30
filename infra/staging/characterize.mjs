@@ -13,7 +13,9 @@ import https from 'node:https';
 import { fileURLToPath } from 'node:url';
 
 export const LOCAL_HOSTS = ['127.0.0.1', 'localhost', '::1'];
-export const EXPECTED_HSTS = 'max-age=31536000; includeSubDomains';
+// G06-H7: HSTS del borde (nginx). Sin includeSubDomains ni preload: el dominio es un nip.io compartido.
+// nginx oculta el de Helmet en /api, asi que en /api tambien se ve este valor.
+export const EXPECTED_HSTS = 'max-age=31536000';
 
 export function assertLocalHost(host) {
   if (!LOCAL_HOSTS.includes(host)) {
@@ -42,7 +44,7 @@ function request({ host, port, path, secure, headers = {} }) {
 export const CHECKS = [
   {
     id: 'HARN-01',
-    title: '/api por HTTPS responde con el set de Helmet y el HSTS actual',
+    title: '/api por HTTPS responde con el set de Helmet y el HSTS del borde (un solo valor)',
     request: { path: '/api', secure: true, headers: { Accept: 'application/json' } },
     verify: (r) => [
       r.status === 200 || `status ${r.status} != 200`,
@@ -66,13 +68,13 @@ export const CHECKS = [
   },
   {
     // G06-C02: antes / no traía ninguna cabecera de seguridad; ahora trae las
-    // cabeceras base del frontend. HSTS sigue siendo solo del backend (/api).
+    // cabeceras base del frontend. G06-H7: el HSTS lo pone el borde en todo el server.
     id: 'HARN-04',
-    title: '/ por HTTPS con las cabeceras base del frontend (G06) y sin HSTS',
+    title: '/ por HTTPS con las cabeceras base del frontend (G06) y el HSTS del borde',
     request: { path: '/', secure: true, headers: { Accept: 'text/html' } },
     verify: (r) => [
       r.status < 500 || `status ${r.status}`,
-      r.headers['strict-transport-security'] === undefined || 'HSTS en /',
+      r.headers['strict-transport-security'] === EXPECTED_HSTS || `HSTS=${r.headers['strict-transport-security']}`,
       r.headers['x-frame-options'] === 'DENY' || `X-Frame-Options=${r.headers['x-frame-options']}`,
       r.headers['x-content-type-options'] === 'nosniff' || 'falta nosniff en /',
       r.headers['content-security-policy'] === "frame-ancestors 'none'" || `CSP=${r.headers['content-security-policy']}`,
@@ -82,9 +84,12 @@ export const CHECKS = [
   },
   {
     id: 'HARN-05',
-    title: 'HTTP plano sigue sirviendo /api sin redireccion (sin H4)',
+    title: 'HTTP plano redirige /api a HTTPS con 301 (H4)',
     request: { path: '/api', secure: false, headers: { Accept: 'application/json' } },
-    verify: (r) => [r.status === 200 || `status ${r.status} != 200`],
+    verify: (r) => [
+      r.status === 301 || `status ${r.status} != 301`,
+      /^https:\/\/[^/]+\/api$/.test(r.headers.location ?? '') || `Location=${r.headers.location}`,
+    ],
   },
 ];
 
@@ -233,8 +238,8 @@ export async function characterizeSpoofing({ host = '127.0.0.1', httpsPort, logi
 
 /**
  * T17/T18/T21 (G06-C08): contratos de navegador a través de nginx con TLS.
- * T17: cabeceras exactas del frontend (G06-C02/C03/C04). T21: HSTS exacto de
- * la API, sin preload, y ausente en el frontend. T18: con COOKIE_SECURE=true
+ * T17: cabeceras exactas del frontend (G06-C02/C03/C04, HSTS del borde G06-H7).
+ * T21: HSTS exacto de la API, sin preload. T18: con COOKIE_SECURE=true
  * las cookies de sesión llevan Secure, HttpOnly y SameSite=Lax. Solo se
  * reportan nombres de cabeceras y atributos, nunca valores de cookies.
  */
@@ -244,6 +249,7 @@ export const EXPECTED_FRONTEND_HEADERS = {
   'referrer-policy': 'strict-origin-when-cross-origin',
   'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
   'content-security-policy': "frame-ancestors 'none'",
+  'strict-transport-security': EXPECTED_HSTS,
 };
 export const REQUIRED_REPORT_ONLY_DIRECTIVES = ["default-src 'self'", "object-src 'none'", "base-uri 'self'", "frame-ancestors 'none'"];
 
@@ -260,10 +266,8 @@ export function verifyFrontendHeaders(headers) {
       failures.push(`report-only sin ${directive}`);
     }
   }
-  for (const name of ['x-powered-by', 'strict-transport-security']) {
-    if (headers[name] !== undefined) {
-      failures.push(`${name} presente`);
-    }
+  if (headers['x-powered-by'] !== undefined) {
+    failures.push('x-powered-by presente');
   }
   return failures;
 }

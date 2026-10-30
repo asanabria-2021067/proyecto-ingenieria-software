@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { JwtService } from '@nestjs/jwt';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
+import type { SecurityRequestContext } from '../src/security-events/request-context';
 import { AuthService, accountAttemptKey } from '../src/auth/auth.service';
 import {
   AccountAttemptsService,
@@ -32,7 +33,7 @@ function setup(store?: AttemptBackingStore) {
     usuario: {
       // La búsqueda en la base es exacta (como hoy); solo el contador se normaliza.
       findUnique: vi.fn(async ({ where }: { where: { correo: string } }) =>
-        accountAttemptKey(where.correo) === CORREO
+        accountAttemptKey(where.correo).split('|')[0] === CORREO
           ? { idUsuario: 1, correo: CORREO, contrasena: HASH, estado: 'ACTIVO' }
           : null,
       ),
@@ -46,9 +47,10 @@ function setup(store?: AttemptBackingStore) {
     {} as NotificationsService,
     attempts,
   );
-  const login = (correo: string, contrasena: string) => service.login({ correo, contrasena });
-  const outcome = async (correo: string, contrasena: string) =>
-    login(correo, contrasena).then(
+  const login = (correo: string, contrasena: string, ip?: string) =>
+    service.login({ correo, contrasena }, ip ? ({ ip } as SecurityRequestContext) : undefined);
+  const outcome = async (correo: string, contrasena: string, ip?: string) =>
+    login(correo, contrasena, ip).then(
       () => 'OK',
       (error: unknown) => {
         expect(error).toBeInstanceOf(UnauthorizedException);
@@ -72,6 +74,27 @@ describe('G04-C06: bloqueo temporal por cuenta en login', () => {
 
     expect(await outcome(CORREO, PASSWORD)).toBe(generica);
     expect(prisma.tokenRefresco.create).not.toHaveBeenCalled();
+  });
+
+  it('5 fallos desde la IP A no bloquean la misma cuenta desde la IP B, y desde A si', async () => {
+    const { outcome } = setup();
+    for (let i = 0; i < 5; i += 1) {
+      expect(await outcome(CORREO, 'Incorrecta1', '10.0.0.1')).not.toBe('OK');
+    }
+    expect(await outcome(CORREO, PASSWORD, '10.0.0.2')).toBe('OK');
+    expect(await outcome(CORREO, PASSWORD, '10.0.0.1')).not.toBe('OK');
+  });
+
+  it('sin origen (ip null) el login sigue pasando y se cuenta aparte', async () => {
+    const { outcome } = setup();
+    await failTimes(outcome, CORREO, 4);
+    expect(await outcome(CORREO, PASSWORD)).toBe('OK');
+    expect(await outcome(CORREO, PASSWORD, '10.0.0.1')).toBe('OK');
+  });
+
+  it('accountAttemptKey incluye la IP normalizando el correo', () => {
+    expect(accountAttemptKey(' ANA@uvg.edu.gt ', '1.2.3.4')).toBe('ana@uvg.edu.gt|1.2.3.4');
+    expect(accountAttemptKey('ana@uvg.edu.gt')).toBe('ana@uvg.edu.gt|');
   });
 
   it('el bloqueo dura 15 minutos y después la cuenta vuelve a entrar', async () => {

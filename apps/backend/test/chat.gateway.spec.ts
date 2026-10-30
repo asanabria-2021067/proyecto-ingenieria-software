@@ -19,12 +19,13 @@ function makeSocket(overrides: Partial<{ auth: Record<string, unknown>; headers:
   };
 }
 
-function makeGateway(prismaOverrides: { findUnique?: ReturnType<typeof vi.fn> } = {}) {
+const CANAL = { esCanal: true, idProyecto: 10, proyecto: { creadoPor: 1, eliminadoEn: null } };
+
+function makeGateway(prismaOverrides: { findFirst?: ReturnType<typeof vi.fn>; participacion?: ReturnType<typeof vi.fn> } = {}) {
   const jwtService = { verifyAsync: vi.fn() };
   const prisma = {
-    conversacionParticipante: {
-      findUnique: prismaOverrides.findUnique ?? vi.fn(),
-    },
+    conversacion: { findFirst: prismaOverrides.findFirst ?? vi.fn() },
+    participacionProyecto: { findFirst: prismaOverrides.participacion ?? vi.fn().mockResolvedValue(null) },
     // G07-C03: la política del handshake consulta el estado de la cuenta.
     usuario: { findUnique: vi.fn().mockResolvedValue({ estado: 'ACTIVO' }) },
   };
@@ -92,36 +93,75 @@ describe('ChatGateway', () => {
 
   describe('joinConversation — un usuario ajeno al proyecto no puede unirse a la sala ni leer mensajes', () => {
     it('sin fila en ConversacionParticipante, no une al cliente a la room de la conversación', async () => {
-      const findUnique = vi.fn().mockResolvedValue(null);
-      const { gateway } = makeGateway({ findUnique });
+      const findFirst = vi.fn().mockResolvedValue(null);
+      const { gateway } = makeGateway({ findFirst });
       const socket = makeSocket();
       socket.data.userId = 99;
 
       const ack = await gateway.joinConversation(socket as any, { idConversacion: 1 });
 
-      expect(findUnique).toHaveBeenCalledWith({
-        where: { idConversacion_idUsuario: { idConversacion: 1, idUsuario: 99 } },
-        select: { idUsuario: true },
-      });
+      expect(findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { idConversacion: 1, eliminadaEn: null, participantes: { some: { idUsuario: 99 } } },
+        }),
+      );
       expect(socket.join).not.toHaveBeenCalled();
       expect(ack).toEqual({ joined: false });
     });
 
+    it('ex lider sin participacion activa en #general no entra a la room', async () => {
+      const { gateway } = makeGateway({ findFirst: vi.fn().mockResolvedValue(CANAL) });
+      const socket = makeSocket();
+      socket.data.userId = 5;
+
+      await expect(gateway.joinConversation(socket as any, { idConversacion: 3 })).resolves.toEqual({ joined: false });
+      expect(socket.join).not.toHaveBeenCalled();
+    });
+
+    it('miembro activo en #general entra a la room', async () => {
+      const { gateway } = makeGateway({
+        findFirst: vi.fn().mockResolvedValue(CANAL),
+        participacion: vi.fn().mockResolvedValue({ idParticipacion: 1 }),
+      });
+      const socket = makeSocket();
+      socket.data.userId = 5;
+
+      await expect(gateway.joinConversation(socket as any, { idConversacion: 3 })).resolves.toEqual({ joined: true });
+      expect(socket.join).toHaveBeenCalledWith('conversation:3');
+    });
+
+    it('lider vigente en #general entra a la room', async () => {
+      const { gateway } = makeGateway({ findFirst: vi.fn().mockResolvedValue(CANAL) });
+      const socket = makeSocket();
+      socket.data.userId = 1;
+
+      await expect(gateway.joinConversation(socket as any, { idConversacion: 3 })).resolves.toEqual({ joined: true });
+    });
+
+    it('conversacion eliminada: joined false', async () => {
+      const { gateway } = makeGateway({ findFirst: vi.fn().mockResolvedValue(null) });
+      const socket = makeSocket();
+      socket.data.userId = 5;
+
+      await expect(gateway.joinConversation(socket as any, { idConversacion: 3 })).resolves.toEqual({ joined: false });
+      expect(socket.join).not.toHaveBeenCalled();
+    });
+
     it('sin userId autenticado en el socket, ni siquiera consulta la participación', async () => {
-      const findUnique = vi.fn();
-      const { gateway } = makeGateway({ findUnique });
+      const findFirst = vi.fn();
+      const { gateway } = makeGateway({ findFirst });
       const socket = makeSocket();
 
       const ack = await gateway.joinConversation(socket as any, { idConversacion: 1 });
 
-      expect(findUnique).not.toHaveBeenCalled();
+      expect(findFirst).not.toHaveBeenCalled();
       expect(socket.join).not.toHaveBeenCalled();
       expect(ack).toEqual({ joined: false });
     });
 
     it('con fila en ConversacionParticipante, sí une al cliente a la room conversation:{id} y confirma con { joined: true }', async () => {
-      const findUnique = vi.fn().mockResolvedValue({ idUsuario: 5 });
-      const { gateway } = makeGateway({ findUnique });
+      const findFirst = vi.fn().mockResolvedValue({ idUsuario: 5 });
+      const { gateway } = makeGateway({ findFirst });
       const socket = makeSocket();
       socket.data.userId = 5;
 
@@ -172,8 +212,8 @@ describe('ChatGateway', () => {
 
   describe('typing', () => {
     it('un participante emite typing al resto de la room (sin incluirse)', async () => {
-      const findUnique = vi.fn().mockResolvedValue({ idUsuario: 5 });
-      const { gateway } = makeGateway({ findUnique });
+      const findFirst = vi.fn().mockResolvedValue({ idUsuario: 5 });
+      const { gateway } = makeGateway({ findFirst });
       const emit = vi.fn();
       const socket = { ...makeSocket(), to: vi.fn(() => ({ emit })) };
       socket.data.userId = 5;
@@ -185,8 +225,17 @@ describe('ChatGateway', () => {
       expect(ack).toEqual({ ok: true });
     });
 
+    it('ex lider sin participacion activa en #general: ok false', async () => {
+      const { gateway } = makeGateway({ findFirst: vi.fn().mockResolvedValue(CANAL) });
+      const socket = { ...makeSocket(), to: vi.fn() };
+      socket.data.userId = 5;
+
+      await expect(gateway.typing(socket as any, { idConversacion: 3 })).resolves.toEqual({ ok: false });
+      expect(socket.to).not.toHaveBeenCalled();
+    });
+
     it('un ajeno a la conversacion no emite nada', async () => {
-      const { gateway } = makeGateway({ findUnique: vi.fn().mockResolvedValue(null) });
+      const { gateway } = makeGateway({ findFirst: vi.fn().mockResolvedValue(null) });
       const socket = { ...makeSocket(), to: vi.fn() };
       socket.data.userId = 99;
 

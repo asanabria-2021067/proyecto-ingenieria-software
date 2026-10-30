@@ -60,6 +60,36 @@ describe('parseMetadata', () => {
   });
 });
 
+describe('parseMetadata con entradas hostiles', () => {
+  const MAX_MS = 50;
+  const medir = (html: string) => {
+    const inicio = performance.now();
+    parseMetadata(html, page);
+    return performance.now() - inicio;
+  };
+
+  it.each([
+    ['512 KB de "<"', '<'.repeat(512 * 1024)],
+    ['<meta con 60000 caracteres', '<meta ' + 'a'.repeat(60000)],
+    ['100000 "<meta " repetidos', '<meta '.repeat(100000)],
+    ['100000 "<title " repetidos', '<title '.repeat(100000)],
+    ['16 etiquetas <meta con 4089 letras sin "="', ('<meta ' + 'a'.repeat(4089) + '>').repeat(16)],
+    ['16 etiquetas <meta con "a-" repetido', ('<meta ' + 'a-'.repeat(2040) + '>').repeat(16)],
+    ['og:description con 100k "<"', `<meta property="og:description" content="${'<'.repeat(100000)}">`],
+  ])('termina en menos de 50 ms: %s', (_nombre, html) => {
+    expect(medir(html)).toBeLessThan(MAX_MS);
+  });
+
+  it('el HTML normal sigue produciendo los mismos metadatos', () => {
+    const html = `<html><head><title>Fallback</title>
+      <meta property="og:title" content="Titulo OG">
+      <meta property="og:description" content="Descripcion OG">
+      <meta property="og:image" content="/x.png"></head></html>`;
+    expect(parseMetadata(html, page)).toEqual({ titulo: 'Titulo OG', descripcion: 'Descripcion OG', sitio: 'example.com' });
+    expect(parseMetadata('<title>  Hola  mundo </title>', page).titulo).toBe('Hola mundo');
+  });
+});
+
 describe('cleanText', () => {
   it('devuelve null para vacio o solo espacios', () => {
     expect(cleanText(undefined, 10)).toBeNull();

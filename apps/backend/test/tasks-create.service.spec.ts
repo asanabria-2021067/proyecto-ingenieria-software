@@ -44,7 +44,10 @@ function makePrisma(tx = makeTx()) {
 }
 
 function makeAuthorization() {
-  const authorization = { assertCanCreateTask: vi.fn().mockResolvedValue(undefined) };
+  const authorization = {
+    assertCanCreateTask: vi.fn().mockResolvedValue(undefined),
+    assertCanAssignOnCreate: vi.fn().mockResolvedValue(undefined),
+  };
   return authorization as typeof authorization & TasksAuthorizationService;
 }
 
@@ -78,8 +81,9 @@ function makeService(
   auth: TasksAuthorizationService,
   relations: TasksRelationsService,
   notifications: NotificationsService,
+  policy = makeProjectPolicyDouble(),
 ) {
-  return new TasksService(prisma, auth, relations, notifications, makeContext(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
+  return new TasksService(prisma, auth, relations, notifications, makeContext(), new ProjectTransactionService(prisma as unknown as PrismaService), policy, makeProjectReadPolicyDouble(), makeTimeRecordsDouble());
 }
 
 const BASE_DTO = {
@@ -414,7 +418,7 @@ describe('TasksService.create', () => {
       const orden: string[] = [];
       const tx = makeTx();
       const prisma = makePrisma(tx);
-      const authLiteral = { assertCanCreateTask: vi.fn(async () => { orden.push('autorizacion'); }) };
+      const authLiteral = { assertCanCreateTask: vi.fn(async () => { orden.push('autorizacion'); }), assertCanAssignOnCreate: vi.fn().mockResolvedValue(undefined) };
       const auth = authLiteral as typeof authLiteral & TasksAuthorizationService;
       const relationsLiteral = {
         validateCreateTaskRelations: vi.fn(async () => {
@@ -620,6 +624,91 @@ describe('TasksService.create', () => {
       expect(prisma.tarea).toBeUndefined();
       expect(prisma.asignacionTarea).toBeUndefined();
       expect(prisma.tareaEtiqueta).toBeUndefined();
+    });
+  });
+
+  describe('asignación inicial y etiquetas exigen autoridad', () => {
+    function setup(authOverrides: Record<string, unknown> = {}, policy = makeProjectPolicyDouble()) {
+      const tx = makeTx();
+      const prisma = makePrisma(tx);
+      const auth = Object.assign(makeAuthorization(), authOverrides);
+      const relations = makeRelations();
+      const notifications = makeNotifications();
+      tx.tarea.create.mockResolvedValue({ idTarea: 100 });
+      tx.tarea.findFirst.mockResolvedValue(tareaRow());
+      const service = makeService(prisma, auth, relations, notifications, policy);
+      return { tx, auth, relations, policy, service };
+    }
+
+    it('con idUsuarioAsignado verifica la autoridad de asignación con el rol de la tarea', async () => {
+      const { auth, tx, service } = setup();
+
+      await service.create(5, 1, { ...BASE_DTO, idUsuarioAsignado: 3, idRolProyecto: 6 });
+
+      expect(auth.assertCanAssignOnCreate).toHaveBeenCalledWith(5, 1, 6, tx);
+    });
+
+    it('sin idRolProyecto pasa null a la verificación', async () => {
+      const { auth, tx, service } = setup();
+
+      await service.create(5, 1, { ...BASE_DTO, idUsuarioAsignado: 3 });
+
+      expect(auth.assertCanAssignOnCreate).toHaveBeenCalledWith(5, 1, null, tx);
+    });
+
+    it('sin idUsuarioAsignado no se verifica asignación', async () => {
+      const { auth, service } = setup();
+
+      await service.create(5, 1, BASE_DTO);
+
+      expect(auth.assertCanAssignOnCreate).not.toHaveBeenCalled();
+    });
+
+    it('participante de otro rol: Forbidden y no se crea la tarea ni la asignación', async () => {
+      const { tx, relations, service } = setup({
+        assertCanAssignOnCreate: vi.fn().mockRejectedValue(new ForbiddenException('No tienes permiso')),
+      });
+
+      await expect(service.create(5, 2, { ...BASE_DTO, idUsuarioAsignado: 3, idRolProyecto: 9 })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+
+      expect(relations.validateCreateTaskRelations).not.toHaveBeenCalled();
+      expect(tx.tarea.create).not.toHaveBeenCalled();
+      expect(tx.asignacionTarea.create).not.toHaveBeenCalled();
+    });
+
+    it('idsEtiquetas en create exige la familia ETIQUETA_TAREA (solo líder)', async () => {
+      const policy = makeProjectPolicyDouble();
+      const { service } = setup({}, policy);
+
+      await service.create(5, 1, { ...BASE_DTO, idsEtiquetas: [1] });
+
+      expect(policy.assertWriteTx).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'ETIQUETA_TAREA', 1, expect.anything());
+    });
+
+    it('sin idsEtiquetas no se exige ETIQUETA_TAREA', async () => {
+      const policy = makeProjectPolicyDouble();
+      const { service } = setup({}, policy);
+
+      await service.create(5, 1, BASE_DTO);
+
+      expect(policy.assertWriteTx).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), 'ETIQUETA_TAREA', expect.anything(), expect.anything());
+    });
+
+    it('participante con idsEtiquetas: Forbidden y no se crea nada', async () => {
+      const policy = makeProjectPolicyDouble();
+      policy.assertWriteTx.mockImplementation(async (_tx: unknown, _p: unknown, familia: string) => {
+        if (familia === 'ETIQUETA_TAREA') {
+          throw new ForbiddenException('Solo el líder');
+        }
+      });
+      const { tx, service } = setup({}, policy);
+
+      await expect(service.create(5, 2, { ...BASE_DTO, idsEtiquetas: [1] })).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(tx.tarea.create).not.toHaveBeenCalled();
+      expect(tx.tareaEtiqueta.createMany).not.toHaveBeenCalled();
     });
   });
 
