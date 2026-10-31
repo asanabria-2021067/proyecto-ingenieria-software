@@ -118,6 +118,29 @@ export class AccountAttemptsService {
     });
   }
 
+  /**
+   * Fallos que le quedan a la clave antes del bloqueo (0 si ya está bloqueada).
+   * La clave es correo+IP exista o no la cuenta, así que el valor es el mismo
+   * para correos registrados y no registrados. Fail-open: ante un fallo interno
+   * devuelve el máximo (no avisa).
+   */
+  remaining(key: string): number {
+    return this.failOpen('remaining', this.policy.maxFailures, () => {
+      const entry = this.store.get(key);
+      const now = this.now();
+      if (!entry) {
+        return this.policy.maxFailures;
+      }
+      if (entry.lockedUntil > now) {
+        return 0;
+      }
+      if (entry.lockedUntil !== 0 || now - entry.windowStart >= this.policy.windowMs) {
+        return this.policy.maxFailures;
+      }
+      return Math.max(0, this.policy.maxFailures - entry.failures);
+    });
+  }
+
   /** Un éxito limpia el contador de la cuenta. Fail-open. */
   recordSuccess(key: string): void {
     this.failOpen('recordSuccess', undefined, () => {

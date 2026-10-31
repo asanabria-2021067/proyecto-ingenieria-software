@@ -169,7 +169,15 @@ export class AuthService {
       if (!bloqueada && pendiente) {
         throw new ForbiddenException(MENSAJE_CUENTA_PENDIENTE);
       }
-      throw new UnauthorizedException("Credenciales inválidas");
+      // NL-T1: intentos que quedan antes del bloqueo temporal. Sale del mismo
+      // contador correo+IP que se alimenta con cuentas inexistentes, así que
+      // un correo registrado y uno que no lo está reciben el mismo número.
+      throw new UnauthorizedException({
+        statusCode: 401,
+        message: "Credenciales inválidas",
+        error: "Unauthorized",
+        intentosRestantes: this.attempts.remaining(cuenta),
+      });
     }
 
     this.attempts.recordSuccess(cuenta);

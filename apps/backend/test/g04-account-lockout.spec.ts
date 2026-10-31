@@ -54,10 +54,18 @@ function setup(store?: AttemptBackingStore) {
       () => 'OK',
       (error: unknown) => {
         expect(error).toBeInstanceOf(UnauthorizedException);
-        return JSON.stringify((error as UnauthorizedException).getResponse());
+        const { intentosRestantes: _omit, ...cuerpo } = (error as UnauthorizedException).getResponse() as Record<string, unknown>;
+        return JSON.stringify(cuerpo);
       },
     );
-  return { service, prisma, login, outcome, advance: (ms: number) => (now += ms) };
+  // NL-T1: el aviso de intentos restantes cambia con cada intento (a propósito);
+  // `outcome` lo omite para seguir comparando que el resto de la respuesta es idéntico.
+  const restantes = async (correo: string, contrasena: string, ip?: string) =>
+    login(correo, contrasena, ip).then(
+      () => null,
+      (error: unknown) => ((error as UnauthorizedException).getResponse() as { intentosRestantes: number }).intentosRestantes,
+    );
+  return { service, prisma, login, outcome, restantes, advance: (ms: number) => (now += ms) };
 }
 
 async function failTimes(fn: (correo: string, pwd: string) => Promise<string>, correo: string, times: number) {
@@ -152,5 +160,34 @@ describe('G04-C06: bloqueo temporal por cuenta en login', () => {
     const { outcome } = setup(roto);
     expect(await outcome(CORREO, 'Incorrecta1')).not.toBe('OK');
     expect(await outcome(CORREO, PASSWORD)).toBe('OK');
+  });
+
+  // NL-T1: aviso «Te quedan N intentos». El contador es correo+IP y también cuenta
+  // las cuentas inexistentes, así que el número no delata si el correo existe.
+  it('intentosRestantes baja igual para un correo registrado y para uno inexistente', async () => {
+    const { restantes } = setup();
+    const existente: (number | null)[] = [];
+    const inexistente: (number | null)[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      existente.push(await restantes(CORREO, 'Incorrecta1', '10.0.0.1'));
+      inexistente.push(await restantes('nadie@uvg.edu.gt', 'Incorrecta1', '10.0.0.1'));
+    }
+    expect(existente).toEqual([4, 3, 2, 1, 0, 0]);
+    expect(inexistente).toEqual(existente);
+  });
+
+  it('con la cuenta bloqueada la contraseña correcta recibe 0 intentos, igual que una incorrecta', async () => {
+    const { restantes } = setup();
+    for (let i = 0; i < 5; i += 1) await restantes(CORREO, 'Incorrecta1');
+    expect(await restantes(CORREO, PASSWORD)).toBe(0);
+  });
+
+  it('el contador es por IP y vuelve al máximo tras el bloqueo', async () => {
+    const { restantes, advance } = setup();
+    await restantes(CORREO, 'Incorrecta1', '10.0.0.1');
+    expect(await restantes(CORREO, 'Incorrecta1', '10.0.0.2')).toBe(4);
+    for (let i = 0; i < 4; i += 1) await restantes(CORREO, 'Incorrecta1', '10.0.0.1');
+    advance(15 * MIN);
+    expect(await restantes(CORREO, 'Incorrecta1', '10.0.0.1')).toBe(4);
   });
 });

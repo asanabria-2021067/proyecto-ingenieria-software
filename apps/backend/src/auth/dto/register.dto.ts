@@ -6,6 +6,7 @@ import {
   Min,
   Max,
   MinLength,
+  MaxLength,
   Matches,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
@@ -21,6 +22,8 @@ export class RegisterDto {
 
   @IsString()
   @MinLength(8)
+  // bcrypt solo usa los primeros 72 bytes: más largo se truncaría en silencio.
+  @MaxLength(72)
   contrasena!: string;
 
   @IsString()
