@@ -3,6 +3,7 @@
   "include": ["src/**/*"],
   "compilerOptions": {
     "rootDir": "./src",
+    "noEmit": false,
     "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
   },
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts", "prisma", "vitest.config.ts"]

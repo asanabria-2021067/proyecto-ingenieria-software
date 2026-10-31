@@ -77,3 +77,8 @@ owasp-wip/
 *.key
 *.p12
 *.pfx
+
+# Salida de tsc accidental junto a la fuente
+apps/backend/vitest.config.js
+apps/backend/vitest.config.d.ts
+apps/backend/vitest.config.js.map
