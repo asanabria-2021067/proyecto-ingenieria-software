@@ -18,6 +18,17 @@ export function isProfileIncomplete(user: UserProfile): boolean {
   );
 }
 
+export const PERFIL_POSPUESTO_KEY = 'perfil_asistente_pospuesto';
+
+// Se guarda el id del usuario para que otra cuenta en la misma pestana no herede el aplazamiento.
+export function perfilPospuesto(idUsuario: number): boolean {
+  try {
+    return sessionStorage.getItem(PERFIL_POSPUESTO_KEY) === String(idUsuario);
+  } catch {
+    return false;
+  }
+}
+
 export function isAdminUser(user?: UserProfile | null): boolean {
   return (user?.roles ?? []).some(
     (r) => r.toLowerCase() === 'administrador',

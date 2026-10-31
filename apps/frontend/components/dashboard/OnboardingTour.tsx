@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { useJoyride, STATUS } from 'react-joyride';
-import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
+import { useCurrentUser, isProfileIncomplete, perfilPospuesto } from '@/hooks/use-current-user';
 import { Button } from '@/components/ui/button';
 
 // Custom Tooltip component for React Joyride
@@ -99,7 +99,8 @@ export default function OnboardingTour() {
 
       // Si el perfil está incompleto (sale la pantalla de "Completa tu perfil"),
       // no mostramos el tour hasta que termine de completarlo, a menos que sea forzado (ayuda)
-      if (isProfileIncomplete(user) && !force) {
+      // Si el usuario aplazó el asistente, el diálogo ya está cerrado y el tour puede correr.
+      if (isProfileIncomplete(user) && !force && !perfilPospuesto(user.idUsuario)) {
         return;
       }
 
@@ -133,6 +134,12 @@ export default function OnboardingTour() {
     return () => {
       window.removeEventListener('start-onboarding-tour', handleStartTour);
     };
+  }, [startTour]);
+
+  useEffect(() => {
+    const handlePospuesto = () => startTour();
+    window.addEventListener('perfil-asistente-pospuesto', handlePospuesto);
+    return () => window.removeEventListener('perfil-asistente-pospuesto', handlePospuesto);
   }, [startTour]);
 
   const handleJoyrideCallback = (data: any) => {
