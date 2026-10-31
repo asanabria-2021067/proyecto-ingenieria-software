@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { Spinner } from '@/components/ui/spinner';
 import logoLight from '@/public/Logo UVG-08.png';
 import logoDark from '@/public/Logo claro.png';
 
@@ -18,6 +19,10 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // NL-T2: /registro tarda en abrir (en desarrollo compila al primer clic) y sin
+  // señal visible el usuario volvía a hacer clic. Se muestra «Abriendo…» al instante.
+  const [abriendoRegistro, setAbriendoRegistro] = useState(false);
+  const etiquetaRegistro = abriendoRegistro ? 'Abriendo…' : 'Registrarse';
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -73,9 +78,12 @@ export default function Navbar() {
             </Link>
             <Link
               href="/registro"
-              className="rounded-xl bg-primary px-5 py-2 text-sm font-bold uppercase tracking-wider text-on-primary shadow-md transition-all duration-200 hover:brightness-110"
+              onClick={() => setAbriendoRegistro(true)}
+              aria-busy={abriendoRegistro}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-bold uppercase tracking-wider text-on-primary shadow-md transition-all duration-200 hover:brightness-110"
             >
-              Registrarse
+              {abriendoRegistro && <Spinner aria-label="Cargando" />}
+              {etiquetaRegistro}
             </Link>
             <ThemeToggle />
           </div>
@@ -113,10 +121,13 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/registro"
-                className="rounded-xl bg-primary px-4 py-2 text-center text-sm font-bold uppercase tracking-wider text-on-primary"
-                onClick={() => setMenuOpen(false)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-center text-sm font-bold uppercase tracking-wider text-on-primary"
+                // El menú queda abierto para que se vea «Abriendo…» hasta que cargue el formulario.
+                onClick={() => setAbriendoRegistro(true)}
+                aria-busy={abriendoRegistro}
               >
-                Registrarse
+                {abriendoRegistro && <Spinner aria-label="Cargando" />}
+                {etiquetaRegistro}
               </Link>
             </div>
           </div>
