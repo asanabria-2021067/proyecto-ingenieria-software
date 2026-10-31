@@ -134,8 +134,10 @@ export class AuthService {
     const pendiente = usuario?.estado === EstadoUsuario.PENDIENTE_VERIFICACION && contrasenaValida;
 
     if (bloqueada || !usuario || !contrasenaValida || usuario.estado !== EstadoUsuario.ACTIVO) {
-      // Cuenta inexistente o contraseña incorrecta suman al contador por igual.
-      const bloqueoNuevo = !bloqueada && (!usuario || !contrasenaValida) && this.attempts.recordFailure(cuenta);
+      // Todo 401 suma al contador por igual (cuenta inexistente, contraseña incorrecta,
+      // INACTIVO/BLOQUEADO con la contraseña correcta): así intentosRestantes sigue la
+      // misma secuencia y no delata la cuenta. Solo PENDIENTE (403, documentado) no suma.
+      const bloqueoNuevo = !bloqueada && !pendiente && this.attempts.recordFailure(cuenta);
       const cuentaRef = usuario ? {} : { cuentaRef: accountReference(loginDto.correo) };
       // G05 (OWASP25-C037): un evento por intento, tras conocer el resultado.
       // Una cuenta inexistente se identifica solo con una referencia

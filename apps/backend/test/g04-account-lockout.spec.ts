@@ -26,7 +26,7 @@ const CORREO = 'ana@uvg.edu.gt';
 const PASSWORD = 'Correcta123';
 const HASH = bcrypt.hashSync(PASSWORD, 4);
 
-function setup(store?: AttemptBackingStore) {
+function setup(store?: AttemptBackingStore, estado = 'ACTIVO') {
   let now = 5_000_000;
   const attempts = new AccountAttemptsService(DEFAULT_ATTEMPT_POLICY, store ?? new Map(), () => now);
   const prisma = {
@@ -34,7 +34,7 @@ function setup(store?: AttemptBackingStore) {
       // La búsqueda en la base es exacta (como hoy); solo el contador se normaliza.
       findUnique: vi.fn(async ({ where }: { where: { correo: string } }) =>
         accountAttemptKey(where.correo).split('|')[0] === CORREO
-          ? { idUsuario: 1, correo: CORREO, contrasena: HASH, estado: 'ACTIVO' }
+          ? { idUsuario: 1, correo: CORREO, contrasena: HASH, estado }
           : null,
       ),
       update: vi.fn().mockResolvedValue({}),
@@ -54,18 +54,19 @@ function setup(store?: AttemptBackingStore) {
       () => 'OK',
       (error: unknown) => {
         expect(error).toBeInstanceOf(UnauthorizedException);
-        const { intentosRestantes: _omit, ...cuerpo } = (error as UnauthorizedException).getResponse() as Record<string, unknown>;
-        return JSON.stringify(cuerpo);
+        return JSON.stringify((error as UnauthorizedException).getResponse());
       },
     );
-  // NL-T1: el aviso de intentos restantes cambia con cada intento (a propósito);
-  // `outcome` lo omite para seguir comparando que el resto de la respuesta es idéntico.
+  // NL-T1: intentosRestantes cambia con cada intento (a propósito); esta variante lo
+  // omite para comparar respuestas de intentos distintos.
+  const outcomeSinConteo = async (correo: string, contrasena: string, ip?: string) =>
+    (await outcome(correo, contrasena, ip)).replace(/,"intentosRestantes":\d+/, '');
   const restantes = async (correo: string, contrasena: string, ip?: string) =>
     login(correo, contrasena, ip).then(
       () => null,
       (error: unknown) => ((error as UnauthorizedException).getResponse() as { intentosRestantes: number }).intentosRestantes,
     );
-  return { service, prisma, login, outcome, restantes, advance: (ms: number) => (now += ms) };
+  return { service, prisma, login, outcome, outcomeSinConteo, restantes, advance: (ms: number) => (now += ms) };
 }
 
 async function failTimes(fn: (correo: string, pwd: string) => Promise<string>, correo: string, times: number) {
@@ -76,11 +77,11 @@ async function failTimes(fn: (correo: string, pwd: string) => Promise<string>, c
 
 describe('G04-C06: bloqueo temporal por cuenta en login', () => {
   it('5 fallos bloquean: la contraseña correcta se rechaza con la respuesta genérica y sin tokens', async () => {
-    const { outcome, prisma } = setup();
-    const generica = await outcome(CORREO, 'Incorrecta1');
+    const { outcome, outcomeSinConteo, prisma } = setup();
+    const generica = await outcomeSinConteo(CORREO, 'Incorrecta1');
     await failTimes(outcome, CORREO, 4);
 
-    expect(await outcome(CORREO, PASSWORD)).toBe(generica);
+    expect(await outcomeSinConteo(CORREO, PASSWORD)).toBe(generica);
     expect(prisma.tokenRefresco.create).not.toHaveBeenCalled();
   });
 
@@ -131,17 +132,30 @@ describe('G04-C06: bloqueo temporal por cuenta en login', () => {
     expect(await outcome(CORREO, PASSWORD)).not.toBe('OK');
   });
 
-  it('sin enumeración: una cuenta inexistente también se bloquea y todas las respuestas son idénticas', async () => {
+  it('sin enumeración: una cuenta inexistente también se bloquea y cada respuesta, con su conteo, es idéntica intento a intento', async () => {
     const { outcome } = setup();
-    const inexistente = 'nadie@uvg.edu.gt';
-    const respuestas = new Set<string>();
     for (let i = 0; i < 6; i += 1) {
-      respuestas.add(await outcome(inexistente, 'Incorrecta1'));
+      expect(await outcome('nadie@uvg.edu.gt', 'Incorrecta1')).toBe(await outcome(CORREO, 'Incorrecta1'));
     }
-    await failTimes(outcome, CORREO, 5);
-    respuestas.add(await outcome(CORREO, PASSWORD));
-    expect(respuestas.size).toBe(1);
+    // Con 5 fallos el bloqueo es el mismo para ambas: la contraseña correcta también recibe lo mismo.
+    expect(await outcome(CORREO, PASSWORD)).toBe(await outcome('nadie@uvg.edu.gt', PASSWORD));
   });
+
+  it.each(['INACTIVO', 'BLOQUEADO'])(
+    'una cuenta %s con la contraseña correcta cuenta igual que una incorrecta y que un correo inexistente',
+    async (estado) => {
+      const secuencia = async (correo: string, contrasena: string, estadoCuenta?: string) => {
+        const { restantes } = setup(undefined, estadoCuenta);
+        const valores: (number | null)[] = [];
+        for (let i = 0; i < 6; i += 1) valores.push(await restantes(correo, contrasena, '10.0.0.1'));
+        return valores;
+      };
+      const esperada = [4, 3, 2, 1, 0, 0];
+      expect(await secuencia(CORREO, PASSWORD, estado)).toEqual(esperada);
+      expect(await secuencia(CORREO, 'Incorrecta1')).toEqual(esperada);
+      expect(await secuencia('nadie@uvg.edu.gt', 'Incorrecta1')).toEqual(esperada);
+    },
+  );
 
   it('una cuenta bloqueada sigue haciendo el mismo trabajo (búsqueda + bcrypt)', async () => {
     const { outcome, prisma } = setup();
