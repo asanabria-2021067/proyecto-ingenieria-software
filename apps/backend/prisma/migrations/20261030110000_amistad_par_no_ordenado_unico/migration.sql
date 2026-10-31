@@ -3,8 +3,8 @@
 -- dos solicitudes cruzadas (A->B y B->A) podian coexistir.
 
 -- 1) Resolver duplicados existentes de forma determinista. Por cada par no
--- ordenado se conserva UNA fila: la ACEPTADA (si hay varias, la de menor
--- id_amistad); si ninguna esta ACEPTADA, la mas antigua por fecha_solicitud
+-- ordenado se conserva UNA fila: la ACEPTADA (si hay varias, la mas antigua por
+-- fecha_solicitud y luego menor id_amistad); si ninguna esta ACEPTADA, la mas antigua por fecha_solicitud
 -- (desempate por id_amistad). El resto se elimina.
 DELETE FROM "amistad"
 WHERE "id_amistad" IN (
