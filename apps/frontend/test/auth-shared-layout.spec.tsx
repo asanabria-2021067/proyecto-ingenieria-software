@@ -165,7 +165,8 @@ describe('Identidad visual compartida de Login y Registro', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Crear Cuenta' }));
     await waitFor(() =>
-      expect(registrar).toHaveBeenCalledWith({
+      expect(registrar).toHaveBeenCalledWith(
+      {
         nombre: 'Ana',
         apellido: 'García',
         carne: '24725',
@@ -173,7 +174,10 @@ describe('Identidad visual compartida de Login y Registro', () => {
         contrasena: 'Passw0rd!',
         idCarrera: 2,
         semestre: 7,
-      }),
+      },
+      // NL-T2: segundo argumento con el onError que mapea el 400 del backend al campo.
+      { onError: expect.any(Function) },
+      ),
     );
   });
 });
