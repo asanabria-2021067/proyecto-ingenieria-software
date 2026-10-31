@@ -13,11 +13,11 @@ const PROYECTOS = [
   { ...base, idProyecto: 1, tituloProyecto: 'Tutorías', tipoProyecto: 'ACADEMICO_HORAS_BECA', roles: [{ cupos: 2 }], mismaCarrera: true },
   { ...base, idProyecto: 2, tituloProyecto: 'Huerto', tipoProyecto: 'EXTRACURRICULAR_EXTENSION', roles: [{ cupos: 0 }] },
   { ...base, idProyecto: 3, tituloProyecto: 'App móvil', tipoProyecto: 'ACADEMICO_EXPERIENCIA', roles: [{ cupos: 1 }] },
+  { ...base, idProyecto: 4, tituloProyecto: 'Archivo', tipoProyecto: 'ACADEMICO_EXPERIENCIA', estadoProyecto: 'CERRADO', roles: [{ cupos: 3 }] },
 ];
 
-vi.mock('@/lib/api/client', () => ({
-  apiFetch: vi.fn(async (ruta: string) => (ruta.startsWith('/organizaciones') ? [] : PROYECTOS)),
-}));
+const apiFetchMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/api/client', () => ({ apiFetch: apiFetchMock }));
 
 // La tarjeta trae sus propios hooks (usuario, anclados); aquí solo importa qué proyectos se pintan.
 vi.mock('@/components/projects/available-project-card', () => ({
@@ -28,6 +28,8 @@ vi.mock('@/components/projects/available-project-card', () => ({
 
 async function renderPage(q = '') {
   qActual = q;
+  apiFetchMock.mockReset();
+  apiFetchMock.mockImplementation(async (ruta: string) => (ruta.startsWith('/organizaciones') ? [] : PROYECTOS));
   const { default: Page } = await import('../app/dashboard/proyectos/page');
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
@@ -57,6 +59,7 @@ describe('Explorar: filtros visibles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Con vacantes' }));
     expect(screen.queryByText('Huerto')).not.toBeInTheDocument();
     expect(screen.getByText('App móvil')).toBeInTheDocument();
+    expect(screen.queryByText('Archivo')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'De tu carrera' }));
     expect(screen.queryByText('App móvil')).not.toBeInTheDocument();
@@ -81,5 +84,18 @@ describe('Explorar: filtros visibles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Limpiar filtros y ver todos' }));
     expect(screen.getByText('Huerto')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Con vacantes' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('con ?q= pide el texto al backend (que filtra por título y devuelve solo 20)', async () => {
+    await renderPage('huerto');
+    expect(apiFetchMock).toHaveBeenCalledWith('/proyectos?q=huerto');
+  });
+
+  it('al vaciar el texto quita q de la URL para que volver a buscar lo mismo se reaplique', async () => {
+    const replace = vi.spyOn(window.history, 'replaceState');
+    await renderPage('huerto');
+    fireEvent.change(screen.getByRole('textbox', { name: /Buscar proyectos/ }), { target: { value: '' } });
+    expect(replace).toHaveBeenCalledWith(null, '', window.location.pathname);
+    replace.mockRestore();
   });
 });

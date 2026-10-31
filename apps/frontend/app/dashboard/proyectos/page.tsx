@@ -53,13 +53,18 @@ export default function ProyectosPage() {
 }
 
 function ProyectosContenido() {
-  const qParam = useSearchParams().get('q') ?? '';
-  const [busqueda, setBusqueda] = useState(qParam);
+  const qParam = useSearchParams()?.get('q') ?? '';
+  const [busqueda, setBusquedaLocal] = useState(qParam);
+  // Al vaciar el texto se quita `q` de la URL: así volver a buscar el mismo texto desde la barra sí cambia la URL y se reaplica.
+  const setBusqueda = (valor: string) => {
+    setBusquedaLocal(valor);
+    if (!valor && qParam) window.history.replaceState(null, '', window.location.pathname);
+  };
   // El buscador de la barra superior puede llegar aquí con otro texto estando ya en Explorar.
   const [ultimoQ, setUltimoQ] = useState(qParam);
   if (ultimoQ !== qParam) {
     setUltimoQ(qParam);
-    setBusqueda(qParam);
+    setBusquedaLocal(qParam);
   }
   const [soloVacantes, setSoloVacantes] = useState(false);
   const [soloMiCarrera, setSoloMiCarrera] = useState(false);
@@ -73,13 +78,15 @@ function ProyectosContenido() {
     isError,
     refetch,
   } = useQuery<ProyectoDisponibleResumen[]>({
-    queryKey: ['proyectos', organizacionFiltro],
-    queryFn: () =>
-      apiFetch(
-        organizacionFiltro
-          ? `/proyectos?organizacionId=${organizacionFiltro}`
-          : '/proyectos',
-      ),
+    queryKey: ['proyectos', organizacionFiltro, qParam],
+    queryFn: () => {
+      // El backend devuelve solo 20 y filtra `q` por título: con `q` en la URL se lo pedimos a él.
+      const params = new URLSearchParams();
+      if (organizacionFiltro) params.set('organizacionId', organizacionFiltro);
+      if (qParam) params.set('q', qParam);
+      const qs = params.toString();
+      return apiFetch(qs ? `/proyectos?${qs}` : '/proyectos');
+    },
   });
 
   const {
@@ -100,7 +107,7 @@ function ProyectosContenido() {
 
       const coincideTipo = !tipoFiltro || p.tipoProyecto === tipoFiltro;
       const coincideGuardado = !soloGuardados || p.guardado;
-      const coincideVacantes = !soloVacantes || (p.roles ?? []).some((r) => r.cupos > 0);
+      const coincideVacantes = !soloVacantes || (p.estadoProyecto !== 'CERRADO' && (p.roles ?? []).some((r) => r.cupos > 0));
       const coincideCarrera = !soloMiCarrera || Boolean(p.mismaCarrera);
 
       return coincideBusqueda && coincideTipo && coincideGuardado && coincideVacantes && coincideCarrera;
