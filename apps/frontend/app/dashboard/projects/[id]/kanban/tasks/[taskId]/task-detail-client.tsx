@@ -252,6 +252,20 @@ function TaskDetailView({
     });
   }, [enfocarComentarios]);
 
+  // section=hours (NL-T4): desde «Mis tareas» y el aviso de tarea asignada se
+  // llega directo a «Horas de la tarea».
+  const enfocarHoras = searchParams.get('section') === 'hours';
+  const horasHeadingRef = useRef<HTMLHeadingElement>(null);
+  const focoHorasAplicado = useRef(false);
+  useEffect(() => {
+    if (!enfocarHoras || focoHorasAplicado.current) return;
+    focoHorasAplicado.current = true;
+    requestAnimationFrame(() => {
+      horasHeadingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      horasHeadingRef.current?.focus();
+    });
+  }, [enfocarHoras]);
+
   return (
     <div className="mx-auto w-full max-w-360 px-6 pb-12 pt-5 md:px-7">
       {/* BREADCRUMB (Sección 14) */}
@@ -543,7 +557,12 @@ function TaskDetailView({
           {/* Horas de la tarea (HU-142 · S7 VIEW-04): el resumen del backend
               gobierna crear/editar/revocar; aquí no se infiere permiso alguno. */}
           <section className={CARD} aria-labelledby="horas-tarea-titulo">
-            <h2 id="horas-tarea-titulo" className="mb-1 flex items-center gap-2 text-sm font-bold text-on-surface">
+            <h2
+              id="horas-tarea-titulo"
+              ref={horasHeadingRef}
+              tabIndex={-1}
+              className="mb-1 flex items-center gap-2 text-sm font-bold text-on-surface focus:outline-none"
+            >
               <Clock className="size-4 text-tertiary" aria-hidden="true" />
               Horas de la tarea
             </h2>
