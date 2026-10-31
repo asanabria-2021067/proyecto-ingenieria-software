@@ -131,6 +131,16 @@ describe('GlobalSearchInput', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
+  it('Enter sin opción activa lleva a Explorar con el texto en ?q= y limpia el buscador', async () => {
+    await renderInput();
+    const input = escribir(' tutorías ');
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(pushMock).toHaveBeenCalledWith('/dashboard/proyectos?q=tutor%C3%ADas');
+    expect(input).toHaveValue('');
+  });
+
   it('navega con flechas y abre el resultado seleccionado con Enter', async () => {
     searchGlobalMock.mockResolvedValue({
       proyectos: { items: [{ idProyecto: 1, tituloProyecto: 'Primero', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' }], hasMore: false },

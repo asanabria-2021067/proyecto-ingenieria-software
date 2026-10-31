@@ -217,6 +217,14 @@ export function GlobalSearchInput({
       setOpen(false);
       return;
     }
+    if (e.key === 'Enter' && activeIndex < 0 && query.trim()) {
+      e.preventDefault();
+      const q = encodeURIComponent(query.trim());
+      limpiar();
+      router.push(`/dashboard/proyectos?q=${q}`);
+      onNavigate?.();
+      return;
+    }
     if (!open || flat.length === 0) return;
 
     if (e.key === 'ArrowDown') {

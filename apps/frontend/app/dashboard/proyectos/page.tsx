@@ -26,7 +26,8 @@ import { TIPO_LABEL } from '@/types';
 import type { TipoProyecto } from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, Bookmark, FolderOpen, SearchX } from 'lucide-react';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import { SkeletonRegion } from '@/components/ui/skeleton';
@@ -37,8 +38,36 @@ type OrganizacionFiltro = {
   nombreOrganizacion: string;
 };
 
+const CHIP_BASE =
+  'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold motion-select focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
+const chipClase = (activo: boolean) =>
+  `${CHIP_BASE} ${activo ? 'bg-primary text-on-primary' : 'bg-surface-container text-text-secondary hover:bg-surface-container-high'}`;
+
+// useSearchParams exige Suspense en el prerender.
 export default function ProyectosPage() {
-  const [busqueda, setBusqueda] = useState('');
+  return (
+    <Suspense fallback={null}>
+      <ProyectosContenido />
+    </Suspense>
+  );
+}
+
+function ProyectosContenido() {
+  const qParam = useSearchParams()?.get('q') ?? '';
+  const [busqueda, setBusquedaLocal] = useState(qParam);
+  // Cualquier cambio del texto quita `q` de la URL: el backend deja de filtrar por el texto viejo y repetir la búsqueda desde la barra se reaplica.
+  const setBusqueda = (valor: string) => {
+    setBusquedaLocal(valor);
+    if (qParam && valor !== qParam) window.history.replaceState(null, '', window.location.pathname);
+  };
+  // El buscador de la barra superior puede llegar aquí con otro texto estando ya en Explorar.
+  const [ultimoQ, setUltimoQ] = useState(qParam);
+  if (ultimoQ !== qParam) {
+    setUltimoQ(qParam);
+    if (qParam) setBusquedaLocal(qParam);
+  }
+  const [soloVacantes, setSoloVacantes] = useState(false);
+  const [soloMiCarrera, setSoloMiCarrera] = useState(false);
   const [tipoFiltro, setTipoFiltro] = useState('');
   const [organizacionFiltro, setOrganizacionFiltro] = useState('');
   const [soloGuardados, setSoloGuardados] = useState(false);
@@ -49,13 +78,15 @@ export default function ProyectosPage() {
     isError,
     refetch,
   } = useQuery<ProyectoDisponibleResumen[]>({
-    queryKey: ['proyectos', organizacionFiltro],
-    queryFn: () =>
-      apiFetch(
-        organizacionFiltro
-          ? `/proyectos?organizacionId=${organizacionFiltro}`
-          : '/proyectos',
-      ),
+    queryKey: ['proyectos', organizacionFiltro, qParam],
+    queryFn: () => {
+      // El backend devuelve solo 20 y filtra `q` por título: con `q` en la URL se lo pedimos a él.
+      const params = new URLSearchParams();
+      if (organizacionFiltro) params.set('organizacionId', organizacionFiltro);
+      if (qParam) params.set('q', qParam);
+      const qs = params.toString();
+      return apiFetch(qs ? `/proyectos?${qs}` : '/proyectos');
+    },
   });
 
   const {
@@ -76,14 +107,17 @@ export default function ProyectosPage() {
 
       const coincideTipo = !tipoFiltro || p.tipoProyecto === tipoFiltro;
       const coincideGuardado = !soloGuardados || p.guardado;
+      const coincideVacantes = !soloVacantes || (p.estadoProyecto !== 'CERRADO' && (p.roles ?? []).some((r) => r.cupos > 0));
+      const coincideCarrera = !soloMiCarrera || Boolean(p.mismaCarrera);
 
-      return coincideBusqueda && coincideTipo && coincideGuardado;
+      return coincideBusqueda && coincideTipo && coincideGuardado && coincideVacantes && coincideCarrera;
     })
     // S7 (VIEW-09): los cerrados no aceptan postulaciones; van al final y solo se consultan.
     .sort((a, b) => Number(a.estadoProyecto === 'CERRADO') - Number(b.estadoProyecto === 'CERRADO'));
   const cerrados = filtrados.filter((p) => p.estadoProyecto === 'CERRADO').length;
-  const hasActiveFilters = Boolean(busqueda || tipoFiltro || organizacionFiltro || soloGuardados);
+  const hasActiveFilters = Boolean(busqueda || tipoFiltro || organizacionFiltro || soloGuardados || soloVacantes || soloMiCarrera);
   const activos = proyectos.filter((p) => p.estadoProyecto !== 'CERRADO').length;
+  const hayMiCarrera = proyectos.some((p) => p.mismaCarrera);
   const totalGuardados = proyectos.filter((p) => p.guardado).length;
   const conteoPorTipo = proyectos.reduce<Partial<Record<TipoProyecto, number>>>((acc, p) => {
     const tipo = p.tipoProyecto as TipoProyecto;
@@ -96,6 +130,8 @@ export default function ProyectosPage() {
     setTipoFiltro('');
     setOrganizacionFiltro('');
     setSoloGuardados(false);
+    setSoloVacantes(false);
+    setSoloMiCarrera(false);
   };
 
   return (
@@ -147,28 +183,6 @@ export default function ProyectosPage() {
             />
 
             <Select
-              value={tipoFiltro || '__ALL__'}
-              onValueChange={(v) => setTipoFiltro(v === '__ALL__' ? '' : v)}
-            >
-              <SelectTrigger
-                aria-label="Filtrar proyectos por tipo"
-                className={`w-full sm:w-50 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="z-50">
-                <SelectItem value="__ALL__" className="focus:bg-primary focus:text-on-primary">
-                  Todos los tipos
-                </SelectItem>
-                {Object.entries(TIPO_LABEL).map(([value, label]) => (
-                  <SelectItem key={value} value={value} className="focus:bg-primary focus:text-on-primary">
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
               value={organizacionFiltro || '__ALL__'}
               onValueChange={(v) => setOrganizacionFiltro(v === '__ALL__' ? '' : v)}
               disabled={isLoadingOrganizaciones || isErrorOrganizaciones}
@@ -204,34 +218,35 @@ export default function ProyectosPage() {
             </Select>
           </div>
 
-          {/* Chips rapidos por tipo de proyecto (mismo conteo que el Select de arriba, solo mas rapido de tocar). */}
+          {/* Filtros principales siempre visibles; los tipos son los del enum real (TIPO_LABEL). */}
           {!isLoading && !isError && proyectos.length > 0 && (
-            <div className="flex items-center gap-tight overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <button
-                type="button"
-                onClick={() => setTipoFiltro('')}
-                aria-pressed={tipoFiltro === ''}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold motion-select ${
-                  tipoFiltro === '' ? 'bg-primary text-on-primary' : 'bg-surface-container text-text-secondary hover:bg-surface-container-high'
-                }`}
-              >
+            <div
+              role="group"
+              aria-label="Filtros de proyectos"
+              className="flex items-center gap-tight overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              <button type="button" onClick={() => setTipoFiltro('')} aria-pressed={tipoFiltro === ''} className={chipClase(tipoFiltro === '')}>
                 Todos <span className="opacity-80">{proyectos.length}</span>
               </button>
-              {(Object.entries(TIPO_LABEL) as [TipoProyecto, string][])
-                .filter(([tipo]) => conteoPorTipo[tipo])
-                .map(([tipo, label]) => (
-                  <button
-                    key={tipo}
-                    type="button"
-                    onClick={() => setTipoFiltro((actual) => (actual === tipo ? '' : tipo))}
-                    aria-pressed={tipoFiltro === tipo}
-                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold motion-select ${
-                      tipoFiltro === tipo ? 'bg-primary text-on-primary' : 'bg-surface-container text-text-secondary hover:bg-surface-container-high'
-                    }`}
-                  >
-                    {label} <span className="opacity-80">{conteoPorTipo[tipo]}</span>
-                  </button>
-                ))}
+              {(Object.entries(TIPO_LABEL) as [TipoProyecto, string][]).map(([tipo, label]) => (
+                <button
+                  key={tipo}
+                  type="button"
+                  onClick={() => setTipoFiltro((actual) => (actual === tipo ? '' : tipo))}
+                  aria-pressed={tipoFiltro === tipo}
+                  className={chipClase(tipoFiltro === tipo)}
+                >
+                  {label} <span className="opacity-80">{conteoPorTipo[tipo] ?? 0}</span>
+                </button>
+              ))}
+              <button type="button" onClick={() => setSoloVacantes((v) => !v)} aria-pressed={soloVacantes} className={chipClase(soloVacantes)}>
+                Con vacantes
+              </button>
+              {(hayMiCarrera || soloMiCarrera) && (
+                <button type="button" onClick={() => setSoloMiCarrera((v) => !v)} aria-pressed={soloMiCarrera} className={chipClase(soloMiCarrera)}>
+                  De tu carrera
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -285,18 +300,23 @@ export default function ProyectosPage() {
               </EmptyTitle>
               {hasActiveFilters && (
                 <EmptyDescription>
-                  No encontramos proyectos que coincidan con los filtros seleccionados.
+                  No encontramos proyectos con {busqueda ? `«${busqueda}»` : 'esos filtros'}. Prueba una de estas opciones.
                 </EmptyDescription>
               )}
             </EmptyHeader>
             {hasActiveFilters && (
-              <EmptyContent>
+              <EmptyContent className="flex-row flex-wrap justify-center">
+                {busqueda && (
+                  <Button type="button" variant="outline" onClick={() => setBusqueda('')} className="h-auto px-5 py-2.5 text-sm font-bold">
+                    Quitar el texto
+                  </Button>
+                )}
                 <Button
                   type="button"
                   onClick={limpiarFiltros}
                   className="h-auto bg-primary px-5 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90 motion-glow-primary"
                 >
-                  Limpiar filtros
+                  Limpiar filtros y ver todos
                 </Button>
               </EmptyContent>
             )}
