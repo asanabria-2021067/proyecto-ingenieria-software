@@ -168,6 +168,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # RTF-3.1: un *.service.ts nuevo exige su *.service.spec.ts; los
+      # existentes sin spec viven en scripts/service-spec-exceptions.txt.
+      - name: Guard de specs de servicios
+        working-directory: .
+        run: node scripts/check-service-specs.mjs
+
       # Cobertura completa solo en PR (gate antes de mergear); en push/deploy
       # (workflow_call) corren las pruebas sin instrumentar cobertura para
       # que el pipeline de deploy sea rapido — la validacion fuerte ya paso
