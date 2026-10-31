@@ -4,6 +4,8 @@ import { TimeRecordsModule } from '../time-records/time-records.module';
 import { TasksController } from './tasks.controller';
 import { TareaComentariosController } from './tarea-comentarios.controller';
 import { TasksService } from './tasks.service';
+import { TasksNotificationsService } from './tasks-notifications.service';
+import { TasksBulkService } from './tasks-bulk.service';
 import { TasksContextService } from './tasks-context.service';
 import { TasksAuthorizationService } from './tasks-authorization.service';
 import { TasksRelationsService } from './tasks-relations.service';
@@ -19,6 +21,8 @@ import { BitacoraModule } from '../bitacora/bitacora.module';
   controllers: [TasksController, TareaComentariosController],
   providers: [
     TasksService,
+    TasksNotificationsService,
+    TasksBulkService,
     TasksContextService,
     TasksAuthorizationService,
     TasksRelationsService,
