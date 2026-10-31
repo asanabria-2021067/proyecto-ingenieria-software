@@ -1,31 +1,50 @@
 import '@testing-library/jest-dom/vitest';
+import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 
 vi.mock('@/components/theme-toggle', () => ({ ThemeToggle: () => null }));
 vi.mock('next/image', () => ({ default: () => null }));
 
+// `useLinkStatus` solo es true durante una navegación real de Next; aquí se controla.
+const estadoEnlace = vi.hoisted(() => ({ pending: false }));
+vi.mock('next/link', () => ({
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => createElement('a', { href, ...props }, children),
+  useLinkStatus: () => estadoEnlace,
+}));
+
 import Navbar from '../components/landing/Navbar';
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  estadoEnlace.pending = false;
+});
 
 /**
- * NL-T2: /registro tarda en abrir y el visitante volvía a hacer clic. Un clic
- * debe dar respuesta visible al instante y el enlace debe seguir apuntando al formulario.
+ * NL-T2: /registro tarda en abrir y el visitante volvía a hacer clic. Mientras
+ * la navegación está pendiente (useLinkStatus) el enlace muestra «Abriendo…»;
+ * sin navegación (Ctrl/Cmd/clic central) nunca queda pegado.
  */
 describe('NL-T2: «Registrarse» en la navbar', () => {
-  it('un solo clic muestra «Abriendo…», marca el enlace como ocupado y conserva el destino', () => {
+  it('en reposo dice «Registrarse» y apunta al formulario', () => {
     const { container } = render(<Navbar />);
     const enlace = within(container.querySelector('nav') as HTMLElement).getByRole('link', { name: 'Registrarse' });
     expect(enlace).toHaveAttribute('href', '/registro');
-    expect(enlace).not.toHaveAttribute('aria-busy', 'true');
+  });
 
-    fireEvent.click(enlace);
+  it('con la navegación pendiente muestra «Abriendo…» con indicador y conserva el destino', () => {
+    estadoEnlace.pending = true;
+    render(<Navbar />);
 
     const ocupado = screen.getByRole('link', { name: /Abriendo/ });
     expect(ocupado).toHaveAttribute('href', '/registro');
-    expect(ocupado).toHaveAttribute('aria-busy', 'true');
     expect(within(ocupado).getByRole('status', { name: 'Cargando' })).toBeInTheDocument();
+  });
+
+  it('un clic con Ctrl (sin navegación) no deja el estado pegado', () => {
+    const { container } = render(<Navbar />);
+    fireEvent.click(within(container.querySelector('nav') as HTMLElement).getByRole('link', { name: 'Registrarse' }), { ctrlKey: true });
+    expect(screen.queryByRole('link', { name: /Abriendo/ })).not.toBeInTheDocument();
   });
 
   it('en móvil el menú sigue abierto tras el clic para que se vea «Abriendo…»', () => {
@@ -36,6 +55,5 @@ describe('NL-T2: «Registrarse» en la navbar', () => {
     fireEvent.click(within(menu).getByRole('link', { name: 'Registrarse' }));
 
     expect(container.querySelector('nav > div.md\\:hidden')).not.toBeNull();
-    expect(within(menu).getByRole('link', { name: /Abriendo/ })).toHaveAttribute('aria-busy', 'true');
   });
 });

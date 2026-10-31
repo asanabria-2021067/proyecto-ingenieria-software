@@ -399,7 +399,7 @@ export default function RegistroPage() {
                   placeholder="Mínimo 8 caracteres"
                   className={AUTH_INPUT_COMPACT}
                   aria-invalid={errores.contrasena ? 'true' : 'false'}
-                  aria-describedby={errores.contrasena ? 'contrasena-error' : undefined}
+                  aria-describedby={['contrasena-requisitos', errores.contrasena && 'contrasena-error'].filter(Boolean).join(' ')}
                 />
                 {passwordStrength && (
                   <div className="space-y-1">
@@ -433,7 +433,7 @@ export default function RegistroPage() {
                     </div>
                   </div>
                 )}
-                <ul aria-label="Requisitos de la contraseña" className="space-y-1">
+                <ul id="contrasena-requisitos" aria-label="Requisitos de la contraseña" className="space-y-1">
                   {REQUISITOS_CONTRASENA.map((requisito) => {
                     const cumple = requisito.cumple(contrasena);
                     return (

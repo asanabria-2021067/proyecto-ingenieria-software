@@ -1,3 +1,5 @@
+import { MAX_CONTRASENA, MIN_CONTRASENA } from './contrasena';
+
 // NL-T2: convierte el 400 de validación del backend (class-validator) en un
 // mensaje por campo del formulario. Devuelve {} si no reconoce ningún campo,
 // y entonces se usa el mensaje genérico.
@@ -6,9 +8,9 @@ export type CampoRegistro = 'nombre' | 'apellido' | 'carne' | 'correo' | 'contra
 const MENSAJE_POR_CAMPO: Record<CampoRegistro, string> = {
   nombre: 'Revisa tu nombre',
   apellido: 'Revisa tu apellido',
-  carne: 'Revisa tu carnet',
+  carne: 'Revisa tu carné',
   correo: 'Revisa tu correo institucional',
-  contrasena: 'La contraseña debe tener entre 8 y 72 caracteres',
+  contrasena: `La contraseña debe tener entre ${MIN_CONTRASENA} y ${MAX_CONTRASENA} caracteres`,
   idCarrera: 'Selecciona una carrera',
   semestre: 'El semestre es inválido',
 };

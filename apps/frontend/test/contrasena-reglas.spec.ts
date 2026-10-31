@@ -18,6 +18,12 @@ describe('NL-T2: reglas de contraseña del registro', () => {
     expect(limite('MaxLength')).toBe(MAX_CONTRASENA);
   });
 
+  it('el restablecimiento de contraseña usa los mismos límites', () => {
+    const reset = readFileSync(resolve(process.cwd(), '../backend/src/auth/dto/reset-password.dto.ts'), 'utf-8');
+    expect(Number(/@MinLength\((\d+)\)/.exec(reset)?.[1])).toBe(MIN_CONTRASENA);
+    expect(Number(/@MaxLength\((\d+)\)/.exec(reset)?.[1])).toBe(MAX_CONTRASENA);
+  });
+
   it('la lista de requisitos marca exactamente los límites', () => {
     const [min, max] = REQUISITOS_CONTRASENA;
     expect(min.cumple('a'.repeat(MIN_CONTRASENA - 1))).toBe(false);

@@ -2,7 +2,7 @@
 // del backend (@MinLength / @MaxLength en apps/backend/src/auth/dto/register.dto.ts);
 // test/contrasena-reglas.spec.ts compara ambos valores.
 export const MIN_CONTRASENA = 8;
-// bcrypt solo usa los primeros 72 bytes: más largo se truncaría en silencio.
+// Tope en caracteres, igual que @MaxLength del backend (bcrypt solo usa los primeros 72 bytes).
 export const MAX_CONTRASENA = 72;
 
 export const REQUISITOS_CONTRASENA = [
