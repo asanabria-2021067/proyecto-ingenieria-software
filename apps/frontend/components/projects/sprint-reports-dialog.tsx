@@ -23,7 +23,7 @@ function buildReportes(idProyecto: number, idSprintBurndown: number | null): Rep
     {
       icono: TrendingDown,
       titulo: 'Diagrama de trabajo pendiente de Sprint',
-      descripcion: 'Da seguimiento al trabajo restante de un Sprint dia a dia frente a la linea ideal, hasta su cierre.',
+      descripcion: 'Da seguimiento al trabajo restante de un Sprint día a día frente a la línea ideal, hasta su cierre.',
       href: idSprintBurndown ? `/dashboard/proyectos/${idProyecto}/sprints/${idSprintBurndown}/informes/burndown` : undefined,
     },
     {
@@ -39,7 +39,7 @@ function buildReportes(idProyecto: number, idSprintBurndown: number | null): Rep
     },
     {
       icono: LineChart,
-      titulo: 'Informe de duracion del ciclo',
+      titulo: 'Informe de duración del ciclo',
       descripcion: 'Cuanto tiempo tardan las tareas en moverse por el tablero, de inicio a terminado.',
     },
     {

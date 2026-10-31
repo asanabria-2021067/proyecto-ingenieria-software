@@ -675,7 +675,7 @@ export default function DashboardPage() {
                             No hay proyectos destacados
                           </EmptyTitle>
                           <EmptyDescription>
-                            Aun no hay proyectos con suficientes postulaciones
+                            Aún no hay proyectos con suficientes postulaciones
                             para destacar.
                           </EmptyDescription>
                         </EmptyHeader>
@@ -704,8 +704,8 @@ export default function DashboardPage() {
                             No hay proyectos disponibles
                           </EmptyTitle>
                           <EmptyDescription>
-                            Cuando se publiquen nuevas oportunidades, apareceran
-                            aqui para que puedas revisarlas rapido.
+                            Cuando se publiquen nuevas oportunidades, aparecerán
+                            aquí para que puedas revisarlas rápido.
                           </EmptyDescription>
                         </EmptyHeader>
                         <EmptySteps />

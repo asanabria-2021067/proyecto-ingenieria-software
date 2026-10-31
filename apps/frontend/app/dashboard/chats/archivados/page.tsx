@@ -94,7 +94,7 @@ export default function ChatsArchivadosPage() {
           </EmptyMedia>
           <EmptyHeader>
             <EmptyTitle className="type-subtitle">
-              {q.trim() ? 'No encontramos ningún chat archivado con eso' : 'Todavía no tenés chats archivados'}
+              {q.trim() ? 'No encontramos ningún chat archivado con eso' : 'Todavía no tienes chats archivados'}
             </EmptyTitle>
             <EmptyDescription>
               {q.trim()

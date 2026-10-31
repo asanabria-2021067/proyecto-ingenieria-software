@@ -176,7 +176,7 @@ function ProyectosContenido() {
           <div className="flex flex-col gap-stack sm:flex-row">
             <DashboardSearchField
               containerClassName="flex-1"
-              aria-label="Buscar proyectos por titulo o descripcion"
+              aria-label="Buscar proyectos por título o descripción"
               placeholder="Buscar proyectos disponibles..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
@@ -188,7 +188,7 @@ function ProyectosContenido() {
               disabled={isLoadingOrganizaciones || isErrorOrganizaciones}
             >
               <SelectTrigger
-                aria-label="Filtrar proyectos por organizacion"
+                aria-label="Filtrar proyectos por organización"
                 className={`w-full sm:w-60 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
               >
                 <SelectValue

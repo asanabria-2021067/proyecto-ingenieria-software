@@ -94,7 +94,7 @@ describe('Identidad visual compartida de Login y Registro', () => {
   it('Registro conserva su mensaje institucional sobre la fotografía y deja desplazar solo el panel del formulario', () => {
     const { container } = render(<RegistroPage />, { wrapper });
     expect(screen.getByRole('heading', { level: 2, name: 'Comienza tu camino' })).toBeInTheDocument();
-    expect(screen.getByText(/oportunidades de beca, extension y experiencia academica/)).toBeInTheDocument();
+    expect(screen.getByText(/oportunidades de beca, extensión y experiencia académica/)).toBeInTheDocument();
     const raiz = container.firstElementChild as HTMLElement;
     expect(raiz).toHaveClass('lg:h-screen');
     expect(raiz.children[1]).toHaveClass('lg:overflow-y-auto');
@@ -104,7 +104,7 @@ describe('Identidad visual compartida de Login y Registro', () => {
     render(<LoginPage />, { wrapper });
     const etiquetaLogin = screen.getByText('Correo Institucional').className;
     const campoLogin = screen.getByLabelText('Correo Institucional').className;
-    const botonLogin = screen.getByRole('button', { name: 'Iniciar Sesion' }).className;
+    const botonLogin = screen.getByRole('button', { name: 'Iniciar Sesión' }).className;
     cleanup();
 
     render(<RegistroPage />, { wrapper });
@@ -112,7 +112,7 @@ describe('Identidad visual compartida de Login y Registro', () => {
     // Mismo control; en el formulario largo solo cambia el relleno vertical.
     expect(screen.getByLabelText('Correo institucional').className).toBe(campoLogin.replace('py-4', 'py-3'));
     expect(screen.getByRole('button', { name: 'Crear Cuenta' }).className).toBe(botonLogin);
-    expect(screen.getByRole('link', { name: 'Inicia sesion' })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: 'Inicia sesión' })).toHaveAttribute('href', '/login');
   });
 
   it('Registro conserva los ocho campos, el catálogo de carreras y los doce semestres', async () => {

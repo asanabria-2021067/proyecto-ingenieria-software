@@ -13,14 +13,14 @@ import uvgSwal from '@/lib/swal';
 // auth.controller.ts) se explica aparte para que el bloqueo se sienta como
 // un estado temporal y no como otro error de credenciales.
 function mensajeErrorLogin(error: (Error & { statusCode?: number }) | null): string {
-  if (!error) return 'No se pudo iniciar sesion. Verifica tu correo y contraseña.';
+  if (!error) return 'No se pudo iniciar sesión. Verifica tu correo y contraseña.';
   if (error.statusCode === 429) {
-    return 'Demasiados intentos de inicio de sesion. Espera un minuto antes de volver a intentarlo.';
+    return 'Demasiados intentos de inicio de sesión. Espera un minuto antes de volver a intentarlo.';
   }
   if (error.statusCode === 403) {
     return 'Tu cuenta está pendiente de verificación por administración.';
   }
-  return 'No se pudo iniciar sesion. Verifica tu correo y contraseña.';
+  return 'No se pudo iniciar sesión. Verifica tu correo y contraseña.';
 }
 
 // T-221: si la sesión había vencido, vuelve a la ruta desde la que se

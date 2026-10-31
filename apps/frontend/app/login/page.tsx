@@ -31,12 +31,12 @@ const loginSchema = z.object({
 export function mensajeError(error: (Error & { statusCode?: number }) | null): string {
   if (!error) return '';
   if (error.statusCode === 429) {
-    return 'Demasiados intentos de inicio de sesion. Espera un minuto antes de volver a intentarlo.';
+    return 'Demasiados intentos de inicio de sesión. Espera un minuto antes de volver a intentarlo.';
   }
   if (error.statusCode === 403) {
     return 'Tu cuenta está pendiente de verificación por administración.';
   }
-  return 'No se pudo iniciar sesion. Verifica tu correo y contraseña.';
+  return 'No se pudo iniciar sesión. Verifica tu correo y contraseña.';
 }
 
 export default function LoginPage() {
@@ -81,7 +81,7 @@ export default function LoginPage() {
   return (
     <AuthSplitLayout
       titulo="Excelencia que trasciende"
-      descripcion="Unete a la comunidad academica lider en ciencia y tecnologia de Guatemala."
+      descripcion="Únete a la comunidad académica líder en ciencia y tecnología de Guatemala."
     >
           <div className="w-full max-w-md">
             {/* Branding */}
@@ -91,7 +91,7 @@ export default function LoginPage() {
                 Bienvenido de nuevo
               </h1>
               <p className="mt-2 text-base text-tertiary">
-                Inicia sesion con tu correo institucional
+                Inicia sesión con tu correo institucional
               </p>
             </div>
 
@@ -146,7 +146,7 @@ export default function LoginPage() {
                       setErrores((prev) => ({ ...prev, contrasena: undefined }));
                     }
                   }}
-                  placeholder="Minimo 8 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   className={AUTH_INPUT}
                   aria-invalid={errores.contrasena ? 'true' : 'false'}
                   aria-describedby={errores.contrasena ? 'contrasena-error' : undefined}
@@ -165,7 +165,7 @@ export default function LoginPage() {
                 disabled={isPending}
                 className={AUTH_PRIMARY_BUTTON}
               >
-                {isPending ? 'Iniciando sesion...' : 'Iniciar Sesion'}
+                {isPending ? 'Iniciando sesión...' : 'Iniciar Sesión'}
               </button>
             </form>
 
@@ -173,7 +173,7 @@ export default function LoginPage() {
             <div className="my-8 flex w-full items-center">
               <div className="h-px flex-1 bg-surface-container-highest" />
               <span className="px-4 font-label text-[10px] font-bold uppercase tracking-widest text-outline-variant">
-                O continua con
+                O continúa con
               </span>
               <div className="h-px flex-1 bg-surface-container-highest" />
             </div>
@@ -196,7 +196,7 @@ export default function LoginPage() {
             <p className="mt-10 text-center text-xs text-tertiary">
               No tienes cuenta?{' '}
               <Link href="/registro" className="font-bold text-primary motion-link">
-                Registrate aqui
+                Regístrate aquí
               </Link>
             </p>
           </div>

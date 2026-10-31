@@ -13,10 +13,10 @@ export function useLogout() {
   return async () => {
     const result = await uvgSwal.fire({
       icon: 'question',
-      title: 'Cerrar sesion',
-      text: 'Tu sesion actual se cerrara en este dispositivo.',
+      title: 'Cerrar sesión',
+      text: 'Tu sesión actual se cerrará en este dispositivo.',
       showCancelButton: true,
-      confirmButtonText: 'Si, cerrar sesion',
+      confirmButtonText: 'Sí, cerrar sesión',
       cancelButtonText: 'Cancelar',
     });
 

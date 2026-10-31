@@ -183,7 +183,7 @@ export default function RegistroPage() {
   return (
     <AuthSplitLayout
       titulo="Comienza tu camino"
-      descripcion="Registrate y accede a oportunidades de beca, extension y experiencia academica."
+      descripcion="Regístrate y accede a oportunidades de beca, extensión y experiencia académica."
       panelDesplazable
     >
           <div className="w-full max-w-lg">
@@ -293,7 +293,7 @@ export default function RegistroPage() {
                 />
                 {!correoEditadoManualmente && correo && (
                   <p className="text-xs text-primary">
-                    Correo generado automaticamente. Puedes editarlo si lo necesitas.
+                    Correo generado automáticamente. Puedes editarlo si lo necesitas.
                   </p>
                 )}
                 {errores.correo && (
@@ -392,7 +392,7 @@ export default function RegistroPage() {
                     setContrasena(e.target.value);
                     if (errores.contrasena) setErrores((prev) => ({ ...prev, contrasena: undefined }));
                   }}
-                  placeholder="Minimo 8 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   className={AUTH_INPUT_COMPACT}
                   aria-invalid={errores.contrasena ? 'true' : 'false'}
                   aria-describedby={errores.contrasena ? 'contrasena-error' : undefined}
@@ -488,7 +488,7 @@ export default function RegistroPage() {
             <p className="mt-8 text-center text-xs text-tertiary">
               Ya tienes cuenta?{' '}
               <Link href="/login" className="font-bold text-primary hover:underline">
-                Inicia sesion
+                Inicia sesión
               </Link>
             </p>
           </div>

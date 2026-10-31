@@ -69,8 +69,8 @@ function rolLabel(rol: string) {
     administrador: 'Administrador',
     estudiante: 'Estudiante',
     mentor: 'Mentor',
-    lider_asociacion: 'Lider de asociacion',
-    coordinador_academico: 'Coordinador academico',
+    lider_asociacion: 'Líder de asociación',
+    coordinador_academico: 'Coordinador académico',
   };
   return map[rol.toLowerCase()] ?? rol;
 }
@@ -229,7 +229,7 @@ export default function PerfilPage() {
                 <article className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-outline">
-                      Horas extension
+                      Horas extensión
                     </p>
                     <HeartHandshake className="h-5 w-5 text-secondary" />
                   </div>
@@ -260,7 +260,7 @@ export default function PerfilPage() {
             {isAdmin ? (
               <section className="rounded-2xl bg-surface-container-lowest p-8 shadow-sm">
                 <h2 className="text-2xl font-black tracking-tight text-on-surface">
-                  Informacion de cuenta
+                  Información de cuenta
                 </h2>
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-5">
@@ -297,7 +297,7 @@ export default function PerfilPage() {
                     </div>
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-widest text-outline mb-1">
-                        Ultima sesion
+                        Última sesión
                       </p>
                       <p className="text-sm font-medium text-on-surface">
                         {adminDetail?.fechaUltimaSesion
@@ -311,7 +311,7 @@ export default function PerfilPage() {
             ) : (
               <section className="rounded-2xl bg-surface-container-lowest p-8 shadow-sm">
                 <h2 className="text-2xl font-black tracking-tight text-on-surface">
-                  Perfil academico
+                  Perfil académico
                 </h2>
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div className="md:col-span-2">
@@ -319,7 +319,7 @@ export default function PerfilPage() {
                       Biografia
                     </p>
                     <p className="w-[45ch] max-w-full whitespace-normal wrap-break-word text-sm leading-relaxed text-on-surface-variant">
-                      {user?.perfil?.biografia || 'No has agregado biografia.'}
+                      {user?.perfil?.biografia || 'No has agregado biografía.'}
                     </p>
 
                     <div className="mt-6 flex flex-wrap gap-3">

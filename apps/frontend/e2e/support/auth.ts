@@ -30,8 +30,8 @@ export async function login(page: Page, correo: string, destino = '/dashboard'):
 
   await page.goto('/login');
   await page.getByPlaceholder('usuario@uvg.edu.gt').fill(correo);
-  await page.getByPlaceholder('Minimo 8 caracteres').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Iniciar Sesion' }).click();
+  await page.getByPlaceholder('Mínimo 8 caracteres').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Iniciar Sesión' }).click();
   await page.waitForURL(`**${destino}`, { timeout: 45_000 });
 
   const cookies = await page.context().cookies();

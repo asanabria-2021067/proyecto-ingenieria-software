@@ -6,21 +6,21 @@ const projectTypes = [
     icon: GraduationCap,
     title: 'Horas Beca',
     description:
-      'Postulate a proyectos academicos que te permiten cumplir tus horas beca mientras ganas experiencia real.',
+      'Postúlate a proyectos académicos que te permiten cumplir tus horas beca mientras ganas experiencia real.',
     color: 'bg-primary/10 text-primary',
   },
   {
     icon: HeartHandshake,
-    title: 'Extension',
+    title: 'Extensión',
     description:
-      'Participa en proyectos de servicio comunitario y extension universitaria con impacto social.',
+      'Participa en proyectos de servicio comunitario y extensión universitaria con impacto social.',
     color: 'bg-secondary/10 text-secondary',
   },
   {
     icon: Briefcase,
-    title: 'Experiencia Academica',
+    title: 'Experiencia Académica',
     description:
-      'Colabora en investigaciones, laboratorios o proyectos de catedra que fortalecen tu perfil profesional.',
+      'Colabora en investigaciones, laboratorios o proyectos de cátedra que fortalecen tu perfil profesional.',
     color: 'bg-tertiary/10 text-tertiary',
   },
 ];
@@ -42,9 +42,9 @@ export default function IndividualProjectsSection() {
               Tu proyecto, tu ritmo
             </h2>
             <p className="text-lg leading-relaxed ">
-              No necesitas pertenecer a una organizacion. Cualquier estudiante puede crear un
+              No necesitas pertenecer a una organización. Cualquier estudiante puede crear un
               proyecto propio o postularse a los que ya existen. Explora oportunidades de horas
-              beca, extension o experiencia academica desde tu perfil.
+              beca, extensión o experiencia académica desde tu perfil.
             </p>
             <div className="flex items-center gap-3 pt-2">
               <Link
@@ -104,7 +104,7 @@ export default function IndividualProjectsSection() {
                   1-click
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-widest text-tertiary">
-                  Postulacion rapida
+                  Postulación rápida
                 </span>
               </div>
             </div>

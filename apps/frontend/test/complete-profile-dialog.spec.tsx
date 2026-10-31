@@ -147,7 +147,7 @@ describe('CompleteProfileDialog (T-203)', () => {
 
     expect(await screen.findByDisplayValue('Estudiante de ISW')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /Horas beca/i }) as HTMLInputElement).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /Horas de extension/i }) as HTMLInputElement).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Horas de extensión/i }) as HTMLInputElement).not.toBeChecked();
 
     await avanzarHasta(1);
     const chipReact = await screen.findByRole('button', { name: 'React' });
@@ -162,9 +162,9 @@ describe('CompleteProfileDialog (T-203)', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /Horas beca/i }));
     expect(screen.getByPlaceholderText('Total de horas beca')).toHaveValue(150);
 
-    expect(screen.queryByPlaceholderText('Total de horas de extension')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('checkbox', { name: /Horas de extension/i }));
-    expect(screen.getByPlaceholderText('Total de horas de extension')).toHaveValue(40);
+    expect(screen.queryByPlaceholderText('Total de horas de extensión')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Horas de extensión/i }));
+    expect(screen.getByPlaceholderText('Total de horas de extensión')).toHaveValue(40);
   });
 
   it('al guardar el paso 1: desmarcar los checkboxes de horas hace que viajen null, aunque tengan un valor numerico cargado', async () => {
@@ -176,7 +176,7 @@ describe('CompleteProfileDialog (T-203)', () => {
 
     expect(screen.getByRole('checkbox', { name: /Horas beca/i })).toBeChecked();
     fireEvent.click(screen.getByRole('checkbox', { name: /Horas beca/i }));
-    fireEvent.click(screen.getByRole('checkbox', { name: /Horas de extension/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Horas de extensión/i }));
 
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
     await waitFor(() => expect(updateProfileMock).toHaveBeenCalled());

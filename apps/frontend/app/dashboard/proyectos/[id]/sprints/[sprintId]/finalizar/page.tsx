@@ -178,7 +178,7 @@ export default function SprintClosingPage() {
       if (status === 409) {
         refetch();
         setCloseError(
-          `${mensajeDeError(err)} Se actualizo el resumen; revisa los bloqueos antes de volver a intentarlo.`,
+          `${mensajeDeError(err)} Se actualizó el resumen; revisa los bloqueos antes de volver a intentarlo.`,
         );
       } else {
         setCloseError(getApiErrorMessage(err, 'hours'));
@@ -200,7 +200,7 @@ export default function SprintClosingPage() {
   const motivoNoCerrar = readOnly
     ? estadoSprint === 'CERRADO'
       ? 'Este Sprint ya esta cerrado.'
-      : 'El Sprint debe estar en finalizacion para cerrarlo.'
+      : 'El Sprint debe estar en finalización para cerrarlo.'
     : blockers.length > 0
       ? `Hay ${blockers.length} ${blockers.length === 1 ? 'bloqueo' : 'bloqueos'} pendientes: ${blockers
           .map((b) => b.message)
@@ -335,7 +335,7 @@ export default function SprintClosingPage() {
                   <EmptyHeader>
                     <EmptyTitle>Este Sprint no tiene contribuciones registradas.</EmptyTitle>
                     <EmptyDescription>
-                      No hay participantes con tareas u horas asociadas a este Sprint todavia.
+                      No hay participantes con tareas u horas asociadas a este Sprint todavía.
                     </EmptyDescription>
                   </EmptyHeader>
                 </Empty>

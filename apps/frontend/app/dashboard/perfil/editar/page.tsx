@@ -500,7 +500,7 @@ export default function EditarPerfilPage() {
                   value={biografia}
                   onChange={(e) => setBiografia(e.target.value)}
                   rows={4}
-                  placeholder="Cuentanos sobre ti, tus intereses académicos, fortalezas y áreas en las que deseas crecer..."
+                  placeholder="Cuéntanos sobre ti, tus intereses académicos, fortalezas y áreas en las que deseas crecer..."
                   className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm text-on-surface transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                 />
               </div>

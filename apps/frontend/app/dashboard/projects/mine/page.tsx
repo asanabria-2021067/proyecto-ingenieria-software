@@ -145,7 +145,7 @@ export default function MyProjectsPage() {
         <div className="mb-4.5 flex flex-col gap-4 sm:flex-row">
           <DashboardSearchField
             containerClassName="flex-1"
-            aria-label="Buscar mis proyectos por titulo o descripcion"
+            aria-label="Buscar mis proyectos por título o descripción"
             placeholder="Buscar proyectos..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
@@ -221,7 +221,7 @@ export default function MyProjectsPage() {
             <EmptyHeader>
               <EmptyTitle>Aún no has creado proyectos.</EmptyTitle>
               <EmptyDescription>
-                Crea una propuesta, define roles y enviala a revision para que otros estudiantes puedan sumarse.
+                Crea una propuesta, define roles y envíala a revisión para que otros estudiantes puedan sumarse.
               </EmptyDescription>
             </EmptyHeader>
             <EmptySteps />

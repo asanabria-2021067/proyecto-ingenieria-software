@@ -179,7 +179,7 @@ function SprintHoursReview() {
           </EmptyMedia>
           <EmptyHeader>
             <EmptyTitle>Este Sprint no tiene contribuciones registradas.</EmptyTitle>
-            <EmptyDescription>No hay participantes con tareas u horas asociadas a este Sprint todavia.</EmptyDescription>
+            <EmptyDescription>No hay participantes con tareas u horas asociadas a este Sprint todavía.</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <Button asChild variant="outline" size="sm">
