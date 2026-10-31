@@ -257,7 +257,7 @@ export default function DashboardLayout({
         {/* H-08: la columna central tiene un ancho MÁXIMO (16rem, 24rem desde lg) y puede
             encoger. Con `auto` el buscador exigía sus 16rem fijos y, a 768 px con la barra
             lateral abierta, empujaba fuera de la ventana los últimos controles de la derecha. */}
-        <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:grid md:grid-cols-[1fr_minmax(0,16rem)_1fr] md:px-section lg:grid-cols-[1fr_minmax(0,24rem)_1fr]">
+        <header className="z-50 flex h-16 shrink-0 items-center justify-between gap-inline border-b border-outline-variant bg-card px-stack md:grid md:grid-cols-[1fr_minmax(0,16rem)_1fr] md:px-section lg:grid-cols-[1fr_minmax(0,24rem)_1fr]">
           <div className="flex items-center gap-inline">
             {/* Mobile-only logo */}
             <div className="flex items-center gap-tight md:hidden">
