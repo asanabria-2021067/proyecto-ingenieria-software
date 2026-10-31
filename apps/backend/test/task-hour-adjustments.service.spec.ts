@@ -155,7 +155,7 @@ describe('TaskHourAdjustmentsService.upsert', () => {
     await expect(s.svc.upsert(1, 2, 7, 1, { deltaHoras: 2, justificacion: 'ok' } as never)).rejects.toBe(boom);
   });
 
-  it('permisos: la politica rechaza (ajeno / integrante / sprint cerrado) y nada se escribe', async () => {
+  it('si la politica rechaza, no se escribe nada', async () => {
     s.policy.assertWriteTx.mockRejectedValue(new ForbiddenException('no autorizado'));
     await expect(s.svc.upsert(1, 2, 7, 55, { deltaHoras: 2, justificacion: 'ok' } as never)).rejects.toBeInstanceOf(ForbiddenException);
     expect(s.tx.asignacionTarea.findFirst).not.toHaveBeenCalled();

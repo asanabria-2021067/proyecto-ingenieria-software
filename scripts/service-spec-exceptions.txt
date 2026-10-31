@@ -1,4 +1,4 @@
-﻿# Servicios sin <nombre>.service.spec.ts al crear el guard (RTF-3.1).
+# Servicios sin <nombre>.service.spec.ts al crear el guard (RTF-3.1).
 # Solo se pueden QUITAR lineas (al escribir el spec). No agregar servicios nuevos.
 apps/backend/src/admin/admin.service.ts
 apps/backend/src/auth/account-attempts.service.ts
@@ -6,7 +6,6 @@ apps/backend/src/catalogs/catalogs.service.ts
 apps/backend/src/chat/chat-estado.service.ts
 apps/backend/src/chat/link-preview/link-preview.service.ts
 apps/backend/src/common/project-policy/project-id-resolver.service.ts
-apps/backend/src/common/project-policy/project-policy.service.ts
 apps/backend/src/common/project-policy/project-transaction.service.ts
 apps/backend/src/eligibility/project-eligibility.service.ts
 apps/backend/src/exit-requests/exit-requests.authorization.service.ts

@@ -41,7 +41,7 @@ function okDocument() {
 function setup() {
   const tx = {
     revisionCierreProyecto: {
-      findFirst: vi.fn().mockResolvedValue({ idRevisionCierre: 9, estadoRevision: 'ENVIADA', fingerprintEntrega: 'fp', numeroRevision: 2, numeroRevision_: 0, documentos: [{ idDocumentoCierre: 1, orden: 1 }, { idDocumentoCierre: 2, orden: 2 }] }),
+      findFirst: vi.fn().mockResolvedValue({ idRevisionCierre: 9, estadoRevision: 'ENVIADA', fingerprintEntrega: 'fp', numeroRevision: 2, documentos: [{ idDocumentoCierre: 1, orden: 1 }, { idDocumentoCierre: 2, orden: 2 }] }),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       aggregate: vi.fn().mockResolvedValue({ _max: { numeroRevision: 2 } }),
       create: vi.fn().mockResolvedValue({ idRevisionCierre: 10, numeroRevision: 3 }),
@@ -116,7 +116,7 @@ describe('ProjectClosureReviewService.requestDocumentaryCorrection', () => {
     ]);
     expect(s.notifications.persistTemplateTx).toHaveBeenCalledWith(s.tx, [77], 'CIERRE_CORRECCION_DOCUMENTAL', expect.objectContaining({ projectTitle: 'Proyecto X' }), s.effects);
     expect(out).toMatchObject({ estadoProyecto: 'EN_SOLICITUD_CIERRE', revisionId: 10, numeroRevision: 3, cantidades: { vinculosHeredados: 2 } });
-    s.opts[0] && (s.opts[0] as { publish: (e: unknown) => void }).publish('E');
+    (s.opts[0] as { publish: (e: unknown) => void }).publish('E');
     expect(s.notifications.publishEffects).toHaveBeenCalledWith('E');
   });
 
@@ -138,7 +138,7 @@ describe('ProjectClosureReviewService.requestDocumentaryCorrection', () => {
     expect(s.tx.revisionCierreProyecto.create).not.toHaveBeenCalled();
   });
 
-  it('no administrador (lider, integrante, ajeno): la politica lo rechaza', async () => {
+  it('si la politica rechaza, no se lee ni se escribe nada', async () => {
     s.policy.assertWriteTx.mockRejectedValue(new ForbiddenException());
     await expect(s.svc.requestDocumentaryCorrection(1, 77, { revisionId: 9, comentario: 'c' } as never)).rejects.toBeInstanceOf(ForbiddenException);
     expect(s.tx.revisionCierreProyecto.findFirst).not.toHaveBeenCalled();
@@ -363,7 +363,6 @@ describe('ProjectClosureReviewService.approveClosure', () => {
     it.each(['documentoCierre', 'revisionCierreProyecto', 'proyecto'] as const)('finalizacion atomica falla si %s no afecta 1 fila', async (tabla) => {
       // Las llamadas previas de updateMany devuelven count 1; solo falla la ultima de la tabla.
       const mock = s.tx[tabla].updateMany;
-      const base = mock.getMockImplementation();
       mock.mockImplementation(async (args: { data?: { estadoDocumento?: string; estadoRevision?: string; estadoProyecto?: string } }) => {
         const d = args?.data ?? {};
         const falla = (tabla === 'documentoCierre' && d.estadoDocumento === 'DISPONIBLE')
@@ -371,7 +370,6 @@ describe('ProjectClosureReviewService.approveClosure', () => {
           || (tabla === 'proyecto' && d.estadoProyecto === 'CERRADO');
         return { count: falla ? 0 : 1 };
       });
-      void base;
       await expect(s.svc.approveClosure(1, 5, dto)).rejects.toThrow('finalización atómica');
       expect(s.audit.registrarEvento).not.toHaveBeenCalled();
     });
