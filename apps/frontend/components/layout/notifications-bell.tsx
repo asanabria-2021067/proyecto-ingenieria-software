@@ -57,6 +57,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
                 ? `Notificaciones, ${unread} sin leer`
                 : 'Notificaciones, no hay pendientes'
             }
+            title="Notificaciones"
             className="relative flex items-center justify-center h-10 w-10 rounded-md text-on-surface hover:bg-surface-container-high motion-icon cursor-pointer"
           >
             <div className="relative">

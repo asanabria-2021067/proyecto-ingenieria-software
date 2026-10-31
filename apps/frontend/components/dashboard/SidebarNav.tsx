@@ -19,6 +19,8 @@ export interface NavLeaf {
   icon: LucideIcon;
   exact?: boolean;
   badge?: number;
+  /** Destino sin ruta (p. ej. «Mensajes», que abre un panel): se pinta como botón y no entra a la barra móvil. */
+  onSelect?: () => void;
 }
 
 export interface NavGroup {
@@ -35,7 +37,7 @@ export type NavEntry = NavLeaf | NavGroup;
 /** Aplana grupos a sus hijos — usado por la barra inferior móvil, que no tiene
  *  espacio para subopciones expandibles y necesita la lista plana original. */
 export function flattenNavEntries(entries: NavEntry[]): NavLeaf[] {
-  return entries.flatMap((entry) => (entry.type === 'group' ? (entry.mobile ? [entry.mobile] : entry.items) : [entry]));
+  return entries.flatMap((entry) => (entry.type === 'group' ? (entry.mobile ? [entry.mobile] : entry.items) : entry.onSelect ? [] : [entry]));
 }
 
 /**
@@ -68,6 +70,11 @@ function activeItemHrefs(items: NavLeaf[], pathname: string, search?: string | n
 
 function slug(label: string): string {
   return label.toLowerCase().replace(/\s+/g, '-');
+}
+
+/** Nombre accesible de un destino sin ruta: contiene el texto visible (WCAG 2.5.3) pero no empieza por él, para no confundirse con el botón «Mensajes» de la barra superior. */
+function etiquetaAccion(leaf: NavLeaf): string {
+  return `Abrir ${leaf.label.toLowerCase()}${leaf.badge ? `, ${leaf.badge} sin leer` : ''}`;
 }
 
 function NavBadge({ count }: { count?: number }) {
@@ -136,6 +143,23 @@ export function SidebarNav({ entries, theme = 'default', search = null, idUsuari
         if (entry.type !== 'group') {
           const active = isLeafActive(pathname, entry, search);
           const Icon = entry.icon;
+          if (entry.onSelect) {
+            return (
+              <button
+                key={entry.href}
+                type="button"
+                id={`nav-item-${slug(entry.label)}`}
+                onClick={entry.onSelect}
+                aria-label={etiquetaAccion(entry)}
+                aria-haspopup="dialog"
+                className="admin-nav-item admin-nav-inactive w-full"
+              >
+                <Icon className="w-5 h-5 shrink-0" />
+                {entry.label}
+                <NavBadge count={entry.badge} />
+              </button>
+            );
+          }
           return (
             <Link
               key={entry.href}
@@ -250,6 +274,25 @@ interface CollapsedSidebarNavProps {
 function CollapsedSidebarNav({ entries, pathname, search, pinned, onExpand, navId, navLabel }: CollapsedSidebarNavProps) {
   const renderLeaf = (leaf: NavLeaf, active = isLeafActive(pathname, leaf, search)) => {
     const Icon = leaf.icon;
+    if (leaf.onSelect) {
+      return (
+        <Tooltip key={leaf.href}>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              id={`nav-item-${slug(leaf.label)}`}
+              aria-label={etiquetaAccion(leaf)}
+              aria-haspopup="dialog"
+              onClick={leaf.onSelect}
+              className="admin-nav-item admin-nav-icon admin-nav-inactive"
+            >
+              <Icon className="size-4.5" aria-hidden="true" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{leaf.label}</TooltipContent>
+        </Tooltip>
+      );
+    }
     return (
       <Tooltip key={leaf.href}>
         <TooltipTrigger asChild>
