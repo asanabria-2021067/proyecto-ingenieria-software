@@ -11,6 +11,8 @@ export default defineConfig({
       'test/password-recovery-admin.real-db.e2e.spec.ts',
     ],
     globals: true,
+    // RTF-3.9: un .only olvidado falla la corrida en vez de ocultar tests.
+    allowOnly: false,
     clearMocks: true,
     // G01 · OWASP25-C019: JWT_SECRET sintético para todas las suites.
     setupFiles: ['test/helpers/synthetic-jwt-secret.setup.ts'],

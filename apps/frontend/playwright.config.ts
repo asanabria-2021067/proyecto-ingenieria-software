@@ -19,6 +19,7 @@ export default defineConfig({
   // CI cambia velocidad por estabilidad; en local, con --workers no seteado,
   // sigue paralelo.
   workers: process.env.CI ? 1 : undefined,
+  forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: [['html', { open: 'never' }]],
   use: {
