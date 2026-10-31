@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { apiFetch } from '@/lib/api/client';
 import uvgSwal from '@/lib/swal';
+import { MAX_CONTRASENA, MIN_CONTRASENA } from '@/lib/validators/contrasena';
 
 import logo from '@/public/logo.png';
 import img from '@/public/login-foto.jpg';
@@ -43,11 +44,11 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (nuevaContrasena.length < 8) {
+    if (nuevaContrasena.length < MIN_CONTRASENA || nuevaContrasena.length > MAX_CONTRASENA) {
       uvgSwal.fire({
         icon: 'warning',
         title: 'Error',
-        text: 'La contraseña debe tener al menos 8 caracteres',
+        text: `La contraseña debe tener entre ${MIN_CONTRASENA} y ${MAX_CONTRASENA} caracteres`,
       });
       return;
     }
@@ -132,10 +133,11 @@ function ResetPasswordForm() {
                     <input
                       type="password"
                       required
-                      minLength={8}
+                      minLength={MIN_CONTRASENA}
+                      maxLength={MAX_CONTRASENA}
                       value={nuevaContrasena}
                       onChange={(e) => setNuevaContrasena(e.target.value)}
-                      placeholder="Mínimo 8 caracteres"
+                      placeholder={`Mínimo ${MIN_CONTRASENA} caracteres`}
                       className="w-full rounded-xl border border-surface-container-highest bg-white dark:bg-surface-container pl-11 pr-4 py-4 font-body text-on-surface shadow-sm placeholder:text-tertiary/50 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>

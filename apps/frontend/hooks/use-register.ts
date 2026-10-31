@@ -5,14 +5,6 @@ import { useRouter } from 'next/navigation';
 import { register, type RegisterPayload } from '@/lib/services/auth';
 import uvgSwal from '@/lib/swal';
 
-function mensajeErrorRegistro(error: (Error & { statusCode?: number }) | null): string {
-  if (!error) return 'No se pudo completar el registro. Intenta de nuevo.';
-  if (error.statusCode === 429) {
-    return 'Demasiados intentos de registro. Espera un minuto antes de volver a intentarlo.';
-  }
-  return 'No se pudo completar el registro. Intenta de nuevo.';
-}
-
 export function useRegister() {
   const router = useRouter();
 
@@ -29,12 +21,7 @@ export function useRegister() {
       });
       setTimeout(() => router.push('/login'), 4000);
     },
-    onError: (error) => {
-      uvgSwal.fire({
-        icon: 'error',
-        title: 'No se pudo completar el registro',
-        text: mensajeErrorRegistro(error as Error & { statusCode?: number }),
-      });
-    },
+    // NL-T2: los errores se muestran en el formulario (por campo o en la alerta
+    // de app/registro/page.tsx), no en un popup duplicado.
   });
 }

@@ -134,8 +134,10 @@ export class AuthService {
     const pendiente = usuario?.estado === EstadoUsuario.PENDIENTE_VERIFICACION && contrasenaValida;
 
     if (bloqueada || !usuario || !contrasenaValida || usuario.estado !== EstadoUsuario.ACTIVO) {
-      // Cuenta inexistente o contraseña incorrecta suman al contador por igual.
-      const bloqueoNuevo = !bloqueada && (!usuario || !contrasenaValida) && this.attempts.recordFailure(cuenta);
+      // Todo 401 suma al contador por igual (cuenta inexistente, contraseña incorrecta,
+      // INACTIVO/BLOQUEADO con la contraseña correcta): así intentosRestantes sigue la
+      // misma secuencia y no delata la cuenta. Solo PENDIENTE (403, documentado) no suma.
+      const bloqueoNuevo = !bloqueada && !pendiente && this.attempts.recordFailure(cuenta);
       const cuentaRef = usuario ? {} : { cuentaRef: accountReference(loginDto.correo) };
       // G05 (OWASP25-C037): un evento por intento, tras conocer el resultado.
       // Una cuenta inexistente se identifica solo con una referencia
@@ -169,7 +171,15 @@ export class AuthService {
       if (!bloqueada && pendiente) {
         throw new ForbiddenException(MENSAJE_CUENTA_PENDIENTE);
       }
-      throw new UnauthorizedException("Credenciales inválidas");
+      // NL-T1: intentos que quedan antes del bloqueo temporal. Sale del mismo
+      // contador correo+IP que se alimenta con cuentas inexistentes, así que
+      // un correo registrado y uno que no lo está reciben el mismo número.
+      throw new UnauthorizedException({
+        statusCode: 401,
+        message: "Credenciales inválidas",
+        error: "Unauthorized",
+        intentosRestantes: this.attempts.remaining(cuenta),
+      });
     }
 
     this.attempts.recordSuccess(cuenta);

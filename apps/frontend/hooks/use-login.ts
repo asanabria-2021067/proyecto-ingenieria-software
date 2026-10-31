@@ -8,21 +8,6 @@ import { isAdminUser } from '@/hooks/use-current-user';
 import { readNextFromLocation } from '@/lib/api/session';
 import uvgSwal from '@/lib/swal';
 
-// T-274 (OWASP): un solo mensaje para credenciales invalidas, nunca se dice
-// si el correo existe o no. El limite de intentos (5/60s, ver
-// auth.controller.ts) se explica aparte para que el bloqueo se sienta como
-// un estado temporal y no como otro error de credenciales.
-function mensajeErrorLogin(error: (Error & { statusCode?: number }) | null): string {
-  if (!error) return 'No se pudo iniciar sesión. Verifica tu correo y contraseña.';
-  if (error.statusCode === 429) {
-    return 'Demasiados intentos de inicio de sesión. Espera un minuto antes de volver a intentarlo.';
-  }
-  if (error.statusCode === 403) {
-    return 'Tu cuenta está pendiente de verificación por administración.';
-  }
-  return 'No se pudo iniciar sesión. Verifica tu correo y contraseña.';
-}
-
 // T-221: si la sesión había vencido, vuelve a la ruta desde la que se
 // redirigió al login (`next`) en vez de ir siempre al dashboard.
 export function useLogin() {
@@ -45,12 +30,6 @@ export function useLogin() {
       const destination = readNextFromLocation() ?? (isAdminUser(user) ? '/dashboard/admin' : '/dashboard');
       setTimeout(() => router.push(destination), 1200);
     },
-    onError: (error) => {
-      uvgSwal.fire({
-        icon: 'error',
-        title: 'No se pudo iniciar sesión',
-        text: mensajeErrorLogin(error as Error & { statusCode?: number }),
-      });
-    },
+    // NL-T1: los errores se muestran en el formulario (app/login/page.tsx), no en un popup.
   });
 }

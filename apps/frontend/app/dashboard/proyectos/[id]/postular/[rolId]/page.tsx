@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { Postulacion, Proyecto } from '@/types';
 import { SkeletonCard, SkeletonDetail } from '@/components/ui/skeleton';
 
@@ -182,7 +183,9 @@ export default function PostularPage() {
                 </Link>
               </div>
             ) : (
-              <form noValidate onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-5">
+              <form noValidate onSubmit={handleSubmit((data) => {
+                if (!mutation.isPending) mutation.mutate(data);
+              })} className="space-y-5">
                 <div>
                   <label htmlFor="justificacion" className="block text-sm font-semibold text-on-surface mb-1.5">
                     Justificación <span className="text-error">*</span>
@@ -233,8 +236,10 @@ export default function PostularPage() {
                   <Button
                     type="submit"
                     disabled={mutation.isPending}
+                    aria-busy={mutation.isPending}
                     className="h-auto flex-1 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary hover:bg-primary disabled:opacity-60 motion-glow-primary"
                   >
+                    {mutation.isPending && <Spinner aria-label="Cargando" />}
                     {mutation.isPending ? 'Enviando...' : 'Enviar Postulación'}
                   </Button>
                 </div>
