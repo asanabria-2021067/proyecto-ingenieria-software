@@ -11,6 +11,8 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['test/**/*.spec.ts', 'test/**/*.spec.tsx'],
     globals: true,
+    // RTF-3.9: un .only olvidado falla la corrida en vez de ocultar tests.
+    allowOnly: false,
     clearMocks: true,
     // jsdom acumula memoria entre archivos dentro del mismo worker (~105
     // archivos de test). tinypool reparte archivos entre forks de forma
