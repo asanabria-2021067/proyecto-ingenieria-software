@@ -25,6 +25,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
+import ProfileCompletionCard, {
+  PERFIL_POSPUESTO_KEY,
+  profileCompletionPercent,
+} from '@/components/profile/ProfileCompletionCard';
 import {
   Empty,
   EmptyDescription,
@@ -324,13 +328,22 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const { data: user, isLoading: userLoading } = useCurrentUser();
   const [wizardDismissed, setWizardDismissed] = useState(false);
+  const [wizardDeferred, setWizardDeferred] = useState(() => {
+    try {
+      return sessionStorage.getItem(PERFIL_POSPUESTO_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   const [projectTab, setProjectTab] = useState<'destacados' | 'disponibles'>(
     'destacados',
   );
   const showWizard = useMemo(
-    () => !wizardDismissed && !!user && isProfileIncomplete(user),
-    [wizardDismissed, user],
+    () => !wizardDismissed && !wizardDeferred && !!user && isProfileIncomplete(user),
+    [wizardDismissed, wizardDeferred, user],
   );
+  const profilePercent = user && wizardDeferred ? profileCompletionPercent(user) : 100;
+  const showProfileCard = wizardDeferred && !wizardDismissed && profilePercent < 100;
 
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
@@ -396,6 +409,12 @@ export default function DashboardPage() {
     <>
       <CompleteProfileDialog
         open={showWizard}
+        onDefer={() => {
+          try {
+            sessionStorage.setItem(PERFIL_POSPUESTO_KEY, '1');
+          } catch {}
+          setWizardDeferred(true);
+        }}
         onComplete={async () => {
           setWizardDismissed(true);
           await Promise.all([
@@ -407,6 +426,12 @@ export default function DashboardPage() {
       />
 
       <div className={dashboardPage('py-section lg:py-page')}>
+        {showProfileCard && (
+          <ProfileCompletionCard
+            percent={profilePercent}
+            onComplete={() => setWizardDeferred(false)}
+          />
+        )}
         {/* Welcome + Stats */}
         <section className="relative mb-section overflow-hidden rounded-card bg-sage-welcome p-card text-sage-ink shadow-card">
           <div className="absolute -right-10 -bottom-10 h-56 w-56 rounded-full bg-sage-accent/10 blur-3xl" />
