@@ -84,17 +84,19 @@ describe('Identidad visual compartida de Login y Registro', () => {
     const registro = estructura(render(<RegistroPage />, { wrapper }).container);
 
     expect(registro).toEqual(login);
-    expect(login.foto).toContain('lg:w-1/2');
-    expect(login.panel).toContain('lg:w-1/2');
+    // NL-T1: la fotografía pesa 40 % y el formulario 60 %; en móvil la foto no se muestra.
+    expect(login.foto).toContain('lg:w-2/5');
+    expect(login.foto).toContain('hidden');
+    expect(login.panel).toContain('lg:w-3/5');
     expect(login.fotoAlt).toBe('Estudiantes UVG');
-    // Sin el filtro verde intenso: solo el velo tenue de Login.
-    expect(login.filtro).toBe('absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent');
+    // Velo oscuro (sin el verde intenso) para que el mensaje se lea y la foto pese menos.
+    expect(login.filtro).toBe('absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/40');
   });
 
   it('Registro conserva su mensaje institucional sobre la fotografía y deja desplazar solo el panel del formulario', () => {
     const { container } = render(<RegistroPage />, { wrapper });
     expect(screen.getByRole('heading', { level: 2, name: 'Comienza tu camino' })).toBeInTheDocument();
-    expect(screen.getByText(/oportunidades de beca, extension y experiencia academica/)).toBeInTheDocument();
+    expect(screen.getByText(/oportunidades de beca, extensión y experiencia académica/)).toBeInTheDocument();
     const raiz = container.firstElementChild as HTMLElement;
     expect(raiz).toHaveClass('lg:h-screen');
     expect(raiz.children[1]).toHaveClass('lg:overflow-y-auto');
@@ -104,7 +106,7 @@ describe('Identidad visual compartida de Login y Registro', () => {
     render(<LoginPage />, { wrapper });
     const etiquetaLogin = screen.getByText('Correo Institucional').className;
     const campoLogin = screen.getByLabelText('Correo Institucional').className;
-    const botonLogin = screen.getByRole('button', { name: 'Iniciar Sesion' }).className;
+    const botonLogin = screen.getByRole('button', { name: 'Iniciar Sesión' }).className;
     cleanup();
 
     render(<RegistroPage />, { wrapper });
@@ -112,7 +114,7 @@ describe('Identidad visual compartida de Login y Registro', () => {
     // Mismo control; en el formulario largo solo cambia el relleno vertical.
     expect(screen.getByLabelText('Correo institucional').className).toBe(campoLogin.replace('py-4', 'py-3'));
     expect(screen.getByRole('button', { name: 'Crear Cuenta' }).className).toBe(botonLogin);
-    expect(screen.getByRole('link', { name: 'Inicia sesion' })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: 'Inicia sesión' })).toHaveAttribute('href', '/login');
   });
 
   it('Registro conserva los ocho campos, el catálogo de carreras y los doce semestres', async () => {
@@ -163,7 +165,8 @@ describe('Identidad visual compartida de Login y Registro', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Crear Cuenta' }));
     await waitFor(() =>
-      expect(registrar).toHaveBeenCalledWith({
+      expect(registrar).toHaveBeenCalledWith(
+      {
         nombre: 'Ana',
         apellido: 'García',
         carne: '24725',
@@ -171,7 +174,10 @@ describe('Identidad visual compartida de Login y Registro', () => {
         contrasena: 'Passw0rd!',
         idCarrera: 2,
         semestre: 7,
-      }),
+      },
+      // NL-T2: segundo argumento con el onError que mapea el 400 del backend al campo.
+      { onError: expect.any(Function) },
+      ),
     );
   });
 });

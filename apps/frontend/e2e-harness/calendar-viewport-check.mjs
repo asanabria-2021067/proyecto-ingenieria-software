@@ -69,8 +69,8 @@ if (rutaAxe) {
         // Sesión real por el formulario, con la cuenta sintética del seed (misma que e2e/support/auth.ts).
         await pagina.goto('/login');
         await pagina.getByPlaceholder('usuario@uvg.edu.gt').fill('carlos.mendoza@uvg.edu.gt');
-        await pagina.getByPlaceholder('Minimo 8 caracteres').fill('Test1234!');
-        await pagina.getByRole('button', { name: 'Iniciar Sesion' }).click();
+        await pagina.getByPlaceholder('Mínimo 8 caracteres').fill('Test1234!');
+        await pagina.getByRole('button', { name: 'Iniciar Sesión' }).click();
         await pagina.waitForURL('**/dashboard', { timeout: 45_000 });
         await pagina.goto('/dashboard/calendario');
         const analizar = async (superficie, selector) => {

@@ -431,8 +431,8 @@ model Amistad {
   fechaSolicitud       DateTime      @default(now()) @map("fecha_solicitud")
   fechaResolucion      DateTime?     @map("fecha_resolucion")
 
-  solicitante Usuario @relation("AmistadesSolicitadas", fields: [idUsuarioSolicitante], references: [idUsuario])
-  receptor    Usuario @relation("AmistadesRecibidas", fields: [idUsuarioReceptor], references: [idUsuario])
+  solicitante Usuario @relation("AmistadesSolicitadas", fields: [idUsuarioSolicitante], references: [idUsuario], onDelete: Restrict)
+  receptor    Usuario @relation("AmistadesRecibidas", fields: [idUsuarioReceptor], references: [idUsuario], onDelete: Restrict)
 
   @@unique([idUsuarioSolicitante, idUsuarioReceptor])
   @@map("amistad")
@@ -444,8 +444,8 @@ model Seguimiento {
   idSeguido     Int      @map("id_seguido")
   fechaCreacion DateTime @default(now()) @map("fecha_creacion")
 
-  seguidor Usuario @relation("Siguiendo", fields: [idSeguidor], references: [idUsuario])
-  seguido  Usuario @relation("Seguidores", fields: [idSeguido], references: [idUsuario])
+  seguidor Usuario @relation("Siguiendo", fields: [idSeguidor], references: [idUsuario], onDelete: Restrict)
+  seguido  Usuario @relation("Seguidores", fields: [idSeguido], references: [idUsuario], onDelete: Restrict)
 
   @@unique([idSeguidor, idSeguido])
   @@map("seguimiento")
@@ -458,7 +458,7 @@ model UsuarioTelefono {
   tipoTelefono      TipoTelefono @default(PERSONAL) @map("tipo_telefono")
   esPrincipal       Boolean      @default(false) @map("es_principal")
 
-  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
 
   @@map("usuario_telefono")
 }
@@ -479,8 +479,8 @@ model PerfilEstudiante {
   preferenciasNotificaciones Json?     @map("preferencias_notificaciones")
   fechaActualizacion         DateTime? @map("fecha_actualizacion")
 
-  usuario Usuario  @relation(fields: [idUsuario], references: [idUsuario])
-  carrera Carrera? @relation(fields: [idCarrera], references: [idCarrera])
+  usuario Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  carrera Carrera? @relation(fields: [idCarrera], references: [idCarrera], onDelete: SetNull)
 
   @@map("perfil_estudiante")
 }
@@ -518,8 +518,8 @@ model UsuarioHabilidad {
   nivelHabilidad     NivelHabilidad @default(BASICO) @map("nivel_habilidad")
   aniosExperiencia   Int?           @map("anios_experiencia")
 
-  usuario   Usuario   @relation(fields: [idUsuario], references: [idUsuario])
-  habilidad Habilidad @relation(fields: [idHabilidad], references: [idHabilidad])
+  usuario   Usuario   @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  habilidad Habilidad @relation(fields: [idHabilidad], references: [idHabilidad], onDelete: Restrict)
 
   @@unique([idUsuario, idHabilidad])
   @@map("usuario_habilidad")
@@ -541,8 +541,8 @@ model UsuarioInteres {
   idUsuario        Int @map("id_usuario")
   idInteres        Int @map("id_interes")
 
-  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
-  interes Interes @relation(fields: [idInteres], references: [idInteres])
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  interes Interes @relation(fields: [idInteres], references: [idInteres], onDelete: Restrict)
 
   @@unique([idUsuario, idInteres])
   @@map("usuario_interes")
@@ -563,8 +563,8 @@ model UsuarioCualidad {
   idUsuario         Int @map("id_usuario")
   idCualidad        Int @map("id_cualidad")
 
-  usuario  Usuario  @relation(fields: [idUsuario], references: [idUsuario])
-  cualidad Cualidad @relation(fields: [idCualidad], references: [idCualidad])
+  usuario  Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  cualidad Cualidad @relation(fields: [idCualidad], references: [idCualidad], onDelete: Restrict)
 
   @@unique([idUsuario, idCualidad])
   @@map("usuario_cualidad")
@@ -581,8 +581,8 @@ model ExperienciaPrevia {
   fechaFin                  DateTime?       @map("fecha_fin") @db.Date
   tipoExperiencia           TipoExperiencia @default(OTRO) @map("tipo_experiencia")
 
-  usuario            Usuario    @relation(fields: [idUsuario], references: [idUsuario])
-  habilidadPrincipal Habilidad? @relation(fields: [idHabilidadPrincipal], references: [idHabilidad])
+  usuario            Usuario    @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  habilidadPrincipal Habilidad? @relation(fields: [idHabilidadPrincipal], references: [idHabilidad], onDelete: SetNull)
 
   @@map("experiencia_previa")
 }
@@ -600,7 +600,7 @@ model Organizacion {
   creadaPor               Int                @map("creada_por")
   fechaCreacion           DateTime           @default(now()) @map("fecha_creacion")
 
-  creador   Usuario                @relation(fields: [creadaPor], references: [idUsuario])
+  creador   Usuario                @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
   miembros  UsuarioOrganizacion[]
   proyectos ProyectoOrganizacion[]
 
@@ -615,8 +615,8 @@ model UsuarioOrganizacion {
   fechaIngreso          DateTime        @default(now()) @map("fecha_ingreso")
   estadoMembresia       EstadoMembresia @default(ACTIVA) @map("estado_membresia")
 
-  usuario      Usuario      @relation(fields: [idUsuario], references: [idUsuario])
-  organizacion Organizacion @relation(fields: [idOrganizacion], references: [idOrganizacion])
+  usuario      Usuario      @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  organizacion Organizacion @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Restrict)
 
   @@unique([idUsuario, idOrganizacion])
   @@map("usuario_organizacion")
@@ -642,7 +642,7 @@ model Proyecto {
   fechaActualizacion  DateTime?         @map("fecha_actualizacion")
   eliminadoEn         DateTime?         @map("eliminado_en")
 
-  creador           Usuario                   @relation(fields: [creadoPor], references: [idUsuario])
+  creador           Usuario                   @relation(fields: [creadoPor], references: [idUsuario], onDelete: Restrict)
   organizaciones    ProyectoOrganizacion[]
   intereses         ProyectoInteres[]
   roles             RolProyecto[]
@@ -723,8 +723,8 @@ model EventoProyecto {
   /// reunión de Administración: solo Administración la edita o cancela.
   idReunion             Int?            @map("id_reunion")
 
-  proyecto Proyecto               @relation(fields: [idProyecto], references: [idProyecto])
-  creador  Usuario                @relation(fields: [idCreador], references: [idUsuario])
+  proyecto Proyecto               @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  creador  Usuario                @relation(fields: [idCreador], references: [idUsuario], onDelete: Restrict)
   reunion  ReunionAdministracion? @relation(fields: [idReunion], references: [idReunion], onDelete: Restrict)
 
   @@unique([idReunion, idProyecto])
@@ -749,7 +749,7 @@ model ReunionAdministracion {
   actualizadaEn   DateTime?              @map("actualizada_en")
   canceladaEn     DateTime?              @map("cancelada_en")
 
-  creador  Usuario                      @relation("ReunionesAdministracionCreadas", fields: [idCreador], references: [idUsuario])
+  creador  Usuario                      @relation("ReunionesAdministracionCreadas", fields: [idCreador], references: [idUsuario], onDelete: Restrict)
   editores ReunionAdministradorEditor[]
   eventos  EventoProyecto[]
 
@@ -772,7 +772,7 @@ model ReunionAdministradorEditor {
   idUsuario Int @map("id_usuario")
 
   reunion ReunionAdministracion @relation(fields: [idReunion], references: [idReunion], onDelete: Restrict)
-  usuario Usuario               @relation("ReunionesAdministracionEditables", fields: [idUsuario], references: [idUsuario])
+  usuario Usuario               @relation("ReunionesAdministracionEditables", fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
 
   @@id([idReunion, idUsuario])
   @@index([idUsuario])
@@ -787,8 +787,8 @@ model CalendarioCompartido {
   idInvitado             Int      @map("id_invitado")
   creadoEn               DateTime @default(now()) @map("creado_en")
 
-  propietario Usuario @relation("CalendarioPropietario", fields: [idPropietario], references: [idUsuario])
-  invitado    Usuario @relation("CalendarioInvitado", fields: [idInvitado], references: [idUsuario])
+  propietario Usuario @relation("CalendarioPropietario", fields: [idPropietario], references: [idUsuario], onDelete: Restrict)
+  invitado    Usuario @relation("CalendarioInvitado", fields: [idInvitado], references: [idUsuario], onDelete: Restrict)
 
   @@unique([idPropietario, idInvitado])
   @@index([idInvitado])
@@ -806,8 +806,8 @@ model RevisionProyecto {
   enviadaEn          DateTime               @default(now()) @map("enviada_en")
   revisadaEn         DateTime?              @map("revisada_en")
 
-  proyecto Proyecto                  @relation(fields: [idProyecto], references: [idProyecto])
-  revisor  Usuario?                  @relation("RevisionesProyectoRealizadas", fields: [idRevisor], references: [idUsuario])
+  proyecto Proyecto                  @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  revisor  Usuario?                  @relation("RevisionesProyectoRealizadas", fields: [idRevisor], references: [idUsuario], onDelete: SetNull)
   mensajes MensajeRevisionProyecto[]
 
   @@map("revision_proyecto")
@@ -820,8 +820,8 @@ model ProyectoOrganizacion {
   rolOrganizacion        RolOrganizacionProyecto @default(PRINCIPAL) @map("rol_organizacion")
   fechaVinculacion       DateTime                @default(now()) @map("fecha_vinculacion")
 
-  proyecto     Proyecto     @relation(fields: [idProyecto], references: [idProyecto])
-  organizacion Organizacion @relation(fields: [idOrganizacion], references: [idOrganizacion])
+  proyecto     Proyecto     @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  organizacion Organizacion @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Restrict)
 
   @@unique([idProyecto, idOrganizacion])
   @@map("proyecto_organizacion")
@@ -832,8 +832,8 @@ model ProyectoInteres {
   idProyecto        Int @map("id_proyecto")
   idInteres         Int @map("id_interes")
 
-  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto])
-  interes  Interes  @relation(fields: [idInteres], references: [idInteres])
+  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  interes  Interes  @relation(fields: [idInteres], references: [idInteres], onDelete: Restrict)
 
   @@unique([idProyecto, idInteres])
   @@map("proyecto_interes")
@@ -848,8 +848,8 @@ model RolProyecto {
   cupos                   Int     @default(1)
   horasSemanalesEstimadas Int?    @map("horas_semanales_estimadas")
 
-  proyecto         Proyecto                @relation(fields: [idProyecto], references: [idProyecto])
-  carreraRequerida Carrera?                @relation(fields: [idCarreraRequerida], references: [idCarrera])
+  proyecto         Proyecto                @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  carreraRequerida Carrera?                @relation(fields: [idCarreraRequerida], references: [idCarrera], onDelete: SetNull)
   requisitos       RequisitoHabilidadRol[]
   postulaciones    Postulacion[]
   participaciones  ParticipacionProyecto[]
@@ -866,8 +866,8 @@ model RequisitoHabilidadRol {
   nivelMinimo          NivelHabilidad @default(BASICO) @map("nivel_minimo")
   obligatorio          Boolean        @default(true)
 
-  rolProyecto RolProyecto @relation(fields: [idRolProyecto], references: [idRolProyecto])
-  habilidad   Habilidad   @relation(fields: [idHabilidad], references: [idHabilidad])
+  rolProyecto RolProyecto @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: Restrict)
+  habilidad   Habilidad   @relation(fields: [idHabilidad], references: [idHabilidad], onDelete: Restrict)
 
   @@unique([idRolProyecto, idHabilidad])
   @@map("requisito_habilidad_rol")
@@ -885,9 +885,9 @@ model Postulacion {
   resueltaPor          Int?              @map("resuelta_por")
   comentarioResolucion String?           @map("comentario_resolucion") @db.Text
 
-  postulante      Usuario                 @relation("Postulante", fields: [idUsuarioPostulante], references: [idUsuario])
-  resolutor       Usuario?                @relation("PostulacionResolutor", fields: [resueltaPor], references: [idUsuario])
-  rolProyecto     RolProyecto             @relation(fields: [idRolProyecto], references: [idRolProyecto])
+  postulante      Usuario                 @relation("Postulante", fields: [idUsuarioPostulante], references: [idUsuario], onDelete: Restrict)
+  resolutor       Usuario?                @relation("PostulacionResolutor", fields: [resueltaPor], references: [idUsuario], onDelete: SetNull)
+  rolProyecto     RolProyecto             @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: Restrict)
   participaciones ParticipacionProyecto[]
 
   @@index([idUsuarioPostulante, idRolProyecto])
@@ -907,9 +907,9 @@ model ParticipacionProyecto {
   fechaIngreso        DateTime            @default(now()) @map("fecha_ingreso") @db.Date
   fechaSalida         DateTime?           @map("fecha_salida") @db.Date
 
-  usuario           Usuario              @relation(fields: [idUsuario], references: [idUsuario])
-  rolProyecto       RolProyecto          @relation(fields: [idRolProyecto], references: [idRolProyecto])
-  postulacion       Postulacion?         @relation(fields: [idPostulacion], references: [idPostulacion])
+  usuario           Usuario              @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  rolProyecto       RolProyecto          @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: Restrict)
+  postulacion       Postulacion?         @relation(fields: [idPostulacion], references: [idPostulacion], onDelete: SetNull)
   registrosHoras    HorasParticipacion[]
   certificados      Certificado[]
   asignacionesTarea AsignacionTarea[]
@@ -943,9 +943,9 @@ model SolicitudSalidaProyecto {
   resueltaEn      DateTime?             @map("resuelta_en")
   resueltaPor     Int?                  @map("resuelta_por")
 
-  proyecto  Proyecto @relation(fields: [idProyecto], references: [idProyecto])
-  usuario   Usuario  @relation("SolicitudSalidaSolicitante", fields: [idUsuario], references: [idUsuario])
-  resolutor Usuario? @relation("SolicitudSalidaResolutor", fields: [resueltaPor], references: [idUsuario])
+  proyecto  Proyecto @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  usuario   Usuario  @relation("SolicitudSalidaSolicitante", fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  resolutor Usuario? @relation("SolicitudSalidaResolutor", fields: [resueltaPor], references: [idUsuario], onDelete: SetNull)
 
   @@index([idProyecto, idUsuario])
   @@map("solicitud_salida_proyecto")
@@ -960,7 +960,7 @@ model Hito {
   estadoHito      EstadoHito @default(PENDIENTE) @map("estado_hito")
   orden           Int
 
-  proyecto    Proyecto     @relation(fields: [idProyecto], references: [idProyecto])
+  proyecto    Proyecto     @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
   tareas      Tarea[]
   comentarios Comentario[]
 
@@ -994,8 +994,8 @@ model Sprint {
   puntosHistoriaCompletadosCierre  Int? @map("puntos_historia_completados_cierre")
   tareasArrastradasCierre          Int? @map("tareas_arrastradas_cierre")
 
-  proyecto           Proyecto             @relation(fields: [idProyecto], references: [idProyecto])
-  cerrador           Usuario?             @relation(fields: [cerradoPor], references: [idUsuario])
+  proyecto           Proyecto             @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  cerrador           Usuario?             @relation(fields: [cerradoPor], references: [idUsuario], onDelete: SetNull)
   tareas             Tarea[]
   horasParticipacion HorasParticipacion[]
   instantaneas       InstantaneaSprint[]
@@ -1019,7 +1019,7 @@ model InstantaneaSprint {
   puntosHistoriaRestantes Int      @map("puntos_historia_restantes")
   generadaEn              DateTime @default(now()) @map("generada_en")
 
-  sprint Sprint @relation(fields: [idSprint], references: [idSprint])
+  sprint Sprint @relation(fields: [idSprint], references: [idSprint], onDelete: Restrict)
 
   @@unique([idSprint, fecha])
   @@map("instantanea_sprint")
@@ -1045,11 +1045,11 @@ model Tarea {
   eliminadoEn         DateTime?        @map("eliminado_en")
   destinoArrastre     DestinoArrastre? @map("destino_arrastre")
 
-  proyecto     Proyecto          @relation(fields: [idProyecto], references: [idProyecto])
-  hito         Hito?             @relation(fields: [idHito], references: [idHito])
+  proyecto     Proyecto          @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  hito         Hito?             @relation(fields: [idHito], references: [idHito], onDelete: SetNull)
   rolProyecto  RolProyecto?      @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
-  sprint       Sprint?           @relation(fields: [idSprint], references: [idSprint])
-  creador      Usuario           @relation(fields: [creadaPor], references: [idUsuario])
+  sprint       Sprint?           @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
+  creador      Usuario           @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
   asignaciones AsignacionTarea[]
   evidencias   Evidencia[]
   comentarios  Comentario[]
@@ -1106,9 +1106,9 @@ model AsignacionTarea {
   /// S7 M1: procedencia del importe de este tramo (ver OrigenReporteTramo). Por defecto GRANULAR, que describe el comportamiento vigente; la clasificación real de tramos históricos es tarea de la herramienta de conciliación D1.
   origenReporte   OrigenReporteTramo @default(GRANULAR) @map("origen_reporte")
 
-  tarea           Tarea                      @relation(fields: [idTarea], references: [idTarea])
-  usuario         Usuario                    @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario])
-  asignador       Usuario                    @relation("TareaAsignador", fields: [asignadoPor], references: [idUsuario])
+  tarea           Tarea                      @relation(fields: [idTarea], references: [idTarea], onDelete: Restrict)
+  usuario         Usuario                    @relation("TareaAsignada", fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  asignador       Usuario                    @relation("TareaAsignador", fields: [asignadoPor], references: [idUsuario], onDelete: Restrict)
   participacion   ParticipacionProyecto?     @relation(fields: [idParticipacion], references: [idParticipacion], onDelete: Restrict, onUpdate: Cascade)
   registrosAvance RegistroAvanceAsignacion[]
   registrosTiempo RegistroTiempoTarea[]
@@ -1133,8 +1133,8 @@ model RegistroAvanceAsignacion {
   creadoEn         DateTime  @default(now()) @map("creado_en")
   editadoEn        DateTime? @map("editado_en")
 
-  asignacion AsignacionTarea @relation(fields: [idAsignacion], references: [idAsignacion])
-  autor      Usuario         @relation(fields: [idAutor], references: [idUsuario])
+  asignacion AsignacionTarea @relation(fields: [idAsignacion], references: [idAsignacion], onDelete: Restrict)
+  autor      Usuario         @relation(fields: [idAutor], references: [idUsuario], onDelete: Restrict)
 
   @@map("registro_avance_asignacion")
 }
@@ -1370,7 +1370,7 @@ model Etiqueta {
   nombreNormalizado String @map("nombre_normalizado") @db.VarChar(255)
   color             String @db.VarChar(7)
 
-  proyecto Proyecto        @relation(fields: [idProyecto], references: [idProyecto])
+  proyecto Proyecto        @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
   tareas   TareaEtiqueta[]
 
   @@unique([idProyecto, nombreNormalizado])
@@ -1381,7 +1381,7 @@ model TareaEtiqueta {
   idTarea    Int @map("id_tarea")
   idEtiqueta Int @map("id_etiqueta")
 
-  tarea    Tarea    @relation(fields: [idTarea], references: [idTarea])
+  tarea    Tarea    @relation(fields: [idTarea], references: [idTarea], onDelete: Restrict)
   etiqueta Etiqueta @relation(fields: [idEtiqueta], references: [idEtiqueta], onDelete: Cascade)
 
   @@id([idTarea, idEtiqueta])
@@ -1399,8 +1399,8 @@ model Evidencia {
   tamanoBytes       BigInt?       @map("tamano_bytes")
   fechaEnvio        DateTime      @default(now()) @map("fecha_envio")
 
-  tarea      Tarea               @relation(fields: [idTarea], references: [idTarea])
-  cargador   Usuario             @relation(fields: [idUsuarioCargador], references: [idUsuario])
+  tarea      Tarea               @relation(fields: [idTarea], references: [idTarea], onDelete: Restrict)
+  cargador   Usuario             @relation(fields: [idUsuarioCargador], references: [idUsuario], onDelete: Restrict)
   revisiones RevisionEvidencia[]
 
   @@map("evidencia")
@@ -1414,8 +1414,8 @@ model RevisionEvidencia {
   comentario        String?           @db.Text
   fechaRevision     DateTime          @default(now()) @map("fecha_revision")
 
-  evidencia Evidencia @relation(fields: [idEvidencia], references: [idEvidencia])
-  revisor   Usuario   @relation(fields: [idRevisor], references: [idUsuario])
+  evidencia Evidencia @relation(fields: [idEvidencia], references: [idEvidencia], onDelete: Restrict)
+  revisor   Usuario   @relation(fields: [idRevisor], references: [idUsuario], onDelete: Restrict)
 
   @@map("revision_evidencia")
 }
@@ -1442,7 +1442,7 @@ model HorasParticipacion {
   fechaAprobacion     DateTime?   @map("fecha_aprobacion")
   idSprint            Int?        @map("id_sprint")
 
-  participacion ParticipacionProyecto @relation(fields: [idParticipacion], references: [idParticipacion])
+  participacion ParticipacionProyecto @relation(fields: [idParticipacion], references: [idParticipacion], onDelete: Restrict)
   aprobador     Usuario?              @relation(fields: [aprobadoPor], references: [idUsuario], onDelete: Restrict, onUpdate: Cascade)
   sprint        Sprint?               @relation(fields: [idSprint], references: [idSprint], onDelete: Restrict, onUpdate: Cascade)
   /// T-297 (HU-177): presente cuando esta fila fue generada por confirmar asistencia a una actividad, no por reconocimiento de Sprint.
@@ -1475,8 +1475,8 @@ model ActividadProyecto {
   creadoPor       Int           @map("creado_por")
   creadoEn        DateTime      @default(now()) @map("creado_en")
 
-  proyecto    Proyecto              @relation(fields: [idProyecto], references: [idProyecto])
-  creador     Usuario               @relation(fields: [creadoPor], references: [idUsuario])
+  proyecto    Proyecto              @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  creador     Usuario               @relation(fields: [creadoPor], references: [idUsuario], onDelete: Restrict)
   asistencias AsistenciaActividad[]
 
   @@index([idProyecto, fechaActividad])
@@ -1496,10 +1496,10 @@ model AsistenciaActividad {
   confirmadoEn    DateTime? @map("confirmado_en")
   idRegistroHoras Int?      @unique @map("id_registro_horas")
 
-  actividad     ActividadProyecto   @relation(fields: [idActividad], references: [idActividad])
-  usuario       Usuario             @relation("AsistenciaUsuario", fields: [idUsuario], references: [idUsuario])
-  confirmador   Usuario?            @relation("AsistenciaConfirmador", fields: [confirmadoPor], references: [idUsuario])
-  registroHoras HorasParticipacion? @relation(fields: [idRegistroHoras], references: [idRegistroHoras])
+  actividad     ActividadProyecto   @relation(fields: [idActividad], references: [idActividad], onDelete: Restrict)
+  usuario       Usuario             @relation("AsistenciaUsuario", fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  confirmador   Usuario?            @relation("AsistenciaConfirmador", fields: [confirmadoPor], references: [idUsuario], onDelete: SetNull)
+  registroHoras HorasParticipacion? @relation(fields: [idRegistroHoras], references: [idRegistroHoras], onDelete: SetNull)
 
   @@unique([idActividad, idUsuario])
   @@map("asistencia_actividad")
@@ -1515,8 +1515,8 @@ model Certificado {
   fechaEmision       DateTime        @default(now()) @map("fecha_emision")
   codigoVerificacion String          @unique @map("codigo_verificacion") @db.VarChar(255)
 
-  participacion ParticipacionProyecto @relation(fields: [idParticipacion], references: [idParticipacion])
-  emisor        Usuario               @relation(fields: [emitidoPor], references: [idUsuario])
+  participacion ParticipacionProyecto @relation(fields: [idParticipacion], references: [idParticipacion], onDelete: Restrict)
+  emisor        Usuario               @relation(fields: [emitidoPor], references: [idUsuario], onDelete: Restrict)
 
   @@map("certificado")
 }
@@ -1535,7 +1535,7 @@ model Notificacion {
   /// aviso al mismo usuario. Null para los avisos que no lo necesitan.
   claveIdempotencia   String?          @map("clave_idempotencia") @db.VarChar(160)
 
-  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
 
   @@unique([idUsuario, claveIdempotencia])
   @@index([idUsuario, leidaEn])
@@ -1552,7 +1552,7 @@ model PreferenciaNotificacion {
   activa           Boolean          @default(true)
   actualizadaEn    DateTime         @default(now()) @updatedAt @map("actualizada_en")
 
-  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
 
   @@unique([idUsuario, tipoNotificacion])
   @@map("preferencia_notificacion")
@@ -1569,8 +1569,8 @@ model SolicitudRecuperacion {
   atendidaPor      Int?                        @map("atendida_por")
   tokenUtilizadoEn DateTime?                   @map("token_utilizado_en")
 
-  usuario Usuario  @relation("SolicitudRecuperacionUsuario", fields: [idUsuario], references: [idUsuario])
-  admin   Usuario? @relation("SolicitudRecuperacionAdmin", fields: [atendidaPor], references: [idUsuario])
+  usuario Usuario  @relation("SolicitudRecuperacionUsuario", fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  admin   Usuario? @relation("SolicitudRecuperacionAdmin", fields: [atendidaPor], references: [idUsuario], onDelete: SetNull)
 
   @@index([estado])
   @@map("solicitud_recuperacion")
@@ -1603,8 +1603,8 @@ model UsuarioRolAcceso {
   idRolAcceso        Int      @map("id_rol_acceso")
   fechaAsignacion    DateTime @default(now()) @map("fecha_asignacion")
 
-  usuario   Usuario   @relation(fields: [idUsuario], references: [idUsuario])
-  rolAcceso RolAcceso @relation(fields: [idRolAcceso], references: [idRolAcceso])
+  usuario   Usuario   @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  rolAcceso RolAcceso @relation(fields: [idRolAcceso], references: [idRolAcceso], onDelete: Restrict)
 
   @@unique([idUsuario, idRolAcceso])
   @@map("usuario_rol_acceso")
@@ -1615,8 +1615,8 @@ model RolPermiso {
   idRolAcceso  Int @map("id_rol_acceso")
   idPermiso    Int @map("id_permiso")
 
-  rolAcceso RolAcceso @relation(fields: [idRolAcceso], references: [idRolAcceso])
-  permiso   Permiso   @relation(fields: [idPermiso], references: [idPermiso])
+  rolAcceso RolAcceso @relation(fields: [idRolAcceso], references: [idRolAcceso], onDelete: Restrict)
+  permiso   Permiso   @relation(fields: [idPermiso], references: [idPermiso], onDelete: Restrict)
 
   @@unique([idRolAcceso, idPermiso])
   @@map("rol_permiso")
@@ -1644,7 +1644,7 @@ model BitacoraAuditoria {
   ipOrigen    String?  @map("ip_origen") @db.VarChar(255)
   fechaEvento DateTime @default(now()) @map("fecha_evento")
 
-  usuario Usuario? @relation(fields: [idUsuario], references: [idUsuario])
+  usuario Usuario? @relation(fields: [idUsuario], references: [idUsuario], onDelete: SetNull)
 
   @@index([tipoObjeto, fechaEvento(sort: Desc), idAuditoria(sort: Desc)])
   @@map("bitacora_auditoria")
@@ -1657,7 +1657,7 @@ model ConfiguracionSistema {
   actualizadoPor       Int?      @map("actualizado_por")
   actualizadoEn        DateTime? @map("actualizado_en")
 
-  actualizador Usuario? @relation(fields: [actualizadoPor], references: [idUsuario])
+  actualizador Usuario? @relation(fields: [actualizadoPor], references: [idUsuario], onDelete: SetNull)
 
   @@map("configuracion_sistema")
 }
@@ -1673,10 +1673,10 @@ model Comentario {
   editadoEn    DateTime? @map("editado_en")
   eliminadoEn  DateTime? @map("eliminado_en")
 
-  autor     Usuario             @relation(fields: [idAutor], references: [idUsuario])
-  proyecto  Proyecto?           @relation(fields: [idProyecto], references: [idProyecto])
-  tarea     Tarea?              @relation(fields: [idTarea], references: [idTarea])
-  hito      Hito?               @relation(fields: [idHito], references: [idHito])
+  autor     Usuario             @relation(fields: [idAutor], references: [idUsuario], onDelete: Restrict)
+  proyecto  Proyecto?           @relation(fields: [idProyecto], references: [idProyecto], onDelete: SetNull)
+  tarea     Tarea?              @relation(fields: [idTarea], references: [idTarea], onDelete: SetNull)
+  hito      Hito?               @relation(fields: [idHito], references: [idHito], onDelete: SetNull)
   menciones MencionComentario[]
 
   @@index([idTarea])
@@ -1693,7 +1693,7 @@ model MencionComentario {
   creadaEn     DateTime @default(now()) @map("creada_en")
 
   comentario Comentario @relation(fields: [idComentario], references: [idComentario], onDelete: Cascade)
-  usuario    Usuario    @relation(fields: [idUsuario], references: [idUsuario])
+  usuario    Usuario    @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
 
   @@unique([idComentario, idUsuario])
   @@index([idUsuario])
@@ -1709,9 +1709,9 @@ model MensajeRevisionProyecto {
   enviadoEn   DateTime  @default(now()) @map("enviado_en")
   leidoEn     DateTime? @map("leido_en")
 
-  proyecto  Proyecto          @relation(fields: [idProyecto], references: [idProyecto])
-  remitente Usuario           @relation("MensajesEnviados", fields: [idRemitente], references: [idUsuario])
-  revision  RevisionProyecto? @relation(fields: [idRevision], references: [idRevisionProyecto])
+  proyecto  Proyecto          @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  remitente Usuario           @relation("MensajesEnviados", fields: [idRemitente], references: [idUsuario], onDelete: Restrict)
+  revision  RevisionProyecto? @relation(fields: [idRevision], references: [idRevisionProyecto], onDelete: SetNull)
 
   @@map("mensaje_revision_proyecto")
 }
@@ -1747,8 +1747,8 @@ model Conversacion {
   esCanal     Boolean @default(false) @map("es_canal")
   nombreCanal String? @map("nombre_canal") @db.VarChar(40)
 
-  proyecto      Proyecto                   @relation(fields: [idProyecto], references: [idProyecto])
-  creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario])
+  proyecto      Proyecto                   @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
   participantes ConversacionParticipante[]
   mensajes      MensajeChat[]
   adjuntos      AdjuntoMensajeChat[]
@@ -1770,8 +1770,8 @@ model ConversacionParticipante {
   silenciadaSiempre Boolean   @default(false) @map("silenciada_siempre")
   temaColor       String?   @map("tema_color") @db.VarChar(20)
 
-  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
-  usuario      Usuario      @relation(fields: [idUsuario], references: [idUsuario])
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
+  usuario      Usuario      @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
 
   @@id([idConversacion, idUsuario])
   @@index([idUsuario])
@@ -1790,7 +1790,7 @@ model PreferenciaNoMolestar {
   zona          String   @default("America/Guatemala") @db.VarChar(64)
   actualizadoEn DateTime @updatedAt @map("actualizado_en")
 
-  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
 
   @@map("preferencia_no_molestar")
 }
@@ -1805,8 +1805,8 @@ model MensajeChat {
   eliminadoEn     DateTime? @map("eliminado_en")
   idMensajeCitado Int?     @map("id_mensaje_citado")
 
-  conversacion Conversacion       @relation(fields: [idConversacion], references: [idConversacion])
-  remitente    Usuario            @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario])
+  conversacion Conversacion       @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
+  remitente    Usuario            @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario], onDelete: Restrict)
   adjunto      AdjuntoMensajeChat?
   citado       MensajeChat?       @relation("MensajeCitado", fields: [idMensajeCitado], references: [idMensaje], onDelete: SetNull)
   respuestas   MensajeChat[]      @relation("MensajeCitado")
@@ -1829,8 +1829,8 @@ model AdjuntoMensajeChat {
   claveAlmacenamiento String   @map("clave_almacenamiento") @db.VarChar(255)
   creadoEn            DateTime @default(now()) @map("creado_en")
 
-  mensaje      MensajeChat  @relation(fields: [idMensaje], references: [idMensaje])
-  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
+  mensaje      MensajeChat  @relation(fields: [idMensaje], references: [idMensaje], onDelete: Restrict)
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
 
   @@index([idConversacion, idMensaje])
   @@map("adjunto_mensaje_chat")
@@ -1845,7 +1845,7 @@ model ReaccionMensajeChat {
   creadaEn   DateTime @default(now()) @map("creada_en")
 
   mensaje MensajeChat @relation(fields: [idMensaje], references: [idMensaje], onDelete: Cascade)
-  usuario Usuario     @relation(fields: [idUsuario], references: [idUsuario])
+  usuario Usuario     @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
 
   @@unique([idMensaje, idUsuario, emoji])
   @@index([idMensaje])
@@ -1862,8 +1862,8 @@ model ApodoConversacion {
   apodo             String   @db.VarChar(40)
 
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Cascade)
-  define       Usuario      @relation("ApodosDefinidos", fields: [idUsuarioDefine], references: [idUsuario])
-  objetivo     Usuario      @relation("ApodosRecibidos", fields: [idUsuarioObjetivo], references: [idUsuario])
+  define       Usuario      @relation("ApodosDefinidos", fields: [idUsuarioDefine], references: [idUsuario], onDelete: Restrict)
+  objetivo     Usuario      @relation("ApodosRecibidos", fields: [idUsuarioObjetivo], references: [idUsuario], onDelete: Restrict)
 
   @@unique([idConversacion, idUsuarioDefine, idUsuarioObjetivo])
   @@index([idUsuarioDefine])
@@ -1923,8 +1923,8 @@ model MensajeProgramado {
   enviadoEn           DateTime?               @map("enviado_en")
   idMensaje           Int?                    @map("id_mensaje")
 
-  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion])
-  remitente    Usuario      @relation("MensajesProgramadosChat", fields: [idRemitente], references: [idUsuario])
+  conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
+  remitente    Usuario      @relation("MensajesProgramadosChat", fields: [idRemitente], references: [idUsuario], onDelete: Restrict)
 
   @@index([estado, enviarEn])
   @@index([idConversacion, idRemitente])
@@ -2014,7 +2014,7 @@ model AnuncioCierre {
   cerradoEn       DateTime @default(now()) @map("cerrado_en")
 
   anuncio Anuncio @relation(fields: [idAnuncio], references: [idAnuncio], onDelete: Cascade)
-  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
 
   @@unique([idAnuncio, idUsuario])
   @@index([idUsuario])

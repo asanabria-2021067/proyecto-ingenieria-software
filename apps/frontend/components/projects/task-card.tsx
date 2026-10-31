@@ -48,6 +48,8 @@ export interface TaskCardProps {
   onEditar?: () => void;
   /** Resaltado temporal al llegar desde el enlace de una notificación. */
   resaltada?: boolean;
+  /** La asignación activa es del usuario actual (NL-T4): borde y etiqueta «Asignada a ti». */
+  asignadaAMi?: boolean;
   /** Registro de refs por tarea para scroll/foco (notificación y post-drag). */
   onRegistrarCardRef?: (idTarea: number, el: HTMLElement | null) => void;
   onRegistrarHandleRef?: (idTarea: number, el: HTMLButtonElement | null) => void;
@@ -68,6 +70,7 @@ export function TaskCard({
   onAbrirDetalles,
   onAbrirComentarios,
   resaltada = false,
+  asignadaAMi = false,
   onRegistrarCardRef,
   onRegistrarHandleRef,
   onAlternarSeleccion,
@@ -141,7 +144,9 @@ export function TaskCard({
           ? 'border-primary bg-primary/5 ring-2 ring-primary/40'
           : resaltada
             ? 'border-primary bg-primary/5 ring-2 ring-primary/50'
-            : 'border-outline-variant/30'
+            : asignadaAMi
+              ? 'border-primary/60'
+              : 'border-outline-variant/30'
       } ${isDragging ? 'opacity-40' : ''}`}
     >
       {/* Franja de prioridad (HU-201/T-380): refuerzo visual; el texto
@@ -220,6 +225,11 @@ export function TaskCard({
           <span aria-hidden="true">{PRIORIDAD_LABEL[tarea.prioridad]}</span>
           <span className="sr-only">{prioridadTextoAccesible(tarea.prioridad)}</span>
         </span>
+        {asignadaAMi && (
+          <span className="inline-flex items-center rounded-md bg-primary px-2 py-0.5 font-semibold text-on-primary">
+            Asignada a ti
+          </span>
+        )}
         {tarea.rolProyecto && (
           <span className="inline-flex max-w-40 items-center truncate rounded-md bg-secondary-container px-2 py-0.5 font-medium text-on-secondary-container">
             {tarea.rolProyecto.nombreRol}

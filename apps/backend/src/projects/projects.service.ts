@@ -29,303 +29,52 @@ import {
   type ProjectTransactionContext,
 } from '../common/project-policy/project-transaction.service';
 
+import {
+  ESTADOS_CON_DETALLE,
+  ESTADOS_EDITABLES,
+  ESTADOS_EDITABLE_PARCIAL,
+  ESTADOS_VISIBLES,
+  calcularAvanceProyecto,
+  proyectoDetalleAnonimoSelect,
+  proyectoDetallePublicoSelect,
+  proyectoDetalleSelect,
+  proyectoListSelect,
+  toDateOnly,
+} from './projects.read-model';
+import { ProjectsCacheService } from './projects-cache.service';
+import { ProjectsAffinityService } from './projects-affinity.service';
+import { ProjectsRevisionsService } from './projects-revisions.service';
+
+export { PESOS_ORDEN_DISPONIBLES } from './projects.read-model';
+
 /** Cliente Prisma raíz o transaccional: los helpers de autorización se repiten con `tx` después del lock (06 v2 §16). */
 type Db = Prisma.TransactionClient | PrismaService;
 
-const FEATURED_CACHE_KEY = 'projects:featured';
-const FEATURED_CACHE_TTL = 300_000;
-
-/**
- * T-252: único lugar donde viven los pesos del orden ponderado de
- * "Proyectos Disponibles". `amigoParticipante` es por amigo (así que 2
- * amigos ya superan `mismaCarrera`); `mismaCarrera` es fijo, aplica una
- * sola vez por proyecto sin importar cuántos roles pidan esa carrera.
- */
-export const PESOS_ORDEN_DISPONIBLES = {
-  amigoParticipante: 2,
-  mismaCarrera: 1,
-} as const;
-
-/** Estados que aparecen en el catálogo público y en destacados. */
-const ESTADOS_VISIBLES: EstadoProyecto[] = [
-  EstadoProyecto.PUBLICADO,
-  EstadoProyecto.EN_PROGRESO,
-];
-
-/**
- * Estados cuyo DETALLE sigue siendo consultable. Es una lista distinta de
- * `ESTADOS_VISIBLES` a propósito: un proyecto en solicitud de cierre ya no se
- * ofrece en el catálogo —no admite postulaciones— pero su espacio de trabajo
- * debe seguir abriéndose, empezando por el del propio líder, que necesita ver
- * el estado de su solicitud.
- *
- * Antes compartían lista y el detalle respondía 404 en cuanto se solicitaba el
- * cierre: el proyecto «desaparecía» para todo el mundo.
- *
- * `CERRADO` NO entra: se lee como histórico completo por su propia ruta.
- */
-const ESTADOS_CON_DETALLE: EstadoProyecto[] = [
-  ...ESTADOS_VISIBLES,
-  EstadoProyecto.EN_SOLICITUD_CIERRE,
-];
-
-const ESTADOS_EDITABLES: EstadoProyecto[] = [
-  EstadoProyecto.BORRADOR,
-  EstadoProyecto.OBSERVADO,
-];
-
-// Un proyecto ya publicado / en progreso admite edición PARCIAL: solo un
-// subconjunto seguro de campos, mediante una lista explícita (nunca el DTO
-// completo de creación). No cambia estado, revisión, postulaciones, roles,
-// organizaciones, participantes, tareas, hitos, comentarios ni notificaciones.
-const ESTADOS_EDITABLE_PARCIAL: EstadoProyecto[] = [
-  EstadoProyecto.PUBLICADO,
-  EstadoProyecto.EN_PROGRESO,
-];
-
-function calcularAvanceTareas(tareas: { estadoTarea: string }[]) {
-  const total = tareas.length;
-  const hecho = tareas.filter((t) => t.estadoTarea === 'HECHO').length;
-  const porHacer = tareas.filter((t) => t.estadoTarea === 'POR_HACER').length;
-  const enProgreso = total - hecho - porHacer;
-
-  return {
-    porcentaje: total === 0 ? 0 : Math.round((hecho / total) * 100),
-    total,
-    porHacer,
-    enProgreso,
-    hecho,
-  };
-}
-
-/**
- * El estado de un hito, históricamente, NUNCA se leía de `Hito.estadoHito`:
- * esa columna se fijaba en PENDIENTE al crear el hito (createHito) y ningún
- * flujo la volvía a escribir, así que quedaba congelada aunque se
- * completaran todas sus tareas (bug de cálculo de la barra de progreso de
- * hitos). A12 corrige la persistencia (ver `TasksService` — sincroniza
- * `Hito.estadoHito` en los write-paths reales de `estadoTarea`), pero este
- * agregado de PROYECTO sigue derivando en memoria a partir de las tareas
- * (`tarea.idHito`), nunca de la columna persistida: es un GET puro, no debe
- * depender de que la sincronización ya haya corrido. La fórmula por-Hito
- * (% = hechas/total; COMPLETADO al 100% con al menos una tarea, EN_PROGRESO
- * si %>0, PENDIENTE en otro caso, incluye hitos sin tareas) es la misma
- * semántica canónica de `calcularProgresoHito` (src/common/hito-progreso.ts,
- * A12) — única fuente de verdad, reutilizada aquí en vez de duplicada.
- */
-function calcularAvanceHitos(
-  hitos: { idHito: number }[],
-  tareas: { idHito: number | null; estadoTarea: string }[],
-) {
-  const total = hitos.length;
-  let completado = 0;
-  let pendiente = 0;
-  let enProgreso = 0;
-
-  for (const hito of hitos) {
-    const tareasHito = tareas.filter((t) => t.idHito === hito.idHito);
-    const { estadoHito } = calcularProgresoHito(tareasHito);
-
-    if (estadoHito === EstadoHito.COMPLETADO) {
-      completado += 1;
-    } else if (estadoHito === EstadoHito.EN_PROGRESO) {
-      enProgreso += 1;
-    } else {
-      pendiente += 1;
-    }
-  }
-
-  return {
-    porcentaje: total === 0 ? 0 : Math.round((completado / total) * 100),
-    total,
-    pendiente,
-    enProgreso,
-    completado,
-  };
-}
-
-/**
- * Hito.fechaLimite es @db.Date: se lee/escribe igual que Tarea.fechaLimite
- * en TasksService (mismo comportamiento verificado de Prisma con columnas
- * @db.Date), anclando siempre a medianoche UTC del día calendario y
- * extrayendo con toISOString() para no depender de la zona horaria del proceso.
- */
-function toDateOnly(value: Date | null): string | null {
-  return value ? value.toISOString().slice(0, 10) : null;
-}
-
-/** % de avance del proyecto, desglosado por hitos y por tareas. */
-function calcularAvanceProyecto(
-  tareas: { estadoTarea: string; idHito: number | null }[],
-  hitos: { idHito: number }[],
-) {
-  return {
-    tareas: calcularAvanceTareas(tareas),
-    hitos: calcularAvanceHitos(hitos, tareas),
-  };
-}
-
-const proyectoListSelect = {
-  idProyecto: true,
-  tituloProyecto: true,
-  descripcionProyecto: true,
-  tipoProyecto: true,
-  estadoProyecto: true,
-  modalidadProyecto: true,
-  fechaPublicacion: true,
-  creador: {
-    select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
-  },
-  organizaciones: {
-    select: {
-      organizacion: { select: { nombreOrganizacion: true } },
-    },
-  },
-  intereses: {
-    select: { interes: { select: { nombreInteres: true } } },
-  },
-  // Solo `cupos` por rol: lo mínimo para que el listado calcule roles con
-  // disponibilidad real (cupos > 0) sin exponer requisitos/postulaciones.
-  roles: { select: { cupos: true } },
-  _count: { select: { roles: true } },
-} as const;
-
-const proyectoDetalleSelect = {
-  idProyecto: true,
-  tituloProyecto: true,
-  descripcionProyecto: true,
-  objetivosProyecto: true,
-  tipoProyecto: true,
-  estadoProyecto: true,
-  modalidadProyecto: true,
-  ubicacionProyecto: true,
-  contextoAcademico: true,
-  urlRecursoExterno: true,
-  fechaPublicacion: true,
-  fechaInicio: true,
-  fechaFinEstimada: true,
-  fechaCreacion: true,
-  fechaActualizacion: true,
-  creadoPor: true,
-  creador: {
-    select: { idUsuario: true, nombre: true, apellido: true, correo: true },
-  },
-  organizaciones: {
-    select: {
-      idProyectoOrganizacion: true,
-      rolOrganizacion: true,
-      fechaVinculacion: true,
-      organizacion: {
-        select: {
-          idOrganizacion: true,
-          nombreOrganizacion: true,
-          tipoOrganizacion: true,
-          descripcionOrganizacion: true,
-          correoContacto: true,
-          telefonoContacto: true,
-          sitioWeb: true,
-          logoUrl: true,
-          estadoOrganizacion: true,
-        },
-      },
-    },
-  },
-  intereses: {
-    select: {
-      idProyectoInteres: true,
-      interes: {
-        select: { idInteres: true, nombreInteres: true, descripcionInteres: true },
-      },
-    },
-  },
-  roles: {
-    select: {
-      idRolProyecto: true,
-      nombreRol: true,
-      descripcionRolProyecto: true,
-      cupos: true,
-      horasSemanalesEstimadas: true,
-      carreraRequerida: {
-        select: { idCarrera: true, nombreCarrera: true, facultad: true },
-      },
-      requisitos: {
-        select: {
-          idRequisitoHabilidad: true,
-          nivelMinimo: true,
-          obligatorio: true,
-          habilidad: {
-            select: {
-              idHabilidad: true,
-              nombreHabilidad: true,
-              categoriaHabilidad: true,
-            },
-          },
-        },
-      },
-    },
-  },
-  hitos: {
-    select: {
-      idHito: true,
-      tituloHito: true,
-      descripcionHito: true,
-      fechaLimite: true,
-      estadoHito: true,
-      orden: true,
-    },
-    orderBy: { orden: 'asc' as const },
-  },
-  tareas: {
-    select: {
-      idTarea: true,
-      idHito: true,
-      tituloTarea: true,
-      descripcionTarea: true,
-      estadoTarea: true,
-      prioridad: true,
-      fechaLimite: true,
-      _count: {
-        select: { comentarios: { where: { eliminadoEn: null } } },
-      },
-    },
-    orderBy: { idTarea: 'asc' as const },
-  },
-} as const;
-
-// T-292 (HU-176): GET /proyectos/:id es público y el frontend solo lo usa
-// para los datos del proyecto, sus roles e hitos. Embebía todas las tareas
-// (51 KB con 236 tareas, sin importar el Sprint); el tablero las pide aparte.
-const { tareas: _tareasDetalle, ...proyectoDetallePublicoSelect } = proyectoDetalleSelect;
-
-// Sin sesión no se exponen datos de contacto (correo del líder ni de la organización).
-const { correo: _correoCreador, ...creadorAnonimoSelect } = proyectoDetallePublicoSelect.creador.select;
-const {
-  correoContacto: _correoContacto,
-  telefonoContacto: _telefonoContacto,
-  ...organizacionAnonimaSelect
-} = proyectoDetallePublicoSelect.organizaciones.select.organizacion.select;
-const proyectoDetalleAnonimoSelect = {
-  ...proyectoDetallePublicoSelect,
-  creador: { select: creadorAnonimoSelect },
-  organizaciones: {
-    select: {
-      ...proyectoDetallePublicoSelect.organizaciones.select,
-      organizacion: { select: organizacionAnonimaSelect },
-    },
-  },
-} as const;
 
 @Injectable()
 export class ProjectsService {
+  private readonly cache: ProjectsCacheService;
+  private readonly affinity: ProjectsAffinityService;
+  private readonly revisions: ProjectsRevisionsService;
+
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @Inject(CACHE_MANAGER) cacheManager: Cache,
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
     private readonly readPolicy: ProjectReadPolicyService,
     private readonly social: SocialService,
-  ) {}
+    // RTF-3.3: opcionales porque las suites construyen ProjectsService con
+    // argumentos posicionales; en producción ProjectsModule los provee.
+    cache?: ProjectsCacheService,
+    affinity?: ProjectsAffinityService,
+    revisions?: ProjectsRevisionsService,
+  ) {
+    this.cache = cache ?? new ProjectsCacheService(cacheManager);
+    this.affinity = affinity ?? new ProjectsAffinityService(prisma, social);
+    this.revisions = revisions ?? new ProjectsRevisionsService();
+  }
 
   /**
    * C033 (06 v2 §34): el detalle aplica el scope de Sprint del lector en la
@@ -421,24 +170,8 @@ export class ProjectsService {
     const ordenados =
       !userId || esBusqueda || proyectos.length === 0
         ? proyectos
-        : await this._ordenarPorAfinidad(proyectos, userId);
-    return this._conGuardado(ordenados, userId);
-  }
-
-  /** Marca cada proyecto con `guardado` (bookmark del usuario actual). Sin sesión, siempre `false`. */
-  private async _conGuardado<T extends { idProyecto: number }>(
-    proyectos: T[],
-    userId?: number,
-  ): Promise<Array<T & { guardado: boolean }>> {
-    if (!userId || proyectos.length === 0) {
-      return proyectos.map((p) => ({ ...p, guardado: false }));
-    }
-    const guardados = await this.prisma.proyectoGuardado.findMany({
-      where: { idUsuario: userId, idProyecto: { in: proyectos.map((p) => p.idProyecto) } },
-      select: { idProyecto: true },
-    });
-    const guardadoIds = new Set(guardados.map((g) => g.idProyecto));
-    return proyectos.map((p) => ({ ...p, guardado: guardadoIds.has(p.idProyecto) }));
+        : await this.affinity.ordenarPorAfinidad(proyectos, userId);
+    return this.affinity.conGuardado(ordenados, userId);
   }
 
   /** Bookmark personal ("guardar"), distinto de postularse. Idempotente. */
@@ -461,105 +194,6 @@ export class ProjectsService {
   async desguardarProyecto(idProyecto: number, userId: number) {
     await this.prisma.proyectoGuardado.deleteMany({ where: { idUsuario: userId, idProyecto } });
     return { idProyecto, guardado: false };
-  }
-
-  /**
-   * T-252: agrega `amigosParticipantes`/`mismaCarrera` a cada proyecto y
-   * reordena por afinidad (ver `PESOS_ORDEN_DISPONIBLES`). El motivo textual
-   * ("2 amigos participan", "De tu carrera") se arma en el FRONTEND a partir
-   * de estos dos campos estructurados — acá nunca se manda texto armado.
-   *
-   * Dos consultas fijas además de la lista base (amigos del usuario + una
-   * consulta agregada para TODOS los proyectos a la vez), nunca una por
-   * proyecto: no escalan con la cantidad de proyectos mostrados.
-   */
-  private async _ordenarPorAfinidad<
-    T extends { idProyecto: number },
-  >(proyectos: T[], userId: number): Promise<Array<T & { amigosParticipantes: number; mismaCarrera: boolean }>> {
-    const idsProyecto = proyectos.map((p) => p.idProyecto);
-
-    // Ids de amigos: misma fuente de verdad que el resto del producto
-    // (social-feed.service.ts ya la consume así), en vez de duplicar la
-    // consulta de amistades acá.
-    const [amigoIds, perfil] = await Promise.all([
-      this.social.getAmigoIds(userId),
-      this.prisma.perfilEstudiante.findUnique({
-        where: { idUsuario: userId },
-        select: { idCarrera: true },
-      }),
-    ]);
-    const carreraId = perfil?.idCarrera ?? null;
-
-    // Ni amigos ni carrera registrada: nada que ponderar. Se evita la
-    // consulta agregada y se devuelve tal cual (orden por recencia de siempre).
-    if (amigoIds.length === 0 && carreraId === null) {
-      return proyectos.map((p) => ({ ...p, amigosParticipantes: 0, mismaCarrera: false }));
-    }
-
-    const amigoParticipaCondicion =
-      amigoIds.length > 0 ? Prisma.sql`pp.id_usuario IN (${Prisma.join(amigoIds)})` : Prisma.sql`FALSE`;
-    const liderEsAmigoCondicion =
-      amigoIds.length > 0 ? Prisma.sql`p.creado_por IN (${Prisma.join(amigoIds)})` : Prisma.sql`FALSE`;
-
-    // UNA sola consulta agregada para TODOS los proyectos listados (no una
-    // por proyecto): cuenta, por proyecto, cuántos de los amigos del usuario
-    // participan ACTIVOS en cualquiera de sus roles, y si algún rol pide la
-    // carrera del usuario. El líder de un proyecto NO tiene fila en
-    // `participacion_proyecto` (schema.prisma: "no existe una
-    // ParticipacionProyecto equivalente para el líder"), así que se cuenta
-    // aparte en la segunda rama del UNION cuando también es amigo — mismo
-    // criterio que ya usa `social-feed.service.ts`.
-    const filas = await this.prisma.$queryRaw<
-      { idProyecto: number; amigosParticipantes: number; mismaCarrera: boolean }[]
-    >(Prisma.sql`
-      SELECT
-        x."idProyecto",
-        COUNT(DISTINCT x."idUsuarioAmigo")::int AS "amigosParticipantes",
-        COALESCE(BOOL_OR(x."mismaCarrera"), FALSE) AS "mismaCarrera"
-      FROM (
-        SELECT
-          rp.id_proyecto AS "idProyecto",
-          pp.id_usuario AS "idUsuarioAmigo",
-          (rp.id_carrera_requerida = ${carreraId}) AS "mismaCarrera"
-        FROM rol_proyecto rp
-        LEFT JOIN participacion_proyecto pp
-          ON pp.id_rol_proyecto = rp.id_rol_proyecto
-          AND pp.estado_participacion = 'ACTIVO'
-          AND ${amigoParticipaCondicion}
-        WHERE rp.id_proyecto IN (${Prisma.join(idsProyecto)})
-
-        UNION ALL
-
-        SELECT
-          p.id_proyecto AS "idProyecto",
-          CASE WHEN ${liderEsAmigoCondicion} THEN p.creado_por END AS "idUsuarioAmigo",
-          NULL::boolean AS "mismaCarrera"
-        FROM proyecto p
-        WHERE p.id_proyecto IN (${Prisma.join(idsProyecto)})
-      ) x
-      GROUP BY x."idProyecto"
-    `);
-    const afinidadPorProyecto = new Map(filas.map((f) => [f.idProyecto, f]));
-
-    const enriquecidos = proyectos.map((p) => {
-      const fila = afinidadPorProyecto.get(p.idProyecto);
-      return {
-        ...p,
-        amigosParticipantes: fila?.amigosParticipantes ?? 0,
-        mismaCarrera: fila?.mismaCarrera ?? false,
-      };
-    });
-
-    // `proyectos` ya viene ordenado por recencia; Array.sort es estable, así
-    // que a igual score se conserva ese orden (la recencia como base, T-251).
-    return enriquecidos.sort((a, b) => this._scoreAfinidad(b) - this._scoreAfinidad(a));
-  }
-
-  private _scoreAfinidad(p: { amigosParticipantes: number; mismaCarrera: boolean }): number {
-    return (
-      p.amigosParticipantes * PESOS_ORDEN_DISPONIBLES.amigoParticipante +
-      (p.mismaCarrera ? PESOS_ORDEN_DISPONIBLES.mismaCarrera : 0)
-    );
   }
 
   async findAllPaginated(filters: {
@@ -786,7 +420,7 @@ export class ProjectsService {
   }
 
   async findFeatured() {
-    const cached = await this.cacheManager.get<Record<string, unknown>[]>(FEATURED_CACHE_KEY).catch(() => null);
+    const cached = await this.cache.getFeatured();
     if (cached) return cached;
 
     const proyectos = await this.prisma.proyecto.findMany({
@@ -809,12 +443,8 @@ export class ProjectsService {
       .slice(0, 6)
       .map(({ totalPostulaciones: _totalPostulaciones, ...p }) => p);
 
-    await this.cacheManager.set(FEATURED_CACHE_KEY, destacados, FEATURED_CACHE_TTL).catch(() => {});
+    await this.cache.setFeatured(destacados);
     return destacados;
-  }
-
-  private async _invalidateFeaturedCache(): Promise<void> {
-    await this.cacheManager.del(FEATURED_CACHE_KEY).catch(() => {});
   }
 
   async createFull(data: CreateProjectFullDto, creadoPor: number) {
@@ -865,8 +495,8 @@ export class ProjectsService {
       });
 
       if (accion === 'EN_REVISION') {
-        const snapshot = await this._buildProjectSnapshot(tx, proyecto.idProyecto);
-        await this._crearRevisionPendiente(tx, proyecto.idProyecto, 1, snapshot);
+        const snapshot = await this.revisions.buildProjectSnapshot(tx, proyecto.idProyecto);
+        await this.revisions.crearRevisionPendiente(tx, proyecto.idProyecto, 1, snapshot);
         await this.notifications.persistAdminsTx(
           tx,
           'PROYECTO_EN_REVISION',
@@ -1099,12 +729,12 @@ export class ProjectsService {
       const totalEnvios = await tx.revisionProyecto.count({
         where: { idProyecto: id },
       });
-      const snapshot = await this._buildProjectSnapshot(tx, id);
+      const snapshot = await this.revisions.buildProjectSnapshot(tx, id);
       await tx.proyecto.update({
         where: { idProyecto: id },
         data: { estadoProyecto: EstadoProyecto.EN_REVISION, fechaActualizacion: new Date() },
       });
-      await this._crearRevisionPendiente(tx, id, totalEnvios + 1, snapshot);
+      await this.revisions.crearRevisionPendiente(tx, id, totalEnvios + 1, snapshot);
       await this.notifications.persistAdminsTx(
         tx,
         'PROYECTO_EN_REVISION',
@@ -1132,12 +762,12 @@ export class ProjectsService {
       const totalEnvios = await tx.revisionProyecto.count({
         where: { idProyecto: id },
       });
-      const snapshot = await this._buildProjectSnapshot(tx, id);
+      const snapshot = await this.revisions.buildProjectSnapshot(tx, id);
       await tx.proyecto.update({
         where: { idProyecto: id },
         data: { estadoProyecto: EstadoProyecto.EN_REVISION, fechaActualizacion: new Date() },
       });
-      await this._crearRevisionPendiente(tx, id, totalEnvios + 1, snapshot);
+      await this.revisions.crearRevisionPendiente(tx, id, totalEnvios + 1, snapshot);
       await this.notifications.persistAdminsTx(
         tx,
         'PROYECTO_EN_REVISION',
@@ -1220,7 +850,7 @@ export class ProjectsService {
 
     if (estadoAnterior === EstadoProyecto.PUBLICADO) {
       // I/O de caché fuera del lock: efecto post-commit.
-      effects.add({ key: 'cache:projects:featured', publish: () => this._invalidateFeaturedCache() });
+      effects.add({ key: 'cache:projects:featured', publish: () => this.cache.invalidateFeatured() });
     }
 
     return actualizado;
@@ -1516,65 +1146,4 @@ export class ProjectsService {
     });
   }
 
-  private async _buildProjectSnapshot(tx: Prisma.TransactionClient, idProyecto: number) {
-    return tx.proyecto.findUnique({
-      where: { idProyecto },
-      select: {
-        tituloProyecto: true,
-        descripcionProyecto: true,
-        objetivosProyecto: true,
-        tipoProyecto: true,
-        modalidadProyecto: true,
-        ubicacionProyecto: true,
-        contextoAcademico: true,
-        urlRecursoExterno: true,
-        fechaInicio: true,
-        fechaFinEstimada: true,
-        roles: {
-          select: {
-            idRolProyecto: true,
-            nombreRol: true,
-            descripcionRolProyecto: true,
-            cupos: true,
-            horasSemanalesEstimadas: true,
-            carreraRequerida: {
-              select: { idCarrera: true, nombreCarrera: true, facultad: true },
-            },
-            requisitos: {
-              select: {
-                idRequisitoHabilidad: true,
-                nivelMinimo: true,
-                obligatorio: true,
-                habilidad: {
-                  select: { idHabilidad: true, nombreHabilidad: true, categoriaHabilidad: true },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  private async _crearRevisionPendiente(
-    tx: Prisma.TransactionClient,
-    idProyecto: number,
-    numeroEnvio: number,
-    snapshot?: object | null,
-  ) {
-    const existente = await tx.revisionProyecto.findFirst({
-      where: { idProyecto, estadoRevision: 'PENDIENTE' },
-    });
-    if (existente) {
-      throw new BadRequestException('Ya existe una revisión pendiente para este proyecto');
-    }
-    return tx.revisionProyecto.create({
-      data: {
-        idProyecto,
-        numeroEnvio,
-        estadoRevision: 'PENDIENTE',
-        ...(snapshot ? { snapshotProyecto: snapshot as Prisma.InputJsonValue } : {}),
-      },
-    });
-  }
 }

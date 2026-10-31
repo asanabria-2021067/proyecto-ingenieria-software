@@ -63,6 +63,8 @@ vi.mock('@/hooks/use-current-user', () => ({
     isLoading: false,
   }),
   isProfileIncomplete: () => false,
+  perfilPospuesto: () => false,
+  PERFIL_POSPUESTO_KEY: 'perfil_asistente_pospuesto',
 }));
 
 vi.mock('@/lib/services/users', () => ({

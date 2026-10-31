@@ -10,7 +10,7 @@ import { ChatService } from '../src/chat/chat.service';
 // mock de Prisma, sin tener que ejercitar la transacción de cierre en sí.
 
 function makePrisma() {
-  return {
+  const prisma = {
     proyecto: { findFirst: vi.fn() },
     conversacion: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
     conversacionParticipante: { update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
@@ -18,7 +18,10 @@ function makePrisma() {
     mensajeChat: { create: vi.fn(), count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
     apodoConversacion: { findMany: vi.fn().mockResolvedValue([]) },
     mensajeGuardado: { deleteMany: vi.fn(), createMany: vi.fn(), findMany: vi.fn() },
+    $transaction: vi.fn(),
   };
+  prisma.$transaction.mockImplementation(async (fn: (tx: typeof prisma) => unknown) => fn(prisma));
+  return prisma;
 }
 
 function makeGateway() {

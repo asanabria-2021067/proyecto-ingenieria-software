@@ -57,6 +57,7 @@ import { ProjectHeaderCard } from '@/components/projects/detail/project-header-c
 import { ProjectDescriptionCard } from '@/components/projects/detail/project-description-card';
 import { ProjectOwnerCard } from '@/components/projects/detail/project-owner-card';
 import { parseObjetivos } from '@/components/projects/detail/parse-objetivos';
+import { MyTasksCard } from '@/components/projects/detail/my-tasks-card';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -251,6 +252,9 @@ export default function ProyectoDetallePage() {
             acción de su menú «Acciones del proyecto». */}
 
         <ProjectGridMain>
+          {esParticipante && currentUser && proyecto.estadoProyecto !== 'CERRADO' && (
+            <MyTasksCard idProyecto={projectId} idUsuario={currentUser.idUsuario} />
+          )}
           <ProjectDescriptionCard descripcion={proyecto.descripcionProyecto} objetivos={objetivos} />
 
           {/* Estado personal: la salida en curso va junto a los roles. */}
@@ -737,7 +741,7 @@ function HistoricalProjectPage({
           </TabsTrigger>
           {esParticipante && (
             <Link href={`/dashboard/projects/${projectId}/kanban`} className={TAB_INACTIVE}>
-              Tablero
+              Tablero (Kanban)
               <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
             </Link>
           )}

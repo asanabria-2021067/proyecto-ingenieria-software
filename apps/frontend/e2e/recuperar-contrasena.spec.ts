@@ -18,12 +18,12 @@ const CORREO = 'carlos.mendoza@uvg.edu.gt';
 // llegar: enviar la solicitud y confirmar que quedó registrada.
 test('un usuario puede solicitar la recuperación de su contraseña desde el login', async ({ page }) => {
   await page.goto('/login');
-  await page.getByRole('link', { name: 'Olvide mi contraseña' }).click();
+  await page.getByRole('link', { name: '¿Olvidaste tu contraseña?' }).click();
   await page.waitForURL('**/recuperar-contrasena');
 
   await page.getByPlaceholder('21000').fill(CARNE);
   await page.getByPlaceholder('usuario@uvg.edu.gt').fill(CORREO);
-  await page.getByRole('button', { name: 'Enviar solicitud de recuperacion' }).click();
+  await page.getByRole('button', { name: 'Enviar solicitud de recuperación' }).click();
 
   await expect(page.getByText('Solicitud registrada')).toBeVisible();
 });

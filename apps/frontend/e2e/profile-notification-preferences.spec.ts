@@ -197,8 +197,8 @@ test.describe('FG05-C03: preferencias de notificación por tipo en el perfil', (
     for (let intento = 0; ; intento += 1) {
       await page.goto('/login');
       await page.getByPlaceholder('usuario@uvg.edu.gt').fill(CARLOS);
-      await page.getByPlaceholder('Minimo 8 caracteres').fill('Test1234!');
-      await page.getByRole('button', { name: 'Iniciar Sesion' }).click();
+      await page.getByPlaceholder('Mínimo 8 caracteres').fill('Test1234!');
+      await page.getByRole('button', { name: 'Iniciar Sesión' }).click();
       const entro = await page.waitForURL(/\/dashboard$/, { timeout: 15_000 }).then(() => true, () => false);
       if (entro) break;
       expect(intento, 'el inicio de sesión no entró ni tras esperar la ventana del límite').toBe(0);

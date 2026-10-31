@@ -5,29 +5,16 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  HttpException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  AsignacionTarea,
-  EstadoSprint,
-  EstadoTarea,
-  Prioridad,
-  Prisma,
-  TipoNotificacion,
-} from '@prisma/client';
+import { EstadoSprint, EstadoTarea, Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TasksAuthorizationService } from './tasks-authorization.service';
 import { TasksContextService } from './tasks-context.service';
 import { TasksRelationsService, RelatedResourcesInput } from './tasks-relations.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import {
-  ProjectTransactionService,
-  type ProjectLockRow,
-  type ProjectTransactionContext,
-} from '../common/project-policy/project-transaction.service';
+import { ProjectTransactionService } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -35,63 +22,16 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
 import { CloseAssignmentDto } from './dto/close-assignment.dto';
-import type { AccionMasivaTarea, BulkTaskActionDto } from './dto/bulk-task-action.dto';
-import { calcularProgresoHito } from '../common/hito-progreso';
+import type { BulkTaskActionDto } from './dto/bulk-task-action.dto';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
+import { TASK_SELECT, compareTareas, mapTarea, toDateOnly, type TareaPublica } from './tasks.mapper';
+import { TasksNotificationsService } from './tasks-notifications.service';
+import { TasksBulkService, type ResultadoAccionMasiva } from './tasks-bulk.service';
+import { createActiveAssignment, lockedProject, syncHitoEstado } from './tasks-writes.helpers';
 
-/**
- * Select único reutilizado por listado y detalle: hito, rolProyecto,
- * asignación activa (filtrada por desasignadaEn: null, con el usuario
- * asignado en campos seguros), etiquetas planas vía la tabla intermedia y
- * el conteo de comentarios no eliminados — todo en una sola consulta
- * Prisma, sin N+1.
- */
-const TASK_SELECT = {
-  idTarea: true,
-  idProyecto: true,
-  idHito: true,
-  idRolProyecto: true,
-  tituloTarea: true,
-  descripcionTarea: true,
-  estadoTarea: true,
-  prioridad: true,
-  creadaPor: true,
-  fechaCreacion: true,
-  fechaLimite: true,
-  actualizadaEn: true,
-  tiempoEstimadoHoras: true,
-  puntosHistoria: true,
-  hito: {
-    select: { idHito: true, tituloHito: true },
-  },
-  rolProyecto: {
-    select: { idRolProyecto: true, nombreRol: true },
-  },
-  asignaciones: {
-    where: { desasignadaEn: null },
-    select: {
-      idAsignacion: true,
-      idUsuario: true,
-      fechaAsignacion: true,
-      usuario: {
-        select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
-      },
-    },
-  },
-  etiquetas: {
-    select: {
-      etiqueta: {
-        select: { idEtiqueta: true, nombreEtiqueta: true, nombreNormalizado: true, color: true },
-      },
-    },
-  },
-  _count: {
-    select: { comentarios: { where: { eliminadoEn: null } } },
-  },
-} satisfies Prisma.TareaSelect;
-
-type TareaRow = Prisma.TareaGetPayload<{ select: typeof TASK_SELECT }>;
+export type { TareaPublica } from './tasks.mapper';
+export type { ResultadoAccionMasiva } from './tasks-bulk.service';
 
 /**
  * Únicas claves relevantes para distinguir un PATCH vacío de uno con al
@@ -113,240 +53,15 @@ const UPDATE_TASK_FIELDS = [
 
 const MIN_PROGRESS_CONTENT_LENGTH = 200;
 
-interface UsuarioResumenPublico {
-  idUsuario: number;
-  nombre: string;
-  apellido: string;
-  fotoUrl: string | null;
-}
-
-interface AsignacionActivaPublica {
-  idAsignacion: number;
-  idUsuario: number;
-  fechaAsignacion: Date;
-  usuario: UsuarioResumenPublico;
-}
-
-interface RolProyectoResumenPublico {
-  idRolProyecto: number;
-  nombreRol: string;
-}
-
-interface HitoResumenPublico {
-  idHito: number;
-  tituloHito: string;
-}
-
-interface EtiquetaPublica {
-  idEtiqueta: number;
-  nombreEtiqueta: string;
-  nombreNormalizado: string;
-  color: string;
-}
-
-export interface TareaPublica {
-  idTarea: number;
-  idProyecto: number;
-  idHito: number | null;
-  idRolProyecto: number | null;
-  tituloTarea: string;
-  descripcionTarea: string | null;
-  estadoTarea: EstadoTarea;
-  prioridad: Prioridad;
-  creadaPor: number;
-  fechaCreacion: Date;
-  fechaLimite: string | null;
-  actualizadaEn: Date | null;
-  tiempoEstimadoHoras: number | null;
-  puntosHistoria: number | null;
-  asignacionActiva: AsignacionActivaPublica | null;
-  rolProyecto: RolProyectoResumenPublico | null;
-  hito: HitoResumenPublico | null;
-  etiquetas: EtiquetaPublica[];
-  cantidadComentarios: number;
-}
-
-/**
- * Prisma devuelve las columnas @db.Date como Date a medianoche UTC del día
- * calendario almacenado (verificado empíricamente contra la base local:
- * una fila con fecha_limite = DATE '2026-12-25' se lee como
- * 2026-12-25T00:00:00.000Z). Usar getters locales reinterpreta ese instante
- * en la zona horaria del proceso y puede desplazar el día (confirmado con
- * TZ=America/Guatemala: getFullYear/getMonth/getDate devolvían 24, no 25).
- * Por eso se extrae siempre con toISOString(), que es UTC por definición.
- */
-function toDateOnly(value: Date | null): string | null {
-  return value ? value.toISOString().slice(0, 10) : null;
-}
-
-function mapTarea(row: TareaRow): TareaPublica {
-  const asignacion = row.asignaciones[0];
-  const etiquetas = row.etiquetas
-    .map((tareaEtiqueta) => tareaEtiqueta.etiqueta)
-    .sort((a, b) => a.nombreNormalizado.localeCompare(b.nombreNormalizado));
-
-  return {
-    idTarea: row.idTarea,
-    idProyecto: row.idProyecto,
-    idHito: row.idHito,
-    idRolProyecto: row.idRolProyecto,
-    tituloTarea: row.tituloTarea,
-    descripcionTarea: row.descripcionTarea,
-    estadoTarea: row.estadoTarea,
-    prioridad: row.prioridad,
-    creadaPor: row.creadaPor,
-    fechaCreacion: row.fechaCreacion,
-    fechaLimite: toDateOnly(row.fechaLimite),
-    actualizadaEn: row.actualizadaEn,
-    tiempoEstimadoHoras: row.tiempoEstimadoHoras,
-    puntosHistoria: row.puntosHistoria,
-    asignacionActiva: asignacion
-      ? {
-          idAsignacion: asignacion.idAsignacion,
-          idUsuario: asignacion.idUsuario,
-          fechaAsignacion: asignacion.fechaAsignacion,
-          usuario: asignacion.usuario,
-        }
-      : null,
-    rolProyecto: row.rolProyecto,
-    hito: row.hito,
-    etiquetas,
-    cantidadComentarios: row._count.comentarios,
-  };
-}
-
-/**
- * Tarea 34: plan de audiencia calculado a partir del estado comprometido
- * (nunca de datos del body ni de una relectura ambigua). Prioridad fija:
- * un rol asignado a la tarea siempre gana sobre el asignado activo; sin rol
- * y sin asignado activo, no hay audiencia.
- */
-type TaskNotificationAudience =
-  | { kind: 'role'; projectId: number; roleId: number }
-  | { kind: 'assignee'; userId: number }
-  | { kind: 'none' };
-
-interface TaskNotificationInput {
-  tipoNotificacion: TipoNotificacion;
-  tituloNotificacion: string;
-  mensajeNotificacion: string;
-  datosJson: Prisma.InputJsonValue;
-}
-
-const PRIORITY_ORDER: Record<Prioridad, number> = {
-  ALTA: 0,
-  MEDIA: 1,
-  BAJA: 2,
-};
-
-/**
- * Orden de negocio: ALTA > MEDIA > BAJA; dentro de la misma prioridad,
- * fecha límite más próxima primero (comparación de strings YYYY-MM-DD, ya
- * normalizados por mapTarea), tareas sin fecha al final, e idTarea
- * ascendente como desempate estable. Se ordena en memoria tras una única
- * consulta; no existe ninguna columna de posición manual.
- */
-function compareTareas(a: TareaPublica, b: TareaPublica): number {
-  const prioridadDiff = PRIORITY_ORDER[a.prioridad] - PRIORITY_ORDER[b.prioridad];
-  if (prioridadDiff !== 0) {
-    return prioridadDiff;
-  }
-
-  if (a.fechaLimite !== b.fechaLimite) {
-    if (a.fechaLimite === null) return 1;
-    if (b.fechaLimite === null) return -1;
-    return a.fechaLimite < b.fechaLimite ? -1 : 1;
-  }
-
-  return a.idTarea - b.idTarea;
-}
-
-/**
- * HU-202/T-383: columnas mínimas que la acción masiva necesita de cada tarea
- * antes de escribir (Sprint para la política, Hito para resincronizar, rol
- * para validar al candidato y título para los mensajes de error).
- */
-interface TareaAccionMasiva {
-  idTarea: number;
-  idSprint: number | null;
-  idHito: number | null;
-  idRolProyecto: number | null;
-  tituloTarea: string;
-  estadoTarea: EstadoTarea;
-}
-
-export interface ResultadoAccionMasiva {
-  accion: AccionMasivaTarea;
-  /** Todas las tareas pedidas, ya con su estado final (mismo contrato que el tablero). */
-  tareas: TareaPublica[];
-  /** Solo las que realmente cambiaron (las que ya estaban así no se reescriben). */
-  idsActualizadas: number[];
-}
-
-const ESTADO_TAREA_ETIQUETA: Record<EstadoTarea, string> = {
-  POR_HACER: 'Por hacer',
-  EN_PROGRESO: 'En progreso',
-  EN_REVISION: 'En revisión',
-  HECHO: 'Hecho',
-};
-
-/**
- * Texto del aviso agrupado de una acción masiva para un destinatario. Con
- * una sola tarea se nombra; con varias, se resume el conteo.
- */
-function contenidoAvisoMasivo(
-  dto: BulkTaskActionDto,
-  tareas: TareaPublica[],
-  idDestinatario: number,
-): { tipoNotificacion: TipoNotificacion; tituloNotificacion: string; mensajeNotificacion: string } {
-  const n = tareas.length;
-  const sujeto = n === 1 ? `la tarea "${tareas[0].tituloTarea}"` : `${n} tareas`;
-
-  switch (dto.accion) {
-    case 'MOVER': {
-      const estado = ESTADO_TAREA_ETIQUETA[dto.estadoTarea!];
-      return {
-        tipoNotificacion: TipoNotificacion.TAREA_ACTUALIZADA,
-        tituloNotificacion: n === 1 ? 'Estado de tarea actualizado' : 'Tareas movidas',
-        mensajeNotificacion:
-          n === 1 ? `La tarea "${tareas[0].tituloTarea}" cambió de estado a ${estado}.` : `Se movieron ${n} tareas a ${estado}.`,
-      };
-    }
-    case 'ASIGNAR': {
-      const asignado = tareas[0].asignacionActiva?.usuario;
-      const esElAsignado = asignado?.idUsuario === idDestinatario;
-      return {
-        tipoNotificacion: TipoNotificacion.TAREA_ASIGNADA,
-        tituloNotificacion: n === 1 ? 'Tarea asignada' : 'Tareas asignadas',
-        mensajeNotificacion: esElAsignado
-          ? `Se te ${n === 1 ? 'asignó' : 'asignaron'} ${sujeto}.`
-          : `Se ${n === 1 ? 'asignó' : 'asignaron'} ${sujeto} a ${asignado ? `${asignado.nombre} ${asignado.apellido}` : 'un integrante'}.`,
-      };
-    }
-    case 'DESASIGNAR':
-      return {
-        tipoNotificacion: TipoNotificacion.TAREA_ACTUALIZADA,
-        tituloNotificacion: 'Asignación retirada',
-        mensajeNotificacion: `Ya no estás asignado a ${sujeto}.`,
-      };
-    case 'AGREGAR_ETIQUETAS':
-      return {
-        tipoNotificacion: TipoNotificacion.TAREA_ACTUALIZADA,
-        tituloNotificacion: 'Etiquetas actualizadas',
-        mensajeNotificacion: `Se agregaron etiquetas a ${sujeto}.`,
-      };
-    case 'QUITAR_ETIQUETAS':
-      return {
-        tipoNotificacion: TipoNotificacion.TAREA_ACTUALIZADA,
-        tituloNotificacion: 'Etiquetas actualizadas',
-        mensajeNotificacion: `Se quitaron etiquetas de ${sujeto}.`,
-      };
-  }
-}
-
 @Injectable()
 export class TasksService {
-  private readonly logger = new Logger(TasksService.name);
+  private readonly notifier: TasksNotificationsService;
+  private readonly bulk: TasksBulkService;
+
+  // Los errores de notificación se registran en el logger del notificador.
+  private get logger() {
+    return this.notifier.logger;
+  }
 
   constructor(
     private prisma: PrismaService,
@@ -370,13 +85,24 @@ export class TasksService {
     private bitacoraEventos?: BitacoraEventosService,
     // HU-190: opcional por la misma razón (suites con argumentos posicionales).
     private events?: EventEmitter2,
-  ) {}
-
-  private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
-    if (!ctx.project) {
-      throw new NotFoundException('Proyecto no encontrado');
-    }
-    return ctx.project;
+    // RTF-3.3: opcionales porque las suites construyen TasksService con
+    // argumentos posicionales; en producción TasksModule los provee.
+    notifier?: TasksNotificationsService,
+    bulk?: TasksBulkService,
+  ) {
+    this.notifier = notifier ?? new TasksNotificationsService(prisma, notifications);
+    this.bulk =
+      bulk ??
+      new TasksBulkService(
+        projectTx,
+        policy,
+        tasksContext,
+        tasksRelations,
+        timeRecords,
+        this.notifier,
+        bitacoraEventos,
+        events,
+      );
   }
 
   /**
@@ -482,9 +208,9 @@ export class TasksService {
 
       // C040: política de escritura tras el lock (P/E, Sprint ambiente ACTIVO);
       // crear no tiene una entidad previa que exigir.
-      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId);
+      await this.policy.assertWriteTx(tx, lockedProject(ctx), 'TAREA_WRITE', userId);
       if (dto.idsEtiquetas !== undefined) {
-        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ETIQUETA_TAREA', userId, {
+        await this.policy.assertWriteTx(tx, lockedProject(ctx), 'ETIQUETA_TAREA', userId, {
           sprintId: sprintActivo.idSprint,
         });
       }
@@ -573,7 +299,7 @@ export class TasksService {
       // mismo mecanismo de sincronización que updateEstado/closeAssignment
       // (A12), reutilizado sin duplicar la fórmula.
       if (filaFinal.idHito !== null) {
-        await this.syncHitoEstado(tx, filaFinal.idHito);
+        await syncHitoEstado(tx, filaFinal.idHito);
       }
 
       // T-164: registrado con el MISMO tx que la creación — si cualquier
@@ -605,7 +331,7 @@ export class TasksService {
     // Reutiliza _notifyAssignment (ya excluye al actor) para la rama sin
     // rol, exactamente el mismo comportamiento que ya tenía esta operación.
     if (tareaCreada.idRolProyecto !== null) {
-      await this.notifyTaskAudience(
+      await this.notifier.notifyTaskAudience(
         { kind: 'role', projectId: tareaCreada.idProyecto, roleId: tareaCreada.idRolProyecto },
         userId,
         {
@@ -620,7 +346,7 @@ export class TasksService {
         },
       );
     } else if (dto.idUsuarioAsignado !== undefined) {
-      await this._notifyAssignment(tareaCreada, userId, dto.idUsuarioAsignado);
+      await this.notifier.notifyAssignment(tareaCreada, userId, dto.idUsuarioAsignado);
     }
 
     return tareaCreada;
@@ -657,11 +383,11 @@ export class TasksService {
       // mismo `tx` y el mismo alcance de proyecto. `idSprint` es NOT NULL en
       // `Tarea`: el acceso opcional solo tolera un doble de prueba incompleto,
       // mismo criterio defensivo que `resolveTaskNotificationAudience`.
-      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId, {
+      await this.policy.assertWriteTx(tx, lockedProject(ctx), 'TAREA_WRITE', userId, {
         sprintId: tareaAntes?.idSprint ?? null,
       });
       if (Object.prototype.hasOwnProperty.call(dto, 'idsEtiquetas')) {
-        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'ETIQUETA_TAREA', userId, {
+        await this.policy.assertWriteTx(tx, lockedProject(ctx), 'ETIQUETA_TAREA', userId, {
           sprintId: tareaAntes?.idSprint ?? null,
         });
       }
@@ -800,8 +526,8 @@ export class TasksService {
     // del rol/asignado anterior a la edición). update() nunca toca
     // AsignacionTarea, así que asignacionActiva ya refleja exactamente lo
     // que la tarea conservaba antes de esta edición.
-    await this.notifyTaskAudience(
-      this.resolveTaskNotificationAudience(
+    await this.notifier.notifyTaskAudience(
+      this.notifier.resolveTaskNotificationAudience(
         tareaActualizada.idRolProyecto,
         tareaActualizada.idProyecto,
         tareaActualizada.asignacionActiva?.idUsuario ?? null,
@@ -846,7 +572,7 @@ export class TasksService {
         userId,
         tx,
       );
-      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId, {
+      await this.policy.assertWriteTx(tx, lockedProject(ctx), 'TAREA_WRITE', userId, {
         sprintId: tareaAntes?.idSprint ?? null,
       });
 
@@ -871,7 +597,7 @@ export class TasksService {
       // tarea pertenece a un Hito, su progreso persistido puede haber
       // cambiado.
       if (filaFinal.idHito !== null) {
-        await this.syncHitoEstado(tx, filaFinal.idHito);
+        await syncHitoEstado(tx, filaFinal.idHito);
       }
 
       await this.bitacoraEventos?.registrarEvento({
@@ -897,8 +623,8 @@ export class TasksService {
     // idempotencia para "mismo estado"; ver docstring de updateEstado), así
     // que se notifica en cada invocación exitosa, sin introducir aquí una
     // regla nueva de "sin cambios reales" que el método no tiene.
-    await this.notifyTaskAudience(
-      this.resolveTaskNotificationAudience(
+    await this.notifier.notifyTaskAudience(
+      this.notifier.resolveTaskNotificationAudience(
         tareaConEstado.idRolProyecto,
         tareaConEstado.idProyecto,
         tareaConEstado.asignacionActiva?.idUsuario ?? null,
@@ -941,7 +667,7 @@ export class TasksService {
     const snapshot = await this.projectTx.run(projectId, userId, 'tasks.remove', async (ctx) => {
       const { tx } = ctx;
       const tarea = await this.tasksAuthorization.assertCanDeleteTask(projectId, taskId, userId, tx);
-      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_WRITE', userId, {
+      await this.policy.assertWriteTx(tx, lockedProject(ctx), 'TAREA_WRITE', userId, {
         sprintId: tarea?.idSprint ?? null,
       });
       const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
@@ -993,7 +719,7 @@ export class TasksService {
       // misma invariante que corrige la creación; se resincroniza con el
       // mismo mecanismo (A12), dentro de esta misma transacción.
       if (tarea.idHito !== null) {
-        await this.syncHitoEstado(tx, tarea.idHito);
+        await syncHitoEstado(tx, tarea.idHito);
       }
 
       return {
@@ -1005,8 +731,8 @@ export class TasksService {
       };
     });
 
-    await this.notifyTaskAudience(
-      this.resolveTaskNotificationAudience(
+    await this.notifier.notifyTaskAudience(
+      this.notifier.resolveTaskNotificationAudience(
         snapshot.idRolProyecto,
         snapshot.projectId,
         snapshot.previousAssigneeId,
@@ -1059,7 +785,7 @@ export class TasksService {
         actorUserId,
         tx,
       );
-      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_ASIGNACION', actorUserId, {
+      await this.policy.assertWriteTx(tx, lockedProject(ctx), 'TAREA_ASIGNACION', actorUserId, {
         sprintId: tarea?.idSprint ?? null,
       });
 
@@ -1082,7 +808,7 @@ export class TasksService {
       let esReasignacion = false;
 
       if (!asignacionActiva) {
-        await this.createActiveAssignment(tx, {
+        await createActiveAssignment(tx, {
           idTarea: taskId,
           idUsuario: dto.idUsuario,
           idParticipacion: idParticipacionResuelta,
@@ -1103,7 +829,7 @@ export class TasksService {
           data: { desasignadaEn },
         });
 
-        await this.createActiveAssignment(tx, {
+        await createActiveAssignment(tx, {
           idTarea: taskId,
           idUsuario: dto.idUsuario,
           idParticipacion: idParticipacionResuelta,
@@ -1153,7 +879,7 @@ export class TasksService {
 
     if (resultado.escribio) {
       if (tareaAsignada.idRolProyecto !== null) {
-        await this.notifyTaskAudience(
+        await this.notifier.notifyTaskAudience(
           {
             kind: 'role',
             projectId: tareaAsignada.idProyecto,
@@ -1172,73 +898,11 @@ export class TasksService {
           },
         );
       } else {
-        await this._notifyAssignment(tareaAsignada, actorUserId, dto.idUsuario);
+        await this.notifier.notifyAssignment(tareaAsignada, actorUserId, dto.idUsuario);
       }
     }
 
     return tareaAsignada;
-  }
-
-  /**
-   * Crea la fila activa de AsignacionTarea y traduce ÚNICAMENTE la
-   * violación reconocida del índice parcial asignacion_tarea_activa_unique
-   * a 409; cualquier otro error (otro P2002, P2003, P2025, errores de
-   * conexión, errores genéricos) se relanza sin cambios. Único punto de
-   * `tx.asignacionTarea.create` en assign(): se reutiliza tanto para la
-   * asignación inicial como para la reasignación, de modo que el manejo de
-   * la colisión no se duplica ni se olvida en ninguno de los dos caminos.
-   */
-  private async createActiveAssignment(
-    tx: Prisma.TransactionClient,
-    data: {
-      idTarea: number;
-      idUsuario: number;
-      idParticipacion: number;
-      asignadoPor: number;
-      desasignadaEn: null;
-    },
-  ): Promise<AsignacionTarea> {
-    try {
-      return await tx.asignacionTarea.create({ data });
-    } catch (error) {
-      if (this.isActiveAssignmentCollision(error)) {
-        throw new ConflictException('La tarea ya tiene una asignación activa');
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Reconoce específicamente la violación del índice parcial
-   * asignacion_tarea_activa_unique (Tarea 9), reproducida empíricamente
-   * contra PostgreSQL real antes de escribir este detector (Tarea 26):
-   * Prisma 6.19.2 no expone el nombre del índice parcial en `error.meta`
-   * para esta violación — solo entrega `modelName` y `target` (las
-   * columnas involucradas, en snake_case real de la base: `id_tarea`). Por
-   * eso no basta `error.code === 'P2002'`: se exige además que el modelo
-   * sea AsignacionTarea y que el target sea exactamente ['id_tarea'], la
-   * combinación más estrecha posible con la metadata realmente disponible.
-   * Un P2002 de otro modelo u otro target, un P2003 (FK), un P2025
-   * (registro no encontrado) o cualquier error sin esa forma exacta
-   * devuelven false y se relanzan sin cambios por el llamador.
-   */
-  private isActiveAssignmentCollision(error: unknown): boolean {
-    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
-      return false;
-    }
-    if (error.code !== 'P2002') {
-      return false;
-    }
-
-    const modelName = error.meta?.modelName;
-    const target = error.meta?.target;
-
-    return (
-      modelName === 'AsignacionTarea' &&
-      Array.isArray(target) &&
-      target.length === 1 &&
-      target[0] === 'id_tarea'
-    );
   }
 
   /**
@@ -1263,7 +927,7 @@ export class TasksService {
         actorUserId,
         tx,
       );
-      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_ASIGNACION', actorUserId, {
+      await this.policy.assertWriteTx(tx, lockedProject(ctx), 'TAREA_ASIGNACION', actorUserId, {
         sprintId: tarea?.idSprint ?? null,
       });
 
@@ -1298,7 +962,7 @@ export class TasksService {
     });
 
     if (resultado.cerrada) {
-      await this._notifyUnassignment(
+      await this.notifier.notifyUnassignment(
         resultado.taskId,
         resultado.projectId,
         resultado.taskTitle,
@@ -1341,7 +1005,7 @@ export class TasksService {
       }
 
       await this.tasksContext.assertActiveProjectParticipant(projectId, actorUserId, tx);
-      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'TAREA_ASIGNACION', actorUserId, {
+      await this.policy.assertWriteTx(tx, lockedProject(ctx), 'TAREA_ASIGNACION', actorUserId, {
         sprintId: tareaBase?.idSprint ?? null,
       });
 
@@ -1392,7 +1056,7 @@ export class TasksService {
       // A12: solo cuando este cierre de tramo efectivamente cambió
       // estadoTarea (marcarComoHecha) y la tarea pertenece a un Hito.
       if (dto.marcarComoHecha === true && filaFinal.idHito !== null) {
-        await this.syncHitoEstado(tx, filaFinal.idHito);
+        await syncHitoEstado(tx, filaFinal.idHito);
       }
 
       await this.bitacoraEventos?.registrarEvento({
@@ -1419,475 +1083,6 @@ export class TasksService {
     if (dto.marcarComoHecha === true) this.events?.emit(INSIGNIAS_EVENTO, { claves: ['tareas', 'sprints'], idTarea: taskId });
 
     return mapTarea(row);
-  }
-
-  /**
-   * HU-202/T-383: acción masiva del tablero (mover de columna, asignar,
-   * quitar asignación, agregar o quitar etiquetas) sobre varias tareas en una
-   * sola operación. Exclusiva del líder del proyecto, aunque las acciones
-   * individuales admitan a otros actores: la HU es "como líder".
-   *
-   * Todo o nada: corre en un único `projectTx.run` (lock del proyecto
-   * primero). Si una tarea no existe, no es del proyecto, su Sprint no está
-   * ACTIVO o no admite la acción (p. ej. el integrante no pertenece a su rol),
-   * se lanza y la transacción revierte TODO. El error de una tarea concreta
-   * lleva su título para que el líder sepa cuál falló.
-   *
-   * Reutiliza los mismos efectos que la acción individual (recálculo de
-   * horas antes de cerrar una asignación, sincronización del Hito, evento de
-   * bitácora por tarea, insignias al pasar a HECHO). Las tareas que ya
-   * estaban en el estado pedido no se reescriben. Después del commit, cada
-   * persona afectada recibe UNA notificación agrupada, no una por tarea.
-   */
-  async bulkAction(
-    projectId: number,
-    userId: number,
-    dto: BulkTaskActionDto,
-  ): Promise<ResultadoAccionMasiva> {
-    const familia = dto.accion === 'ASIGNAR' || dto.accion === 'DESASIGNAR' ? 'TAREA_ASIGNACION' : 'TAREA_WRITE';
-
-    const resultado = await this.projectTx.run(projectId, userId, 'tasks.bulkAction', async (ctx) => {
-      const { tx } = ctx;
-      const proyecto = this.lockedProject(ctx);
-      await this.tasksContext.assertProjectLeader(projectId, userId, tx);
-
-      const tareas: TareaAccionMasiva[] = await tx.tarea.findMany({
-        where: { idTarea: { in: dto.idsTareas }, idProyecto: projectId, eliminadoEn: null },
-        select: {
-          idTarea: true,
-          idSprint: true,
-          idHito: true,
-          idRolProyecto: true,
-          tituloTarea: true,
-          estadoTarea: true,
-        },
-      });
-      const encontradas = new Set(tareas.map((tarea) => tarea.idTarea));
-      const faltantes = dto.idsTareas.filter((idTarea) => !encontradas.has(idTarea));
-      if (faltantes.length > 0) {
-        throw new NotFoundException(
-          `Tarea(s) con id ${faltantes.join(', ')} no encontrada(s) en el proyecto ${projectId}`,
-        );
-      }
-
-      // Misma política que la acción individual, partida en dos: la del
-      // proyecto (estado P/E, Sprint ambiente ACTIVO) una sola vez, y la de
-      // la entidad una vez por Sprint distinto (normalmente uno solo), con los
-      // títulos de sus tareas en el error: desde la Lista de tareas se pueden
-      // seleccionar tareas de un Sprint ya cerrado.
-      await this.policy.assertWriteTx(tx, proyecto, familia, userId);
-      for (const sprintId of new Set(tareas.map((tarea) => tarea.idSprint))) {
-        if (sprintId === null) continue;
-        const titulos = tareas.filter((tarea) => tarea.idSprint === sprintId).map((tarea) => tarea.tituloTarea);
-        // TAREA_WRITE y TAREA_ASIGNACION exigen la entidad en un Sprint ACTIVO.
-        await this.conTituloDeTarea(titulos, () => this.policy.assertEntitySprintTx(tx, sprintId, 'ACTIVO'));
-      }
-
-      const asignadosPrevios = new Map<number, number>();
-      let idsCambiadas: number[];
-      switch (dto.accion) {
-        case 'MOVER':
-          idsCambiadas = await this.moverTareasMasivo(tx, projectId, userId, tareas, dto.estadoTarea!);
-          break;
-        case 'ASIGNAR':
-          idsCambiadas = await this.asignarTareasMasivo(tx, projectId, userId, tareas, dto.idUsuario!);
-          break;
-        case 'DESASIGNAR':
-          idsCambiadas = await this.desasignarTareasMasivo(tx, tareas, asignadosPrevios);
-          break;
-        case 'AGREGAR_ETIQUETAS':
-        case 'QUITAR_ETIQUETAS':
-          idsCambiadas = await this.cambiarEtiquetasMasivo(
-            tx,
-            projectId,
-            userId,
-            tareas,
-            dto.idsEtiquetas!,
-            dto.accion === 'AGREGAR_ETIQUETAS' ? 'AGREGAR' : 'QUITAR',
-          );
-          break;
-      }
-
-      const filas = await tx.tarea.findMany({
-        where: { idTarea: { in: dto.idsTareas }, idProyecto: projectId, eliminadoEn: null },
-        select: TASK_SELECT,
-      });
-
-      return { filas, idsCambiadas, asignadosPrevios };
-    });
-
-    const tareasFinales = resultado.filas.map(mapTarea).sort(compareTareas);
-
-    if (dto.accion === 'MOVER' && dto.estadoTarea === EstadoTarea.HECHO) {
-      for (const idTarea of resultado.idsCambiadas) {
-        this.events?.emit(INSIGNIAS_EVENTO, { claves: ['tareas', 'sprints'], idTarea });
-      }
-    }
-
-    const cambiadas = new Set(resultado.idsCambiadas);
-    await this.notificarAccionMasiva(
-      projectId,
-      userId,
-      dto,
-      tareasFinales.filter((tarea) => cambiadas.has(tarea.idTarea)),
-      resultado.asignadosPrevios,
-    );
-
-    return { accion: dto.accion, tareas: tareasFinales, idsActualizadas: resultado.idsCambiadas };
-  }
-
-  /** MOVER: solo reescribe las que cambian de columna; cada Hito afectado se resincroniza una vez. */
-  private async moverTareasMasivo(
-    tx: Prisma.TransactionClient,
-    projectId: number,
-    userId: number,
-    tareas: TareaAccionMasiva[],
-    estadoTarea: EstadoTarea,
-  ): Promise<number[]> {
-    const aMover = tareas.filter((tarea) => tarea.estadoTarea !== estadoTarea);
-    if (aMover.length === 0) {
-      return [];
-    }
-
-    await tx.tarea.updateMany({
-      where: { idTarea: { in: aMover.map((tarea) => tarea.idTarea) }, idProyecto: projectId },
-      data: { estadoTarea },
-    });
-
-    const hitos = new Set(aMover.map((tarea) => tarea.idHito).filter((idHito): idHito is number => idHito !== null));
-    for (const idHito of hitos) {
-      await this.syncHitoEstado(tx, idHito);
-    }
-
-    for (const tarea of aMover) {
-      await this.bitacoraEventos?.registrarEvento({
-        tx,
-        tipoEvento: TipoEventoBitacora.TASK_STATUS_CHANGED,
-        idActor: userId,
-        idProyecto: projectId,
-        idSprint: tarea.idSprint,
-        tipoEntidad: 'TAREA',
-        idEntidad: tarea.idTarea,
-        valorAnterior: { estadoTarea: tarea.estadoTarea },
-        valorNuevo: { estadoTarea },
-      });
-    }
-
-    return aMover.map((tarea) => tarea.idTarea);
-  }
-
-  /**
-   * ASIGNAR: mismo flujo que `assign()` por tarea — el candidato se valida
-   * contra el rol de CADA tarea; si ya era el asignado activo, no se escribe;
-   * si había otra persona, se recalculan sus horas, se cierra su tramo y se
-   * abre uno nuevo (nunca se reescribe la fila anterior).
-   */
-  private async asignarTareasMasivo(
-    tx: Prisma.TransactionClient,
-    projectId: number,
-    actorUserId: number,
-    tareas: TareaAccionMasiva[],
-    idUsuario: number,
-  ): Promise<number[]> {
-    const cambiadas: number[] = [];
-    for (const tarea of tareas) {
-      const escribio = await this.conTituloDeTarea(tarea.tituloTarea, async () => {
-        const idParticipacion = await this.tasksRelations.assertUserAssignableToProject(
-          projectId,
-          idUsuario,
-          tarea.idRolProyecto ?? null,
-          tx,
-          { nuevaAsignacion: true, actorId: actorUserId },
-        );
-
-        const asignacionActiva = await this.tasksContext.getActiveAssignment(tarea.idTarea, tx);
-        if (asignacionActiva?.idUsuario === idUsuario) {
-          return false;
-        }
-
-        if (asignacionActiva) {
-          await this.timeRecords.recalculateAssignment(tx, asignacionActiva.idAsignacion);
-          await tx.asignacionTarea.updateMany({
-            where: {
-              idAsignacion: asignacionActiva.idAsignacion,
-              idTarea: tarea.idTarea,
-              desasignadaEn: null,
-            },
-            data: { desasignadaEn: new Date() },
-          });
-        }
-
-        await this.createActiveAssignment(tx, {
-          idTarea: tarea.idTarea,
-          idUsuario,
-          idParticipacion,
-          asignadoPor: actorUserId,
-          desasignadaEn: null,
-        });
-
-        await this.bitacoraEventos?.registrarEvento({
-          tx,
-          tipoEvento: asignacionActiva
-            ? TipoEventoBitacora.TASK_REASSIGNED
-            : TipoEventoBitacora.TASK_ASSIGNED,
-          idActor: actorUserId,
-          idProyecto: projectId,
-          idSprint: tarea.idSprint,
-          tipoEntidad: 'TAREA',
-          idEntidad: tarea.idTarea,
-          valorAnterior: { idUsuario: asignacionActiva?.idUsuario ?? null },
-          valorNuevo: { idUsuario },
-        });
-        return true;
-      });
-      if (escribio) {
-        cambiadas.push(tarea.idTarea);
-      }
-    }
-    return cambiadas;
-  }
-
-  /**
-   * DESASIGNAR: mismo cierre que `unassign()` (recalcular antes de cerrar,
-   * filtro completo en el `updateMany`); sin asignación activa no hay nada que
-   * hacer. Guarda quién estaba asignado para avisarle después del commit.
-   */
-  private async desasignarTareasMasivo(
-    tx: Prisma.TransactionClient,
-    tareas: TareaAccionMasiva[],
-    asignadosPrevios: Map<number, number>,
-  ): Promise<number[]> {
-    const cambiadas: number[] = [];
-    for (const tarea of tareas) {
-      const asignacionActiva = await this.tasksContext.getActiveAssignment(tarea.idTarea, tx);
-      if (!asignacionActiva) {
-        continue;
-      }
-
-      await this.timeRecords.recalculateAssignment(tx, asignacionActiva.idAsignacion);
-      const cerradas = await tx.asignacionTarea.updateMany({
-        where: {
-          idAsignacion: asignacionActiva.idAsignacion,
-          idTarea: tarea.idTarea,
-          idUsuario: asignacionActiva.idUsuario,
-          desasignadaEn: null,
-        },
-        data: { desasignadaEn: new Date() },
-      });
-      if (cerradas.count === 0) {
-        continue;
-      }
-
-      asignadosPrevios.set(tarea.idTarea, asignacionActiva.idUsuario);
-      cambiadas.push(tarea.idTarea);
-    }
-    return cambiadas;
-  }
-
-  /**
-   * AGREGAR/QUITAR etiquetas: solo toca las etiquetas pedidas; las demás de
-   * cada tarea se conservan. Las etiquetas se validan contra el proyecto con
-   * la misma regla que `update()` (existen y son de este proyecto).
-   */
-  private async cambiarEtiquetasMasivo(
-    tx: Prisma.TransactionClient,
-    projectId: number,
-    userId: number,
-    tareas: TareaAccionMasiva[],
-    idsEtiquetas: number[],
-    modo: 'AGREGAR' | 'QUITAR',
-  ): Promise<number[]> {
-    await this.tasksRelations.validateRelatedResources(projectId, { idsEtiquetas }, tx);
-
-    const actuales = await tx.tareaEtiqueta.findMany({
-      where: { idTarea: { in: tareas.map((tarea) => tarea.idTarea) } },
-      select: { idTarea: true, idEtiqueta: true },
-    });
-    const etiquetasPorTarea = new Map<number, number[]>();
-    for (const { idTarea, idEtiqueta } of actuales) {
-      etiquetasPorTarea.set(idTarea, [...(etiquetasPorTarea.get(idTarea) ?? []), idEtiqueta]);
-    }
-
-    const cambios: { tarea: TareaAccionMasiva; antes: number[]; despues: number[] }[] = [];
-    for (const tarea of tareas) {
-      const antes = etiquetasPorTarea.get(tarea.idTarea) ?? [];
-      const despues =
-        modo === 'AGREGAR'
-          ? [...antes, ...idsEtiquetas.filter((idEtiqueta) => !antes.includes(idEtiqueta))]
-          : antes.filter((idEtiqueta) => !idsEtiquetas.includes(idEtiqueta));
-      if (despues.length !== antes.length) {
-        cambios.push({ tarea, antes, despues });
-      }
-    }
-    if (cambios.length === 0) {
-      return [];
-    }
-
-    if (modo === 'AGREGAR') {
-      await tx.tareaEtiqueta.createMany({
-        data: cambios.flatMap(({ tarea, antes }) =>
-          idsEtiquetas
-            .filter((idEtiqueta) => !antes.includes(idEtiqueta))
-            .map((idEtiqueta) => ({ idTarea: tarea.idTarea, idEtiqueta })),
-        ),
-        skipDuplicates: true,
-      });
-    } else {
-      await tx.tareaEtiqueta.deleteMany({
-        where: {
-          idTarea: { in: cambios.map(({ tarea }) => tarea.idTarea) },
-          idEtiqueta: { in: idsEtiquetas },
-        },
-      });
-    }
-
-    const ordenar = (ids: number[]) => [...ids].sort((a, b) => a - b);
-    for (const { tarea, antes, despues } of cambios) {
-      await this.bitacoraEventos?.registrarEvento({
-        tx,
-        tipoEvento: TipoEventoBitacora.TASK_UPDATED,
-        idActor: userId,
-        idProyecto: projectId,
-        idSprint: tarea.idSprint,
-        tipoEntidad: 'TAREA',
-        idEntidad: tarea.idTarea,
-        valorAnterior: { idsEtiquetas: ordenar(antes) },
-        valorNuevo: { idsEtiquetas: ordenar(despues) },
-      });
-    }
-
-    return cambios.map(({ tarea }) => tarea.idTarea);
-  }
-
-  /**
-   * Antepone el título de la(s) tarea(s) al mensaje de un error HTTP (mismo
-   * status y mismo cuerpo, p. ej. `code`), para que el líder sepa qué tarea
-   * impidió la acción masiva. Cualquier otro error se relanza sin cambios.
-   */
-  private async conTituloDeTarea<T>(titulos: string | string[], operacion: () => Promise<T>): Promise<T> {
-    try {
-      return await operacion();
-    } catch (error) {
-      if (!(error instanceof HttpException)) {
-        throw error;
-      }
-      const lista = Array.isArray(titulos) ? titulos : [titulos];
-      const nombrados = lista.slice(0, 3).map((titulo) => `"${titulo}"`).join(', ');
-      const resto = lista.length > 3 ? ` y ${lista.length - 3} más` : '';
-      const prefijo = `${lista.length === 1 ? 'Tarea' : 'Tareas'} ${nombrados}${resto}`;
-
-      const respuesta = error.getResponse();
-      const esObjeto = typeof respuesta === 'object' && respuesta !== null;
-      const original = esObjeto ? (respuesta as { message?: unknown }).message : respuesta;
-      const texto = Array.isArray(original) ? original.join(', ') : String(original ?? error.message);
-      const cuerpo = esObjeto ? respuesta : { statusCode: error.getStatus() };
-      throw new HttpException({ ...cuerpo, message: `${prefijo}: ${texto}` }, error.getStatus());
-    }
-  }
-
-  /**
-   * Aviso agrupado post-commit: la audiencia de cada tarea es la misma que en
-   * la acción individual (miembros activos de su rol; sin rol, su asignado;
-   * al desasignar, quien estaba asignado), pero cada persona recibe UNA sola
-   * notificación con todas las tareas que le afectan. Excluye al actor. Un
-   * fallo se registra y nunca se relanza: la acción ya se comprometió.
-   */
-  private async notificarAccionMasiva(
-    projectId: number,
-    actorUserId: number,
-    dto: BulkTaskActionDto,
-    tareas: TareaPublica[],
-    asignadosPrevios: Map<number, number>,
-  ): Promise<void> {
-    if (tareas.length === 0) {
-      return;
-    }
-
-    try {
-      const tareasPorUsuario = new Map<number, TareaPublica[]>();
-      const sumar = (idUsuario: number, tarea: TareaPublica) => {
-        if (idUsuario === actorUserId) return;
-        const lista = tareasPorUsuario.get(idUsuario) ?? [];
-        if (!lista.includes(tarea)) lista.push(tarea);
-        tareasPorUsuario.set(idUsuario, lista);
-      };
-
-      if (dto.accion === 'DESASIGNAR') {
-        for (const tarea of tareas) {
-          const previo = asignadosPrevios.get(tarea.idTarea);
-          if (previo !== undefined) sumar(previo, tarea);
-        }
-      } else {
-        const idsRoles = [
-          ...new Set(tareas.map((tarea) => tarea.idRolProyecto).filter((id): id is number => id !== null)),
-        ];
-        const participaciones =
-          idsRoles.length === 0
-            ? []
-            : await this.prisma.participacionProyecto.findMany({
-                where: {
-                  estadoParticipacion: 'ACTIVO',
-                  rolProyecto: {
-                    idRolProyecto: { in: idsRoles },
-                    idProyecto: projectId,
-                    proyecto: { eliminadoEn: null },
-                  },
-                },
-                select: { idUsuario: true, idRolProyecto: true },
-              });
-
-        for (const tarea of tareas) {
-          if (tarea.idRolProyecto !== null) {
-            for (const participacion of participaciones) {
-              if (participacion.idRolProyecto === tarea.idRolProyecto) sumar(participacion.idUsuario, tarea);
-            }
-          } else if (tarea.asignacionActiva) {
-            sumar(tarea.asignacionActiva.idUsuario, tarea);
-          }
-        }
-      }
-
-      for (const [idUsuario, tareasUsuario] of tareasPorUsuario) {
-        const unica = tareasUsuario.length === 1 ? tareasUsuario[0] : null;
-        await this.notifications.notifyUsers([idUsuario], {
-          ...contenidoAvisoMasivo(dto, tareasUsuario, idUsuario),
-          // Con una sola tarea el aviso abre su vista; con varias, el tablero
-          // (resolveTaskNotificationLink cae al workspace sin taskId).
-          datosJson: {
-            projectId,
-            accion: dto.accion,
-            taskIds: tareasUsuario.map((tarea) => tarea.idTarea),
-            ...(unica ? { taskId: unica.idTarea, taskTitle: unica.tituloTarea } : {}),
-          },
-        });
-      }
-    } catch (error) {
-      this.logger.error('No se pudo emitir la notificación de la acción masiva', error as Error);
-    }
-  }
-
-  /**
-   * A12: sincroniza `Hito.estadoHito` con el progreso real derivado de sus
-   * tareas vigentes — misma fórmula única que `ProjectsService.calcularAvanceHitos`
-   * (vía `calcularProgresoHito`, src/common/hito-progreso.ts), nunca una
-   * segunda definición. Se llama SIEMPRE dentro de la misma transacción que
-   * acaba de escribir `estadoTarea`, así que la consulta ve el estado ya
-   * comprometido (no el anterior). Acotado por `idHito`: una sola consulta
-   * (`tarea.findMany` filtrado por ese Hito, `eliminadoEn: null`) y una sola
-   * escritura (`hito.update`) — nunca recorre otros Hitos ni otros
-   * proyectos. El caller es responsable de solo invocar esto cuando la
-   * tarea realmente tiene `idHito !== null`.
-   */
-  private async syncHitoEstado(tx: Prisma.TransactionClient, idHito: number): Promise<void> {
-    const tareasHito = await tx.tarea.findMany({
-      where: { idHito, eliminadoEn: null },
-      select: { estadoTarea: true },
-    });
-    const { estadoHito } = calcularProgresoHito(tareasHito);
-    await tx.hito.update({
-      where: { idHito },
-      data: { estadoHito },
-    });
   }
 
   private assertValidAssignmentClosureInput(dto: CloseAssignmentDto): void {
@@ -1919,170 +1114,8 @@ export class TasksService {
     return value as Prisma.InputJsonValue;
   }
 
-  /**
-   * Tarea 34: resuelve el plan de audiencia a partir del estado ya
-   * comprometido de la tarea (nunca del body ni de una relectura aparte).
-   * Un rol asignado siempre gana sobre el asignado activo, incluso cuando
-   * ambos existen; sin rol, el asignado activo (asociación con
-   * `desasignadaEn: null`, tal como ya la expone `TareaPublica.asignacionActiva`)
-   * es la única audiencia; sin rol ni asignado, no hay audiencia.
-   */
-  private resolveTaskNotificationAudience(
-    idRolProyecto: number | null,
-    idProyecto: number,
-    assigneeId: number | null,
-  ): TaskNotificationAudience {
-    // idRolProyecto/assigneeId son `number | null` por contrato (TareaPublica,
-    // fila Prisma real); la comparación explícita contra `undefined` es una
-    // defensa adicional para no tratar un mock de prueba incompleto (campo
-    // omitido) como si tuviera rol.
-    if (idRolProyecto !== null && idRolProyecto !== undefined) {
-      return { kind: 'role', projectId: idProyecto, roleId: idRolProyecto };
-    }
-    if (assigneeId !== null && assigneeId !== undefined) {
-      return { kind: 'assignee', userId: assigneeId };
-    }
-    return { kind: 'none' };
+  /** HU-202/T-383: acción masiva del tablero; la lógica vive en TasksBulkService. */
+  bulkAction(projectId: number, userId: number, dto: BulkTaskActionDto): Promise<ResultadoAccionMasiva> {
+    return this.bulk.bulkAction(projectId, userId, dto);
   }
-
-  /**
-   * Tarea 34: único punto de emisión para las operaciones generales de
-   * gestión de tareas (creación con rol, edición, cambio de estado,
-   * asignación/reasignación con rol, soft delete). Recibe un plan ya
-   * comprometido (nunca abre transacciones ni consulta/modifica la tarea) y
-   * delega en `NotificationsService`: audiencia de rol → `notifyRoleMembers`
-   * (que ya resuelve participación activa, aislamiento por proyecto,
-   * exclusión del actor y deduplicación); audiencia de asignado → exclusión
-   * del actor y deduplicación explícitas antes de `notifyUsers`, con un
-   * único candidato. `kind: 'none'` no tiene efecto. Nunca llama al gateway
-   * directamente. Un fallo se registra con Logger (sin datos sensibles) y
-   * nunca se relanza: la mutación ya se comprometió antes de llegar aquí.
-   */
-  private async notifyTaskAudience(
-    audience: TaskNotificationAudience,
-    actorUserId: number,
-    input: TaskNotificationInput,
-  ): Promise<void> {
-    if (audience.kind === 'none') {
-      return;
-    }
-
-    try {
-      if (audience.kind === 'role') {
-        await this.notifications.notifyRoleMembers(
-          audience.projectId,
-          audience.roleId,
-          actorUserId,
-          input,
-        );
-        return;
-      }
-
-      const recipientIds = [...new Set([audience.userId])].filter(
-        (idUsuario) => idUsuario !== actorUserId,
-      );
-      if (recipientIds.length === 0) {
-        return;
-      }
-      await this.notifications.notifyUsers(recipientIds, input);
-    } catch (error) {
-      this.logger.error(
-        'No se pudo emitir la notificación de gestión de tarea',
-        error as Error,
-      );
-    }
-  }
-
-  /**
-   * Notificación post-commit: un fallo aquí (almacenamiento, emisión o
-   * incluso las lecturas auxiliares de nombre/título) nunca debe afectar
-   * la respuesta de creación, que ya es exitosa. Se registra con Logger y
-   * no se relanza; no se abre una segunda transacción ni se compensa nada.
-   * Tarea 34: excluye al actor (p. ej. el líder que se asigna a sí mismo al
-   * crear o asignar la tarea) antes de notificar — mismo contrato de
-   * exclusión que el resto de operaciones de gestión.
-   */
-  private async _notifyAssignment(
-    tarea: TareaPublica,
-    actorId: number,
-    assignedUserId: number,
-  ): Promise<void> {
-    if (assignedUserId === actorId) {
-      return;
-    }
-    try {
-      const [actor, proyecto] = await Promise.all([
-        this.prisma.usuario.findUnique({
-          where: { idUsuario: actorId },
-          select: { nombre: true, apellido: true },
-        }),
-        this.prisma.proyecto.findUnique({
-          where: { idProyecto: tarea.idProyecto },
-          select: { tituloProyecto: true },
-        }),
-      ]);
-
-      await this.notifications.notifyFromTemplate([assignedUserId], 'TAREA_ASIGNADA', {
-        taskTitle: tarea.tituloTarea,
-        projectTitle: proyecto?.tituloProyecto ?? '',
-        assignedBy: actor ? `${actor.nombre} ${actor.apellido}` : 'Alguien',
-        taskId: tarea.idTarea,
-        projectId: tarea.idProyecto,
-      });
-    } catch (error) {
-      this.logger.error(
-        `No se pudo notificar la asignación inicial de la tarea ${tarea.idTarea}`,
-        error as Error,
-      );
-    }
-  }
-
-  /**
-   * Notificación post-commit de la desasignación: mismo patrón que
-   * _notifyAssignment (auxiliares de actor/proyecto resueltas aquí, nunca
-   * dentro de la transacción de unassign; un fallo se registra con Logger
-   * y no se relanza — entrega "como máximo una vez", no un mecanismo de
-   * reintento). Solo se invoca cuando esta llamada cerró realmente la
-   * asignación, así que no hay riesgo de notificar dos veces ante
-   * solicitudes repetidas o una carrera con count: 0. Tarea 34: excluye al
-   * actor (líder que se desasigna a sí mismo) antes de notificar.
-   */
-  private async _notifyUnassignment(
-    taskId: number,
-    projectId: number,
-    taskTitle: string,
-    actorId: number,
-    previousUserId: number,
-  ): Promise<void> {
-    if (previousUserId === actorId) {
-      return;
-    }
-    try {
-      const [actor, proyecto] = await Promise.all([
-        this.prisma.usuario.findUnique({
-          where: { idUsuario: actorId },
-          select: { nombre: true, apellido: true },
-        }),
-        this.prisma.proyecto.findUnique({
-          where: { idProyecto: projectId },
-          select: { tituloProyecto: true },
-        }),
-      ]);
-
-      await this.notifications.notifyFromTemplate([previousUserId], 'TAREA_ACTUALIZADA', {
-        taskTitle,
-        projectTitle: proyecto?.tituloProyecto ?? '',
-        unassignedBy: actor ? `${actor.nombre} ${actor.apellido}` : 'Alguien',
-        taskId,
-        projectId,
-      });
-    } catch (error) {
-      this.logger.error(
-        `No se pudo notificar la desasignación de la tarea ${taskId}`,
-        error as Error,
-      );
-    }
-  }
-
-
 }

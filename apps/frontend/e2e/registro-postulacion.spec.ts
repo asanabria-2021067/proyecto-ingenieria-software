@@ -28,7 +28,7 @@ async function registrar(page: Page): Promise<string> {
   // Desplegable del sistema (no un <select> nativo): se abre y se elige la primera carrera.
   await page.getByTestId('registro-carrera-select').click();
   await page.getByRole('option').first().click();
-  await page.getByPlaceholder('Minimo 8 caracteres').fill(CONTRASENA);
+  await page.getByPlaceholder('Mínimo 8 caracteres').fill(CONTRASENA);
   await page.getByPlaceholder('••••••••').fill(CONTRASENA);
   await page.getByRole('button', { name: 'Crear Cuenta' }).click();
 
@@ -38,8 +38,8 @@ async function registrar(page: Page): Promise<string> {
 
 async function enviarLogin(page: Page, correo: string): Promise<void> {
   await page.getByPlaceholder('usuario@uvg.edu.gt').fill(correo);
-  await page.getByPlaceholder('Minimo 8 caracteres').fill(CONTRASENA);
-  await page.getByRole('button', { name: 'Iniciar Sesion' }).click();
+  await page.getByPlaceholder('Mínimo 8 caracteres').fill(CONTRASENA);
+  await page.getByRole('button', { name: 'Iniciar Sesión' }).click();
 }
 
 // El registro no abre sesión: sin cookie y sin acceso a la API.
@@ -50,8 +50,8 @@ async function expectSinSesion(page: Page): Promise<void> {
 }
 
 async function expectLoginRechazado(page: Page, mensaje: string): Promise<void> {
-  await expect(page.getByText(mensaje)).toBeVisible();
-  await page.getByRole('button', { name: 'Aceptar' }).click();
+  // NL-T1: el rechazo se muestra como alerta en el formulario, ya no en un popup.
+  await expect(page.getByRole('alert').filter({ hasText: mensaje })).toBeVisible();
   await expect(page).toHaveURL(/\/login/);
   await expectSinSesion(page);
 }
@@ -155,5 +155,5 @@ test('administración rechaza una cuenta nueva y esta no puede iniciar sesión',
 
   // La cuenta rechazada recibe el error genérico de credenciales, no el de «pendiente».
   await enviarLogin(page, correo);
-  await expectLoginRechazado(page, 'No se pudo iniciar sesion. Verifica tu correo y contraseña.');
+  await expectLoginRechazado(page, 'Correo o contraseña incorrectos');
 });

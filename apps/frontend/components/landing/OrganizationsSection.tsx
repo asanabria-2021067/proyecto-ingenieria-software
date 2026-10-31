@@ -2,8 +2,8 @@ import Image from 'next/image';
 import { CheckCircle2 } from 'lucide-react';
 
 const benefits = [
-  'Miembros automaticos en cada proyecto de la org',
-  'Gestion centralizada de multiples proyectos',
+  'Miembros automáticos en cada proyecto de la org',
+  'Gestión centralizada de múltiples proyectos',
   'Control de hitos y tareas por proyecto',
 ];
 
@@ -22,8 +22,8 @@ export default function OrganizationsSection() {
             Organizaciones: tu equipo, tus proyectos
           </h2>
           <p className="text-lg leading-relaxed text-surface-variant opacity-80 dark:text-slate-300">
-            Creas una organizacion, agregas miembros y los proyectos que se creen dentro ya
-            incluyen automaticamente a todo el equipo. Es ideal para asociaciones estudiantiles
+            Creas una organización, agregas miembros y los proyectos que se creen dentro ya
+            incluyen automáticamente a todo el equipo. Es ideal para asociaciones estudiantiles
             con un grupo fijo.
           </p>
           <ul className="space-y-4">
@@ -36,7 +36,7 @@ export default function OrganizationsSection() {
           </ul>
           <div className="pt-4">
             <button className="rounded-xl bg-secondary-fixed px-10 py-4 font-headline text-lg font-bold text-on-secondary-fixed dark:text-on-secondary shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:bg-secondary-fixed-dim hover:shadow-xl active:scale-95">
-              Crear organizacion
+              Crear organización
             </button>
           </div>
         </div>
@@ -70,7 +70,7 @@ export default function OrganizationsSection() {
               </div>
               <div className="group relative h-64 overflow-hidden rounded-3xl">
                 <Image
-                  alt="Colaboracion"
+                  alt="Colaboración"
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                   src="https://res.cloudinary.com/uvggt/image/upload/q_auto:best,f_auto,w_800/v1701711361/2023/12%20Diciembre/Proyectos%20Ingenieria%20Mecanica/Proyectos-Ingenieria-Mecanica.jpg"
                   fill

@@ -68,9 +68,13 @@ describe('G04-C03: tokens solo para usuarios ACTIVO', () => {
   it.each(ESTADOS_SIN_ACCESO)('login %s con contraseña correcta: sin tokens, sin última sesión, respuesta genérica', async (estado) => {
     const { service, prisma } = makeService(estado);
 
-    await expect(service.login({ correo: 'a@uvg.edu.gt', contrasena: PASSWORD })).rejects.toThrow(
-      new UnauthorizedException('Credenciales invalidas'),
-    );
+    const error = await service.login({ correo: 'a@uvg.edu.gt', contrasena: PASSWORD }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(UnauthorizedException);
+    // NL-T1: suma al contador como cualquier otro 401 (primer fallo: quedan 4).
+    expect((error as UnauthorizedException).getResponse()).toMatchObject({
+      message: 'Credenciales inválidas',
+      intentosRestantes: 4,
+    });
     expect(prisma.tokenRefresco.create).not.toHaveBeenCalled();
     expect(prisma.usuario.update).not.toHaveBeenCalled();
   });

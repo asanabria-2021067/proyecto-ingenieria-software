@@ -41,13 +41,13 @@ describe('acceso a contacto desde la navbar pública', () => {
 
     const enlace = screen.getByRole('link', { name: 'Contacto' });
     expect(enlace).toHaveAttribute('href', '/contacto');
-    expect(screen.getByRole('link', { name: 'Como Funciona' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cómo Funciona' })).toBeInTheDocument();
   });
 
   it('el menú móvil también lleva a contacto', () => {
     const { container } = render(<Navbar />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir menu' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
 
     const menuMovil = container.querySelector('nav > div.md\\:hidden') as HTMLElement;
     expect(menuMovil).not.toBeNull();

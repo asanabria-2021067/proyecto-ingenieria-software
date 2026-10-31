@@ -313,7 +313,7 @@ describe('Revisión de horas — ajustes e historial (misma lógica que antes)',
     fireEvent.change(screen.getByLabelText(/Justificación del líder/), { target: { value: 'Motivo' } });
     fireEvent.click(screen.getByRole('button', { name: /Guardar ajuste/ }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/El resumen cambio mientras trabajabas/);
+    expect(screen.getByRole('alert')).toHaveTextContent(/El resumen cambió mientras trabajabas/);
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
     expect(refetch).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();

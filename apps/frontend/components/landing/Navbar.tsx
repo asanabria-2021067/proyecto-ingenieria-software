@@ -1,19 +1,35 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { Spinner } from '@/components/ui/spinner';
 import logoLight from '@/public/Logo UVG-08.png';
 import logoDark from '@/public/Logo claro.png';
 
 const navLinks = [
   { label: 'El Problema', href: '#el-problema' },
-  { label: 'La Solucion', href: '#la-solucion' },
-  { label: 'Como Funciona', href: '#como-funciona' },
+  { label: 'La Solución', href: '#la-solucion' },
+  { label: 'Cómo Funciona', href: '#como-funciona' },
   { label: 'Contacto', href: '/contacto' },
 ];
+
+// NL-T2: /registro tarda en abrir (en desarrollo compila al primer clic) y sin
+// señal visible el usuario volvía a hacer clic. `useLinkStatus` solo marca
+// pendiente una navegación real (no Ctrl/Cmd/clic central) y se apaga solo.
+function EtiquetaRegistro() {
+  const { pending } = useLinkStatus();
+  return pending ? (
+    <>
+      <Spinner aria-label="Cargando" />
+      Abriendo…
+    </>
+  ) : (
+    'Registrarse'
+  );
+}
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -69,13 +85,13 @@ export default function Navbar() {
               href="/login"
               className="rounded-lg px-4 py-2 text-sm font-semibold uppercase tracking-wider text-on-surface transition-all duration-200 hover:bg-white/15"
             >
-              Iniciar Sesion
+              Iniciar Sesión
             </Link>
             <Link
               href="/registro"
-              className="rounded-xl bg-primary px-5 py-2 text-sm font-bold uppercase tracking-wider text-on-primary shadow-md transition-all duration-200 hover:brightness-110"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-bold uppercase tracking-wider text-on-primary shadow-md transition-all duration-200 hover:brightness-110"
             >
-              Registrarse
+              <EtiquetaRegistro />
             </Link>
             <ThemeToggle />
           </div>
@@ -85,7 +101,7 @@ export default function Navbar() {
               type="button"
               className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-on-surface"
               onClick={() => setMenuOpen((prev) => !prev)}
-              aria-label="Abrir menu"
+              aria-label="Abrir menú"
             >
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -109,14 +125,14 @@ export default function Navbar() {
                 className="rounded-lg px-2 py-2 text-sm font-semibold uppercase tracking-wider text-primary hover:bg-primary/10"
                 onClick={() => setMenuOpen(false)}
               >
-                Iniciar Sesion
+                Iniciar Sesión
               </Link>
               <Link
                 href="/registro"
-                className="rounded-xl bg-primary px-4 py-2 text-center text-sm font-bold uppercase tracking-wider text-on-primary"
-                onClick={() => setMenuOpen(false)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-center text-sm font-bold uppercase tracking-wider text-on-primary"
+                // Sin cerrar el menú al hacer clic: así se ve «Abriendo…» hasta que cargue el formulario.
               >
-                Registrarse
+                <EtiquetaRegistro />
               </Link>
             </div>
           </div>

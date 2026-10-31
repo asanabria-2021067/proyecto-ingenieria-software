@@ -57,6 +57,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
                 ? `Notificaciones, ${unread} sin leer`
                 : 'Notificaciones, no hay pendientes'
             }
+            title="Notificaciones"
             className="relative flex items-center justify-center h-10 w-10 rounded-md text-on-surface hover:bg-surface-container-high motion-icon cursor-pointer"
           >
             <div className="relative">
@@ -122,7 +123,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
               type="button"
               onClick={() => marcarTodas.mutate()}
               disabled={marcarTodas.isPending}
-              aria-label="Marcar todas las notificaciones como leidas"
+              aria-label="Marcar todas las notificaciones como leídas"
               className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
             >
               <CheckCheck className="w-3.5 h-3.5" />

@@ -23,7 +23,9 @@ describe('ChatService - adjuntos', () => {
       mensajeChat: { create: fn() },
       conversacionParticipante: { update: fn().mockResolvedValue({}) },
       adjuntoMensajeChat: { findFirst: fn(), findMany: fn() },
+      $transaction: fn(),
     };
+    prisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) => cb(prisma));
     gateway = { broadcastMessage: fn() };
     storage = {
       upload: fn().mockResolvedValue(undefined),
@@ -80,6 +82,33 @@ describe('ChatService - adjuntos', () => {
       await expect(service.createMessage(10, 5, 1, '', ARCHIVO)).rejects.toThrow('db');
       expect(storage.destroy).toHaveBeenCalledWith(storage.upload.mock.calls[0][0]);
       expect(gateway.broadcastMessage).not.toHaveBeenCalled();
+    });
+
+    it('RTF-3.4: si falla la segunda escritura (ultimaLecturaEn) no queda mensaje, ni difusion, y se borra el adjunto', async () => {
+      // Transaccion simulada: las escrituras solo "persisten" si el callback resuelve.
+      const persistidos: unknown[] = [];
+      prisma.$transaction.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
+        const staged: unknown[] = [];
+        const tx = {
+          mensajeChat: {
+            create: async () => {
+              const m = { idMensaje: 9, enviadoEn: new Date(), remitente: USUARIO };
+              staged.push(m);
+              return m;
+            },
+          },
+          conversacionParticipante: { update: async () => Promise.reject(new Error('fallo segunda escritura')) },
+        };
+        const res = await cb(tx);
+        persistidos.push(...staged);
+        return res;
+      });
+
+      await expect(service.createMessage(10, 5, 1, '', ARCHIVO)).rejects.toThrow('fallo segunda escritura');
+
+      expect(persistidos).toHaveLength(0);
+      expect(gateway.broadcastMessage).not.toHaveBeenCalled();
+      expect(storage.destroy).toHaveBeenCalledWith(storage.upload.mock.calls[0][0]);
     });
 
     it('un mensaje sin archivo no usa el almacenamiento ni crea adjunto', async () => {

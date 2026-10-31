@@ -37,6 +37,7 @@ interface Props {
   open: boolean;
   onComplete: () => void;
   allowClose?: boolean;
+  onDefer?: () => void;
 }
 
 type NivelHabilidad = 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
@@ -52,7 +53,7 @@ interface ExperienciaForm {
   tipoExperiencia: string;
 }
 
-export default function CompleteProfileDialog({ open, onComplete, allowClose = false }: Props) {
+export default function CompleteProfileDialog({ open, onComplete, allowClose = false, onDefer }: Props) {
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const [step, setStep] = useState(0);
@@ -376,7 +377,9 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && allowClose) onComplete();
+        if (nextOpen) return;
+        if (allowClose) onComplete();
+        else onDefer?.();
       }}
     >
       <DialogContent
@@ -437,12 +440,12 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-widest text-tertiary">
-                Biografia
+                Biografía
               </label>
               <textarea
                 value={biografia}
                 onChange={(e) => setBiografia(e.target.value)}
-                placeholder="Cuentanos sobre ti, tus intereses academicos..."
+                placeholder="Cuéntanos sobre ti, tus intereses académicos..."
                 rows={3}
                 className={inputClass}
               />
@@ -481,7 +484,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                   <div>
                     <p className="text-sm font-bold text-on-surface">Horas beca</p>
                     <p className="text-[11px] text-tertiary">
-                      Requeridas por tu beca academica
+                      Requeridas por tu beca académica
                     </p>
                   </div>
                   {requiereHorasBeca && (
@@ -507,7 +510,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                 />
                 <div className="flex-1 space-y-2">
                   <div>
-                    <p className="text-sm font-bold text-on-surface">Horas de extension</p>
+                    <p className="text-sm font-bold text-on-surface">Horas de extensión</p>
                     <p className="text-[11px] text-tertiary">
                       Para actividades extracurriculares
                     </p>
@@ -521,7 +524,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                       onChange={(e) =>
                         setHorasExtensionRequeridas(Number(e.target.value))
                       }
-                      placeholder="Total de horas de extension"
+                      placeholder="Total de horas de extensión"
                       className={inputClass}
                     />
                   )}
@@ -535,7 +538,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
         {step === 1 && (
           <div className="space-y-5 py-2">
             <p className="text-sm text-tertiary">
-              Esto nos ayudara a mostrarte proyectos mas relacionados a tu perfil
+              Esto nos ayudará a mostrarte proyectos más relacionados a tu perfil
             </p>
 
             <div className="space-y-2">
@@ -584,7 +587,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                           }
                           className="rounded-lg border border-outline-variant bg-white px-1 py-0.5 text-[10px] text-on-surface"
                         >
-                          <option value="BASICO">Basico</option>
+                          <option value="BASICO">Básico</option>
                           <option value="INTERMEDIO">Intermedio</option>
                           <option value="AVANZADO">Avanzado</option>
                         </select>
@@ -601,7 +604,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
         {step === 2 && (
           <div className="space-y-5 py-2">
             <p className="text-sm text-tertiary">
-              Agrega tus intereses. Si no existen, se crean automaticamente.
+              Agrega tus intereses. Si no existen, se crean automáticamente.
             </p>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-tertiary">
@@ -618,7 +621,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                       await applyTypedIntereses();
                     }
                   }}
-                  placeholder="Escribe intereses (ej: IA, Robotica) y presiona Enter"
+                  placeholder="Escribe intereses (ej: IA, Robótica) y presiona Enter"
                   className={inputClass}
                 />
                 {interesesMatchInfo && (
@@ -666,7 +669,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                       await applyTypedCualidades();
                     }
                   }}
-                  placeholder="Escribe cualidades (ej: Liderazgo, Comunicacion) y presiona Enter"
+                  placeholder="Escribe cualidades (ej: Liderazgo, Comunicación) y presiona Enter"
                   className={inputClass}
                 />
                 {cualidadesMatchInfo && (
@@ -787,14 +790,14 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                   </div>
                   <input
                     type="text"
-                    placeholder="Titulo del proyecto"
+                    placeholder="Título del proyecto"
                     value={exp.tituloProyectoExperiencia}
                     onChange={(e) => updateExp(idx, 'tituloProyectoExperiencia', e.target.value)}
                     className={inputClass}
                   />
                   <input
                     type="text"
-                    placeholder="Rol desempenado"
+                    placeholder="Rol desempeñado"
                     value={exp.rolDesempenado}
                     onChange={(e) => updateExp(idx, 'rolDesempenado', e.target.value)}
                     className={inputClass}
@@ -829,18 +832,39 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
           ) : (
             <div />
           )}
-          <Button
-            type="button"
-            onClick={saveStep}
-            disabled={saving}
-            className="h-auto gap-1 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-on-primary shadow-sm hover:bg-primary-container has-[>svg]:px-6 disabled:opacity-60 motion-glow-primary"
-          >
-            {saving
-              ? 'Guardando...'
-              : step === 4
-                ? <>Finalizar <Check className="h-4 w-4" /></>
-                : <>Siguiente <ChevronRight className="h-4 w-4" /></>}
-          </Button>
+          <div className="flex items-center gap-2">
+            {onDefer && (
+              <button
+                type="button"
+                onClick={onDefer}
+                className="rounded-xl px-4 py-2.5 text-sm font-bold text-tertiary hover:bg-surface-container-high transition-colors"
+              >
+                Hacerlo después
+              </button>
+            )}
+            {step < steps.length - 1 && (
+              <button
+                type="button"
+                onClick={() => setStep((s) => s + 1)}
+                disabled={saving}
+                className="rounded-xl px-4 py-2.5 text-sm font-bold text-tertiary hover:bg-surface-container-high transition-colors disabled:opacity-60"
+              >
+                Omitir este paso
+              </button>
+            )}
+            <Button
+              type="button"
+              onClick={saveStep}
+              disabled={saving}
+              className="h-auto gap-1 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-on-primary shadow-sm hover:bg-primary-container has-[>svg]:px-6 disabled:opacity-60 motion-glow-primary"
+            >
+              {saving
+                ? 'Guardando...'
+                : step === 4
+                  ? <>Finalizar <Check className="h-4 w-4" /></>
+                  : <>Siguiente <ChevronRight className="h-4 w-4" /></>}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

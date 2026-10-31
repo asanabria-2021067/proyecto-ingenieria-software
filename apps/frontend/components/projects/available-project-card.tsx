@@ -24,6 +24,8 @@ export type CreadorProyectoResumen = {
 export type ProyectoDisponibleResumen = Omit<ProyectoResumen, 'roles'> & {
   creador?: CreadorProyectoResumen | null;
   roles?: { cupos: number }[];
+  /** Llega con sesión y sin q: algún rol pide la carrera del usuario. */
+  mismaCarrera?: boolean;
 };
 
 // Los badges se pintan por clase, nunca por `style` inline: cada tono

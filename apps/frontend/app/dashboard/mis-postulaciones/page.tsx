@@ -187,7 +187,7 @@ export default function MisPostulacionesPage() {
             <EmptyHeader>
               <EmptyTitle>No se pudieron cargar tus postulaciones</EmptyTitle>
               <EmptyDescription>
-                Verifica que tu sesion siga activa o intenta actualizar la lista.
+                Verifica que tu sesión siga activa o intenta actualizar la lista.
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
@@ -208,9 +208,9 @@ export default function MisPostulacionesPage() {
               <ClipboardList aria-hidden="true" className="h-7 w-7" />
             </EmptyMedia>
             <EmptyHeader>
-              <EmptyTitle>Encuentra tu siguiente colaboracion</EmptyTitle>
+              <EmptyTitle>Encuentra tu siguiente colaboración</EmptyTitle>
               <EmptyDescription>
-                Cuando envies una postulacion, aqui veras el rol, el estado y la respuesta del equipo.
+                Cuando envíes una postulación, aquí verás el rol, el estado y la respuesta del equipo.
               </EmptyDescription>
             </EmptyHeader>
             <EmptySteps />
@@ -305,7 +305,7 @@ export default function MisPostulacionesPage() {
                         type="button"
                         onClick={() => handleCancelar(p.idPostulacion)}
                         disabled={deleteMutation.isPending}
-                        aria-label={`Cancelar postulacion a ${p.rolProyecto.nombreRol}`}
+                        aria-label={`Cancelar postulación a ${p.rolProyecto.nombreRol}`}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-error/10 text-error text-xs font-semibold hover:bg-error/20 transition-colors disabled:opacity-50"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

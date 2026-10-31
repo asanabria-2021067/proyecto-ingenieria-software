@@ -107,11 +107,11 @@ export function buildProjectNavGroups(ctx: ProjectNavContext): ProjectNavGroup[]
   const trabajo: ProjectNavItem[] = [];
   if (esMiembro) {
     trabajo.push(
-      { id: 'tablero', href: `/dashboard/projects/${idProyecto}/kanban`, label: 'Tablero', icon: Kanban },
+      { id: 'tablero', href: `/dashboard/projects/${idProyecto}/kanban`, label: 'Tablero (Kanban)', icon: Kanban },
       {
         id: 'lista-tareas',
         href: `/dashboard/projects/${idProyecto}/tareas`,
-        label: 'Lista de tareas',
+        label: 'Todas las tareas',
         icon: ListChecks,
       },
     );

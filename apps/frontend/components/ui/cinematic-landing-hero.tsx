@@ -169,11 +169,11 @@ export function CinematicHero({
   brandName = "UVG",
   tagline1 = "Conecta oportunidades,",
   tagline2 = "mide tu impacto real.",
-  cardHeading = "Colaboracion universitaria, ordenada.",
+  cardHeading = "Colaboración universitaria, ordenada.",
   cardDescription = (
     <>
       <span className="font-semibold text-white">UVG Scholar</span> centraliza horas beca,
-      extension y proyectos academicos para que encuentres, postules y des seguimiento con
+      extensión y proyectos académicos para que encuentres, postules y des seguimiento con
       evidencia y trazabilidad.
     </>
   ),
@@ -181,7 +181,7 @@ export function CinematicHero({
   metricLabel = "Horas UVG",
   ctaHeading = "Activa tu perfil UVG.",
   ctaDescription =
-    "Crea tu cuenta, descubre proyectos y postulate en minutos desde un solo lugar.",
+    "Crea tu cuenta, descubre proyectos y postúlate en minutos desde un solo lugar.",
   className,
   ...props
 }: CinematicHeroProps) {
@@ -481,8 +481,8 @@ export function CinematicHero({
                     <BellRing className="h-4 w-4 text-green-300 lg:h-5 lg:w-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold tracking-tight text-white lg:text-sm">Notificacion nueva</p>
-                    <p className="text-[10px] font-medium text-emerald-200/60 lg:text-xs">Postulacion actualizada</p>
+                    <p className="text-xs font-bold tracking-tight text-white lg:text-sm">Notificación nueva</p>
+                    <p className="text-[10px] font-medium text-emerald-200/60 lg:text-xs">Postulación actualizada</p>
                   </div>
                 </div>
               </div>

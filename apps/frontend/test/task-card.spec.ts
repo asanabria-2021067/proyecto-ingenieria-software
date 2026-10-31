@@ -320,3 +320,19 @@ describe('TaskCard (compacta, Secciones 33-46)', () => {
     });
   });
 });
+
+
+describe('TaskCard - asignada al usuario actual (NL-T4)', () => {
+  afterEach(() => cleanup());
+
+  it('asignadaAMi muestra la etiqueta «Asignada a ti» y el borde', () => {
+    const { container } = renderCard({ asignadaAMi: true });
+    expect(screen.getByText('Asignada a ti')).toBeInTheDocument();
+    expect(container.querySelector('article')?.className).toContain('border-primary/60');
+  });
+
+  it('sin asignadaAMi no hay etiqueta', () => {
+    renderCard();
+    expect(screen.queryByText('Asignada a ti')).not.toBeInTheDocument();
+  });
+});

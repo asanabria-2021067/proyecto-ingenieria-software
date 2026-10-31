@@ -3,6 +3,7 @@ import { SprintsController } from './sprints.controller';
 import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
 import { SprintsService } from './sprints.service';
+import { SprintsReadService } from './sprints-read.service';
 import { HoursRecognitionService } from './hours-recognition.service';
 import { ProjectHoursSummaryService } from './project-hours-summary.service';
 import { SprintSnapshotsService } from './sprint-snapshots.service';
@@ -19,6 +20,7 @@ import { ProjectPolicyModule } from '../common/project-policy/project-policy.mod
     SprintsContextService,
     SprintsAuthorizationService,
     SprintsService,
+    SprintsReadService,
     HoursRecognitionService,
     ProjectHoursSummaryService,
     SprintSnapshotsService,

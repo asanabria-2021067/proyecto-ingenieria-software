@@ -57,7 +57,7 @@ describe('G06-C08: T17/T18/T21 en el arnés TLS', () => {
     expect(
       verifyPendingAccount({
         registro: { status: 201 },
-        login: { status: 401, message: 'Credenciales invalidas' },
+        login: { status: 401, message: 'Credenciales inválidas' },
       }),
     ).toEqual(['login status 401 != 403', 'el login no devolvio el mensaje de cuenta pendiente']);
   });

@@ -66,14 +66,14 @@ export function ProjectSearchInput() {
         <div
           id="project-search-results"
           role="listbox"
-          aria-label="Resultados de busqueda de proyectos"
+          aria-label="Resultados de búsqueda de proyectos"
           className="surface-enter absolute top-full mt-1.5 right-0 w-72 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden"
         >
           {results.length === 0 && !isFetching && (
             <div className="px-4 py-4 text-center" role="status">
               <p className="text-xs font-semibold text-gray-700">Sin coincidencias</p>
               <p className="mt-1 text-[11px] text-gray-400">
-                Prueba con otro titulo o area de interes.
+                Prueba con otro título o área de interés.
               </p>
             </div>
           )}

@@ -65,7 +65,7 @@ export function SprintCloseConfirmModal({
             Este Sprint tiene {cantidad} {cantidad === 1 ? 'tarea pendiente' : 'tareas pendientes'}
           </DialogTitle>
           <DialogDescription className="text-sm text-on-surface-variant">
-            Elige a donde se mueven antes de cerrar. Esta accion no se puede deshacer.
+            Elige a dónde se mueven antes de cerrar. Esta acción no se puede deshacer.
           </DialogDescription>
         </DialogHeader>
 

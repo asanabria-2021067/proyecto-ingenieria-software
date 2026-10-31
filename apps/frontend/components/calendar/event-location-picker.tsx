@@ -117,7 +117,7 @@ export default function EventLocationPicker({
     try {
       const params = new URLSearchParams({ format: 'json', q: nombre.trim(), limit: '5' });
       const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
-      if (!res.ok) throw new Error('busqueda fallida');
+      if (!res.ok) throw new Error('búsqueda fallida');
       const data = (await res.json()) as NominatimResult[];
       setResults(data);
       if (data.length === 0) setSearchError('No se encontraron resultados.');

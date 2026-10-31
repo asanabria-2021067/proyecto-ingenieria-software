@@ -1,0 +1,30 @@
+# Servicios sin <nombre>.service.spec.ts al crear el guard (RTF-3.1).
+# Solo se pueden QUITAR lineas (al escribir el spec). No agregar servicios nuevos.
+apps/backend/src/admin/admin.service.ts
+apps/backend/src/auth/account-attempts.service.ts
+apps/backend/src/catalogs/catalogs.service.ts
+apps/backend/src/chat/chat-estado.service.ts
+apps/backend/src/chat/link-preview/link-preview.service.ts
+apps/backend/src/common/project-policy/project-id-resolver.service.ts
+apps/backend/src/common/project-policy/project-transaction.service.ts
+apps/backend/src/eligibility/project-eligibility.service.ts
+apps/backend/src/exit-requests/exit-requests.authorization.service.ts
+apps/backend/src/exit-requests/exit-requests.context.service.ts
+apps/backend/src/leadership/leadership-read.service.ts
+apps/backend/src/leadership/leadership.service.ts
+apps/backend/src/prisma/prisma.service.ts
+apps/backend/src/project-closure/closure-cleanup.service.ts
+apps/backend/src/project-closure/historical-project-read.service.ts
+apps/backend/src/project-closure/project-close-readiness.service.ts
+apps/backend/src/project-closure/project-closure-documents.service.ts
+apps/backend/src/project-closure/project-closure-report.service.ts
+apps/backend/src/project-closure/project-closure.service.ts
+apps/backend/src/projects/draft-inactivity.service.ts
+apps/backend/src/security-events/security-alerts.service.ts
+apps/backend/src/security-events/security-events.service.ts
+apps/backend/src/sprints/project-hours-summary.service.ts
+apps/backend/src/storage/closure-crypto.service.ts
+apps/backend/src/storage/closure-pdf-validation.service.ts
+apps/backend/src/storage/closure-ticket.service.ts
+apps/backend/src/team/team.service.ts
+apps/backend/src/ws-auth/ws-auth.service.ts

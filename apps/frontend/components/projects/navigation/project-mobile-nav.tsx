@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { ChatEquipoButton } from './chat-equipo-button';
 import { ProjectActionsMenu } from './project-actions-menu';
 import { ProjectNavList } from './project-nav-list';
 import { buildProjectActions, buildProjectNavGroups, flattenNavItems, resolveActiveHref } from './project-nav-model';
@@ -59,6 +60,13 @@ export function ProjectMobileNav({ idProyecto }: { idProyecto: number }) {
               variant="full"
               onNavigate={() => setAbiertoEn(null)}
             />
+            {nav.actor !== 'visitor' && (
+              <ChatEquipoButton
+                idProyecto={idProyecto}
+                onAbrir={() => setAbiertoEn(null)}
+                className="mt-card flex w-full items-center gap-inline rounded-control px-inline py-tight text-sm font-medium text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary"
+              />
+            )}
           </nav>
         </SheetContent>
       </Sheet>
