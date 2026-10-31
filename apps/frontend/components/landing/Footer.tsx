@@ -9,8 +9,8 @@ const platformLinks = [
 ];
 
 const legalLinks = [
-  { label: 'Politica de Privacidad', href: '#' },
-  { label: 'Terminos de Servicio', href: '#' },
+  { label: 'Política de Privacidad', href: '#' },
+  { label: 'Términos de Servicio', href: '#' },
 ];
 
 export default function Footer() {
@@ -21,7 +21,7 @@ export default function Footer() {
           <Image src={logoLight} alt="UVGenius" className="h-15 w-auto brightness-0 dark:hidden" />
           <Image src={logoDark} alt="UVGenius" className="h-15 w-auto hidden dark:block" />
           <p className="text-sm text-slate-500">
-            Impulsando la excelencia academica y el compromiso social de la Universidad del
+            Impulsando la excelencia académica y el compromiso social de la Universidad del
             Valle de Guatemala.
           </p>
         </div>

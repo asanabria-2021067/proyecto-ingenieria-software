@@ -122,7 +122,7 @@ describe('T-221: useLogin', () => {
   // correos registrados. Solo 429 (limite de intentos) tiene mensaje propio.
   it.each([401, 500])('%i → mensaje neutro, nunca el detalle del backend', (statusCode) => {
     const error = Object.assign(new Error('Internal server error: constraint failed'), { statusCode });
-    expect(mensajeErrorLogin(error)).toBe('No se pudo iniciar sesion. Verifica tu correo y contraseña.');
+    expect(mensajeErrorLogin(error)).toBe('No se pudo iniciar sesión. Verifica tu correo y contraseña.');
   });
 
   it('429 → aviso de limite de intentos, no el mensaje de credenciales', () => {

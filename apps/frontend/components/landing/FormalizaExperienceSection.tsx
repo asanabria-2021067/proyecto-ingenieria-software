@@ -38,7 +38,7 @@ const bullets = [
   {
     icon: CheckCircle2,
     title: "Resultados medibles",
-    text: "Toda colaboracion queda registrada y verificable.",
+    text: "Toda colaboración queda registrada y verificable.",
   },
 ];
 

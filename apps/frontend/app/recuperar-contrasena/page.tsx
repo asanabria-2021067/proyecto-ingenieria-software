@@ -53,7 +53,7 @@ export default function RecuperarContrasenaPage() {
             Recupera tu acceso
           </h2>
           <p className="text-lg font-medium text-white/90 drop-shadow-md">
-            Te enviaremos un enlace para restablecer tu contrasena de forma segura.
+            Te enviaremos un enlace para restablecer tu contraseña de forma segura.
           </p>
         </div>
       </div>
@@ -75,7 +75,7 @@ export default function RecuperarContrasenaPage() {
             <div className="mb-10 text-left">
               <Image src={logo} alt="UVGENIUS" className="h-40 w-auto mx-auto mb-4" />
               <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
-                Recuperar contrasena
+                Recuperar contraseña
               </h1>
               <p className="mt-2 text-base text-tertiary">
                 Ingresa tu carné y tu correo institucional. Un administrador revisará tu
@@ -124,7 +124,7 @@ export default function RecuperarContrasenaPage() {
                   disabled={enviando}
                   className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary dark:hover:bg-[#153e26] active:scale-[0.98] disabled:opacity-60"
                 >
-                  {enviando ? 'Enviando...' : 'Enviar solicitud de recuperacion'}
+                  {enviando ? 'Enviando...' : 'Enviar solicitud de recuperación'}
                 </button>
               </form>
             ) : (
@@ -151,9 +151,9 @@ export default function RecuperarContrasenaPage() {
             )}
 
             <p className="mt-10 text-center text-xs text-tertiary">
-              Recordaste tu contrasena?{' '}
+              ¿Recordaste tu contraseña?{' '}
               <Link href="/login" className="font-bold text-primary hover:underline">
-                Inicia sesion
+                Inicia sesión
               </Link>
             </p>
           </div>

@@ -297,7 +297,7 @@ describeIntegration('verificación de cuentas — contrato HTTP (PostgreSQL real
     const login = await post('/auth/login', { correo: porRechazar().correo, contrasena: CONTRASENA });
     expect(login.status).toBe(401);
     expect(login.headers.getSetCookie()).toEqual([]);
-    expect(await mensajeDe(login)).toBe('Credenciales invalidas');
+    expect(await mensajeDe(login)).toBe('Credenciales inválidas');
 
     expect((await patch(`/admin/cuentas-pendientes/${ids.porRechazar}/rechazar`, tokens.admin)).status).toBe(409);
     expect((await patch(`/admin/cuentas-pendientes/${ids.porRechazar}/aprobar`, tokens.admin)).status).toBe(409);

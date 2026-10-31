@@ -53,12 +53,12 @@ beforeEach(() => {
 describe('ChatsArchivadosPage', () => {
   it('muestra el estado vacío cuando no hay chats archivados', async () => {
     await renderPage();
-    expect(await screen.findByText('Todavía no tenés chats archivados')).toBeInTheDocument();
+    expect(await screen.findByText('Todavía no tienes chats archivados')).toBeInTheDocument();
   });
 
   it('el estado vacío es una tarjeta blanca (como Mis Postulaciones) con un icono pequeño y neutro', async () => {
     await renderPage();
-    const titulo = await screen.findByText('Todavía no tenés chats archivados');
+    const titulo = await screen.findByText('Todavía no tienes chats archivados');
     const vacio = titulo.closest('[data-slot="empty"]') as HTMLElement;
     expect(vacio).toHaveClass('bg-surface-container-lowest', 'rounded-2xl', 'shadow-sm');
     expect(vacio).not.toHaveClass('border-dashed', 'bg-surface-container-low');

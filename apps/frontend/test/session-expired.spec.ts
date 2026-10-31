@@ -97,7 +97,7 @@ describe('T-221: sesión vencida', () => {
 
   it('401 en /auth/* (credenciales inválidas) → no es sesión vencida', async () => {
     simularUbicacion('/dashboard');
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(respuesta(401, { message: 'Credenciales invalidas' }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(respuesta(401, { message: 'Credenciales inválidas' }));
 
     await apiFetch('/auth/login', { method: 'POST' }).catch(() => {});
 
@@ -191,7 +191,7 @@ describe('T-221: registro técnico del error original', () => {
 
   it('no registra el cuerpo de la petición, headers ni la query string', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      respuesta(401, { statusCode: 401, message: 'Credenciales invalidas' }),
+      respuesta(401, { statusCode: 401, message: 'Credenciales inválidas' }),
     );
 
     await apiFetch('/auth/login?correo=ana@uvg.edu.gt', {

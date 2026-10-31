@@ -380,7 +380,7 @@ export function GlobalSearchInput({
             })}
           </div>
 
-          <div id={listboxId} role="listbox" aria-label="Resultados de busqueda" className="max-h-[26rem] overflow-y-auto">
+          <div id={listboxId} role="listbox" aria-label="Resultados de búsqueda" className="max-h-[26rem] overflow-y-auto">
             {sinResultadosTodavia && (
               <div className="px-card py-card text-center" role="status">
                 <p className="text-sm font-semibold text-text-primary">Sin coincidencias</p>
