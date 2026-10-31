@@ -1,12 +1,12 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { EstadoAmistad } from '@prisma/client';
+import { EstadoAmistad, Prisma } from '@prisma/client';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { NotificationsService } from '../src/notifications/notifications.service';
 import { FILTRO_DIRECTORIO, SocialService } from '../src/social/social.service';
 
 function makePrisma() {
-  return {
+  const prisma = {
     amistad: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
@@ -37,7 +37,10 @@ function makePrisma() {
     },
     insignia: { findMany: vi.fn().mockResolvedValue([]) },
     $queryRaw: vi.fn().mockResolvedValue([]),
+    $transaction: vi.fn(),
   };
+  prisma.$transaction.mockImplementation(async (fn: (tx: typeof prisma) => unknown) => fn(prisma));
+  return prisma;
 }
 
 function makeService(prisma: ReturnType<typeof makePrisma>) {
@@ -56,6 +59,19 @@ describe('SocialService — amistades', () => {
 
     await expect(service.crearSolicitudAmistad(1, 1)).rejects.toThrow(BadRequestException);
     expect(prisma.amistad.create).not.toHaveBeenCalled();
+  });
+
+  it('RTF-3.2: convierte el P2002 del indice del par no ordenado en 409 y no notifica', async () => {
+    const prisma = makePrisma();
+    prisma.amistad.findUnique.mockResolvedValue(null);
+    prisma.amistad.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('unique', { code: 'P2002', clientVersion: 'test' }),
+    );
+    const { service, notifications } = makeService(prisma);
+
+    await expect(service.crearSolicitudAmistad(1, 2)).rejects.toThrow(ConflictException);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
   });
 
   it('rechaza una solicitud duplicada en el mismo sentido', async () => {

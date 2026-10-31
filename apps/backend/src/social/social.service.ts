@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoAmistad, EstadoProyecto, EstadoUsuario, Prisma } from '@prisma/client';
+import { Amistad, EstadoAmistad, EstadoProyecto, EstadoUsuario, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { listarInsigniasUsuario } from '../insignias/insignias.service';
@@ -58,50 +58,66 @@ export class SocialService {
     }
     await this.assertVisibleEnElDirectorio(idReceptor);
 
-    const [directa, inversa] = await Promise.all([
-      this.prisma.amistad.findUnique({
-        where: { idUsuarioSolicitante_idUsuarioReceptor: { idUsuarioSolicitante: idUsuario, idUsuarioReceptor: idReceptor } },
-      }),
-      this.prisma.amistad.findUnique({
-        where: { idUsuarioSolicitante_idUsuarioReceptor: { idUsuarioSolicitante: idReceptor, idUsuarioReceptor: idUsuario } },
-      }),
-    ]);
+    // RTF-3.2: verificacion + escritura en una transaccion; el indice unico del
+    // par no ordenado (migracion amistad_par_no_ordenado_unico) cierra la carrera
+    // entre dos solicitudes cruzadas simultaneas (la perdedora recibe 409).
+    let resultado: { amistad: Amistad; aceptadaDeId: number | null };
+    try {
+      resultado = await this.prisma.$transaction(async (tx) => {
+        const [directa, inversa] = await Promise.all([
+          tx.amistad.findUnique({
+            where: { idUsuarioSolicitante_idUsuarioReceptor: { idUsuarioSolicitante: idUsuario, idUsuarioReceptor: idReceptor } },
+          }),
+          tx.amistad.findUnique({
+            where: { idUsuarioSolicitante_idUsuarioReceptor: { idUsuarioSolicitante: idReceptor, idUsuarioReceptor: idUsuario } },
+          }),
+        ]);
 
-    if (directa) {
-      throw new ConflictException('Ya existe una solicitud o amistad con este usuario');
-    }
+        if (directa) {
+          throw new ConflictException('Ya existe una solicitud o amistad con este usuario');
+        }
 
-    if (inversa) {
-      if (inversa.estado !== EstadoAmistad.PENDIENTE) {
+        if (inversa) {
+          if (inversa.estado !== EstadoAmistad.PENDIENTE) {
+            throw new ConflictException('Ya existe una solicitud o amistad con este usuario');
+          }
+          const aceptada = await tx.amistad.update({
+            where: { idAmistad: inversa.idAmistad },
+            data: { estado: EstadoAmistad.ACEPTADA, fechaResolucion: new Date() },
+          });
+          return { amistad: aceptada, aceptadaDeId: inversa.idUsuarioSolicitante };
+        }
+
+        const creada = await tx.amistad.create({
+          data: { idUsuarioSolicitante: idUsuario, idUsuarioReceptor: idReceptor },
+        });
+        return { amistad: creada, aceptadaDeId: null };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException('Ya existe una solicitud o amistad con este usuario');
       }
-      const aceptada = await this.prisma.amistad.update({
-        where: { idAmistad: inversa.idAmistad },
-        data: { estado: EstadoAmistad.ACEPTADA, fechaResolucion: new Date() },
-      });
-      const actor = await this.prisma.usuario.findUniqueOrThrow({
-        where: { idUsuario },
-        select: { nombre: true, apellido: true },
-      });
-      await this.notifications.notifyFromTemplate([inversa.idUsuarioSolicitante], 'AMISTAD_ACEPTADA', {
-        userName: `${actor.nombre} ${actor.apellido}`,
-        idAmistad: aceptada.idAmistad,
-      });
-      return aceptada;
+      throw error;
     }
 
-    const solicitud = await this.prisma.amistad.create({
-      data: { idUsuarioSolicitante: idUsuario, idUsuarioReceptor: idReceptor },
-    });
     const actor = await this.prisma.usuario.findUniqueOrThrow({
       where: { idUsuario },
       select: { nombre: true, apellido: true },
     });
-    await this.notifications.notifyFromTemplate([idReceptor], 'SOLICITUD_AMISTAD', {
-      userName: `${actor.nombre} ${actor.apellido}`,
-      idAmistad: solicitud.idAmistad,
-    });
-    return solicitud;
+    const userName = `${actor.nombre} ${actor.apellido}`;
+    const { amistad, aceptadaDeId } = resultado;
+    if (aceptadaDeId !== null) {
+      await this.notifications.notifyFromTemplate([aceptadaDeId], 'AMISTAD_ACEPTADA', {
+        userName,
+        idAmistad: amistad.idAmistad,
+      });
+    } else {
+      await this.notifications.notifyFromTemplate([idReceptor], 'SOLICITUD_AMISTAD', {
+        userName,
+        idAmistad: amistad.idAmistad,
+      });
+    }
+    return amistad;
   }
 
   async resolverSolicitudAmistad(idUsuario: number, idAmistad: number, accion: 'aceptar' | 'rechazar') {

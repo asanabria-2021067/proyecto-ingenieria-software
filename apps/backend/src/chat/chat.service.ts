@@ -589,29 +589,33 @@ export class ChatService {
       };
     }
 
+    // RTF-3.4: mensaje + ultimaLecturaEn atomicos; la difusion por socket solo
+    // ocurre despues del commit. Si la transaccion falla, se borra el adjunto ya subido.
     let mensaje;
     try {
       mensaje = conResumenDeCita(
-        await this.prisma.mensajeChat.create({
-          data: {
-            idConversacion,
-            idRemitente: userId,
-            contenido: contenido.trim(),
-            idMensajeCitado,
-            ...(adjunto ? { adjunto: { create: adjunto } } : {}),
-          },
-          select: MENSAJE_CON_CITA_SELECT,
+        await this.prisma.$transaction(async (tx) => {
+          const creado = await tx.mensajeChat.create({
+            data: {
+              idConversacion,
+              idRemitente: userId,
+              contenido: contenido.trim(),
+              idMensajeCitado,
+              ...(adjunto ? { adjunto: { create: adjunto } } : {}),
+            },
+            select: MENSAJE_CON_CITA_SELECT,
+          });
+          await tx.conversacionParticipante.update({
+            where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
+            data: { ultimaLecturaEn: creado.enviadoEn },
+          });
+          return creado;
         }),
       );
     } catch (error) {
       if (adjunto) await this.storage.destroy(adjunto.claveAlmacenamiento);
       throw error;
     }
-
-    await this.prisma.conversacionParticipante.update({
-      where: { idConversacion_idUsuario: { idConversacion, idUsuario: userId } },
-      data: { ultimaLecturaEn: mensaje.enviadoEn },
-    });
 
     const destinatarios = conversacion.participantes.map((p) => p.idUsuario).filter((id) => id !== userId);
     this.gateway.broadcastMessage(idConversacion, destinatarios, mensaje);
