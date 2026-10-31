@@ -307,7 +307,7 @@ function NewProjectFormContent() {
   if (proyectoExistente && !ALLOWED_EDIT_STATES.includes(proyectoExistente.estadoProyecto)) {
     return (
       <>
-        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px]" />
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="bg-surface rounded-2xl border border-outline-variant shadow-2xl px-12 py-10 text-tertiary text-sm">
             Redirigiendo...
@@ -322,7 +322,7 @@ function NewProjectFormContent() {
   if (esEdicionParcial) {
     return (
       <>
-        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px]" />
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-8">
           <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-2xl">
             <div className="px-8 pb-4 pt-8">
@@ -363,7 +363,7 @@ function NewProjectFormContent() {
   return (
     <>
       {/* Scrim */}
-      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
+      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px]" />
 
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4">
@@ -442,7 +442,7 @@ function NewProjectFormContent() {
 function FormularioSkeleton({ label }: { label: string }) {
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
+      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px]" />
       <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4">
         <SkeletonRegion
           label={label}

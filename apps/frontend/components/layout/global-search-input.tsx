@@ -245,7 +245,7 @@ export function GlobalSearchInput({
   const sinResultadosTodavia = !cargando && flat.length === 0;
 
   // El dropdown se porta a document.body (ver mas abajo): el header es un
-  // stacking context propio (z-30 dentro de un layout flex), asi que ningun
+  // stacking context propio (z-50 dentro de un layout flex), asi que ningun
   // z-index dentro de el puede ganarle a un overlay de body como el tour de
   // onboarding (react-joyride, zIndex 10000) por mas alto que sea el numero.
   // Al portarlo, hay que calcular su posicion a mano en vez de `absolute`.
@@ -338,7 +338,7 @@ export function GlobalSearchInput({
       </div>
 
       {/* Portado a document.body: un z-index dentro del header (stacking
-          context propio, z-30) nunca puede ganarle a un overlay montado en
+          context propio, z-50) nunca puede ganarle a un overlay montado en
           body como el tour de onboarding (react-joyride, zIndex 10000) sin
           importar el numero — solo escapando via portal compite de verdad
           por encima de el (T-231). La posicion se calcula a mano porque ya
