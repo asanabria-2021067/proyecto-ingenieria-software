@@ -13,7 +13,7 @@ function project(estadoProyecto: EstadoProyecto) {
 }
 
 // Solo ADMIN tiene fila de rol "administrador"; solo INTEGRANTE tiene participacion activa.
-function makeTx(sprintEstado: EstadoSprint | null) {
+function makeTx(sprintEstado: EstadoSprint | null, entidadEstado: EstadoSprint | null = sprintEstado) {
   return {
     usuarioRolAcceso: {
       findFirst: vi.fn(async ({ where }: { where: { idUsuario: number } }) =>
@@ -25,7 +25,7 @@ function makeTx(sprintEstado: EstadoSprint | null) {
     },
     sprint: {
       findFirst: vi.fn(async () => (sprintEstado ? { idSprint: 5, estado: sprintEstado } : null)),
-      findUnique: vi.fn(async () => (sprintEstado ? { estado: sprintEstado } : null)),
+      findUnique: vi.fn(async () => (entidadEstado ? { estado: entidadEstado } : null)),
     },
   };
 }
@@ -54,12 +54,12 @@ describe('ProjectPolicyService - AJUSTE_HORA exige lider', () => {
   });
 
   it('sprint de la entidad cerrado -> 409', async () => {
-    await expect(write(makeTx(EstadoSprint.CERRADO), p, 'AJUSTE_HORA' as never, LIDER, { sprintId: 5 } as never)).rejects.toBeInstanceOf(ConflictException);
+    await expect(write(makeTx(EstadoSprint.EN_FINALIZACION, EstadoSprint.CERRADO), p, 'AJUSTE_HORA' as never, LIDER, { sprintId: 5 } as never)).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('proyecto fuera de estado operativo -> 409 antes de evaluar actor', async () => {
     const tx = makeTx(EstadoSprint.EN_FINALIZACION);
-    await expect(write(tx, project(EstadoProyecto.CERRADO), 'AJUSTE_HORA' as never, LIDER)).rejects.toBeInstanceOf(ConflictException);
+    await expect(write(tx, project(EstadoProyecto.CERRADO), 'AJUSTE_HORA' as never, AJENO)).rejects.toBeInstanceOf(ConflictException);
   });
 });
 
