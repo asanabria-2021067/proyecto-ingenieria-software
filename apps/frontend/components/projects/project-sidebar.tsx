@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { MessageSquarePlus, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { NewChatDialog } from '@/components/chat-dock/new-chat-dialog';
+import { ChatEquipoButton } from '@/components/projects/navigation/chat-equipo-button';
 import { ProjectActionsMenu } from '@/components/projects/navigation/project-actions-menu';
 import { ProjectNavList } from '@/components/projects/navigation/project-nav-list';
 import {
@@ -21,6 +22,9 @@ interface ProjectSidebarProps {
 }
 
 const ACTOR_LABEL = { leader: 'Líder', participant: 'Participante' } as const;
+
+const ITEM_CHAT_CLASS =
+  'flex w-full items-center gap-2 rounded-control px-2 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary';
 
 const TOGGLE_CLASS =
   'flex size-8 shrink-0 items-center justify-center rounded-md text-text-secondary motion-icon hover:bg-on-surface/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
@@ -136,11 +140,16 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
         <ProjectNavList id={navId} groups={groups} activeHref={activeHref} variant={collapsed ? 'rail' : 'full'} />
       </nav>
 
-      {/* Los chats del proyecto viven en el dock global (esquina inferior
-          derecha, cualquier página del dashboard) — acá solo queda el
-          punto de entrada para iniciar uno nuevo. */}
+      {/* La lista de chats vive en el icono de la barra superior y las ventanas en el dock
+          global (cualquier página del dashboard). Aquí quedan los accesos propios del
+          proyecto: abrir el chat del equipo e iniciar un chat nuevo. */}
       {puedeChatear && (
-        <div className={collapsed ? 'flex justify-center border-t border-outline-variant py-inline' : 'border-t border-outline-variant px-inline py-inline'}>
+        <div className={collapsed ? 'flex flex-col items-center gap-micro border-t border-outline-variant py-inline' : 'border-t border-outline-variant px-inline py-inline'}>
+          <ChatEquipoButton
+            idProyecto={idProyecto}
+            variante={collapsed ? 'icono' : 'etiqueta'}
+            className={collapsed ? TOGGLE_CLASS : ITEM_CHAT_CLASS}
+          />
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -159,7 +168,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
             <button
               type="button"
               onClick={() => setNuevoChatAbierto(true)}
-              className="flex w-full items-center gap-2 rounded-control px-2 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary"
+              className={ITEM_CHAT_CLASS}
             >
               <MessageSquarePlus className="size-4" aria-hidden="true" />
               Nuevo chat del proyecto

@@ -60,9 +60,9 @@ test('no molestar por horario suprime el badge del dock y se puede desactivar', 
     await expect(dialogo).toBeHidden();
     await pageB.getByRole('button', { name: 'Cerrar chat' }).click();
 
-    // El dock indica el modo con icono y texto.
+    // El icono de la barra superior indica el modo en su nombre accesible (con el icono de campana tachada).
     const boton = pageB.getByRole('button', { name: /^mensajes/i });
-    await expect(boton).toContainText('No molestar');
+    await expect(boton).toHaveAccessibleName(/no molestar activo/);
 
     // A escribe a B: el boton de B no anuncia mensajes sin leer.
     const mensaje = `NoMolestar ${Math.random().toString(36).slice(2)}`;
@@ -83,7 +83,7 @@ test('no molestar por horario suprime el badge del dock y se puede desactivar', 
     await dialogo.getByLabel('Activar no molestar').click();
     await dialogo.getByRole('button', { name: 'Guardar' }).click();
     await expect(dialogo).toBeHidden();
-    await expect(boton).not.toContainText('No molestar');
+    await expect(boton).not.toHaveAccessibleName(/no molestar activo/);
   } finally {
     await contextA.close();
     await contextB.close();
