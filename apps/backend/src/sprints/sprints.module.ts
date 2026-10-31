@@ -30,7 +30,6 @@ import { ProjectPolicyModule } from '../common/project-policy/project-policy.mod
     SprintsContextService,
     SprintsAuthorizationService,
     SprintsService,
-    SprintsReadService,
     HoursRecognitionService,
     ProjectHoursSummaryService,
     SprintSnapshotsService,

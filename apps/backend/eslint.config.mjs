@@ -49,7 +49,8 @@ export default [
       'src/events/admin-meetings.service.ts',
       'src/comentarios/comentarios.service.ts',
       'src/leadership/leadership.service.ts',
-      // Specs y fixtures largos (un caso por it).
+      // PERMANENTE: los specs y fixtures de test/ siempre quedan en warn (un caso
+      // por it); este tramo no se retira al terminar la division de servicios.
       'test/**/*.ts',
     ],
     rules: {

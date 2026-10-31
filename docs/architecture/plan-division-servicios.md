@@ -60,7 +60,7 @@ Un servicio por PR, en el orden indicado, partiendo siempre de `develop`.
 
 ## 4. Criterio de salida
 
-- Ningun archivo de `src/` supera 800 lineas (la regla `max-lines` pasa a `error` para todos y se vacia el override de `eslint.config.mjs`).
+- Ningun archivo de `src/` supera 800 lineas (la regla `max-lines` pasa a `error` para todos y se vacia el override de archivos de `src` en `eslint.config.mjs`; el de `test/**` es permanente).
 - Cada servicio tiene un unico motivo de cambio (un caso de uso) y no mas de 6 dependencias de constructor.
 - Cero cambios de comportamiento por PR: las specs existentes de tasks, sprints y projects pasan sin modificar aserciones (solo providers/mocks del constructor), `tsc --noEmit -p tsconfig.build.json` y `npm run lint` sin errores.
 - La API HTTP no cambia (mismos DTOs y rutas); los metodos publicos usados por otros modulos mantienen firma o se migran en el mismo PR.
