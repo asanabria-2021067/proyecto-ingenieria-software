@@ -222,8 +222,8 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
     <ProjectPageShell>
       {/* encabezado fuera de las tarjetas; la vuelta lleva al Tablero, como el breadcrumb anterior */}
       <ProjectPageHeader
-        back={{ href: `/dashboard/projects/${idProyecto}/kanban`, label: 'Volver al Tablero' }}
-        title="Lista de tareas"
+        back={{ href: `/dashboard/projects/${idProyecto}/kanban`, label: 'Volver al Tablero (Kanban)' }}
+        title="Todas las tareas"
         description={
           isLeader
             ? 'Todas las tareas del proyecto. Selecciona varias para moverlas, asignarlas o etiquetarlas a la vez; para editar una tarea, abre el Kanban.'

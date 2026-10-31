@@ -295,8 +295,8 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           href: isLeader ? `/dashboard/projects/${idProyecto}` : `/dashboard/proyectos/${idProyecto}`,
           label: 'Volver al proyecto',
         }}
-        title="Tablero"
-        description="Workspace del proyecto"
+        title="Tablero (Kanban)"
+        description="Tus tareas y las del equipo por estado. Abre una tarjeta para cambiar su estado o registrar horas."
       />
 
       {/* TARJETA RESUMEN DEL PROYECTO (Secciones 10-15): contenido, no encabezado de página */}

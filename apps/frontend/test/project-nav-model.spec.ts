@@ -40,8 +40,8 @@ describe('buildProjectNavGroups', () => {
         id: 'trabajo',
         label: 'Trabajo',
         items: [
-          ['Tablero', '/dashboard/projects/42/kanban'],
-          ['Lista de tareas', '/dashboard/projects/42/tareas'],
+          ['Tablero (Kanban)', '/dashboard/projects/42/kanban'],
+          ['Todas las tareas', '/dashboard/projects/42/tareas'],
           ['Sprints', '/dashboard/proyectos/42/sprints'],
         ],
       },
@@ -87,8 +87,8 @@ describe('buildProjectNavGroups', () => {
         id: 'trabajo',
         label: 'Trabajo',
         items: [
-          ['Tablero', '/dashboard/projects/42/kanban'],
-          ['Lista de tareas', '/dashboard/projects/42/tareas'],
+          ['Tablero (Kanban)', '/dashboard/projects/42/kanban'],
+          ['Todas las tareas', '/dashboard/projects/42/tareas'],
         ],
       },
       {
@@ -217,8 +217,8 @@ describe('flattenNavItems', () => {
   it('conserva el orden de grupos e ítems', () => {
     expect(flattenNavItems(buildProjectNavGroups(ctx({ actor: 'participant' }))).map((i) => i.label)).toEqual([
       'Resumen',
-      'Tablero',
-      'Lista de tareas',
+      'Tablero (Kanban)',
+      'Todas las tareas',
       'Bitácora',
       'Analítica',
       'Asistencia',

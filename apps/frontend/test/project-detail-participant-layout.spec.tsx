@@ -238,7 +238,7 @@ describe('La salida se ofrece desde la navegación contextual', () => {
     const navegaciones = screen.getAllByRole('navigation', { name: 'Navegación del proyecto' });
     const nav = within(navegaciones[0]);
     expect(nav.getByRole('link', { name: 'Resumen' })).toHaveAttribute('href', '/dashboard/proyectos/55');
-    expect(nav.getByRole('link', { name: 'Tablero' })).toHaveAttribute('href', '/dashboard/projects/55/kanban');
+    expect(nav.getByRole('link', { name: 'Tablero (Kanban)' })).toHaveAttribute('href', '/dashboard/projects/55/kanban');
     expect(screen.getByRole('button', { name: 'Secciones' })).toBeInTheDocument();
   });
 });
