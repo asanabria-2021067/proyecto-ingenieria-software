@@ -1,0 +1,20 @@
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  titulo-con-ticket:
+    # develop -> main queda excluido
+    if: github.base_ref != 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar ticket en el titulo
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if ! printf '%s' "$TITLE" | grep -Eq '(^|[^A-Za-z])(IESUC|HU|T|RTF|NL)-[0-9A-Za-z.]+'; then
+            echo "::error::El titulo del PR debe contener IESUC-, HU-, T-, RTF- o NL- (ej: IESUC-123)"
+            exit 1
+          fi

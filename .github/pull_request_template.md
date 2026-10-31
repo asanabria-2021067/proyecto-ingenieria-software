@@ -2,6 +2,10 @@
 
 <!-- Breve descripcion de los cambios realizados -->
 
+## Ticket o HU relacionado (IESUC-..., HU-..., T-...)
+
+<!-- Ej: IESUC-123, HU-45, T-12 -->
+
 ## Tipo de cambio
 
 - [ ] Nueva funcionalidad (feature)
