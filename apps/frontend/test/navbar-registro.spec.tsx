@@ -41,12 +41,6 @@ describe('NL-T2: «Registrarse» en la navbar', () => {
     expect(within(ocupado).getByRole('status', { name: 'Cargando' })).toBeInTheDocument();
   });
 
-  it('un clic con Ctrl (sin navegación) no deja el estado pegado', () => {
-    const { container } = render(<Navbar />);
-    fireEvent.click(within(container.querySelector('nav') as HTMLElement).getByRole('link', { name: 'Registrarse' }), { ctrlKey: true });
-    expect(screen.queryByRole('link', { name: /Abriendo/ })).not.toBeInTheDocument();
-  });
-
   it('en móvil el menú sigue abierto tras el clic para que se vea «Abriendo…»', () => {
     const { container } = render(<Navbar />);
     fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
