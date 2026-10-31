@@ -29,12 +29,14 @@ vi.mock('@/components/profile/CompleteProfileDialog', () => ({
       </div>
     ) : null,
 }));
+const perfil = vi.hoisted(() => ({ incompleto: true }));
+
 vi.mock('@/hooks/use-current-user', () => {
   const KEY = 'perfil_asistente_pospuesto';
   return {
     PERFIL_POSPUESTO_KEY: KEY,
     perfilPospuesto: (id: number) => sessionStorage.getItem(KEY) === String(id),
-    isProfileIncomplete: () => true,
+    isProfileIncomplete: () => perfil.incompleto,
     useCurrentUser: () => ({
       data: {
         idUsuario: 7,
@@ -77,7 +79,10 @@ async function renderDashboard() {
   );
 }
 
-beforeEach(() => sessionStorage.clear());
+beforeEach(() => {
+  sessionStorage.clear();
+  perfil.incompleto = true;
+});
 afterEach(() => cleanup());
 
 describe('Dashboard - asistente de perfil aplazado', () => {
@@ -96,6 +101,20 @@ describe('Dashboard - asistente de perfil aplazado', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.queryByText(/Tu perfil está al/)).toBeNull();
     window.removeEventListener('perfil-asistente-pospuesto', onEvento);
+  });
+
+  it('con isProfileIncomplete en false (hay biografía) y perfil aplazado, "Completar perfil" igual abre el diálogo', async () => {
+    perfil.incompleto = false;
+    sessionStorage.setItem('perfil_asistente_pospuesto', '7');
+    await renderDashboard();
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Completar perfil' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hacerlo después' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByText('Tu perfil está al 17%')).toBeInTheDocument();
   });
 
   it('el aplazamiento de otro usuario en la misma pestaña no aplica', async () => {

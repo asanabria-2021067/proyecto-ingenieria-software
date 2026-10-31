@@ -333,14 +333,18 @@ export default function DashboardPage() {
   const { data: user, isLoading: userLoading } = useCurrentUser();
   const [wizardDismissed, setWizardDismissed] = useState(false);
   const [deferredNow, setDeferredNow] = useState(false);
+  const [wizardReopened, setWizardReopened] = useState(false);
   // Aplazado en esta pestaña por el usuario actual (sobrevive a recargas, no a otras cuentas).
   const wizardDeferred = deferredNow || (!!user && perfilPospuesto(user.idUsuario));
   const [projectTab, setProjectTab] = useState<'destacados' | 'disponibles'>(
     'destacados',
   );
   const showWizard = useMemo(
-    () => !wizardDismissed && !wizardDeferred && !!user && isProfileIncomplete(user),
-    [wizardDismissed, wizardDeferred, user],
+    () =>
+      !wizardDismissed &&
+      !!user &&
+      (wizardReopened || (!wizardDeferred && isProfileIncomplete(user))),
+    [wizardDismissed, wizardDeferred, wizardReopened, user],
   );
   const profilePercent = user && wizardDeferred ? profileCompletionPercent(user) : 100;
   const showProfileCard = wizardDeferred && !wizardDismissed && profilePercent < 100;
@@ -414,6 +418,7 @@ export default function DashboardPage() {
             if (user) sessionStorage.setItem(PERFIL_POSPUESTO_KEY, String(user.idUsuario));
           } catch {}
           setDeferredNow(true);
+          setWizardReopened(false);
           window.dispatchEvent(new Event('perfil-asistente-pospuesto'));
         }}
         onComplete={async () => {
@@ -435,6 +440,7 @@ export default function DashboardPage() {
                 sessionStorage.removeItem(PERFIL_POSPUESTO_KEY);
               } catch {}
               setDeferredNow(false);
+              setWizardReopened(true);
             }}
           />
         )}
