@@ -55,16 +55,16 @@ export default function ProyectosPage() {
 function ProyectosContenido() {
   const qParam = useSearchParams()?.get('q') ?? '';
   const [busqueda, setBusquedaLocal] = useState(qParam);
-  // Al vaciar el texto se quita `q` de la URL: así volver a buscar el mismo texto desde la barra sí cambia la URL y se reaplica.
+  // Cualquier cambio del texto quita `q` de la URL: el backend deja de filtrar por el texto viejo y repetir la búsqueda desde la barra se reaplica.
   const setBusqueda = (valor: string) => {
     setBusquedaLocal(valor);
-    if (!valor && qParam) window.history.replaceState(null, '', window.location.pathname);
+    if (qParam && valor !== qParam) window.history.replaceState(null, '', window.location.pathname);
   };
   // El buscador de la barra superior puede llegar aquí con otro texto estando ya en Explorar.
   const [ultimoQ, setUltimoQ] = useState(qParam);
   if (ultimoQ !== qParam) {
     setUltimoQ(qParam);
-    setBusquedaLocal(qParam);
+    if (qParam) setBusquedaLocal(qParam);
   }
   const [soloVacantes, setSoloVacantes] = useState(false);
   const [soloMiCarrera, setSoloMiCarrera] = useState(false);
@@ -242,7 +242,7 @@ function ProyectosContenido() {
               <button type="button" onClick={() => setSoloVacantes((v) => !v)} aria-pressed={soloVacantes} className={chipClase(soloVacantes)}>
                 Con vacantes
               </button>
-              {hayMiCarrera && (
+              {(hayMiCarrera || soloMiCarrera) && (
                 <button type="button" onClick={() => setSoloMiCarrera((v) => !v)} aria-pressed={soloMiCarrera} className={chipClase(soloMiCarrera)}>
                   De tu carrera
                 </button>

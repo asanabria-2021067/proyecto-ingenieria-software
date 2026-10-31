@@ -91,11 +91,13 @@ describe('Explorar: filtros visibles', () => {
     expect(apiFetchMock).toHaveBeenCalledWith('/proyectos?q=huerto');
   });
 
-  it('al vaciar el texto quita q de la URL para que volver a buscar lo mismo se reaplique', async () => {
+  it('al reescribir el texto quita q de la URL y conserva lo escrito', async () => {
     const replace = vi.spyOn(window.history, 'replaceState');
     await renderPage('huerto');
-    fireEvent.change(screen.getByRole('textbox', { name: /Buscar proyectos/ }), { target: { value: '' } });
+    const campo = screen.getByRole('textbox', { name: /Buscar proyectos/ });
+    fireEvent.change(campo, { target: { value: 'tutor' } });
     expect(replace).toHaveBeenCalledWith(null, '', window.location.pathname);
+    expect(campo).toHaveValue('tutor');
     replace.mockRestore();
   });
 });
