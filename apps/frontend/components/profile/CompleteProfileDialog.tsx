@@ -440,7 +440,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-widest text-tertiary">
-                Biografia
+                Biografía
               </label>
               <textarea
                 value={biografia}
@@ -587,7 +587,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                           }
                           className="rounded-lg border border-outline-variant bg-white px-1 py-0.5 text-[10px] text-on-surface"
                         >
-                          <option value="BASICO">Basico</option>
+                          <option value="BASICO">Básico</option>
                           <option value="INTERMEDIO">Intermedio</option>
                           <option value="AVANZADO">Avanzado</option>
                         </select>

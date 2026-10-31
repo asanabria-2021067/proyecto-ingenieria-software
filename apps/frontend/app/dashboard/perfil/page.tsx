@@ -44,7 +44,7 @@ function progreso(actual: number, requerido: number | null) {
 function nivelLabel(nivel: string) {
   if (nivel === 'AVANZADO') return 'Avanzado';
   if (nivel === 'INTERMEDIO') return 'Intermedio';
-  return 'Basico';
+  return 'Básico';
 }
 
 function experienciaLabel(tipo: string) {
@@ -316,7 +316,7 @@ export default function PerfilPage() {
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div className="md:col-span-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-outline mb-3">
-                      Biografia
+                      Biografía
                     </p>
                     <p className="w-[45ch] max-w-full whitespace-normal wrap-break-word text-sm leading-relaxed text-on-surface-variant">
                       {user?.perfil?.biografia || 'No has agregado biografía.'}

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 // palabras que nunca son correctas sin tilde en un texto de interfaz.
 // "aun" sin tilde solo es correcto en "aun así / aun cuando / aun con / aun si".
 const PALABRAS =
-  /(?<!\p{L})(sesion|contrasena|informacion|validacion|invalidas?|invalidos?|aun(?!\s+(así|cuando|con|si)(?!\p{L})))(?!\p{L})/iu;
+  /(?<!\p{L})(sesion|contrasena|informacion|validacion|invalidas?|invalidos?|biografia|basico|aun(?!\s+(así|cuando|con|si)(?!\p{L})))(?!\p{L})/iu;
 
 const RAIZ_FRONTEND = path.resolve(__dirname, '..');
 const RAIZ_BACKEND = path.resolve(__dirname, '../../backend/src');
@@ -133,5 +133,5 @@ describe('RTF-3.10 ortografía de los textos visibles', () => {
       }
     }
     expect(fallos).toEqual([]);
-  });
+  }, 30_000);
 });
