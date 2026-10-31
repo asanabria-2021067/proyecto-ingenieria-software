@@ -169,7 +169,7 @@ export class AuthService {
       if (!bloqueada && pendiente) {
         throw new ForbiddenException(MENSAJE_CUENTA_PENDIENTE);
       }
-      throw new UnauthorizedException("Credenciales invalidas");
+      throw new UnauthorizedException("Credenciales inválidas");
     }
 
     this.attempts.recordSuccess(cuenta);

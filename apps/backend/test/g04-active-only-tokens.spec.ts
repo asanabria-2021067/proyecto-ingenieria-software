@@ -69,7 +69,7 @@ describe('G04-C03: tokens solo para usuarios ACTIVO', () => {
     const { service, prisma } = makeService(estado);
 
     await expect(service.login({ correo: 'a@uvg.edu.gt', contrasena: PASSWORD })).rejects.toThrow(
-      new UnauthorizedException('Credenciales invalidas'),
+      new UnauthorizedException('Credenciales inválidas'),
     );
     expect(prisma.tokenRefresco.create).not.toHaveBeenCalled();
     expect(prisma.usuario.update).not.toHaveBeenCalled();

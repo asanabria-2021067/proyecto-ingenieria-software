@@ -120,8 +120,8 @@ describe('T-221: traducción de errores del backend', () => {
   });
 
   it('401 en login (scope auth) → credenciales, no sesión vencida', async () => {
-    const error = await errorDelBackend(401, { statusCode: 401, message: 'Credenciales invalidas' }, '/auth/login');
-    expect(getApiErrorMessage(error, 'auth')).toBe('Credenciales invalidas');
+    const error = await errorDelBackend(401, { statusCode: 401, message: 'Credenciales inválidas' }, '/auth/login');
+    expect(getApiErrorMessage(error, 'auth')).toBe('Credenciales inválidas');
   });
 
   it('500 → mensaje genérico, nunca el código ni el texto técnico', async () => {
