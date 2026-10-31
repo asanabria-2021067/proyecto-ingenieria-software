@@ -98,7 +98,7 @@ export default function ChatsArchivadosPage() {
             </EmptyTitle>
             <EmptyDescription>
               {q.trim()
-                ? 'Probá con otro nombre de chat o de persona.'
+                ? 'Prueba con otro nombre de chat o de persona.'
                 : 'Cuando un proyecto cierre, su chat aparece acá en solo lectura.'}
             </EmptyDescription>
           </EmptyHeader>

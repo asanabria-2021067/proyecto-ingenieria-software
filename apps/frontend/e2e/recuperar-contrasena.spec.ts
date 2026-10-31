@@ -23,7 +23,7 @@ test('un usuario puede solicitar la recuperación de su contraseña desde el log
 
   await page.getByPlaceholder('21000').fill(CARNE);
   await page.getByPlaceholder('usuario@uvg.edu.gt').fill(CORREO);
-  await page.getByRole('button', { name: 'Enviar solicitud de recuperacion' }).click();
+  await page.getByRole('button', { name: 'Enviar solicitud de recuperación' }).click();
 
   await expect(page.getByText('Solicitud registrada')).toBeVisible();
 });

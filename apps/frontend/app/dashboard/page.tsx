@@ -501,7 +501,7 @@ export default function DashboardPage() {
               <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-sage-kpi-border bg-sage-kpi p-stack">
                 <div className="flex items-start justify-between gap-tight">
                   <span className="type-meta uppercase tracking-wider text-sage-ink-muted">
-                    Horas de Extension
+                    Horas de Extensión
                   </span>
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-sage-open text-sage-accent">
                     <HeartHandshake className="h-4 w-4" />

@@ -302,7 +302,7 @@ describe('CompleteProfileDialog (T-203)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Agregar otra/i }));
     fireEvent.click(screen.getByRole('button', { name: /Agregar otra/i }));
-    const titulos = screen.getAllByPlaceholderText('Titulo del proyecto');
+    const titulos = screen.getAllByPlaceholderText('Título del proyecto');
     expect(titulos).toHaveLength(2);
     fireEvent.change(titulos[0], { target: { value: 'UVG Collab' } });
 

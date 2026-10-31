@@ -140,7 +140,7 @@ test.describe('GPI01-C16: tiempo real entre cuentas', () => {
 
       // Leer todas: el estado se sincroniza entre la interfaz y la base.
       await asignada.page.getByRole('button', { name: /notificaciones/i }).first().click();
-      await asignada.page.getByRole('button', { name: 'Marcar todas las notificaciones como leidas' }).click();
+      await asignada.page.getByRole('button', { name: 'Marcar todas las notificaciones como leídas' }).click();
       await expect.poll(() => noLeidas(asignada.page)).toBe(0);
       await asignada.page.reload();
       await expect(asignada.page.getByRole('heading', { level: 1 }).first()).toBeVisible();

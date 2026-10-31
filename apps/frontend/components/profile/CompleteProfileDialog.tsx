@@ -790,7 +790,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                   </div>
                   <input
                     type="text"
-                    placeholder="Titulo del proyecto"
+                    placeholder="Título del proyecto"
                     value={exp.tituloProyectoExperiencia}
                     onChange={(e) => updateExp(idx, 'tituloProyectoExperiencia', e.target.value)}
                     className={inputClass}

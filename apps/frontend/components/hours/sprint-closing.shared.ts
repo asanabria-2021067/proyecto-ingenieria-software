@@ -59,7 +59,7 @@ export function useSprintClosingAdjustments(idProyecto: number, idSprint: number
       setGlobalError({
         message: isProyectoOcupado(err)
           ? 'El proyecto está ocupado por otra operación. Actualiza e inténtalo de nuevo.'
-          : 'El resumen cambio mientras trabajabas. Actualiza para ver el estado actual.',
+          : 'El resumen cambió mientras trabajabas. Actualiza para ver el estado actual.',
         conflict: true,
       });
       return;

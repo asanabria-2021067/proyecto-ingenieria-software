@@ -151,7 +151,7 @@ test.describe('HU-204: estados de carga del estudiante', () => {
       await sinSkeleton(page, 'Cargando proyectos');
       const filtrada = await retener(page, new RegExp(`/api/proyectos\\?organizacionId=${organizacion.idOrganizacion}`));
 
-      await page.getByRole('combobox', { name: 'Filtrar proyectos por organizacion' }).click();
+      await page.getByRole('combobox', { name: 'Filtrar proyectos por organización' }).click();
       await page.getByRole('option', { name: organizacion.nombreOrganizacion }).click();
       await filtrada.pedida;
       await esperarSkeleton(page, 'Cargando proyectos');
@@ -175,14 +175,14 @@ test.describe('HU-204: estados de carga del estudiante', () => {
       if (reales.length > 0) {
         await expect(page.getByRole('heading', { level: 2, name: reales[0].rolProyecto.nombreRol }).first()).toBeVisible();
       } else {
-        await expect(page.getByText('Encuentra tu siguiente colaboracion')).toBeVisible();
+        await expect(page.getByText('Encuentra tu siguiente colaboración')).toBeVisible();
       }
     });
 
     test('vacío y error se distinguen de la carga', async ({ page }) => {
       await responder(page, /\/api\/postulaciones\/mis-postulaciones/, 200, []);
       await page.goto('/dashboard/mis-postulaciones');
-      await expect(page.getByText('Encuentra tu siguiente colaboracion')).toBeVisible();
+      await expect(page.getByText('Encuentra tu siguiente colaboración')).toBeVisible();
       await sinSkeleton(page, 'Cargando tus postulaciones');
 
       await page.unrouteAll();

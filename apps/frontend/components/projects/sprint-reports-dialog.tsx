@@ -59,7 +59,7 @@ export interface SprintReportsDialogProps {
 }
 
 /**
- * "Mas informes" al estilo Jira: un catalogo de graficas de analitica de
+ * "Más informes" al estilo Jira: un catalogo de graficas de analitica de
  * Sprint. Burndown y Velocidad son reales y enlazan a su pagina dedicada;
  * el resto necesitaria metricas que hoy no registramos (flujo acumulado,
  * duracion de ciclo, frecuencia de cierre) y se muestran como Proximamente

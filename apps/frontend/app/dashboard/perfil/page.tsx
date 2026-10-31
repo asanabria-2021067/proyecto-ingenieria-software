@@ -457,7 +457,7 @@ export default function PerfilPage() {
                         <XCircle className="h-4 w-4 text-outline shrink-0" />
                       )}
                       <span className="text-sm font-medium text-on-surface">
-                        Gestion de usuarios
+                        Gestión de usuarios
                       </span>
                     </div>
                     <div
@@ -473,7 +473,7 @@ export default function PerfilPage() {
                         <XCircle className="h-4 w-4 text-outline shrink-0" />
                       )}
                       <span className="text-sm font-medium text-on-surface">
-                        Revision de proyectos
+                        Revisión de proyectos
                       </span>
                     </div>
                   </div>
