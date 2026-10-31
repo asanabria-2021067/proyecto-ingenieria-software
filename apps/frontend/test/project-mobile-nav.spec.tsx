@@ -111,7 +111,7 @@ describe('ProjectMobileNav', () => {
     const sheet = abrirSecciones();
     expect(within(sheet).getByRole('group', { name: 'Trabajo' })).toBeInTheDocument();
     expect(within(sheet).getByText('Líder')).toHaveClass('pill');
-    expect(within(sheet).getByRole('link', { name: 'Tablero' })).toHaveAttribute('aria-current', 'page');
+    expect(within(sheet).getByRole('link', { name: 'Tablero (Kanban)' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('elegir un destino cierra el Sheet', async () => {

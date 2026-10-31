@@ -239,7 +239,7 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     expect(screen.getByRole('tab', { name: 'Tablero' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Hitos' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Proyecto de prueba' })).toBeInTheDocument();
-    expect(screen.getByText('Workspace del proyecto')).toBeInTheDocument();
+    expect(screen.getByText('Tus tareas y las del equipo por estado. Abre una tarjeta para cambiar su estado o registrar horas.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /volver al proyecto/i })).toHaveAttribute(
       'href',
       '/dashboard/projects/42',
@@ -252,9 +252,9 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
 
     renderWorkspace();
 
-    const titulo = screen.getByRole('heading', { level: 1, name: 'Tablero' });
+    const titulo = screen.getByRole('heading', { level: 1, name: 'Tablero (Kanban)' });
     expect(titulo.closest('[data-slot="project-page-header"]')).not.toBeNull();
-    expect(screen.getByText('Workspace del proyecto').closest('[data-slot="project-page-header"]')).not.toBeNull();
+    expect(screen.getByText('Tus tareas y las del equipo por estado. Abre una tarjeta para cambiar su estado o registrar horas.').closest('[data-slot="project-page-header"]')).not.toBeNull();
     // el nombre del proyecto es contenido de la tarjeta resumen, no el título de la página
     expect(screen.getByRole('heading', { level: 2, name: 'Proyecto de prueba' })).toBeInTheDocument();
     // una sola vuelta al proyecto (ya no hay botón duplicado dentro de la tarjeta)

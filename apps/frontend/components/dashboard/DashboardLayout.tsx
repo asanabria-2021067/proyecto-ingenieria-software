@@ -37,6 +37,7 @@ import { useDashboardSidebarCollapsed } from '@/components/dashboard/use-dashboa
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
 import { resolveCommentNotificationLink } from '@/components/notifications/comment-notification-link';
+import { resolveAssignedTaskToastLink } from '@/components/notifications/task-notification-link';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
 import { AnuncioBanner } from '@/components/anuncios/anuncio-banner';
 import { ChatDockProvider } from '@/components/chat-dock/chat-dock-context';
@@ -164,6 +165,18 @@ export default function DashboardLayout({
     queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
 
     // HU-200: una mención o un comentario nuevo enlazan al comentario desde el aviso en vivo.
+    const tareaHref = resolveAssignedTaskToastLink(latestNotification);
+    if (tareaHref) {
+      // NL-T4: tarea asignada. Variante `info` (color con contraste, `richColors` del Toaster),
+      // 10 s y botón directo al detalle. Misma esquina que el resto de avisos: abajo a la
+      // derecha está el chat y taparía el aviso.
+      toast.info(latestNotification.tituloNotificacion, {
+        description: latestNotification.mensajeNotificacion,
+        duration: 10_000,
+        action: { label: 'Ver mi tarea', onClick: () => router.push(tareaHref) },
+      });
+      return;
+    }
     const href = getNotificationLink(latestNotification) ?? resolveCommentNotificationLink(latestNotification);
     toast(latestNotification.tituloNotificacion, {
       description: latestNotification.mensajeNotificacion,

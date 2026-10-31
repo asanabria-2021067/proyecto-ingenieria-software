@@ -141,9 +141,9 @@ describe('TareasExplorerClient — T-182/T-184 (HU-146)', () => {
       renderExplorer();
 
       // encabezado de página fuera de tarjetas; el proyecto es contexto
-      expect(screen.getByRole('heading', { level: 1, name: 'Lista de tareas' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'Todas las tareas' })).toBeInTheDocument();
       expect(screen.getByText('UVG Collab')).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Volver al Tablero' })).toHaveAttribute(
+      expect(screen.getByRole('link', { name: 'Volver al Tablero (Kanban)' })).toHaveAttribute(
         'href',
         expect.stringMatching(/\/kanban$/),
       );

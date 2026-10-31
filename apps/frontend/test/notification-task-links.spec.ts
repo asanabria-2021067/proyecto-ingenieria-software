@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { resolveTaskNotificationLink } from '../components/notifications/task-notification-link';
+import { resolveAssignedTaskToastLink, resolveTaskNotificationLink } from '../components/notifications/task-notification-link';
 
 describe('resolveTaskNotificationLink', () => {
   it('resuelve TAREA_ASIGNADA con projectId/taskId (forma real de tasks.service.ts)', () => {
@@ -189,5 +189,21 @@ describe('NotificationsBell — enlaces de notificaciones de tarea', () => {
 
     expect(screen.queryByRole('link', { name: /Ya no estás asignado/ })).not.toBeInTheDocument();
     expect(screen.getByText('Ya no estás asignado')).toBeInTheDocument();
+  });
+});
+
+
+describe('resolveAssignedTaskToastLink (NL-T4)', () => {
+  it('TAREA_ASIGNADA lleva al detalle de la tarea', () => {
+    expect(
+      resolveAssignedTaskToastLink({ tipoNotificacion: 'TAREA_ASIGNADA', datosJson: { projectId: 12, taskId: 34 } }),
+    ).toBe('/dashboard/projects/12/kanban/tasks/34');
+  });
+
+  it('otros tipos y TAREA_ASIGNADA sin taskId no tienen botón', () => {
+    expect(
+      resolveAssignedTaskToastLink({ tipoNotificacion: 'TAREA_ACTUALIZADA', datosJson: { projectId: 12, taskId: 34 } }),
+    ).toBeNull();
+    expect(resolveAssignedTaskToastLink({ tipoNotificacion: 'TAREA_ASIGNADA', datosJson: { projectId: 12 } })).toBeNull();
   });
 });

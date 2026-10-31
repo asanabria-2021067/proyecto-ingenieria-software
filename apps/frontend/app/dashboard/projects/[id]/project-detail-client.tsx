@@ -30,6 +30,7 @@ import { useCloseReadiness, useClosureRevisions } from '@/hooks/use-closure';
 import { countPassedChecks, TOTAL_CLOSURE_CHECKS } from '@/components/closure/closure-readiness-panel';
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 import { ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+import { MyTasksCard } from '@/components/projects/detail/my-tasks-card';
 import { ProjectCommentsCard } from '@/components/projects/detail/project-comments-card';
 
 interface Props {
@@ -231,6 +232,9 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
       </ProjectGridFull>
 
       <ProjectGridMain>
+        {puedeVerKanban && !proyectoCerrado && currentUser && (
+          <MyTasksCard idProyecto={idProyecto} idUsuario={currentUser.idUsuario} />
+        )}
         <ProjectDescriptionCard descripcion={proyecto.descripcionProyecto} objetivos={objetivos} />
 
         {/* Estado personal: junto a los roles, igual que en la vista del participante. */}

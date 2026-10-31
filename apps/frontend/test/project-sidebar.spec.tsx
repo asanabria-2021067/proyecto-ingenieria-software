@@ -111,7 +111,7 @@ describe('ProjectSidebar', () => {
       'href',
       '/dashboard/projects/42/kanban',
     );
-    expect(screen.getByRole('link', { name: /lista de tareas/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /todas las tareas/i })).toHaveAttribute(
       'href',
       '/dashboard/projects/42/tareas',
     );
@@ -252,7 +252,7 @@ describe('ProjectSidebar', () => {
     renderSidebar();
 
     expect(screen.getByRole('link', { name: /tablero/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /lista de tareas/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /todas las tareas/i })).toHaveAttribute(
       'href',
       '/dashboard/projects/42/tareas',
     );
@@ -296,8 +296,8 @@ describe('ProjectSidebar — navegación agrupada y colapsable', () => {
 
     const trabajo = screen.getByRole('group', { name: 'Trabajo' });
     expect(within(trabajo).getAllByRole('link').map((l) => l.textContent)).toEqual([
-      'Tablero',
-      'Lista de tareas',
+      'Tablero (Kanban)',
+      'Todas las tareas',
       'Sprints',
     ]);
     expect(within(screen.getByRole('group', { name: 'Equipo' })).getAllByRole('link').map((l) => l.textContent)).toEqual(
@@ -392,8 +392,8 @@ describe('ProjectSidebar — navegación agrupada y colapsable', () => {
     renderSidebar();
     colapsar();
 
-    fireEvent.focus(screen.getByRole('link', { name: 'Tablero' }));
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Tablero');
+    fireEvent.focus(screen.getByRole('link', { name: 'Tablero (Kanban)' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Tablero (Kanban)');
   });
 
   it('en el rail el destino activo mantiene aria-current', () => {
@@ -404,7 +404,7 @@ describe('ProjectSidebar — navegación agrupada y colapsable', () => {
 
     const activos = enlacesActivos();
     expect(activos).toHaveLength(1);
-    expect(activos[0]).toHaveAccessibleName('Tablero');
+    expect(activos[0]).toHaveAccessibleName('Tablero (Kanban)');
   });
 
   it('al colapsar y expandir el foco pasa al control opuesto y la preferencia se guarda', () => {
@@ -511,7 +511,7 @@ describe('ProjectSidebar — identidad de navegación del proyecto', () => {
     renderSidebar();
 
     const [activo] = enlacesActivos();
-    expect(activo).toHaveTextContent('Tablero');
+    expect(activo).toHaveTextContent('Tablero (Kanban)');
     expect(activo).toHaveClass('bg-on-surface/8', 'font-semibold', 'text-text-primary');
     expect(activo.className).not.toMatch(/(?<![\w-])(bg-primary|text-primary)\b/);
     const inactivo = within(aside()).getByRole('link', { name: 'Sprints' });

@@ -398,6 +398,7 @@ export function TaskBoard({
         onSolicitarEliminar={() => void solicitarEliminar(tarea)}
         onEditar={() => setTareaEditar(tarea)}
         resaltada={focusTaskId === tarea.idTarea}
+        asignadaAMi={esAsignadoActivo(tarea)}
         onRegistrarCardRef={registrarCardRef}
         onRegistrarHandleRef={registrarHandleRef}
         onAlternarSeleccion={

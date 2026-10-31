@@ -58,3 +58,17 @@ export function resolveTaskNotificationLink(n: {
   }
   return base;
 }
+
+/**
+ * NL-T4: el aviso emergente de `TAREA_ASIGNADA` lleva el botón «Ver mi tarea».
+ * Devuelve el detalle de la tarea o `null` si la notificación no es de ese tipo
+ * (o no trae ids válidos).
+ */
+export function resolveAssignedTaskToastLink(n: {
+  tipoNotificacion: string;
+  datosJson?: Record<string, unknown> | null;
+}): string | null {
+  if (n.tipoNotificacion !== 'TAREA_ASIGNADA') return null;
+  const link = resolveTaskNotificationLink(n);
+  return link?.includes('/tasks/') ? link : null;
+}
