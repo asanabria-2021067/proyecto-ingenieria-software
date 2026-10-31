@@ -50,8 +50,8 @@ async function expectSinSesion(page: Page): Promise<void> {
 }
 
 async function expectLoginRechazado(page: Page, mensaje: string): Promise<void> {
-  await expect(page.getByText(mensaje)).toBeVisible();
-  await page.getByRole('button', { name: 'Aceptar' }).click();
+  // NL-T1: el rechazo se muestra como alerta en el formulario, ya no en un popup.
+  await expect(page.getByRole('alert').filter({ hasText: mensaje })).toBeVisible();
   await expect(page).toHaveURL(/\/login/);
   await expectSinSesion(page);
 }
@@ -155,5 +155,5 @@ test('administración rechaza una cuenta nueva y esta no puede iniciar sesión',
 
   // La cuenta rechazada recibe el error genérico de credenciales, no el de «pendiente».
   await enviarLogin(page, correo);
-  await expectLoginRechazado(page, 'No se pudo iniciar sesión. Verifica tu correo y contraseña.');
+  await expectLoginRechazado(page, 'Correo o contraseña incorrectos');
 });

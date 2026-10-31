@@ -120,9 +120,15 @@ describe('T-221: useLogin', () => {
   // importar el status ni el texto del backend — decir "no existe esa
   // cuenta" o "credenciales invalidas" por separado permite enumerar
   // correos registrados. Solo 429 (limite de intentos) tiene mensaje propio.
-  it.each([401, 500])('%i → mensaje neutro, nunca el detalle del backend', (statusCode) => {
-    const error = Object.assign(new Error('Internal server error: constraint failed'), { statusCode });
-    expect(mensajeErrorLogin(error)).toBe('No se pudo iniciar sesión. Verifica tu correo y contraseña.');
+  // NL-T1: «Correo o contraseña incorrectos» no dice cuál de los dos falló.
+  it('401 → «Correo o contraseña incorrectos», nunca el detalle del backend', () => {
+    const error = Object.assign(new Error('Credenciales inválidas'), { statusCode: 401 });
+    expect(mensajeErrorLogin(error)).toBe('Correo o contraseña incorrectos');
+  });
+
+  it('500 → mensaje genérico, nunca el detalle del backend', () => {
+    const error = Object.assign(new Error('Internal server error: constraint failed'), { statusCode: 500 });
+    expect(mensajeErrorLogin(error)).toBe('No se pudo iniciar sesión. Inténtalo de nuevo en unos minutos.');
   });
 
   it('429 → aviso de limite de intentos, no el mensaje de credenciales', () => {
