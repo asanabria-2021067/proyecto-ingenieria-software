@@ -26,7 +26,6 @@ import {
 } from '@/components/ui/tooltip';
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
 import ProfileCompletionCard, {
-  PERFIL_POSPUESTO_KEY,
   profileCompletionPercent,
 } from '@/components/profile/ProfileCompletionCard';
 import {
@@ -37,7 +36,12 @@ import {
   EmptySteps,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { useCurrentUser, isProfileIncomplete } from '@/hooks/use-current-user';
+import {
+  useCurrentUser,
+  isProfileIncomplete,
+  perfilPospuesto,
+  PERFIL_POSPUESTO_KEY,
+} from '@/hooks/use-current-user';
 import {
   getDashboardStats,
   getMisTareas,
@@ -328,13 +332,9 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const { data: user, isLoading: userLoading } = useCurrentUser();
   const [wizardDismissed, setWizardDismissed] = useState(false);
-  const [wizardDeferred, setWizardDeferred] = useState(() => {
-    try {
-      return sessionStorage.getItem(PERFIL_POSPUESTO_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
+  const [deferredNow, setDeferredNow] = useState(false);
+  // Aplazado en esta pestaña por el usuario actual (sobrevive a recargas, no a otras cuentas).
+  const wizardDeferred = deferredNow || (!!user && perfilPospuesto(user.idUsuario));
   const [projectTab, setProjectTab] = useState<'destacados' | 'disponibles'>(
     'destacados',
   );
@@ -411,9 +411,10 @@ export default function DashboardPage() {
         open={showWizard}
         onDefer={() => {
           try {
-            sessionStorage.setItem(PERFIL_POSPUESTO_KEY, '1');
+            if (user) sessionStorage.setItem(PERFIL_POSPUESTO_KEY, String(user.idUsuario));
           } catch {}
-          setWizardDeferred(true);
+          setDeferredNow(true);
+          window.dispatchEvent(new Event('perfil-asistente-pospuesto'));
         }}
         onComplete={async () => {
           setWizardDismissed(true);
@@ -429,7 +430,12 @@ export default function DashboardPage() {
         {showProfileCard && (
           <ProfileCompletionCard
             percent={profilePercent}
-            onComplete={() => setWizardDeferred(false)}
+            onComplete={() => {
+              try {
+                sessionStorage.removeItem(PERFIL_POSPUESTO_KEY);
+              } catch {}
+              setDeferredNow(false);
+            }}
           />
         )}
         {/* Welcome + Stats */}

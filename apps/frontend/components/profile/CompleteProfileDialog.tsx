@@ -377,7 +377,9 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && allowClose) onComplete();
+        if (nextOpen) return;
+        if (allowClose) onComplete();
+        else onDefer?.();
       }}
     >
       <DialogContent
@@ -850,18 +852,18 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                 Omitir este paso
               </button>
             )}
-          <Button
-            type="button"
-            onClick={saveStep}
-            disabled={saving}
-            className="h-auto gap-1 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-on-primary shadow-sm hover:bg-primary-container has-[>svg]:px-6 disabled:opacity-60 motion-glow-primary"
-          >
-            {saving
-              ? 'Guardando...'
-              : step === 4
-                ? <>Finalizar <Check className="h-4 w-4" /></>
-                : <>Siguiente <ChevronRight className="h-4 w-4" /></>}
-          </Button>
+            <Button
+              type="button"
+              onClick={saveStep}
+              disabled={saving}
+              className="h-auto gap-1 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-on-primary shadow-sm hover:bg-primary-container has-[>svg]:px-6 disabled:opacity-60 motion-glow-primary"
+            >
+              {saving
+                ? 'Guardando...'
+                : step === 4
+                  ? <>Finalizar <Check className="h-4 w-4" /></>
+                  : <>Siguiente <ChevronRight className="h-4 w-4" /></>}
+            </Button>
           </div>
         </div>
       </DialogContent>

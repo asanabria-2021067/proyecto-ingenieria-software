@@ -3,8 +3,6 @@
 import { Button } from '@/components/ui/button';
 import type { UserProfile } from '@/lib/services/users';
 
-export const PERFIL_POSPUESTO_KEY = 'perfil_asistente_pospuesto';
-
 export function profileCompletionPercent(user: UserProfile): number {
   const p = user.perfil;
   const checks = [
@@ -27,7 +25,6 @@ export default function ProfileCompletionCard({
 }) {
   return (
     <section
-      aria-label="Perfil completo"
       className="mb-section flex flex-col gap-3 rounded-card bg-surface-container-low p-card shadow-card sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="flex-1">
@@ -39,7 +36,7 @@ export default function ProfileCompletionCard({
         </p>
         <div
           role="progressbar"
-          aria-label="Perfil completo"
+          aria-label="Progreso del perfil"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent}
