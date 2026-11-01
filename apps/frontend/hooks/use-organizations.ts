@@ -71,16 +71,16 @@ export function useOrganizacion(id: number) {
   });
 }
 
-export function useMisInvitacionesOrg(enabled = true) {
-  return useQuery({ queryKey: misInvitacionesOrgQueryKey, queryFn: getMisInvitaciones, enabled, retry: false });
+export function useMisInvitacionesOrg() {
+  return useQuery({ queryKey: misInvitacionesOrgQueryKey, queryFn: getMisInvitaciones, retry: false });
 }
 
-export function useInvitacionesOrg(id: number, enabled: boolean) {
-  return useQuery({ queryKey: invitacionesOrgQueryKey(id), queryFn: () => getInvitacionesOrganizacion(id), enabled });
+export function useInvitacionesOrg(id: number) {
+  return useQuery({ queryKey: invitacionesOrgQueryKey(id), queryFn: () => getInvitacionesOrganizacion(id) });
 }
 
-export function useSolicitudesOrg(id: number, enabled: boolean) {
-  return useQuery({ queryKey: solicitudesOrgQueryKey(id), queryFn: () => getSolicitudesOrganizacion(id), enabled });
+export function useSolicitudesOrg(id: number) {
+  return useQuery({ queryKey: solicitudesOrgQueryKey(id), queryFn: () => getSolicitudesOrganizacion(id) });
 }
 
 /** El backend exige 3 letras como mínimo; con menos no se pide nada. */
@@ -171,8 +171,8 @@ export function useResolverSolicitud(id: number) {
   });
 }
 
-export function useCanalOrganizacion(id: number, enabled: boolean) {
-  return useQuery({ queryKey: canalOrgQueryKey(id), queryFn: () => getCanalOrganizacion(id), enabled, retry: false });
+export function useCanalOrganizacion(id: number) {
+  return useQuery({ queryKey: canalOrgQueryKey(id), queryFn: () => getCanalOrganizacion(id), retry: false });
 }
 
 /**

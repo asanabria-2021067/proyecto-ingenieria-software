@@ -3,9 +3,6 @@ import type { ChatMensaje, ChatUsuario } from '@/lib/types/chat';
 export const ROLES_ORGANIZACION = ['PROPIETARIO', 'ADMINISTRADOR', 'EDITOR', 'LECTURA'] as const;
 export type RolOrganizacion = (typeof ROLES_ORGANIZACION)[number];
 
-/** Roles que se pueden asignar al invitar o cambiar (el Propietario solo se transfiere). */
-export const ROLES_ASIGNABLES: readonly RolOrganizacion[] = ['ADMINISTRADOR', 'EDITOR', 'LECTURA'];
-
 export type VisibilidadOrganizacion = 'PUBLICA' | 'PRIVADA';
 
 export interface UsuarioOrganizacion {

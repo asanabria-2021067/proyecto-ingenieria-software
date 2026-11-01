@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Archive, Building2, ChevronLeft, ExternalLink, Folder, Globe, LogOut, Lock, Plus, Users } from 'lucide-react';
+import { Archive, Building2, ChevronLeft, ExternalLink, Folder, Globe, LogOut, Lock, Pencil, Plus, Users } from 'lucide-react';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { InvitarDialog } from '@/components/organizations/invitar-dialog';
 import { OrgAvatar } from '@/components/organizations/org-avatar';
@@ -174,6 +174,14 @@ export default function OrganizacionPage() {
               <Link href={`/dashboard/projects/mine/form?org=${org.idOrganizacion}`}>
                 <Plus aria-hidden="true" />
                 Nuevo proyecto
+              </Link>
+            </Button>
+          )}
+          {gestiona && !org.archivada && (
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/organizaciones/${org.idOrganizacion}/editar`}>
+                <Pencil aria-hidden="true" />
+                Editar
               </Link>
             </Button>
           )}

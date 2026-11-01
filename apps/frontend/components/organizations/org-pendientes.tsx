@@ -36,8 +36,8 @@ const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-GT', { day: 
 
 /** Solicitudes de unirse (aceptar entra como Lectura) e invitaciones enviadas aún vigentes. */
 export function OrgPendientes({ idOrganizacion, archivada }: { idOrganizacion: number; archivada: boolean }) {
-  const { data: solicitudes = [] } = useSolicitudesOrg(idOrganizacion, true);
-  const { data: invitaciones = [] } = useInvitacionesOrg(idOrganizacion, true);
+  const { data: solicitudes = [] } = useSolicitudesOrg(idOrganizacion);
+  const { data: invitaciones = [] } = useInvitacionesOrg(idOrganizacion);
   const resolver = useResolverSolicitud(idOrganizacion);
   const cancelar = useCancelarInvitacion(idOrganizacion);
 

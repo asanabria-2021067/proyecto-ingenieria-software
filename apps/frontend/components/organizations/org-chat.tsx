@@ -16,7 +16,7 @@ const sinAccion = () => {};
 /** Canal #general: reutiliza la burbuja del chat de proyecto; todos los miembros leen y escriben (salvo archivada). */
 export function OrgChat({ idOrganizacion }: { idOrganizacion: number }) {
   const { data: usuario } = useCurrentUser();
-  const { data: canal, isLoading, isError } = useCanalOrganizacion(idOrganizacion, true);
+  const { data: canal, isLoading, isError } = useCanalOrganizacion(idOrganizacion);
   const idConversacion = canal?.idConversacion ?? null;
   const { data: mensajes = [] } = useMensajesOrganizacion(idOrganizacion, idConversacion);
   const enviar = useEnviarMensajeOrganizacion(idOrganizacion, idConversacion);

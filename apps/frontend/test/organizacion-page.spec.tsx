@@ -101,6 +101,7 @@ describe('pagina de la organizacion', () => {
     estado.org = orgCon('PROPIETARIO');
     render(<OrganizacionPage />);
 
+    expect(screen.getByRole('link', { name: 'Editar' })).toHaveAttribute('href', '/dashboard/organizaciones/7/editar');
     expect(boton('Invitar')).toBeInTheDocument();
     expect(boton('Transferir propiedad')).toBeInTheDocument();
     expect(boton('Archivar')).toBeInTheDocument();
@@ -128,6 +129,7 @@ describe('pagina de la organizacion', () => {
 
     expect(screen.getByRole('link', { name: /Nuevo proyecto/ })).toBeInTheDocument();
     expect(boton('Invitar')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Editar' })).toBeNull();
     expect(screen.queryByRole('tab', { name: /Solicitudes e invitaciones/ })).toBeNull();
     expect(screen.getByRole('tab', { name: 'Chat' })).toBeInTheDocument();
   });

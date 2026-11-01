@@ -39,6 +39,5 @@ export function rolesQueSePuedenAsignar(miRol: RolOpcional): RolOrganizacion[] {
   return [];
 }
 
-const ESTADOS_CERRADOS = new Set(['CERRADO']);
 
-export const esProyectoCerrado = (estado: string) => ESTADOS_CERRADOS.has(estado);
+export const esProyectoCerrado = (estado: string) => estado === 'CERRADO';

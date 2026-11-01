@@ -88,8 +88,8 @@ export const resolverSolicitud = (id: number, idSolicitud: number, aceptar: bool
 
 export const getCanalOrganizacion = (id: number) => apiFetch<CanalOrganizacion>(`${BASE}/${id}/chat`);
 
-export const getMensajesOrganizacion = (id: number, cursor?: number) =>
-  apiFetch<MensajeOrganizacion[]>(`${BASE}/${id}/chat/mensajes${cursor ? `?cursor=${cursor}` : ''}`);
+export const getMensajesOrganizacion = (id: number) =>
+  apiFetch<MensajeOrganizacion[]>(`${BASE}/${id}/chat/mensajes`);
 
 export const enviarMensajeOrganizacion = (id: number, contenido: string) =>
   apiFetch<MensajeOrganizacion>(`${BASE}/${id}/chat/mensajes`, json('POST', { contenido }));

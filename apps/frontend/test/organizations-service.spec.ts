@@ -93,11 +93,9 @@ describe('servicios de organizaciones', () => {
     expect(apiFetch).toHaveBeenLastCalledWith('/organizaciones/4/candidatos?q=ana%20perez');
   });
 
-  it('chat: lee con cursor opcional y envia el contenido', async () => {
+  it('chat: lee y envia el contenido', async () => {
     await getMensajesOrganizacion(4);
     expect(apiFetch).toHaveBeenLastCalledWith('/organizaciones/4/chat/mensajes');
-    await getMensajesOrganizacion(4, 50);
-    expect(apiFetch).toHaveBeenLastCalledWith('/organizaciones/4/chat/mensajes?cursor=50');
     await enviarMensajeOrganizacion(4, 'hola');
     expect(apiFetch).toHaveBeenLastCalledWith('/organizaciones/4/chat/mensajes', {
       method: 'POST',
