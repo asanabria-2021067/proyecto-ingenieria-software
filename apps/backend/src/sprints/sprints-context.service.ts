@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { esMiembroDeOrganizacionDelProyecto } from '../organizations/organization-access';
 
 type TxClient = Prisma.TransactionClient;
 
@@ -48,6 +49,11 @@ export class SprintsContextService {
    * Usado por lecturas que un miembro (no solo el líder) necesita — p. ej.
    * saber si hay un Sprint operable para renderizar el tablero Kanban.
    */
+  /** Miembro de una organización dueña del proyecto: solo lectura, nunca escritura. */
+  esMiembroDeOrganizacionDelProyecto(projectId: number, userId: number, tx?: TxClient): Promise<boolean> {
+    return esMiembroDeOrganizacionDelProyecto(tx ?? this.prisma, projectId, userId);
+  }
+
   async assertActiveProjectParticipant(
     projectId: number,
     userId: number,

@@ -63,6 +63,8 @@ function makeIsolatedPrisma(data: {
           data.participaciones.find((participation) => whereMatches(participation, where)) ?? null,
       ),
     },
+    // Ninguno de estos escenarios involucra organizaciones: el lector externo no es miembro de ninguna.
+    usuarioOrganizacion: { count: vi.fn(async () => 0) },
   };
 }
 

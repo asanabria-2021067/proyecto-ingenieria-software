@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { esMiembroDeOrganizacionDelProyecto } from '../organizations/organization-access';
 
 type TxClient = Prisma.TransactionClient;
 
@@ -76,6 +77,11 @@ export class TasksContextService {
    * en algún rol del proyecto (ParticipacionProyecto no tiene idProyecto
    * directo, por lo que se filtra vía la relación rolProyecto.idProyecto).
    */
+  /** Miembro de una organización dueña del proyecto: solo lectura, nunca escritura. */
+  esMiembroDeOrganizacionDelProyecto(projectId: number, userId: number, tx?: TxClient): Promise<boolean> {
+    return esMiembroDeOrganizacionDelProyecto(tx ?? this.prisma, projectId, userId);
+  }
+
   async assertActiveProjectParticipant(
     projectId: number,
     userId: number,

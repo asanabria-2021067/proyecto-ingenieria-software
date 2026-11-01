@@ -36,6 +36,7 @@ import {
   ESTADOS_EDITABLE_PARCIAL,
   ESTADOS_VISIBLES,
   calcularAvanceProyecto,
+  conCuposDisponibles,
   proyectoDetalleAnonimoSelect,
   proyectoDetallePublicoSelect,
   proyectoDetalleSelect,
@@ -45,6 +46,8 @@ import {
 import { ProjectsCacheService } from './projects-cache.service';
 import { ProjectsAffinityService } from './projects-affinity.service';
 import { ProjectsRevisionsService } from './projects-revisions.service';
+import { assertPuedePublicar } from '../organizations/organization-access';
+import { crearParticipaciones, validarParticipantes } from '../organizations/organization-projects';
 
 export { PESOS_ORDEN_DISPONIBLES } from './projects.read-model';
 
@@ -172,7 +175,7 @@ export class ProjectsService {
       !userId || esBusqueda || proyectos.length === 0
         ? proyectos
         : await this.affinity.ordenarPorAfinidad(proyectos, userId);
-    return this.affinity.conGuardado(ordenados, userId);
+    return this.affinity.conGuardado(ordenados.map(conCuposDisponibles), userId);
   }
 
   /** Bookmark personal ("guardar"), distinto de postularse. Idempotente. */
@@ -222,7 +225,7 @@ export class ProjectsService {
     ]);
 
     return {
-      data,
+      data: data.map(conCuposDisponibles),
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -298,7 +301,7 @@ export class ProjectsService {
    * líder del proyecto o un participante activo — nadie más puede consultarlo.
    */
   async getAvance(id: number, userId: number) {
-    await this.readPolicy.assertRead(undefined, { projectId: id, actorId: userId, scope: 'resumen' });
+    const decision = await this.readPolicy.assertRead(undefined, { projectId: id, actorId: userId, scope: 'resumen' });
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto: id, eliminadoEn: null },
       select: {
@@ -314,7 +317,8 @@ export class ProjectsService {
     }
 
     const esLider = proyecto.creadoPor === userId;
-    const esMiembro = esLider || (await this.esParticipanteActivo(id, userId));
+    const esMiembro =
+      esLider || decision.profile === 'MIEMBRO_ORGANIZACION' || (await this.esParticipanteActivo(id, userId));
     if (!esMiembro) {
       throw new ForbiddenException(
         'Solo el líder o los miembros del proyecto pueden ver el avance',
@@ -398,7 +402,7 @@ export class ProjectsService {
   }
 
   async findAsContributor(userId: number) {
-    return this.prisma.proyecto.findMany({
+    const proyectos = await this.prisma.proyecto.findMany({
       where: {
         eliminadoEn: null,
         roles: {
@@ -418,6 +422,7 @@ export class ProjectsService {
       },
       orderBy: { fechaCreacion: 'desc' },
     });
+    return proyectos.map(conCuposDisponibles);
   }
 
   async findFeatured() {
@@ -449,7 +454,8 @@ export class ProjectsService {
   }
 
   async createFull(data: CreateProjectFullDto, creadoPor: number) {
-    const { fechaInicio, fechaFinEstimada, organizacionesIds, roles, accion, ...rest } = data;
+    const { fechaInicio, fechaFinEstimada, organizacionesIds, idOrganizacion, participantes, roles, accion, ...rest } = data;
+    const idsOrganizacion = [...new Set([...(organizacionesIds ?? []), ...(idOrganizacion === undefined ? [] : [idOrganizacion])])];
     const estadoProyecto =
       accion === 'EN_REVISION' ? EstadoProyecto.EN_REVISION : EstadoProyecto.BORRADOR;
 
@@ -460,6 +466,8 @@ export class ProjectsService {
       'projects.createFull',
       async ({ tx, effects }) => {
       if (rest.idAsociacion != null) await assertPuedePublicarComoAsociacion(tx, rest.idAsociacion, creadoPor);
+      await assertPuedePublicar(tx, creadoPor, idsOrganizacion);
+      await validarParticipantes(tx, creadoPor, idOrganizacion, participantes ?? [], roles ?? []);
       const proyecto = await tx.proyecto.create({
         data: {
           ...rest,
@@ -467,9 +475,9 @@ export class ProjectsService {
           creadoPor,
           fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
           fechaFinEstimada: fechaFinEstimada ? new Date(fechaFinEstimada) : undefined,
-          ...(organizacionesIds?.length && {
+          ...(idsOrganizacion.length && {
             organizaciones: {
-              create: organizacionesIds.map((idOrganizacion) => ({ idOrganizacion })),
+              create: idsOrganizacion.map((idOrganizacion) => ({ idOrganizacion })),
             },
           }),
           ...(roles?.length && {
@@ -493,8 +501,15 @@ export class ProjectsService {
             },
           }),
         },
-        select: { idProyecto: true, estadoProyecto: true, tituloProyecto: true },
+        select: {
+          idProyecto: true,
+          estadoProyecto: true,
+          tituloProyecto: true,
+          roles: { select: { idRolProyecto: true }, orderBy: { idRolProyecto: 'asc' } },
+        },
       });
+      const { roles: rolesCreados, ...resultado } = proyecto;
+      await crearParticipaciones(tx, participantes ?? [], rolesCreados.map((r) => r.idRolProyecto));
 
       if (accion === 'EN_REVISION') {
         const snapshot = await this.revisions.buildProjectSnapshot(tx, proyecto.idProyecto);
@@ -510,7 +525,7 @@ export class ProjectsService {
           effects,
         );
       }
-      return proyecto;
+      return resultado;
       },
       { createsProject: true },
     );
@@ -527,6 +542,7 @@ export class ProjectsService {
 
     return this.prisma.$transaction(async (tx) => {
       if (rest.idAsociacion != null) await assertPuedePublicarComoAsociacion(tx, rest.idAsociacion, creadoPor);
+      await assertPuedePublicar(tx, creadoPor, organizacionesIds ?? []);
       const proyecto = await tx.proyecto.create({
         data: {
           ...rest,
@@ -621,6 +637,10 @@ export class ProjectsService {
       });
 
       if (organizacionesIds !== undefined) {
+        // Solo se exige permiso para las organizaciones que se agregan; las que ya estaban se conservan.
+        const vinculadas = await tx.proyectoOrganizacion.findMany({ where: { idProyecto: id }, select: { idOrganizacion: true } });
+        const yaVinculadas = new Set(vinculadas.map((v) => v.idOrganizacion));
+        await assertPuedePublicar(tx, userId, organizacionesIds.filter((idOrganizacion) => !yaVinculadas.has(idOrganizacion)));
         await tx.proyectoOrganizacion.deleteMany({ where: { idProyecto: id } });
         if (organizacionesIds.length > 0) {
           await tx.proyectoOrganizacion.createMany({
