@@ -11,6 +11,7 @@ import type { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { CreateProjectFullDto } from './dto/create-project-full.dto';
+import { assertPuedePublicarComoAsociacion } from '../associations/junta-access';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { CreateHitoDto } from './dto/create-hito.dto';
 import {
@@ -458,6 +459,7 @@ export class ProjectsService {
       creadoPor,
       'projects.createFull',
       async ({ tx, effects }) => {
+      if (rest.idAsociacion != null) await assertPuedePublicarComoAsociacion(tx, rest.idAsociacion, creadoPor);
       const proyecto = await tx.proyecto.create({
         data: {
           ...rest,
@@ -524,6 +526,7 @@ export class ProjectsService {
     } = data;
 
     return this.prisma.$transaction(async (tx) => {
+      if (rest.idAsociacion != null) await assertPuedePublicarComoAsociacion(tx, rest.idAsociacion, creadoPor);
       const proyecto = await tx.proyecto.create({
         data: {
           ...rest,
