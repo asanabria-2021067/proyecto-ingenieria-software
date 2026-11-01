@@ -178,10 +178,12 @@ describe('verificacion de membresia', () => {
     ({ switchToHttp: () => ({ getRequest: () => ({ user: { userId }, params: { idAsociacion } }) }) }) as never;
 
   it('JuntaGuard: 403 si no es de la junta, deja la membresia si lo es', async () => {
-    const findUnique = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ cargo: 'VOCAL' });
+    const findUnique = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ cargo: 'VOCAL', asociacion: { archivada: false } })
+      .mockResolvedValueOnce({ cargo: 'VOCAL', asociacion: { archivada: true } });
     const guard = new JuntaGuard({ juntaAsociacion: { findUnique } } as never);
     await expect(guard.canActivate(ctx(5, '1'))).rejects.toBeInstanceOf(ForbiddenException);
     await expect(guard.canActivate(ctx(5, '1'))).resolves.toBe(true);
+    await expect(guard.canActivate(ctx(5, '1'))).rejects.toBeInstanceOf(ForbiddenException);
     await expect(guard.canActivate(ctx(5, 'abc'))).rejects.toBeInstanceOf(ForbiddenException);
   });
 
