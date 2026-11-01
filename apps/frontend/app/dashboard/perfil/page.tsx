@@ -1,6 +1,7 @@
 'use client';
 
 import { getHabilidadBadgeStyle } from '@/lib/social/badge-colors';
+import { AVISO_PRIVACIDAD_JUNTA } from '@/lib/asociaciones/vista';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -181,6 +182,7 @@ export default function PerfilPage() {
                           : 'Semestre no registrado'}
                       </span>
                     </div>
+                    <p className="text-xs leading-snug text-tertiary">{AVISO_PRIVACIDAD_JUNTA}</p>
                   </>
                 )}
               </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { AVISO_PRIVACIDAD_JUNTA } from '@/lib/asociaciones/vista';
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -381,6 +382,7 @@ export default function RegistroPage() {
                   {errores.semestre && <AuthFieldError id="semestre-error">{errores.semestre}</AuthFieldError>}
                 </div>
               </div>
+              <p className="text-xs leading-snug text-tertiary">{AVISO_PRIVACIDAD_JUNTA}</p>
 
               <div className="min-w-0 space-y-1.5">
                 <label htmlFor="contrasena" className={AUTH_LABEL}>
