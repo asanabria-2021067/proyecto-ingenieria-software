@@ -347,7 +347,7 @@ export default function DashboardPage() {
     [wizardDismissed, wizardDeferred, wizardReopened, user],
   );
   const profilePercent = user && wizardDeferred ? profileCompletionPercent(user) : 100;
-  const showProfileCard = wizardDeferred && !wizardDismissed && profilePercent < 100;
+  const showProfileCard = wizardDeferred && !wizardReopened && !wizardDismissed && profilePercent < 100;
 
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
@@ -422,6 +422,9 @@ export default function DashboardPage() {
           window.dispatchEvent(new Event('perfil-asistente-pospuesto'));
         }}
         onComplete={async () => {
+          try {
+            sessionStorage.removeItem(PERFIL_POSPUESTO_KEY);
+          } catch {}
           setWizardDismissed(true);
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ['currentUser'] }),
@@ -436,11 +439,9 @@ export default function DashboardPage() {
           <ProfileCompletionCard
             percent={profilePercent}
             onComplete={() => {
-              try {
-                sessionStorage.removeItem(PERFIL_POSPUESTO_KEY);
-              } catch {}
-              setDeferredNow(false);
+              // El aplazamiento se conserva: si se recarga con el asistente abierto, la tarjeta sigue.
               setWizardReopened(true);
+              window.dispatchEvent(new Event('perfil-asistente-reabierto'));
             }}
           />
         )}

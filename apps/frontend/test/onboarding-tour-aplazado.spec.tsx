@@ -60,3 +60,34 @@ describe('OnboardingTour y asistente de perfil', () => {
     expect(corrio()).toBe(true);
   });
 });
+
+describe('OnboardingTour temporizador de 800 ms', () => {
+  it('no arranca si se desmonta antes de los 800 ms', () => {
+    sessionStorage.setItem('k', '7');
+    const { unmount } = render(<OnboardingTour />);
+    act(() => void vi.advanceTimersByTime(400));
+    unmount();
+    act(() => void vi.advanceTimersByTime(2000));
+    expect(corrio()).toBe(false);
+  });
+
+  it('dos arranques seguidos dejan un solo temporizador', () => {
+    sessionStorage.setItem('k', '7');
+    render(<OnboardingTour />);
+    const base = vi.getTimerCount();
+    act(() => {
+      window.dispatchEvent(new Event('perfil-asistente-pospuesto'));
+      window.dispatchEvent(new Event('perfil-asistente-pospuesto'));
+    });
+    expect(vi.getTimerCount()).toBe(base);
+  });
+
+  it('reabrir el asistente cancela el arranque pendiente', () => {
+    sessionStorage.setItem('k', '7');
+    render(<OnboardingTour />);
+    act(() => void vi.advanceTimersByTime(400));
+    act(() => void window.dispatchEvent(new Event('perfil-asistente-reabierto')));
+    act(() => void vi.advanceTimersByTime(2000));
+    expect(corrio()).toBe(false);
+  });
+});

@@ -123,3 +123,18 @@ describe('Dashboard - asistente de perfil aplazado', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 });
+
+describe('Dashboard - recarga con el asistente reabierto', () => {
+  it('reabrir no borra el aplazamiento: tras recargar la tarjeta sigue visible', async () => {
+    sessionStorage.setItem('perfil_asistente_pospuesto', '7');
+    await renderDashboard();
+    fireEvent.click(await screen.findByRole('button', { name: 'Completar perfil' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(sessionStorage.getItem('perfil_asistente_pospuesto')).toBe('7');
+
+    cleanup();
+    await renderDashboard();
+    expect(await screen.findByText('Tu perfil está al 17%')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});

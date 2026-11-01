@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { useJoyride, STATUS } from 'react-joyride';
 import { useCurrentUser, isProfileIncomplete, perfilPospuesto } from '@/hooks/use-current-user';
@@ -92,6 +92,11 @@ export default function OnboardingTour() {
   const { data: user } = useCurrentUser();
   const pathname = usePathname();
   const [run, setRun] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelTimer = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }, []);
 
   const startTour = useCallback(
     (force = false) => {
@@ -112,12 +117,25 @@ export default function OnboardingTour() {
       }
 
       // Retardo para asegurar que los elementos del DOM estén completamente listos
-      setTimeout(() => {
+      cancelTimer();
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
         setRun(true);
       }, 800);
     },
-    [user],
+    [user, cancelTimer],
   );
+
+  useEffect(() => cancelTimer, [cancelTimer]);
+
+  useEffect(() => {
+    const handleReabierto = () => {
+      cancelTimer();
+      setRun(false);
+    };
+    window.addEventListener('perfil-asistente-reabierto', handleReabierto);
+    return () => window.removeEventListener('perfil-asistente-reabierto', handleReabierto);
+  }, [cancelTimer]);
 
   useEffect(() => {
     if (user) {
