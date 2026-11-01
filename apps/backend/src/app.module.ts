@@ -41,6 +41,7 @@ import { ChatModule } from './chat/chat.module';
 import { BitacoraModule } from './bitacora/bitacora.module';
 import { GlobalSearchModule } from './search/global-search.module';
 import { ExportsModule } from './exports/exports.module';
+import { HorasSemestreModule } from './horas-semestre/horas-semestre.module';
 import { SecurityEventsModule } from './security-events/security-events.module';
 import { EventsModule } from './events/events.module';
 import { CalendarSharesModule } from './calendar-shares/calendar-shares.module';
@@ -124,6 +125,7 @@ const skipThrottling = () => isThrottlerDisabled();
     BitacoraModule,
     GlobalSearchModule,
     ExportsModule,
+    HorasSemestreModule,
     // G05 (OWASP25-C037): writer best-effort de eventos de seguridad (global).
     SecurityEventsModule,
     EventsModule,
