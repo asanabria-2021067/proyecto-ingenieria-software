@@ -86,6 +86,7 @@ describe('DashboardLayout — «Mis Horas» en «Mi trabajo»', () => {
     const destinos = within(movil).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
     expect(destinos).toEqual([
       'Dashboard',
+      'Mensajes',
       'Personas',
       'Explorar Proyectos',
       'Mis Proyectos',
@@ -154,6 +155,7 @@ describe('DashboardLayout — navegación global del estudiante', () => {
 
   const DESTINOS = [
     ['Dashboard', '/dashboard'],
+    ['Mensajes', '/dashboard/mensajes'],
     ['Descubrir personas', '/dashboard/personas'],
     ['Mis amigos', '/dashboard/personas?seccion=amigos'],
     ['Amigos de amigos', '/dashboard/personas?seccion=amigos-de-amigos'],
