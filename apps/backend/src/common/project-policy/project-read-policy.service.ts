@@ -104,7 +104,19 @@ export class ProjectReadPolicyService {
     }
 
     const profile = await this.profileFor(db, project, input.actorId);
-    const decision = this.decide(profile, project, input.scope);
+    let decision: ReadDecision | undefined;
+    // Quien participó o lideró antes y sigue en la organización ve como cualquier otro miembro (ORG-8).
+    if (
+      (profile === 'PARTICIPANTE_HISTORICO' || profile === 'EXLIDER_SIN_PARTICIPACION') &&
+      (await esMiembroDeOrganizacionDelProyecto(db, project.idProyecto, input.actorId))
+    ) {
+      try {
+        decision = this.decide('MIEMBRO_ORGANIZACION', project, input.scope);
+      } catch (error) {
+        if (!(error instanceof ForbiddenException)) throw error;
+      }
+    }
+    decision ??= this.decide(profile, project, input.scope);
 
     if (
       input.entitySprintId !== undefined &&

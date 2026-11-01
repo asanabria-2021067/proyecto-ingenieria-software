@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import { IsEmail, IsIn, IsInt, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 import { RolOrganizacion } from '@prisma/client';
+import { ROLES_ASIGNABLES } from '../organization-access';
 
 const normalizarCorreo = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
 
@@ -16,7 +17,7 @@ export class InviteMemberDto {
   @MaxLength(255)
   correo?: string;
 
-  @IsIn([RolOrganizacion.ADMINISTRADOR, RolOrganizacion.EDITOR, RolOrganizacion.LECTURA])
+  @IsIn([...ROLES_ASIGNABLES])
   rolOrganizacion!: RolOrganizacion;
 }
 

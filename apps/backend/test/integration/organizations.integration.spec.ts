@@ -851,4 +851,30 @@ describeIntegration('ORG — organizaciones, invitaciones, chat y proyectos (Pos
     const horas = await pedir('POST', `/proyectos/${idProyecto}/tareas/${tarea.idTarea}/horas`, participante.token, { horas: 1.5, fecha: '2031-03-10' });
     expect(horas.status).toBe(201);
   });
+
+  it('un miembro que antes participó en el proyecto y sigue en la organización lo ve completo, como el resto de miembros', async () => {
+    const dueno = await usuario();
+    const editor = await usuario();
+    const retirado = await usuario();
+    const org = await crearOrg(dueno);
+    await agregar(org, editor, 'EDITOR');
+    await agregar(org, retirado, 'EDITOR');
+
+    const r = await crearProyecto(editor.token, { idOrganizacion: org, participantes: [{ idUsuario: retirado.idUsuario, indiceRol: 0 }] });
+    const idProyecto = r.body.idProyecto as number;
+    await prisma.proyecto.update({ where: { idProyecto }, data: { estadoProyecto: 'EN_PROGRESO' } });
+    await prisma.participacionProyecto.updateMany({
+      where: { idUsuario: retirado.idUsuario, rolProyecto: { idProyecto } },
+      data: { estadoParticipacion: 'RETIRADO' },
+    });
+    const sprint = await createIntegrationSprint(prisma, idProyecto, { estado: 'ACTIVO' });
+    scope.sprintIds!.push(sprint.idSprint);
+    const tarea = await createIntegrationTask(prisma, idProyecto, editor.idUsuario, sprint.idSprint);
+    scope.taskIds!.push(tarea.idTarea);
+
+    const tablero = await pedir('GET', `/proyectos/${idProyecto}/tareas`, retirado.token);
+    expect(tablero.status).toBe(200);
+    expect(tablero.body.map((t: { idTarea: number }) => t.idTarea)).toEqual([tarea.idTarea]);
+    expect((await pedir('GET', `/proyectos/${idProyecto}/avance`, retirado.token)).status).toBe(200);
+  });
 });
