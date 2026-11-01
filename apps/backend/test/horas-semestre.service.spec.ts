@@ -10,6 +10,7 @@ function crearServicio(opts: {
 }) {
   const aprobadas = opts.aprobadas ?? [];
   const prisma = {
+    usuarioRolAcceso: { findFirst: vi.fn(async ({ where }: { where: { idUsuario: number } }) => (where.idUsuario === 1 ? { id: 1 } : null)) },
     usuario: {
       findMany: vi.fn(async ({ where, take }: { where: { idUsuario: { gt: number } }; take: number }) =>
         opts.usuarios
@@ -64,11 +65,11 @@ describe('HorasSemestreService', () => {
       ],
       aprobadas: [{ idUsuario: 1, tipo: 'ACADEMICO_HORAS_BECA', horas: 20 }],
     });
-    const p1 = await service.listarCentral({ limit: 2 });
+    const p1 = await service.listarCentral(1, { limit: 2 });
     expect(p1.filas.map((f) => f.idUsuario)).toEqual([1, 2]);
     expect(p1.siguienteCursor).toBe(2);
     expect(p1.filas[0]).toMatchObject({ becaDeclarada: 10, becaAcreditada: 20, faltaBeca: 70, faltaExtension: null });
-    const p2 = await service.listarCentral({ limit: 2, cursor: p1.siguienteCursor! });
+    const p2 = await service.listarCentral(1, { limit: 2, cursor: p1.siguienteCursor! });
     expect(p2.filas.map((f) => f.idUsuario)).toEqual([3]);
     expect(p2.siguienteCursor).toBeNull();
   });
@@ -84,22 +85,29 @@ describe('HorasSemestreService', () => {
         { id: 5 },
       ],
     });
-    const p1 = await service.listarCentral({ enRiesgo: true, limit: 1 });
+    const p1 = await service.listarCentral(1, { enRiesgo: true, limit: 1 });
     expect(p1.filas.map((f) => f.idUsuario)).toEqual([2]);
     expect(p1.siguienteCursor).toBe(2);
-    const p2 = await service.listarCentral({ enRiesgo: true, limit: 1, cursor: 2 });
+    const p2 = await service.listarCentral(1, { enRiesgo: true, limit: 1, cursor: 2 });
     expect(p2.filas.map((f) => f.idUsuario)).toEqual([4]);
     expect(p2.siguienteCursor).toBeNull();
   });
 
   it('solo cuenta horas aprobadas dentro del semestre consultado', async () => {
     const { service, prisma } = crearServicio({ usuarios: [{ id: 1 }] });
-    await service.listarCentral({ anio: 2025, periodo: 2 });
+    await service.listarCentral(1, { anio: 2025, periodo: 2 });
     const where = prisma.horasParticipacion.findMany.mock.calls[0][0].where as unknown as {
       fechaAprobacion: { gte: Date; lt: Date };
     };
     expect(where.fechaAprobacion.gte.toISOString()).toBe('2025-07-01T06:00:00.000Z');
     expect(where.fechaAprobacion.lt.toISOString()).toBe('2026-01-01T06:00:00.000Z');
+  });
+
+  it('rechaza a quien no es administrador', async () => {
+    const { service } = crearServicio({ usuarios: [{ id: 1 }] });
+    await expect(service.listarCentral(2, {})).rejects.toThrow('administradores');
+    await expect(service.totales(2, {})).rejects.toThrow('administradores');
+    await expect(service.todasLasFilas(2, {})).rejects.toThrow('administradores');
   });
 
   it('totales agrupa por carrera', async () => {
@@ -109,7 +117,7 @@ describe('HorasSemestreService', () => {
         { id: 2, registro: { metaBeca: 50, becaDeclarada: 5 } },
       ],
     });
-    const { porCarrera } = await service.totales({});
+    const { porCarrera } = await service.totales(1, {});
     expect(porCarrera).toHaveLength(1);
     expect(porCarrera[0]).toMatchObject({ estudiantes: 2, metaBeca: 150, becaDeclarada: 15, faltaBeca: 135 });
   });

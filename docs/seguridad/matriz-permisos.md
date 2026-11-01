@@ -243,7 +243,7 @@ protección actual ya es correcta.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/admin/estadisticas` | Estadísticas del panel | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |
 | GET | `/admin/metricas` | Tendencias de uso | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |
-| GET | `/admin/horas-semestre`, `/admin/horas-semestre/totales`, `/admin/horas-semestre/csv`, `/admin/horas-semestre/pdf` | Vista central de horas por semestre | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` | — |
+| GET | `/admin/horas-semestre`, `/admin/horas-semestre/totales`, `/admin/horas-semestre/csv`, `/admin/horas-semestre/pdf` | Vista central de horas por semestre | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | — |
 | GET | `/admin/usuarios`, `/admin/usuarios/:id` | Listar / ver usuarios | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |
 | PATCH | `/admin/usuarios/:id/estado` | Activar / bloquear usuario | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` (+ no a sí mismo ni a otro admin) | ✅ Corregido en T-286 (H-01) |
 | GET | `/admin/password-reset-requests` | Solicitudes de recuperación | ❌ | ❌ | ❌ | ❌ | ✅ | `JWT` + `Roles:admin` + `S:admin` | ✅ Corregido en T-286 (H-01) |

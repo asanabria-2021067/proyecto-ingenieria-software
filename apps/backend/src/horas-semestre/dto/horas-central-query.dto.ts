@@ -21,7 +21,8 @@ export class HorasCentralQueryDto {
   idCarrera?: number;
 
   @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true')
+  // enableImplicitConversion convierte 'false' en true antes de @Transform; se lee el valor crudo
+  @Transform(({ obj }) => obj.enRiesgo === true || obj.enRiesgo === 'true')
   @IsBoolean()
   enRiesgo?: boolean;
 }

@@ -19,6 +19,7 @@ describeIntegration('HRS registro de horas por semestre', () => {
   });
 
   afterAll(async () => {
+    await db.usuarioRolAcceso.deleteMany({ where: { idUsuario: { in: userIds } } });
     await db.registroHorasSemestre.deleteMany({ where: { idUsuario: { in: userIds } } });
     await db.perfilEstudiante.deleteMany({ where: { idUsuario: { in: userIds } } });
     await db.usuario.deleteMany({ where: { idUsuario: { in: userIds } } });
@@ -63,8 +64,13 @@ describeIntegration('HRS registro de horas por semestre', () => {
 
   it('la vista central lista al estudiante con su meta y falta', async () => {
     const u = await estudiante();
+    const admin = await createIntegrationUser(db);
+    userIds.push(admin.idUsuario);
+    const rol = await db.rolAcceso.upsert({ where: { nombrePerfil: 'administrador' }, update: {}, create: { nombrePerfil: 'administrador' } });
+    await db.usuarioRolAcceso.create({ data: { idUsuario: admin.idUsuario, idRolAcceso: rol.idRolAcceso } });
     await service.actualizarActual(u.idUsuario, { metaBeca: 100, becaDeclarada: 30 });
-    const { filas } = await service.todasLasFilas({});
+    await expect(service.todasLasFilas(u.idUsuario, {})).rejects.toThrow();
+    const { filas } = await service.todasLasFilas(admin.idUsuario, {});
     const fila = filas.find((f) => f.idUsuario === u.idUsuario);
     expect(fila).toMatchObject({ metaBeca: 100, becaDeclarada: 30, becaAcreditada: 0, faltaBeca: 70 });
   });

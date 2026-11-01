@@ -1,5 +1,6 @@
 import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -23,24 +24,24 @@ export class AdminHorasSemestreController {
   constructor(private readonly service: HorasSemestreService) {}
 
   @Get()
-  listar(@Query() query: HorasCentralListQueryDto) {
-    return this.service.listarCentral(query);
+  listar(@CurrentUser() user: { userId: number }, @Query() query: HorasCentralListQueryDto) {
+    return this.service.listarCentral(user.userId, query);
   }
 
   @Get('totales')
-  totales(@Query() query: HorasCentralQueryDto) {
-    return this.service.totales(query);
+  totales(@CurrentUser() user: { userId: number }, @Query() query: HorasCentralQueryDto) {
+    return this.service.totales(user.userId, query);
   }
 
   @Get('csv')
-  async csv(@Query() query: HorasCentralQueryDto, @Res() res: Response) {
-    const { semestre, filas } = await this.service.todasLasFilas(query);
+  async csv(@CurrentUser() user: { userId: number }, @Query() query: HorasCentralQueryDto, @Res() res: Response) {
+    const { semestre, filas } = await this.service.todasLasFilas(user.userId, query);
     enviar(res, Buffer.from(buildHorasCsv(filas), 'utf-8'), 'text/csv; charset=utf-8', `horas-${semestre.anio}-${semestre.periodo}.csv`);
   }
 
   @Get('pdf')
-  async pdf(@Query() query: HorasCentralQueryDto, @Res() res: Response) {
-    const { semestre, filas } = await this.service.todasLasFilas(query);
+  async pdf(@CurrentUser() user: { userId: number }, @Query() query: HorasCentralQueryDto, @Res() res: Response) {
+    const { semestre, filas } = await this.service.todasLasFilas(user.userId, query);
     const titulo = `Horas por estudiante - semestre ${semestre.periodo} de ${semestre.anio}`;
     enviar(res, renderHorasPdf(titulo, filas), 'application/pdf', `horas-${semestre.anio}-${semestre.periodo}.pdf`);
   }

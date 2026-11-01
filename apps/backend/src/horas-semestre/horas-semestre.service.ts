@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { TipoProyecto } from '@prisma/client';
 import { addDaysToDay, todayInGuatemala } from '../common/utils/guatemala-date';
 import { PrismaService } from '../prisma/prisma.service';
@@ -216,7 +216,19 @@ export class HorasSemestreService {
    * Pagina con cursor (idUsuario) de los estudiantes activos con sus horas del semestre.
    * `enRiesgo` se evalua despues de calcular, asi que recorre lotes hasta llenar la pagina.
    */
-  async listarCentral(q: HorasCentralListQueryDto) {
+  async listarCentral(idActor: number, q: HorasCentralListQueryDto) {
+    await this.requireAdmin(idActor);
+    return this.paginaCentral(q);
+  }
+
+  private async requireAdmin(idUsuario: number) {
+    const rol = await this.prisma.usuarioRolAcceso.findFirst({
+      where: { idUsuario, rolAcceso: { nombrePerfil: 'administrador' } },
+    });
+    if (!rol) throw new ForbiddenException('Acceso restringido a administradores');
+  }
+
+  private async paginaCentral(q: HorasCentralListQueryDto) {
     const semestre = this.semestreDeQuery(q);
     const hoy = todayInGuatemala();
     const limit = q.limit ?? 50;
@@ -281,12 +293,13 @@ export class HorasSemestreService {
   }
 
   /** Todas las filas que cumplen el filtro (totales y reportes). */
-  async todasLasFilas(q: HorasCentralQueryDto) {
+  async todasLasFilas(idActor: number, q: HorasCentralQueryDto) {
+    await this.requireAdmin(idActor);
     const filas: FilaHorasCentral[] = [];
     let cursor: number | undefined;
     let semestre!: Semestre;
     do {
-      const pagina = await this.listarCentral({ ...q, cursor, limit: LOTE_REPORTE });
+      const pagina = await this.paginaCentral({ ...q, cursor, limit: LOTE_REPORTE });
       semestre = pagina.semestre;
       filas.push(...pagina.filas);
       cursor = pagina.siguienteCursor ?? undefined;
@@ -298,8 +311,8 @@ export class HorasSemestreService {
    * Totales por carrera. ponytail: el modelo Asociacion aun no existe (fase ASO);
    * cuando exista, agrupar por asociacion a partir de las carreras que representa.
    */
-  async totales(q: HorasCentralQueryDto) {
-    const { semestre, filas } = await this.todasLasFilas(q);
+  async totales(idActor: number, q: HorasCentralQueryDto) {
+    const { semestre, filas } = await this.todasLasFilas(idActor, q);
     const vacio = (f: FilaHorasCentral) => ({
       idCarrera: f.idCarrera,
       carrera: f.carrera,
