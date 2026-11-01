@@ -23,6 +23,7 @@ comprobación en cada endpoint administrativo. Ninguna ruta de este inventario e
 | `/dashboard/admin/sprints` | Calendario de Sprints | Supervisión de Sprints | — |
 | `/dashboard/admin/apelaciones` | Apelaciones | Sprint 7 · VIEW-18 (F015) | — |
 | `/dashboard/admin/metricas` | Tendencias de uso | Sprint 9 · página propia de las métricas de HU-178 (T-301); hasta el cierre del Sprint era el ancla `/dashboard/admin#metricas` (T-321) | `GET /admin/metricas` (HU-178) |
+| `/dashboard/admin/horas` | Horas por semestre | HRS · vista central de las horas beca y de extensión de todos los estudiantes del semestre, con filtros, totales por asociación y reportes CSV y PDF | `GET /admin/horas-semestre` |
 | `/dashboard/admin/usuarios` | Gestión de Usuarios | Administración de cuentas | — |
 | `/dashboard/admin/solicitudes-recuperacion` | Recuperación de contraseña | HU-14 | — |
 | `/dashboard/admin/cuentas-pendientes` | Cuentas pendientes | HU-179 (PR #270); colocada en la estructura por T-321 | `GET /admin/cuentas-pendientes` |
@@ -41,7 +42,7 @@ El menú se agrupa por tema de trabajo. «Panel Admin» va suelto arriba y los g
 | Usuarios | Gestión de Usuarios · Recuperación de contraseña | Todo lo que se hace sobre una cuenta: consultarla, cambiar su estado y devolverle el acceso. |
 | Proyectos | Activos · Solicitudes de publicación · Solicitudes de cierre · Cerrados · Calendario de Sprints | El ciclo de vida de un proyecto, de la publicación al cierre, más la supervisión de sus Sprints. |
 | Gobernanza | Apelaciones | Decisiones sobre el liderazgo de un proyecto, que resuelve la administración. |
-| Métricas | Tendencias de uso | Las métricas de uso de la plataforma (HU-178), en su propia página. |
+| Métricas | Tendencias de uso · Horas por semestre | Las métricas de uso de la plataforma (HU-178) y la vista central de horas del semestre (HRS), cada una en su propia página. |
 | Comunicación | Anuncios | Avisos que la administración publica como banner en el dashboard (HU-191): crear, editar y despublicar. |
 | Verificación y seguridad | Cuentas pendientes · Eventos de seguridad | Supervisión de accesos y cuentas: la bandeja de cuentas que esperan verificación (HU-179), con su contador, y el visor de eventos. |
 

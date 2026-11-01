@@ -283,6 +283,7 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Calendario de Sprints',
     'Apelaciones',
     'Tendencias de uso',
+    'Horas por semestre',
     'Anuncios',
     'Cuentas pendientes',
     'Eventos de seguridad',
@@ -517,7 +518,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
         items: ['Activos', 'Solicitudes de publicación', 'Solicitudes de cierre', 'Cerrados', 'Calendario de Sprints'],
       },
       { grupo: 'Gobernanza', items: ['Apelaciones'] },
-      { grupo: 'Métricas', items: ['Tendencias de uso'] },
+      { grupo: 'Métricas', items: ['Tendencias de uso', 'Horas por semestre'] },
       { grupo: 'Comunicación', items: ['Anuncios'] },
       { grupo: 'Verificación y seguridad', items: ['Cuentas pendientes', 'Eventos de seguridad'] },
     ]);
@@ -688,7 +689,10 @@ describe('Métricas de uso en la estructura (T-321 · HU-178, FG08-C01)', () => 
 
   it('«Tendencias de uso» está en el grupo «Métricas», una sola vez', () => {
     const grupo = adminNavEntries.find((e) => 'type' in e && e.type === 'group' && e.label === 'Métricas');
-    expect(grupo && 'items' in grupo ? grupo.items.map((i) => [i.label, i.href]) : []).toEqual([['Tendencias de uso', HREF]]);
+    expect(grupo && 'items' in grupo ? grupo.items.map((i) => [i.label, i.href]) : []).toEqual([
+      ['Tendencias de uso', HREF],
+      ['Horas por semestre', '/dashboard/admin/horas'],
+    ]);
     expect(flattenNavEntries(adminNavEntries).filter((d) => /m[eé]trica|tendencia/i.test(d.label))).toHaveLength(1);
   });
 

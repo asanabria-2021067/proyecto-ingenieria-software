@@ -23,6 +23,7 @@ const LINEA_BASE: Record<string, Medida> = {
   '/dashboard/admin/cuentas-pendientes': { px: 1, radio: 5, hex: 0, boton: 3, titular: false },
   // Página propia de «Tendencias de uso»: nació ya con los tokens; su línea base es su primera medición.
   '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/horas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   // HU-191 (T-352): nació ya con los tokens; su línea base es su primera medición.
   '/dashboard/admin/anuncios': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
@@ -43,6 +44,7 @@ const ESTADO_ACTUAL: Record<string, Medida> = {
   // Al pasar a la tabla compartida perdió su radio literal y sus tres `<button>` propios.
   '/dashboard/admin/cuentas-pendientes': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/horas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/anuncios': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/apelaciones': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },

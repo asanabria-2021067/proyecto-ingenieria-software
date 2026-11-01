@@ -40,6 +40,7 @@ motivo de comentario» de `docs/design-system.md`.
 | `/dashboard/admin/solicitudes-recuperacion` | sí | 1 | 3 | 2 | 0 | `app/dashboard/admin/solicitudes-recuperacion/page.tsx` |
 | `/dashboard/admin/cuentas-pendientes` | no | 1 | 5 | 3 | 0 | `app/dashboard/admin/cuentas-pendientes/page.tsx` |
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/metricas/page.tsx` |
+| `/dashboard/admin/horas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/horas/page.tsx` |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/seguridad/page.tsx` |
 | `/dashboard/admin/anuncios` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/anuncios/page.tsx` |
 | `/dashboard/admin/botones` | sí | 0 | 0 | 1 | 0 | `app/dashboard/admin/botones/page.tsx` |
@@ -105,6 +106,7 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin/solicitudes-recuperacion` | sí | 0 | 2 | 2 | 0 |
 | `/dashboard/admin/cuentas-pendientes` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/horas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/anuncios` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/apelaciones` | sí | 0 | 0 | 0 | 0 |
