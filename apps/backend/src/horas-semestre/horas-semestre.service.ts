@@ -241,7 +241,12 @@ export class HorasSemestreService {
         where: {
           idUsuario: { gt: cursor },
           estado: 'ACTIVO',
-          perfil: { is: q.idCarrera ? { idCarrera: q.idCarrera } : {} },
+          perfil: {
+            is: {
+              ...(q.idCarrera ? { idCarrera: q.idCarrera } : {}),
+              ...(q.idAsociacion ? { carrera: { asociaciones: { some: { idAsociacion: q.idAsociacion } } } } : {}),
+            },
+          },
         },
         orderBy: { idUsuario: 'asc' },
         take: lote,

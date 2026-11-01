@@ -15,6 +15,8 @@ import {
 import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
 import { MyHoursRequirements } from '@/components/hours/my-hours-requirements';
 import { MyHoursProjectList } from '@/components/hours/my-hours-project-list';
+import { SemestreHorasCard } from '@/components/hours/semestre-horas-card';
+import { SemestreHorasHistorial } from '@/components/hours/semestre-horas-historial';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { useMisHoras } from '@/hooks/use-my-hours';
 import { formatearHoras } from '@/lib/hours/format';
@@ -100,6 +102,8 @@ function Contenido({ vista }: { vista: MisHorasView }) {
 
   return (
     <>
+      <SemestreHorasCard editable />
+
       {/* Tres KPI por fila solo si el contenido mide al menos 42rem: con la
           sidebar global abierta, a 768 px quedan ~500 px y no caben. */}
       <section aria-label="Resumen de horas" className="grid gap-grid @2xl/mis-horas:grid-cols-3">
@@ -133,6 +137,8 @@ function Contenido({ vista }: { vista: MisHorasView }) {
       <MyHoursRequirements requisitos={vista.requisitos} porTipo={vista.porTipo} />
 
       {vista.proyectos.length === 0 ? <SinHoras /> : <MyHoursProjectList proyectos={vista.proyectos} />}
+
+      <SemestreHorasHistorial />
     </>
   );
 }

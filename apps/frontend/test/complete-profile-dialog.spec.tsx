@@ -39,6 +39,13 @@ vi.mock('@/lib/services/users', () => ({
   addExperiencia: (e: unknown) => addExperienciaMock(e),
 }));
 
+const getHorasActualMock = vi.fn();
+const putHorasActualMock = vi.fn();
+vi.mock('@/lib/services/horas-semestre', () => ({
+  getHorasActual: () => getHorasActualMock(),
+  putHorasActual: (d: unknown) => putHorasActualMock(d),
+}));
+
 const uploadToCloudinaryMock = vi.fn();
 vi.mock('@/lib/cloudinary', () => ({
   uploadToCloudinary: (file: File, folder: string) => uploadToCloudinaryMock(file, folder),
@@ -96,31 +103,44 @@ beforeEach(() => {
   addExperienciaMock.mockResolvedValue({});
   uploadToCloudinaryMock.mockResolvedValue({ url: 'https://cloudinary/foto.png' });
   useCurrentUserMock.mockReturnValue({ data: baseUser() });
+  getHorasActualMock.mockResolvedValue({
+    semestre: { anio: 2026, periodo: 2, inicio: '2026-07-01', fin: '2026-12-31' },
+    registro: null,
+    necesitaRegistro: true,
+  });
+  putHorasActualMock.mockResolvedValue({});
   global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
 });
 
-function renderDialog(opts: { user?: UserProfile; allowClose?: boolean } = {}) {
+function renderDialog(opts: { user?: UserProfile; allowClose?: boolean; soloHoras?: boolean } = {}) {
   useCurrentUserMock.mockReturnValue({ data: opts.user ?? baseUser() });
   const onComplete = vi.fn();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
   render(
     <QueryClientProvider client={queryClient}>
-      <CompleteProfileDialog open={true} onComplete={onComplete} allowClose={opts.allowClose ?? false} />
+      <CompleteProfileDialog
+        open={true}
+        onComplete={onComplete}
+        allowClose={opts.allowClose ?? false}
+        soloHoras={opts.soloHoras}
+      />
     </QueryClientProvider>,
   );
   return { onComplete, invalidateSpy };
 }
 
-async function avanzarHasta(pasoDestino: number) {
+// Los indices son los del asistente sin el paso de horas del semestre (paso 2 de 6): 1 = habilidades ... 4 = ultimo.
+async function avanzarHasta(pasoSinHoras: number) {
+  const pasoDestino = pasoSinHoras === 0 ? 0 : pasoSinHoras + 1;
   const leerPasoActual = () => {
-    const texto = screen.getByText(/Paso \d de 5/).textContent ?? '';
-    return Number(texto.match(/Paso (\d) de 5/)?.[1] ?? '1') - 1;
+    const texto = screen.getByText(/Paso \d de 6/).textContent ?? '';
+    return Number(texto.match(/Paso (\d) de 6/)?.[1] ?? '1') - 1;
   };
   while (leerPasoActual() < pasoDestino) {
     const siguiente = leerPasoActual() + 1;
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-    await screen.findByText(new RegExp(`Paso ${siguiente + 1} de 5`));
+    await screen.findByText(new RegExp(`Paso ${siguiente + 1} de 6`));
   }
 }
 
@@ -335,7 +355,7 @@ describe('CompleteProfileDialog (T-203)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     await waitFor(() => expect(updateProfileMock).toHaveBeenCalled());
-    expect(await screen.findByText(/Paso 1 de 5/)).toBeInTheDocument();
+    expect(await screen.findByText(/Paso 1 de 6/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Siguiente/i })).not.toBeDisabled();
   });
 
@@ -364,7 +384,7 @@ describe('CompleteProfileDialog (T-203)', () => {
     expect(botonGuardando).toBeDisabled();
 
     resolverUpdate?.();
-    await screen.findByText(/Paso 2 de 5/);
+    await screen.findByText(/Paso 2 de 6/);
   });
 
   it('sin ninguna experiencia agregada (estado vacio), guardar no llama a addExperiencia y aun asi completa', async () => {
@@ -382,5 +402,57 @@ describe('CompleteProfileDialog (T-203)', () => {
     await screen.findByDisplayValue('10');
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onComplete).not.toHaveBeenCalled();
+  });
+  it('paso de horas del semestre: pregunta por el semestre actual, parte de la meta del perfil y guarda el registro', async () => {
+    const user = baseUser({ perfil: { ...baseUser().perfil!, horasBecaRequeridas: 150 } });
+    renderDialog({ user });
+    await avanzarHasta(0);
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    await screen.findByText(/Horas del semestre - Paso 2 de 6/);
+
+    expect(await screen.findByText('2.º semestre 2026')).toBeInTheDocument();
+    expect(screen.getByLabelText('¿Cuántas horas beca debes completar este semestre?')).toHaveValue(150);
+    fireEvent.change(screen.getAllByLabelText('¿Cuántas llevas ya este semestre?')[0], { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    await waitFor(() =>
+      expect(putHorasActualMock).toHaveBeenCalledWith({
+        metaBeca: 150,
+        becaDeclarada: 12,
+        metaExtension: null,
+        extensionDeclarada: 0,
+      }),
+    );
+    await screen.findByText(/Habilidades - Paso 3 de 6/);
+  });
+
+  it('el paso de horas es opcional: Omitir no guarda nada y un valor invalido bloquea Siguiente', async () => {
+    renderDialog();
+    await avanzarHasta(0);
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    await screen.findByText(/Paso 2 de 6/);
+
+    fireEvent.change(screen.getAllByLabelText('¿Cuántas llevas ya este semestre?')[0], { target: { value: '-1' } });
+    expect(screen.getByRole('button', { name: /Siguiente/i })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Omitir este paso/i }));
+    await screen.findByText(/Habilidades - Paso 3 de 6/);
+    expect(putHorasActualMock).not.toHaveBeenCalled();
+  });
+
+  it('soloHoras (perfil completo, falta el registro): un unico paso que guarda y completa', async () => {
+    const { onComplete } = renderDialog({ soloHoras: true });
+    await screen.findByText(/Horas del semestre - Paso 1 de 1/);
+    expect(screen.queryByRole('button', { name: /Anterior/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Finalizar/i }));
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    expect(putHorasActualMock).toHaveBeenCalledWith({
+      metaBeca: null,
+      becaDeclarada: 0,
+      metaExtension: null,
+      extensionDeclarada: 0,
+    });
+    expect(updateProfileMock).not.toHaveBeenCalled();
   });
 });

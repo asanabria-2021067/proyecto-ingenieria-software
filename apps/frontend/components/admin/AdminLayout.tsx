@@ -101,6 +101,7 @@ export const adminNavEntries: NavEntry[] = [
     items: [
       // HU-178: las métricas de uso tienen página propia; el Panel Admin solo conserva un resumen.
       { href: ADMIN_METRICS_ROUTE, label: 'Tendencias de uso', icon: TrendingUp },
+      { href: '/dashboard/admin/horas', label: 'Horas por semestre', icon: Clock },
     ],
   },
   {

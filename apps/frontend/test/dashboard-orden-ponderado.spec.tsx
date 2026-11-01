@@ -37,6 +37,8 @@ vi.mock('@/hooks/use-current-user', () => ({
   perfilPospuesto: () => false,
   PERFIL_POSPUESTO_KEY: 'perfil_asistente_pospuesto',
 }));
+vi.mock('@/hooks/use-horas-semestre', () => ({ useHorasActual: () => ({ data: undefined }) }));
+vi.mock('@/components/hours/semestre-horas-card', () => ({ SemestreHorasCard: () => null }));
 vi.mock('@/hooks/use-social', () => ({
   useFeedSocial: () => ({ proyectosDeAmigos: [], proyectosDeSeguidos: [] }),
 }));
