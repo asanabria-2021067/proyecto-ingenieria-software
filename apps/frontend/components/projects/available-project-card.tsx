@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Blend, Bookmark, Check, Clock, Eye, Lock, MapPin, Monitor, Pencil, Pin, Trash2, Users } from 'lucide-react';
+import { Blend, Bookmark, Building2, Check, Clock, Eye, Lock, MapPin, Monitor, Pencil, Pin, Trash2, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
@@ -23,7 +23,7 @@ export type CreadorProyectoResumen = {
 /** Item de la lista de "Proyectos Disponibles": ProyectoResumen + creador + cupos por rol. */
 export type ProyectoDisponibleResumen = Omit<ProyectoResumen, 'roles'> & {
   creador?: CreadorProyectoResumen | null;
-  roles?: { cupos: number }[];
+  roles?: { cupos: number; cuposDisponibles?: number }[];
   /** Llega con sesión y sin q: algún rol pide la carrera del usuario. */
   mismaCarrera?: boolean;
 };
@@ -306,6 +306,8 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
     else guardar.mutate(idProyecto);
   };
 
+  const publicadoPor = proyecto.organizaciones?.[0]?.organizacion.nombreOrganizacion ?? null;
+
   const tipoStyle = tipoBadgeStyle(tipoProyecto);
   const ModalidadIcon = MODALIDAD_ICON[modalidadProyecto as ModalidadProyecto] ?? MapPin;
 
@@ -378,11 +380,9 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
 
     const roles = props.proyecto.roles ?? [];
     const totalRoles = props.proyecto._count?.roles ?? roles.length;
-    const rolesDisponibles = roles.filter((r) => r.cupos > 0).length;
-    const chip =
-      props.proyecto.intereses?.[0]?.interes.nombreInteres ??
-      props.proyecto.organizaciones?.[0]?.organizacion.nombreOrganizacion ??
-      null;
+    // Los participantes de una organización ocupan cupos: el backend manda los libres.
+    const rolesDisponibles = roles.filter((r) => (r.cuposDisponibles ?? r.cupos) > 0).length;
+    const chip = props.proyecto.intereses?.[0]?.interes.nombreInteres ?? null;
     const creador = props.proyecto.creador ?? null;
 
     metadataExtra = (
@@ -491,6 +491,15 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
       <p className="mt-inline text-[13px] leading-4.5 font-normal text-on-surface-variant line-clamp-3">
         {descripcionProyecto || 'Sin descripción disponible.'}
       </p>
+
+      {publicadoPor && (
+        <p className="mt-inline flex items-center gap-1.5 text-[12px] text-on-surface-variant">
+          <Building2 aria-hidden="true" className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">
+            Publicado por <span className="font-semibold text-on-surface">{publicadoPor}</span>
+          </span>
+        </p>
+      )}
 
       {/* Metadatos */}
       <div className="mt-stack flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px]">

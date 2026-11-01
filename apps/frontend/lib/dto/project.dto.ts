@@ -107,6 +107,8 @@ export interface ProyectoListItemDTO {
   estadoProyecto: string;
   modalidadProyecto: string;
   descripcionProyecto: string | null;
+  /** Organización dueña («Publicado por»), la PRINCIPAL primero; vacío en proyectos personales. */
+  organizaciones?: { organizacion: { nombreOrganizacion: string } }[];
   /**
    * T-251/T-252: solo presentes cuando el pedido tenía sesión — amigos
    * ACTIVOS del usuario que participan en el proyecto y si alguno de sus
@@ -210,6 +212,10 @@ export interface CreateProjectPayload {
   fechaInicio?: string;
   fechaFinEstimada?: string;
   organizacionesIds?: number[];
+  /** «¿A nombre de quién?»: ausente = proyecto personal. */
+  idOrganizacion?: number;
+  /** Miembros de la organización que entran directo; `indiceRol` es la posición dentro de `roles`. */
+  participantes?: { idUsuario: number; indiceRol: number }[];
   roles?: {
     nombreRol: string;
     descripcionRolProyecto?: string;
