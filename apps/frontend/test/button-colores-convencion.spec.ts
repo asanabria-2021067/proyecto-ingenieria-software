@@ -28,12 +28,9 @@ const SUELTO = new RegExp(
 );
 
 function tsx(dir: string): string[] {
-  return readdirSync(dir).flatMap((nombre) => {
-    if (nombre === 'node_modules' || nombre === '.next') return [];
-    const ruta = join(dir, nombre);
-    if (statSync(ruta).isDirectory()) return tsx(ruta);
-    return ruta.endsWith('.tsx') ? [ruta] : [];
-  });
+  return readdirSync(dir, { recursive: true })
+    .map((r) => join(dir, String(r)))
+    .filter((r) => r.endsWith('.tsx') && !/node_modules|\.next/.test(r));
 }
 
 /** Etiquetas de apertura `<Button ...>` / `<button ...>` (respeta `>` dentro de `{}`). */
@@ -58,14 +55,21 @@ function etiquetasBoton(fuente: string): { texto: string; linea: number }[] {
   return salida;
 }
 
+/** Constantes de clases que acaban en botones (`const X_ACTION = {...}`, `actionClasses`...). */
+function constantesBoton(fuente: string): { texto: string; linea: number }[] {
+  const re = /const\s+\w*(?:ACTION|BUTTON|BTN|actionClasses|buttonClasses)\w*[^=\n]*=[\s\S]*?\n[}\]](?: as const)?;/g;
+  return [...fuente.matchAll(re)].map((m) => ({ texto: m[0], linea: fuente.slice(0, m.index).split('\n').length }));
+}
+
 function infracciones(fuente: string): string[] {
-  return etiquetasBoton(fuente).flatMap(({ texto, linea }) =>
+  return [...etiquetasBoton(fuente), ...constantesBoton(fuente)].flatMap(({ texto, linea }) =>
     (texto.match(SUELTO) ?? []).map((c) => `línea ${linea}: ${c.trim()}`),
   );
 }
 
 describe('UI-1 · botones sin colores sueltos', () => {
   it('detecta colores de paleta y arbitrarios en <Button> y <button>', () => {
+    expect(infracciones("const BOTON_ACTION = {\n  a: 'bg-amber-600 text-white',\n};")).toHaveLength(2);
     expect(infracciones('<Button className="bg-red-500 text-white">x</Button>')).toHaveLength(2);
     expect(infracciones('<button className={`a ${y ? "hover:bg-[#153e26]" : ""}`}>x</button>')).toHaveLength(1);
     expect(infracciones('<Button variant="destructive" className="bg-primary text-on-surface">x</Button>')).toEqual([]);

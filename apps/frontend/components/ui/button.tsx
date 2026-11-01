@@ -18,7 +18,7 @@ const buttonVariants = cva(
       variant: {
         default: 'motion-action bg-action text-on-action hover:bg-action/90',
         destructive:
-          'motion-action motion-glow-danger bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
+          'motion-action motion-glow-danger bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',
         outline:
           'motion-control border bg-background shadow-xs hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
         secondary:

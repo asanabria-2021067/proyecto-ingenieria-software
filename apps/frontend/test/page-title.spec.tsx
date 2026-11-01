@@ -20,12 +20,9 @@ const PERMITIDOS: Record<string, string> = {
 };
 
 function tsx(dir: string): string[] {
-  return readdirSync(dir).flatMap((n) => {
-    if (n === 'node_modules' || n === '.next') return [];
-    const ruta = join(dir, n);
-    if (statSync(ruta).isDirectory()) return tsx(ruta);
-    return ruta.endsWith('.tsx') ? [ruta] : [];
-  });
+  return readdirSync(dir, { recursive: true })
+    .map((r) => join(dir, String(r)))
+    .filter((r) => r.endsWith('.tsx') && !/node_modules|\.next/.test(r));
 }
 
 describe('UI-2 · PageTitle', () => {

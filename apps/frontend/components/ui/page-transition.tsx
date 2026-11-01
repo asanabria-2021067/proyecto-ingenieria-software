@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { animate, useReducedMotion } from 'framer-motion';
 
 /** Tarjetas estándar (`.card-base`, `Card`); las arrastrables (dnd-kit) se saltan. */
@@ -18,11 +18,13 @@ export function PageTransition({ children }: { children: ReactNode }) {
   const raiz = useRef<HTMLDivElement>(null);
   const reducir = useReducedMotion();
 
-  useEffect(() => {
+  // Antes del pintado: evita el destello a opacidad plena. Sin `y` en la raíz: un transform residual
+  // volvería `position: fixed` relativo al contenedor.
+  useLayoutEffect(() => {
     const nodo = raiz.current;
     if (!nodo || reducir) return;
 
-    animate(nodo, { opacity: [0, 1], y: [6, 0] }, SALIDA);
+    animate(nodo, { opacity: [0, 1] }, SALIDA);
 
     let lote = 0;
     const revelar = (el: Element) => {

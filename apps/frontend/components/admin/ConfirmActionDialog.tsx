@@ -28,7 +28,7 @@ const actionClasses: Record<string, string> = {
   destructive:
     'motion-glow-danger bg-error text-on-error hover:bg-error/90 rounded-md px-4 py-2 text-sm font-bold',
   warning:
-    'motion-glow-warning bg-amber-600 text-white hover:bg-amber-700 rounded-md px-4 py-2 text-sm font-bold',
+    'motion-glow-warning bg-status-warning text-on-status-warning hover:bg-status-warning/90 rounded-md px-4 py-2 text-sm font-bold',
   default:
     'motion-glow-primary bg-primary text-on-primary hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-bold',
 };

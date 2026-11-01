@@ -104,7 +104,7 @@ export const REQUEST_INBOX_ACTION = {
   primary:
     'inline-flex items-center gap-1.5 rounded-control bg-primary px-3 py-2 text-xs font-bold text-on-primary outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary/40',
   attention:
-    'inline-flex items-center gap-1.5 rounded-control bg-amber-600 px-3 py-2 text-xs font-bold text-white outline-none transition-colors hover:bg-amber-700 focus-visible:ring-2 focus-visible:ring-primary/40',
+    'inline-flex items-center gap-1.5 rounded-control bg-status-warning px-3 py-2 text-xs font-bold text-on-status-warning outline-none transition-colors hover:bg-status-warning/90 focus-visible:ring-2 focus-visible:ring-primary/40',
   outline:
     'inline-flex items-center gap-1.5 rounded-control border border-outline-variant px-3 py-2 text-xs font-bold text-on-surface outline-none transition-colors hover:bg-surface-container-high focus-visible:ring-2 focus-visible:ring-primary/40',
 } as const;

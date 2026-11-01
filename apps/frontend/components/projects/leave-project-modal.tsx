@@ -177,7 +177,7 @@ export function LeaveProjectModal({ open, onOpenChange, idProyecto, onSuccess }:
                 <Button
                   type="submit"
                   disabled={crearSolicitud.isPending}
-                  className="h-10 gap-1.5 rounded-md bg-tertiary text-xs font-bold text-on-tertiary hover:bg-tertiary/90 motion-glow-warning"
+                  className="h-10 gap-1.5 rounded-md bg-status-warning text-xs font-bold text-on-status-warning hover:bg-status-warning/90 motion-glow-warning"
                 >
                   {crearSolicitud.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
                   Continuar
