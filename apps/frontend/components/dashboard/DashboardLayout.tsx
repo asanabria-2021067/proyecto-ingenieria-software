@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
+import { useMisJuntas } from '@/hooks/use-asociaciones';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { GlobalSearchInput } from '@/components/layout/global-search-input';
 import { UserMenu } from '@/components/dashboard/UserMenu';
@@ -154,6 +155,7 @@ export default function DashboardLayout({
   const { latestNotification, isConnected: notificationsConnected } =
     useRealtimeNotifications(!!user);
   const handleLogout = useLogout();
+  const { data: juntas } = useMisJuntas(!!user && !isAdminUser(user));
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const { collapsed: sidebarCollapsed } = useDashboardSidebarCollapsed();
   const { total: chatNoLeidos } = useChatNoLeidos();
@@ -249,7 +251,7 @@ export default function DashboardLayout({
           id="dashboard-account-menu"
           className={`admin-sidebar-footer py-4 ${sidebarCollapsed ? 'flex justify-center px-2' : 'px-3'}`}
         >
-          <UserMenu user={user} onLogout={handleLogout} variant={sidebarCollapsed ? 'compact' : 'sidebar'} theme="admin" menuClassName="student-account-menu" />
+          <UserMenu user={user} onLogout={handleLogout} variant={sidebarCollapsed ? 'compact' : 'sidebar'} theme="admin" menuClassName="student-account-menu" juntas={juntas} />
         </div>
       </aside>
 
@@ -379,7 +381,7 @@ export default function DashboardLayout({
             </Link>
           );
         })}
-        <UserMenu user={user} onLogout={handleLogout} variant="compact" />
+        <UserMenu user={user} onLogout={handleLogout} variant="compact" juntas={juntas} />
       </nav>
 
       <OnboardingTour />
