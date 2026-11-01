@@ -52,7 +52,11 @@ describe('AssociationDashboardService', () => {
   it('proyectos: solo los de la asociacion, con avance de tareas y sprints, integrantes y horas', async () => {
     const { service, prisma } = crear();
     const filas = await service.proyectos(3);
-    expect(prisma.proyecto.findMany.mock.calls[0][0].where).toEqual({ idAsociacion: 3, eliminadoEn: null });
+    expect(prisma.proyecto.findMany.mock.calls[0][0].where).toEqual({
+      idAsociacion: 3,
+      eliminadoEn: null,
+      estadoProyecto: { in: ['PUBLICADO', 'EN_PROGRESO', 'EN_SOLICITUD_CIERRE', 'CERRADO'] },
+    });
     expect(filas[0]).toEqual({
       idProyecto: 1,
       titulo: 'Feria',

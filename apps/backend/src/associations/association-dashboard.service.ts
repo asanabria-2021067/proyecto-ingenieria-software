@@ -27,7 +27,11 @@ export class AssociationDashboardService {
 
   async proyectos(idAsociacion: number): Promise<(FilaProyectoAsociacion & { idProyecto: number })[]> {
     const proyectos = await this.prisma.proyecto.findMany({
-      where: { idAsociacion, eliminadoEn: null },
+      where: {
+        idAsociacion,
+        eliminadoEn: null,
+        estadoProyecto: { in: ['PUBLICADO', 'EN_PROGRESO', 'EN_SOLICITUD_CIERRE', 'CERRADO'] },
+      },
       orderBy: { idProyecto: 'desc' },
       select: { idProyecto: true, tituloProyecto: true, estadoProyecto: true },
     });

@@ -65,6 +65,7 @@ describeIntegration('dashboard de asociacion - permisos y regla en riesgo (Postg
     sinRegistroA1: 0,
     inactivoA1: 0,
     proyecto: 0,
+    borrador: 0,
   };
   const tokens: Record<string, string> = {};
   const usuarios: number[] = [];
@@ -133,6 +134,8 @@ describeIntegration('dashboard de asociacion - permisos y regla en riesgo (Postg
 
     ids.proyecto = (await createIntegrationProject(prisma, ids.presA, { tituloProyecto: `Proyecto Aso ${marca}`, estadoProyecto: 'EN_PROGRESO' })).idProyecto;
     await prisma.proyecto.update({ where: { idProyecto: ids.proyecto }, data: { idAsociacion: ids.asociacionA } });
+    ids.borrador = (await createIntegrationProject(prisma, ids.presA, { tituloProyecto: `Borrador Aso ${marca}`, estadoProyecto: 'BORRADOR' })).idProyecto;
+    await prisma.proyecto.update({ where: { idProyecto: ids.borrador }, data: { idAsociacion: ids.asociacionA } });
     await prisma.tarea.createMany({
       data: [
         { idProyecto: ids.proyecto, creadaPor: ids.presA, tituloTarea: 'Hecha', estadoTarea: 'HECHO' },
@@ -144,7 +147,7 @@ describeIntegration('dashboard de asociacion - permisos y regla en riesgo (Postg
   afterAll(async () => {
     try {
       await prisma.tarea.deleteMany({ where: { idProyecto: ids.proyecto || -1 } });
-      await prisma.proyecto.deleteMany({ where: { idProyecto: ids.proyecto || -1 } });
+      await prisma.proyecto.deleteMany({ where: { idProyecto: { in: [ids.proyecto || -1, ids.borrador || -1] } } });
       await prisma.juntaAsociacion.deleteMany({ where: { idAsociacion: { in: [ids.asociacionA, ids.asociacionB] } } });
       await prisma.asociacion.deleteMany({ where: { nombre: { endsWith: marca } } });
       await prisma.registroHorasSemestre.deleteMany({ where: { idUsuario: { in: usuarios } } });
@@ -258,6 +261,7 @@ describeIntegration('dashboard de asociacion - permisos y regla en riesgo (Postg
     expect(await res.json()).toEqual([
       expect.objectContaining({ idProyecto: ids.proyecto, estado: 'EN_PROGRESO', avanceTareasPct: 50, avanceSprintsPct: 0 }),
     ]);
+    expect((await (await pedir(`/asociaciones/${ids.asociacionA}/proyectos`, 'presA')).json()).map((p: { idProyecto: number }) => p.idProyecto)).not.toContain(ids.borrador);
     expect(await (await pedir(`/asociaciones/${ids.asociacionB}/proyectos`, 'presB')).json()).toEqual([]);
 
     const csv = await (await pedir(`/asociaciones/${ids.asociacionA}/proyectos/csv`, 'presA')).text();
