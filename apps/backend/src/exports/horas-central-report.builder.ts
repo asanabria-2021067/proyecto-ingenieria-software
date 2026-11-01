@@ -54,7 +54,7 @@ const filaTabla = (f: FilaReporteHoras) => [
 
 export const buildHorasCsv = (filas: FilaReporteHoras[]) => buildCsv([...HEADER], filas.map(filaTabla));
 
-export function renderHorasPdf(titulo: string, filas: FilaReporteHoras[]): Buffer {
+export function renderTablaPdf(titulo: string, head: readonly string[], body: (string | number)[][]): Buffer {
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
   doc.addFileToVFS(FONT_FILE, fontBase64());
   doc.addFont(FONT_FILE, PROJECT_REPORT_FONT, 'normal');
@@ -63,8 +63,8 @@ export function renderHorasPdf(titulo: string, filas: FilaReporteHoras[]): Buffe
   doc.text(titulo, 40, 40);
   autoTable(doc, {
     startY: 56,
-    head: [[...HEADER]],
-    body: filas.map((f) => filaTabla(f).map(String)),
+    head: [[...head]],
+    body: body.map((fila) => fila.map(String)),
     styles: { font: PROJECT_REPORT_FONT, fontSize: 8 },
     headStyles: { font: PROJECT_REPORT_FONT, fontStyle: 'normal' },
     showHead: 'everyPage',
@@ -72,3 +72,6 @@ export function renderHorasPdf(titulo: string, filas: FilaReporteHoras[]): Buffe
   });
   return Buffer.from(doc.output('arraybuffer'));
 }
+
+export const renderHorasPdf = (titulo: string, filas: FilaReporteHoras[]) =>
+  renderTablaPdf(titulo, HEADER, filas.map(filaTabla));

@@ -34,7 +34,20 @@ export interface FilaHorasCentral {
   extensionAcreditada: number;
   faltaExtension: number | null;
   enRiesgo: boolean;
+  /** Solo en la vista de asociacion. */
+  proyectosActivos?: number;
 }
+
+export type TipoHoras = 'BECA' | 'EXTENSION';
+
+export interface FiltroCentral extends HorasCentralListQueryDto {
+  /** Solo con este tipo se evalua el riesgo. */
+  tipo?: TipoHoras;
+  busqueda?: string;
+  conProyectos?: boolean;
+}
+
+const ESTADOS_ACTIVOS = ['PUBLICADO', 'EN_PROGRESO', 'EN_SOLICITUD_CIERRE'] as const;
 
 const LOTE_EN_RIESGO = 200;
 const LOTE_REPORTE = 100;
@@ -228,19 +241,50 @@ export class HorasSemestreService {
     if (!rol) throw new ForbiddenException('Acceso restringido a administradores');
   }
 
-  private async paginaCentral(q: HorasCentralListQueryDto) {
+  /** Proyectos activos (participacion activa) por usuario. */
+  private async proyectosActivosPorUsuario(idsUsuario: number[]) {
+    const filas = await this.prisma.participacionProyecto.findMany({
+      where: {
+        idUsuario: { in: idsUsuario },
+        estadoParticipacion: 'ACTIVO',
+        rolProyecto: { proyecto: { estadoProyecto: { in: [...ESTADOS_ACTIVOS] }, eliminadoEn: null } },
+      },
+      select: { idUsuario: true, rolProyecto: { select: { idProyecto: true } } },
+    });
+    const mapa = new Map<number, Set<number>>();
+    for (const f of filas) {
+      const set = mapa.get(f.idUsuario) ?? new Set<number>();
+      set.add(f.rolProyecto.idProyecto);
+      mapa.set(f.idUsuario, set);
+    }
+    return mapa;
+  }
+
+  async paginaCentral(q: FiltroCentral) {
     const semestre = this.semestreDeQuery(q);
     const hoy = todayInGuatemala();
     const limit = q.limit ?? 50;
     const lote = q.enRiesgo ? LOTE_EN_RIESGO : limit + 1;
     const filas: FilaHorasCentral[] = [];
     let cursor = q.cursor ?? 0;
+    const terminos = (q.busqueda ?? '').trim().split(/\s+/).filter(Boolean);
 
     while (filas.length <= limit) {
       const usuarios = await this.prisma.usuario.findMany({
         where: {
           idUsuario: { gt: cursor },
           estado: 'ACTIVO',
+          ...(terminos.length
+            ? {
+                AND: terminos.map((t) => ({
+                  OR: [
+                    { nombre: { contains: t, mode: 'insensitive' as const } },
+                    { apellido: { contains: t, mode: 'insensitive' as const } },
+                    { perfil: { is: { carne: { contains: t, mode: 'insensitive' as const } } } },
+                  ],
+                })),
+              }
+            : {}),
           perfil: {
             is: {
               ...(q.idCarrera ? { idCarrera: q.idCarrera } : {}),
@@ -259,6 +303,7 @@ export class HorasSemestreService {
         },
       });
       const acreditadas = await this.acreditadasPorUsuario(semestre, usuarios.map((u) => u.idUsuario));
+      const proyectos = q.conProyectos ? await this.proyectosActivosPorUsuario(usuarios.map((u) => u.idUsuario)) : null;
       for (const u of usuarios) {
         cursor = u.idUsuario;
         const r = u.registrosHorasSemestre[0];
@@ -266,8 +311,8 @@ export class HorasSemestreService {
         const avanceBeca = (r?.becaDeclarada ?? 0) + acred.beca;
         const avanceExt = (r?.extensionDeclarada ?? 0) + acred.extension;
         const enRiesgo =
-          enRiesgoMeta(r?.metaBeca ?? null, avanceBeca, semestre, hoy) ||
-          enRiesgoMeta(r?.metaExtension ?? null, avanceExt, semestre, hoy);
+          (q.tipo !== 'EXTENSION' && enRiesgoMeta(r?.metaBeca ?? null, avanceBeca, semestre, hoy)) ||
+          (q.tipo !== 'BECA' && enRiesgoMeta(r?.metaExtension ?? null, avanceExt, semestre, hoy));
         if (q.enRiesgo && !enRiesgo) continue;
         filas.push({
           idUsuario: u.idUsuario,
@@ -285,6 +330,7 @@ export class HorasSemestreService {
           extensionAcreditada: acred.extension,
           faltaExtension: falta(r?.metaExtension ?? null, avanceExt),
           enRiesgo,
+          ...(proyectos && { proyectosActivos: proyectos.get(u.idUsuario)?.size ?? 0 }),
         });
         if (filas.length > limit) break;
       }
@@ -300,6 +346,11 @@ export class HorasSemestreService {
   /** Todas las filas que cumplen el filtro (totales y reportes). */
   async todasLasFilas(idActor: number, q: HorasCentralQueryDto) {
     await this.requireAdmin(idActor);
+    return this.recorrerTodas(q);
+  }
+
+  /** Igual que `todasLasFilas` sin verificar al actor: el llamador ya autorizo (junta de la asociacion). */
+  async recorrerTodas(q: FiltroCentral) {
     const filas: FilaHorasCentral[] = [];
     let cursor: number | undefined;
     let semestre!: Semestre;
