@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
 import { Tag } from '@/components/ui/tag';
 import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
-import { esProyectoCerrado } from '@/lib/organizations/roles';
 import { TIPO_LABEL } from '@/types';
 import type { TipoProyecto } from '@/types';
 import type { ProyectoDeOrganizacion } from '@/lib/types/organizations';
@@ -56,8 +55,8 @@ function Grupo({ titulo, proyectos, vacio }: { titulo: string; proyectos: Proyec
 
 /** Proyectos de la organización: activos y cerrados, cada uno con su avance por tareas. */
 export function OrgProyectos({ proyectos }: { proyectos: ProyectoDeOrganizacion[] }) {
-  const cerrados = proyectos.filter((p) => esProyectoCerrado(p.estadoProyecto));
-  const activos = proyectos.filter((p) => !esProyectoCerrado(p.estadoProyecto));
+  const cerrados = proyectos.filter((p) => p.estadoProyecto === 'CERRADO');
+  const activos = proyectos.filter((p) => p.estadoProyecto !== 'CERRADO');
   return (
     <div className="space-y-8">
       <Grupo titulo="Proyectos activos" proyectos={activos} vacio="Aún no hay proyectos activos." />

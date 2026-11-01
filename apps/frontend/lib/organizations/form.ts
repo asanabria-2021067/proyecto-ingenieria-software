@@ -2,14 +2,8 @@ import { safeExternalHref } from '@/lib/security/safe-url';
 
 export type ErroresOrganizacion = Partial<Record<'nombre' | 'descripcion' | 'sitioWeb' | 'logo', string>>;
 
-export interface DatosOrganizacion {
-  nombre: string;
-  descripcion: string;
-  sitioWeb: string;
-}
-
 /** Mismos límites que `CreateOrganizationDto`. */
-export function validarDatosOrganizacion({ nombre, descripcion }: Pick<DatosOrganizacion, 'nombre' | 'descripcion'>): ErroresOrganizacion {
+export function validarDatosOrganizacion({ nombre, descripcion }: { nombre: string; descripcion: string }): ErroresOrganizacion {
   const errores: ErroresOrganizacion = {};
   const limpio = nombre.trim();
   if (limpio.length < 3) errores.nombre = 'El nombre debe tener al menos 3 caracteres.';

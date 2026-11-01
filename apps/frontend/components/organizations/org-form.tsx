@@ -105,8 +105,8 @@ export function OrgForm({ org }: { org?: OrganizacionDetalle }) {
       const logoUrl = logo ? (await uploadToCloudinary(logo, 'organization-logos')).url : undefined;
       const datos = {
         nombreOrganizacion: nombre.trim(),
-        descripcionOrganizacion: descripcion.trim() || undefined,
-        sitioWeb: normalizeUrlInput(sitioWeb),
+        descripcionOrganizacion: org ? descripcion.trim() : descripcion.trim() || undefined,
+        sitioWeb: org ? sitioWeb.trim() : normalizeUrlInput(sitioWeb),
         logoUrl,
       };
       if (org) {

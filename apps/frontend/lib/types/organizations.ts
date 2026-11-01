@@ -1,7 +1,6 @@
 import type { ChatMensaje, ChatUsuario } from '@/lib/types/chat';
 
-export const ROLES_ORGANIZACION = ['PROPIETARIO', 'ADMINISTRADOR', 'EDITOR', 'LECTURA'] as const;
-export type RolOrganizacion = (typeof ROLES_ORGANIZACION)[number];
+export type RolOrganizacion = 'PROPIETARIO' | 'ADMINISTRADOR' | 'EDITOR' | 'LECTURA';
 
 export type VisibilidadOrganizacion = 'PUBLICA' | 'PRIVADA';
 

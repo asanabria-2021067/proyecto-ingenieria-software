@@ -38,6 +38,3 @@ export function rolesQueSePuedenAsignar(miRol: RolOpcional): RolOrganizacion[] {
   if (miRol === 'ADMINISTRADOR') return ['EDITOR', 'LECTURA'];
   return [];
 }
-
-
-export const esProyectoCerrado = (estado: string) => estado === 'CERRADO';
