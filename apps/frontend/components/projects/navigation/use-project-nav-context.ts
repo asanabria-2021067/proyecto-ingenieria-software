@@ -4,6 +4,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectMembers, type MiembroProyecto } from '@/hooks/use-project-members';
 import { useCurrentExitRequest } from '@/hooks/use-exit-request';
+import { useLectorOrganizacion } from '@/hooks/use-lector-organizacion';
 import type { ProjectNavActor, ProjectNavContext } from './project-nav-model';
 
 export interface ProjectNavState extends ProjectNavContext {
@@ -25,12 +26,13 @@ export interface ProjectNavState extends ProjectNavContext {
 export function useProjectNavContext(idProyecto: number): ProjectNavState {
   const { data: currentUser } = useCurrentUser();
   const { data: proyecto } = useProjectDetail(idProyecto);
-  const { members } = useProjectMembers(idProyecto);
+  const { members, isLoading: cargandoMiembros } = useProjectMembers(idProyecto);
 
   const currentUserId = currentUser?.idUsuario ?? null;
   const isLeader = currentUserId != null && proyecto != null && currentUserId === proyecto.creador.idUsuario;
   const esMiembro = currentUserId != null && members.some((m) => m.idUsuario === currentUserId);
-  const actor: ProjectNavActor = isLeader ? 'leader' : esMiembro ? 'participant' : 'visitor';
+  const { soloLectura } = useLectorOrganizacion(proyecto, cargandoMiembros ? undefined : members);
+  const actor: ProjectNavActor = isLeader ? 'leader' : esMiembro ? 'participant' : soloLectura ? 'org-reader' : 'visitor';
 
   // Solo el participante puede tener una solicitud de salida propia.
   const { request: solicitudSalida } = useCurrentExitRequest(idProyecto, { habilitado: actor === 'participant' });

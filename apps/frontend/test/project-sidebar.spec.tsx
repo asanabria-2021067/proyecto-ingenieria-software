@@ -32,6 +32,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 vi.mock('@/hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('@/hooks/use-project-members', () => ({ useProjectMembers: vi.fn() }));
+vi.mock('@/hooks/use-organizations', () => ({ useMisOrganizaciones: () => ({ data: [] }) }));
 // Doble mínimo: el dock global de chat tiene su propio spec; aquí solo
 // importa si el diálogo de "Nuevo chat" se abre, no su contenido.
 vi.mock('@/components/chat-dock/new-chat-dialog', () => ({

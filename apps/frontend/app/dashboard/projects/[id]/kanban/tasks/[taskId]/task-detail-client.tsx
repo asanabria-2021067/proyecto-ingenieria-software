@@ -47,6 +47,7 @@ import {
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
 import { TaskCommentsPanel } from '@/components/projects/task-comments-panel';
 import { TaskHoursSection } from '@/components/hours/task-hours-section';
+import { useLectorOrganizacion } from '@/hooks/use-lector-organizacion';
 import { TaskFormDialog } from '@/components/projects/task-form-dialog';
 import { CloseAssignmentForm } from '@/components/projects/close-assignment-form';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
@@ -153,7 +154,7 @@ function TaskDetailView({
   const { data: currentUser } = useCurrentUser();
   const { cambiarEstadoTarea, eliminarTarea, crearTarea, editarTarea, asignarTarea, desasignarTarea } =
     useProjectTasks(idProyecto);
-  const { members } = useProjectMembers(idProyecto);
+  const { members, isLoading: cargandoMiembros } = useProjectMembers(idProyecto);
   const {
     labels,
     isLoading: labelsLoading,
@@ -169,6 +170,7 @@ function TaskDetailView({
   const [cerrarTramoAbierto, setCerrarTramoAbierto] = useState(false);
 
   const isLeader = currentUser?.idUsuario === proyecto.creador.idUsuario;
+  const lectorOrganizacion = useLectorOrganizacion(proyecto, cargandoMiembros ? undefined : members);
   const asignado = tarea.asignacionActiva?.usuario ?? null;
   const esAsignadoActivo =
     currentUser != null && tarea.asignacionActiva?.idUsuario === currentUser.idUsuario;
@@ -566,12 +568,18 @@ function TaskDetailView({
               <Clock className="size-4 text-tertiary" aria-hidden="true" />
               Horas de la tarea
             </h2>
-            <TaskHoursSection
-              idProyecto={idProyecto}
-              idTarea={tarea.idTarea}
-              idUsuarioActual={currentUser?.idUsuario ?? null}
-              enabled
-            />
+            {lectorOrganizacion.soloLectura ? (
+              <p className="type-body text-text-secondary">
+                Las horas solo las ven quienes participan en el proyecto.
+              </p>
+            ) : (
+              <TaskHoursSection
+                idProyecto={idProyecto}
+                idTarea={tarea.idTarea}
+                idUsuarioActual={currentUser?.idUsuario ?? null}
+                enabled
+              />
+            )}
           </section>
 
           {/* Etiquetas (Sección 40) */}

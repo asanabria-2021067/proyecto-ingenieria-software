@@ -8,6 +8,8 @@ import { renderHook } from '@testing-library/react';
 vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 vi.mock('@/hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('@/hooks/use-project-members', () => ({ useProjectMembers: vi.fn() }));
+const organizaciones = vi.hoisted(() => ({ mias: [] as { idOrganizacion: number }[] }));
+vi.mock('@/hooks/use-organizations', () => ({ useMisOrganizaciones: () => ({ data: organizaciones.mias }) }));
 vi.mock('@/hooks/use-exit-request', () => ({ useCurrentExitRequest: vi.fn() }));
 
 import { useProjectNavContext } from '@/components/projects/navigation/use-project-nav-context';
@@ -25,6 +27,8 @@ function mockEscenario({
   estado = 'EN_PROGRESO',
   solicitud = null,
   sinProyecto = false,
+  organizacionesProyecto = [],
+  misOrganizaciones = [],
 }: {
   userId: number | null;
   creadorId?: number;
@@ -32,12 +36,24 @@ function mockEscenario({
   estado?: string;
   solicitud?: unknown;
   sinProyecto?: boolean;
+  organizacionesProyecto?: number[];
+  misOrganizaciones?: number[];
 }) {
+  organizaciones.mias = misOrganizaciones.map((idOrganizacion) => ({ idOrganizacion }));
   (useCurrentUser as any).mockReturnValue({ data: userId == null ? undefined : { idUsuario: userId } });
   (useProjectDetail as any).mockReturnValue({
     data: sinProyecto
       ? undefined
-      : { idProyecto: 42, tituloProyecto: 'Proyecto de prueba', estadoProyecto: estado, creador: { idUsuario: creadorId } },
+      : {
+          idProyecto: 42,
+          tituloProyecto: 'Proyecto de prueba',
+          estadoProyecto: estado,
+          creador: { idUsuario: creadorId },
+          organizaciones: organizacionesProyecto.map((idOrganizacion) => ({
+            idOrganizacion,
+            organizacion: { nombreOrganizacion: `Org ${idOrganizacion}` },
+          })),
+        },
   });
   (useProjectMembers as any).mockReturnValue({ members });
   (useCurrentExitRequest as any).mockReturnValue({ request: solicitud });
@@ -51,6 +67,24 @@ function ultimaLlamadaSalida() {
 describe('useProjectNavContext', () => {
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('miembro de la organización dueña que no participa: actor org-reader (solo lectura)', () => {
+    mockEscenario({ userId: 9, organizacionesProyecto: [5], misOrganizaciones: [5] });
+    const { result } = renderHook(() => useProjectNavContext(42));
+
+    expect(result.current.actor).toBe('org-reader');
+    expect(ultimaLlamadaSalida()).toEqual([42, { habilitado: false }]);
+  });
+
+  it('un miembro de otra organización sigue siendo visitante', () => {
+    mockEscenario({ userId: 9, organizacionesProyecto: [5], misOrganizaciones: [6] });
+    expect(renderHook(() => useProjectNavContext(42)).result.current.actor).toBe('visitor');
+  });
+
+  it('si el miembro de la organización participa, es participante', () => {
+    mockEscenario({ userId: 9, members: [{ idUsuario: 9 }], organizacionesProyecto: [5], misOrganizaciones: [5] });
+    expect(renderHook(() => useProjectNavContext(42)).result.current.actor).toBe('participant');
   });
 
   it('líder: actor leader, sin consultar su solicitud de salida', () => {

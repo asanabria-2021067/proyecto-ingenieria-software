@@ -23,6 +23,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 vi.mock('@/hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('@/hooks/use-project-members', () => ({ useProjectMembers: vi.fn() }));
+vi.mock('@/hooks/use-organizations', () => ({ useMisOrganizaciones: () => ({ data: [] }) }));
 vi.mock('@/hooks/use-exit-request', () => ({ useCurrentExitRequest: vi.fn(() => ({ request: null })) }));
 vi.mock('@/components/projects/leave-project-modal', () => ({ LeaveProjectModal: () => null }));
 
@@ -39,6 +40,7 @@ import { useProjectMembers } from '@/hooks/use-project-members';
 const ESCENARIOS: Record<ProjectNavActor, { userId: number; members: { idUsuario: number }[] }> = {
   leader: { userId: 1, members: [] },
   participant: { userId: 2, members: [{ idUsuario: 2 }] },
+  'org-reader': { userId: 9, members: [] },
   visitor: { userId: 9, members: [] },
 };
 

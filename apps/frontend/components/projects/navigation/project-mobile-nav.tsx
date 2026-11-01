@@ -11,7 +11,7 @@ import { ProjectNavList } from './project-nav-list';
 import { buildProjectActions, buildProjectNavGroups, flattenNavItems, resolveActiveHref } from './project-nav-model';
 import { useProjectNavContext } from './use-project-nav-context';
 
-const ACTOR_LABEL = { leader: 'Líder', participant: 'Participante' } as const;
+const ACTOR_LABEL = { leader: 'Líder', participant: 'Participante', 'org-reader': 'Solo lectura' } as const;
 
 /**
  * HU-154 (T-215): navegación contextual del proyecto en tablet y móvil
@@ -60,7 +60,7 @@ export function ProjectMobileNav({ idProyecto }: { idProyecto: number }) {
               variant="full"
               onNavigate={() => setAbiertoEn(null)}
             />
-            {nav.actor !== 'visitor' && (
+            {(nav.actor === 'leader' || nav.actor === 'participant') && (
               <ChatEquipoButton
                 idProyecto={idProyecto}
                 onAbrir={() => setAbiertoEn(null)}
