@@ -8,6 +8,8 @@ import { createProject, updateProject, getMyProjectById, submitProjectForReview 
 import { getCarreras, getHabilidades, type Carrera, type Habilidad } from '@/lib/services/catalogs';
 import { useMisOrganizaciones, useOrganizacion } from '@/hooks/use-organizations';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useMisJuntas } from '@/hooks/use-asociaciones';
+import { puedePublicarComoAsociacion } from '@/lib/asociaciones/vista';
 import {
   errorParticipantes,
   miembrosElegibles,
@@ -62,6 +64,7 @@ function NewProjectFormContent() {
   const [triedParcial, setTriedParcial] = useState(false);
   const [triedParticipantes, setTriedParticipantes] = useState(false);
   const [idOrganizacion, setIdOrganizacion] = useState<number | null>(null);
+  const [idAsociacion, setIdAsociacion] = useState<number | null>(null);
   const [participantes, setParticipantes] = useState<ParticipanteForm[]>([]);
   const orgPreseleccionada = useRef(false);
 
@@ -78,6 +81,8 @@ function NewProjectFormContent() {
   const { data: usuarioActual } = useCurrentUser();
   const { data: misOrganizaciones = [], isLoading: cargandoOrgs } = useMisOrganizaciones(editId === null);
   const orgsPublicables = organizacionesParaPublicar(misOrganizaciones);
+  const { data: misJuntas = [] } = useMisJuntas(editId === null);
+  const asociacionesPublicables = misJuntas.filter(puedePublicarComoAsociacion);
   const { data: orgElegida, isLoading: cargandoOrg } = useOrganizacion(idOrganizacion ?? 0);
   const orgParam = Number(searchParams.get('org')) || null;
 
@@ -172,6 +177,13 @@ function NewProjectFormContent() {
 
   const elegirOrganizacion = (id: number | null) => {
     setIdOrganizacion(id);
+    setIdAsociacion(null);
+    setParticipantes([]);
+  };
+
+  const elegirAsociacion = (id: number | null) => {
+    setIdAsociacion(id);
+    setIdOrganizacion(null);
     setParticipantes([]);
   };
 
@@ -211,6 +223,7 @@ function NewProjectFormContent() {
         .filter((req) => req.idHabilidad !== null && req.nivelMinimo !== '')
         .map((req) => ({ idHabilidad: req.idHabilidad!, nivelMinimo: req.nivelMinimo as NivelHabilidad, obligatorio: req.obligatorio })),
     })) : undefined,
+    ...(!editId && idAsociacion !== null && { idAsociacion }),
     ...(!editId && idOrganizacion !== null && {
       idOrganizacion,
       ...(participantes.length > 0 && { participantes: participantesPayload(form.roles, participantes) }),
@@ -458,6 +471,9 @@ function NewProjectFormContent() {
                 cargando={cargandoOrgs}
                 idOrganizacion={idOrganizacion}
                 onChange={elegirOrganizacion}
+                asociaciones={asociacionesPublicables}
+                idAsociacion={idAsociacion}
+                onChangeAsociacion={elegirAsociacion}
               />
             )}
             {pasoActual === 'datos' && <Step1 form={form} update={updateForm} errors={step1Errors} />}
@@ -484,7 +500,15 @@ function NewProjectFormContent() {
                 form={form}
                 saving={saving}
                 onSubmit={submit}
-                organizacion={!editId && idOrganizacion !== null ? (orgElegida?.nombreOrganizacion ?? null) : null}
+                organizacion={
+                  editId
+                    ? null
+                    : idAsociacion !== null
+                      ? `Asociación ${asociacionesPublicables.find((j) => j.idAsociacion === idAsociacion)?.nombre ?? ''}`
+                      : idOrganizacion !== null
+                        ? (orgElegida?.nombreOrganizacion ?? null)
+                        : null
+                }
                 participantes={participantes.map((p) => {
                   const m = orgElegida?.miembros?.find((x) => x.idUsuario === p.idUsuario);
                   return {
