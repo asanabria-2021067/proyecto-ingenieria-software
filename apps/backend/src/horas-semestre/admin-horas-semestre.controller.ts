@@ -1,0 +1,47 @@
+import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { HorasSemestreService } from './horas-semestre.service';
+import { HorasCentralListQueryDto, HorasCentralQueryDto } from './dto/horas-central-query.dto';
+import { buildHorasCsv, renderHorasPdf } from '../exports/horas-central-report.builder';
+
+function enviar(res: Response, bytes: Buffer, tipo: string, nombre: string) {
+  res.setHeader('Content-Type', tipo);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Disposition', `attachment; filename="${nombre}"`);
+  res.setHeader('Content-Length', String(bytes.length));
+  res.status(200).end(bytes);
+}
+
+@Controller('admin/horas-semestre')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('administrador')
+export class AdminHorasSemestreController {
+  constructor(private readonly service: HorasSemestreService) {}
+
+  @Get()
+  listar(@Query() query: HorasCentralListQueryDto) {
+    return this.service.listarCentral(query);
+  }
+
+  @Get('totales')
+  totales(@Query() query: HorasCentralQueryDto) {
+    return this.service.totales(query);
+  }
+
+  @Get('csv')
+  async csv(@Query() query: HorasCentralQueryDto, @Res() res: Response) {
+    const { semestre, filas } = await this.service.todasLasFilas(query);
+    enviar(res, Buffer.from(buildHorasCsv(filas), 'utf-8'), 'text/csv; charset=utf-8', `horas-${semestre.anio}-${semestre.periodo}.csv`);
+  }
+
+  @Get('pdf')
+  async pdf(@Query() query: HorasCentralQueryDto, @Res() res: Response) {
+    const { semestre, filas } = await this.service.todasLasFilas(query);
+    const titulo = `Horas por estudiante - semestre ${semestre.periodo} de ${semestre.anio}`;
+    enviar(res, renderHorasPdf(titulo, filas), 'application/pdf', `horas-${semestre.anio}-${semestre.periodo}.pdf`);
+  }
+}
