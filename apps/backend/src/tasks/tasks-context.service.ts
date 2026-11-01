@@ -77,11 +77,6 @@ export class TasksContextService {
    * en algún rol del proyecto (ParticipacionProyecto no tiene idProyecto
    * directo, por lo que se filtra vía la relación rolProyecto.idProyecto).
    */
-  /** Miembro de una organización dueña del proyecto: solo lectura, nunca escritura. */
-  esMiembroDeOrganizacionDelProyecto(projectId: number, userId: number, tx?: TxClient): Promise<boolean> {
-    return esMiembroDeOrganizacionDelProyecto(tx ?? this.prisma, projectId, userId);
-  }
-
   async assertActiveProjectParticipant(
     projectId: number,
     userId: number,
@@ -104,6 +99,11 @@ export class TasksContextService {
     if (!participacion) {
       throw new ForbiddenException('No tienes una participación activa en este proyecto');
     }
+  }
+
+  /** Miembro de una organización dueña del proyecto: solo lectura, nunca escritura. */
+  esMiembroDeOrganizacionDelProyecto(projectId: number, userId: number, tx?: TxClient): Promise<boolean> {
+    return esMiembroDeOrganizacionDelProyecto(tx ?? this.prisma, projectId, userId);
   }
 
   /**

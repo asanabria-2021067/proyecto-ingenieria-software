@@ -3,8 +3,7 @@ import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-valida
 import { VisibilidadOrganizacion } from '@prisma/client';
 import { IsCloudinaryUrl } from '../../common/validators/cloudinary-url.validator';
 import { IsHttpUrl } from '../../common/validators/http-url.validator';
-
-const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+import { trim } from './create-organization.dto';
 
 export class UpdateOrganizationDto {
   @IsOptional()

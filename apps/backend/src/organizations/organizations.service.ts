@@ -1,4 +1,6 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import {
   EstadoInvitacionOrganizacion,
   EstadoMembresia,
@@ -12,11 +14,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import { CATALOG_CACHE_KEYS } from '../catalogs/catalogs.service';
 import { OrganizationChatService } from './organization-chat.service';
 import {
   ROLES_GESTION,
   ROLES_PUBLICAN,
   TIPO_OBJETO_ORGANIZACION,
+  USUARIO_SELECT,
   assertActiva,
   assertRol,
   assertVisible,
@@ -26,7 +30,6 @@ import {
   notificar,
 } from './organization-access';
 
-const USUARIO_SELECT = { idUsuario: true, nombre: true, apellido: true, fotoUrl: true } as const;
 
 const ORG_SELECT = {
   idOrganizacion: true,
@@ -82,7 +85,12 @@ export class OrganizationsService {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private chat: OrganizationChatService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
+
+  private invalidarCatalogo() {
+    return this.cacheManager.del(CATALOG_CACHE_KEYS.organizaciones).catch(() => {});
+  }
 
   async create(userId: number, dto: CreateOrganizationDto) {
     const creada = await this.prisma
@@ -104,6 +112,7 @@ export class OrganizationsService {
         return org;
       })
       .catch(traducirNombreDuplicado);
+    await this.invalidarCatalogo();
     await this.chat.sincronizarSinFallar(creada.idOrganizacion);
     return resumen(creada, RolOrganizacion.PROPIETARIO);
   }
@@ -145,6 +154,7 @@ export class OrganizationsService {
         return { org, rol: ctx.rol };
       })
       .catch(traducirNombreDuplicado);
+    await this.invalidarCatalogo();
     return resumen(actualizada.org, actualizada.rol);
   }
 
@@ -400,6 +410,7 @@ export class OrganizationsService {
       });
       return { nombre: ctx.org.nombreOrganizacion, miembros: miembros.map((m) => m.idUsuario) };
     });
+    await this.invalidarCatalogo();
     await notificar(this.notifications, miembros, 'ORGANIZACION_ACTUALIZADA', {
       organizationName: nombre,
       organizationId: idOrganizacion,

@@ -6,8 +6,9 @@ import { CreateCatalogItemDto } from './dto/create-catalog-item.dto';
 
 // T-292: los catálogos casi no cambian y se piden en cada formulario de
 // perfil y de proyecto. Se cachean en Redis con TTL corto; las altas de
-// habilidades, intereses y cualidades invalidan su lista. Carreras y
-// organizaciones solo cambian por seed, así que dependen del TTL.
+// habilidades, intereses y cualidades invalidan su lista, y OrganizationsService
+// invalida la de organizaciones al crear, editar o archivar. Las carreras solo
+// cambian por seed, así que dependen del TTL.
 export const CATALOG_CACHE_TTL = 300_000;
 export const CATALOG_CACHE_KEYS = {
   carreras: 'catalogs:carreras',

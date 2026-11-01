@@ -27,6 +27,7 @@ import { ListOrganizationsQueryDto } from '../../src/organizations/dto/list-orga
 import { ProjectsController } from '../../src/projects/projects.controller';
 import { ProjectsService } from '../../src/projects/projects.service';
 import { CreateProjectFullDto } from '../../src/projects/dto/create-project-full.dto';
+import { UpdateProjectDto } from '../../src/projects/dto/update-project.dto';
 import { TasksController } from '../../src/tasks/tasks.controller';
 import { TasksService } from '../../src/tasks/tasks.service';
 import { TimeRecordsController } from '../../src/time-records/time-records.controller';
@@ -107,7 +108,7 @@ describeIntegration('ORG — organizaciones, invitaciones, chat y proyectos (Pos
     const notifications = new NotificationsService(prismaService, { server: undefined } as unknown as NotificationsGateway);
     const chatService = new ChatService(prismaService, gateway as unknown as ChatGateway, {} as ChatStoragePort);
     const orgChat = new OrganizationChatService(prismaService, gateway as unknown as ChatGateway, chatService);
-    const organizations = new OrganizationsService(prismaService, notifications, orgChat);
+    const organizations = new OrganizationsService(prismaService, notifications, orgChat, { del: async () => undefined } as unknown as Cache);
     const invitations = new OrganizationInvitationsService(prismaService, notifications, orgChat);
 
     const resolver = new ProjectIdResolverService(prismaService);
@@ -140,7 +141,7 @@ describeIntegration('ORG — organizaciones, invitaciones, chat y proyectos (Pos
             sendChatMessage: [Number, SendOrgMessageDto, Object],
           },
         },
-        { controller: ProjectsController, deps: [ProjectsService], handlers: { create: [CreateProjectFullDto, Object] } },
+        { controller: ProjectsController, deps: [ProjectsService], handlers: { create: [CreateProjectFullDto, Object], patch: [Number, UpdateProjectDto, Object] } },
         { controller: TasksController, deps: [TasksService] },
         { controller: TimeRecordsController, deps: [TimeRecordsService] },
       ],
@@ -454,7 +455,7 @@ describeIntegration('ORG — organizaciones, invitaciones, chat y proyectos (Pos
     expect(await rolDe(org, otro.idUsuario)).toBeNull();
   });
 
-  it('el candidato se busca por nombre o correo y excluye a miembros y administradores del sistema', async () => {
+  it('el candidato se busca solo por nombre, sin exponer ni buscar por correo, y excluye a miembros y administradores del sistema', async () => {
     const dueno = await usuario();
     const clave = randomUUID().slice(0, 8);
     const buscado = await createIntegrationUser(prisma, { nombre: `Zoe${clave}`, apellido: 'Pérez' });
@@ -466,6 +467,8 @@ describeIntegration('ORG — organizaciones, invitaciones, chat y proyectos (Pos
 
     const r = await pedir('GET', `/organizaciones/${org}/candidatos?q=zoe${clave}`, dueno.token);
     expect(r.body.map((u: { idUsuario: number }) => u.idUsuario)).toEqual([buscado.idUsuario]);
+    expect(r.body[0]).not.toHaveProperty('correo');
+    expect((await pedir('GET', `/organizaciones/${org}/candidatos?q=${encodeURIComponent(buscado.correo)}`, dueno.token)).body).toEqual([]);
     await agregar(org, buscado, 'LECTURA');
     expect((await pedir('GET', `/organizaciones/${org}/candidatos?q=zoe${clave}`, dueno.token)).body).toEqual([]);
     expect((await pedir('GET', `/organizaciones/${org}/candidatos?q=zo`, dueno.token)).body).toEqual([]);
@@ -743,6 +746,25 @@ describeIntegration('ORG — organizaciones, invitaciones, chat y proyectos (Pos
     expect(tarjeta.roles).toEqual([{ cupos: 6, cuposDisponibles: 2 }]);
     expect(tarjeta.organizaciones[0].organizacion).toMatchObject({ idOrganizacion: org });
     expect(tarjeta.organizaciones[0].organizacion.nombreOrganizacion).toEqual(expect.any(String));
+  });
+
+  it('editar los roles de un borrador de la organización con participantes devuelve 400 y no toca nada', async () => {
+    const dueno = await usuario();
+    const editor = await usuario();
+    const org = await crearOrg(dueno);
+    await agregar(org, editor, 'EDITOR');
+    const r = await crearProyecto(dueno.token, { idOrganizacion: org, participantes: [{ idUsuario: editor.idUsuario, indiceRol: 0 }] });
+    expect(r.status).toBe(201);
+    const idProyecto = r.body.idProyecto as number;
+
+    const parche = await pedir('PATCH', `/proyectos/${idProyecto}`, dueno.token, { roles: [{ nombreRol: 'Otro', cupos: 3 }] });
+    expect(parche.status).toBe(400);
+    const roles = await prisma.rolProyecto.findMany({ where: { idProyecto } });
+    expect(roles.map((x) => x.nombreRol)).toEqual(['Desarrollo']);
+    expect(await prisma.participacionProyecto.count({ where: { rolProyecto: { idProyecto } } })).toBe(1);
+
+    const sinRoles = await pedir('PATCH', `/proyectos/${idProyecto}`, dueno.token, { descripcionProyecto: 'Descripción nueva con más de veinte caracteres.' });
+    expect(sinRoles.status).toBe(200);
   });
 
   const proyectoTitulo = (r: Respuesta) => r.body.tituloProyecto as string;

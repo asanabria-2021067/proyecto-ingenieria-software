@@ -656,6 +656,13 @@ export class ProjectsService {
         });
         const idsRolesActuales = rolesActuales.map((r) => r.idRolProyecto);
 
+        if (
+          idsRolesActuales.length > 0 &&
+          (await tx.participacionProyecto.count({ where: { idRolProyecto: { in: idsRolesActuales } } })) > 0
+        ) {
+          throw new BadRequestException('No puedes reemplazar los roles de un proyecto que ya tiene participantes');
+        }
+
         if (idsRolesActuales.length > 0) {
           await tx.requisitoHabilidadRol.deleteMany({
             where: { idRolProyecto: { in: idsRolesActuales } },

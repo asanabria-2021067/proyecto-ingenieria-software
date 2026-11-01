@@ -6,6 +6,8 @@ import type { NotificationTemplateData, NotificationTemplateKey } from '../notif
 
 type Db = Prisma.TransactionClient | PrismaService;
 
+export const USUARIO_SELECT = { idUsuario: true, nombre: true, apellido: true, fotoUrl: true } as const;
+
 export const DIAS_VENCIMIENTO = 14;
 
 export const venceEnDesde = (ahora: Date = new Date()): Date =>

@@ -4,7 +4,7 @@ import { VisibilidadOrganizacion } from '@prisma/client';
 import { IsCloudinaryUrl } from '../../common/validators/cloudinary-url.validator';
 import { IsHttpUrl } from '../../common/validators/http-url.validator';
 
-const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+export const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
 export class CreateOrganizationDto {
   @Transform(trim)

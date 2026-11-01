@@ -14,6 +14,7 @@ import { InviteMemberDto } from './dto/invite-member.dto';
 import { OrganizationChatService } from './organization-chat.service';
 import {
   ROLES_GESTION,
+  USUARIO_SELECT,
   assertActiva,
   assertRol,
   assertVisible,
@@ -24,7 +25,6 @@ import {
   venceEnDesde,
 } from './organization-access';
 
-const USUARIO_SELECT = { idUsuario: true, nombre: true, apellido: true, fotoUrl: true } as const;
 const PENDIENTE = EstadoInvitacionOrganizacion.PENDIENTE;
 const CANCELADA = EstadoInvitacionOrganizacion.CANCELADA;
 
@@ -54,11 +54,10 @@ export class OrganizationInvitationsService {
           OR: [
             { nombre: { contains: p, mode: 'insensitive' as const } },
             { apellido: { contains: p, mode: 'insensitive' as const } },
-            { correo: { contains: p, mode: 'insensitive' as const } },
           ],
         })),
       },
-      select: { ...USUARIO_SELECT, correo: true },
+      select: USUARIO_SELECT,
       orderBy: [{ nombre: 'asc' }, { apellido: 'asc' }],
       take: 10,
     });

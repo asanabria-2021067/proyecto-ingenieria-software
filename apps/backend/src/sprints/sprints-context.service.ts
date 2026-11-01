@@ -49,11 +49,6 @@ export class SprintsContextService {
    * Usado por lecturas que un miembro (no solo el líder) necesita — p. ej.
    * saber si hay un Sprint operable para renderizar el tablero Kanban.
    */
-  /** Miembro de una organización dueña del proyecto: solo lectura, nunca escritura. */
-  esMiembroDeOrganizacionDelProyecto(projectId: number, userId: number, tx?: TxClient): Promise<boolean> {
-    return esMiembroDeOrganizacionDelProyecto(tx ?? this.prisma, projectId, userId);
-  }
-
   async assertActiveProjectParticipant(
     projectId: number,
     userId: number,
@@ -76,6 +71,11 @@ export class SprintsContextService {
     if (!participacion) {
       throw new ForbiddenException('No tienes una participación activa en este proyecto');
     }
+  }
+
+  /** Miembro de una organización dueña del proyecto: solo lectura, nunca escritura. */
+  esMiembroDeOrganizacionDelProyecto(projectId: number, userId: number, tx?: TxClient): Promise<boolean> {
+    return esMiembroDeOrganizacionDelProyecto(tx ?? this.prisma, projectId, userId);
   }
 
   /**
