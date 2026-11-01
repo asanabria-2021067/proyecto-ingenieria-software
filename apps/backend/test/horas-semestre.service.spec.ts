@@ -74,6 +74,14 @@ describe('HorasSemestreService', () => {
     expect(p2.siguienteCursor).toBeNull();
   });
 
+  it('idAsociacion filtra por las carreras de la asociacion en el servidor', async () => {
+    const { service, prisma } = crearServicio({ usuarios: [{ id: 1 }] });
+    await service.listarCentral(1, { idAsociacion: 7 });
+    expect(prisma.usuario.findMany.mock.calls[0][0].where.perfil).toEqual({
+      is: { carrera: { asociaciones: { some: { idAsociacion: 7 } } } },
+    });
+  });
+
   it('el filtro enRiesgo salta a los que no lo estan y mantiene el cursor', async () => {
     // 1-abr: 50 % del semestre; en riesgo si avance < 30 %
     const { service } = crearServicio({

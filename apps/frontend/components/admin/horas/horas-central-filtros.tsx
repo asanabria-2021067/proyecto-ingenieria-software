@@ -10,9 +10,7 @@ import { etiquetaSemestre, ultimosSemestres, type FiltrosUI } from '@/lib/hours/
 import type { Carrera } from '@/lib/services/catalogs';
 import type { AsociacionResumen, Semestre } from '@/lib/services/horas-semestre';
 
-export type HorasCentralFiltrosUI = FiltrosUI;
-
-export const HORAS_FILTROS_INICIALES: HorasCentralFiltrosUI = {
+export const HORAS_FILTROS_INICIALES: FiltrosUI = {
   semestre: 'actual',
   idCarrera: '',
   idAsociacion: '',
@@ -24,15 +22,15 @@ const SELECT = `w-full ${DASHBOARD_FILTER_TRIGGER_CLASS} data-[size=default]:h-1
 const CAMPO = 'flex min-w-0 flex-col gap-tight';
 
 interface Props {
-  value: HorasCentralFiltrosUI;
-  onChange: (value: HorasCentralFiltrosUI) => void;
+  value: FiltrosUI;
+  onChange: (value: FiltrosUI) => void;
   carreras: Carrera[];
   asociaciones: AsociacionResumen[];
   semestreActual?: Semestre;
 }
 
 export function HorasCentralFiltros({ value, onChange, carreras, asociaciones, semestreActual }: Props) {
-  const cambiar = (parcial: Partial<HorasCentralFiltrosUI>) => onChange({ ...value, ...parcial });
+  const cambiar = (parcial: Partial<FiltrosUI>) => onChange({ ...value, ...parcial });
   const semestres = semestreActual ? ultimosSemestres(semestreActual) : [];
   const asociacion = asociaciones.find((a) => String(a.idAsociacion) === value.idAsociacion);
   const idsDeAsociacion = asociacion?.carreras.map((c) => c.carrera.idCarrera);

@@ -70,8 +70,6 @@ export function formDesdeRegistro(
   };
 }
 
-export const formVacio = (f: HorasForm) => Object.values(f).every((v) => v.trim() === '');
-
 /** Campos con valor invalido (no entero entre 0 y 2000). */
 export function erroresForm(f: HorasForm): Partial<Record<keyof HorasForm, string>> {
   const errores: Partial<Record<keyof HorasForm, string>> = {};
@@ -109,20 +107,8 @@ const SUMAS = [
   'faltaExtension',
 ] as const;
 
-const vacio = (clave: string, nombre: string): TotalesAsociacion => ({
-  clave,
-  nombre,
-  estudiantes: 0,
-  enRiesgo: 0,
-  metaBeca: 0,
-  becaDeclarada: 0,
-  becaAcreditada: 0,
-  faltaBeca: 0,
-  metaExtension: 0,
-  extensionDeclarada: 0,
-  extensionAcreditada: 0,
-  faltaExtension: 0,
-});
+const vacio = (clave: string, nombre: string) =>
+  ({ clave, nombre, ...Object.fromEntries(SUMAS.map((c) => [c, 0])) }) as TotalesAsociacion;
 
 /**
  * Suma los totales por carrera dentro de cada asociacion activa que la representa.
@@ -169,11 +155,8 @@ export interface FiltrosUI {
   enRiesgo: boolean;
 }
 
-/**
- * Filtros del servidor a partir de los de pantalla. El backend filtra por una sola carrera:
- * una asociacion con varias carreras (y sin carrera elegida) se completa en el cliente con `carrerasPermitidas`.
- */
-export function filtrosServidor(ui: FiltrosUI, asociaciones: AsociacionResumen[]) {
+/** Filtros del servidor a partir de los de pantalla. */
+export function filtrosServidor(ui: FiltrosUI): HorasCentralFiltros {
   const filtros: HorasCentralFiltros = {};
   if (ui.semestre !== 'actual') {
     const [anio, periodo] = ui.semestre.split('-').map(Number);
@@ -181,14 +164,7 @@ export function filtrosServidor(ui: FiltrosUI, asociaciones: AsociacionResumen[]
     filtros.periodo = periodo as 1 | 2;
   }
   if (ui.enRiesgo) filtros.enRiesgo = true;
-  let carrerasPermitidas: Set<number> | null = null;
   if (ui.idCarrera) filtros.idCarrera = Number(ui.idCarrera);
-  else if (ui.idAsociacion) {
-    const ids = asociaciones
-      .find((a) => String(a.idAsociacion) === ui.idAsociacion)
-      ?.carreras.map((c) => c.carrera.idCarrera) ?? [];
-    if (ids.length === 1) filtros.idCarrera = ids[0];
-    else carrerasPermitidas = new Set(ids);
-  }
-  return { filtros, carrerasPermitidas };
+  if (ui.idAsociacion) filtros.idAsociacion = Number(ui.idAsociacion);
+  return filtros;
 }

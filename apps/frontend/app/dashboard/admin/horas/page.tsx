@@ -8,7 +8,6 @@ import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admi
 import {
   HORAS_FILTROS_INICIALES,
   HorasCentralFiltros,
-  type HorasCentralFiltrosUI,
 } from '@/components/admin/horas/horas-central-filtros';
 import { HorasCentralTabla } from '@/components/admin/horas/horas-central-tabla';
 import { HorasTotalesAsociacion } from '@/components/admin/horas/horas-totales-asociacion';
@@ -17,8 +16,9 @@ import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { useAdminAsociaciones, useAdminHorasCentral, useAdminHorasTotales } from '@/hooks/use-admin-horas';
+import { useHorasActual } from '@/hooks/use-horas-semestre';
 import { downloadBlob } from '@/lib/download-file';
-import { filtrosServidor, totalesPorAsociacion } from '@/lib/hours/semestre';
+import { filtrosServidor, totalesPorAsociacion, type FiltrosUI } from '@/lib/hours/semestre';
 import { getCarreras, type Carrera } from '@/lib/services/catalogs';
 import { descargarHorasCentral } from '@/lib/services/horas-semestre';
 
@@ -27,22 +27,20 @@ import { descargarHorasCentral } from '@/lib/services/horas-semestre';
  * (meta, declaradas, acreditadas y lo que falta). Solo lectura; los reportes respetan los filtros.
  */
 export default function AdminHorasPage() {
-  const [ui, setUi] = useState<HorasCentralFiltrosUI>(HORAS_FILTROS_INICIALES);
+  const [ui, setUi] = useState<FiltrosUI>(HORAS_FILTROS_INICIALES);
   const [descargando, setDescargando] = useState<'csv' | 'pdf' | null>(null);
   const [errorDescarga, setErrorDescarga] = useState(false);
 
   const { data: carreras = [] } = useQuery<Carrera[]>({ queryKey: ['carreras'], queryFn: getCarreras });
   const { data: asociaciones = [] } = useAdminAsociaciones();
-  const { filtros, carrerasPermitidas } = useMemo(() => filtrosServidor(ui, asociaciones), [ui, asociaciones]);
+  const filtros = useMemo(() => filtrosServidor(ui), [ui]);
 
   const central = useAdminHorasCentral(filtros);
   const totales = useAdminHorasTotales(filtros);
 
   const semestre = central.data?.pages[0]?.semestre;
-  const filas = useMemo(() => {
-    const todas = central.data?.pages.flatMap((p) => p.filas) ?? [];
-    return carrerasPermitidas ? todas.filter((f) => f.idCarrera !== null && carrerasPermitidas.has(f.idCarrera)) : todas;
-  }, [central.data, carrerasPermitidas]);
+  const semestreActual = useHorasActual().data?.semestre;
+  const filas = useMemo(() => central.data?.pages.flatMap((p) => p.filas) ?? [], [central.data]);
 
   const totalesAsociacion = useMemo(() => {
     const lista = totalesPorAsociacion(totales.data?.porCarrera ?? [], asociaciones);
@@ -80,7 +78,7 @@ export default function AdminHorasPage() {
           onChange={setUi}
           carreras={carreras}
           asociaciones={asociaciones}
-          semestreActual={semestre}
+          semestreActual={semestreActual}
         />
 
         <div className="flex flex-wrap items-center gap-inline">
@@ -92,9 +90,6 @@ export default function AdminHorasPage() {
             <FileText aria-hidden="true" />
             {descargando === 'pdf' ? 'Descargando...' : 'Descargar PDF'}
           </Button>
-          {carrerasPermitidas && (
-            <p className="type-meta">El reporte incluye todas las carreras; elige una carrera para limitarlo.</p>
-          )}
           {errorDescarga && (
             <p role="alert" className="type-meta text-error">
               No pudimos generar el reporte. Inténtalo de nuevo.

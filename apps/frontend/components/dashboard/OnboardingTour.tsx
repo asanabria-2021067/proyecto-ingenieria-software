@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { useJoyride, STATUS } from 'react-joyride';
 import { useCurrentUser, isProfileIncomplete, perfilPospuesto } from '@/hooks/use-current-user';
+import { useHorasActual } from '@/hooks/use-horas-semestre';
 import { Button } from '@/components/ui/button';
 
 // Custom Tooltip component for React Joyride
@@ -90,6 +91,7 @@ const RUTA_TOUR = '/dashboard';
 
 export default function OnboardingTour() {
   const { data: user } = useCurrentUser();
+  const { data: horasActual, isPending: horasPendientes } = useHorasActual();
   const pathname = usePathname();
   const [run, setRun] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,7 +107,9 @@ export default function OnboardingTour() {
       // Si el perfil está incompleto (sale la pantalla de "Completa tu perfil"),
       // no mostramos el tour hasta que termine de completarlo, a menos que sea forzado (ayuda)
       // Si el usuario aplazó el asistente, el diálogo ya está cerrado y el tour puede correr.
-      if (isProfileIncomplete(user) && !force && !perfilPospuesto(user.idUsuario)) {
+      // El paso de horas del semestre también abre el diálogo (perfil completo, sin registro).
+      const asistenteAbierto = isProfileIncomplete(user) || horasPendientes || horasActual?.necesitaRegistro === true;
+      if (asistenteAbierto && !force && !perfilPospuesto(user.idUsuario)) {
         return;
       }
 
@@ -123,7 +127,7 @@ export default function OnboardingTour() {
         setRun(true);
       }, 800);
     },
-    [user, cancelTimer],
+    [user, horasPendientes, horasActual?.necesitaRegistro, cancelTimer],
   );
 
   useEffect(() => cancelTimer, [cancelTimer]);

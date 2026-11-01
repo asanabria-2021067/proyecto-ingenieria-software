@@ -30,6 +30,7 @@ import { getAdminUserDetail, type AdminUserDetail } from '@/lib/services/admin';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
 import { SemestreHorasCard } from '@/components/hours/semestre-horas-card';
+import { SemestreHorasHistorial } from '@/components/hours/semestre-horas-historial';
 import { useMisInsignias } from '@/hooks/use-insignias';
 import { SkeletonCard, SkeletonDetail } from '@/components/ui/skeleton';
 
@@ -403,7 +404,12 @@ export default function PerfilPage() {
             )}
 
             {/* Horas del semestre - students only */}
-            {!isAdmin && <SemestreHorasCard editable />}
+            {!isAdmin && (
+              <>
+                <SemestreHorasCard editable />
+                <SemestreHorasHistorial />
+              </>
+            )}
 
             {/* Habilidades - students only */}
             {!isAdmin && (

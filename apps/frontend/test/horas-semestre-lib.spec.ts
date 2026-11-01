@@ -6,7 +6,6 @@ import {
   filtrosServidor,
   formDesdeRegistro,
   formatearDiaMes,
-  formVacio,
   HORAS_FORM_VACIO,
   parseHoras,
   porcentajeAvance,
@@ -112,7 +111,6 @@ describe('formulario de horas', () => {
   });
 
   it('senala solo los campos invalidos', () => {
-    expect(formVacio(HORAS_FORM_VACIO)).toBe(true);
     expect(Object.keys(erroresForm({ ...HORAS_FORM_VACIO, becaDeclarada: '-3', metaBeca: '10' }))).toEqual(['becaDeclarada']);
   });
 });
@@ -142,23 +140,16 @@ describe('filtros', () => {
   });
 
   it('semestre actual no manda anio ni periodo', () => {
-    expect(filtrosServidor(ui, []).filtros).toEqual({});
-    expect(filtrosServidor({ ...ui, semestre: '2025-2', enRiesgo: true }, []).filtros).toEqual({
+    expect(filtrosServidor(ui)).toEqual({});
+    expect(filtrosServidor({ ...ui, semestre: '2025-2', enRiesgo: true })).toEqual({
       anio: 2025,
       periodo: 2,
       enRiesgo: true,
     });
   });
 
-  it('una asociacion de una carrera filtra en el servidor; de varias, en el cliente', () => {
-    const asociaciones = [aso(1, 'Una', [5]), aso(2, 'Varias', [5, 6])];
-    expect(filtrosServidor({ ...ui, idAsociacion: '1' }, asociaciones)).toEqual({ filtros: { idCarrera: 5 }, carrerasPermitidas: null });
-    const varias = filtrosServidor({ ...ui, idAsociacion: '2' }, asociaciones);
-    expect(varias.filtros).toEqual({});
-    expect([...(varias.carrerasPermitidas ?? [])]).toEqual([5, 6]);
-    expect(filtrosServidor({ ...ui, idAsociacion: '2', idCarrera: '6' }, asociaciones)).toEqual({
-      filtros: { idCarrera: 6 },
-      carrerasPermitidas: null,
-    });
+  it('la asociacion y la carrera viajan al servidor', () => {
+    expect(filtrosServidor({ ...ui, idAsociacion: '2' })).toEqual({ idAsociacion: 2 });
+    expect(filtrosServidor({ ...ui, idAsociacion: '2', idCarrera: '6' })).toEqual({ idAsociacion: 2, idCarrera: 6 });
   });
 });

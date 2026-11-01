@@ -343,7 +343,7 @@ export default function DashboardPage() {
   );
   const { data: horasActual } = useHorasActual();
   // Perfil completo pero sin registro de horas del semestre: el asistente reaparece solo con ese paso.
-  const soloHoras = !!user && !isProfileIncomplete(user) && !wizardReopened;
+  const soloHorasAhora = !!user && !isProfileIncomplete(user) && !wizardReopened;
   const showWizard = useMemo(
     () =>
       !wizardDismissed &&
@@ -352,6 +352,11 @@ export default function DashboardPage() {
         (!wizardDeferred && (isProfileIncomplete(user) || horasActual?.necesitaRegistro === true))),
     [wizardDismissed, wizardDeferred, wizardReopened, user, horasActual?.necesitaRegistro],
   );
+  // Se fija al abrir el diálogo: si el perfil se completa a medio asistente no debe cambiar de modo.
+  const [soloHorasFijo, setSoloHorasFijo] = useState<boolean | null>(null);
+  if (showWizard && soloHorasFijo === null) setSoloHorasFijo(soloHorasAhora);
+  else if (!showWizard && soloHorasFijo !== null) setSoloHorasFijo(null);
+  const soloHoras = soloHorasFijo ?? soloHorasAhora;
   const profilePercent = user && wizardDeferred ? profileCompletionPercent(user) : 100;
   const showProfileCard = wizardDeferred && !wizardReopened && !wizardDismissed && profilePercent < 100;
 

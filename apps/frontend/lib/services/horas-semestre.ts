@@ -99,6 +99,7 @@ export interface HorasCentralFiltros {
   anio?: number;
   periodo?: 1 | 2;
   idCarrera?: number;
+  idAsociacion?: number;
   enRiesgo?: boolean;
 }
 

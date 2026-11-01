@@ -11,7 +11,12 @@ if (typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver === 'unde
   };
 }
 
+Element.prototype.scrollIntoView = () => {};
+Element.prototype.hasPointerCapture = () => false;
+Element.prototype.releasePointerCapture = () => {};
+
 vi.mock('../lib/services/horas-semestre', () => ({
+  getHorasActual: vi.fn(),
   getHorasCentral: vi.fn(),
   getHorasTotales: vi.fn(),
   getAsociacionesAdmin: vi.fn(),
@@ -26,6 +31,7 @@ import { getCarreras } from '../lib/services/catalogs';
 import {
   descargarHorasCentral,
   getAsociacionesAdmin,
+  getHorasActual,
   getHorasCentral,
   getHorasTotales,
   type FilaHorasCentral,
@@ -53,6 +59,7 @@ const fila = (idUsuario: number, p: Partial<FilaHorasCentral> = {}): FilaHorasCe
 });
 
 function montar() {
+  vi.mocked(getHorasActual).mockResolvedValue({ semestre: SEMESTRE, registro: null, necesitaRegistro: false });
   vi.mocked(getCarreras).mockResolvedValue([{ idCarrera: 1, nombreCarrera: 'Ciencias de la Computación', facultad: 'Ingeniería' }]);
   vi.mocked(getAsociacionesAdmin).mockResolvedValue([
     { idAsociacion: 7, nombre: 'Asociación CC', archivada: false, carreras: [{ carrera: { idCarrera: 1, nombreCarrera: 'CC' } }] },
@@ -147,6 +154,21 @@ describe('HRS: vista central de horas del admin', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'En riesgo' }));
     await waitFor(() => expect(getHorasCentral).toHaveBeenLastCalledWith({ enRiesgo: true }, undefined));
     expect(getHorasTotales).toHaveBeenLastCalledWith({ enRiesgo: true });
+  });
+
+  it('la asociacion llega al servidor, a la lista, a los totales y a los reportes', async () => {
+    vi.mocked(getHorasCentral).mockResolvedValue({ semestre: SEMESTRE, filas: [fila(1)], siguienteCursor: null });
+    vi.mocked(descargarHorasCentral).mockResolvedValue(new Blob(['x']));
+    montar();
+    await screen.findByRole('table', { name: /por estudiante/i });
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Asociación' }), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('option', { name: 'Asociación CC' }));
+    await waitFor(() => expect(getHorasCentral).toHaveBeenLastCalledWith({ idAsociacion: 7 }, undefined));
+    expect(getHorasTotales).toHaveBeenLastCalledWith({ idAsociacion: 7 });
+    await screen.findByRole('table', { name: /por estudiante/i });
+    fireEvent.click(screen.getByRole('button', { name: 'Descargar CSV' }));
+    await waitFor(() => expect(descargarHorasCentral).toHaveBeenCalledWith('csv', { idAsociacion: 7 }));
   });
 
   it('CSV y PDF descargan con los filtros activos', async () => {

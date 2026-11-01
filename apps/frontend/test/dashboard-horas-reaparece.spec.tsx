@@ -86,6 +86,22 @@ describe('Dashboard - el asistente reaparece si falta el registro de horas del s
     expect(await screen.findByRole('dialog', { name: 'asistente completo' })).toBeInTheDocument();
   });
 
+  it('el modo del asistente no cambia a medio camino si el perfil pasa a completo', async () => {
+    estado.perfilIncompleto = true;
+    const { default: DashboardPage } = await import('@/app/dashboard/page');
+    const cliente = new QueryClient();
+    const arbol = (
+      <QueryClientProvider client={cliente}>
+        <DashboardPage />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(arbol);
+    expect(await screen.findByRole('dialog', { name: 'asistente completo' })).toBeInTheDocument();
+    estado.perfilIncompleto = false;
+    rerender(<QueryClientProvider client={cliente}><DashboardPage /></QueryClientProvider>);
+    expect(screen.getByRole('dialog', { name: 'asistente completo' })).toBeInTheDocument();
+  });
+
   it('con registro del semestre y perfil completo no se abre', async () => {
     estado.necesitaRegistro = false;
     await renderDashboard();
