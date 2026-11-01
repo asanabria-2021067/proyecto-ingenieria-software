@@ -81,7 +81,7 @@ export class CatalogsService {
   findOrganizaciones() {
     return this.cached(CATALOG_CACHE_KEYS.organizaciones, () =>
       this.prisma.organizacion.findMany({
-        where: { estadoOrganizacion: 'ACTIVA' },
+        where: { estadoOrganizacion: 'ACTIVA', visibilidad: 'PUBLICA' },
         select: {
           idOrganizacion: true,
           nombreOrganizacion: true,
