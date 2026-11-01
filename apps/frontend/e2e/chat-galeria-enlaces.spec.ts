@@ -17,12 +17,12 @@ test('los enlaces enviados aparecen en la galeria de enlaces compartidos', async
   await login(page, CORREO_A);
   await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
 
-  await page.getByRole('button', { name: /^mensajes/i }).click();
+  await page.goto('/dashboard/mensajes');
   const existente = page.getByRole('button', { name: /María/ });
   if (await existente.count()) {
     await existente.first().click();
   } else {
-    await page.getByRole('button', { name: /^mensajes/i }).click();
+    await page.goto('/dashboard/mensajes');
     await page.getByRole('button', { name: /nuevo chat/i }).click();
     await page.getByRole('button', { name: 'Individual' }).click();
     await page.getByRole('checkbox', { name: /María/ }).click();

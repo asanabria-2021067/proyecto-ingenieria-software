@@ -37,7 +37,7 @@ test('el lider crea un canal con una integrante: ella lo ve junto a #general y p
     await paginaMiembro.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
 
     // El lider crea el canal desde el dock.
-    await paginaLider.getByRole('button', { name: /^mensajes/i }).click();
+    await paginaLider.goto('/dashboard/mensajes');
     await paginaLider.getByRole('button', { name: 'Crear canal' }).click();
     const dialogo = paginaLider.getByRole('dialog');
     await dialogo.getByLabel('Proyecto').click();
@@ -49,7 +49,7 @@ test('el lider crea un canal con una integrante: ella lo ve junto a #general y p
     await expect(dialogo).toBeHidden();
 
     // La integrante ve #general y el canal nuevo en la seccion Canales.
-    await paginaMiembro.getByRole('button', { name: /^mensajes/i }).click();
+    await paginaMiembro.goto('/dashboard/mensajes');
     const seccion = paginaMiembro.getByRole('region', { name: 'Canales' });
     await expect(seccion.getByText('#general').first()).toBeVisible();
     await expect(seccion.getByText(`#${canal}`)).toBeVisible();

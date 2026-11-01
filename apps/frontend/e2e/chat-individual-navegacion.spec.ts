@@ -35,7 +35,7 @@ async function desactivarTour(page: Page) {
  * sigue siendo una acción del proyecto ("Nuevo chat del proyecto").
  */
 async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
+  await page.goto('/dashboard/mensajes');
   const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
 
   if (await existente.count()) {
@@ -43,7 +43,7 @@ async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
     return;
   }
 
-  await page.getByRole('button', { name: /^mensajes/i }).click(); // cierra la lista, vacía
+  await page.goto('/dashboard/mensajes');
   await page.getByRole('button', { name: /nuevo chat/i }).click();
   await page.getByRole('button', { name: 'Individual' }).click();
   await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();

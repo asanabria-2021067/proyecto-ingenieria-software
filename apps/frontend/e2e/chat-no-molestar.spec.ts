@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { iconoMensajes } from './support/chat';
 
 // Mismo par real del Proyecto 1 del seed que usa chat-mensajeria.spec.ts.
 const PROYECTO_ID = 1;
@@ -18,7 +19,7 @@ async function desactivarTour(page: Page) {
 }
 
 async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
+  await page.goto('/dashboard/mensajes');
   const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
 
   if (await existente.count()) {
@@ -26,7 +27,7 @@ async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
     return;
   }
 
-  await page.getByRole('button', { name: /^mensajes/i }).click();
+  await page.goto('/dashboard/mensajes');
   await page.getByRole('button', { name: /nuevo chat/i }).click();
   await page.getByRole('button', { name: 'Individual' }).click();
   await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
@@ -58,10 +59,10 @@ test('no molestar por horario suprime el badge del dock y se puede desactivar', 
     await dialogo.getByLabel('Hasta').fill('23:59');
     await dialogo.getByRole('button', { name: 'Guardar' }).click();
     await expect(dialogo).toBeHidden();
-    await pageB.getByRole('button', { name: 'Cerrar chat' }).click();
+    await pageB.goto('/dashboard');
 
     // El icono de la barra superior indica el modo en su nombre accesible (con el icono de campana tachada).
-    const boton = pageB.getByRole('button', { name: /^mensajes/i });
+    const boton = iconoMensajes(pageB);
     await expect(boton).toHaveAccessibleName(/no molestar activo/);
 
     // A escribe a B: el boton de B no anuncia mensajes sin leer.
@@ -71,9 +72,8 @@ test('no molestar por horario suprime el badge del dock y se puede desactivar', 
     await pageA.getByRole('button', { name: 'Enviar mensaje' }).click();
     await expect(pageA.getByText(mensaje).first()).toBeVisible();
 
-    await boton.click();
+    await pageB.goto('/dashboard/mensajes');
     await expect(pageB.getByText(mensaje).first()).toBeVisible();
-    await boton.click();
     await expect(boton).not.toHaveAccessibleName(/sin leer/);
 
     // B lo desactiva.

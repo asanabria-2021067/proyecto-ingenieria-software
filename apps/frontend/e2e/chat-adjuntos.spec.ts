@@ -5,15 +5,13 @@ import { login } from './support/auth';
 const PROYECTO_ID = 1;
 const CORREO_A = 'carlos.mendoza@uvg.edu.gt';
 
-// Con el dock abierto hay dos botones "Nuevo chat": se cierra y se usa el de la barra del proyecto.
 async function abrirChatConMaria(page: Page) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
+  await page.goto('/dashboard/mensajes');
   const existente = page.getByRole('button', { name: /María/ });
   if (await existente.count()) {
     await existente.first().click();
   } else {
-    await page.getByRole('button', { name: /^mensajes/i }).click();
-    await page.getByRole('button', { name: 'Nuevo chat del proyecto' }).click();
+    await page.getByRole('button', { name: /nuevo chat/i }).click();
     await page.getByRole('button', { name: 'Individual' }).click();
     await page.getByRole('checkbox', { name: /María/ }).click();
     await page.getByRole('button', { name: 'Crear chat' }).click();

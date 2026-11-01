@@ -16,7 +16,7 @@ async function desactivarTour(page: Page) {
 }
 
 async function abrirListaDeChats(page: Page) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
+  await page.goto('/dashboard/mensajes');
 }
 
 // Garantiza que exista el chat individual con `nombreOtro` (lo crea si falta).
