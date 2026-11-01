@@ -334,7 +334,9 @@ export interface NotificationTemplateData {
     accion: 'ASIGNADA' | 'ACTUALIZADA' | 'REMOVIDA';
     cargo: string;
     nivelPermiso: string | null;
-  };\n\n  INVITACION_ORGANIZACION: {
+  };
+
+  INVITACION_ORGANIZACION: {
     organizationName: string;
     organizationId: number;
     invitationId: number;
@@ -643,7 +645,9 @@ export const NOTIFICATION_TEMPLATES = {
       const verbo = data.accion === 'ASIGNADA' ? 'te nombró' : 'actualizó tu cargo como';
       return `Administración ${verbo} ${data.cargo} de ${data.nombreAsociacion} con permiso ${data.nivelPermiso}.`;
     },
-  };\n\n  INVITACION_ORGANIZACION: {
+  },
+
+  INVITACION_ORGANIZACION: {
     title: 'Te invitaron a una organización',
     message: (data: NotificationTemplateData['INVITACION_ORGANIZACION']) =>
       `${data.invitedBy} te invitó a "${data.organizationName}" como ${data.roleName}. La invitación vence en 14 días.`,

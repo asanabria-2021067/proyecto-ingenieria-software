@@ -132,7 +132,8 @@ export class CreateProjectFullDto {
   @IsOptional()
   @IsInt()
   idAsociacion?: number;
-\n  /** «¿A nombre de quién?»: ausente = proyecto personal. Exige Propietario, Administrador o Editor de la organización. */
+
+  /** «¿A nombre de quién?»: ausente = proyecto personal. Exige Propietario, Administrador o Editor de la organización. */
   @IsOptional()
   @IsInt()
   idOrganizacion?: number;

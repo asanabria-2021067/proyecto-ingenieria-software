@@ -637,10 +637,14 @@ export class ProjectsService {
       });
 
       if (organizacionesIds !== undefined) {
-        // Solo se exige permiso para las organizaciones que se agregan; las que ya estaban se conservan.
+        // Se exige permiso para las organizaciones que se agregan y para las que se quitan; las que se conservan no cambian.
         const vinculadas = await tx.proyectoOrganizacion.findMany({ where: { idProyecto: id }, select: { idOrganizacion: true } });
         const yaVinculadas = new Set(vinculadas.map((v) => v.idOrganizacion));
-        await assertPuedePublicar(tx, userId, organizacionesIds.filter((idOrganizacion) => !yaVinculadas.has(idOrganizacion)));
+        const nuevas = new Set(organizacionesIds);
+        await assertPuedePublicar(tx, userId, [
+          ...organizacionesIds.filter((idOrganizacion) => !yaVinculadas.has(idOrganizacion)),
+          ...[...yaVinculadas].filter((idOrganizacion) => !nuevas.has(idOrganizacion)),
+        ]);
         await tx.proyectoOrganizacion.deleteMany({ where: { idProyecto: id } });
         if (organizacionesIds.length > 0) {
           await tx.proyectoOrganizacion.createMany({

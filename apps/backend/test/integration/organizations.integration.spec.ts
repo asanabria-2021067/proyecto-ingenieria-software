@@ -722,6 +722,23 @@ describeIntegration('ORG — organizaciones, invitaciones, chat y proyectos (Pos
     expect(await prisma.proyectoOrganizacion.count({ where: { idProyecto: personal.body.idProyecto } })).toBe(0);
   });
 
+  it('quien dejó de poder publicar en la organización tampoco puede quitarle el proyecto', async () => {
+    const dueno = await usuario();
+    const editor = await usuario();
+    const org = await crearOrg(dueno);
+    await agregar(org, editor, 'EDITOR');
+    const creado = await crearProyecto(editor.token, { idOrganizacion: org });
+    expect(creado.status).toBe(201);
+    const ruta = `/proyectos/${creado.body.idProyecto}`;
+
+    await prisma.usuarioOrganizacion.update({
+      where: { idUsuario_idOrganizacion: { idUsuario: editor.idUsuario, idOrganizacion: org } },
+      data: { rolOrganizacion: 'LECTURA' },
+    });
+    expect((await pedir('PATCH', ruta, editor.token, { organizacionesIds: [] })).status).toBe(403);
+    expect(await prisma.proyectoOrganizacion.count({ where: { idProyecto: creado.body.idProyecto } })).toBe(1);
+  });
+
   it('los miembros elegidos entran como participantes activos y ocupan cupos: 6 cupos y 4 miembros dejan 2', async () => {
     const dueno = await usuario();
     const editor = await usuario();
