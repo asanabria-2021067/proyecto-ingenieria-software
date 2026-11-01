@@ -270,4 +270,13 @@ describeIntegration('dashboard de asociacion - permisos y regla en riesgo (Postg
     expect(pdf.status).toBe(200);
     expect((await pdf.text()).startsWith('%PDF')).toBe(true);
   });
+
+  it('una asociacion archivada cierra todas las rutas a su antigua junta', async () => {
+    await prisma.asociacion.update({ where: { idAsociacion: ids.asociacionA }, data: { archivada: true } });
+    try {
+      for (const ruta of rutas(ids.asociacionA)) expect((await pedir(ruta, 'presA')).status).toBe(403);
+    } finally {
+      await prisma.asociacion.update({ where: { idAsociacion: ids.asociacionA }, data: { archivada: false } });
+    }
+  });
 });

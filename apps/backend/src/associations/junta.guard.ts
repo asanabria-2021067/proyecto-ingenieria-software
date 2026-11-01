@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { JUNTA_FORBIDDEN_MESSAGE, membresiaJunta } from './junta-access';
+import { ASOCIACION_ARCHIVADA_MESSAGE, JUNTA_FORBIDDEN_MESSAGE, membresiaJunta } from './junta-access';
 
 /**
  * Exige que el usuario autenticado sea de la junta de `:idAsociacion`. Va después de `JwtAuthGuard`
@@ -17,6 +17,7 @@ export class JuntaGuard implements CanActivate {
     if (!Number.isInteger(idAsociacion) || typeof userId !== 'number') throw new ForbiddenException(JUNTA_FORBIDDEN_MESSAGE);
     const m = await membresiaJunta(this.prisma, idAsociacion, userId);
     if (!m) throw new ForbiddenException(JUNTA_FORBIDDEN_MESSAGE);
+    if (m.asociacion.archivada) throw new ForbiddenException(ASOCIACION_ARCHIVADA_MESSAGE);
     req.junta = m;
     return true;
   }
