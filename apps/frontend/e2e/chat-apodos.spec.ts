@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon } from './support/chat';
 
 const PROYECTO_ID = 1;
 const CORREO_A = 'carlos.mendoza@uvg.edu.gt';
@@ -14,22 +15,6 @@ async function desactivarTour(page: Page) {
       return originalGetItem.call(this, key);
     };
   });
-}
-
-async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.goto('/dashboard/mensajes');
-  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
-
-  if (await existente.count()) {
-    await existente.first().click();
-    return;
-  }
-
-  await page.goto('/dashboard/mensajes');
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
 }
 
 test('el apodo es privado: solo lo ve quien lo define', async ({ browser }) => {

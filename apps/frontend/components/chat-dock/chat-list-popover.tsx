@@ -33,8 +33,6 @@ function estadoUltimoMensaje(conversacion: ChatConversacionGlobal): string | nul
 }
 
 interface ChatListPopoverProps {
-  /** Pone el foco en el buscador al abrirse (cuando se abre desde la barra lateral). */
-  enfocarBuscador?: boolean;
   onClose: () => void;
   /** Abre el diálogo de mensajes guardados (vive en ChatDock para sobrevivir al cierre de este popover). */
   onOpenSaved?: () => void;
@@ -43,7 +41,7 @@ interface ChatListPopoverProps {
   idActiva?: number | null;
 }
 
-export function ChatListPopover({ onClose, onOpenSaved, enfocarBuscador, pagina = false, idActiva = null }: ChatListPopoverProps) {
+export function ChatListPopover({ onClose, onOpenSaved, pagina = false, idActiva = null }: ChatListPopoverProps) {
   const { data: user } = useCurrentUser();
   const currentUserId = user?.idUsuario ?? null;
   const { abrirChat } = useChatDock();
@@ -125,7 +123,6 @@ export function ChatListPopover({ onClose, onOpenSaved, enfocarBuscador, pagina 
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar mensajes"
-            autoFocus={enfocarBuscador}
             aria-label="Buscar por nombre de chat o por mensajes enviados"
             className="h-9 rounded-full border-outline-variant pl-8 text-sm"
           />

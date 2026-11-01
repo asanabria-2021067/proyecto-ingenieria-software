@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon } from './support/chat';
 
 // Mismo par de usuarios que chat-mensajeria.spec.ts (ambos participan en el Proyecto 1 del seed).
 const PROYECTO_ID = 1;
@@ -16,22 +17,6 @@ async function desactivarTour(page: Page) {
       return originalGetItem.call(this, key);
     };
   });
-}
-
-async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.goto('/dashboard/mensajes');
-  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
-
-  if (await existente.count()) {
-    await existente.first().click();
-    return;
-  }
-
-  await page.goto('/dashboard/mensajes');
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
 }
 
 test('guardar un mensaje es privado: aparece en Mensajes guardados de quien lo guarda y no de la otra persona', async ({ browser }) => {

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon } from './support/chat';
 
 // Mismo par de usuarios del seed que chat-mensajeria.spec.ts (Proyecto 1).
 const PROYECTO_ID = 1;
@@ -16,22 +17,6 @@ async function desactivarTour(page: Page) {
       return originalGetItem.call(this, key);
     };
   });
-}
-
-async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.goto('/dashboard/mensajes');
-  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
-
-  if (await existente.count()) {
-    await existente.first().click();
-    return;
-  }
-
-  await page.goto('/dashboard/mensajes');
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
 }
 
 test('el autor edita y elimina su mensaje y el otro participante lo ve en vivo', async ({ browser }) => {

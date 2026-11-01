@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
-import { iconoMensajes } from './support/chat';
+import { abrirChatIndividualCon, iconoMensajes } from './support/chat';
 
 // Mismo par real del Proyecto 1 del seed que usa chat-mensajeria.spec.ts.
 const PROYECTO_ID = 1;
@@ -16,22 +16,6 @@ async function desactivarTour(page: Page) {
       return originalGetItem.call(this, key);
     };
   });
-}
-
-async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.goto('/dashboard/mensajes');
-  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
-
-  if (await existente.count()) {
-    await existente.first().click();
-    return;
-  }
-
-  await page.goto('/dashboard/mensajes');
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
 }
 
 test('silenciar un chat muestra el indicador y no suma al badge de no leidos', async ({ browser }) => {
@@ -65,10 +49,9 @@ test('silenciar un chat muestra el indicador y no suma al badge de no leidos', a
 
     // B ve el chat con el mensaje nuevo marcado como Silenciado, y el
     // boton del dock no anuncia mensajes sin leer.
-    const boton = iconoMensajes(pageB);
-    await expect(boton).toHaveAccessibleName('Mensajes');
     await pageB.goto('/dashboard/mensajes');
     await expect(pageB.getByText(mensaje).first()).toBeVisible();
+    await expect(iconoMensajes(pageB)).toHaveAccessibleName('Mensajes');
     await expect(pageB.getByText('Silenciado').first()).toBeVisible();
 
     // Reactivar desde el menu de la ventana.
