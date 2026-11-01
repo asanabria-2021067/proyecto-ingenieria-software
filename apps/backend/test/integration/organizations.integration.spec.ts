@@ -739,6 +739,32 @@ describeIntegration('ORG — organizaciones, invitaciones, chat y proyectos (Pos
     expect(await prisma.proyectoOrganizacion.count({ where: { idProyecto: creado.body.idProyecto } })).toBe(1);
   });
 
+  it('Administrador y Editor de la organización editan su proyecto; Lectura y ajenos no', async () => {
+    const dueno = await usuario();
+    const admin = await usuario();
+    const editor = await usuario();
+    const lector = await usuario();
+    const ajeno = await usuario();
+    const org = await crearOrg(dueno);
+    await agregar(org, admin, 'ADMINISTRADOR');
+    await agregar(org, editor, 'EDITOR');
+    await agregar(org, lector, 'LECTURA');
+    const creado = await crearProyecto(dueno.token, { idOrganizacion: org });
+    expect(creado.status).toBe(201);
+    const ruta = `/proyectos/${creado.body.idProyecto}`;
+
+    for (const [quien, titulo] of [[admin, 'Editado por admin'], [editor, 'Editado por editor']] as const) {
+      expect((await pedir('PATCH', ruta, quien.token, { tituloProyecto: titulo })).status).toBe(200);
+      expect((await prisma.proyecto.findUniqueOrThrow({ where: { idProyecto: creado.body.idProyecto } })).tituloProyecto).toBe(titulo);
+    }
+    for (const sinPermiso of [lector, ajeno]) {
+      expect((await pedir('PATCH', ruta, sinPermiso.token, { tituloProyecto: 'No debe cambiar' })).status).toBe(403);
+    }
+    // Quitar la organización exige poder publicar en ella.
+    expect((await pedir('PATCH', ruta, lector.token, { organizacionesIds: [] })).status).toBe(403);
+    expect(await prisma.proyectoOrganizacion.count({ where: { idProyecto: creado.body.idProyecto } })).toBe(1);
+  });
+
   it('los miembros elegidos entran como participantes activos y ocupan cupos: 6 cupos y 4 miembros dejan 2', async () => {
     const dueno = await usuario();
     const editor = await usuario();

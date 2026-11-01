@@ -95,6 +95,19 @@ export async function assertPuedePublicar(db: Db, userId: number, idsOrganizacio
   }
 }
 
+/** Propietario, Administrador o Editor activo de una organización activa dueña del proyecto. */
+export async function puedeEditarComoOrganizacion(db: Db, idProyecto: number, userId: number): Promise<boolean> {
+  const miembro = await db.usuarioOrganizacion.count({
+    where: {
+      idUsuario: userId,
+      estadoMembresia: EstadoMembresia.ACTIVA,
+      rolOrganizacion: { in: [...ROLES_PUBLICAN] },
+      organizacion: { estadoOrganizacion: EstadoOrganizacion.ACTIVA, proyectos: { some: { idProyecto } } },
+    },
+  });
+  return miembro > 0;
+}
+
 /**
  * Miembro activo de alguna organización dueña del proyecto: lo ve en solo
  * lectura aunque no participe. Nunca autoriza escritura.

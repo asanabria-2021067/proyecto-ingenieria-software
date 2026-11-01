@@ -46,7 +46,7 @@ import {
 import { ProjectsCacheService } from './projects-cache.service';
 import { ProjectsAffinityService } from './projects-affinity.service';
 import { ProjectsRevisionsService } from './projects-revisions.service';
-import { assertPuedePublicar } from '../organizations/organization-access';
+import { assertPuedePublicar, puedeEditarComoOrganizacion } from '../organizations/organization-access';
 import { crearParticipaciones, validarParticipantes } from '../organizations/organization-projects';
 
 export { PESOS_ORDEN_DISPONIBLES } from './projects.read-model';
@@ -601,8 +601,13 @@ export class ProjectsService {
   async update(id: number, data: UpdateProjectDto, userId: number) {
     return this.projectTx.run(id, userId, 'projects.update', async (ctx) => {
     const { tx } = ctx;
-    const proyecto = await this._requireOwner(id, userId, tx);
-    await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'PROYECTO_EDICION', userId);
+    const proyecto = await this._requireOwnerOEditorOrg(id, userId, tx);
+    if (proyecto.creadoPor === userId) {
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'PROYECTO_EDICION', userId);
+    } else {
+      // Editor de la organización dueña: mismas reglas de estado que el líder.
+      this.policy.assertProjectState(this.lockedProject(ctx), this.policy.policyFor('PROYECTO_EDICION').states);
+    }
 
     // Edición parcial (proyecto ya publicado / en progreso): solo el
     // subconjunto seguro de campos; conserva estado, roles, organizaciones,
@@ -903,6 +908,21 @@ export class ProjectsService {
     const esLider = proyecto.creadoPor === userId;
     if (!esLider && !(await this.esParticipanteActivo(idProyecto, userId, db))) {
       throw new ForbiddenException('No tienes una participación activa en este proyecto');
+    }
+    return proyecto;
+  }
+
+  /** Líder, o Propietario/Administrador/Editor activo de una organización dueña del proyecto (Lectura nunca). */
+  private async _requireOwnerOEditorOrg(idProyecto: number, userId: number, db: Db = this.prisma) {
+    const proyecto = await db.proyecto.findFirst({
+      where: { idProyecto, eliminadoEn: null },
+      select: { idProyecto: true, estadoProyecto: true, creadoPor: true, tituloProyecto: true },
+    });
+    if (!proyecto) {
+      throw new NotFoundException(`Proyecto con id ${idProyecto} no encontrado`);
+    }
+    if (proyecto.creadoPor !== userId && !(await puedeEditarComoOrganizacion(db, idProyecto, userId))) {
+      throw new ForbiddenException('No eres el líder de este proyecto');
     }
     return proyecto;
   }
