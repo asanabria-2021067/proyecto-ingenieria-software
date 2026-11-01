@@ -2,6 +2,7 @@ import type { Browser, BrowserContext, Page } from '@playwright/test';
 import type { Socket } from 'socket.io-client';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon } from './support/chat';
 import { capturar } from './support/calendario';
 import { API_URL, desactivarTour, noLeidas, socketDe } from './support/realtime';
 
@@ -59,20 +60,6 @@ async function sesion(browser: Browser, correo: string, destino?: string): Promi
   await login(page, correo, destino);
   await page.waitForLoadState('networkidle');
   return { contexto, page };
-}
-
-async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
-  if (await existente.count()) {
-    await existente.first().click();
-    return;
-  }
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
 }
 
 // ───────────────────────────── Tiempo real ─────────────────────────────

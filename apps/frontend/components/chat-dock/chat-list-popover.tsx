@@ -33,14 +33,15 @@ function estadoUltimoMensaje(conversacion: ChatConversacionGlobal): string | nul
 }
 
 interface ChatListPopoverProps {
-  /** Pone el foco en el buscador al abrirse (cuando se abre desde la barra lateral). */
-  enfocarBuscador?: boolean;
   onClose: () => void;
   /** Abre el diálogo de mensajes guardados (vive en ChatDock para sobrevivir al cierre de este popover). */
   onOpenSaved?: () => void;
+  /** Columna izquierda de /dashboard/mensajes: ocupa todo el alto y marca la conversación abierta. */
+  pagina?: boolean;
+  idActiva?: number | null;
 }
 
-export function ChatListPopover({ onClose, onOpenSaved, enfocarBuscador }: ChatListPopoverProps) {
+export function ChatListPopover({ onClose, onOpenSaved, pagina = false, idActiva = null }: ChatListPopoverProps) {
   const { data: user } = useCurrentUser();
   const currentUserId = user?.idUsuario ?? null;
   const { abrirChat } = useChatDock();
@@ -68,7 +69,13 @@ export function ChatListPopover({ onClose, onOpenSaved, enfocarBuscador }: ChatL
   );
 
   return (
-    <div className="flex h-[28rem] w-80 max-w-[calc(100vw-2rem)] flex-col rounded-xl border border-outline-variant bg-surface-container-lowest shadow-raised">
+    <div
+      className={
+        pagina
+          ? 'flex h-full min-h-0 w-full flex-col bg-surface-container-lowest'
+          : 'flex h-[28rem] w-80 max-w-[calc(100vw-2rem)] flex-col rounded-xl border border-outline-variant bg-surface-container-lowest shadow-raised'
+      }
+    >
       <div className="shrink-0 border-b border-outline-variant px-3 pb-2 pt-3">
         <div className="flex items-center justify-between px-1 pb-2">
           <p className="text-sm font-bold text-on-surface">Mensajes</p>
@@ -116,7 +123,6 @@ export function ChatListPopover({ onClose, onOpenSaved, enfocarBuscador }: ChatL
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar mensajes"
-            autoFocus={enfocarBuscador}
             aria-label="Buscar por nombre de chat o por mensajes enviados"
             className="h-9 rounded-full border-outline-variant pl-8 text-sm"
           />
@@ -207,7 +213,8 @@ export function ChatListPopover({ onClose, onOpenSaved, enfocarBuscador }: ChatL
                 abrirChat(c.idProyecto, c.idConversacion);
                 onClose();
               }}
-              className="flex w-full items-start gap-2.5 border-b border-outline-variant/50 px-3 py-2.5 text-left transition-colors hover:bg-surface-container-high"
+              aria-current={c.idConversacion === idActiva ? 'true' : undefined}
+              className={`flex w-full items-start gap-2.5 border-b border-outline-variant/50 px-3 py-2.5 text-left transition-colors hover:bg-surface-container-high ${c.idConversacion === idActiva ? 'bg-primary/10' : ''}`}
             >
               {c.tipo === 'GRUPAL' ? (
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">

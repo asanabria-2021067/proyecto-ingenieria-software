@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Archive,
   ArchiveRestore,
+  ArrowLeft,
   Bell,
   BellOff,
   ChevronDown,
@@ -100,9 +101,12 @@ interface ChatWindowProps {
   typingUserIds?: number[];
   /** Se llama al teclear; el socket lo limita (throttle). */
   onTyping?: () => void;
+  /** `pagina`: ocupa todo el espacio de /dashboard/mensajes en vez de ser una ventana flotante. */
+  variante?: 'ventana' | 'pagina';
 }
 
-export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, onClose, typingUserIds = [], onTyping }: ChatWindowProps) {
+export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, onClose, typingUserIds = [], onTyping, variante = 'ventana' }: ChatWindowProps) {
+  const pagina = variante === 'pagina';
   const { data: user } = useCurrentUser();
   const currentUserId = user?.idUsuario ?? null;
   const { conversations } = useAllConversations();
@@ -232,8 +236,19 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const titulo = conversacion ? nombreConversacion(conversacion, currentUserId) : 'Chat';
 
   return (
-    <div className="flex w-[36rem] shrink-0 flex-col rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest shadow-raised max-w-[calc(100vw-2rem)]">
-      <div className={`flex shrink-0 items-center gap-2 rounded-t-xl border-b border-outline-variant bg-surface-container px-3 py-2 ${claseAcentoCabecera(conversacion?.temaColor)}`}>
+    <div
+      className={
+        pagina
+          ? 'flex h-full min-h-0 w-full min-w-0 flex-col bg-surface-container-lowest'
+          : 'flex w-[36rem] shrink-0 flex-col rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest shadow-raised max-w-[calc(100vw-2rem)]'
+      }
+    >
+      <div className={`flex shrink-0 items-center gap-2 border-b border-outline-variant bg-surface-container px-3 py-2 ${pagina ? '' : 'rounded-t-xl'} ${claseAcentoCabecera(conversacion?.temaColor)}`}>
+        {pagina && (
+          <button type="button" onClick={onClose} aria-label="Volver a la lista de mensajes" className="motion-icon motion-focus rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary md:hidden">
+            <ArrowLeft className="size-4" aria-hidden="true" />
+          </button>
+        )}
         {conversacion?.tipo === 'GRUPAL' ? (
           <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
             {conversacion.esCanal ? <Hash className="size-3.5" aria-hidden="true" /> : <UsersIcon className="size-3.5" aria-hidden="true" />}
@@ -247,7 +262,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
         <div className="min-w-0 flex-1">
           <button
             type="button"
-            onClick={onMinimize}
+            onClick={pagina ? undefined : onMinimize}
             title={otro && !conversacion?.nombrePersonalizado ? nombreReal(otro) : undefined}
             className="block w-full truncate text-left text-sm font-semibold text-on-surface"
           >
@@ -357,12 +372,16 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <button type="button" onClick={onMinimize} aria-label={minimized ? 'Expandir chat' : 'Minimizar chat'} className="motion-icon motion-focus rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary">
-          {minimized ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}
-        </button>
-        <button type="button" onClick={onClose} aria-label="Cerrar chat" className="motion-icon motion-focus rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary">
-          <X className="size-4" aria-hidden="true" />
-        </button>
+        {!pagina && (
+          <>
+            <button type="button" onClick={onMinimize} aria-label={minimized ? 'Expandir chat' : 'Minimizar chat'} className="motion-icon motion-focus rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary">
+              {minimized ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}
+            </button>
+            <button type="button" onClick={onClose} aria-label="Cerrar chat" className="motion-icon motion-focus rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary">
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          </>
+        )}
       </div>
 
       {!minimized && (
@@ -376,7 +395,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               onClose={() => setBuscarAbierto(false)}
             />
           )}
-          <div ref={listRef} className="h-[40rem] max-h-[60dvh] min-h-0 space-y-3 overflow-y-auto px-3 py-3">
+          <div ref={listRef} className={`${pagina ? 'flex-1' : 'h-[40rem] max-h-[60dvh]'} min-h-0 space-y-3 overflow-y-auto px-3 py-3`}>
             {isLoading && <SkeletonList label="Cargando historial" count={3} lines={1} avatar="circle" layout="plain" />}
             {!isLoading && messages.length === 0 && (
               <p className="text-xs text-tertiary">Todavía no hay mensajes. Sé el primero en escribir.</p>

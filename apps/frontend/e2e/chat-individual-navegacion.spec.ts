@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon } from './support/chat';
 
 const PROYECTO_ID = 1;
 // Proyecto 1 tiene tres participantes activos reales (carlos, maria, jose) —
@@ -26,30 +27,6 @@ async function desactivarTour(page: Page) {
     };
   });
 }
-
-
-/**
- * Abre (o crea, si no existe todavía) la conversación individual con
- * `nombreOtro`. La lista de chats vive en el dock global (botón "Mensajes",
- * abajo a la derecha), no en el sidebar del proyecto — crear uno nuevo sí
- * sigue siendo una acción del proyecto ("Nuevo chat del proyecto").
- */
-async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
-
-  if (await existente.count()) {
-    await existente.first().click();
-    return;
-  }
-
-  await page.getByRole('button', { name: /^mensajes/i }).click(); // cierra la lista, vacía
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
-}
-
 async function enviarMensaje(page: Page, texto: string) {
   await page.getByPlaceholder('Escribe un mensaje…').fill(texto);
   await page.getByRole('button', { name: 'Enviar mensaje' }).click();

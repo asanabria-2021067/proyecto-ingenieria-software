@@ -1,31 +1,29 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { BellOff, MessageCircle } from 'lucide-react';
 import { ChatListPopover } from '@/components/chat-dock/chat-list-popover';
 import { SavedMessagesDialog } from '@/components/chat-dock/saved-messages-dialog';
 import { useChatNoLeidos } from '@/components/chat-dock/use-chat-no-leidos';
+import { RUTA_MENSAJES } from '@/components/chat-dock/chat-dock-context';
 import { useCurrentUser } from '@/hooks/use-current-user';
 
-/** Evento que abre la lista de chats desde fuera (el ítem «Mensajes» de la barra lateral). */
-export const ABRIR_LISTA_CHATS = 'abrir-lista-chats';
-
 /**
- * Botón + panel de la lista de chats. Un solo componente para los dos puntos de
- * entrada: `barra` (icono junto a la campana, desde escritorio) y `flotante`
- * (móvil, abajo a la derecha).
+ * Punto de entrada al chat. `barra` (icono junto a la campana, desde escritorio)
+ * lleva a la página /dashboard/mensajes; `flotante` (móvil, abajo a la derecha)
+ * abre el panel rápido con la lista de chats.
  */
 export function ChatListLauncher({ variante, conectado = true }: { variante: 'barra' | 'flotante'; conectado?: boolean }) {
   const [listOpen, setListOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
-  const [enfocarBuscador, setEnfocarBuscador] = useState(false);
   const { data: user } = useCurrentUser();
   const { total, enNoMolestar } = useChatNoLeidos();
   const listRef = useRef<HTMLDivElement>(null);
   const esBarra = variante === 'barra';
 
   useEffect(() => {
-    if (!listOpen) return;
+    if (!listOpen || esBarra) return;
     const cerrarSiEsAfuera = (event: MouseEvent) => {
       // Los diálogos (nuevo chat, mi estado) y sus listas desplegables (Select) van en portales: no cuentan como «afuera».
       if ((event.target as Element).closest?.('[role="dialog"], [role="listbox"]')) return;
@@ -33,38 +31,22 @@ export function ChatListLauncher({ variante, conectado = true }: { variante: 'ba
     };
     document.addEventListener('mousedown', cerrarSiEsAfuera);
     return () => document.removeEventListener('mousedown', cerrarSiEsAfuera);
-  }, [listOpen]);
-
-  useEffect(() => {
-    if (!esBarra) return;
-    // El listener sigue montado aunque el contenedor esté oculto por CSS.
-    const abrir = () => {
-      setEnfocarBuscador(true);
-      setListOpen(true);
-    };
-    window.addEventListener(ABRIR_LISTA_CHATS, abrir);
-    return () => window.removeEventListener(ABRIR_LISTA_CHATS, abrir);
-  }, [esBarra]);
+  }, [listOpen, esBarra]);
 
   const etiqueta = `Mensajes${enNoMolestar ? ', no molestar activo' : ''}${total > 0 ? `, ${total} sin leer` : ''}`;
 
   return (
     <div ref={listRef} className={esBarra ? 'relative hidden md:block' : 'pointer-events-auto relative shrink-0 md:hidden'}>
-      {listOpen && (
-        <div className={esBarra ? 'absolute right-0 top-full z-[60] mt-2' : 'absolute bottom-full right-0 mb-2'}>
-          <ChatListPopover onClose={() => setListOpen(false)} onOpenSaved={() => setSavedOpen(true)} enfocarBuscador={enfocarBuscador} />
+      {listOpen && !esBarra && (
+        <div className="absolute bottom-full right-0 mb-2">
+          <ChatListPopover onClose={() => setListOpen(false)} onOpenSaved={() => setSavedOpen(true)} />
         </div>
       )}
       {esBarra ? (
-        <button
-          type="button"
-          onClick={() => {
-            setEnfocarBuscador(false);
-            setListOpen((open) => !open);
-          }}
+        <Link
+          href={RUTA_MENSAJES}
           aria-label={etiqueta}
           title="Mensajes"
-          aria-expanded={listOpen}
           className="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-md text-on-surface hover:bg-surface-container-high motion-icon"
         >
           <div className="relative">
@@ -78,7 +60,7 @@ export function ChatListLauncher({ variante, conectado = true }: { variante: 'ba
               <BellOff className="absolute -bottom-1.5 -right-1.5 size-3 rounded-full bg-card text-text-secondary" aria-hidden="true" />
             )}
           </div>
-        </button>
+        </Link>
       ) : (
         <button
           type="button"

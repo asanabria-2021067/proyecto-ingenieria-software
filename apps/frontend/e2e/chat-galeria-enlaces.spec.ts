@@ -1,5 +1,6 @@
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon } from './support/chat';
 
 const PROYECTO_ID = 1;
 const CORREO_A = 'carlos.mendoza@uvg.edu.gt';
@@ -17,17 +18,7 @@ test('los enlaces enviados aparecen en la galeria de enlaces compartidos', async
   await login(page, CORREO_A);
   await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
 
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  const existente = page.getByRole('button', { name: /María/ });
-  if (await existente.count()) {
-    await existente.first().click();
-  } else {
-    await page.getByRole('button', { name: /^mensajes/i }).click();
-    await page.getByRole('button', { name: /nuevo chat/i }).click();
-    await page.getByRole('button', { name: 'Individual' }).click();
-    await page.getByRole('checkbox', { name: /María/ }).click();
-    await page.getByRole('button', { name: 'Crear chat' }).click();
-  }
+  await abrirChatIndividualCon(page, 'María');
 
   const marca = Math.random().toString(36).slice(2, 8);
   const url = `https://ejemplo-${marca}.org/guia`;

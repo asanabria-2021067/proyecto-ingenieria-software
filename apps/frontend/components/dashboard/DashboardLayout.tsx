@@ -41,9 +41,9 @@ import { resolveCommentNotificationLink } from '@/components/notifications/comme
 import { resolveAssignedTaskToastLink } from '@/components/notifications/task-notification-link';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
 import { AnuncioBanner } from '@/components/anuncios/anuncio-banner';
-import { ChatDockProvider } from '@/components/chat-dock/chat-dock-context';
-import { ChatDock } from '@/components/chat-dock/chat-dock';
-import { ABRIR_LISTA_CHATS, ChatListLauncher } from '@/components/chat-dock/chat-list-launcher';
+import { ChatDockProvider, RUTA_MENSAJES } from '@/components/chat-dock/chat-dock-context';
+import { ChatDock, ChatSocketProvider } from '@/components/chat-dock/chat-dock';
+import { ChatListLauncher } from '@/components/chat-dock/chat-list-launcher';
 import { useChatNoLeidos } from '@/components/chat-dock/use-chat-no-leidos';
 import { toast } from 'sonner';
 import logo from '@/public/logo.png';
@@ -62,12 +62,11 @@ const navEntries: NavEntry[] = [
     icon: LayoutDashboard,
     exact: true,
   },
-  // Sin ruta: abre el panel de chats de la barra superior (el contador se inyecta en el layout).
+  // El contador de no leídos se inyecta en el layout.
   {
-    href: '#mensajes',
+    href: RUTA_MENSAJES,
     label: 'Mensajes',
     icon: MessageCircle,
-    onSelect: () => window.dispatchEvent(new Event(ABRIR_LISTA_CHATS)),
   },
   {
     type: 'group',
@@ -153,7 +152,7 @@ export default function DashboardLayout({
   const { collapsed: sidebarCollapsed } = useDashboardSidebarCollapsed();
   const { total: chatNoLeidos } = useChatNoLeidos();
   const entries = useMemo(
-    () => navEntries.map((e) => (e.type !== 'group' && e.onSelect ? { ...e, badge: chatNoLeidos } : e)),
+    () => navEntries.map((e) => (e.type !== 'group' && e.href === RUTA_MENSAJES ? { ...e, badge: chatNoLeidos } : e)),
     [chatNoLeidos],
   );
   const navItemsMobile = flattenNavEntries(entries);
@@ -206,6 +205,7 @@ export default function DashboardLayout({
 
   return (
     <ChatDockProvider>
+    <ChatSocketProvider>
     <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-page">
       <a href="#dashboard-main" className="skip-link">
         Saltar al contenido principal
@@ -379,6 +379,7 @@ export default function DashboardLayout({
       <OnboardingTour />
       <ChatDock />
     </div>
+    </ChatSocketProvider>
     </ChatDockProvider>
   );
 }

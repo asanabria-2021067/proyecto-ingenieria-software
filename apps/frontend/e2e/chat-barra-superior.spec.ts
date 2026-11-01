@@ -4,7 +4,7 @@ import { login } from './support/auth';
 import { desactivarTour } from './support/realtime';
 import { asegurarChatCon, iconoMensajes } from './support/chat';
 
-// NL-T5: el chat se abre desde un icono de la barra superior (junto a la campana),
+// NL-T5 / CHAT-PAGE: el icono de la barra superior (junto a la campana) lleva a /dashboard/mensajes,
 // con contador en vivo; el botón flotante queda solo en pantallas angostas.
 const PROYECTO_ID = 1;
 const CARLOS = 'carlos.mendoza@uvg.edu.gt';
@@ -47,9 +47,11 @@ test('el icono de la barra superior abre el chat con un clic y su contador baja 
     await expect.poll(() => sinLeer(pageB), { timeout: 15_000 }).toBeGreaterThan(antes);
     const conMensaje = await sinLeer(pageB);
 
-    // Un clic abre la lista; al abrir la conversación y leerla, el contador baja.
+    // Un clic lleva a la página de mensajes; al abrir la conversación y leerla, el contador baja.
     await iconoMensajes(pageB).click();
+    await expect(pageB).toHaveURL(/\/dashboard\/mensajes$/);
     await pageB.getByRole('button', { name: /Carlos/ }).first().click();
+    await expect(pageB).toHaveURL(/\/dashboard\/mensajes\/\d+$/);
     await expect(pageB.getByText(mensaje).first()).toBeVisible();
     await expect.poll(() => sinLeer(pageB), { timeout: 15_000 }).toBeLessThan(conMensaje);
   } finally {
@@ -58,13 +60,13 @@ test('el icono de la barra superior abre el chat con un clic y su contador baja 
   }
 });
 
-test('el ítem «Mensajes» de la barra lateral abre el mismo panel y enfoca el buscador', async ({ page }) => {
+test('el ítem «Mensajes» de la barra lateral lleva a la página de mensajes', async ({ page }) => {
   await desactivarTour(page);
   await login(page, JOSE);
 
-  // Su nombre accesible no empieza por «Mensajes»: no se confunde con el icono de la barra superior.
-  await page.getByRole('button', { name: /^abrir mensajes/i }).click();
-  await expect(page.getByPlaceholder('Buscar mensajes')).toBeFocused();
+  await page.locator('#nav-item-mensajes').click();
+  await expect(page).toHaveURL(/\/dashboard\/mensajes$/);
+  await expect(page.getByPlaceholder('Buscar mensajes')).toBeVisible();
   await expect(page.getByRole('button', { name: /nuevo chat/i })).toBeVisible();
 });
 
@@ -85,8 +87,9 @@ test('en pantalla angosta el botón flotante «Mensajes» reemplaza al icono de 
   try {
     await login(page, JOSE);
     await page.goto('/dashboard');
-    await expect(iconoMensajes(page)).toHaveCount(1);
-    await iconoMensajes(page).click();
+    const flotante = page.getByRole('button', { name: /^mensajes/i });
+    await expect(flotante).toHaveCount(1);
+    await flotante.click();
     await expect(page.getByRole('button', { name: /nuevo chat/i })).toBeVisible();
   } finally {
     await context.close();

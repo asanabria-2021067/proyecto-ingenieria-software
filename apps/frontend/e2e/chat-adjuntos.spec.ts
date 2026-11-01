@@ -1,24 +1,10 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon } from './support/chat';
 
 const PROYECTO_ID = 1;
 const CORREO_A = 'carlos.mendoza@uvg.edu.gt';
-
-// Con el dock abierto hay dos botones "Nuevo chat": se cierra y se usa el de la barra del proyecto.
-async function abrirChatConMaria(page: Page) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  const existente = page.getByRole('button', { name: /María/ });
-  if (await existente.count()) {
-    await existente.first().click();
-  } else {
-    await page.getByRole('button', { name: /^mensajes/i }).click();
-    await page.getByRole('button', { name: 'Nuevo chat del proyecto' }).click();
-    await page.getByRole('button', { name: 'Individual' }).click();
-    await page.getByRole('checkbox', { name: /María/ }).click();
-    await page.getByRole('button', { name: 'Crear chat' }).click();
-  }
-}
 
 // El POST simulado no se guarda en la base: tras enviarlo, la recarga de la lista
 // de mensajes (que la app dispara) debe incluirlo o el mensaje desaparece.
@@ -55,7 +41,7 @@ test('adjuntar un PDF, verlo en el mensaje, descargarlo y listarlo en la galeria
   await login(page, CORREO_A);
   await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
 
-  await abrirChatConMaria(page);
+  await abrirChatIndividualCon(page, 'María');
 
   await simularEnvioArchivo(page, {
     idMensaje: 900001,
@@ -133,7 +119,7 @@ test('una imagen adjunta muestra su miniatura servida por el backend', async ({ 
 
   await login(page, CORREO_A);
   await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
-  await abrirChatConMaria(page);
+  await abrirChatIndividualCon(page, 'María');
 
   await simularEnvioArchivo(page, {
     idMensaje: 900002,

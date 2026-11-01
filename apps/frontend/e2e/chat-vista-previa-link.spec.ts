@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon } from './support/chat';
 
 // Mismo par real del Proyecto 1 del seed que usa chat-mensajeria.spec.ts.
 const PROYECTO_ID = 1;
@@ -26,20 +27,6 @@ async function desactivarTour(page: Page) {
   });
 }
 
-async function abrirChatCon(page: Page, nombreOtro: string) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
-  if (await existente.count()) {
-    await existente.first().click();
-    return;
-  }
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
-}
-
 // El stack local no tiene por que tener salida a internet: se mockea la respuesta
 // del endpoint (la seguridad SSRF se prueba en las unitarias del backend).
 test('un mensaje con link muestra la tarjeta de vista previa con enlace seguro', async ({ page }) => {
@@ -54,7 +41,7 @@ test('un mensaje con link muestra la tarjeta de vista previa con enlace seguro',
 
   await login(page, CORREO_A);
   await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
-  await abrirChatCon(page, NOMBRE_B);
+  await abrirChatIndividualCon(page, NOMBRE_B);
 
   await page.getByPlaceholder('Escribe un mensaje…').fill(`Mira esto ${URL_MENSAJE}`);
   await page.getByRole('button', { name: 'Enviar mensaje' }).click();
@@ -77,7 +64,7 @@ test('si el endpoint falla no aparece tarjeta ni error', async ({ page }) => {
 
   await login(page, CORREO_A);
   await page.goto(`/dashboard/proyectos/${PROYECTO_ID}`);
-  await abrirChatCon(page, NOMBRE_B);
+  await abrirChatIndividualCon(page, NOMBRE_B);
 
   const mensaje = `Link roto ${URL_MENSAJE}?r=${Date.now()}`;
   await page.getByPlaceholder('Escribe un mensaje…').fill(mensaje);

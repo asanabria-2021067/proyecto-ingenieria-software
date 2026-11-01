@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon } from './support/chat';
 
 // Mismo par de usuarios que chat-mensajeria.spec.ts (ambos participan en el Proyecto 1 del seed).
 const PROYECTO_ID = 1;
@@ -16,22 +17,6 @@ async function desactivarTour(page: Page) {
       return originalGetItem.call(this, key);
     };
   });
-}
-
-async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
-
-  if (await existente.count()) {
-    await existente.first().click();
-    return;
-  }
-
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
 }
 
 test('guardar un mensaje es privado: aparece en Mensajes guardados de quien lo guarda y no de la otra persona', async ({ browser }) => {
@@ -62,7 +47,7 @@ test('guardar un mensaje es privado: aparece en Mensajes guardados de quien lo g
     await expect(pageA.getByRole('button', { name: 'Quitar de guardados' }).last()).toHaveAttribute('aria-pressed', 'true');
 
     // A lo ve en Mensajes guardados.
-    await pageA.getByRole('button', { name: /^mensajes/i }).click();
+    await pageA.goto('/dashboard/mensajes');
     await pageA.getByRole('button', { name: 'Ver mensajes guardados' }).click();
     const dialogoA = pageA.getByRole('dialog', { name: 'Mensajes guardados' });
     await expect(dialogoA.getByText(mensaje)).toBeVisible();
@@ -71,7 +56,7 @@ test('guardar un mensaje es privado: aparece en Mensajes guardados de quien lo g
     await abrirChatIndividualCon(pageB, 'Carlos');
     await expect(pageB.getByText(mensaje).first()).toBeVisible();
     await expect(pageB.getByRole('button', { name: 'Guardar mensaje' }).last()).toHaveAttribute('aria-pressed', 'false');
-    await pageB.getByRole('button', { name: /^mensajes/i }).click();
+    await pageB.goto('/dashboard/mensajes');
     await pageB.getByRole('button', { name: 'Ver mensajes guardados' }).click();
     const dialogoB = pageB.getByRole('dialog', { name: 'Mensajes guardados' });
     await expect(dialogoB.getByText('Aún no has guardado mensajes.')).toBeVisible();
