@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useRef, useState } from 'react';
 import { AlertCircle, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
@@ -119,7 +120,7 @@ export default function AdminSeguridadPage() {
       <AdminBreadcrumb seccion="Verificación y seguridad" pagina="Eventos de seguridad" />
       {/* Sin botón «Actualizar» propio: el de la barra superior del shell vuelve a pedir esta consulta. */}
       <section className="mb-8">
-        <h1 className={ADMIN_PAGE_TITLE}>Eventos de seguridad</h1>
+        <PageTitle className={ADMIN_PAGE_TITLE}>Eventos de seguridad</PageTitle>
         <p className={ADMIN_PAGE_LEAD}>
           Inicios de sesión, bloqueos, recuperaciones de contraseña y cambios de estado de cuenta que la plataforma ya
           registra. Solo consulta: desde aquí no se modifica ningún registro.

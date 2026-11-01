@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useEffect, useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -436,9 +437,9 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <h1 className={ADMIN_PAGE_TITLE}>
+          <PageTitle className={ADMIN_PAGE_TITLE}>
             Panel de Administración
-          </h1>
+          </PageTitle>
           <p className={ADMIN_PAGE_LEAD}>
             Resumen general de actividad, usuarios y proyectos en UVGenius.
           </p>

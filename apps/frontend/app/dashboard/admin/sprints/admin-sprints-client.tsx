@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -227,9 +228,9 @@ export default function AdminSprintsClient() {
 
       <header className="mb-6 flex flex-wrap items-start justify-between gap-x-section gap-y-stack">
         <div className="min-w-0">
-          <h1 className={ADMIN_PAGE_TITLE}>
+          <PageTitle className={ADMIN_PAGE_TITLE}>
             Calendario de Sprints
-          </h1>
+          </PageTitle>
           <p className={ADMIN_PAGE_LEAD}>
             Supervisa las fechas planificadas de finalización de los Sprints activos y las reuniones administrativas.
           </p>

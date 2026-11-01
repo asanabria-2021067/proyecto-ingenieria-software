@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, FileDown, FileText, Users } from 'lucide-react';
@@ -65,7 +66,7 @@ export default function AdminHorasPage() {
     <div className={ADMIN_PAGE}>
       <AdminBreadcrumb seccion="Métricas" pagina="Horas por semestre" />
       <section className="mb-8">
-        <h1 className={ADMIN_PAGE_TITLE}>Horas por semestre</h1>
+        <PageTitle className={ADMIN_PAGE_TITLE}>Horas por semestre</PageTitle>
         <p className={ADMIN_PAGE_LEAD}>
           Horas beca y de extensión de todos los estudiantes activos. Las declaradas por el estudiante se muestran
           siempre aparte de las acreditadas en UVGenius. Solo consulta.

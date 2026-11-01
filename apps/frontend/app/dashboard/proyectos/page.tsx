@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import {
   Select,
   SelectContent,
@@ -140,7 +141,7 @@ function ProyectosContenido() {
         <div className="mb-section flex flex-col gap-stack lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-tight">
-              <h1 className="type-display">Proyectos Disponibles</h1>
+              <PageTitle className="type-display">Proyectos Disponibles</PageTitle>
               {!isLoading && !isError && (
                 <span className="pill pill-accent inline-flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />

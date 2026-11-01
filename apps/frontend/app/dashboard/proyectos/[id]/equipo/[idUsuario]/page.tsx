@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useParams } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
@@ -207,9 +208,9 @@ function DetalleIntegranteContent({
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <h1 className="type-display break-words text-text-primary">
+          <PageTitle className="type-display break-words text-text-primary">
             {usuario.nombre} {usuario.apellido}
-          </h1>
+          </PageTitle>
           <p className="type-meta break-all">{usuario.correo}</p>
           <ul aria-label="Roles en el proyecto" className="mt-tight flex flex-wrap gap-x-stack gap-y-tight">
             {participaciones.map((participacion) => {

@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertCircle, ChevronRight, ClipboardList, Trash2 } from 'lucide-react';
@@ -102,9 +103,9 @@ export default function MisPostulacionesPage() {
       <div className={dashboardPage('py-8')}>
         <div className="mb-6 flex flex-col gap-stack lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="type-display mb-1">
+            <PageTitle className="type-display mb-1">
               Mis Postulaciones
-            </h1>
+            </PageTitle>
             <p className="text-tertiary text-sm">
               Aquí puedes ver el estado de todas tus postulaciones enviadas.
             </p>

@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import Link from 'next/link';
 import { AlertCircle, CheckCircle2, Clock, Hourglass, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,7 @@ import { dashboardPage } from '@/components/layout/dashboard-page';
 function Encabezado() {
   return (
     <header>
-      <h1 className="type-display">Mis Horas</h1>
+      <PageTitle className="type-display">Mis Horas</PageTitle>
       <p className="type-body mt-micro text-text-secondary">
         Tus horas registradas, propuestas y acreditadas en todos tus proyectos.
       </p>

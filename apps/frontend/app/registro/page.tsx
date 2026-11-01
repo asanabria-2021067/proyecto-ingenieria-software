@@ -1,6 +1,7 @@
 'use client';
 
 import { AVISO_PRIVACIDAD_JUNTA } from '@/lib/asociaciones/vista';
+import { PageTitle } from '@/components/ui/page-title';
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -219,7 +220,7 @@ export default function RegistroPage() {
             {/* Branding */}
             <div className="mb-8 text-left">
               <Image src={logo} alt="UVGENIUS" className="mx-auto mb-4 h-28 w-auto" />
-              <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">Crear cuenta</h1>
+              <PageTitle className="text-4xl font-extrabold tracking-tight text-on-surface">Crear cuenta</PageTitle>
               <p className="mt-2 text-base text-tertiary">Usa tu correo institucional para registrarte</p>
             </div>
 

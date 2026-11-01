@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
@@ -555,7 +556,7 @@ export default function CalendarioPage() {
     <div className={dashboardPage('py-8')}>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-gap">
         <div>
-          <h1 className="type-display mb-1">Calendario académico y proyectos</h1>
+          <PageTitle className="type-display mb-1">Calendario académico y proyectos</PageTitle>
           <p className="text-sm text-tertiary">Organiza tus tutorías, reuniones, entregas y fechas límite de tus proyectos.</p>
         </div>
 

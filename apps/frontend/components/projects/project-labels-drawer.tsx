@@ -367,7 +367,7 @@ function ProjectLabelRow({
         disabled={disabled}
         aria-label={`Eliminar etiqueta ${label.nombreEtiqueta}`}
         onClick={() => onDelete(label)}
-        className="rounded-md text-tertiary hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
+        className="rounded-md text-tertiary hover:bg-destructive/10 hover:text-destructive"
       >
         <Trash2 className="size-4" />
       </Button>

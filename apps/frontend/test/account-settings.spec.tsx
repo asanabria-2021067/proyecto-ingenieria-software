@@ -143,7 +143,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
 
   it('la vista solo contiene las preferencias de notificación', () => {
     const pagina = fuente('app/dashboard/configuracion/page.tsx');
-    expect(pagina).toContain('<h1 className="type-display">Configuración</h1>');
+    expect(pagina).toContain('<PageTitle className="type-display">Configuración</PageTitle>');
     expect(pagina).toContain('Administra qué notificaciones deseas recibir en UVGenius.');
     expect(pagina).not.toMatch(/Próximamente|Apariencia|Contraseña|Sesiones|Privacidad|<Tabs/i);
   });

@@ -330,7 +330,7 @@ function ComentarioCuerpo({
               disabled={eliminando}
               aria-label="Eliminar comentario"
               title="Eliminar comentario"
-              className="text-tertiary hover:text-red-500 transition-colors disabled:opacity-50"
+              className="text-tertiary hover:text-destructive transition-colors disabled:opacity-50"
             >
               <Trash2 className="size-3.5" />
             </button>

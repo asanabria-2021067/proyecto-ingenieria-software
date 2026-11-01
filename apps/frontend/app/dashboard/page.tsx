@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -464,9 +465,9 @@ export default function DashboardPage() {
             <span className="pill mb-tight bg-sage-active text-sage-ink">
               Bienvenido de vuelta
             </span>
-            <h1 className="type-display text-sage-ink">
+            <PageTitle className="type-display text-sage-ink">
               ¡Hola, {user?.nombre ?? ''}! 👋
-            </h1>
+            </PageTitle>
             <p className="type-body mt-tight text-sage-ink-soft">
               Tu progreso académico este semestre. Tienes{' '}
               <span className="font-semibold text-sage-ink">

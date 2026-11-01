@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, Building2, Plus, SearchX } from 'lucide-react';
@@ -189,7 +190,7 @@ export default function OrganizacionesPage() {
     <div className={dashboardPage('pt-7 pb-10')}>
       <div className="mb-4.5 flex items-start justify-between gap-4">
         <div>
-          <h1 className="type-display">Mis Organizaciones</h1>
+          <PageTitle className="type-display">Mis Organizaciones</PageTitle>
           <p className="mt-1 text-[14px] font-normal text-tertiary">
             Grupos con miembros, roles, chat y proyectos propios.
           </p>

@@ -179,6 +179,10 @@
 
   --font-family-headline: var(--font-manrope, 'Manrope'), sans-serif;
   --font-family-body: var(--font-inter, 'Inter'), sans-serif;
+  /* UI-2: Rubik solo para títulos de página (PageTitle). */
+  --font-family-title: var(--font-rubik, 'Rubik'), sans-serif;
+  /* Lima de marca para el subrayado de los títulos; decorativo, nunca texto. */
+  --color-brand-lime: #a3e635;
 }
 
 :root {
@@ -502,6 +506,20 @@
     font-weight: var(--text-display--font-weight);
     line-height: var(--text-display--line-height);
     letter-spacing: var(--text-display--letter-spacing);
+  }
+
+  /* UI-2: título de página. Entrada: aparece y sube 8px; el subrayado lima crece. */
+  .page-title {
+    font-family: var(--font-family-title);
+    padding-bottom: 0.4rem;
+    background: linear-gradient(var(--color-brand-lime), var(--color-brand-lime)) no-repeat left bottom / 3.5rem 0.2rem;
+    animation: page-title-in 220ms var(--ease-out-quart) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .page-title {
+      animation: none;
+    }
   }
 
   .type-section {
@@ -1381,6 +1399,19 @@ button:disabled {
 .admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive']:hover,
 .admin-account-menu [data-slot='dropdown-menu-item'][data-variant='destructive']:focus {
   background-color: color-mix(in srgb, var(--admin-menu-danger) 14%, transparent);
+}
+
+@keyframes page-title-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    background-size: 0 0.2rem;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    background-size: 3.5rem 0.2rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

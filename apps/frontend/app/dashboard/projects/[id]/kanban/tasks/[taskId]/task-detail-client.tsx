@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -416,9 +417,9 @@ function TaskDetailView({
           )}
         </div>
 
-        <h1 className="type-display mt-4 line-clamp-3">
+        <PageTitle className="type-display mt-4 line-clamp-3">
           {tarea.tituloTarea}
-        </h1>
+        </PageTitle>
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
           <span className={`pill pill-sm pill-${ESTADO_TAREA_TONE[tarea.estadoTarea]}`}>
@@ -713,9 +714,9 @@ export default function TaskDetailClient({ idProyecto, idTarea }: Props) {
   if (idsValidos && (proyectoError || tasksError) && (!proyecto || !tarea)) {
     return (
         <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-          <h1 className="text-lg font-bold text-on-surface">
+          <PageTitle className="text-lg font-bold text-on-surface">
             No fue posible cargar la información de la tarea.
-          </h1>
+          </PageTitle>
           <div className="mt-5 flex justify-center gap-2">
             <Button
               variant="outline"
@@ -740,7 +741,7 @@ export default function TaskDetailClient({ idProyecto, idTarea }: Props) {
   if (!proyecto || !tarea) {
     return (
         <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-          <h1 className="text-lg font-bold text-on-surface">Tarea no encontrada</h1>
+          <PageTitle className="text-lg font-bold text-on-surface">Tarea no encontrada</PageTitle>
           <p className="mt-2 text-sm text-on-surface-variant">
             Esta tarea no existe o ya no está disponible.
           </p>

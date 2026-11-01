@@ -1,3 +1,4 @@
+import { PageTitle } from '@/components/ui/page-title';
 import type { ComponentProps, ReactNode } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -75,7 +76,7 @@ export function ProjectPageHeader({
       <div className="flex flex-col gap-stack @3xl/project:flex-row @3xl/project:items-start @3xl/project:justify-between">
         <div className="min-w-0">
           {/* Solo el título: sin icono de sección a su lado. */}
-          <h1 className="type-display min-w-0 text-text-primary">{title}</h1>
+          <PageTitle className="type-display min-w-0 text-text-primary">{title}</PageTitle>
           {description && <p className="type-body mt-micro max-w-prose text-text-secondary">{description}</p>}
           {children}
         </div>

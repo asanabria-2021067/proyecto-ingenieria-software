@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -212,7 +213,7 @@ export function NotificationInbox() {
     <div className="flex shrink-0 items-start gap-tight px-stack pb-tight pt-inline">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-tight">
-          <h1 className="type-display">Notificaciones</h1>
+          <PageTitle className="type-display">Notificaciones</PageTitle>
           {nuevas > 0 && (
             <span className="pill pill-accent">
               {nuevas} nueva{nuevas !== 1 ? 's' : ''}

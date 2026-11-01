@@ -515,7 +515,7 @@ export default function BitacoraPage() {
                     type="button"
                     aria-label={`Quitar filtro ${chip.label}`}
                     onClick={chip.onQuitar}
-                    className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-black/10"
+                    className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-on-surface/10"
                   >
                     <X aria-hidden="true" className="size-3" />
                   </button>

@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -187,7 +188,7 @@ export default function AppealsInboxClient() {
       <AdminBreadcrumb seccion="Gobernanza" seccionHref="/dashboard/admin" pagina="Apelaciones" />
 
       <section className="mb-6">
-        <h1 className={ADMIN_PAGE_TITLE}>Apelaciones de liderazgo</h1>
+        <PageTitle className={ADMIN_PAGE_TITLE}>Apelaciones de liderazgo</PageTitle>
         <p className={ADMIN_PAGE_LEAD}>
           Solicitudes de los líderes para transferir su liderazgo. La apelación es una solicitud, no una designación.
         </p>

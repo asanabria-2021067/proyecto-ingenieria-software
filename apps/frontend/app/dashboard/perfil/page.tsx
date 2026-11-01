@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { getHabilidadBadgeStyle } from '@/lib/social/badge-colors';
 import { AVISO_PRIVACIDAD_JUNTA } from '@/lib/asociaciones/vista';
 
@@ -144,9 +145,9 @@ export default function PerfilPage() {
             </div>
 
             <div className="flex-1">
-              <h1 className="type-display">
+              <PageTitle className="type-display">
                 {fullName || (isAdmin ? 'Administrador' : 'Perfil de estudiante')}
-              </h1>
+              </PageTitle>
 
               <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-on-surface-variant">
                 {isAdmin ? (

@@ -726,7 +726,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                     onClick={() => toggleCualidad(c.idCualidad)}
                     className={`rounded-full px-3 py-1 text-xs font-medium motion-select ${
                       selectedCualidades.includes(c.idCualidad)
-                        ? 'bg-tertiary text-white'
+                        ? 'bg-tertiary text-on-tertiary'
                         : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'
                     }`}
                   >

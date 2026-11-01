@@ -74,7 +74,7 @@ const CustomTooltip = ({
           <Button
             type="button"
             {...primaryProps}
-            className="h-auto rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-primary/95 motion-glow-primary"
+            className="h-auto rounded-xl bg-primary px-4 py-2 text-xs font-bold text-on-primary shadow-md hover:bg-primary/95 motion-glow-primary"
           >
             {isLastStep ? 'Finalizar' : 'Siguiente'}
           </Button>

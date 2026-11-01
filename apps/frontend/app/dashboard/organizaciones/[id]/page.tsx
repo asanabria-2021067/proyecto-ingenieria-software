@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Archive, Building2, ChevronLeft, ExternalLink, Folder, Globe, LogOut, Lock, Pencil, Plus, Users } from 'lucide-react';
@@ -135,7 +136,7 @@ export default function OrganizacionPage() {
         <div className="flex min-w-0 gap-4">
           <OrgAvatar nombre={org.nombreOrganizacion} logoUrl={org.logoUrl} className="size-16 sm:size-20" />
           <div className="min-w-0">
-            <h1 className="type-display break-words">{org.nombreOrganizacion}</h1>
+            <PageTitle className="type-display break-words">{org.nombreOrganizacion}</PageTitle>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <Tag tone={org.visibilidad === 'PUBLICA' ? 'green' : 'slate'}>
                 {org.visibilidad === 'PUBLICA' ? <Globe aria-hidden="true" /> : <Lock aria-hidden="true" />}

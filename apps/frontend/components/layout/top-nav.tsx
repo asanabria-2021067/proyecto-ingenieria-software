@@ -75,7 +75,7 @@ export function TopNav() {
           <button
             type="button"
             aria-label="Notificaciones"
-            className="relative p-1.5 text-gray-500 hover:text-gray-800 transition-colors"
+            className="relative p-1.5 text-on-surface-variant hover:text-on-surface transition-colors"
           >
             <Bell className="size-5" />
             <span className="absolute top-1 right-1 size-2 rounded-full bg-red-500 ring-1 ring-white" />
@@ -85,7 +85,7 @@ export function TopNav() {
           <button
             type="button"
             aria-label="Aplicaciones"
-            className="p-1.5 text-gray-500 hover:text-gray-800 transition-colors"
+            className="p-1.5 text-on-surface-variant hover:text-on-surface transition-colors"
           >
             <LayoutGrid className="size-5" />
           </button>
