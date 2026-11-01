@@ -24,6 +24,8 @@ export interface FilaHorasCentral {
   apellido: string;
   carne: string;
   idCarrera: number | null;
+  /** Semestre academico del estudiante en su carrera. */
+  semestreCarrera: number | null;
   carrera: string | null;
   metaBeca: number | null;
   becaDeclarada: number;
@@ -298,7 +300,7 @@ export class HorasSemestreService {
           idUsuario: true,
           nombre: true,
           apellido: true,
-          perfil: { select: { carne: true, idCarrera: true, carrera: { select: { nombreCarrera: true } } } },
+          perfil: { select: { carne: true, idCarrera: true, semestre: true, carrera: { select: { nombreCarrera: true } } } },
           registrosHorasSemestre: { where: { anio: semestre.anio, periodo: semestre.periodo } },
         },
       });
@@ -320,6 +322,7 @@ export class HorasSemestreService {
           apellido: u.apellido,
           carne: u.perfil!.carne,
           idCarrera: u.perfil!.idCarrera,
+          semestreCarrera: u.perfil!.semestre,
           carrera: u.perfil!.carrera?.nombreCarrera ?? null,
           metaBeca: r?.metaBeca ?? null,
           becaDeclarada: r?.becaDeclarada ?? 0,

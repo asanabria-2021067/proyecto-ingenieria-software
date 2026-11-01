@@ -205,10 +205,10 @@ describeIntegration('dashboard de asociacion - permisos y regla en riesgo (Postg
     expect(Object.keys(fila).sort()).toEqual(
       [
         'apellido', 'becaAcreditada', 'becaDeclarada', 'carne', 'carrera', 'enRiesgo', 'extensionAcreditada', 'extensionDeclarada',
-        'faltaBeca', 'faltaExtension', 'idCarrera', 'idUsuario', 'metaBeca', 'metaExtension', 'nombre', 'proyectosActivos',
+        'faltaBeca', 'faltaExtension', 'idCarrera', 'idUsuario', 'metaBeca', 'metaExtension', 'nombre', 'proyectosActivos', 'semestreCarrera',
       ].sort(),
     );
-    expect(fila).toMatchObject({ metaBeca: 100, becaDeclarada: 10, becaAcreditada: 0, faltaBeca: 90, proyectosActivos: 0 });
+    expect(fila).toMatchObject({ metaBeca: 100, becaDeclarada: 10, becaAcreditada: 0, faltaBeca: 90, proyectosActivos: 0, semestreCarrera: 4 });
   });
 
   it('en riesgo: avance < esperado - 20 puntos (reusa esEnRiesgo de HRS)', async () => {
