@@ -25,6 +25,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
+import { SemestreHorasCard } from '@/components/hours/semestre-horas-card';
+import { useHorasActual } from '@/hooks/use-horas-semestre';
 import ProfileCompletionCard, {
   profileCompletionPercent,
 } from '@/components/profile/ProfileCompletionCard';
@@ -339,12 +341,16 @@ export default function DashboardPage() {
   const [projectTab, setProjectTab] = useState<'destacados' | 'disponibles'>(
     'destacados',
   );
+  const { data: horasActual } = useHorasActual();
+  // Perfil completo pero sin registro de horas del semestre: el asistente reaparece solo con ese paso.
+  const soloHoras = !!user && !isProfileIncomplete(user) && !wizardReopened;
   const showWizard = useMemo(
     () =>
       !wizardDismissed &&
       !!user &&
-      (wizardReopened || (!wizardDeferred && isProfileIncomplete(user))),
-    [wizardDismissed, wizardDeferred, wizardReopened, user],
+      (wizardReopened ||
+        (!wizardDeferred && (isProfileIncomplete(user) || horasActual?.necesitaRegistro === true))),
+    [wizardDismissed, wizardDeferred, wizardReopened, user, horasActual?.necesitaRegistro],
   );
   const profilePercent = user && wizardDeferred ? profileCompletionPercent(user) : 100;
   const showProfileCard = wizardDeferred && !wizardReopened && !wizardDismissed && profilePercent < 100;
@@ -413,6 +419,7 @@ export default function DashboardPage() {
     <>
       <CompleteProfileDialog
         open={showWizard}
+        soloHoras={soloHoras}
         onDefer={() => {
           try {
             if (user) sessionStorage.setItem(PERFIL_POSPUESTO_KEY, String(user.idUsuario));
@@ -567,6 +574,10 @@ export default function DashboardPage() {
             />
           </div>
         </section>
+
+        <div className="mb-section">
+          <SemestreHorasCard />
+        </div>
 
         <div className="layout-grid">
           <div className="layout-main space-y-section">
