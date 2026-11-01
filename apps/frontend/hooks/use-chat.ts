@@ -96,7 +96,7 @@ export function useAllConversations(q: string = '') {
     queryKey: allConversationsQueryKey(q.trim()),
     queryFn: () => listAllConversations(q.trim() || undefined),
   });
-  return { conversations: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
+  return { conversations: query.data ?? [], isLoading: query.isLoading, isFetching: query.isFetching, isError: query.isError };
 }
 
 function invalidateChatLists(queryClient: ReturnType<typeof useQueryClient>, idProyecto: number) {

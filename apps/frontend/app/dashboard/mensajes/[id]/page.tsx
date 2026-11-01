@@ -11,12 +11,12 @@ import { SkeletonList } from '@/components/ui/skeleton';
 export default function MensajesConversacionPage() {
   const router = useRouter();
   const idConversacion = Number(useParams<{ id: string }>().id);
-  const { conversations, isLoading } = useAllConversations();
+  const { conversations, isLoading, isFetching } = useAllConversations();
   const { typingByConversation, emitTyping } = useChatSocket();
   const conversacion = conversations.find((c) => c.idConversacion === idConversacion);
 
   if (!conversacion) {
-    return isLoading ? (
+    return isLoading || isFetching ? (
       <SkeletonList label="Cargando conversación" count={4} lines={2} avatar="circle" layout="plain" className="px-4 py-stack" />
     ) : (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">

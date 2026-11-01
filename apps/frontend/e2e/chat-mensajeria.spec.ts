@@ -29,13 +29,6 @@ async function desactivarTour(page: Page) {
     };
   });
 }
-
-/**
- * Abre (o crea, si no existe todavía) la conversación individual con
- * `nombreOtro`. La lista de chats vive en el dock global (botón "Mensajes",
- * abajo a la derecha), no en el sidebar del proyecto — crear uno nuevo sí
- * sigue siendo una acción del proyecto ("Nuevo chat del proyecto").
- */
 // smoke: chat en tiempo real entre dos usuarios reales del mismo proyecto
 // (T-Fase3.3): A envía, B lo ve aparecer sin recargar la página.
 test('un usuario envía un mensaje y el otro lo recibe sin recargar', async ({ browser }) => {

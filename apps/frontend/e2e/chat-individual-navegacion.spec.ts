@@ -27,14 +27,6 @@ async function desactivarTour(page: Page) {
     };
   });
 }
-
-
-/**
- * Abre (o crea, si no existe todavía) la conversación individual con
- * `nombreOtro`. La lista de chats vive en el dock global (botón "Mensajes",
- * abajo a la derecha), no en el sidebar del proyecto — crear uno nuevo sí
- * sigue siendo una acción del proyecto ("Nuevo chat del proyecto").
- */
 async function enviarMensaje(page: Page, texto: string) {
   await page.getByPlaceholder('Escribe un mensaje…').fill(texto);
   await page.getByRole('button', { name: 'Enviar mensaje' }).click();

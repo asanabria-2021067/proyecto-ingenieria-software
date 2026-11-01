@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { asegurarChatCon } from './support/chat';
 
 const PROYECTO_ID = 1;
 
@@ -17,20 +18,7 @@ async function desactivarTour(page: Page) {
 
 async function abrirListaDeChats(page: Page) {
   await page.goto('/dashboard/mensajes');
-}
-
-// Garantiza que exista el chat individual con `nombreOtro` (lo crea si falta).
-async function asegurarChatCon(page: Page, nombreOtro: string) {
-  await abrirListaDeChats(page);
-  if (await page.getByRole('button', { name: new RegExp(nombreOtro) }).count()) {
-    await abrirListaDeChats(page);
-    return;
-  }
-  await abrirListaDeChats(page);
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
+  await expect(page.getByPlaceholder('Buscar mensajes')).toBeVisible();
 }
 
 test('estado: se define, lo ve la otra persona en su lista y se limpia', async ({ browser }) => {
