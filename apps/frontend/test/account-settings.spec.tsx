@@ -46,7 +46,8 @@ const FAMILIAS = [
   // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA.
   ['Recordatorios y calendario', 5],
   ['Red de contactos', 3],
-  ['Cuenta y seguridad', 5],
+  // ASO-1: + JUNTA_ASOCIACION.
+  ['Cuenta y seguridad', 6],
 ] as const;
 
 const familia = (titulo: string) => screen.getByRole('button', { name: new RegExp(`^${titulo}`) });

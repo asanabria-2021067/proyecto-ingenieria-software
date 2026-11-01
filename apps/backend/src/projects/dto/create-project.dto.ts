@@ -125,6 +125,11 @@ export class CreateProjectDto {
   @IsInt({ each: true, message: 'Cada id de organización debe ser un número entero' })
   organizacionesIds?: number[];
 
+  /** Publicar a nombre de una asociación oficial: solo Presidente y Editores de su junta. */
+  @IsOptional()
+  @IsInt()
+  idAsociacion?: number;
+
   @IsOptional()
   @IsArray({ message: 'roles debe ser un arreglo' })
   @ValidateNested({ each: true })

@@ -60,6 +60,20 @@ enum RolOrganizacion {
   MIEMBRO
 }
 
+enum CargoJunta {
+  PRESIDENTE
+  VICEPRESIDENTE
+  SECRETARIO
+  TESORERO
+  VOCAL
+}
+
+enum NivelPermisoJunta {
+  ADMINISTRADOR
+  EDITOR
+  LECTURA
+}
+
 enum EstadoMembresia {
   ACTIVA
   INACTIVA
@@ -281,6 +295,8 @@ enum TipoNotificacion {
   REUNION_CANCELADA
   // HU-205 (T-394): solicitud enviada desde la página de contacto, solo para administradores.
   SOLICITUD_CONTACTO
+  // ASO: el admin nombra, cambia o quita a un usuario de la junta de una asociación.
+  JUNTA_ASOCIACION
 }
 
 enum EstadoAmistad {
@@ -341,69 +357,70 @@ model Usuario {
   experiencias                     ExperienciaPrevia[]
   organizacionesCreadas            Organizacion[]
   membresiasOrganizacion           UsuarioOrganizacion[]
+  juntasAsociacion                 JuntaAsociacion[]
   proyectosCreados                 Proyecto[]
-  postulaciones                    Postulacion[]              @relation("Postulante")
-  postulacionesResueltas           Postulacion[]              @relation("PostulacionResolutor")
+  postulaciones                    Postulacion[]                @relation("Postulante")
+  postulacionesResueltas           Postulacion[]                @relation("PostulacionResolutor")
   participaciones                  ParticipacionProyecto[]
   tareasCreadas                    Tarea[]
   eventosCreados                   EventoProyecto[]
-  tareasAsignadas                  AsignacionTarea[]          @relation("TareaAsignada")
-  tareasQueAsigno                  AsignacionTarea[]          @relation("TareaAsignador")
+  tareasAsignadas                  AsignacionTarea[]            @relation("TareaAsignada")
+  tareasQueAsigno                  AsignacionTarea[]            @relation("TareaAsignador")
   evidenciasCargadas               Evidencia[]
   revisionesRealizadas             RevisionEvidencia[]
   horasAprobadas                   HorasParticipacion[]
   certificadosEmitidos             Certificado[]
   notificaciones                   Notificacion[]
   preferenciasNotificacion         PreferenciaNotificacion[]
-  solicitudesRecuperacion          SolicitudRecuperacion[]    @relation("SolicitudRecuperacionUsuario")
-  solicitudesRecuperacionAtendidas SolicitudRecuperacion[]    @relation("SolicitudRecuperacionAdmin")
+  solicitudesRecuperacion          SolicitudRecuperacion[]      @relation("SolicitudRecuperacionUsuario")
+  solicitudesRecuperacionAtendidas SolicitudRecuperacion[]      @relation("SolicitudRecuperacionAdmin")
   rolesAcceso                      UsuarioRolAcceso[]
   anunciosCerrados                 AnuncioCierre[]
   auditorias                       BitacoraAuditoria[]
   configuracionesActualizadas      ConfiguracionSistema[]
-  revisionesProyectoRealizadas     RevisionProyecto[]         @relation("RevisionesProyectoRealizadas")
+  revisionesProyectoRealizadas     RevisionProyecto[]           @relation("RevisionesProyectoRealizadas")
   comentariosEscritos              Comentario[]
   mencionesRecibidas               MencionComentario[]
-  mensajesRevisionEnviados         MensajeRevisionProyecto[]  @relation("MensajesEnviados")
-  solicitudesSalidaSolicitadas     SolicitudSalidaProyecto[]  @relation("SolicitudSalidaSolicitante")
-  solicitudesSalidaResueltas       SolicitudSalidaProyecto[]  @relation("SolicitudSalidaResolutor")
+  mensajesRevisionEnviados         MensajeRevisionProyecto[]    @relation("MensajesEnviados")
+  solicitudesSalidaSolicitadas     SolicitudSalidaProyecto[]    @relation("SolicitudSalidaSolicitante")
+  solicitudesSalidaResueltas       SolicitudSalidaProyecto[]    @relation("SolicitudSalidaResolutor")
   sprintsCerrados                  Sprint[]
   registrosAvanceEscritos          RegistroAvanceAsignacion[]
   registrosTiempoRegistrados       RegistroTiempoTarea[]
-  registrosTiempoRevocados         RegistroTiempoTarea[]      @relation("RegistroTiempoRevocador")
-  ajustesAutor                     AjusteHoraTarea[]          @relation("AjusteHoraAutor")
-  ajustesAnulados                  AjusteHoraTarea[]          @relation("AjusteHoraAnulador")
-  apelacionesSolicitadas           ApelacionLiderazgo[]       @relation("ApelacionSolicitante")
-  apelacionesComoCandidato         ApelacionLiderazgo[]       @relation("ApelacionCandidato")
-  apelacionesResueltas             ApelacionLiderazgo[]       @relation("ApelacionResolutor")
-  liderazgosAnteriores             HistorialLiderazgo[]       @relation("HistorialLiderAnterior")
-  liderazgosNuevos                 HistorialLiderazgo[]       @relation("HistorialLiderNuevo")
-  cambiosLiderazgoAdministrados    HistorialLiderazgo[]       @relation("HistorialAdmin")
-  cierresSolicitados               RevisionCierreProyecto[]   @relation("RevisionCierreSolicitante")
-  cierresRevisados                 RevisionCierreProyecto[]   @relation("RevisionCierreRevisor")
-  documentosCierreCreados          DocumentoCierre[]          @relation("DocumentoCierreAutor")
-  amistadesSolicitadas             Amistad[]                  @relation("AmistadesSolicitadas")
-  amistadesRecibidas               Amistad[]                  @relation("AmistadesRecibidas")
-  siguiendo                        Seguimiento[]              @relation("Siguiendo")
-  seguidores                       Seguimiento[]              @relation("Seguidores")
-  conversacionesCreadas            Conversacion[]             @relation("ConversacionesCreadas")
+  registrosTiempoRevocados         RegistroTiempoTarea[]        @relation("RegistroTiempoRevocador")
+  ajustesAutor                     AjusteHoraTarea[]            @relation("AjusteHoraAutor")
+  ajustesAnulados                  AjusteHoraTarea[]            @relation("AjusteHoraAnulador")
+  apelacionesSolicitadas           ApelacionLiderazgo[]         @relation("ApelacionSolicitante")
+  apelacionesComoCandidato         ApelacionLiderazgo[]         @relation("ApelacionCandidato")
+  apelacionesResueltas             ApelacionLiderazgo[]         @relation("ApelacionResolutor")
+  liderazgosAnteriores             HistorialLiderazgo[]         @relation("HistorialLiderAnterior")
+  liderazgosNuevos                 HistorialLiderazgo[]         @relation("HistorialLiderNuevo")
+  cambiosLiderazgoAdministrados    HistorialLiderazgo[]         @relation("HistorialAdmin")
+  cierresSolicitados               RevisionCierreProyecto[]     @relation("RevisionCierreSolicitante")
+  cierresRevisados                 RevisionCierreProyecto[]     @relation("RevisionCierreRevisor")
+  documentosCierreCreados          DocumentoCierre[]            @relation("DocumentoCierreAutor")
+  amistadesSolicitadas             Amistad[]                    @relation("AmistadesSolicitadas")
+  amistadesRecibidas               Amistad[]                    @relation("AmistadesRecibidas")
+  siguiendo                        Seguimiento[]                @relation("Siguiendo")
+  seguidores                       Seguimiento[]                @relation("Seguidores")
+  conversacionesCreadas            Conversacion[]               @relation("ConversacionesCreadas")
   conversacionesParticipa          ConversacionParticipante[]
-  mensajesChatEnviados             MensajeChat[]              @relation("MensajesChatEnviados")
-  apodosDefinidos                  ApodoConversacion[]        @relation("ApodosDefinidos")
-  apodosRecibidos                  ApodoConversacion[]        @relation("ApodosRecibidos")
-  mensajesProgramadosChat          MensajeProgramado[]        @relation("MensajesProgramadosChat")
+  mensajesChatEnviados             MensajeChat[]                @relation("MensajesChatEnviados")
+  apodosDefinidos                  ApodoConversacion[]          @relation("ApodosDefinidos")
+  apodosRecibidos                  ApodoConversacion[]          @relation("ApodosRecibidos")
+  mensajesProgramadosChat          MensajeProgramado[]          @relation("MensajesProgramadosChat")
   tokensRefresco                   TokenRefresco[]
   proyectosGuardados               ProyectoGuardado[]
   estadoChat                       EstadoChatUsuario?
   actividadesCreadas               ActividadProyecto[]
-  asistencias                      AsistenciaActividad[]      @relation("AsistenciaUsuario")
-  asistenciasConfirmadas           AsistenciaActividad[]      @relation("AsistenciaConfirmador")
-  calendariosCompartidosPorMi      CalendarioCompartido[]     @relation("CalendarioPropietario")
-  calendariosCompartidosConmigo    CalendarioCompartido[]     @relation("CalendarioInvitado")
+  asistencias                      AsistenciaActividad[]        @relation("AsistenciaUsuario")
+  asistenciasConfirmadas           AsistenciaActividad[]        @relation("AsistenciaConfirmador")
+  calendariosCompartidosPorMi      CalendarioCompartido[]       @relation("CalendarioPropietario")
+  calendariosCompartidosConmigo    CalendarioCompartido[]       @relation("CalendarioInvitado")
   insignias                        InsigniaUsuario[]
   reaccionesChat                   ReaccionMensajeChat[]
   mensajesGuardados                MensajeGuardado[]
-  reunionesAdministracionCreadas   ReunionAdministracion[]    @relation("ReunionesAdministracionCreadas")
+  reunionesAdministracionCreadas   ReunionAdministracion[]      @relation("ReunionesAdministracionCreadas")
   reunionesAdministracionEditables ReunionAdministradorEditor[] @relation("ReunionesAdministracionEditables")
 
   @@index([estado, fechaCreacion])
@@ -515,6 +532,7 @@ model Carrera {
 
   perfiles      PerfilEstudiante[]
   rolesProyecto RolProyecto[]
+  asociaciones  AsociacionCarrera[]
 
   @@map("carrera")
 }
@@ -662,8 +680,11 @@ model Proyecto {
   fechaCreacion       DateTime          @default(now()) @map("fecha_creacion")
   fechaActualizacion  DateTime?         @map("fecha_actualizacion")
   eliminadoEn         DateTime?         @map("eliminado_en")
+  /// Publicado a nombre de una asociación oficial (solo Presidente y Editores de su junta).
+  idAsociacion        Int?              @map("id_asociacion")
 
   creador           Usuario                   @relation(fields: [creadoPor], references: [idUsuario], onDelete: Restrict)
+  asociacion        Asociacion?               @relation(fields: [idAsociacion], references: [idAsociacion], onDelete: Restrict)
   organizaciones    ProyectoOrganizacion[]
   intereses         ProyectoInteres[]
   roles             RolProyecto[]
@@ -686,7 +707,56 @@ model Proyecto {
   actividades          ActividadProyecto[]
 
   @@index([estadoProyecto, eliminadoEn])
+  @@index([idAsociacion])
   @@map("proyecto")
+}
+
+/// Asociación oficial de estudiantes: la crea solo el admin del sistema. No es una Organizacion.
+model Asociacion {
+  idAsociacion       Int       @id @default(autoincrement()) @map("id_asociacion")
+  nombre             String    @unique @db.VarChar(255)
+  logoUrl            String?   @map("logo_url") @db.VarChar(500)
+  descripcion        String?   @db.Text
+  archivada          Boolean   @default(false)
+  fechaCreacion      DateTime  @default(now()) @map("fecha_creacion")
+  fechaActualizacion DateTime? @map("fecha_actualizacion")
+
+  carreras  AsociacionCarrera[]
+  junta     JuntaAsociacion[]
+  proyectos Proyecto[]
+
+  @@map("asociacion")
+}
+
+model AsociacionCarrera {
+  idAsociacion Int @map("id_asociacion")
+  idCarrera    Int @map("id_carrera")
+
+  asociacion Asociacion @relation(fields: [idAsociacion], references: [idAsociacion], onDelete: Cascade)
+  carrera    Carrera    @relation(fields: [idCarrera], references: [idCarrera], onDelete: Restrict)
+
+  @@id([idAsociacion, idCarrera])
+  @@index([idCarrera])
+  @@map("asociacion_carrera")
+}
+
+/// Un cargo lo ocupa un solo usuario y un usuario ocupa un solo cargo por asociación.
+model JuntaAsociacion {
+  idJuntaAsociacion Int               @id @default(autoincrement()) @map("id_junta_asociacion")
+  idAsociacion      Int               @map("id_asociacion")
+  idUsuario         Int               @map("id_usuario")
+  cargo             CargoJunta
+  nivelPermiso      NivelPermisoJunta @map("nivel_permiso")
+  asignadoPor       Int?              @map("asignado_por")
+  fechaAsignacion   DateTime          @default(now()) @map("fecha_asignacion")
+
+  asociacion Asociacion @relation(fields: [idAsociacion], references: [idAsociacion], onDelete: Cascade)
+  usuario    Usuario    @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+
+  @@unique([idAsociacion, cargo])
+  @@unique([idAsociacion, idUsuario])
+  @@index([idUsuario])
+  @@map("junta_asociacion")
 }
 
 /// Bookmark personal de un usuario sobre un proyecto ("guardar" en Explorar
@@ -1066,15 +1136,15 @@ model Tarea {
   eliminadoEn         DateTime?        @map("eliminado_en")
   destinoArrastre     DestinoArrastre? @map("destino_arrastre")
 
-  proyecto     Proyecto          @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
-  hito         Hito?             @relation(fields: [idHito], references: [idHito], onDelete: SetNull)
-  rolProyecto  RolProyecto?      @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
-  sprint       Sprint?           @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
-  creador      Usuario           @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
-  asignaciones AsignacionTarea[]
-  evidencias   Evidencia[]
-  comentarios  Comentario[]
-  etiquetas    TareaEtiqueta[]
+  proyecto      Proyecto            @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  hito          Hito?               @relation(fields: [idHito], references: [idHito], onDelete: SetNull)
+  rolProyecto   RolProyecto?        @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
+  sprint        Sprint?             @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
+  creador       Usuario             @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
+  asignaciones  AsignacionTarea[]
+  evidencias    Evidencia[]
+  comentarios   Comentario[]
+  etiquetas     TareaEtiqueta[]
   // HU-186 (T-329): avisos de vencimiento ya enviados.
   recordatorios RecordatorioTarea[]
 
@@ -1744,36 +1814,36 @@ model MensajeRevisionProyecto {
 /// por par de usuarios dentro del proyecto) se garantiza en ChatService
 /// buscando antes de crear, no con una constraint de base de datos.
 model Conversacion {
-  idConversacion Int              @id @default(autoincrement()) @map("id_conversacion")
-  idProyecto     Int              @map("id_proyecto")
-  tipo           TipoConversacion
-  nombre         String?          @db.VarChar(255)
-  creadaPor      Int              @map("creada_por")
-  creadaEn       DateTime         @default(now()) @map("creada_en")
+  idConversacion      Int              @id @default(autoincrement()) @map("id_conversacion")
+  idProyecto          Int              @map("id_proyecto")
+  tipo                TipoConversacion
+  nombre              String?          @db.VarChar(255)
+  creadaPor           Int              @map("creada_por")
+  creadaEn            DateTime         @default(now()) @map("creada_en")
   // T-xxx: menú de 3 puntos del chat — renombrar/archivar/favorito. Aditivas,
   // nullable/default para no tocar filas existentes.
-  nombrePersonalizado String?     @db.VarChar(120) @map("nombre_personalizado")
-  esFavorita          Boolean     @default(false) @map("es_favorita")
-  archivadaEn         DateTime?   @map("archivada_en")
+  nombrePersonalizado String?          @map("nombre_personalizado") @db.VarChar(120)
+  esFavorita          Boolean          @default(false) @map("es_favorita")
+  archivadaEn         DateTime?        @map("archivada_en")
   // Dock global de chat (estilo LinkedIn): silenciar y la pestaña
   // Prioritarios/Otros. Mismo patrón que esFavorita/archivadaEn arriba:
   // campo compartido en Conversacion, no por participante — así ya venía
   // modelado el menú de 3 puntos en este chat.
-  silenciada    Boolean   @default(false) @map("silenciada")
-  esPrioritaria Boolean   @default(true) @map("es_prioritaria")
-  eliminadaEn   DateTime? @map("eliminada_en")
+  silenciada          Boolean          @default(false) @map("silenciada")
+  esPrioritaria       Boolean          @default(true) @map("es_prioritaria")
+  eliminadaEn         DateTime?        @map("eliminada_en")
   // Canales del proyecto (#general + los que crea el líder). `nombreCanal` es
   // el nombre normalizado (minúsculas, sin #); NULL en chats que no son canal,
   // así el unique solo aplica a canales.
-  esCanal     Boolean @default(false) @map("es_canal")
-  nombreCanal String? @map("nombre_canal") @db.VarChar(40)
+  esCanal             Boolean          @default(false) @map("es_canal")
+  nombreCanal         String?          @map("nombre_canal") @db.VarChar(40)
 
-  proyecto      Proyecto                   @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
-  creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
-  participantes ConversacionParticipante[]
-  mensajes      MensajeChat[]
-  adjuntos      AdjuntoMensajeChat[]
-  apodos        ApodoConversacion[]
+  proyecto            Proyecto                   @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  creador             Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
+  participantes       ConversacionParticipante[]
+  mensajes            MensajeChat[]
+  adjuntos            AdjuntoMensajeChat[]
+  apodos              ApodoConversacion[]
   mensajesProgramados MensajeProgramado[]
 
   @@unique([idProyecto, nombreCanal])
@@ -1782,14 +1852,14 @@ model Conversacion {
 }
 
 model ConversacionParticipante {
-  idConversacion  Int       @map("id_conversacion")
-  idUsuario       Int       @map("id_usuario")
-  agregadoEn      DateTime  @default(now()) @map("agregado_en")
-  ultimaLecturaEn DateTime? @map("ultima_lectura_en")
+  idConversacion    Int       @map("id_conversacion")
+  idUsuario         Int       @map("id_usuario")
+  agregadoEn        DateTime  @default(now()) @map("agregado_en")
+  ultimaLecturaEn   DateTime? @map("ultima_lectura_en")
   // Silencio por usuario: hasta una fecha, o siempre.
   silenciadaHasta   DateTime? @map("silenciada_hasta")
   silenciadaSiempre Boolean   @default(false) @map("silenciada_siempre")
-  temaColor       String?   @map("tema_color") @db.VarChar(20)
+  temaColor         String?   @map("tema_color") @db.VarChar(20)
 
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
   usuario      Usuario      @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
@@ -1817,20 +1887,20 @@ model PreferenciaNoMolestar {
 }
 
 model MensajeChat {
-  idMensaje       Int      @id @default(autoincrement()) @map("id_mensaje")
-  idConversacion  Int      @map("id_conversacion")
-  idRemitente     Int      @map("id_remitente")
-  contenido       String   @db.Text
-  enviadoEn       DateTime @default(now()) @map("enviado_en")
+  idMensaje       Int       @id @default(autoincrement()) @map("id_mensaje")
+  idConversacion  Int       @map("id_conversacion")
+  idRemitente     Int       @map("id_remitente")
+  contenido       String    @db.Text
+  enviadoEn       DateTime  @default(now()) @map("enviado_en")
   editadoEn       DateTime? @map("editado_en")
   eliminadoEn     DateTime? @map("eliminado_en")
-  idMensajeCitado Int?     @map("id_mensaje_citado")
+  idMensajeCitado Int?      @map("id_mensaje_citado")
 
-  conversacion Conversacion       @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
-  remitente    Usuario            @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario], onDelete: Restrict)
+  conversacion Conversacion          @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
+  remitente    Usuario               @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario], onDelete: Restrict)
   adjunto      AdjuntoMensajeChat?
-  citado       MensajeChat?       @relation("MensajeCitado", fields: [idMensajeCitado], references: [idMensaje], onDelete: SetNull)
-  respuestas   MensajeChat[]      @relation("MensajeCitado")
+  citado       MensajeChat?          @relation("MensajeCitado", fields: [idMensajeCitado], references: [idMensaje], onDelete: SetNull)
+  respuestas   MensajeChat[]         @relation("MensajeCitado")
   reacciones   ReaccionMensajeChat[]
   guardadoPor  MensajeGuardado[]
 
@@ -1876,11 +1946,11 @@ model ReaccionMensajeChat {
 // Apodos por chat: cada usuario define como ve a otro participante; es privado
 // (solo lo ve quien lo define).
 model ApodoConversacion {
-  idApodo           Int      @id @default(autoincrement()) @map("id_apodo")
-  idConversacion    Int      @map("id_conversacion")
-  idUsuarioDefine   Int      @map("id_usuario_define")
-  idUsuarioObjetivo Int      @map("id_usuario_objetivo")
-  apodo             String   @db.VarChar(40)
+  idApodo           Int    @id @default(autoincrement()) @map("id_apodo")
+  idConversacion    Int    @map("id_conversacion")
+  idUsuarioDefine   Int    @map("id_usuario_define")
+  idUsuarioObjetivo Int    @map("id_usuario_objetivo")
+  apodo             String @db.VarChar(40)
 
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Cascade)
   define       Usuario      @relation("ApodosDefinidos", fields: [idUsuarioDefine], references: [idUsuario], onDelete: Restrict)
@@ -1901,10 +1971,10 @@ enum TipoEstadoChat {
 }
 
 model EstadoChatUsuario {
-  idUsuario Int           @id @map("id_usuario")
+  idUsuario Int            @id @map("id_usuario")
   tipo      TipoEstadoChat
-  texto     String?       @db.VarChar(60)
-  venceEn   DateTime?     @map("vence_en")
+  texto     String?        @db.VarChar(60)
+  venceEn   DateTime?      @map("vence_en")
 
   usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
 

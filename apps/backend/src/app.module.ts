@@ -49,6 +49,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { InsigniasModule } from './insignias/insignias.module';
 import { AnunciosModule } from './anuncios/anuncios.module';
 import { ContactoModule } from './contacto/contacto.module';
+import { AssociationsModule } from './associations/associations.module';
 
 const skipThrottling = () => isThrottlerDisabled();
 
@@ -134,6 +135,7 @@ const skipThrottling = () => isThrottlerDisabled();
     InsigniasModule,
     AnunciosModule,
     ContactoModule,
+    AssociationsModule,
   ],
   controllers: [AppController],
   providers: [

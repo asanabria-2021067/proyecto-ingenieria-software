@@ -118,6 +118,11 @@ export class CreateProjectFullDto {
   @IsInt({ each: true })
   organizacionesIds?: number[];
 
+  /** Publicar a nombre de una asociación oficial: solo Presidente y Editores de su junta. */
+  @IsOptional()
+  @IsInt()
+  idAsociacion?: number;
+
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
