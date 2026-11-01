@@ -76,7 +76,7 @@ export function ProjectDetailsSection({
             {MODALIDAD_LABEL[proyecto.modalidadProyecto as keyof typeof MODALIDAD_LABEL] ?? proyecto.modalidadProyecto}
           </DetalleFila>
           {organizacionPrincipal && (
-            <DetalleFila label="Organización">
+            <DetalleFila label="Publicado por">
               <span className="inline-flex items-center gap-1.5">
                 <Building2 className="size-3.5 text-outline" aria-hidden="true" />
                 {organizacionPrincipal.organizacion.nombreOrganizacion}

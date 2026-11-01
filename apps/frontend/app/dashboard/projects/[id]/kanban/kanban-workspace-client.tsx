@@ -57,6 +57,7 @@ import type { AvanceProyectoDTO, ProyectoDetalleDTO } from '@/lib/dto/project.dt
 import type { TareaPublicaDTO } from '@/lib/types/tasks';
 import { ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 import { TipoBadge } from '@/components/projects/tipo-badge';
+import { OrgSoloLecturaBanner } from '@/components/organizations/org-solo-lectura-banner';
 
 interface Props {
   id: number;
@@ -249,7 +250,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     updateLabel,
     deleteLabel,
   } = useProjectLabels(idProyecto);
-  const { members } = useProjectMembers(idProyecto);
+  const { members, isLoading: cargandoMiembros } = useProjectMembers(idProyecto);
   const esParticipante =
     !!currentUser && members.some((m) => m.idUsuario === currentUser.idUsuario);
   const puedeCrear = isLeader || esParticipante;
@@ -298,6 +299,8 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
         title="Tablero (Kanban)"
         description="Tus tareas y las del equipo por estado. Abre una tarjeta para cambiar su estado o registrar horas."
       />
+
+      <OrgSoloLecturaBanner proyecto={proyecto} participantes={cargandoMiembros ? undefined : members} className="mb-grid" />
 
       {/* TARJETA RESUMEN DEL PROYECTO (Secciones 10-15): contenido, no encabezado de página */}
       <div className="card-base mb-grid">

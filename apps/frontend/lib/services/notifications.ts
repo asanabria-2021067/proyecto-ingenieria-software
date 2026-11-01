@@ -164,6 +164,14 @@ export function getNotificationLink(n: {
         : null;
     case 'POSTULACION_RESUELTA':
       return '/dashboard/mis-postulaciones';
+    // ORG: la invitación se responde desde el listado (la organización puede ser privada y aún no ser visible).
+    case 'INVITACION_ORGANIZACION':
+      return '/dashboard/organizaciones';
+    case 'SOLICITUD_UNIRSE_ORGANIZACION':
+    case 'ORGANIZACION_ACTUALIZADA': {
+      const id = Number(datos.organizationId);
+      return Number.isInteger(id) && id > 0 ? `/dashboard/organizaciones/${id}` : '/dashboard/organizaciones';
+    }
     case 'SOLICITUD_RECUPERACION_CONTRASENA':
       return '/dashboard/admin/solicitudes-recuperacion';
     // G05 (OWASP25-C038): alerta de ráfaga de accesos fallidos/bloqueos; el

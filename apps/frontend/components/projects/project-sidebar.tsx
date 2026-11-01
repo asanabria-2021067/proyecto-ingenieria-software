@@ -21,7 +21,7 @@ interface ProjectSidebarProps {
   idProyecto: number;
 }
 
-const ACTOR_LABEL = { leader: 'Líder', participant: 'Participante' } as const;
+const ACTOR_LABEL = { leader: 'Líder', participant: 'Participante', 'org-reader': 'Solo lectura' } as const;
 
 const ITEM_CHAT_CLASS =
   'flex w-full items-center gap-2 rounded-control px-2 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-on-surface/5 hover:text-text-primary';
@@ -49,7 +49,7 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
   const groups = buildProjectNavGroups(nav);
   const actions = buildProjectActions(nav);
   const activeHref = resolveActiveHref(groups, pathname);
-  const puedeChatear = nav.actor !== 'visitor';
+  const puedeChatear = nav.actor === 'leader' || nav.actor === 'participant';
   const navId = `project-nav-${idProyecto}`;
   const [nuevoChatAbierto, setNuevoChatAbierto] = useState(false);
 

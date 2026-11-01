@@ -67,6 +67,7 @@ import { useProjectRoles } from '@/hooks/use-project-roles';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ReadOnlyProjectBanner } from '@/components/projects/read-only-project-banner';
+import { OrgSoloLecturaBanner } from '@/components/organizations/org-solo-lectura-banner';
 import { ClosureDocumentViewer, formatearTamano } from '@/components/closure/closure-document-viewer';
 import { useHistoricalProject } from '@/hooks/use-historical-project';
 import { useProjectDetail } from '@/hooks/use-project-detail';
@@ -244,6 +245,7 @@ export default function ProyectoDetallePage() {
             modalidadProyecto={proyecto.modalidadProyecto}
             etiquetas={proyecto.intereses.map(({ interes }) => interes.nombreInteres)}
           />
+          <OrgSoloLecturaBanner proyecto={detalle.data} participantes={isLoadingMembers ? undefined : members} />
         </ProjectGridFull>
 
         {/* HU-154 (T-215): la barra local «Resumen / Solicitud de salida /
@@ -454,7 +456,7 @@ export default function ProyectoDetallePage() {
                 label="Modalidad"
                 value={MODALIDAD_LABEL[proyecto.modalidadProyecto]}
               />
-              {organizacion && <DetalleRow icon={Building2} label="Organización" value={organizacion} />}
+              {organizacion && <DetalleRow icon={Building2} label="Publicado por" value={organizacion} />}
             </ul>
           </CardShell>
 

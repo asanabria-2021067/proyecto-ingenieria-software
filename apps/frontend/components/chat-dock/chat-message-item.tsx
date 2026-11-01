@@ -58,6 +58,8 @@ interface ChatMessageItemProps {
   onResponder: (mensaje: ChatMensaje) => void;
   onIrAlOriginal: (idMensaje: number) => void;
   onReaccionar: (idMensaje: number, emoji: string) => void;
+  /** Solo muestra el mensaje: sin editar, eliminar, guardar, adjuntos ni vista previa (canales que no son de proyecto). */
+  simple?: boolean;
 }
 
 export function ChatMessageItem({
@@ -71,6 +73,7 @@ export function ChatMessageItem({
   onResponder,
   onIrAlOriginal,
   onReaccionar,
+  simple = false,
 }: ChatMessageItemProps) {
   const editar = useEditMessage(idProyecto, idConversacion);
   const eliminar = useDeleteMessage(idProyecto, idConversacion);
@@ -137,7 +140,7 @@ export function ChatMessageItem({
           <p className="italic">Mensaje eliminado</p>
         ) : (
           <>
-            {m.adjunto && <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />}
+            {m.adjunto && !simple && <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />}
             {editando ? (
               <div className="flex items-center gap-1">
                 <Input
@@ -168,7 +171,7 @@ export function ChatMessageItem({
             ) : (
               m.contenido && <p className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}>{m.contenido}</p>
             )}
-            {!editando && <LinkPreviewCard idProyecto={idProyecto} idConversacion={idConversacion} contenido={m.contenido} />}
+            {!editando && !simple && <LinkPreviewCard idProyecto={idProyecto} idConversacion={idConversacion} contenido={m.contenido} />}
           </>
         )}
         <p className={`mt-0.5 text-[10px] ${propio && !eliminado ? '' : 'text-tertiary'}`}>
@@ -177,11 +180,11 @@ export function ChatMessageItem({
             <span title={`Editado a las ${formatHora(m.editadoEn)}`}> (editado)</span>
           )}
         </p>
-        {!eliminado && (
+        {!eliminado && !simple && (
           <MessageReactions reacciones={m.reacciones ?? []} onToggle={(emoji) => onReaccionar(m.idMensaje, emoji)} />
         )}
       </div>
-      {propio && !eliminado && !editando && (
+      {propio && !eliminado && !editando && !simple && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -206,7 +209,7 @@ export function ChatMessageItem({
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      {!eliminado && (
+      {!eliminado && !simple && (
         <>
           <button
             type="button"

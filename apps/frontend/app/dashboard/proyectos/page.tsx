@@ -107,7 +107,7 @@ function ProyectosContenido() {
 
       const coincideTipo = !tipoFiltro || p.tipoProyecto === tipoFiltro;
       const coincideGuardado = !soloGuardados || p.guardado;
-      const coincideVacantes = !soloVacantes || (p.estadoProyecto !== 'CERRADO' && (p.roles ?? []).some((r) => r.cupos > 0));
+      const coincideVacantes = !soloVacantes || (p.estadoProyecto !== 'CERRADO' && (p.roles ?? []).some((r) => (r.cuposDisponibles ?? r.cupos) > 0));
       const coincideCarrera = !soloMiCarrera || Boolean(p.mismaCarrera);
 
       return coincideBusqueda && coincideTipo && coincideGuardado && coincideVacantes && coincideCarrera;
