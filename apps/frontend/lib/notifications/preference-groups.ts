@@ -140,6 +140,11 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   },
   CUENTA_VERIFICADA: { grupo: 'cuenta', etiqueta: 'Cuenta verificada', descripcion: 'Administración verifica tu cuenta.' },
   ALERTA_SEGURIDAD: { grupo: 'cuenta', etiqueta: 'Alerta de seguridad', descripcion: 'La plataforma detecta actividad inusual de acceso.' },
+  JUNTA_ASOCIACION: {
+    grupo: 'cuenta',
+    etiqueta: 'Junta de asociación',
+    descripcion: 'Administración te nombra, cambia o quita de la junta de una asociación.',
+  },
   SOLICITUD_CONTACTO: {
     grupo: 'cuenta',
     etiqueta: 'Solicitud de contacto',

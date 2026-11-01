@@ -327,6 +327,14 @@ export interface NotificationTemplateData {
     mensaje: string;
     idUsuario: number | null;
   };
+
+  JUNTA_ASOCIACION: {
+    idAsociacion: number;
+    nombreAsociacion: string;
+    accion: 'ASIGNADA' | 'ACTUALIZADA' | 'REMOVIDA';
+    cargo: string;
+    nivelPermiso: string | null;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -605,6 +613,16 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Nueva solicitud de contacto',
     message: (data: NotificationTemplateData['SOLICITUD_CONTACTO']) =>
       `${data.nombre} (${data.correo}) escribió sobre "${data.asunto}": ${data.mensaje}`,
+  },
+
+  JUNTA_ASOCIACION: {
+    title: (data: NotificationTemplateData['JUNTA_ASOCIACION']) =>
+      data.accion === 'REMOVIDA' ? 'Saliste de una junta directiva' : 'Junta directiva de asociación',
+    message: (data: NotificationTemplateData['JUNTA_ASOCIACION']) => {
+      if (data.accion === 'REMOVIDA') return `Administración te quitó el cargo de ${data.cargo} en ${data.nombreAsociacion}.`;
+      const verbo = data.accion === 'ASIGNADA' ? 'te nombró' : 'actualizó tu cargo como';
+      return `Administración ${verbo} ${data.cargo} de ${data.nombreAsociacion} con permiso ${data.nivelPermiso}.`;
+    },
   },
 } as const;
 
