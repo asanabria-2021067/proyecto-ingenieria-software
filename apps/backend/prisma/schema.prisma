@@ -334,6 +334,7 @@ model Usuario {
   telefonos                        UsuarioTelefono[]
   preferenciaNoMolestar            PreferenciaNoMolestar?
   perfil                           PerfilEstudiante?
+  registrosHorasSemestre           RegistroHorasSemestre[]
   habilidades                      UsuarioHabilidad[]
   intereses                        UsuarioInteres[]
   cualidades                       UsuarioCualidad[]
@@ -483,6 +484,26 @@ model PerfilEstudiante {
   carrera Carrera? @relation(fields: [idCarrera], references: [idCarrera], onDelete: SetNull)
 
   @@map("perfil_estudiante")
+}
+
+/// HRS: metas y horas declaradas (hechas fuera de UVGenius) por estudiante y semestre (1: ene-jun, 2: jul-dic, hora de Guatemala).
+model RegistroHorasSemestre {
+  idRegistro         Int      @id @default(autoincrement()) @map("id_registro")
+  idUsuario          Int      @map("id_usuario")
+  anio               Int
+  periodo            Int
+  metaBeca           Int?     @map("meta_beca")
+  becaDeclarada      Int      @default(0) @map("beca_declarada")
+  metaExtension      Int?     @map("meta_extension")
+  extensionDeclarada Int      @default(0) @map("extension_declarada")
+  fechaCreacion      DateTime @default(now()) @map("fecha_creacion")
+  fechaActualizacion DateTime @updatedAt @map("fecha_actualizacion")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+
+  @@unique([idUsuario, anio, periodo])
+  @@index([anio, periodo])
+  @@map("registro_horas_semestre")
 }
 
 model Carrera {
