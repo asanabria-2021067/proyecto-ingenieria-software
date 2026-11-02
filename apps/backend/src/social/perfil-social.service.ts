@@ -75,7 +75,7 @@ export class PerfilSocialService {
   /** MEJ-26: organizaciones, asociaciones de la carrera y horas acreditadas del semestre. */
   async resumen(idVisor: number, idObjetivo: number) {
     await this.assertPerfilAccesible(idVisor, idObjetivo);
-    const [membresias, perfil, progreso] = await Promise.all([
+    const [membresias, perfil, progreso, puedeMensaje] = await Promise.all([
       this.prisma.usuarioOrganizacion.findMany({
         where: { idUsuario: idObjetivo, estadoMembresia: 'ACTIVA', organizacion: orgVisiblePara(idVisor) },
         orderBy: { fechaIngreso: 'desc' },
@@ -86,6 +86,7 @@ export class PerfilSocialService {
       }),
       this.prisma.perfilEstudiante.findUnique({ where: { idUsuario: idObjetivo }, select: { idCarrera: true } }),
       this.horas.getProgreso(idObjetivo),
+      this.puedeMensaje(idVisor, idObjetivo),
     ]);
     const asociaciones = perfil?.idCarrera
       ? await this.prisma.asociacion.findMany({
@@ -97,6 +98,7 @@ export class PerfilSocialService {
     return {
       organizaciones: membresias.map((m) => ({ ...m.organizacion, rol: m.rolOrganizacion })),
       asociaciones,
+      puedeMensaje,
       // Solo lo acreditado en UVGenius: metas y horas declaradas son privadas.
       horasSemestre: {
         anio: progreso.semestre.anio,
@@ -166,7 +168,7 @@ export class PerfilSocialService {
     const [usuario, participaciones, liderados] = await Promise.all([
       this.prisma.usuario.findUnique({
         where: { idUsuario: idObjetivo },
-        select: { nombre: true, apellido: true, perfil: { select: { carne: true, carrera: { select: { nombreCarrera: true } } } } },
+        select: { nombre: true, apellido: true, perfil: { select: { carrera: { select: { nombreCarrera: true } } } } },
       }),
       this.prisma.participacionProyecto.findMany({
         where: {
@@ -215,37 +217,34 @@ export class PerfilSocialService {
       .sort((a, b) => (b.fin ?? '').localeCompare(a.fin ?? ''));
     return {
       nombre: `${usuario.nombre} ${usuario.apellido}`,
-      carne: usuario.perfil?.carne ?? null,
       carrera: usuario.perfil?.carrera?.nombreCarrera ?? null,
       proyectos,
       totalHorasAcreditadas: proyectos.reduce((s, p) => s + p.horasAcreditadas, 0),
     };
   }
 
-  /**
-   * MEJ-28: «Enviar mensaje» entre amigos aceptados. Reutiliza la conversación individual del chat de
-   * proyecto: la que ya exista entre ambos o una nueva en un proyecto activo que compartan.
-   */
-  async abrirMensajeDirecto(idUsuario: number, idAmigo: number) {
-    if (idUsuario === idAmigo) throw new ForbiddenException('No puedes escribirte a ti mismo');
+  private async sonAmigos(a: number, b: number) {
     const amistad = await this.prisma.amistad.findFirst({
       where: {
         estado: EstadoAmistad.ACEPTADA,
         OR: [
-          { idUsuarioSolicitante: idUsuario, idUsuarioReceptor: idAmigo },
-          { idUsuarioSolicitante: idAmigo, idUsuarioReceptor: idUsuario },
+          { idUsuarioSolicitante: a, idUsuarioReceptor: b },
+          { idUsuarioSolicitante: b, idUsuarioReceptor: a },
         ],
       },
       select: { idAmistad: true },
     });
-    if (!amistad) throw new ForbiddenException('Solo puedes escribir a tus amigos');
+    return !!amistad;
+  }
 
+  /** Conversación individual ya abierta entre ambos, o un proyecto activo compartido donde crearla; null si no hay ninguno. */
+  private async destinoMensaje(a: number, b: number) {
     const existente = await this.prisma.conversacion.findFirst({
       where: {
         tipo: 'INDIVIDUAL',
         eliminadaEn: null,
         proyecto: { eliminadoEn: null, estadoProyecto: { in: ESTADOS_CON_CHAT } },
-        AND: [idUsuario, idAmigo].map((id) => ({ participantes: { some: { idUsuario: id } } })),
+        AND: [a, b].map((id) => ({ participantes: { some: { idUsuario: id } } })),
       },
       orderBy: { idConversacion: 'desc' },
       select: { idConversacion: true, idProyecto: true },
@@ -256,16 +255,35 @@ export class PerfilSocialService {
       OR: [{ creadoPor: id }, { roles: { some: { participaciones: { some: { idUsuario: id, estadoParticipacion: 'ACTIVO' } } } } }],
     });
     const compartido = await this.prisma.proyecto.findFirst({
-      where: { eliminadoEn: null, estadoProyecto: { in: ESTADOS_CON_CHAT }, AND: [participa(idUsuario), participa(idAmigo)] },
+      where: { eliminadoEn: null, estadoProyecto: { in: ESTADOS_CON_CHAT }, AND: [participa(a), participa(b)] },
       orderBy: { idProyecto: 'desc' },
       select: { idProyecto: true },
     });
-    if (!compartido) throw new ConflictException(MENSAJE_SIN_PROYECTO_COMPARTIDO);
+    return compartido ? { idConversacion: null, idProyecto: compartido.idProyecto } : null;
+  }
 
-    const conversacion = await this.chat.createConversation(compartido.idProyecto, idUsuario, {
+  /** El botón «Enviar mensaje» solo se ofrece cuando abrirMensajeDirecto va a funcionar. */
+  private async puedeMensaje(idVisor: number, idObjetivo: number) {
+    if (idVisor === idObjetivo || !(await this.sonAmigos(idVisor, idObjetivo))) return false;
+    return !!(await this.destinoMensaje(idVisor, idObjetivo));
+  }
+
+  /**
+   * MEJ-28: «Enviar mensaje» entre amigos aceptados. Reutiliza la conversación individual del chat de
+   * proyecto: la que ya exista entre ambos o una nueva en un proyecto activo que compartan.
+   */
+  async abrirMensajeDirecto(idUsuario: number, idAmigo: number) {
+    if (idUsuario === idAmigo) throw new ForbiddenException('No puedes escribirte a ti mismo');
+    if (!(await this.sonAmigos(idUsuario, idAmigo))) throw new ForbiddenException('Solo puedes escribir a tus amigos');
+
+    const destino = await this.destinoMensaje(idUsuario, idAmigo);
+    if (!destino) throw new ConflictException(MENSAJE_SIN_PROYECTO_COMPARTIDO);
+    if (destino.idConversacion) return { idConversacion: destino.idConversacion, idProyecto: destino.idProyecto };
+
+    const conversacion = await this.chat.createConversation(destino.idProyecto, idUsuario, {
       tipo: 'INDIVIDUAL',
       idsParticipantes: [idAmigo],
     });
-    return { idConversacion: conversacion.idConversacion, idProyecto: compartido.idProyecto };
+    return { idConversacion: conversacion.idConversacion, idProyecto: destino.idProyecto };
   }
 }

@@ -42,6 +42,18 @@ describe('PerfilSocialService', () => {
     expect(r.horasSemestre).toEqual({ anio: 2026, periodo: 2, becaAcreditadas: 12, extensionAcreditadas: 3 });
   });
 
+  it('resumen: puedeMensaje solo si son amigos con proyecto compartido', async () => {
+    const { prisma, service } = build();
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 9 });
+    await expect(service.resumen(1, 2)).resolves.toMatchObject({ puedeMensaje: true });
+    prisma.proyecto.findFirst.mockResolvedValue(null);
+    await expect(service.resumen(1, 2)).resolves.toMatchObject({ puedeMensaje: false });
+    prisma.proyecto.findFirst.mockResolvedValue({ idProyecto: 9 });
+    prisma.amistad.findFirst.mockResolvedValue(null);
+    await expect(service.resumen(1, 2)).resolves.toMatchObject({ puedeMensaje: false });
+    await expect(service.resumen(2, 2)).resolves.toMatchObject({ puedeMensaje: false });
+  });
+
   it('resumen, actividad y cv responden 404 si el usuario no esta en el directorio', async () => {
     const { prisma, service } = build();
     prisma.usuario.findFirst.mockResolvedValue(null);
@@ -88,6 +100,7 @@ describe('PerfilSocialService', () => {
       ['Feria', 'Dev', 14.5],
     ]);
     expect(cv.totalHorasAcreditadas).toBe(14.5);
+    expect(cv).not.toHaveProperty('carne');
     expect(prisma.proyecto.findMany.mock.calls[0][0].where).toMatchObject({ creadoPor: 2, estadoProyecto: 'CERRADO' });
   });
 

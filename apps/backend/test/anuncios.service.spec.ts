@@ -16,6 +16,7 @@ function build(esEstudiante = true) {
       findUnique: vi.fn(),
       create: vi.fn().mockImplementation(({ data }) => Promise.resolve(data)),
       update: vi.fn().mockImplementation(({ data }) => Promise.resolve(data)),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     anuncioCierre: { upsert: vi.fn().mockResolvedValue({}) },
     usuarioOrganizacion: { findMany: vi.fn().mockResolvedValue([]) },
@@ -88,15 +89,19 @@ describe('AnunciosService', () => {
   it('despublicar pone activo=false', async () => {
     const { prisma, service } = build();
     await service.despublicar(3);
-    expect(prisma.anuncio.update).toHaveBeenCalledWith({ where: { idAnuncio: 3 }, data: { activo: false } });
+    expect(prisma.anuncio.updateMany).toHaveBeenCalledWith({
+      where: { idAnuncio: 3, idOrganizacion: null, idAsociacion: null },
+      data: { activo: false },
+    });
   });
 
   it('administracion no edita ni despublica anuncios de una organizacion o asociacion (404)', async () => {
     const { prisma, service } = build();
     prisma.anuncio.findFirst.mockResolvedValue(null);
+    prisma.anuncio.updateMany.mockResolvedValue({ count: 0 });
     await expect(service.despublicar(3)).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.update(3, { titulo: 'x' })).rejects.toBeInstanceOf(NotFoundException);
-    expect(prisma.anuncio.findFirst.mock.calls[0][0].where).toMatchObject({ idOrganizacion: null, idAsociacion: null });
+    expect(prisma.anuncio.updateMany.mock.calls[0][0].where).toMatchObject({ idOrganizacion: null, idAsociacion: null });
     expect(prisma.anuncio.update).not.toHaveBeenCalled();
   });
 

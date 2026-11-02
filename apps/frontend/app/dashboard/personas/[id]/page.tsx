@@ -33,7 +33,7 @@ import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badg
 import { aviso } from '@/lib/mensajes';
 import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
 import { PerfilActividad, PerfilCvAcciones, PerfilOrganizaciones } from '@/components/profile/perfil-social-secciones';
-import { useEnviarMensaje } from '@/hooks/use-perfil-social';
+import { useEnviarMensaje, usePerfilResumen } from '@/hooks/use-perfil-social';
 import { InvitarARolDialog } from '@/components/projects/invitar-a-rol-dialog';
 
 function compartirPerfil() {
@@ -75,6 +75,7 @@ export default function PerfilPersonaPage() {
     perfil ?? { idUsuario, esAmigo: false, solicitudPendiente: null, idAmistad: null, loSigo: false },
   );
   const enviarMensaje = useEnviarMensaje(idUsuario);
+  const { data: resumen } = usePerfilResumen(idUsuario);
 
   if (isLoading) {
     return <PerfilSkeleton />;
@@ -159,7 +160,7 @@ export default function PerfilPersonaPage() {
                 <Button variant="outline" disabled={seguimiento.disabled} onClick={seguimiento.onClick} className="h-9.5 rounded-md px-4.5 text-[13px] font-semibold">
                   {seguimiento.label}
                 </Button>
-                {perfil.esAmigo && (
+                {perfil.esAmigo && resumen?.puedeMensaje && (
                   <Button variant="secondary" disabled={enviarMensaje.isPending} onClick={() => enviarMensaje.mutate()} className="col-span-2 h-9.5 rounded-md px-4.5 text-[13px] font-semibold">
                     <MessageSquare className="size-4" aria-hidden="true" />
                     Enviar mensaje

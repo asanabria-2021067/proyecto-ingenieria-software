@@ -5,6 +5,8 @@ import type { RolOrganizacion } from '@/lib/types/organizations';
 export interface PerfilResumen {
   organizaciones: { idOrganizacion: number; nombreOrganizacion: string; logoUrl: string | null; rol: RolOrganizacion }[];
   asociaciones: { idAsociacion: number; nombre: string; logoUrl: string | null }[];
+  /** Amigos aceptados con una conversación o un proyecto activo compartido. */
+  puedeMensaje: boolean;
   horasSemestre: { anio: number; periodo: 1 | 2; becaAcreditadas: number; extensionAcreditadas: number };
 }
 
@@ -21,7 +23,6 @@ export interface ActividadReciente {
 /** MEJ-27/63: `GET /social/usuarios/:id/cv`. */
 export interface CvProyectos {
   nombre: string;
-  carne: string | null;
   carrera: string | null;
   proyectos: { idProyecto: number; titulo: string; rol: string; inicio: string | null; fin: string | null; horasAcreditadas: number }[];
   totalHorasAcreditadas: number;

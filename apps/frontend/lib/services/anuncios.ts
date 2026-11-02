@@ -51,7 +51,7 @@ export const updateAnuncio = (idAnuncio: number, input: UpdateAnuncioInput) =>
   apiFetch<AnuncioAdmin>(`/admin/anuncios/${idAnuncio}`, { method: 'PATCH', body: JSON.stringify(input) });
 
 export const despublicarAnuncio = (idAnuncio: number) =>
-  apiFetch<AnuncioAdmin>(`/admin/anuncios/${idAnuncio}/despublicar`, { method: 'PATCH' });
+  apiFetch<{ idAnuncio: number }>(`/admin/anuncios/${idAnuncio}/despublicar`, { method: 'PATCH' });
 
 /** MEJ-66: anuncios de una organización (miembros) o de una asociación (estudiantes de sus carreras). */
 export type TipoEntidadAnuncio = 'organizaciones' | 'asociaciones';

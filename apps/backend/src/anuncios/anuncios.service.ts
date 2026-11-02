@@ -58,10 +58,9 @@ export class AnunciosService {
 
   /** Despublicar no borra: conserva el anuncio y sus cierres. */
   async despublicar(id: number) {
-    if (!(await this.prisma.anuncio.findFirst({ where: { idAnuncio: id, ...GLOBAL }, select: { idAnuncio: true } }))) {
-      throw new NotFoundException(ANUNCIO_NOT_FOUND_MESSAGE);
-    }
-    return this.prisma.anuncio.update({ where: { idAnuncio: id }, data: { activo: false } });
+    const { count } = await this.prisma.anuncio.updateMany({ where: { idAnuncio: id, ...GLOBAL }, data: { activo: false } });
+    if (count === 0) throw new NotFoundException(ANUNCIO_NOT_FOUND_MESSAGE);
+    return { idAnuncio: id };
   }
 
   /** «Estudiante» = rol de acceso `estudiante`; el resto de roles solo ve los anuncios para TODOS. */

@@ -19,9 +19,15 @@ vi.mock('@/hooks/use-social', () => ({
 
 // MEJ-26/28/64: las secciones nuevas tienen su propio spec; aquí solo importa que el perfil no dependa de ellas.
 const enviarMensajeMock = vi.fn();
+const resumen = (puedeMensaje: boolean) => ({
+  data: { organizaciones: [], asociaciones: [], puedeMensaje, horasSemestre: { anio: 2026, periodo: 1, becaAcreditadas: 0, extensionAcreditadas: 0 } },
+  isLoading: false,
+  isError: false,
+});
+const usePerfilResumenMock = vi.fn((): { data?: ReturnType<typeof resumen>["data"]; isLoading: boolean; isError: boolean } => ({ data: undefined, isLoading: false, isError: false }));
 vi.mock('@/hooks/use-perfil-social', () => ({
   useEnviarMensaje: () => ({ mutate: enviarMensajeMock, isPending: false }),
-  usePerfilResumen: () => ({ data: undefined, isLoading: false, isError: false }),
+  usePerfilResumen: () => usePerfilResumenMock(),
   useActividadReciente: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
@@ -128,9 +134,17 @@ describe('PerfilPersonaPage', () => {
     unmount();
 
     usePerfilUsuarioMock.mockReturnValue({ perfil: perfil({ esAmigo: true }), isLoading: false, isError: false });
+    // Amigos sin conversación ni proyecto compartido: no se ofrece un botón que fallaría.
+    usePerfilResumenMock.mockReturnValue(resumen(false));
+    const sinProyecto = render(<PerfilPersonaPage />);
+    expect(screen.queryByRole('button', { name: /Enviar mensaje/ })).not.toBeInTheDocument();
+    sinProyecto.unmount();
+
+    usePerfilResumenMock.mockReturnValue(resumen(true));
     render(<PerfilPersonaPage />);
     fireEvent.click(screen.getByRole('button', { name: /Enviar mensaje/ }));
     expect(enviarMensajeMock).toHaveBeenCalledTimes(1);
+    usePerfilResumenMock.mockReset();
     expect(screen.getByRole('link', { name: /Ver currículum de proyectos/ })).toHaveAttribute('href', '/dashboard/personas/10/cv');
   });
 

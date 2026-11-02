@@ -64,7 +64,6 @@ export default function CvProyectosPage() {
               <p className="type-body text-text-secondary">
                 {cv.nombre}
                 {cv.carrera ? ` · ${cv.carrera}` : ''}
-                {cv.carne ? ` · ${cv.carne}` : ''}
               </p>
             </div>
             <PerfilCvAcciones idUsuario={idUsuario} nombre={cv.nombre} />
