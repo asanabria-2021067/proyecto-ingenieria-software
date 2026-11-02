@@ -8,6 +8,7 @@ import {
   Briefcase,
   Code2,
   GraduationCap,
+  MessageSquare,
   Share2,
   Users,
 } from 'lucide-react';
@@ -31,6 +32,8 @@ import { useAccionesAmistad, usePerfilUsuario } from '@/hooks/use-social';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
 import { aviso } from '@/lib/mensajes';
 import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
+import { PerfilActividad, PerfilCvAcciones, PerfilOrganizaciones } from '@/components/profile/perfil-social-secciones';
+import { useEnviarMensaje, usePerfilResumen } from '@/hooks/use-perfil-social';
 import { InvitarARolDialog } from '@/components/projects/invitar-a-rol-dialog';
 
 function compartirPerfil() {
@@ -71,6 +74,8 @@ export default function PerfilPersonaPage() {
   const { amistad, seguimiento, confirmarEliminarAmistad } = useAccionesAmistad(
     perfil ?? { idUsuario, esAmigo: false, solicitudPendiente: null, idAmistad: null, loSigo: false },
   );
+  const enviarMensaje = useEnviarMensaje(idUsuario);
+  const { data: resumen } = usePerfilResumen(idUsuario);
 
   if (isLoading) {
     return <PerfilSkeleton />;
@@ -155,6 +160,12 @@ export default function PerfilPersonaPage() {
                 <Button variant="outline" disabled={seguimiento.disabled} onClick={seguimiento.onClick} className="h-9.5 rounded-md px-4.5 text-[13px] font-semibold">
                   {seguimiento.label}
                 </Button>
+                {perfil.esAmigo && resumen?.puedeMensaje && (
+                  <Button variant="secondary" disabled={enviarMensaje.isPending} onClick={() => enviarMensaje.mutate()} className="col-span-2 h-9.5 rounded-md px-4.5 text-[13px] font-semibold">
+                    <MessageSquare className="size-4" aria-hidden="true" />
+                    Enviar mensaje
+                  </Button>
+                )}
                 <div className="col-span-2 flex justify-center sm:justify-start">
                   <InvitarARolDialog idUsuario={perfil.idUsuario} nombre={nombreCompleto} />
                 </div>
@@ -195,6 +206,10 @@ export default function PerfilPersonaPage() {
           )}
 
           <InsigniasVitrina insignias={perfil.insignias} publica />
+
+          <PerfilOrganizaciones idUsuario={perfil.idUsuario} />
+
+          <PerfilActividad idUsuario={perfil.idUsuario} />
 
           {/* Proyectos activos */}
           <section className="card-base">
@@ -267,6 +282,11 @@ export default function PerfilPersonaPage() {
                 ))}
               </ul>
             )}
+          </div>
+
+          <div className="card-base space-y-tight">
+            <h2 className="type-meta uppercase tracking-wide">CV de proyectos</h2>
+            <PerfilCvAcciones idUsuario={perfil.idUsuario} nombre={nombreCompleto} />
           </div>
 
           {perfil.carrera && (

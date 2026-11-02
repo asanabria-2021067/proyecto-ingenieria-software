@@ -16,11 +16,14 @@ const SELECT =
 export function AnuncioFormDialog({
   anuncio,
   isPending,
+  conAudiencia = true,
   onSubmit,
   onClose,
 }: {
   anuncio?: AnuncioAdmin;
   isPending: boolean;
+  /** Los anuncios de organizaciones y asociaciones no eligen audiencia: la define la entidad. */
+  conAudiencia?: boolean;
   onSubmit: (input: AnuncioInput) => void;
   onClose: () => void;
 }) {
@@ -63,13 +66,15 @@ export function AnuncioFormDialog({
                 <option value="URGENTE">Urgente</option>
               </select>
             </div>
-            <div>
-              <label htmlFor="anuncio-audiencia" className={LABEL}>Audiencia</label>
-              <select id="anuncio-audiencia" className={SELECT} value={v.audiencia} onChange={(e) => set('audiencia', e.target.value as AnuncioFormValues['audiencia'])}>
-                <option value="TODOS">Todos</option>
-                <option value="ESTUDIANTES">Solo estudiantes</option>
-              </select>
-            </div>
+            {conAudiencia && (
+              <div>
+                <label htmlFor="anuncio-audiencia" className={LABEL}>Audiencia</label>
+                <select id="anuncio-audiencia" className={SELECT} value={v.audiencia} onChange={(e) => set('audiencia', e.target.value as AnuncioFormValues['audiencia'])}>
+                  <option value="TODOS">Todos</option>
+                  <option value="ESTUDIANTES">Solo estudiantes</option>
+                </select>
+              </div>
+            )}
             <div>
               <label htmlFor="anuncio-inicio" className={LABEL}>Inicio</label>
               <Input id="anuncio-inicio" type="datetime-local" value={v.fechaInicio} onChange={(e) => set('fechaInicio', e.target.value)} />

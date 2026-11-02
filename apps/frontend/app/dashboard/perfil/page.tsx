@@ -31,6 +31,7 @@ import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { getAdminUserDetail, type AdminUserDetail } from '@/lib/services/admin';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
+import { PerfilActividad, PerfilCvAcciones, PerfilOrganizaciones } from '@/components/profile/perfil-social-secciones';
 import { SemestreHorasCard } from '@/components/hours/semestre-horas-card';
 import { SemestreHorasHistorial } from '@/components/hours/semestre-horas-historial';
 import { useMisInsignias } from '@/hooks/use-insignias';
@@ -411,6 +412,19 @@ export default function PerfilPage() {
               <>
                 <SemestreHorasCard editable />
                 <SemestreHorasHistorial />
+              </>
+            )}
+
+            {/* Organizaciones, asociación, actividad reciente y CV (MEJ-26, MEJ-27, MEJ-63, MEJ-64) - students only */}
+            {!isAdmin && user?.idUsuario && (
+              <>
+                <PerfilOrganizaciones idUsuario={user.idUsuario} propio mostrarHoras={false} />
+                <PerfilActividad idUsuario={user.idUsuario} propio />
+                <section className="card-base space-y-tight">
+                  <h2 className="type-subtitle">Mi CV de proyectos</h2>
+                  <p className="type-meta">Tus proyectos cerrados con rol, fechas y horas acreditadas. El enlace solo abre con sesión iniciada.</p>
+                  <PerfilCvAcciones idUsuario={user.idUsuario} />
+                </section>
               </>
             )}
 

@@ -98,6 +98,21 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       ).rejects.toThrow(ForbiddenException);
       expect(prisma.conversacion.create).not.toHaveBeenCalled();
     });
+
+    it('no reutiliza una conversación individual eliminada: crea una nueva', async () => {
+      prisma.proyecto.findFirst.mockResolvedValue(proyectoRow('EN_PROGRESO'));
+      prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+      prisma.conversacion.findFirst.mockResolvedValue(null);
+      prisma.conversacion.create.mockResolvedValue({ idConversacion: 9, participantes: [] });
+
+      const resultado = await service.createConversation(10, 1, { tipo: 'INDIVIDUAL', idsParticipantes: [2] });
+
+      expect(prisma.conversacion.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ eliminadaEn: null }) }),
+      );
+      expect(prisma.conversacion.create).toHaveBeenCalled();
+      expect(resultado.idConversacion).toBe(9);
+    });
   });
 
   describe('listConversations', () => {

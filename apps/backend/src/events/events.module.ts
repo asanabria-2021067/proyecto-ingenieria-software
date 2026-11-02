@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { EventsController } from './events.controller';
 import { MyEventsController } from './my-events.controller';
+import { OrganizationEventsController } from './organization-events.controller';
 import { EventsService } from './events.service';
 import { EventsReminderService } from './events-reminder.service';
 import { AdminMeetingsController } from './admin-meetings.controller';
@@ -9,7 +10,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [NotificationsModule],
-  controllers: [EventsController, MyEventsController, AdminMeetingsController],
+  controllers: [EventsController, MyEventsController, OrganizationEventsController, AdminMeetingsController],
   providers: [EventsService, EventsReminderService, AdminMeetingsService],
   exports: [EventsService, AdminMeetingsService],
 })

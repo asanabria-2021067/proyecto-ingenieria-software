@@ -171,6 +171,7 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
       'POST /api/admin/asociaciones/:idAsociacion/junta',
     ]);
     expect(ids((r) => r.path.startsWith('asociaciones'))).toEqual([
+      'GET /api/asociaciones/:idAsociacion/anuncios',
       'GET /api/asociaciones/:idAsociacion/candidatos-participantes',
       'GET /api/asociaciones/:idAsociacion/estudiantes',
       'GET /api/asociaciones/:idAsociacion/estudiantes/csv',
@@ -180,6 +181,8 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
       'GET /api/asociaciones/:idAsociacion/proyectos/csv',
       'GET /api/asociaciones/:idAsociacion/proyectos/pdf',
       'GET /api/asociaciones/mis-juntas',
+      'PATCH /api/asociaciones/:idAsociacion/anuncios/:idAnuncio/despublicar',
+      'POST /api/asociaciones/:idAsociacion/anuncios',
     ]);
     const conJunta = rutas.filter((r) => r.path.startsWith('asociaciones/:idAsociacion'));
     expect(conJunta.every((r) => r.guards.includes(JuntaGuard))).toBe(true);
@@ -212,5 +215,30 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     );
     expect(nuevas.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
     expect(nuevas.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+  });
+
+  // MEJ-26/27/28/63/64/33/34/66: perfil y social, .ics, calendario y anuncios de organizaciones y asociaciones.
+  it('perfil, calendario y anuncios de entidades: las rutas nuevas existen y exigen JwtAuthGuard', () => {
+    const esperadas = [
+      'GET /api/social/usuarios/:id/resumen',
+      'GET /api/social/usuarios/:id/actividad',
+      'GET /api/social/usuarios/:id/cv',
+      'GET /api/social/usuarios/:id/cv/pdf',
+      'POST /api/social/amistades/:idAmigo/mensaje',
+      'GET /api/usuarios/me/eventos/ics',
+      'GET /api/organizaciones/:id/calendario',
+      'GET /api/organizaciones/:id/calendario/ics',
+      'GET /api/organizaciones/:id/anuncios',
+      'POST /api/organizaciones/:id/anuncios',
+      'PATCH /api/organizaciones/:id/anuncios/:idAnuncio/despublicar',
+      'GET /api/asociaciones/:idAsociacion/anuncios',
+      'POST /api/asociaciones/:idAsociacion/anuncios',
+      'PATCH /api/asociaciones/:idAsociacion/anuncios/:idAnuncio/despublicar',
+    ];
+    const nuevas = rutas.filter((r) => esperadas.includes(r.id));
+    expect(nuevas.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(nuevas.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+    expect(nuevas.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+    expect(nuevas.filter((r) => r.path.startsWith('asociaciones/') && !r.guards.includes(JuntaGuard))).toEqual([]);
   });
 });

@@ -39,6 +39,12 @@ vi.mock('../hooks/use-current-user', () => ({
 }));
 vi.mock('../lib/services/users', () => ({ getDashboardStats: () => new Promise(() => undefined) }));
 vi.mock('../lib/services/admin', () => ({ getAdminUserDetail: () => new Promise(() => undefined) }));
+// MEJ-26/64: organizaciones y actividad del perfil consultan sus propios endpoints.
+vi.mock('../lib/services/perfil-social', () => ({
+  getPerfilResumen: () => new Promise(() => undefined),
+  getActividadReciente: () => new Promise(() => undefined),
+  descargarCvPdf: vi.fn(),
+}));
 // T-328: el perfil monta la sección de preferencias de notificación, que consulta su propio endpoint.
 vi.mock('../lib/services/notifications', () => ({
   getNotificationPreferences: () => new Promise(() => undefined),

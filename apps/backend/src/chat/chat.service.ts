@@ -338,6 +338,7 @@ export class ChatService {
         where: {
           idProyecto,
           tipo: 'INDIVIDUAL',
+          eliminadaEn: null,
           AND: idsUnicos.map((idUsuario) => ({ participantes: { some: { idUsuario } } })),
         },
         include: { participantes: { select: { idUsuario: true, usuario: USUARIO_SELECT } } },
