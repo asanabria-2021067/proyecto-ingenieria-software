@@ -42,6 +42,8 @@ export class TasksRecurrenceService {
         repeticion: { not: null },
         repeticionProxima: { lte: hoy },
         eliminadoEn: null,
+        // Una maestra HECHO en un Sprint CERRADO ya no se puede editar ni borrar (TAREA_WRITE exige Sprint ACTIVO): no se repite.
+        OR: [{ idSprint: null }, { sprint: { estado: { not: EstadoSprint.CERRADO } } }],
         proyecto: { eliminadoEn: null },
       },
       select: { idTarea: true },
@@ -61,7 +63,7 @@ export class TasksRecurrenceService {
   private crearCopia(idMaestra: number, hoy: Date): Promise<boolean> {
     return this.prisma.$transaction(async (tx) => {
       const maestra = await tx.tarea.findFirst({
-        where: { idTarea: idMaestra, eliminadoEn: null, repeticion: { not: null }, repeticionProxima: { lte: hoy } },
+        where: { idTarea: idMaestra, eliminadoEn: null, repeticion: { not: null }, repeticionProxima: { lte: hoy }, OR: [{ idSprint: null }, { sprint: { estado: { not: EstadoSprint.CERRADO } } }] },
         include: { etiquetas: { select: { idEtiqueta: true } }, checklist: { orderBy: { orden: 'asc' } } },
       });
       if (!maestra?.repeticion || !maestra.repeticionProxima) return false;

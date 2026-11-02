@@ -483,6 +483,14 @@ describe('MEJ-47: TasksRecurrenceService', () => {
     expect(tx.tarea.create).not.toHaveBeenCalled();
   });
 
+  it('ignora maestras en un Sprint CERRADO (ya no se pueden detener)', async () => {
+    const { service, prisma, tx } = crear();
+    await service.generarTareasRepetitivas(new Date('2026-11-10T14:00:00.000Z'));
+    const filtro = { OR: [{ idSprint: null }, { sprint: { estado: { not: 'CERRADO' } } }] };
+    expect(prisma.tarea.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining(filtro) }));
+    expect(tx.tarea.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining(filtro) }));
+  });
+
   it('si otra corrida ya reservo la ocurrencia no duplica', async () => {
     const { service, tx } = crear({ reservada: 0 });
     expect(await service.generarTareasRepetitivas(new Date('2026-11-10T14:00:00.000Z'))).toBe(0);
