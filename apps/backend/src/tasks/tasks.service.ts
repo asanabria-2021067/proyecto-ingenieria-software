@@ -480,10 +480,12 @@ export class TasksService {
         }
         data.idTareaBloqueante = dto.idTareaBloqueante ?? null;
       }
-      if (Object.prototype.hasOwnProperty.call(dto, 'repeticion')) {
-        data.repeticion = dto.repeticion ?? null;
+      const cambiaRepeticion = Object.prototype.hasOwnProperty.call(dto, 'repeticion');
+      if (cambiaRepeticion || data.fechaLimite) {
+        const repeticion = cambiaRepeticion ? (dto.repeticion ?? null) : tareaAntes.repeticion;
+        if (cambiaRepeticion) data.repeticion = repeticion;
         const base = (data.fechaLimite as Date | undefined) ?? tareaAntes.fechaLimite;
-        data.repeticionProxima = dto.repeticion && base ? sumarRepeticion(base, dto.repeticion) : null;
+        data.repeticionProxima = repeticion && base ? sumarRepeticion(base, repeticion) : null;
       }
 
       await tx.tarea.update({ where: { idTarea: taskId }, data });

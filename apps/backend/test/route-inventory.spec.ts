@@ -128,10 +128,12 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     }
     const escriben = rutas.filter(
       (r) =>
-        (r.controller.startsWith('TasksExtrasController.') || r.controller.startsWith('EvidenceController.')) &&
+        (r.controller.startsWith('TasksExtrasController.') ||
+          r.controller.startsWith('EvidenceController.') ||
+          r.controller.startsWith('PlantillasTareaController.')) &&
         r.metodo !== 'GET',
     );
-    expect(escriben.length).toBe(5);
+    expect(escriben.length).toBe(7);
     expect(escriben.filter((r) => !r.guards.includes(ProjectWriteGuard)).map((r) => r.id)).toEqual([]);
   });
 

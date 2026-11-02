@@ -3,6 +3,7 @@ import { Prisma, TipoEvidencia } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectTransactionService } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { TasksAuthorizationService } from '../tasks/tasks-authorization.service';
 import { TasksContextService } from '../tasks/tasks-context.service';
 import { lockedProject } from '../tasks/tasks-writes.helpers';
@@ -49,10 +50,17 @@ export class EvidenceService {
     private readonly policy: ProjectPolicyService,
     private readonly authorization: TasksAuthorizationService,
     private readonly context: TasksContextService,
+    private readonly readPolicy: ProjectReadPolicyService,
   ) {}
 
   async list(projectId: number, taskId: number, userId: number) {
-    await this.authorization.assertCanReadTask(projectId, taskId, userId);
+    const tarea = await this.authorization.assertCanReadTask(projectId, taskId, userId);
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'tareas',
+      entitySprintId: tarea?.idSprint ?? null,
+    });
     const filas = await this.prisma.evidencia.findMany({
       where: { idTarea: taskId },
       select: EVIDENCIA_SELECT,

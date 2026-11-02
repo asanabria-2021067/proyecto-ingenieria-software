@@ -2,17 +2,10 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
-import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
+import { ProjectWrite } from '../common/guards/project-write.metadata';
+import { TASK_WRITE } from './tasks.controller';
 import { TasksExtrasService } from './tasks-extras.service';
 import { CreateChecklistItemDto, UpdateChecklistItemDto } from './dto/checklist-item.dto';
-
-/** Misma metadata que las demas escrituras de tarea: P/E con Sprint ACTIVO. */
-const TASK_WRITE: ProjectWriteMetadata = {
-  source: { kind: 'param', name: 'projectId' },
-  states: ['P', 'E'],
-  sprint: 'ACTIVO',
-  family: 'TAREA_WRITE',
-};
 
 /** MEJ-6 (checklist) y MEJ-10 (historial). */
 @Controller('proyectos/:projectId/tareas/:taskId')

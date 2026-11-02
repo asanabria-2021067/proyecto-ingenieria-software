@@ -74,7 +74,9 @@ export class TasksRecurrenceService {
 
       let proxima = maestra.repeticionProxima;
       const fechaCopia = proxima;
-      while (proxima <= hoy) proxima = sumarRepeticion(proxima, maestra.repeticion);
+      // Se ancla al dia de la fecha limite de la maestra: 31-ene -> 28-feb -> 31-mar.
+      const diaAncla = (maestra.fechaLimite ?? fechaCopia).getUTCDate();
+      while (proxima <= hoy) proxima = sumarRepeticion(proxima, maestra.repeticion, diaAncla);
 
       const reservada = await tx.tarea.updateMany({
         where: { idTarea: idMaestra, repeticionProxima: maestra.repeticionProxima },

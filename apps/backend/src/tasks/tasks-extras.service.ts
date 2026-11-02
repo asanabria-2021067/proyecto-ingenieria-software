@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectTransactionService } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { TasksAuthorizationService } from './tasks-authorization.service';
 import { lockedProject } from './tasks-writes.helpers';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
@@ -61,6 +62,7 @@ export class TasksExtrasService {
     private readonly projectTx: ProjectTransactionService,
     private readonly policy: ProjectPolicyService,
     private readonly authorization: TasksAuthorizationService,
+    private readonly readPolicy: ProjectReadPolicyService,
   ) {}
 
   private escribirChecklist<T>(
@@ -117,9 +119,15 @@ export class TasksExtrasService {
     });
   }
 
-  /** MEJ-10: quien creo, movio, reasigno o cambio la fecha de la tarea; mismo alcance de lectura que el detalle. */
+  /** MEJ-10: quien creo, movio, reasigno o cambio la fecha de la tarea; misma politica de lectura que el detalle, con el scope de bitacora. */
   async historial(projectId: number, taskId: number, userId: number): Promise<EntradaHistorialTarea[]> {
-    await this.authorization.assertCanReadTask(projectId, taskId, userId);
+    const tarea = await this.authorization.assertCanReadTask(projectId, taskId, userId);
+    await this.readPolicy.assertRead(undefined, {
+      projectId,
+      actorId: userId,
+      scope: 'bitacora',
+      entitySprintId: tarea?.idSprint ?? null,
+    });
     const filas = await this.prisma.bitacoraAuditoria.findMany({
       where: { tipoObjeto: 'TAREA', idObjeto: String(taskId), accion: { in: EVENTOS_HISTORIAL } },
       orderBy: [{ fechaEvento: 'desc' }, { idAuditoria: 'desc' }],

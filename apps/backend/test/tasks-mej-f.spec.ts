@@ -27,6 +27,16 @@ describe('MEJ-47: sumarRepeticion', () => {
     expect(iso(sumarRepeticion(dia('2026-12-31'), RepeticionTarea.MENSUAL))).toBe('2027-01-31');
   });
 
+  it('mensual anclada al dia original no degrada 31 a 28 para siempre', () => {
+    let fecha = dia('2026-01-31');
+    const vistas: string[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      fecha = sumarRepeticion(fecha, RepeticionTarea.MENSUAL, 31);
+      vistas.push(iso(fecha));
+    }
+    expect(vistas).toEqual(['2026-02-28', '2026-03-31', '2026-04-30']);
+  });
+
   it('hoyGuatemala usa el dia calendario UTC-6', () => {
     expect(iso(hoyGuatemala(new Date('2026-11-12T05:30:00.000Z')))).toBe('2026-11-11');
     expect(iso(hoyGuatemala(new Date('2026-11-12T06:00:00.000Z')))).toBe('2026-11-12');
@@ -34,7 +44,7 @@ describe('MEJ-47: sumarRepeticion', () => {
 });
 
 /** Fake de tx.tarea.findFirst sobre un mapa idTarea -> fila. */
-function txConTareas(filas: Record<number, { idProyecto: number; idTareaBloqueante: number | null; estadoTarea?: EstadoTarea; tituloTarea?: string }>) {
+function txConTareas(filas: Record<number, { idProyecto: number; idTareaBloqueante: number | null; eliminadoEn?: Date | null; estadoTarea?: EstadoTarea; tituloTarea?: string }>) {
   return {
     tarea: {
       findFirst: vi.fn(async ({ where }: { where: { idTarea: number; estadoTarea?: unknown } }) => {
@@ -58,6 +68,16 @@ describe('MEJ-48: assertBloqueanteValido', () => {
   it('acepta una tarea del mismo proyecto sin ciclo', async () => {
     await expect(assertBloqueanteValido(txConTareas(filas), 7, 4, 3)).resolves.toBeUndefined();
     await expect(assertBloqueanteValido(txConTareas(filas), 7, null, 3)).resolves.toBeUndefined();
+  });
+
+  it('un eslabon posterior eliminado corta el recorrido y no invalida al bloqueante', async () => {
+    const conEliminada = {
+      ...filas,
+      5: { idProyecto: 7, idTareaBloqueante: 6 },
+      6: { idProyecto: 7, idTareaBloqueante: null, eliminadoEn: new Date() },
+    };
+    await expect(assertBloqueanteValido(txConTareas(conEliminada), 7, 4, 5)).resolves.toBeUndefined();
+    await expect(assertBloqueanteValido(txConTareas(conEliminada), 7, 4, 6)).rejects.toThrow(/no existe en este proyecto/);
   });
 
   it('rechaza bloquearse a si misma', async () => {
@@ -131,7 +151,7 @@ describe('MEJ-6: checklist (TasksExtrasService)', () => {
       assertCanReadTask: vi.fn(),
     };
     const policy = { assertWriteTx: vi.fn(async () => undefined) };
-    const service = new TasksExtrasService({} as never, fakeProjectTx(tx) as never, policy as never, auth as never);
+    const service = new TasksExtrasService({} as never, fakeProjectTx(tx) as never, policy as never, auth as never, {} as never);
     return { service, tx, auth, policy };
   }
 
@@ -198,12 +218,19 @@ describe('MEJ-10: historial de la tarea', () => {
         ]),
       },
     };
-    const auth = { assertCanReadTask: vi.fn(async () => ({})) };
-    const service = new TasksExtrasService(prisma as never, {} as never, {} as never, auth as never);
+    const auth = { assertCanReadTask: vi.fn(async () => ({ idSprint: 3 })) };
+    const readPolicy = { assertRead: vi.fn(async () => ({})) };
+    const service = new TasksExtrasService(prisma as never, {} as never, {} as never, auth as never, readPolicy as never);
 
     const historial = await service.historial(1, 8, 9);
 
     expect(auth.assertCanReadTask).toHaveBeenCalledWith(1, 8, 9);
+    expect(readPolicy.assertRead).toHaveBeenCalledWith(undefined, {
+      projectId: 1,
+      actorId: 9,
+      scope: 'bitacora',
+      entitySprintId: 3,
+    });
     expect(prisma.bitacoraAuditoria.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ tipoObjeto: 'TAREA', idObjeto: '8' }) }),
     );
@@ -220,7 +247,16 @@ describe('MEJ-10: historial de la tarea', () => {
   it('no consulta la bitacora si la lectura es rechazada', async () => {
     const prisma = { bitacoraAuditoria: { findMany: vi.fn() } };
     const auth = { assertCanReadTask: vi.fn().mockRejectedValue(new ForbiddenException('no')) };
-    const service = new TasksExtrasService(prisma as never, {} as never, {} as never, auth as never);
+    const service = new TasksExtrasService(prisma as never, {} as never, {} as never, auth as never, {} as never);
+    await expect(service.historial(1, 8, 9)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.bitacoraAuditoria.findMany).not.toHaveBeenCalled();
+  });
+
+  it('no consulta la bitacora si la politica de lectura la niega', async () => {
+    const prisma = { bitacoraAuditoria: { findMany: vi.fn() } };
+    const auth = { assertCanReadTask: vi.fn(async () => ({ idSprint: 3 })) };
+    const readPolicy = { assertRead: vi.fn().mockRejectedValue(new ForbiddenException('no')) };
+    const service = new TasksExtrasService(prisma as never, {} as never, {} as never, auth as never, readPolicy as never);
     await expect(service.historial(1, 8, 9)).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.bitacoraAuditoria.findMany).not.toHaveBeenCalled();
   });
@@ -249,7 +285,7 @@ describe('MEJ-49: evidencias (EvidenceService)', () => {
       getProjectOrThrow: vi.fn(async () => ({ creadoPor: lider })),
     };
     const policy = { assertWriteTx: vi.fn(async () => undefined) };
-    const service = new EvidenceService({} as never, fakeProjectTx(tx) as never, policy as never, auth as never, context as never);
+    const service = new EvidenceService({} as never, fakeProjectTx(tx) as never, policy as never, auth as never, context as never, {} as never);
     return { service, tx };
   }
 
@@ -287,41 +323,83 @@ describe('MEJ-49: evidencias (EvidenceService)', () => {
   });
 });
 
+describe('MEJ-49: lectura de evidencias', () => {
+  it('aplica la politica de lectura con el sprint de la tarea antes de listar', async () => {
+    const prisma = { evidencia: { findMany: vi.fn(async () => []) } };
+    const auth = { assertCanReadTask: vi.fn(async () => ({ idSprint: 3 })) };
+    const readPolicy = { assertRead: vi.fn(async () => ({})) };
+    const service = new EvidenceService(prisma as never, {} as never, {} as never, auth as never, {} as never, readPolicy as never);
+    await service.list(1, 5, 9);
+    expect(readPolicy.assertRead).toHaveBeenCalledWith(undefined, { projectId: 1, actorId: 9, scope: 'tareas', entitySprintId: 3 });
+
+    readPolicy.assertRead.mockRejectedValue(new ForbiddenException('no'));
+    prisma.evidencia.findMany.mockClear();
+    await expect(service.list(1, 5, 9)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.evidencia.findMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('MEJ-52: plantillas (PlantillasTareaService)', () => {
-  it('solo el lider crea y borra; el listado exige leer el tablero', async () => {
-    const prisma = {
+  function crear(opts: { cantidad?: number; lider?: boolean } = {}) {
+    const { cantidad = 0, lider = true } = opts;
+    const tx = {
       plantillaTarea: {
-        count: vi.fn(async () => 0),
+        count: vi.fn(async () => cantidad),
         create: vi.fn(async ({ data }: { data: unknown }) => data),
         deleteMany: vi.fn(async () => ({ count: 0 })),
-        findMany: vi.fn(async () => []),
       },
     };
+    const prisma = { plantillaTarea: { findMany: vi.fn(async () => []) } };
     const auth = { assertCanListProjectTasks: vi.fn(async () => undefined) };
-    const context = { assertProjectLeader: vi.fn(async () => undefined) };
-    const service = new PlantillasTareaService(prisma as never, auth as never, context as never);
+    const context = {
+      assertProjectLeader: vi.fn(async () => {
+        if (!lider) throw new ForbiddenException('no');
+      }),
+    };
+    const policy = { assertWriteTx: vi.fn(async () => undefined) };
+    const readPolicy = { assertRead: vi.fn(async () => ({})) };
+    const service = new PlantillasTareaService(
+      prisma as never,
+      auth as never,
+      context as never,
+      fakeProjectTx(tx) as never,
+      policy as never,
+      readPolicy as never,
+    );
+    return { service, tx, auth, context, policy, readPolicy };
+  }
 
+  it('el listado exige la politica de lectura y leer el tablero', async () => {
+    const { service, auth, readPolicy } = crear();
     await service.list(1, 9);
+    expect(readPolicy.assertRead).toHaveBeenCalledWith(undefined, { projectId: 1, actorId: 9, scope: 'tareas' });
     expect(auth.assertCanListProjectTasks).toHaveBeenCalledWith(1, 9);
 
+    readPolicy.assertRead.mockRejectedValue(new ForbiddenException('no'));
+    await expect(service.list(1, 9)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('solo el lider crea y borra, con la politica de escritura dentro del lock del proyecto', async () => {
+    const { service, tx, context, policy } = crear();
     await service.create(1, 9, { nombre: 'Bug', tituloTarea: 'Corregir', prioridad: 'ALTA', checklist: ['a'] });
-    expect(context.assertProjectLeader).toHaveBeenCalledWith(1, 9);
-    expect(prisma.plantillaTarea.create).toHaveBeenCalledWith({
+    expect(context.assertProjectLeader).toHaveBeenCalledWith(1, 9, tx);
+    expect(policy.assertWriteTx).toHaveBeenCalledWith(tx, { idProyecto: 1 }, 'ETIQUETA_CRUD', 9);
+    expect(tx.plantillaTarea.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ idProyecto: 1, creadaPor: 9, checklist: ['a'], tiempoEstimadoHoras: null }),
     });
 
     await expect(service.remove(1, 4, 9)).rejects.toBeInstanceOf(NotFoundException);
+    expect(policy.assertWriteTx).toHaveBeenCalledTimes(2);
 
-    context.assertProjectLeader.mockRejectedValue(new ForbiddenException('no'));
-    await expect(service.create(1, 8, { nombre: 'x', tituloTarea: 'x', prioridad: 'BAJA' })).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(service.remove(1, 4, 8)).rejects.toBeInstanceOf(ForbiddenException);
+    const ajeno = crear({ lider: false });
+    await expect(ajeno.service.create(1, 8, { nombre: 'x', tituloTarea: 'x', prioridad: 'BAJA' })).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(ajeno.service.remove(1, 4, 8)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('limita a 30 plantillas por proyecto', async () => {
-    const prisma = { plantillaTarea: { count: vi.fn(async () => 30), create: vi.fn() } };
-    const service = new PlantillasTareaService(prisma as never, {} as never, { assertProjectLeader: vi.fn() } as never);
+    const { service, tx } = crear({ cantidad: 30 });
     await expect(service.create(1, 9, { nombre: 'x', tituloTarea: 'x', prioridad: 'BAJA' })).rejects.toBeInstanceOf(ConflictException);
-    expect(prisma.plantillaTarea.create).not.toHaveBeenCalled();
+    expect(tx.plantillaTarea.create).not.toHaveBeenCalled();
   });
 });
 

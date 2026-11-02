@@ -22,6 +22,7 @@ import { TasksRecurrenceService } from '../../src/tasks/tasks-recurrence.service
 import { EvidenceService } from '../../src/evidence/evidence.service';
 import { BitacoraEventosService } from '../../src/bitacora/bitacora-eventos.service';
 import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectReadPolicyService } from '../../src/common/project-policy/project-read-policy.service';
 import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
 import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
@@ -49,9 +50,10 @@ describeIntegration('Tareas: checklist, bloqueo, historial, evidencias, plantill
     const runner = new ProjectTransactionService(prismaService);
     const policy = new ProjectPolicyService(new ProjectIdResolverService(prismaService));
     stack = tasksStack(prisma);
-    extras = new TasksExtrasService(prismaService, runner, policy, authorization);
-    plantillas = new PlantillasTareaService(prismaService, authorization, context);
-    evidence = new EvidenceService(prismaService, runner, policy, authorization, context);
+    const readPolicy = new ProjectReadPolicyService(prismaService);
+    extras = new TasksExtrasService(prismaService, runner, policy, authorization, readPolicy);
+    plantillas = new PlantillasTareaService(prismaService, authorization, context, runner, policy, readPolicy);
+    evidence = new EvidenceService(prismaService, runner, policy, authorization, context, readPolicy);
     recurrence = new TasksRecurrenceService(prismaService, new BitacoraEventosService());
     await prisma.$connect();
   });

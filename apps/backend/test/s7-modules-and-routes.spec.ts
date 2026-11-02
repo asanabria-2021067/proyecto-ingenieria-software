@@ -624,7 +624,7 @@ describe('S7 grafo de módulos y rutas (T36)', () => {
     expect(ausentes).toEqual([]);
     expect(CANONICAL_OPERATIONS).toHaveLength(118);
   }, 30_000);
-  it('C158: toda ruta de escritura participante declara su policy explícita y la cobertura son 75 usos', async () => {
+  it('C158: toda ruta de escritura participante declara su policy explícita y la cobertura son 77 usos', async () => {
     const { AppModule } = await import('../src/app.module');
     const { PROJECT_WRITE_METADATA_KEY } = await import(
       '../src/common/guards/project-write.metadata'
@@ -636,7 +636,8 @@ describe('S7 grafo de módulos y rutas (T36)', () => {
     //    (66 de Sprint 7 más POST /:id/hitos/:idHito/tareas de HU-147/T-185,
     //    más POST /actividades y PATCH /actividades/:id/asistencia/:id de
     //    HU-177/T-296, más POST /proyectos/:id/tareas/acciones-masivas de
-    //    HU-202/T-383, más cinco de MEJ-6/49: checklist y evidencias de tarea).
+    //    HU-202/T-383, más cinco de MEJ-6/49: checklist y evidencias de tarea, más dos de MEJ-52:
+    //    crear y borrar plantillas de tarea).
     //    Se cuenta sobre el código fuente, no sobre la
     //    metadata resuelta, para que el número describa decisiones escritas
     //    por alguien.
@@ -644,7 +645,7 @@ describe('S7 grafo de módulos y rutas (T36)', () => {
       const matches = fs.readFileSync(file, 'utf8').match(/@ProjectWrite\(/g);
       return total + (matches?.length ?? 0);
     }, 0);
-    expect(declaraciones).toBe(75);
+    expect(declaraciones).toBe(77);
 
     // ── Ninguna ruta participante depende del default restrictivo.
     //

@@ -2,17 +2,10 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
-import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
+import { ProjectWrite } from '../common/guards/project-write.metadata';
+import { TASK_WRITE } from '../tasks/tasks.controller';
 import { EvidenceService } from './evidence.service';
 import { CreateEvidenceDto } from './dto/create-evidence.dto';
-
-/** Misma metadata que las demas escrituras de tarea: P/E con Sprint ACTIVO. */
-const TASK_WRITE: ProjectWriteMetadata = {
-  source: { kind: 'param', name: 'projectId' },
-  states: ['P', 'E'],
-  sprint: 'ACTIVO',
-  family: 'TAREA_WRITE',
-};
 
 /** MEJ-49: permisos por actor en EvidenceService. */
 @Controller('proyectos/:projectId/tareas/:taskId/evidencias')

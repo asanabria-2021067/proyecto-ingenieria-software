@@ -715,19 +715,19 @@ model ExperienciaPrevia {
 }
 
 model Organizacion {
-  idOrganizacion          Int                     @id @default(autoincrement()) @map("id_organizacion")
-  nombreOrganizacion      String                  @map("nombre_organizacion") @db.VarChar(255)
-  tipoOrganizacion        TipoOrganizacion        @default(OTRO) @map("tipo_organizacion")
-  descripcionOrganizacion String?                 @map("descripcion_organizacion") @db.Text
-  correoContacto          String?                 @map("correo_contacto") @db.VarChar(255)
-  telefonoContacto        String?                 @map("telefono_contacto") @db.VarChar(255)
-  sitioWeb                String?                 @map("sitio_web") @db.VarChar(255)
-  logoUrl                 String?                 @map("logo_url") @db.VarChar(255)
+  idOrganizacion          Int                @id @default(autoincrement()) @map("id_organizacion")
+  nombreOrganizacion      String             @map("nombre_organizacion") @db.VarChar(255)
+  tipoOrganizacion        TipoOrganizacion   @default(OTRO) @map("tipo_organizacion")
+  descripcionOrganizacion String?            @map("descripcion_organizacion") @db.Text
+  correoContacto          String?            @map("correo_contacto") @db.VarChar(255)
+  telefonoContacto        String?            @map("telefono_contacto") @db.VarChar(255)
+  sitioWeb                String?            @map("sitio_web") @db.VarChar(255)
+  logoUrl                 String?            @map("logo_url") @db.VarChar(255)
   /// INACTIVA = archivada (solo lectura).
-  estadoOrganizacion      EstadoOrganizacion      @default(ACTIVA) @map("estado_organizacion")
+  estadoOrganizacion      EstadoOrganizacion @default(ACTIVA) @map("estado_organizacion")
   visibilidad             VisibilidadOrganizacion @default(PRIVADA) @map("visibilidad")
-  creadaPor               Int                     @map("creada_por")
-  fechaCreacion           DateTime                @default(now()) @map("fecha_creacion")
+  creadaPor               Int                @map("creada_por")
+  fechaCreacion           DateTime           @default(now()) @map("fecha_creacion")
 
   creador        Usuario                       @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
   miembros       UsuarioOrganizacion[]
@@ -1280,16 +1280,16 @@ model Tarea {
   repeticionProxima   DateTime?        @map("repeticion_proxima") @db.Date
   idTareaOrigen       Int?             @map("id_tarea_origen")
 
-  proyecto      Proyecto             @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  proyecto      Proyecto            @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
   bloqueante    Tarea?               @relation("TareaBloqueo", fields: [idTareaBloqueante], references: [idTarea], onDelete: SetNull)
   bloqueadas    Tarea[]              @relation("TareaBloqueo")
   origen        Tarea?               @relation("TareaRepetida", fields: [idTareaOrigen], references: [idTarea], onDelete: SetNull)
   copias        Tarea[]              @relation("TareaRepetida")
   checklist     TareaChecklistItem[]
-  hito          Hito?                @relation(fields: [idHito], references: [idHito], onDelete: SetNull)
-  rolProyecto   RolProyecto?         @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
-  sprint        Sprint?              @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
-  creador       Usuario              @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
+  hito          Hito?               @relation(fields: [idHito], references: [idHito], onDelete: SetNull)
+  rolProyecto   RolProyecto?        @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
+  sprint        Sprint?             @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
+  creador       Usuario             @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
   asignaciones  AsignacionTarea[]
   evidencias    Evidencia[]
   comentarios   Comentario[]
@@ -1998,14 +1998,14 @@ model MensajeRevisionProyecto {
 /// por par de usuarios dentro del proyecto) se garantiza en ChatService
 /// buscando antes de crear, no con una constraint de base de datos.
 model Conversacion {
-  idConversacion      Int              @id @default(autoincrement()) @map("id_conversacion")
+  idConversacion Int              @id @default(autoincrement()) @map("id_conversacion")
   // Exactamente uno de idProyecto / idOrganizacion (CHECK en la migracion).
-  idProyecto          Int?             @map("id_proyecto")
-  idOrganizacion      Int?             @map("id_organizacion")
-  tipo                TipoConversacion
-  nombre              String?          @db.VarChar(255)
-  creadaPor           Int              @map("creada_por")
-  creadaEn            DateTime         @default(now()) @map("creada_en")
+  idProyecto     Int?             @map("id_proyecto")
+  idOrganizacion Int?             @map("id_organizacion")
+  tipo           TipoConversacion
+  nombre         String?          @db.VarChar(255)
+  creadaPor      Int              @map("creada_por")
+  creadaEn       DateTime         @default(now()) @map("creada_en")
   // T-xxx: menú de 3 puntos del chat — renombrar/archivar/favorito. Aditivas,
   // nullable/default para no tocar filas existentes.
   nombrePersonalizado String?          @map("nombre_personalizado") @db.VarChar(120)
@@ -2024,13 +2024,13 @@ model Conversacion {
   esCanal             Boolean          @default(false) @map("es_canal")
   nombreCanal         String?          @map("nombre_canal") @db.VarChar(40)
 
-  proyecto            Proyecto?                  @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
-  organizacion        Organizacion?              @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Restrict)
-  creador             Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
-  participantes       ConversacionParticipante[]
-  mensajes            MensajeChat[]
-  adjuntos            AdjuntoMensajeChat[]
-  apodos              ApodoConversacion[]
+  proyecto      Proyecto?                  @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  organizacion  Organizacion?              @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Restrict)
+  creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
+  participantes ConversacionParticipante[]
+  mensajes      MensajeChat[]
+  adjuntos      AdjuntoMensajeChat[]
+  apodos        ApodoConversacion[]
   mensajesProgramados MensajeProgramado[]
 
   @@unique([idProyecto, nombreCanal])
