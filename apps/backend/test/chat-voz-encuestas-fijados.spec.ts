@@ -106,7 +106,7 @@ function makePrisma() {
       update: vi.fn(),
       create: vi.fn(),
     },
-    encuestaChat: { update: vi.fn() },
+    encuestaChat: { update: vi.fn(), findUniqueOrThrow: vi.fn().mockResolvedValue({ cerradaEn: null, cierraEn: null }) },
     votoEncuestaChat: { deleteMany: vi.fn().mockReturnValue('del'), createMany: vi.fn().mockReturnValue('crear') },
     conversacionParticipante: { update: vi.fn(), findMany: vi.fn() },
     $queryRaw: vi.fn().mockResolvedValue([]),

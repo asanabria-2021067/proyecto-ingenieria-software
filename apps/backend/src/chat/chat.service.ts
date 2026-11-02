@@ -729,10 +729,20 @@ export class ChatService {
       throw new BadRequestException('Esta encuesta admite un solo voto');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.votoEncuestaChat.deleteMany({ where: { idUsuario: userId, opcion: { idEncuesta: encuesta.idEncuesta } } }),
-      this.prisma.votoEncuestaChat.createMany({ data: idsOpciones.map((idOpcion) => ({ idOpcion, idUsuario: userId })) }),
-    ]);
+    // Bloquea la encuesta para que dos reemplazos simultaneos del mismo usuario no dejen 2 votos
+    // en una encuesta de voto unico, y para releer el cierre justo antes de escribir.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM "encuesta_chat" WHERE "id_encuesta" = ${encuesta.idEncuesta} FOR UPDATE`;
+      const actual = await tx.encuestaChat.findUniqueOrThrow({
+        where: { idEncuesta: encuesta.idEncuesta },
+        select: { cerradaEn: true, cierraEn: true },
+      });
+      if (actual.cerradaEn || (actual.cierraEn && actual.cierraEn.getTime() <= Date.now())) {
+        throw new BadRequestException('La encuesta está cerrada');
+      }
+      await tx.votoEncuestaChat.deleteMany({ where: { idUsuario: userId, opcion: { idEncuesta: encuesta.idEncuesta } } });
+      await tx.votoEncuestaChat.createMany({ data: idsOpciones.map((idOpcion) => ({ idOpcion, idUsuario: userId })) });
+    });
     return this.publicarEncuesta(idConversacion, idMensaje);
   }
 
@@ -746,8 +756,9 @@ export class ChatService {
     if (idRemitente !== userId && conversacion.proyecto?.creadoPor !== userId) {
       throw new ForbiddenException('Solo quien creó la encuesta o el líder del proyecto puede cerrarla');
     }
-    if (encuesta.cerradaEn) return this.publicarEncuesta(idConversacion, idMensaje);
-    await this.prisma.encuestaChat.update({ where: { idEncuesta: encuesta.idEncuesta }, data: { cerradaEn: new Date() } });
+    if (!encuesta.cerradaEn) {
+      await this.prisma.encuestaChat.update({ where: { idEncuesta: encuesta.idEncuesta }, data: { cerradaEn: new Date() } });
+    }
     return this.publicarEncuesta(idConversacion, idMensaje);
   }
 

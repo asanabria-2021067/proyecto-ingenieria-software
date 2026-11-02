@@ -170,6 +170,36 @@ describeIntegration('CHAT — notas de voz, encuestas y fijados (PostgreSQL real
     expect(rm.opciones.map((o) => o.votos.length)).toEqual([1, 1]);
   });
 
+  it('encuesta de voto unico: dos votos simultaneos del mismo usuario dejan un solo voto', async () => {
+    const m = await chat.createMessage(idProyecto, idConversacion, autor, '', undefined, undefined, {
+      encuesta: { pregunta: '¿Carrera?', opciones: ['A', 'B'] },
+    });
+    const [a, b] = m.encuesta!.opciones;
+    await Promise.all([
+      chat.votarEncuesta(idProyecto, idConversacion, m.idMensaje, otro, [a.idOpcion]),
+      chat.votarEncuesta(idProyecto, idConversacion, m.idMensaje, otro, [b.idOpcion]),
+    ]);
+    const votos = await prisma.votoEncuestaChat.count({ where: { idUsuario: otro, opcion: { idEncuesta: m.encuesta!.idEncuesta } } });
+    expect(votos).toBe(1);
+  });
+
+  it('un voto que espera el bloqueo de la encuesta ve el cierre confirmado antes', async () => {
+    const m = await chat.createMessage(idProyecto, idConversacion, autor, '', undefined, undefined, {
+      encuesta: { pregunta: '¿Cierre?', opciones: ['A', 'B'] },
+    });
+    const { idEncuesta, opciones } = m.encuesta!;
+    let voto!: Promise<unknown>;
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM "encuesta_chat" WHERE "id_encuesta" = ${idEncuesta} FOR UPDATE`;
+      voto = chat.votarEncuesta(idProyecto, idConversacion, m.idMensaje, otro, [opciones[0].idOpcion]);
+      voto.catch(() => undefined);
+      await new Promise((r) => setTimeout(r, 300));
+      await tx.encuestaChat.update({ where: { idEncuesta }, data: { cerradaEn: new Date() } });
+    });
+    await expect(voto).rejects.toThrow('cerrada');
+    expect(await prisma.votoEncuestaChat.count({ where: { idUsuario: otro, opcion: { idEncuesta } } })).toBe(0);
+  });
+
   it('encuesta cerrada (manual o por fecha) no admite votos; solo autor o lider la cierran', async () => {
     const m = await chat.createMessage(idProyecto, idConversacion, autor, '', undefined, undefined, {
       encuesta: { pregunta: '¿Si?', opciones: ['Si', 'No'] },
