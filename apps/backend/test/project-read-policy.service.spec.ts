@@ -28,6 +28,8 @@ interface PrismaDoubleOptions {
   esAdmin?: boolean;
   historyAsLeader?: number;
   appealsAsLeader?: number;
+  /** Membresías activas del actor en una organización dueña del proyecto. */
+  miembroDeOrganizacion?: number;
 }
 
 function makePrisma(options: PrismaDoubleOptions = {}) {
@@ -53,6 +55,7 @@ function makePrisma(options: PrismaDoubleOptions = {}) {
     },
     historialLiderazgo: { count: vi.fn().mockResolvedValue(options.historyAsLeader ?? 0) },
     apelacionLiderazgo: { count: vi.fn().mockResolvedValue(options.appealsAsLeader ?? 0) },
+    usuarioOrganizacion: { count: vi.fn().mockResolvedValue(options.miembroDeOrganizacion ?? 0) },
   } as unknown as PrismaService;
 }
 
@@ -127,5 +130,33 @@ describe('ProjectReadPolicyService.assertRead — scope "bitacora" (HU-170/T-269
     await expect(
       service.assertRead(undefined, { projectId: 999, actorId: 1, scope: 'bitacora' }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('ProjectReadPolicyService.assertRead — miembro de la organización dueña (ORG-8)', () => {
+  const pregunta = (scope: 'resumen' | 'tareas' | 'sprints' | 'horas' | 'equipo' | 'bitacora' | 'documentos', options: PrismaDoubleOptions = {}) =>
+    new ProjectReadPolicyService(makePrisma({ miembroDeOrganizacion: 1, ...options })).assertRead(undefined, {
+      projectId: 5,
+      actorId: 42,
+      scope,
+    });
+
+  it.each(['resumen', 'tareas', 'sprints'] as const)('lee %s del proyecto en vivo', async (scope) => {
+    await expect(pregunta(scope)).resolves.toMatchObject({ profile: 'MIEMBRO_ORGANIZACION', sprintEstados: null });
+  });
+
+  it.each(['horas', 'equipo', 'bitacora', 'documentos'] as const)('no lee %s', async (scope) => {
+    await expect(pregunta(scope)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('no ve un proyecto que aún no se publica', async () => {
+    const proyecto = { idProyecto: 5, estadoProyecto: EstadoProyecto.EN_REVISION, creadoPor: 1, eliminadoEn: null };
+    await expect(pregunta('tareas', { proyecto })).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('un participante conserva su perfil de participante', async () => {
+    await expect(pregunta('horas', { participaciones: [{ estadoParticipacion: EstadoParticipacion.ACTIVO }] })).resolves.toMatchObject({
+      profile: 'PARTICIPANTE_ACTIVO',
+    });
   });
 });

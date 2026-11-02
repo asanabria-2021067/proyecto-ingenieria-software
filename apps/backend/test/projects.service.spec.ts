@@ -474,8 +474,18 @@ describe('ProjectsService', () => {
   /** T-251/T-252: orden ponderado de "Proyectos Disponibles" por amigos y carrera. */
   describe('findAll — orden ponderado por amigos y carrera', () => {
     function proyecto(idProyecto: number) {
-      return { idProyecto, tituloProyecto: `Proyecto ${idProyecto}` };
+      return { idProyecto, tituloProyecto: `Proyecto ${idProyecto}`, roles: [{ cupos: 6, _count: { participaciones: 4 } }] };
     }
+
+    it('los participantes activos ocupan cupos: 6 cupos y 4 participantes dejan 2 disponibles', async () => {
+      const prisma = makePrisma();
+      prisma.proyecto.findMany.mockResolvedValue([proyecto(1)]);
+      const service = makeService(prisma);
+
+      const [resultado] = await service.findAll({});
+
+      expect(resultado.roles).toEqual([{ cupos: 6, cuposDisponibles: 2 }]);
+    });
 
     it('un proyecto con 2 amigos participantes sube sobre uno más reciente sin amigos', async () => {
       const prisma = makePrisma();

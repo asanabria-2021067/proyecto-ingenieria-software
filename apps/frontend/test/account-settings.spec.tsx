@@ -40,7 +40,8 @@ afterEach(() => {
 const FAMILIAS = [
   // HU-200: + MENCION_COMENTARIO.
   ['Tareas e hitos', 8],
-  ['Postulaciones y equipo', 7],
+  // ORG-1: + INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA.
+  ['Postulaciones y equipo', 10],
   ['Proyectos', 17],
   ['Horas y reconocimiento', 5],
   // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA.

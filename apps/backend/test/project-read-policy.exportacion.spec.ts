@@ -45,6 +45,7 @@ function makePrisma(options: PrismaDoubleOptions = {}) {
     },
     historialLiderazgo: { count: async () => 0 },
     apelacionLiderazgo: { count: async () => 0 },
+    usuarioOrganizacion: { count: async () => 0 },
   } as unknown as PrismaService;
 }
 

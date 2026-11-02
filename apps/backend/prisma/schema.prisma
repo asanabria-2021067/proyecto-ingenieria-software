@@ -58,6 +58,20 @@ enum RolOrganizacion {
   PROPIETARIO
   ADMINISTRADOR
   MIEMBRO
+  EDITOR
+  LECTURA
+}
+
+enum VisibilidadOrganizacion {
+  PUBLICA
+  PRIVADA
+}
+
+enum EstadoInvitacionOrganizacion {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
+  CANCELADA
 }
 
 enum CargoJunta {
@@ -297,6 +311,9 @@ enum TipoNotificacion {
   SOLICITUD_CONTACTO
   // ASO: el admin nombra, cambia o quita a un usuario de la junta de una asociación.
   JUNTA_ASOCIACION
+  INVITACION_ORGANIZACION
+  SOLICITUD_UNIRSE_ORGANIZACION
+  ORGANIZACION_ACTUALIZADA
 }
 
 enum EstadoAmistad {
@@ -358,6 +375,10 @@ model Usuario {
   organizacionesCreadas            Organizacion[]
   membresiasOrganizacion           UsuarioOrganizacion[]
   juntasAsociacion                 JuntaAsociacion[]
+  invitacionesOrganizacionRecibidas      InvitacionOrganizacion[]      @relation("InvitacionesOrganizacionRecibidas")
+  invitacionesOrganizacionEnviadas       InvitacionOrganizacion[]      @relation("InvitacionesOrganizacionEnviadas")
+  solicitudesUnirseOrganizacion          SolicitudUnirseOrganizacion[] @relation("SolicitudesUnirseOrganizacion")
+  solicitudesUnirseOrganizacionResueltas SolicitudUnirseOrganizacion[] @relation("SolicitudesUnirseOrganizacionResueltas")
   proyectosCreados                 Proyecto[]
   postulaciones                    Postulacion[]                @relation("Postulante")
   postulacionesResueltas           Postulacion[]                @relation("PostulacionResolutor")
@@ -635,13 +656,18 @@ model Organizacion {
   telefonoContacto        String?            @map("telefono_contacto") @db.VarChar(255)
   sitioWeb                String?            @map("sitio_web") @db.VarChar(255)
   logoUrl                 String?            @map("logo_url") @db.VarChar(255)
+  /// INACTIVA = archivada (solo lectura).
   estadoOrganizacion      EstadoOrganizacion @default(ACTIVA) @map("estado_organizacion")
+  visibilidad             VisibilidadOrganizacion @default(PRIVADA) @map("visibilidad")
   creadaPor               Int                @map("creada_por")
   fechaCreacion           DateTime           @default(now()) @map("fecha_creacion")
 
-  creador   Usuario                @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
-  miembros  UsuarioOrganizacion[]
-  proyectos ProyectoOrganizacion[]
+  creador        Usuario                       @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
+  miembros       UsuarioOrganizacion[]
+  proyectos      ProyectoOrganizacion[]
+  invitaciones   InvitacionOrganizacion[]
+  solicitudes    SolicitudUnirseOrganizacion[]
+  conversaciones Conversacion[]
 
   @@map("organizacion")
 }
@@ -659,6 +685,47 @@ model UsuarioOrganizacion {
 
   @@unique([idUsuario, idOrganizacion])
   @@map("usuario_organizacion")
+}
+
+/// Vence a los 14 dias (`venceEn`). Una sola pendiente por (organizacion, invitado): indice parcial en la migracion.
+model InvitacionOrganizacion {
+  idInvitacion    Int                          @id @default(autoincrement()) @map("id_invitacion")
+  idOrganizacion  Int                          @map("id_organizacion")
+  idInvitado      Int                          @map("id_invitado")
+  idInvitadoPor   Int                          @map("id_invitado_por")
+  rolOrganizacion RolOrganizacion              @map("rol_organizacion")
+  estado          EstadoInvitacionOrganizacion @default(PENDIENTE)
+  creadaEn        DateTime                     @default(now()) @map("creada_en")
+  venceEn         DateTime                     @map("vence_en")
+  resueltaEn      DateTime?                    @map("resuelta_en")
+
+  organizacion Organizacion @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Restrict)
+  invitado     Usuario      @relation("InvitacionesOrganizacionRecibidas", fields: [idInvitado], references: [idUsuario], onDelete: Restrict)
+  invitadoPor  Usuario      @relation("InvitacionesOrganizacionEnviadas", fields: [idInvitadoPor], references: [idUsuario], onDelete: Restrict)
+
+  @@index([idInvitado, estado])
+  @@index([idOrganizacion, estado])
+  @@map("invitacion_organizacion")
+}
+
+/// Vence a los 14 dias (`venceEn`). Una sola pendiente por (organizacion, solicitante): indice parcial en la migracion.
+model SolicitudUnirseOrganizacion {
+  idSolicitud    Int                          @id @default(autoincrement()) @map("id_solicitud")
+  idOrganizacion Int                          @map("id_organizacion")
+  idUsuario      Int                          @map("id_usuario")
+  estado         EstadoInvitacionOrganizacion @default(PENDIENTE)
+  creadaEn       DateTime                     @default(now()) @map("creada_en")
+  venceEn        DateTime                     @map("vence_en")
+  resueltaEn     DateTime?                    @map("resuelta_en")
+  resueltaPor    Int?                         @map("resuelta_por")
+
+  organizacion Organizacion @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Restrict)
+  usuario      Usuario      @relation("SolicitudesUnirseOrganizacion", fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  resolutor    Usuario?     @relation("SolicitudesUnirseOrganizacionResueltas", fields: [resueltaPor], references: [idUsuario], onDelete: SetNull)
+
+  @@index([idUsuario, estado])
+  @@index([idOrganizacion, estado])
+  @@map("solicitud_unirse_organizacion")
 }
 
 model Proyecto {
@@ -1814,12 +1881,14 @@ model MensajeRevisionProyecto {
 /// por par de usuarios dentro del proyecto) se garantiza en ChatService
 /// buscando antes de crear, no con una constraint de base de datos.
 model Conversacion {
-  idConversacion      Int              @id @default(autoincrement()) @map("id_conversacion")
-  idProyecto          Int              @map("id_proyecto")
-  tipo                TipoConversacion
-  nombre              String?          @db.VarChar(255)
-  creadaPor           Int              @map("creada_por")
-  creadaEn            DateTime         @default(now()) @map("creada_en")
+  idConversacion Int              @id @default(autoincrement()) @map("id_conversacion")
+  // Exactamente uno de idProyecto / idOrganizacion (CHECK en la migracion).
+  idProyecto     Int?             @map("id_proyecto")
+  idOrganizacion Int?             @map("id_organizacion")
+  tipo           TipoConversacion
+  nombre         String?          @db.VarChar(255)
+  creadaPor      Int              @map("creada_por")
+  creadaEn       DateTime         @default(now()) @map("creada_en")
   // T-xxx: menú de 3 puntos del chat — renombrar/archivar/favorito. Aditivas,
   // nullable/default para no tocar filas existentes.
   nombrePersonalizado String?          @map("nombre_personalizado") @db.VarChar(120)
@@ -1838,15 +1907,17 @@ model Conversacion {
   esCanal             Boolean          @default(false) @map("es_canal")
   nombreCanal         String?          @map("nombre_canal") @db.VarChar(40)
 
-  proyecto            Proyecto                   @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
-  creador             Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
-  participantes       ConversacionParticipante[]
-  mensajes            MensajeChat[]
-  adjuntos            AdjuntoMensajeChat[]
-  apodos              ApodoConversacion[]
+  proyecto      Proyecto?                  @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  organizacion  Organizacion?              @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Restrict)
+  creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
+  participantes ConversacionParticipante[]
+  mensajes      MensajeChat[]
+  adjuntos      AdjuntoMensajeChat[]
+  apodos        ApodoConversacion[]
   mensajesProgramados MensajeProgramado[]
 
   @@unique([idProyecto, nombreCanal])
+  @@unique([idOrganizacion, nombreCanal])
   @@index([idProyecto])
   @@map("conversacion")
 }

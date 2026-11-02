@@ -67,7 +67,7 @@ export class MensajesProgramadosService {
     ahora: Date = new Date(),
   ) {
     const conversacion = await this.getConversacionDelParticipante(idProyecto, idConversacion, userId);
-    if (conversacion.proyecto.estadoProyecto === EstadoProyecto.CERRADO) {
+    if (conversacion.proyecto?.estadoProyecto === EstadoProyecto.CERRADO) {
       throw new ForbiddenException(
         'Esta conversación está archivada: el proyecto ya cerró y no se pueden programar mensajes.',
       );
@@ -150,6 +150,7 @@ export class MensajesProgramadosService {
     });
 
     for (const m of vencidos) {
+      if (m.conversacion.idProyecto === null) continue;
       try {
         const { count } = await this.prisma.mensajeProgramado.updateMany({
           where: { idMensajeProgramado: m.idMensajeProgramado, estado: EstadoMensajeProgramado.PENDIENTE },

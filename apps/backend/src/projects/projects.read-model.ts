@@ -136,6 +136,21 @@ export function calcularAvanceProyecto(
   };
 }
 
+/**
+ * Los participantes activos ocupan cupos (incluidos los miembros de una
+ * organización que entran directo): el listado expone `cuposDisponibles`
+ * además del total `cupos` de cada rol.
+ */
+export function conCuposDisponibles<P extends { roles: { cupos: number; _count: { participaciones: number } }[] }>(proyecto: P) {
+  return {
+    ...proyecto,
+    roles: proyecto.roles.map(({ cupos, _count }) => ({
+      cupos,
+      cuposDisponibles: Math.max(0, cupos - _count.participaciones),
+    })),
+  };
+}
+
 export const proyectoListSelect = {
   idProyecto: true,
   tituloProyecto: true,
@@ -147,17 +162,25 @@ export const proyectoListSelect = {
   creador: {
     select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
   },
+  // «Publicado por»: la organización dueña (la PRINCIPAL va primero).
   organizaciones: {
     select: {
-      organizacion: { select: { nombreOrganizacion: true } },
+      rolOrganizacion: true,
+      organizacion: { select: { idOrganizacion: true, nombreOrganizacion: true, logoUrl: true } },
     },
+    orderBy: { rolOrganizacion: 'asc' as const },
   },
   intereses: {
     select: { interes: { select: { nombreInteres: true } } },
   },
-  // Solo `cupos` por rol: lo mínimo para que el listado calcule roles con
-  // disponibilidad real (cupos > 0) sin exponer requisitos/postulaciones.
-  roles: { select: { cupos: true } },
+  // `cupos` y los participantes activos por rol: lo mínimo para calcular la
+  // disponibilidad real (`conCuposDisponibles`) sin exponer requisitos/postulaciones.
+  roles: {
+    select: {
+      cupos: true,
+      _count: { select: { participaciones: { where: { estadoParticipacion: 'ACTIVO' as const } } } },
+    },
+  },
   _count: { select: { roles: true } },
 } as const;
 

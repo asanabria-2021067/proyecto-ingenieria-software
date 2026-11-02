@@ -80,6 +80,21 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   ROL_ABANDONADO: { grupo: 'postulaciones', etiqueta: 'Rol abandonado', descripcion: 'Un integrante deja su rol en tu proyecto.' },
   ROL_ASIGNADO_LIDER: { grupo: 'postulaciones', etiqueta: 'Rol asignado por el líder', descripcion: 'El líder te asigna un rol.' },
   ROL_ACTUALIZADO: { grupo: 'postulaciones', etiqueta: 'Rol actualizado', descripcion: 'Cambia un rol del proyecto.' },
+  INVITACION_ORGANIZACION: {
+    grupo: 'postulaciones',
+    etiqueta: 'Invitación a una organización',
+    descripcion: 'Te invitan a unirte a una organización.',
+  },
+  SOLICITUD_UNIRSE_ORGANIZACION: {
+    grupo: 'postulaciones',
+    etiqueta: 'Solicitud para unirse a una organización',
+    descripcion: 'Alguien pide unirse a una organización que administras.',
+  },
+  ORGANIZACION_ACTUALIZADA: {
+    grupo: 'postulaciones',
+    etiqueta: 'Organización actualizada',
+    descripcion: 'Cambia tu pertenencia o rol en una organización, o responden a tu invitación.',
+  },
 
   PROYECTO_PUBLICADO: { grupo: 'proyectos', etiqueta: 'Proyecto publicado', descripcion: 'Se publica un proyecto.' },
   PROYECTO_EN_REVISION: { grupo: 'proyectos', etiqueta: 'Proyecto en revisión', descripcion: 'Un proyecto entra a revisión de publicación.' },

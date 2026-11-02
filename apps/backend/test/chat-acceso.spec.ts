@@ -79,3 +79,31 @@ describe('puedeEntrarAConversacion', () => {
     await expect(puedeEntrarAConversacion(prisma, 3, 5)).resolves.toBe(false);
   });
 });
+
+describe('puedeEntrarAConversacion — chat de organización', () => {
+  const deOrganizacion = { esCanal: true, idProyecto: null, idOrganizacion: 7, proyecto: null };
+
+  function setupOrg(miembro: unknown) {
+    const orgFindFirst = vi.fn().mockResolvedValue(miembro);
+    const prisma = {
+      conversacion: { findFirst: vi.fn().mockResolvedValue(deOrganizacion) },
+      usuarioOrganizacion: { findFirst: orgFindFirst },
+    } as unknown as PrismaService;
+    return { prisma, orgFindFirst };
+  }
+
+  it('un miembro activo de la organización entra, cualquiera sea su rol', async () => {
+    const { prisma, orgFindFirst } = setupOrg({ idUsuarioOrganizacion: 1 });
+
+    await expect(puedeEntrarAConversacion(prisma, 3, 5)).resolves.toBe(true);
+    expect(orgFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { idUsuario: 5, idOrganizacion: 7, estadoMembresia: 'ACTIVA' } }),
+    );
+  });
+
+  it('quien salió o fue quitado de la organización ya no entra aunque conserve su fila de participante', async () => {
+    const { prisma } = setupOrg(null);
+
+    await expect(puedeEntrarAConversacion(prisma, 3, 5)).resolves.toBe(false);
+  });
+});

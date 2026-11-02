@@ -9,6 +9,7 @@ function makeContext() {
     getProjectOrThrow: vi.fn(),
     assertProjectLeader: vi.fn(),
     assertActiveProjectParticipant: vi.fn(),
+    esMiembroDeOrganizacionDelProyecto: vi.fn().mockResolvedValue(false),
     getCurrentSprint: vi.fn(),
     getSprintInProjectOrThrow: vi.fn(),
     getSprintWithProjectOrThrow: vi.fn(),
@@ -27,6 +28,22 @@ const NOT_FOUND_SPRINT = () =>
 const FORBIDDEN_LEADER = () => new ForbiddenException('No eres el líder de este proyecto');
 
 describe('SprintsAuthorizationService', () => {
+  describe('lectura para miembros de la organización dueña (ORG-8)', () => {
+    it('listar Sprints y ver su analítica admite al miembro que no participa, pero no gestionarlos', async () => {
+      const ctx = makeContext();
+      ctx.assertActiveProjectParticipant.mockRejectedValue(new ForbiddenException('No tienes una participación activa en este proyecto'));
+      ctx.esMiembroDeOrganizacionDelProyecto.mockResolvedValue(true);
+      ctx.getSprintInProjectOrThrow.mockResolvedValue(SPRINT);
+      ctx.assertProjectLeader.mockRejectedValue(FORBIDDEN_LEADER());
+      const service = new SprintsAuthorizationService(ctx as unknown as SprintsContextService);
+
+      await expect(service.assertCanListSprintHistory(1, EXTERNO_ID)).resolves.toBeUndefined();
+      await expect(service.assertCanListSprintAnalytics(1, EXTERNO_ID)).resolves.toBeUndefined();
+      await expect(service.assertCanViewSprintAnalytics(1, 10, EXTERNO_ID)).resolves.toBe(SPRINT);
+      await expect(service.assertCanStartSprint(1, EXTERNO_ID)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
   describe('assertCanStartSprint', () => {
     it('permite al líder del proyecto', async () => {
       const ctx = makeContext();

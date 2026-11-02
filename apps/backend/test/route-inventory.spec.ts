@@ -34,6 +34,41 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     expect(opt.map((r) => r.id)).toEqual([]);
   });
 
+  // ORG: cada ruta nueva se declara aqui con su guard; una ruta de mas o de menos hace fallar la prueba.
+  it('las rutas de organizaciones existen todas y exigen JwtAuthGuard (permisos por rol en el servicio)', () => {
+    const esperadas = [
+      'POST /api/organizaciones',
+      'GET /api/organizaciones/buscar',
+      'GET /api/organizaciones/mias',
+      'GET /api/organizaciones/invitaciones/mias',
+      'POST /api/organizaciones/invitaciones/:idInvitacion/aceptar',
+      'POST /api/organizaciones/invitaciones/:idInvitacion/rechazar',
+      'GET /api/organizaciones/:id',
+      'PATCH /api/organizaciones/:id',
+      'POST /api/organizaciones/:id/archivar',
+      'POST /api/organizaciones/:id/transferir',
+      'POST /api/organizaciones/:id/salir',
+      'GET /api/organizaciones/:id/bitacora',
+      'PATCH /api/organizaciones/:id/miembros/:idUsuario',
+      'DELETE /api/organizaciones/:id/miembros/:idUsuario',
+      'GET /api/organizaciones/:id/candidatos',
+      'GET /api/organizaciones/:id/invitaciones',
+      'POST /api/organizaciones/:id/invitaciones',
+      'DELETE /api/organizaciones/:id/invitaciones/:idInvitacion',
+      'GET /api/organizaciones/:id/solicitudes',
+      'POST /api/organizaciones/:id/solicitudes',
+      'POST /api/organizaciones/:id/solicitudes/:idSolicitud/aceptar',
+      'POST /api/organizaciones/:id/solicitudes/:idSolicitud/rechazar',
+      'GET /api/organizaciones/:id/chat',
+      'GET /api/organizaciones/:id/chat/mensajes',
+      'POST /api/organizaciones/:id/chat/mensajes',
+    ];
+    const deOrganizaciones = rutas.filter((r) => r.controller.startsWith('OrganizationsController.'));
+    expect(deOrganizaciones.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(deOrganizaciones.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+    expect(deOrganizaciones.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+  });
+
   it('toda ruta de administracion exige RolesGuard y @Roles("administrador")', () => {
     const admin = rutas.filter((r) => r.adminPath);
     expect(admin.length).toBeGreaterThan(20);

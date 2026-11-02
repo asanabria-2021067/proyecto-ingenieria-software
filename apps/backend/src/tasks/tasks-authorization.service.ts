@@ -110,13 +110,25 @@ export class TasksAuthorizationService {
     throw new ForbiddenException('No tienes permiso para realizar esta acción sobre la tarea');
   }
 
-  /** Listar tareas: líder o participante activo, sin cambiar esa semántica. */
+  /** Listar tareas: líder o participante activo, o miembro de la organización dueña (solo lectura). */
   async assertCanListProjectTasks(
     projectId: number,
     userId: number,
     tx?: TxClient,
   ): Promise<void> {
-    await this.tasksContext.assertActiveProjectParticipant(projectId, userId, tx);
+    await this.assertCanReadProject(projectId, userId, tx);
+  }
+
+  /** Lectura del proyecto: participante activo (el líder cuenta) o miembro de la organización dueña. */
+  private async assertCanReadProject(projectId: number, userId: number, tx?: TxClient): Promise<void> {
+    try {
+      await this.tasksContext.assertActiveProjectParticipant(projectId, userId, tx);
+    } catch (error) {
+      if (error instanceof ForbiddenException && (await this.tasksContext.esMiembroDeOrganizacionDelProyecto(projectId, userId, tx))) {
+        return;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -127,7 +139,7 @@ export class TasksAuthorizationService {
    */
   async assertCanReadTask(projectId: number, taskId: number, userId: number, tx?: TxClient) {
     const tarea = await this.tasksContext.getTaskInProjectOrThrow(projectId, taskId, tx);
-    await this.tasksContext.assertActiveProjectParticipant(projectId, userId, tx);
+    await this.assertCanReadProject(projectId, userId, tx);
     return tarea;
   }
 

@@ -335,6 +335,28 @@ export interface NotificationTemplateData {
     cargo: string;
     nivelPermiso: string | null;
   };
+
+  INVITACION_ORGANIZACION: {
+    organizationName: string;
+    organizationId: number;
+    invitationId: number;
+    invitedBy: string;
+    roleName: string;
+  };
+
+  SOLICITUD_UNIRSE_ORGANIZACION: {
+    organizationName: string;
+    organizationId: number;
+    requestId: number;
+    userName: string;
+  };
+
+  // Cambios que le importan a un miembro o solicitante: resolución de invitación o solicitud, rol, salida, propiedad y archivado.
+  ORGANIZACION_ACTUALIZADA: {
+    organizationName: string;
+    organizationId: number;
+    detail: string;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -623,6 +645,23 @@ export const NOTIFICATION_TEMPLATES = {
       const verbo = data.accion === 'ASIGNADA' ? 'te nombró' : 'actualizó tu cargo como';
       return `Administración ${verbo} ${data.cargo} de ${data.nombreAsociacion} con permiso ${data.nivelPermiso}.`;
     },
+  },
+
+  INVITACION_ORGANIZACION: {
+    title: 'Te invitaron a una organización',
+    message: (data: NotificationTemplateData['INVITACION_ORGANIZACION']) =>
+      `${data.invitedBy} te invitó a "${data.organizationName}" como ${data.roleName}. La invitación vence en 14 días.`,
+  },
+
+  SOLICITUD_UNIRSE_ORGANIZACION: {
+    title: 'Nueva solicitud para unirse',
+    message: (data: NotificationTemplateData['SOLICITUD_UNIRSE_ORGANIZACION']) =>
+      `${data.userName} quiere unirse a "${data.organizationName}".`,
+  },
+
+  ORGANIZACION_ACTUALIZADA: {
+    title: (data: NotificationTemplateData['ORGANIZACION_ACTUALIZADA']) => data.organizationName,
+    message: (data: NotificationTemplateData['ORGANIZACION_ACTUALIZADA']) => data.detail,
   },
 } as const;
 
