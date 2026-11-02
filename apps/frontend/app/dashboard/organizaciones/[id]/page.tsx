@@ -9,7 +9,7 @@ import { dashboardPage } from '@/components/layout/dashboard-page';
 import { AnunciosEntidad } from '@/components/anuncios/anuncios-entidad';
 import { OrgCalendario } from '@/components/organizations/org-calendario';
 import { InvitarDialog } from '@/components/organizations/invitar-dialog';
-import { SeguirOrganizacion, SeguirOrganizacionItem } from '@/components/organizations/boton-seguir';
+import { SeguirOrganizacion, SeguirOrganizacionItem, useSeguirOrganizacion } from '@/components/organizations/boton-seguir';
 import { OrgAvatar } from '@/components/organizations/org-avatar';
 import { OrgChat } from '@/components/organizations/org-chat';
 import { OrgMiembros } from '@/components/organizations/org-miembros';
@@ -45,6 +45,7 @@ export default function OrganizacionPage() {
   const salir = useSalirDeOrganizacion(id);
   const archivar = useArchivarOrganizacion(id);
   const solicitar = useSolicitarUnirse();
+  const seguir = useSeguirOrganizacion(id, org?.nombreOrganizacion ?? '');
   const [invitando, setInvitando] = useState(false);
   const [transfiriendo, setTransfiriendo] = useState(false);
 
@@ -90,7 +91,6 @@ export default function OrganizacionPage() {
   const invitaVisible = puedeEditar && !puedeNuevoProyecto;
   const puedeTransferir = esPropietario && !org.archivada && !!org.miembros;
   const hayTransferencia = puedeTransferir && org.miembros!.some((m) => m.idUsuario !== idUsuario);
-  const hayMas = puedeEditar;
 
   const salirDeLaOrg = async () => {
     const ok = await confirmar({
@@ -201,7 +201,7 @@ export default function OrganizacionPage() {
               Invitar
             </Button>
           )}
-          {hayMas ? (
+          {puedeEditar ? (
             // modal={false}: los diálogos se abren al cerrarse el menú y no deben competir por el puntero del body.
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
@@ -211,15 +211,13 @@ export default function OrganizacionPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-52">
-                <SeguirOrganizacionItem id={org.idOrganizacion} nombre={org.nombreOrganizacion} />
-                {puedeEditar && (
-                  <DropdownMenuItem asChild>
-                    <Link href={`/dashboard/organizaciones/${org.idOrganizacion}/editar`}>
-                      <Pencil className="size-4" aria-hidden="true" />
-                      Editar
-                    </Link>
-                  </DropdownMenuItem>
-                )}
+                <SeguirOrganizacionItem nombre={org.nombreOrganizacion} siguiendo={seguir.siguiendo} pendiente={seguir.pendiente} alternar={seguir.alternar} />
+                <DropdownMenuItem asChild>
+                  <Link href={`/dashboard/organizaciones/${org.idOrganizacion}/editar`}>
+                    <Pencil className="size-4" aria-hidden="true" />
+                    Editar
+                  </Link>
+                </DropdownMenuItem>
                 {invitaEnMenu && (
                   <DropdownMenuItem onSelect={() => setInvitando(true)}>
                     <UserPlus className="size-4" aria-hidden="true" />
@@ -232,7 +230,7 @@ export default function OrganizacionPage() {
                     Transferir propiedad
                   </DropdownMenuItem>
                 )}
-                {esPropietario && !org.archivada && (
+                {esPropietario && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem variant="destructive" disabled={archivar.isPending} onSelect={() => void archivarOrg()}>

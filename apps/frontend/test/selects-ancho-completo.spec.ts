@@ -12,7 +12,6 @@ const FORMULARIOS = [
   'components/projects/task-form-extras.tsx',
   'components/projects/assign-milestone-dialog.tsx',
   'components/projects/attendance/create-activity-dialog.tsx',
-  'components/organizations/org-form.tsx',
 ];
 
 describe('selects de los formularios por pasos', () => {

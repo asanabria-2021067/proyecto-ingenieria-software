@@ -19,6 +19,7 @@ vi.mock('@/hooks/use-current-user', () => ({
 vi.mock('@/components/organizations/boton-seguir', () => ({
   SeguirOrganizacion: () => null,
   SeguirOrganizacionItem: () => null,
+  useSeguirOrganizacion: () => ({ siguiendo: false, pendiente: false, alternar: () => {} }),
 }));
 vi.mock('@/lib/mensajes', () => ({
   aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() },

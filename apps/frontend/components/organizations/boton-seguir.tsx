@@ -31,10 +31,24 @@ export function SeguirOrganizacion({ id, nombre }: { id: number; nombre: string 
   return <BotonSeguir tipo="organizacion" id={id} nombre={nombre} siguiendo={useSiguiendoOrg(id)} />;
 }
 
-/** Misma acción que `SeguirOrganizacion`, como ítem de un menú desplegable. */
-export function SeguirOrganizacionItem({ id, nombre }: { id: number; nombre: string }) {
+/** Estado y acción de seguir. Va en la página (siempre montada): en un menú, el ítem se desmonta al elegirlo y los avisos se perderían. */
+export function useSeguirOrganizacion(id: number, nombre: string) {
   const siguiendo = useSiguiendoOrg(id);
-  const { alternar, pendiente } = useAlternarSeguir('organizacion', id, nombre, siguiendo);
+  return { siguiendo, ...useAlternarSeguir('organizacion', id, nombre, siguiendo) };
+}
+
+/** Misma acción que `SeguirOrganizacion`, como ítem de un menú desplegable. */
+export function SeguirOrganizacionItem({
+  nombre,
+  siguiendo,
+  pendiente,
+  alternar,
+}: {
+  nombre: string;
+  siguiendo: boolean;
+  pendiente: boolean;
+  alternar: () => void;
+}) {
   const Icono = siguiendo ? BellOff : Bell;
   return (
     <DropdownMenuItem disabled={pendiente} aria-label={`${siguiendo ? 'Dejar de seguir' : 'Seguir'} ${nombre}`} onSelect={alternar}>
