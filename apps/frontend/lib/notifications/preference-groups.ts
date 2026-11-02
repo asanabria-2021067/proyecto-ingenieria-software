@@ -159,6 +159,8 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   REUNION_PROGRAMADA: { grupo: 'recordatorios', etiqueta: 'Reunión programada', descripcion: 'Administración convoca a tu equipo a una reunión.' },
   REUNION_ACTUALIZADA: { grupo: 'recordatorios', etiqueta: 'Reunión actualizada', descripcion: 'Cambia la fecha, el lugar o el enlace de una reunión de tu equipo.' },
   RECORDATORIO_MENSAJE: { grupo: 'recordatorios', etiqueta: 'Recordatorio de un mensaje', descripcion: 'Un mensaje que pediste que te recordáramos.' },
+  HORAS_EN_RIESGO: { grupo: 'horas', etiqueta: 'Horas en riesgo', descripcion: 'Tu avance de horas del semestre va por debajo de lo esperado (máximo un aviso por semana).' },
+  RECORDATORIO_HORAS: { grupo: 'recordatorios', etiqueta: 'Recordatorio de registrar horas', descripcion: 'Tienes tareas en progreso sin horas registradas en 3 días.' },
   REUNION_CANCELADA: { grupo: 'recordatorios', etiqueta: 'Reunión cancelada', descripcion: 'Administración cancela una reunión de tu equipo.' },
 
   SOLICITUD_AMISTAD: { grupo: 'contactos', etiqueta: 'Solicitud de amistad', descripcion: 'Recibes una solicitud de amistad.' },

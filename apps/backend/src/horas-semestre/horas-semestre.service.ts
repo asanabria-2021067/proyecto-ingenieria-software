@@ -56,7 +56,7 @@ const LOTE_EN_RIESGO = 200;
 const LOTE_REPORTE = 100;
 
 /** Instante UTC del inicio de un dia de Guatemala (UTC-6, sin horario de verano). */
-const inicioDeDia = (dia: string) => new Date(`${dia}T06:00:00Z`);
+export const inicioDeDia = (dia: string) => new Date(`${dia}T06:00:00Z`);
 
 const ventana = (s: Semestre) => ({ gte: inicioDeDia(s.inicio), lt: inicioDeDia(addDaysToDay(s.fin, 1)) });
 

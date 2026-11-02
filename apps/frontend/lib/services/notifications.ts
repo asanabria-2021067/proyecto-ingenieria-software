@@ -212,6 +212,11 @@ export function getNotificationLink(n: {
       const id = idUsuarioSeguro(datos.projectId);
       return id === null ? null : `/dashboard/proyectos/${id}`;
     }
+    // MEJ-13/60: avisos de horas; ambos llevan a la vista donde se resuelven.
+    case 'HORAS_EN_RIESGO':
+      return '/dashboard/mis-horas';
+    case 'RECORDATORIO_HORAS':
+      return '/dashboard/mis-tareas';
     case 'SOLICITUD_RECUPERACION_CONTRASENA':
       return '/dashboard/admin/solicitudes-recuperacion';
     // G05 (OWASP25-C038): alerta de ráfaga de accesos fallidos/bloqueos; el
