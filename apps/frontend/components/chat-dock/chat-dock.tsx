@@ -22,6 +22,19 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
 
 export const useChatSocket = () => useContext(ChatSocketContext);
 
+/** Punto de estado del chat en la barra superior, junto al de las notificaciones. */
+export function ChatConexion() {
+  const { isConnected } = useChatSocket();
+  return (
+    <span
+      role="status"
+      title={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo…'}
+      aria-label={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo'}
+      className={`size-2 shrink-0 rounded-full ${isConnected ? 'bg-status-success' : 'animate-pulse bg-status-warning'}`}
+    />
+  );
+}
+
 /**
  * Dock global de chat (estilo LinkedIn): ventanas de conversación fijas abajo a
  * la derecha en cualquier página del dashboard. El punto de entrada principal es
@@ -31,7 +44,7 @@ export const useChatSocket = () => useContext(ChatSocketContext);
  */
 export function ChatDock() {
   const { windows, minimizedIds, cerrarChat, toggleMinimize } = useChatDock();
-  const { isConnected: chatConnected, typingByConversation, emitTyping } = useChatSocket();
+  const { typingByConversation, emitTyping } = useChatSocket();
   const enPaginaMensajes = usePathname()?.startsWith(RUTA_MENSAJES);
   if (enPaginaMensajes) return null;
 
@@ -53,7 +66,7 @@ export function ChatDock() {
         ))}
       </div>
 
-      <ChatListLauncher variante="flotante" conectado={chatConnected} />
+      <ChatListLauncher variante="flotante" />
     </div>
   );
 }

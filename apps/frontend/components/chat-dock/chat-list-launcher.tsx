@@ -14,7 +14,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
  * lleva a la página /dashboard/mensajes; `flotante` (móvil, abajo a la derecha)
  * abre el panel rápido con la lista de chats.
  */
-export function ChatListLauncher({ variante, conectado = true }: { variante: 'barra' | 'flotante'; conectado?: boolean }) {
+export function ChatListLauncher({ variante }: { variante: 'barra' | 'flotante' }) {
   const [listOpen, setListOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const { data: user } = useCurrentUser();
@@ -84,12 +84,6 @@ export function ChatListLauncher({ variante, conectado = true }: { variante: 'ba
               No molestar
             </span>
           )}
-          <span
-            role="status"
-            title={conectado ? 'Chat en vivo conectado' : 'Reconectando chat en vivo…'}
-            aria-label={conectado ? 'Chat en vivo conectado' : 'Reconectando chat en vivo'}
-            className={`size-2 shrink-0 rounded-full ${conectado ? 'bg-status-success' : 'animate-pulse bg-status-warning'}`}
-          />
         </button>
       )}
       <SavedMessagesDialog open={savedOpen} onOpenChange={setSavedOpen} currentUserId={user?.idUsuario ?? null} />

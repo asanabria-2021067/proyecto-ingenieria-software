@@ -56,7 +56,9 @@ export function PageTransition({ children }: { children: ReactNode }) {
   }, [reducir]);
 
   return (
-    <div ref={raiz} className="h-full">
+    // min-h-full, no h-full: con altura fija el contenido desborda a la raíz y el pb del contenedor con scroll
+    // (barra inferior y botón de Mensajes en móvil) deja de sumarse al final de la página.
+    <div ref={raiz} className="min-h-full">
       {children}
     </div>
   );
