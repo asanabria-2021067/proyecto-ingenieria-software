@@ -666,7 +666,6 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           <TaskTemplatesDialog idProyecto={idProyecto} open={plantillasAbierto} onOpenChange={setPlantillasAbierto} />
         )}
         <TaskFormDialog
-          idProyecto={idProyecto}
           open={crearAbierto}
           mode="create"
           task={null}

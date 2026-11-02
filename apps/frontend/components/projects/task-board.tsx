@@ -770,7 +770,6 @@ export function TaskBoard({
 
         {/* CREAR / EDITAR: única instancia reutilizada en ambos modos */}
         <TaskFormDialog
-          idProyecto={idProyecto}
           open={crearAbierto || tareaEditar !== null}
           mode={tareaEditar !== null ? 'edit' : 'create'}
           task={tareaEditar}

@@ -60,15 +60,13 @@ interface HitoOpcion {
 }
 
 export interface TaskFormDialogProps {
-  /**
-   * Habilita plantilla, «Bloqueada por» y «Repetir» (MEJ-48/47/52). Sin él el
-   * formulario queda como antes.
-   */
-  idProyecto?: number;
   open: boolean;
   mode: 'create' | 'edit';
   task: TareaPublicaDTO | null;
-  /** Proyecto donde se crea la tarea: con él, el borrador de «Nueva tarea» es por proyecto. */
+  /**
+   * Proyecto de la tarea: el borrador de «Nueva tarea» es por proyecto y habilita plantilla,
+   * «Bloqueada por» y «Repetir» (MEJ-48/47/52). Sin él el formulario queda como antes.
+   */
   idProyecto?: number;
   roles: RolOpcion[];
   milestones: HitoOpcion[];
@@ -131,7 +129,6 @@ export function TaskFormDialog(props: TaskFormDialogProps) {
 }
 
 function TaskFormDialogContent({
-  idProyecto,
   mode,
   task,
   idProyecto,
