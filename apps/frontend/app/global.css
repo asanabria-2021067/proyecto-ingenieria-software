@@ -872,7 +872,7 @@ html {
 .motion-glow-primary { --motion-glow: color-mix(in srgb, var(--color-primary) 32%, transparent); }
 .motion-glow-sage    { --motion-glow: color-mix(in srgb, var(--color-consult) 45%, transparent); }
 .motion-glow-danger  { --motion-glow: color-mix(in srgb, var(--color-error) 28%, transparent); }
-.motion-glow-warning { --motion-glow: color-mix(in srgb, #f97316 32%, transparent); }
+.motion-glow-warning { --motion-glow: color-mix(in srgb, var(--color-status-warning) 45%, transparent); }
 
 /* B · Control: outline, filtros, paginadores y acciones compactas.
    Solo color, borde y sombra; presión sin desplazamiento. */

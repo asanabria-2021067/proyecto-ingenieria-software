@@ -6,6 +6,9 @@ import { animate, useReducedMotion } from 'framer-motion';
 /** Tarjetas estándar (`.card-base`, `Card`); las arrastrables (dnd-kit) se saltan. */
 const TARJETAS = '.card-base, [data-slot="card"]';
 
+// Carga dura (HTML del servidor ya pintado): animar desde 0 causaría el destello.
+let hidratada = false;
+
 const SALIDA = { duration: 0.18, ease: 'easeOut' } as const;
 
 /**
@@ -23,6 +26,10 @@ export function PageTransition({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     const nodo = raiz.current;
     if (!nodo || reducir) return;
+    if (!hidratada) {
+      hidratada = true;
+      return;
+    }
 
     animate(nodo, { opacity: [0, 1] }, SALIDA);
 

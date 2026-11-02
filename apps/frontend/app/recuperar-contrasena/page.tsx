@@ -123,7 +123,7 @@ export default function RecuperarContrasenaPage() {
                 <button
                   type="submit"
                   disabled={enviando}
-                  className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-on-primary-container shadow-lg shadow-primary/20 transition-all hover:bg-primary active:scale-[0.98] disabled:opacity-60"
+                  className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-on-primary-container shadow-lg shadow-primary/20 transition-all hover:bg-primary hover:text-on-primary active:scale-[0.98] disabled:opacity-60"
                 >
                   {enviando ? 'Enviando...' : 'Enviar solicitud de recuperación'}
                 </button>

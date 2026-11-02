@@ -1,9 +1,10 @@
 import '@testing-library/jest-dom/vitest';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PageTitle } from '@/components/ui/page-title';
+import { tsx } from './helpers/listar-tsx';
 
 afterEach(cleanup);
 
@@ -18,12 +19,6 @@ const PERMITIDOS: Record<string, string> = {
   'components/login/page.tsx': 'Placeholder heredado sin ruta.',
   'app/e2e/error-simulado/provocar-error.tsx': 'Página de prueba E2E de errores.',
 };
-
-function tsx(dir: string): string[] {
-  return readdirSync(dir, { recursive: true })
-    .map((r) => join(dir, String(r)))
-    .filter((r) => r.endsWith('.tsx') && !/node_modules|\.next/.test(r));
-}
 
 describe('UI-2 · PageTitle', () => {
   it('renderiza un h1 con la clase de título de página', () => {

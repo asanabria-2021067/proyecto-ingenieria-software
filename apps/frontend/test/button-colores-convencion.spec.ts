@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { tsx } from './helpers/listar-tsx';
 
 /**
  * UI-1: ningún `<Button>` ni `<button>` lleva colores sueltos. El color sale de
@@ -26,12 +27,6 @@ const SUELTO = new RegExp(
   `(?:^|[\\s"'\`:])(?:[a-z-]+:)*(?:${UTILIDADES})-(?:${PALETA}(?:-\\d+)?(?:/\\d+)?|\\[(?:#|rgb|hsl|oklch|color))`,
   'g',
 );
-
-function tsx(dir: string): string[] {
-  return readdirSync(dir, { recursive: true })
-    .map((r) => join(dir, String(r)))
-    .filter((r) => r.endsWith('.tsx') && !/node_modules|\.next/.test(r));
-}
 
 /** Etiquetas de apertura `<Button ...>` / `<button ...>` (respeta `>` dentro de `{}`). */
 function etiquetasBoton(fuente: string): { texto: string; linea: number }[] {
