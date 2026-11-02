@@ -19,7 +19,9 @@ export interface Contraste {
  * texto con su alfa y la opacidad acumulada de sus ancestros, sobre el fondo
  * realmente compuesto. Es lo que ve la persona, no el valor del token.
  */
-export function medirContraste(page: Page, selector: string): Promise<Contraste[]> {
+export async function medirContraste(page: Page, selector: string): Promise<Contraste[]> {
+  // Los títulos de página entran con opacidad animada (UI-2): medir a mitad de la entrada da un contraste falso.
+  await esperarAnimaciones(page);
   return page.evaluate((sel) => {
     const lienzo = document.createElement('canvas').getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D;
     type Color = { r: number; g: number; b: number; a: number };

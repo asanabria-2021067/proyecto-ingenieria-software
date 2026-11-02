@@ -42,7 +42,7 @@ test('el apodo es privado: solo lo ve quien lo define', async ({ browser }) => {
     await dialogo.getByRole('button', { name: 'Guardar' }).click();
 
     // A ve el apodo (el nombre real queda accesible en title).
-    await expect(pageA.getByRole('button', { name: apodo })).toBeVisible();
+    await expect(pageA.getByRole('button', { name: apodo }).first()).toBeVisible();
 
     // B nunca ve el apodo que A puso.
     await abrirChatIndividualCon(pageB, 'Carlos');
