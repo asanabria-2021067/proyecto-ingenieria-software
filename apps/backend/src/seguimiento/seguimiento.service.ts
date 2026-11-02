@@ -130,7 +130,8 @@ export class SeguimientoService {
         where: { idProyecto: projectId, eliminadoEn: null },
         select: { estadoProyecto: true, idAsociacion: true, organizaciones: { select: { idOrganizacion: true } } },
       });
-      if (!p) throw e;
+      // el portafolio solo lista proyectos CERRADO: no se revela la existencia de otros
+      if (!p || p.estadoProyecto !== EstadoProyecto.CERRADO) throw e;
       const junta = p.idAsociacion ? await membresiaJunta(this.prisma, p.idAsociacion, actorId) : null;
       if (junta && !junta.asociacion.archivada) return { profile: 'EXTERNO', project: p };
       for (const { idOrganizacion } of p.organizaciones) {

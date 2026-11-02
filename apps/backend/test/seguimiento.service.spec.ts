@@ -155,14 +155,14 @@ describe('SeguimientoService.resultados (MEJ-56)', () => {
   );
 
   describe('lectores del portafolio que la política de lectura niega', () => {
-    function conPolitica403(junta: object | null, org: object | null = null) {
+    function conPolitica403(junta: object | null, org: object | null = null, estado = 'CERRADO') {
       const { prisma, readPolicy, service } = build('EXTERNO', 'CERRADO');
       datosResultados(prisma);
       readPolicy.assertRead.mockRejectedValue(new ForbiddenException('No tienes acceso'));
       Object.assign(prisma, {
         proyecto: {
           ...(prisma as unknown as { proyecto: object }).proyecto,
-          findFirst: vi.fn().mockResolvedValue({ estadoProyecto: 'CERRADO', idAsociacion: 3, organizaciones: [{ idOrganizacion: 4 }] }),
+          findFirst: vi.fn().mockResolvedValue({ estadoProyecto: estado, idAsociacion: 3, organizaciones: [{ idOrganizacion: 4 }] }),
         },
         juntaAsociacion: { findUnique: vi.fn().mockResolvedValue(junta) },
         organizacion: { findUnique: vi.fn().mockResolvedValue(org) },
@@ -185,6 +185,11 @@ describe('SeguimientoService.resultados (MEJ-56)', () => {
 
     it('quien no es de la junta ni ve la organización sigue con 403', async () => {
       const service = conPolitica403(null, { idOrganizacion: 4, nombreOrganizacion: 'O', estadoOrganizacion: 'ACTIVA', visibilidad: 'PRIVADA' });
+      await expect(service.resultados(5, 9)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('un proyecto no cerrado sigue con 403 aunque la junta o la organizacion publica lo vean', async () => {
+      const service = conPolitica403({ asociacion: { archivada: false } }, { idOrganizacion: 4, nombreOrganizacion: 'O', estadoOrganizacion: 'ACTIVA', visibilidad: 'PUBLICA' }, 'EN_PROGRESO');
       await expect(service.resultados(5, 9)).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
