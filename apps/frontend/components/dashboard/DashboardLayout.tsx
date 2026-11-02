@@ -22,11 +22,13 @@ import {
   Network,
   LifeBuoy,
   MessageCircle,
+  Landmark,
   Search as SearchIcon,
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { useLogout } from '@/hooks/use-logout';
 import { useMisJuntas } from '@/hooks/use-asociaciones';
+import { rutaAsociacion } from '@/lib/asociaciones/vista';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
 import { GlobalSearchInput } from '@/components/layout/global-search-input';
 import { UserMenu } from '@/components/dashboard/UserMenu';
@@ -166,6 +168,23 @@ export default function DashboardLayout({
     [chatNoLeidos],
   );
   const navItemsMobile = flattenNavEntries(entries);
+  // «Mi asociación» solo para quien es de una junta; con varias, un grupo para elegir cuál. En móvil
+  // la barra inferior ya va llena: allí se entra desde el menú de cuenta.
+  const entriesSidebar = useMemo(() => {
+    if (!juntas?.length) return entries;
+    const miAsociacion: NavEntry =
+      juntas.length === 1
+        ? { href: rutaAsociacion(juntas[0].idAsociacion), label: 'Mi asociación', icon: Landmark }
+        : {
+            type: 'group',
+            label: 'Mi asociación',
+            icon: Landmark,
+            items: juntas.map((j) => ({ href: rutaAsociacion(j.idAsociacion), label: j.nombre, icon: Landmark })),
+          };
+    const i = entries.findIndex((e) => e.type === 'group' && e.label === 'Mi trabajo');
+    const antesDe = i < 0 ? entries.length : i;
+    return [...entries.slice(0, antesDe), miAsociacion, ...entries.slice(antesDe)];
+  }, [entries, juntas]);
 
   useEffect(() => {
     if (!allowAdmin && !isLoading && isAdminUser(user)) {
@@ -244,8 +263,8 @@ export default function DashboardLayout({
           )}
         </div>
 
-        <Suspense fallback={<SidebarNav entries={entries} idUsuario={user?.idUsuario ?? null} />}>
-          <DashboardSidebarNav entries={entries} idUsuario={user?.idUsuario ?? null} />
+        <Suspense fallback={<SidebarNav entries={entriesSidebar} idUsuario={user?.idUsuario ?? null} />}>
+          <DashboardSidebarNav entries={entriesSidebar} idUsuario={user?.idUsuario ?? null} />
         </Suspense>
 
         {/* Único acceso a la cuenta en escritorio y tableta; en móvil está en la barra inferior. */}
