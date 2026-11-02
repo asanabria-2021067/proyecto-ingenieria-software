@@ -137,6 +137,27 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     expect(escriben.filter((r) => !r.guards.includes(ProjectWriteGuard)).map((r) => r.id)).toEqual([]);
   });
 
+  // MEJ-54/55/56/57/23/24: seguimiento, resultados, portafolios, reconocimientos, retrospectiva y reporte del Sprint (permisos en los servicios).
+  it('las rutas de seguimiento del proyecto y del sprint existen y exigen JwtAuthGuard', () => {
+    const sprint = 'proyectos/:projectId/sprints/:sprintId';
+    const esperadas = [
+      'GET /api/proyectos/:projectId/seguimiento',
+      'GET /api/proyectos/:projectId/resultados',
+      'GET /api/organizaciones/:idOrganizacion/portafolio',
+      'GET /api/asociaciones/:idAsociacion/portafolio',
+      `GET /api/${sprint}/reconocimientos`,
+      `POST /api/${sprint}/reconocimientos`,
+      `GET /api/${sprint}/retrospectiva`,
+      `PUT /api/${sprint}/retrospectiva`,
+      `GET /api/${sprint}/reporte/csv`,
+      `GET /api/${sprint}/reporte/pdf`,
+    ];
+    const deSeguimiento = rutas.filter((r) => esperadas.includes(r.id));
+    expect(deSeguimiento.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(deSeguimiento.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+    expect(deSeguimiento.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+  });
+
   it('toda ruta de administracion exige RolesGuard y @Roles("administrador")', () => {
     const admin = rutas.filter((r) => r.adminPath);
     expect(admin.length).toBeGreaterThan(20);
@@ -177,6 +198,7 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
       'GET /api/asociaciones/:idAsociacion/estudiantes/csv',
       'GET /api/asociaciones/:idAsociacion/estudiantes/pdf',
       'GET /api/asociaciones/:idAsociacion/membresia',
+      'GET /api/asociaciones/:idAsociacion/portafolio',
       'GET /api/asociaciones/:idAsociacion/proyectos',
       'GET /api/asociaciones/:idAsociacion/proyectos/csv',
       'GET /api/asociaciones/:idAsociacion/proyectos/pdf',

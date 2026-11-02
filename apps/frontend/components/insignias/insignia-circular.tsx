@@ -1,6 +1,6 @@
 'use client';
 
-import { Award, CheckCircle2, Clock, Crown, Flag, FolderCheck, MessageSquare, UserCheck, type LucideIcon } from 'lucide-react';
+import { Award, CheckCircle2, Clock, Crown, Flag, FolderCheck, Handshake, MessageSquare, UserCheck, type LucideIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -23,6 +23,7 @@ const ICONOS: Record<string, LucideIcon> = {
   UserCheck,
   MessageSquare,
   Flag,
+  Handshake,
 };
 
 interface InsigniaCircularProps {

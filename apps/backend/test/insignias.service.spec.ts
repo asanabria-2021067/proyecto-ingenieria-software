@@ -235,7 +235,7 @@ describe('InsigniasService.backfillTodos (HU-190, T-347)', () => {
     metricas.valores = { '1:tareas': 1, '2:horas': 100, '3:sprints': 20 };
     const total = await service.backfillTodos();
     expect(total).toBe(3);
-    expect(prisma.insignia.upsert).toHaveBeenCalledTimes(7);
+    expect(prisma.insignia.upsert).toHaveBeenCalledTimes(CATALOGO_INSIGNIAS.length);
     expect(fila(filas, 'tareas', 1)?.nivel).toBe('BRONCE');
     expect(fila(filas, 'horas', 2)?.nivel).toBe('ORO');
     expect(fila(filas, 'sprints', 3)?.nivel).toBe('DIAMANTE');
@@ -273,12 +273,12 @@ describe('InsigniasService.backfillTodos (HU-190, T-347)', () => {
 });
 
 describe('listarInsigniasUsuario', () => {
-  it('devuelve las 7 con progreso, siguiente umbral y fechas; las bloqueadas con nivel null', async () => {
+  it('devuelve las 8 con progreso, siguiente umbral y fechas; las bloqueadas con nivel null', async () => {
     const { service, filas } = build();
     metricas.valores['1:tareas'] = 12;
     await service.recalcular(1, ['tareas']);
     const lista = await service.listarMias(1);
-    expect(lista).toHaveLength(7);
+    expect(lista).toHaveLength(8);
     const tareas = lista.find((i) => i.clave === 'tareas')!;
     expect(tareas).toMatchObject({ nivel: 'PLATA', progreso: 12, siguienteUmbral: 50, umbrales: [1, 10, 50, 100] });
     expect(tareas.fechas.BRONCE).toBe(fila(filas, 'tareas')!.fechaBronce!.toISOString());

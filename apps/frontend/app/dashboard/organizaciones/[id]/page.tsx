@@ -14,6 +14,7 @@ import { OrgChat } from '@/components/organizations/org-chat';
 import { OrgMiembros } from '@/components/organizations/org-miembros';
 import { OrgPendientes } from '@/components/organizations/org-pendientes';
 import { OrgProyectos } from '@/components/organizations/org-proyectos';
+import { PortafolioProyectos } from '@/components/projects/portafolio-proyectos';
 import { TransferirDialog } from '@/components/organizations/transferir-dialog';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -220,6 +221,7 @@ export default function OrganizacionPage() {
       <Tabs defaultValue="proyectos">
         <TabsList className="mb-4.5 h-auto flex-wrap">
           <TabsTrigger value="proyectos">Proyectos</TabsTrigger>
+          <TabsTrigger value="portafolio">Portafolio</TabsTrigger>
           {org.miembros && <TabsTrigger value="miembros">Miembros ({org.miembros.length})</TabsTrigger>}
           {esMiembro && <TabsTrigger value="chat">Chat</TabsTrigger>}
           {esMiembro && <TabsTrigger value="anuncios">Anuncios</TabsTrigger>}
@@ -231,6 +233,9 @@ export default function OrganizacionPage() {
 
         <TabsContent value="proyectos" className="card-base">
           <OrgProyectos proyectos={org.proyectos} />
+        </TabsContent>
+        <TabsContent value="portafolio">
+          <PortafolioProyectos tipo="organizacion" id={org.idOrganizacion} />
         </TabsContent>
         {org.miembros && (
           <TabsContent value="miembros" className="card-base">

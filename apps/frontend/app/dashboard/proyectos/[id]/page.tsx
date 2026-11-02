@@ -1,6 +1,7 @@
 'use client';
 
 import { PageTitle } from '@/components/ui/page-title';
+import { Button } from '@/components/ui/button';
 import { ESTADO_REVISION_LABEL } from '@/components/projects/closure-review-status.utils';
 import type { EstadoRevisionCierre } from '@/lib/types/closure';
 
@@ -59,6 +60,7 @@ import { ProjectDescriptionCard } from '@/components/projects/detail/project-des
 import { ProjectOwnerCard } from '@/components/projects/detail/project-owner-card';
 import { parseObjetivos } from '@/components/projects/detail/parse-objetivos';
 import { MyTasksCard } from '@/components/projects/detail/my-tasks-card';
+import { ProjectHealthCard } from '@/components/projects/detail/project-health-card';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -255,6 +257,9 @@ export default function ProyectoDetallePage() {
             acción de su menú «Acciones del proyecto». */}
 
         <ProjectGridMain>
+          {esParticipante && proyecto.estadoProyecto !== 'CERRADO' && proyecto.estadoProyecto !== 'EN_SOLICITUD_CIERRE' && (
+            <ProjectHealthCard idProyecto={projectId} />
+          )}
           {esParticipante && currentUser && proyecto.estadoProyecto !== 'CERRADO' && (
             <MyTasksCard idProyecto={projectId} idUsuario={currentUser.idUsuario} />
           )}
@@ -694,6 +699,9 @@ function HistoricalProjectPage({
           <p className="mt-2 text-[14px] leading-5.25 text-on-surface-variant">
             {resumen.descripcionProyecto || 'Sin descripción disponible.'}
           </p>
+          <Button asChild variant="outline" size="sm" className="mt-3.5">
+            <Link href={`/dashboard/proyectos/${projectId}/resultados`}>Ver resultados del proyecto</Link>
+          </Button>
           <dl className="mt-5 grid grid-cols-1 gap-4 border-t border-outline-variant/40 pt-4 text-[13px] sm:grid-cols-3">
             <div className="flex items-start gap-2">
               <Calendar className="mt-0.5 size-4 shrink-0 text-tertiary" aria-hidden="true" />

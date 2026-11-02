@@ -113,9 +113,16 @@ function estadoHitoConfig(estado: HitoStats['estado']) {
   return { ...ESTADO_HITO_STYLE[estado], icon: estado === 'COMPLETADO' ? CheckCircle2 : Circle };
 }
 
+/** MEJ-54: hito sin completar cuya fecha límite (AAAA-MM-DD) ya pasó. */
+export function hitoEstaAtrasado(fechaLimite: string | null, estado: HitoStats['estado'], hoy = new Date()): boolean {
+  // Día calendario de Guatemala (UTC-6, sin horario de verano), igual que el backend (hoyGuatemala).
+  const hoyGt = new Date(hoy.getTime() - 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return !!fechaLimite && estado !== 'COMPLETADO' && fechaLimite < hoyGt;
+}
+
 function fechaHitoClass(hito: Hito, stats: HitoStats): string {
   if (!hito.fechaLimite || stats.estado === 'COMPLETADO') return 'text-tertiary';
-  const vencida = hito.fechaLimite < new Date().toISOString().slice(0, 10);
+  const vencida = hitoEstaAtrasado(hito.fechaLimite, stats.estado);
   if (vencida) return 'font-semibold text-red-600 dark:text-red-400';
   return 'text-tertiary';
 }
@@ -330,6 +337,12 @@ function MilestoneCard({
           <EstadoIcon aria-hidden="true" />
           {estado.label}
         </span>
+        {hitoEstaAtrasado(hito.fechaLimite, stats.estado) && (
+          <span className="pill pill-sm pill-red ml-1.5" data-testid={`hito-atrasado-${hito.idHito}`}>
+            <AlertTriangle aria-hidden="true" />
+            Atrasado
+          </span>
+        )}
         <p className={`flex items-center gap-1.5 text-[11px] ${fechaHitoClass(hito, stats)}`}>
           <Calendar className="size-3.5" aria-hidden="true" />
           {hito.fechaLimite ? formatearFechaLimite(hito.fechaLimite) : 'Sin fecha definida'}

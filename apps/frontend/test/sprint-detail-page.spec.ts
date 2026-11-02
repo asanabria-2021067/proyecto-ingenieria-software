@@ -11,6 +11,12 @@ vi.mock('next/navigation', () => ({
 vi.mock('../hooks/use-project-sprints', () => ({ useSprintDetail: vi.fn() }));
 vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
+// MEJ-23/24/57: reporte, retrospectiva y reconocimientos tienen su propia prueba (seguimiento-proyecto.spec.tsx).
+vi.mock('../components/projects/sprint-extras', () => ({
+  SprintReconocimientosEquipo: () => null,
+  SprintReportButtons: () => null,
+  SprintRetrospectiva: () => null,
+}));
 
 import SprintDetailPage from '../app/dashboard/proyectos/[id]/sprints/[sprintId]/page';
 import { useSprintDetail } from '../hooks/use-project-sprints';

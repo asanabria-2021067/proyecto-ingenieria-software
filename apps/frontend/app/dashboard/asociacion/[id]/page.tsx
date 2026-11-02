@@ -9,6 +9,7 @@ import { AsociacionEstudiantesTabla } from '@/components/associations/asociacion
 import { AsociacionFiltros } from '@/components/associations/asociacion-filtros';
 import { AsociacionProyectos } from '@/components/associations/asociacion-proyectos';
 import { ReporteBotones } from '@/components/associations/reporte-botones';
+import { PortafolioProyectos } from '@/components/projects/portafolio-proyectos';
 import { DATA_TABLE_CARD } from '@/components/dashboard/data-table';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { ADMIN_TAB_LIST, ADMIN_TAB_TRIGGER } from '@/components/admin/admin-tabs';
@@ -96,6 +97,9 @@ export default function AsociacionDashboardPage() {
           </TabsTrigger>
           <TabsTrigger value="anuncios" className={ADMIN_TAB_TRIGGER}>
             Anuncios
+          </TabsTrigger>
+          <TabsTrigger value="portafolio" className={ADMIN_TAB_TRIGGER}>
+            Portafolio
           </TabsTrigger>
         </TabsList>
 
@@ -198,6 +202,10 @@ export default function AsociacionDashboardPage() {
             id={idAsociacion}
             puedePublicar={junta.cargo === 'PRESIDENTE' || junta.nivelPermiso !== 'LECTURA'}
           />
+        </TabsContent>
+
+        <TabsContent value="portafolio">
+          <PortafolioProyectos tipo="asociacion" id={idAsociacion} />
         </TabsContent>
       </Tabs>
     </div>

@@ -20,6 +20,7 @@ import {
   Gavel,
   ListPlus,
   Lock,
+  MessageSquareText,
   MessageSquareWarning,
   Paperclip,
   Pencil,
@@ -124,6 +125,9 @@ const EVENTO_STYLE: Record<TipoEventoBitacoraValor, EstiloEvento> = {
   // ---- T-295/T-296 (HU-177): actividades y asistencia del líder. ----
   ACTIVITY_CREATED: { label: 'Actividad creada', icon: CalendarPlus },
   ATTENDANCE_MARKED: { label: 'Asistencia marcada', icon: UserCheck },
+
+  // ---- MEJ-24: retrospectiva opcional del Sprint. ----
+  SPRINT_RETROSPECTIVE_SAVED: { label: 'Retrospectiva del Sprint guardada', icon: MessageSquareText },
 };
 
 /**

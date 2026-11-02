@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CATALOGO_INSIGNIAS, NIVELES, nivelPara, rangoNivel } from '../src/insignias/insignias.catalog';
 
 describe('catálogo de insignias (HU-190)', () => {
-  it('tiene exactamente los 7 logros con sus umbrales e iconos', () => {
+  it('tiene exactamente los 8 logros con sus umbrales e iconos', () => {
     expect(CATALOGO_INSIGNIAS.map((c) => [c.clave, c.icono, ...c.umbrales])).toEqual([
       ['tareas', 'CheckCircle2', 1, 10, 50, 100],
       ['horas', 'Clock', 5, 25, 100, 250],
@@ -11,6 +11,7 @@ describe('catálogo de insignias (HU-190)', () => {
       ['postulaciones', 'UserCheck', 1, 3, 5, 10],
       ['comentarios', 'MessageSquare', 5, 25, 100, 250],
       ['sprints', 'Flag', 1, 5, 10, 20],
+      ['companerismo', 'Handshake', 1, 3, 6, 12],
     ]);
   });
 

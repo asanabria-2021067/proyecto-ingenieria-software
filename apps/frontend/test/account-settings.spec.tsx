@@ -38,14 +38,15 @@ afterEach(() => {
 });
 
 const FAMILIAS = [
-  // HU-200: + MENCION_COMENTARIO.
-  ['Tareas e hitos', 8],
+  // HU-200: + MENCION_COMENTARIO. MEJ-54: + HITO_ATRASADO.
+  ['Tareas e hitos', 9],
   // ORG-1: + INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA.
   // MEJ-22: + INVITACION_ROL_PROYECTO.
   ['Postulaciones y equipo', 11],
   // MEJ-16/17: + PROYECTO_NUEVO_PARA_TI, PROYECTO_GUARDADO_AVISO.
   ['Proyectos', 19],
-  ['Horas y reconocimiento', 5],
+  // MEJ-57: + RECONOCIMIENTO_RECIBIDO.
+  ['Horas y reconocimiento', 6],
   // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA. MEJ-46: + RECORDATORIO_MENSAJE.
   ['Recordatorios y calendario', 6],
   // MEJ-44: + MENCION_CHAT.
@@ -94,7 +95,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
 
     fireEvent.click(familia('Red de contactos'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getAllByRole('switch')).toHaveLength(5);
+    expect(screen.getAllByRole('switch')).toHaveLength(6);
   });
 
   it('el disparador es un botón dentro de un encabezado: se alcanza y se acciona con teclado', async () => {
@@ -132,7 +133,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     guardado.resolver(preferencias(['NUEVO_SEGUIDOR']));
     await waitFor(() => expect(familia('Red de contactos')).toHaveTextContent('3 de 4 activas'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'true');
-    expect(familia('Tareas e hitos')).toHaveTextContent('8 de 8 activas');
+    expect(familia('Tareas e hitos')).toHaveTextContent('9 de 9 activas');
   });
 
   it('si el guardado falla, el contador no se mueve', async () => {

@@ -31,6 +31,7 @@ import { countPassedChecks, TOTAL_CLOSURE_CHECKS } from '@/components/closure/cl
 import type { ProyectoDetalleDTO } from '@/lib/dto/project.dto';
 import { ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 import { MyTasksCard } from '@/components/projects/detail/my-tasks-card';
+import { ProjectHealthCard } from '@/components/projects/detail/project-health-card';
 import { ProjectCommentsCard } from '@/components/projects/detail/project-comments-card';
 
 interface Props {
@@ -232,6 +233,9 @@ function ProjectDetailView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
       </ProjectGridFull>
 
       <ProjectGridMain>
+        {(isLeader || esParticipante) && !proyectoCerrado && !enSolicitudCierre && (
+          <ProjectHealthCard idProyecto={idProyecto} esLider={isLeader} />
+        )}
         {puedeVerKanban && !proyectoCerrado && currentUser && (
           <MyTasksCard idProyecto={idProyecto} idUsuario={currentUser.idUsuario} />
         )}

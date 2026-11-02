@@ -9,7 +9,8 @@ export type ClaveInsignia =
   | 'liderados'
   | 'postulaciones'
   | 'comentarios'
-  | 'sprints';
+  | 'sprints'
+  | 'companerismo';
 
 /**
  * Qué usuarios se recalculan: `idUsuarios` explícitos, los asignados a una
@@ -41,6 +42,7 @@ export const CATALOGO_INSIGNIAS: readonly InsigniaDef[] = [
   { clave: 'postulaciones', nombre: 'Postulaciones aceptadas', descripcion: 'Postulaciones a roles que fueron aceptadas.', icono: 'UserCheck', umbrales: [1, 3, 5, 10] },
   { clave: 'comentarios', nombre: 'Comentarios en tareas', descripcion: 'Comentarios que escribiste en tareas.', icono: 'MessageSquare', umbrales: [5, 25, 100, 250] },
   { clave: 'sprints', nombre: 'Sprints completados', descripcion: 'Sprints cerrados en los que completaste al menos una tarea.', icono: 'Flag', umbrales: [1, 5, 10, 20] },
+  { clave: 'companerismo', nombre: 'Compañero ejemplar', descripcion: 'Reconocimientos que te dieron tus compañeros de equipo en los sprints.', icono: 'Handshake', umbrales: [1, 3, 6, 12] },
 ];
 
 export const NOMBRE_NIVEL: Record<NivelInsignia, string> = {
