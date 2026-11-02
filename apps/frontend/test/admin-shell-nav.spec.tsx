@@ -276,6 +276,7 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Panel Admin',
     'Gestión de Usuarios',
     'Recuperación de contraseña',
+    'Asociaciones y juntas',
     'Activos',
     'Solicitudes de publicación',
     'Solicitudes de cierre',
@@ -283,6 +284,7 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Calendario de Sprints',
     'Apelaciones',
     'Tendencias de uso',
+    'Horas por semestre',
     'Anuncios',
     'Cuentas pendientes',
     'Eventos de seguridad',
@@ -511,13 +513,13 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
   it('el orden es estable: panel, usuarios, proyectos, gobernanza, métricas, comunicación y verificación', () => {
     expect(grupos()).toEqual([
       { enlace: 'Panel Admin' },
-      { grupo: 'Usuarios', items: ['Gestión de Usuarios', 'Recuperación de contraseña'] },
+      { grupo: 'Usuarios', items: ['Gestión de Usuarios', 'Recuperación de contraseña', 'Asociaciones y juntas'] },
       {
         grupo: 'Proyectos',
         items: ['Activos', 'Solicitudes de publicación', 'Solicitudes de cierre', 'Cerrados', 'Calendario de Sprints'],
       },
       { grupo: 'Gobernanza', items: ['Apelaciones'] },
-      { grupo: 'Métricas', items: ['Tendencias de uso'] },
+      { grupo: 'Métricas', items: ['Tendencias de uso', 'Horas por semestre'] },
       { grupo: 'Comunicación', items: ['Anuncios'] },
       { grupo: 'Verificación y seguridad', items: ['Cuentas pendientes', 'Eventos de seguridad'] },
     ]);
@@ -563,6 +565,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
   it.each([
     ['/dashboard/admin/usuarios', 'Usuarios', 'Gestión de Usuarios'],
     ['/dashboard/admin/solicitudes-recuperacion', 'Usuarios', 'Recuperación de contraseña'],
+    ['/dashboard/admin/asociaciones', 'Usuarios', 'Asociaciones y juntas'],
     ['/dashboard/admin/sprints', 'Proyectos', 'Calendario de Sprints'],
     ['/dashboard/admin/apelaciones', 'Gobernanza', 'Apelaciones'],
     ['/dashboard/admin/metricas', 'Métricas', 'Tendencias de uso'],
@@ -624,6 +627,7 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
     ['app/dashboard/admin/cuentas-pendientes/page.tsx', '/dashboard/admin/cuentas-pendientes', 'Cuentas pendientes'],
     ['app/dashboard/admin/seguridad/page.tsx', '/dashboard/admin/seguridad', 'Eventos de seguridad'],
     ['app/dashboard/admin/anuncios/page.tsx', '/dashboard/admin/anuncios', 'Anuncios'],
+    ['app/dashboard/admin/asociaciones/page.tsx', '/dashboard/admin/asociaciones', 'Asociaciones y juntas'],
     ['app/dashboard/admin/metricas/page.tsx', '/dashboard/admin/metricas', 'Tendencias de uso'],
     ['app/dashboard/admin/apelaciones/appeals-inbox-client.tsx', '/dashboard/admin/apelaciones', 'Apelaciones'],
     ['app/dashboard/projects/admin/reviews/page.tsx', '/dashboard/projects/admin/reviews', 'Solicitudes de publicación'],
@@ -688,7 +692,10 @@ describe('Métricas de uso en la estructura (T-321 · HU-178, FG08-C01)', () => 
 
   it('«Tendencias de uso» está en el grupo «Métricas», una sola vez', () => {
     const grupo = adminNavEntries.find((e) => 'type' in e && e.type === 'group' && e.label === 'Métricas');
-    expect(grupo && 'items' in grupo ? grupo.items.map((i) => [i.label, i.href]) : []).toEqual([['Tendencias de uso', HREF]]);
+    expect(grupo && 'items' in grupo ? grupo.items.map((i) => [i.label, i.href]) : []).toEqual([
+      ['Tendencias de uso', HREF],
+      ['Horas por semestre', '/dashboard/admin/horas'],
+    ]);
     expect(flattenNavEntries(adminNavEntries).filter((d) => /m[eé]trica|tendencia/i.test(d.label))).toHaveLength(1);
   });
 

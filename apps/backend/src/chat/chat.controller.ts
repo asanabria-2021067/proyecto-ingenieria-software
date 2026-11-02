@@ -253,7 +253,7 @@ export class ChatController {
   }
 
   @Post(':conversationId/leido')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   markRead(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('conversationId', ParseIntPipe) conversationId: number,

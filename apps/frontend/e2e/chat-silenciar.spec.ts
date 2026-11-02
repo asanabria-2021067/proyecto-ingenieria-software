@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon, iconoMensajes } from './support/chat';
 
 // Mismo par real del Proyecto 1 del seed que usa chat-mensajeria.spec.ts.
 const PROYECTO_ID = 1;
@@ -15,22 +16,6 @@ async function desactivarTour(page: Page) {
       return originalGetItem.call(this, key);
     };
   });
-}
-
-async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
-
-  if (await existente.count()) {
-    await existente.first().click();
-    return;
-  }
-
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
 }
 
 test('silenciar un chat muestra el indicador y no suma al badge de no leidos', async ({ browser }) => {
@@ -53,7 +38,7 @@ test('silenciar un chat muestra el indicador y no suma al badge de no leidos', a
     await pageB.getByRole('button', { name: 'Opciones de la conversación' }).click();
     await pageB.getByRole('menuitem', { name: 'Silenciar 1 hora' }).click();
     await expect(pageB.getByText('Silenciado').first()).toBeVisible();
-    await pageB.getByRole('button', { name: 'Cerrar chat' }).click();
+    await pageB.goto('/dashboard');
 
     // A escribe a B.
     const mensaje = `Silencio ${Math.random().toString(36).slice(2)}`;
@@ -64,12 +49,10 @@ test('silenciar un chat muestra el indicador y no suma al badge de no leidos', a
 
     // B ve el chat con el mensaje nuevo marcado como Silenciado, y el
     // boton del dock no anuncia mensajes sin leer.
-    const boton = pageB.getByRole('button', { name: /^mensajes/i });
-    await boton.click();
+    await pageB.goto('/dashboard/mensajes');
     await expect(pageB.getByText(mensaje).first()).toBeVisible();
+    await expect(iconoMensajes(pageB)).toHaveAccessibleName('Mensajes');
     await expect(pageB.getByText('Silenciado').first()).toBeVisible();
-    await boton.click();
-    await expect(boton).toHaveAccessibleName('Mensajes');
 
     // Reactivar desde el menu de la ventana.
     await abrirChatIndividualCon(pageB, 'Carlos');

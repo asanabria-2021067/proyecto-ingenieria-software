@@ -5,9 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 
 const createConversationMock = vi.hoisted(() => vi.fn());
+const pathnameMock = vi.hoisted(() => ({ valor: '/dashboard' }));
+const pushMock = vi.hoisted(() => vi.fn());
+vi.mock('next/navigation', () => ({ usePathname: () => pathnameMock.valor, useRouter: () => ({ push: pushMock }) }));
 vi.mock('@/lib/services/chat', () => ({ createConversation: createConversationMock }));
 
-import { ChatDockProvider, useChatDock } from '../components/chat-dock/chat-dock-context';
+import { ChatDockProvider, idConversacionDeRuta, useChatDock } from '../components/chat-dock/chat-dock-context';
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -16,6 +19,7 @@ function wrapper({ children }: { children: ReactNode }) {
 
 afterEach(() => {
   vi.clearAllMocks();
+  pathnameMock.valor = '/dashboard';
 });
 
 describe('ChatDockProvider — máximo 3 chats expandidos a la vez', () => {
@@ -85,5 +89,33 @@ describe('useChatDock sin Provider', () => {
     const { result } = renderHook(() => useChatDock());
     expect(() => result.current.abrirChat(1, 1)).not.toThrow();
     expect(result.current.windows).toEqual([]);
+  });
+});
+
+describe('ChatDockProvider — página de mensajes', () => {
+  it('fuera de la página abre la ventana flotante y no navega', () => {
+    const { result } = renderHook(() => useChatDock(), { wrapper });
+
+    act(() => result.current.abrirChat(1, 101));
+
+    expect(result.current.windows).toHaveLength(1);
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('dentro de /dashboard/mensajes navega a la conversación en vez de abrir una ventana', () => {
+    pathnameMock.valor = '/dashboard/mensajes/7';
+    const { result } = renderHook(() => useChatDock(), { wrapper });
+
+    act(() => result.current.abrirChat(1, 101));
+
+    expect(result.current.windows).toHaveLength(0);
+    expect(pushMock).toHaveBeenCalledWith('/dashboard/mensajes/101');
+  });
+
+  it('idConversacionDeRuta lee el id solo de /dashboard/mensajes/<id>', () => {
+    expect(idConversacionDeRuta('/dashboard/mensajes/42')).toBe(42);
+    expect(idConversacionDeRuta('/dashboard/mensajes')).toBeNull();
+    expect(idConversacionDeRuta('/dashboard/mensajes/abc')).toBeNull();
+    expect(idConversacionDeRuta(null)).toBeNull();
   });
 });

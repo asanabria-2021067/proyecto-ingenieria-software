@@ -441,7 +441,7 @@ export function ProjectRolesSheet({
                             variant="ghost"
                             aria-label={`Eliminar rol ${role.nombreRol}`}
                             onClick={() => void handleEliminar(role)}
-                            className="size-10 rounded-md text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10"
+                            className="size-10 rounded-md text-destructive hover:bg-destructive/10 hover:text-destructive"
                           >
                             <Trash2 className="size-4" aria-hidden="true" />
                           </Button>

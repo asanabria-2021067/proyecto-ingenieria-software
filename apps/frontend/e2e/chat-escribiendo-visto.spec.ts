@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon } from './support/chat';
 import { desactivarTour } from './support/realtime';
 
 // Mismo par real del Proyecto 1 del seed que usa chat-mensajeria.spec.ts.
@@ -9,22 +10,6 @@ const CORREO_A = 'carlos.mendoza@uvg.edu.gt';
 const CORREO_B = 'maria.lopez@uvg.edu.gt';
 
 /** Abre (o crea) el chat individual con `nombreOtro` desde el dock global. */
-async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
-
-  if (await existente.count()) {
-    await existente.first().click();
-    return;
-  }
-
-  await page.getByRole('button', { name: /^mensajes/i }).click(); // cierra la lista, vacía
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
-}
-
 test('escribiendo y visto por entre dos usuarios, sin recargar', async ({ browser }) => {
   test.setTimeout(90_000);
   const contextA = await browser.newContext();

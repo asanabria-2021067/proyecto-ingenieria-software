@@ -60,6 +60,16 @@ export class RolProyectoDto {
   requisitos?: RequisitoHabilidadDto[];
 }
 
+export class ParticipanteOrganizacionDto {
+  @IsInt()
+  idUsuario!: number;
+
+  /** Posición (desde 0) del rol dentro de `roles` que ocupará. */
+  @IsInt()
+  @Min(0)
+  indiceRol!: number;
+}
+
 export class CreateProjectFullDto {
   // ─── Sección 1: datos generales ───────────────────────────────
   @IsString()
@@ -117,6 +127,23 @@ export class CreateProjectFullDto {
   @ArrayUnique()
   @IsInt({ each: true })
   organizacionesIds?: number[];
+
+  /** Publicar a nombre de una asociación oficial: solo Presidente y Editores de su junta. */
+  @IsOptional()
+  @IsInt()
+  idAsociacion?: number;
+
+  /** «¿A nombre de quién?»: ausente = proyecto personal. Exige Propietario, Administrador o Editor de la organización. */
+  @IsOptional()
+  @IsInt()
+  idOrganizacion?: number;
+
+  /** Miembros de la organización que entran directo como participantes activos. */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ParticipanteOrganizacionDto)
+  participantes?: ParticipanteOrganizacionDto[];
 
   @IsOptional()
   @IsArray()

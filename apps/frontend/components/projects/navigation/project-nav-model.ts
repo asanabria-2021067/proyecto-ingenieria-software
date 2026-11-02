@@ -31,9 +31,10 @@ import {
 /**
  * `leader`: Proyecto.creadoPor (ver hooks/use-is-project-leader.ts).
  * `participant`: miembro activo del proyecto que no es el líder.
+ * `org-reader`: miembro de la organización dueña que no participa; ve tablero y tareas en solo lectura.
  * `visitor`: cualquier otro usuario (proyecto publicado, sin pertenencia).
  */
-export type ProjectNavActor = 'leader' | 'participant' | 'visitor';
+export type ProjectNavActor = 'leader' | 'participant' | 'org-reader' | 'visitor';
 
 export interface ProjectNavContext {
   idProyecto: number;
@@ -105,7 +106,7 @@ export function buildProjectNavGroups(ctx: ProjectNavContext): ProjectNavGroup[]
   ];
 
   const trabajo: ProjectNavItem[] = [];
-  if (esMiembro) {
+  if (esMiembro || actor === 'org-reader') {
     trabajo.push(
       { id: 'tablero', href: `/dashboard/projects/${idProyecto}/kanban`, label: 'Tablero (Kanban)', icon: Kanban },
       {

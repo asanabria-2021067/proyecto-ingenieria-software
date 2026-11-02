@@ -27,11 +27,11 @@ import type { SprintBurndownDto } from '../sprints/dto/sprint-burndown.dto';
  * una ñ se vea igual en cualquier despliegue.
  */
 export const PROJECT_REPORT_FONT = 'NotoSans';
-const FONT_FILE = 'NotoSans-Regular.ttf';
+export const FONT_FILE = 'NotoSans-Regular.ttf';
 const ASSETS_DIR = join(__dirname, 'assets');
 
 let fuenteBase64Cache: string | null = null;
-function fontBase64(): string {
+export function fontBase64(): string {
   if (fuenteBase64Cache === null) {
     fuenteBase64Cache = readFileSync(join(ASSETS_DIR, FONT_FILE)).toString('base64');
   }

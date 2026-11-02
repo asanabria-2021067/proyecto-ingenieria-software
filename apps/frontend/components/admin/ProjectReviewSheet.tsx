@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle2, SendHorizonal, MessageSquare, Eye } from 'lucide-react';
@@ -223,9 +224,9 @@ export function ProjectReviewSheet({
           <p className="type-micro font-black uppercase tracking-widest text-primary">
             Proyectos · Solicitudes de publicación
           </p>
-          <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
+          <PageTitle className="text-lg font-black text-on-surface leading-tight truncate">
             {proyecto?.tituloProyecto ?? 'Revisión de proyecto'}
-          </h1>
+          </PageTitle>
           {revisionesRevisadas.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {revisionesRevisadas.map((r) => (

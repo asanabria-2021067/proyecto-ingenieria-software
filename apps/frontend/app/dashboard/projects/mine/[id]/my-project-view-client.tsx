@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -368,9 +369,9 @@ export default function MyProjectViewClient({ id }: Props) {
               <p className="type-meta font-black uppercase tracking-widest text-text-primary">
                 Mis Proyectos · Editando correcciones
               </p>
-              <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
+              <PageTitle className="text-lg font-black text-on-surface leading-tight truncate">
                 {proyecto?.tituloProyecto ?? 'Mi proyecto'}
-              </h1>
+              </PageTitle>
             </div>
           </>
         ) : (
@@ -387,9 +388,9 @@ export default function MyProjectViewClient({ id }: Props) {
               <p className="text-[10px] font-black uppercase tracking-widest text-primary">
                 Mis Proyectos · Solicitud
               </p>
-              <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
+              <PageTitle className="text-lg font-black text-on-surface leading-tight truncate">
                 {proyecto?.tituloProyecto ?? 'Mi solicitud'}
-              </h1>
+              </PageTitle>
               {revisionesRevisadas.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                   {revisionesRevisadas.map((r) => (
@@ -754,9 +755,9 @@ export default function MyProjectViewClient({ id }: Props) {
                 <p className="text-[10px] font-black uppercase tracking-widest text-primary">
                   Historial · Solo lectura · Revisión {selectedRevision.numeroEnvio}
                 </p>
-                <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
+                <PageTitle className="text-lg font-black text-on-surface leading-tight truncate">
                   {snap?.tituloProyecto ?? proyecto.tituloProyecto}
-                </h1>
+                </PageTitle>
               </div>
               {selectedRevision.revisadaEn && (
                 <span className="shrink-0 text-xs text-tertiary">

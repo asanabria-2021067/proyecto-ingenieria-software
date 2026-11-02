@@ -1,11 +1,23 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { PageTitle } from '@/components/ui/page-title';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { createProject, updateProject, getMyProjectById, submitProjectForReview } from '@/lib/services/projects';
 import { getCarreras, getHabilidades, type Carrera, type Habilidad } from '@/lib/services/catalogs';
+import { useMisOrganizaciones, useOrganizacion } from '@/hooks/use-organizations';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { useMisJuntas } from '@/hooks/use-asociaciones';
+import { puedePublicarComoAsociacion } from '@/lib/asociaciones/vista';
+import {
+  errorParticipantes,
+  miembrosElegibles,
+  organizacionesParaPublicar,
+  participantesPayload,
+  type ParticipanteForm,
+} from '@/lib/organizations/proyecto';
 import uvgSwal from '@/lib/swal';
 import { getApiErrorMessage, getApiErrorStatus, traducirMensajeValidacion } from '@/components/projects/api-error';
 import { useRequireCan } from '@/hooks/use-can';
@@ -13,8 +25,10 @@ import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
 import { Step1 } from './Step1';
 import { Step2 } from './Step2';
 import { Step3 } from './Step3';
+import { StepPropietario } from './StepPropietario';
+import { StepParticipantes } from './StepParticipantes';
 import {
-  STEPS, newRol, newRequisito, safeId, step1Schema, rolSchema, formSchema, partialProjectSchema, zodToFieldErrors,
+  newRol, newRequisito, safeId, step1Schema, rolSchema, formSchema, partialProjectSchema, zodToFieldErrors,
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
 } from './types';
 import { normalizeUrlInput } from '@/lib/security/safe-url';
@@ -28,6 +42,15 @@ const FULL_EDIT_STATES = ['BORRADOR', 'OBSERVADO'];
 const PARTIAL_EDIT_STATES = ['PUBLICADO', 'EN_PROGRESO'];
 const ALLOWED_EDIT_STATES = [...FULL_EDIT_STATES, ...PARTIAL_EDIT_STATES];
 
+type PasoKey = 'propietario' | 'datos' | 'roles' | 'participantes' | 'resumen';
+const TITULO_PASO: Record<PasoKey, string> = {
+  propietario: '¿A nombre de quién?',
+  datos: 'Datos generales',
+  roles: 'Roles y habilidades',
+  participantes: 'Participantes de la organización',
+  resumen: 'Resumen',
+};
+
 function NewProjectFormContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -40,6 +63,11 @@ function NewProjectFormContent() {
   const [triedStep1, setTriedStep1] = useState(false);
   const [triedStep2, setTriedStep2] = useState(false);
   const [triedParcial, setTriedParcial] = useState(false);
+  const [triedParticipantes, setTriedParticipantes] = useState(false);
+  const [idOrganizacion, setIdOrganizacion] = useState<number | null>(null);
+  const [idAsociacion, setIdAsociacion] = useState<number | null>(null);
+  const [participantes, setParticipantes] = useState<ParticipanteForm[]>([]);
+  const orgPreseleccionada = useRef(false);
 
   const [form, setForm] = useState<FormData>({
     tituloProyecto: '', descripcionProyecto: '', tipoProyecto: '',
@@ -50,6 +78,21 @@ function NewProjectFormContent() {
 
   const { data: carreras = [] } = useQuery<Carrera[]>({ queryKey: ['carreras'], queryFn: getCarreras });
   const { data: habilidades = [] } = useQuery<Habilidad[]>({ queryKey: ['habilidades'], queryFn: getHabilidades });
+
+  const { data: usuarioActual } = useCurrentUser();
+  const { data: misOrganizaciones = [], isLoading: cargandoOrgs } = useMisOrganizaciones(editId === null);
+  const orgsPublicables = organizacionesParaPublicar(misOrganizaciones);
+  const { data: misJuntas = [] } = useMisJuntas(editId === null);
+  const asociacionesPublicables = misJuntas.filter(puedePublicarComoAsociacion);
+  const { data: orgElegida, isLoading: cargandoOrg } = useOrganizacion(idOrganizacion ?? 0);
+  const orgParam = Number(searchParams.get('org')) || null;
+
+  // `?org=<id>` (desde la página de la organización) llega con la organización ya elegida.
+  useEffect(() => {
+    if (orgPreseleccionada.current || orgParam === null || cargandoOrgs) return;
+    orgPreseleccionada.current = true;
+    if (orgsPublicables.some((o) => o.idOrganizacion === orgParam)) setIdOrganizacion(orgParam);
+  }, [orgParam, cargandoOrgs, orgsPublicables]);
 
   const { data: proyectoExistente, isLoading: loadingExistente, error: errorExistente } = useQuery({
     queryKey: ['proyecto-owner', editId],
@@ -108,12 +151,41 @@ function NewProjectFormContent() {
     });
   }, [proyectoExistente, editId, router]);
 
+  const pasos: PasoKey[] = editId
+    ? ['datos', 'roles', 'resumen']
+    : ['propietario', 'datos', 'roles', ...(idOrganizacion !== null ? (['participantes'] as const) : []), 'resumen'];
+  const pasoActual = pasos[Math.min(step, pasos.length - 1)];
+  const errorDeParticipantes = idOrganizacion === null ? null : errorParticipantes(form.roles, participantes);
+
   const goTo = (target: number) => {
-    if (target > step && step === 0) setTriedStep1(true);
-    if (target > step && step === 1) setTriedStep2(true);
-    if (target > step && step === 0 && !step1Schema.safeParse(form).success) return;
+    if (target > step) {
+      // Se valida cada paso que se deja atrás; «roles» solo marca sus errores, como siempre.
+      for (let i = step; i < target; i += 1) {
+        if (pasos[i] === 'datos') {
+          setTriedStep1(true);
+          if (!step1Schema.safeParse(form).success) return setStep(i);
+        }
+        if (pasos[i] === 'roles') setTriedStep2(true);
+        if (pasos[i] === 'participantes') {
+          setTriedParticipantes(true);
+          if (errorDeParticipantes) return setStep(i);
+        }
+      }
+    }
     setDirection(target > step ? 'forward' : 'backward');
     setStep(target);
+  };
+
+  const elegirOrganizacion = (id: number | null) => {
+    setIdOrganizacion(id);
+    setIdAsociacion(null);
+    setParticipantes([]);
+  };
+
+  const elegirAsociacion = (id: number | null) => {
+    setIdAsociacion(id);
+    setIdOrganizacion(null);
+    setParticipantes([]);
   };
 
   const updateForm = (field: keyof Omit<FormData, 'roles'>, value: string) =>
@@ -152,6 +224,11 @@ function NewProjectFormContent() {
         .filter((req) => req.idHabilidad !== null && req.nivelMinimo !== '')
         .map((req) => ({ idHabilidad: req.idHabilidad!, nivelMinimo: req.nivelMinimo as NivelHabilidad, obligatorio: req.obligatorio })),
     })) : undefined,
+    ...(!editId && idAsociacion !== null && { idAsociacion }),
+    ...(!editId && idOrganizacion !== null && {
+      idOrganizacion,
+      ...(participantes.length > 0 && { participantes: participantesPayload(form.roles, participantes) }),
+    }),
   });
 
   const step1Errors: FieldErrors = triedStep1
@@ -213,7 +290,12 @@ function NewProjectFormContent() {
       setTriedStep1(true);
       setTriedStep2(true);
       const firstPath = result.error.issues[0]?.path ?? [];
-      setStep(firstPath[0] === 'roles' ? 1 : 0);
+      setStep(pasos.indexOf(firstPath[0] === 'roles' ? 'roles' : 'datos'));
+      return;
+    }
+    if (errorDeParticipantes) {
+      setTriedParticipantes(true);
+      setStep(pasos.indexOf('participantes'));
       return;
     }
 
@@ -326,7 +408,7 @@ function NewProjectFormContent() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-8">
           <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-2xl">
             <div className="px-8 pb-4 pt-8">
-              <h1 className="font-headline text-xl font-extrabold text-on-surface">Editar información</h1>
+              <PageTitle className="text-xl font-extrabold text-on-surface">Editar información</PageTitle>
               <p className="mt-0.5 text-sm text-tertiary">
                 Este proyecto está {proyectoExistente!.estadoProyecto === 'PUBLICADO' ? 'publicado' : 'en progreso'}: solo puedes editar la información general.
                 El tipo, la modalidad, la fecha de inicio y los roles no se modifican aquí.
@@ -371,21 +453,32 @@ function NewProjectFormContent() {
 
           {/* Header */}
           <div className="px-8 pt-8 pb-4">
-            <h1 className="font-headline text-xl font-extrabold text-on-surface">{editId ? 'Editar proyecto' : 'Crear proyecto'}</h1>
-            <p className="text-tertiary text-sm mt-0.5">{STEPS[step]} — Paso {step + 1} de {STEPS.length}</p>
+            <PageTitle className="text-xl font-extrabold text-on-surface">{editId ? 'Editar proyecto' : 'Crear proyecto'}</PageTitle>
+            <p className="text-tertiary text-sm mt-0.5">{TITULO_PASO[pasoActual]} — Paso {step + 1} de {pasos.length}</p>
           </div>
 
           {/* Barra de progreso */}
           <div className="flex gap-2 px-8 pb-6">
-            {STEPS.map((_, i) => (
+            {pasos.map((_, i) => (
               <button key={i} onClick={() => goTo(i)} className={`h-1.5 flex-1 rounded-full cursor-pointer transition-colors duration-200 ${i <= step ? 'bg-primary' : 'bg-surface-container-highest'}`} />
             ))}
           </div>
 
           {/* Contenido animado */}
           <div key={step} className={`px-8 pb-6 ${animClass}`}>
-            {step === 0 && <Step1 form={form} update={updateForm} errors={step1Errors} />}
-            {step === 1 && (
+            {pasoActual === 'propietario' && (
+              <StepPropietario
+                organizaciones={orgsPublicables}
+                cargando={cargandoOrgs}
+                idOrganizacion={idOrganizacion}
+                onChange={elegirOrganizacion}
+                asociaciones={asociacionesPublicables}
+                idAsociacion={idAsociacion}
+                onChangeAsociacion={elegirAsociacion}
+              />
+            )}
+            {pasoActual === 'datos' && <Step1 form={form} update={updateForm} errors={step1Errors} />}
+            {pasoActual === 'roles' && (
               <Step2
                 roles={form.roles} carreras={carreras} habilidades={habilidades}
                 errors={step2Errors}
@@ -393,8 +486,38 @@ function NewProjectFormContent() {
                 onAddRequisito={addRequisito} onRemoveRequisito={removeRequisito} onUpdateRequisito={updateRequisito}
               />
             )}
-            {step === 2 && (
-              <Step3 form={form} saving={saving} onSubmit={submit} />
+            {pasoActual === 'participantes' && (
+              <StepParticipantes
+                miembros={miembrosElegibles(orgElegida?.miembros ?? [], usuarioActual?.idUsuario ?? null)}
+                roles={form.roles}
+                participantes={participantes}
+                error={triedParticipantes ? errorDeParticipantes : null}
+                cargando={cargandoOrg}
+                onChange={setParticipantes}
+              />
+            )}
+            {pasoActual === 'resumen' && (
+              <Step3
+                form={form}
+                saving={saving}
+                onSubmit={submit}
+                organizacion={
+                  editId
+                    ? null
+                    : idAsociacion !== null
+                      ? `Asociación ${asociacionesPublicables.find((j) => j.idAsociacion === idAsociacion)?.nombre ?? ''}`
+                      : idOrganizacion !== null
+                        ? (orgElegida?.nombreOrganizacion ?? null)
+                        : null
+                }
+                participantes={participantes.map((p) => {
+                  const m = orgElegida?.miembros?.find((x) => x.idUsuario === p.idUsuario);
+                  return {
+                    nombre: m ? `${m.nombre} ${m.apellido}` : `Usuario ${p.idUsuario}`,
+                    rol: form.roles.find((r) => r.id === p.idRol)?.nombreRol ?? '',
+                  };
+                })}
+              />
             )}
           </div>
 
@@ -403,8 +526,8 @@ function NewProjectFormContent() {
             {/* Izquierda: Cancelar (paso 1) o Anterior (pasos 2-3) */}
             {step === 0 ? (
               <button
-                onClick={() => router.push('/dashboard/projects/mine')}
-                className="flex items-center gap-2 bg-transparent text-white border-2 border-error px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-error/10 transition-all duration-200"
+                onClick={() => router.push(idOrganizacion !== null && orgParam === idOrganizacion ? `/dashboard/organizaciones/${idOrganizacion}` : '/dashboard/projects/mine')}
+                className="flex items-center gap-2 bg-transparent text-error border-2 border-error px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-error/10 transition-all duration-200"
               >
                 <X className="w-4 h-4 text-error" />
                 <span className="text-error">Cancelar</span>
@@ -420,7 +543,7 @@ function NewProjectFormContent() {
             )}
 
             {/* Derecha: Siguiente o hint */}
-            {step < 2 ? (
+            {step < pasos.length - 1 ? (
               <button
                 onClick={() => goTo(step + 1)}
                 className="flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-md text-sm font-bold hover:bg-primary/90 motion-action motion-glow-primary motion-focus"

@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState, useCallback } from 'react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -255,9 +256,9 @@ export default function AdminUsuariosPage() {
         {/* Header */}
         <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className={ADMIN_PAGE_TITLE}>
+            <PageTitle className={ADMIN_PAGE_TITLE}>
               Gestión de Usuarios
-            </h1>
+            </PageTitle>
             <p className={ADMIN_PAGE_LEAD}>
               Consulta usuarios registrados, revisa su estado y administra accesos básicos.
             </p>

@@ -1,6 +1,8 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { getHabilidadBadgeStyle } from '@/lib/social/badge-colors';
+import { AVISO_PRIVACIDAD_JUNTA } from '@/lib/asociaciones/vista';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -29,6 +31,8 @@ import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
 import { getAdminUserDetail, type AdminUserDetail } from '@/lib/services/admin';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
+import { SemestreHorasCard } from '@/components/hours/semestre-horas-card';
+import { SemestreHorasHistorial } from '@/components/hours/semestre-horas-historial';
 import { useMisInsignias } from '@/hooks/use-insignias';
 import { SkeletonCard, SkeletonDetail } from '@/components/ui/skeleton';
 
@@ -141,9 +145,9 @@ export default function PerfilPage() {
             </div>
 
             <div className="flex-1">
-              <h1 className="type-display">
+              <PageTitle className="type-display">
                 {fullName || (isAdmin ? 'Administrador' : 'Perfil de estudiante')}
-              </h1>
+              </PageTitle>
 
               <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-on-surface-variant">
                 {isAdmin ? (
@@ -179,6 +183,7 @@ export default function PerfilPage() {
                           : 'Semestre no registrado'}
                       </span>
                     </div>
+                    <p className="text-xs leading-snug text-tertiary">{AVISO_PRIVACIDAD_JUNTA}</p>
                   </>
                 )}
               </div>
@@ -399,6 +404,14 @@ export default function PerfilPage() {
                 isLoading={insignias.isLoading}
                 isError={insignias.isError}
               />
+            )}
+
+            {/* Horas del semestre - students only */}
+            {!isAdmin && (
+              <>
+                <SemestreHorasCard editable />
+                <SemestreHorasHistorial />
+              </>
             )}
 
             {/* Habilidades - students only */}

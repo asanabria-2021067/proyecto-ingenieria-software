@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import dynamic from 'next/dynamic';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
@@ -30,7 +31,7 @@ export default function AdminMetricasPage() {
     <div className={ADMIN_PAGE}>
       <AdminBreadcrumb seccion="Métricas" pagina="Tendencias de uso" />
       <section className="mb-8">
-        <h1 className={ADMIN_PAGE_TITLE}>Tendencias de uso</h1>
+        <PageTitle className={ADMIN_PAGE_TITLE}>Tendencias de uso</PageTitle>
         <p className={ADMIN_PAGE_LEAD}>
           Evolución de usuarios, proyectos, tareas y horas confirmadas en la plataforma, por semana o por mes.
         </p>

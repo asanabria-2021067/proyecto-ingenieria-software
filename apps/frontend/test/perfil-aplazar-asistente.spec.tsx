@@ -27,6 +27,10 @@ vi.mock('@/lib/services/users', () => ({
   replaceCualidades: vi.fn(),
   addExperiencia: vi.fn(),
 }));
+vi.mock('@/lib/services/horas-semestre', () => ({
+  getHorasActual: async () => ({ semestre: { anio: 2026, periodo: 2, inicio: '2026-07-01', fin: '2026-12-31' }, registro: null, necesitaRegistro: true }),
+  putHorasActual: vi.fn(),
+}));
 vi.mock('@/lib/cloudinary', () => ({ uploadToCloudinary: vi.fn() }));
 
 function renderDialog(onDefer?: () => void) {
@@ -54,9 +58,9 @@ describe('Asistente "Completa tu perfil" - aplazar y omitir', () => {
 
   it('"Omitir este paso" avanza sin guardar y desaparece en el último paso', () => {
     renderDialog();
-    for (let paso = 2; paso <= 5; paso++) {
+    for (let paso = 2; paso <= 6; paso++) {
       fireEvent.click(screen.getByRole('button', { name: 'Omitir este paso' }));
-      expect(screen.getByText(new RegExp(`Paso ${paso} de 5`))).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(`Paso ${paso} de 6`))).toBeInTheDocument();
     }
     expect(updateProfileMock).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Omitir este paso' })).toBeNull();

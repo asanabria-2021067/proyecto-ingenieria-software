@@ -12,6 +12,7 @@ function makeContext() {
     getActiveParticipationInRole: vi.fn(),
     assertProjectLeader: vi.fn(),
     assertActiveProjectParticipant: vi.fn(),
+    esMiembroDeOrganizacionDelProyecto: vi.fn().mockResolvedValue(false),
   };
   return context as typeof context & TasksContextService;
 }
@@ -33,6 +34,42 @@ const FORBIDDEN_PARTICIPANT = () =>
   new ForbiddenException('No tienes una participación activa en este proyecto');
 
 describe('TasksAuthorizationService', () => {
+  describe('lectura para miembros de la organización dueña (ORG-8)', () => {
+    it('listar y leer tareas admite al miembro de la organización que no participa', async () => {
+      const ctx = makeContext();
+      ctx.assertActiveProjectParticipant.mockRejectedValue(FORBIDDEN_PARTICIPANT());
+      ctx.esMiembroDeOrganizacionDelProyecto.mockResolvedValue(true);
+      ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
+      const service = new TasksAuthorizationService(ctx);
+
+      await expect(service.assertCanListProjectTasks(1, EXTERNO_ID)).resolves.toBeUndefined();
+      await expect(service.assertCanReadTask(1, 10, EXTERNO_ID)).resolves.toBe(TAREA);
+      expect(ctx.esMiembroDeOrganizacionDelProyecto).toHaveBeenCalledWith(1, EXTERNO_ID, undefined);
+    });
+
+    it('sin organización sigue rechazando, y crear o comentar siguen exigiendo participar', async () => {
+      const ctx = makeContext();
+      ctx.assertActiveProjectParticipant.mockRejectedValue(FORBIDDEN_PARTICIPANT());
+      ctx.esMiembroDeOrganizacionDelProyecto.mockResolvedValue(false);
+      ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
+      const service = new TasksAuthorizationService(ctx);
+      await expect(service.assertCanListProjectTasks(1, EXTERNO_ID)).rejects.toBeInstanceOf(ForbiddenException);
+
+      ctx.esMiembroDeOrganizacionDelProyecto.mockResolvedValue(true);
+      await expect(service.assertCanCreateTask(1, EXTERNO_ID)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.assertCanCommentTask(1, 10, EXTERNO_ID)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('un error distinto de Forbidden (proyecto inexistente) se propaga sin consultar la organización', async () => {
+      const ctx = makeContext();
+      ctx.assertActiveProjectParticipant.mockRejectedValue(new NotFoundException('Proyecto con id 9 no encontrado'));
+      const service = new TasksAuthorizationService(ctx);
+
+      await expect(service.assertCanListProjectTasks(9, EXTERNO_ID)).rejects.toBeInstanceOf(NotFoundException);
+      expect(ctx.esMiembroDeOrganizacionDelProyecto).not.toHaveBeenCalled();
+    });
+  });
+
   describe('assertCanCreateTask', () => {
     it('permite al líder', async () => {
       const ctx = makeContext();

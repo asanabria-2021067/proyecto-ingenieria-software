@@ -8,15 +8,19 @@ type Props = {
   form: FormData;
   saving: boolean;
   onSubmit: (accion: 'BORRADOR' | 'EN_REVISION') => void;
+  /** Nombre de la organización a cuyo nombre se publica; null = proyecto personal. */
+  organizacion?: string | null;
+  participantes?: { nombre: string; rol: string }[];
 };
 
-export function Step3({ form, saving, onSubmit }: Props) {
+export function Step3({ form, saving, onSubmit, organizacion = null, participantes = [] }: Props) {
   return (
     <div className="space-y-5">
       <p className="text-tertiary text-sm">Revisa los datos antes de guardar o enviar tu proyecto.</p>
 
       <div className="rounded-xl border border-outline-variant p-4 space-y-1.5">
         <h3 className="text-sm font-bold text-on-surface mb-2">Datos generales</h3>
+        <p className="text-sm"><span className="text-tertiary">Publicado por: </span>{organizacion ?? 'Personal'}</p>
         <p className="text-sm"><span className="text-tertiary">Título: </span>{form.tituloProyecto}</p>
         <p className="text-sm"><span className="text-tertiary">Tipo: </span>{TIPO_LABEL[form.tipoProyecto as TipoProyecto]}</p>
         <p className="text-sm"><span className="text-tertiary">Modalidad: </span>{MODALIDAD_LABEL[form.modalidadProyecto as ModalidadProyecto]}</p>
@@ -41,6 +45,15 @@ export function Step3({ form, saving, onSubmit }: Props) {
                 </p>
               )}
             </div>
+          ))}
+        </div>
+      )}
+
+      {participantes.length > 0 && (
+        <div className="rounded-xl border border-outline-variant p-4 space-y-1.5">
+          <h3 className="text-sm font-bold text-on-surface mb-2">Participantes de la organización ({participantes.length})</h3>
+          {participantes.map((p) => (
+            <p key={`${p.nombre}-${p.rol}`} className="text-sm">{p.nombre} <span className="text-tertiary">- {p.rol}</span></p>
           ))}
         </div>
       )}

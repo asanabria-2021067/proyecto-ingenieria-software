@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { hashSync } from 'bcryptjs';
 import { InsigniasService } from '../src/insignias/insignias.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
+import { semestreDe } from '../src/horas-semestre/semestre';
 
 const prisma = new PrismaClient();
 
@@ -286,55 +287,6 @@ async function main() {
     });
   }
 
-  // ─── Organizaciones ──────────────────────────────────────
-  const organizaciones = await Promise.all([
-    prisma.organizacion.upsert({
-      where: { idOrganizacion: 1 },
-      update: {},
-      create: { idOrganizacion: 1, nombreOrganizacion: 'Asociación de Computación UVG', tipoOrganizacion: 'ASOCIACION', creadaPor: carlos.idUsuario },
-    }),
-    prisma.organizacion.upsert({
-      where: { idOrganizacion: 2 },
-      update: {},
-      create: { idOrganizacion: 2, nombreOrganizacion: 'Grupo de Robótica UVG', tipoOrganizacion: 'GRUPO_ESTUDIANTIL', creadaPor: jose.idUsuario },
-    }),
-    prisma.organizacion.upsert({
-      where: { idOrganizacion: 3 },
-      update: {},
-      create: { idOrganizacion: 3, nombreOrganizacion: 'Centro de Investigación Biomédica', tipoOrganizacion: 'CENTRO_INVESTIGACION', creadaPor: luis.idUsuario },
-    }),
-    prisma.organizacion.upsert({
-      where: { idOrganizacion: 4 },
-      update: {},
-      create: { idOrganizacion: 4, nombreOrganizacion: 'Instituto de Sostenibilidad', tipoOrganizacion: 'INSTITUTO', creadaPor: sofia.idUsuario },
-    }),
-    prisma.organizacion.upsert({
-      where: { idOrganizacion: 5 },
-      update: {},
-      create: { idOrganizacion: 5, nombreOrganizacion: 'Asociación de Ingeniería Industrial', tipoOrganizacion: 'ASOCIACION', creadaPor: maria.idUsuario },
-    }),
-  ]);
-  const [orgCompu, orgRobot, orgBio, orgSost, orgIndust] = organizaciones;
-
-  // ─── Usuarios ↔ Organizaciones ──────────────────────────
-  const uoData = [
-    { idUsuario: carlos.idUsuario, idOrganizacion: orgCompu.idOrganizacion, rolOrganizacion: 'PROPIETARIO' as const },
-    { idUsuario: maria.idUsuario, idOrganizacion: orgCompu.idOrganizacion, rolOrganizacion: 'MIEMBRO' as const },
-    { idUsuario: jose.idUsuario, idOrganizacion: orgRobot.idOrganizacion, rolOrganizacion: 'PROPIETARIO' as const },
-    { idUsuario: ana.idUsuario, idOrganizacion: orgRobot.idOrganizacion, rolOrganizacion: 'MIEMBRO' as const },
-    { idUsuario: luis.idUsuario, idOrganizacion: orgBio.idOrganizacion, rolOrganizacion: 'PROPIETARIO' as const },
-    { idUsuario: sofia.idUsuario, idOrganizacion: orgSost.idOrganizacion, rolOrganizacion: 'PROPIETARIO' as const },
-    { idUsuario: maria.idUsuario, idOrganizacion: orgIndust.idOrganizacion, rolOrganizacion: 'PROPIETARIO' as const },
-    { idUsuario: carlos.idUsuario, idOrganizacion: orgRobot.idOrganizacion, rolOrganizacion: 'MIEMBRO' as const },
-  ];
-  for (const uo of uoData) {
-    await prisma.usuarioOrganizacion.upsert({
-      where: { idUsuario_idOrganizacion: { idUsuario: uo.idUsuario, idOrganizacion: uo.idOrganizacion } },
-      update: {},
-      create: uo,
-    });
-  }
-
   // ─── Proyectos (5) ─────────────────────────────────────
   const proyectos = await Promise.all([
     prisma.proyecto.upsert({
@@ -438,27 +390,6 @@ async function main() {
       revisadaEn: new Date('2026-04-01'),
     },
   });
-
-  // ─── Proyecto ↔ Organización ───────────────────────────
-  const poData = [
-    { idProyecto: pTutorias.idProyecto, idOrganizacion: orgCompu.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
-    { idProyecto: pAmbiental.idProyecto, idOrganizacion: orgSost.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
-    { idProyecto: pNeural.idProyecto, idOrganizacion: orgBio.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
-    { idProyecto: pRobot.idProyecto, idOrganizacion: orgRobot.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
-    { idProyecto: pEmpleo.idProyecto, idOrganizacion: orgCompu.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
-    { idProyecto: pEmpleo.idProyecto, idOrganizacion: orgIndust.idOrganizacion, rolOrganizacion: 'COLABORADORA' as const },
-    { idProyecto: pRevision.idProyecto, idOrganizacion: orgIndust.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
-    { idProyecto: pObservado.idProyecto, idOrganizacion: orgRobot.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
-    { idProyecto: pCierre.idProyecto, idOrganizacion: orgCompu.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
-    { idProyecto: pCancelado.idProyecto, idOrganizacion: orgSost.idOrganizacion, rolOrganizacion: 'PRINCIPAL' as const },
-  ];
-  for (const po of poData) {
-    await prisma.proyectoOrganizacion.upsert({
-      where: { idProyecto_idOrganizacion: { idProyecto: po.idProyecto, idOrganizacion: po.idOrganizacion } },
-      update: {},
-      create: po,
-    });
-  }
 
   // ─── Proyecto ↔ Intereses ─────────────────────────────
   const piData = [
@@ -1628,7 +1559,6 @@ async function main() {
   const sequences = [
     { table: 'carrera', column: 'id_carrera' },
     { table: 'habilidad', column: 'id_habilidad' },
-    { table: 'organizacion', column: 'id_organizacion' },
     { table: 'proyecto', column: 'id_proyecto' },
     { table: 'rol_proyecto', column: 'id_rol_proyecto' },
     { table: 'revision_proyecto', column: 'id_revision_proyecto' },
@@ -1804,6 +1734,15 @@ async function main() {
       idRemitente: jose.idUsuario,
       contenido: 'Voy avanzado, la termino esta semana.',
     },
+  });
+
+  // HRS: sin registro del semestre actual el asistente de perfil se abre sobre el dashboard de cada
+  // estudiante y tapa la pantalla; los sembrados nacen con el semestre ya registrado.
+  const { anio, periodo } = semestreDe(new Date());
+  const estudiantes = await prisma.usuario.findMany({ where: { perfil: { isNot: null } }, select: { idUsuario: true } });
+  await prisma.registroHorasSemestre.createMany({
+    data: estudiantes.map(({ idUsuario }) => ({ idUsuario, anio, periodo })),
+    skipDuplicates: true,
   });
 
   // conversacion/mensaje_chat/evento_proyecto se siembran con id explícito

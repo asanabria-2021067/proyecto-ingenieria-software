@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState, type ReactNode } from 'react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -143,9 +144,9 @@ export default function AdminReviewsInboxPage() {
         {/* Header */}
         <section className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h1 className={ADMIN_PAGE_TITLE}>
+            <PageTitle className={ADMIN_PAGE_TITLE}>
               Solicitudes de publicación
-            </h1>
+            </PageTitle>
             <p className="mt-2 max-w-2xl text-sm text-tertiary">
               Evalúa los proyectos enviados por estudiantes, aprueba su publicación o solicita correcciones.
             </p>

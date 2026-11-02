@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useId, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ChevronDown, Loader2 } from 'lucide-react';
@@ -401,7 +402,7 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
         <header className="card-base mb-4">
           <div className="flex flex-col gap-stack lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
-              <h1 className="type-display break-words text-text-primary">{cabecera.titulo}</h1>
+              <PageTitle className="type-display break-words text-text-primary">{cabecera.titulo}</PageTitle>
               <dl className="mt-inline flex flex-wrap gap-x-card gap-y-tight">
                 <div>
                   <dt className="type-meta">Líder</dt>

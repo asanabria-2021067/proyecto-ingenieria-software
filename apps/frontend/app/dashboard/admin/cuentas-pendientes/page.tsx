@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Check, UserCheck, X } from 'lucide-react';
@@ -137,7 +138,7 @@ export default function AdminCuentasPendientesPage() {
       <AdminBreadcrumb seccion="Verificación y seguridad" pagina="Cuentas pendientes" />
       {/* Sin botón «Actualizar» propio: el de la barra superior del shell vuelve a pedir esta consulta. */}
       <section className="mb-8">
-        <h1 className={ADMIN_PAGE_TITLE}>Cuentas pendientes</h1>
+        <PageTitle className={ADMIN_PAGE_TITLE}>Cuentas pendientes</PageTitle>
         <p className={ADMIN_PAGE_LEAD}>
           Cuentas nuevas que esperan verificación. Aprueba las que correspondan a la comunidad
           UVG y rechaza las que no.

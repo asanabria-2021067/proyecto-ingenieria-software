@@ -1,5 +1,7 @@
 'use client';
 
+import { AVISO_PRIVACIDAD_JUNTA } from '@/lib/asociaciones/vista';
+import { PageTitle } from '@/components/ui/page-title';
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -218,7 +220,7 @@ export default function RegistroPage() {
             {/* Branding */}
             <div className="mb-8 text-left">
               <Image src={logo} alt="UVGENIUS" className="mx-auto mb-4 h-28 w-auto" />
-              <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">Crear cuenta</h1>
+              <PageTitle className="text-4xl font-extrabold tracking-tight text-on-surface">Crear cuenta</PageTitle>
               <p className="mt-2 text-base text-tertiary">Usa tu correo institucional para registrarte</p>
             </div>
 
@@ -381,6 +383,7 @@ export default function RegistroPage() {
                   {errores.semestre && <AuthFieldError id="semestre-error">{errores.semestre}</AuthFieldError>}
                 </div>
               </div>
+              <p className="text-xs leading-snug text-tertiary">{AVISO_PRIVACIDAD_JUNTA}</p>
 
               <div className="min-w-0 space-y-1.5">
                 <label htmlFor="contrasena" className={AUTH_LABEL}>

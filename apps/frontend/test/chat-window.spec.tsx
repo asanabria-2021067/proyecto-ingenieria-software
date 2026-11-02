@@ -432,4 +432,18 @@ describe('ChatWindow - responder citando un mensaje', () => {
     expect(screen.getByRole('button', { name: /Ir al mensaje original de Rosa Fuentes/ })).toBeInTheDocument();
     expect(screen.getByText('Original')).toBeInTheDocument();
   });
+
+  it('en la página de mensajes no hay minimizar ni cerrar y el botón volver llama a onClose', () => {
+    const { onClose } = renderWindow({ variante: 'pagina' });
+
+    expect(screen.queryByRole('button', { name: 'Minimizar chat' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cerrar chat' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a la lista de mensajes' }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('como ventana flotante no muestra el botón volver', () => {
+    renderWindow();
+    expect(screen.queryByRole('button', { name: 'Volver a la lista de mensajes' })).not.toBeInTheDocument();
+  });
 });

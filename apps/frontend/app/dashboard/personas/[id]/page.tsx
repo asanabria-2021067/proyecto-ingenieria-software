@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -133,7 +134,7 @@ export default function PerfilPersonaPage() {
             </Avatar>
             <div className="flex min-w-0 flex-1 flex-col items-center gap-tight sm:items-start">
               <div>
-                <h1 className="type-display text-text-primary">{nombreCompleto}</h1>
+                <PageTitle className="type-display text-text-primary">{nombreCompleto}</PageTitle>
                 {perfil.carrera && <p className="type-body text-text-secondary">{perfil.carrera}</p>}
               </div>
 

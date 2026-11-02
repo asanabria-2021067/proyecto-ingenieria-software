@@ -3,7 +3,10 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
+vi.mock('next/navigation', () => ({ usePathname: () => '/dashboard' }));
 vi.mock('@/components/chat-dock/chat-dock-context', () => ({
+  RUTA_MENSAJES: '/dashboard/mensajes',
+  idConversacionDeRuta: () => null,
   useChatDock: () => ({ windows: [], minimizedIds: [], cerrarChat: vi.fn(), toggleMinimize: vi.fn() }),
 }));
 vi.mock('@/hooks/use-chat', () => ({

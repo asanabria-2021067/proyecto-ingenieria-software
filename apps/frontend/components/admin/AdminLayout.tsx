@@ -13,6 +13,7 @@ import {
   FileSearch,
   FolderKanban,
   FolderOpen,
+  Landmark,
   BellRing,
   Megaphone,
   Gavel,
@@ -69,6 +70,7 @@ export const adminNavEntries: NavEntry[] = [
     items: [
       { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: UserCog },
       { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
+      { href: '/dashboard/admin/asociaciones', label: 'Asociaciones y juntas', icon: Landmark },
     ],
   },
   {
@@ -101,6 +103,7 @@ export const adminNavEntries: NavEntry[] = [
     items: [
       // HU-178: las métricas de uso tienen página propia; el Panel Admin solo conserva un resumen.
       { href: ADMIN_METRICS_ROUTE, label: 'Tendencias de uso', icon: TrendingUp },
+      { href: '/dashboard/admin/horas', label: 'Horas por semestre', icon: Clock },
     ],
   },
   {

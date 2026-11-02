@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { EstadoParticipacion, EstadoProyecto, EstadoSprint, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { esMiembroDeOrganizacionDelProyecto } from '../../organizations/organization-access';
 
 /**
  * Sprint 7 (06 v2 §34/§40/§41): decisor único de LECTURA por proyecto.
@@ -32,6 +33,7 @@ export type ReaderProfile =
   | 'PARTICIPANTE_ACTIVO'
   | 'PARTICIPANTE_HISTORICO'
   | 'EXLIDER_SIN_PARTICIPACION'
+  | 'MIEMBRO_ORGANIZACION'
   | 'EXTERNO';
 
 export interface ReadProjectRow {
@@ -102,7 +104,19 @@ export class ProjectReadPolicyService {
     }
 
     const profile = await this.profileFor(db, project, input.actorId);
-    const decision = this.decide(profile, project, input.scope);
+    let decision: ReadDecision | undefined;
+    // Quien participó o lideró antes y sigue en la organización ve como cualquier otro miembro (ORG-8).
+    if (
+      (profile === 'PARTICIPANTE_HISTORICO' || profile === 'EXLIDER_SIN_PARTICIPACION') &&
+      (await esMiembroDeOrganizacionDelProyecto(db, project.idProyecto, input.actorId))
+    ) {
+      try {
+        decision = this.decide('MIEMBRO_ORGANIZACION', project, input.scope);
+      } catch (error) {
+        if (!(error instanceof ForbiddenException)) throw error;
+      }
+    }
+    decision ??= this.decide(profile, project, input.scope);
 
     if (
       input.entitySprintId !== undefined &&
@@ -160,7 +174,7 @@ export class ProjectReadPolicyService {
     if (historyAsLeader > 0 || appealsAsLeader > 0) {
       return 'EXLIDER_SIN_PARTICIPACION';
     }
-    return 'EXTERNO';
+    return (await esMiembroDeOrganizacionDelProyecto(db, project.idProyecto, actorId)) ? 'MIEMBRO_ORGANIZACION' : 'EXTERNO';
   }
 
   private async isAdmin(db: Db, actorId: number): Promise<boolean> {
@@ -187,6 +201,10 @@ export class ProjectReadPolicyService {
    *   exclusiva de líder y admin en CUALQUIER estado del proyecto, nunca se abre
    *   a un participante por el solo hecho de que el proyecto ya cerró;
    * - exlíder sin participación: vista pública P/E y sus propios hechos de liderazgo;
+   * - miembro de la organización dueña (no participa): solo lectura de resumen,
+   *   tareas y Sprints del proyecto publicado o cerrado; nada de horas, equipo,
+   *   documentos ni bitácora (ORG-8). Escribir lo impide la política de escritura,
+   *   que exige líder o participante activo;
    * - externo: nada por esta política (el GET público de proyecto queda fuera de ella).
    */
   private decide(profile: ReaderProfile, project: ReadProjectRow, scope: ReadScope): ReadDecision {
@@ -247,6 +265,8 @@ export class ProjectReadPolicyService {
           return allow(null, true);
         }
         return scope === 'resumen' && live ? allow(ONLY_CLOSED, true) : deny();
+      case 'MIEMBRO_ORGANIZACION':
+        return (closed || live) && (scope === 'resumen' || scope === 'tareas' || scope === 'sprints') ? allow(null) : deny();
       case 'EXTERNO':
       default:
         return deny();

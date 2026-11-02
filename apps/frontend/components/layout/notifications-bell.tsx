@@ -12,6 +12,10 @@ import {
 import { getNotificationLink, type Notificacion } from '@/lib/services/notifications';
 import { resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
 import { resolveCommentNotificationLink } from '@/components/notifications/comment-notification-link';
+import {
+  idInvitacionDeNotificacion,
+  InvitacionAcciones,
+} from '@/components/organizations/invitacion-acciones';
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -153,6 +157,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
             <ul className="divide-y divide-outline-variant/50">
               {recientes.map((n) => {
                 const isUnread = n.leidaEn === null;
+                const idInvitacion = isUnread ? idInvitacionDeNotificacion(n) : null;
                 const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n) ?? resolveCommentNotificationLink(n);
 
                 const content = (
@@ -200,7 +205,15 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
 
                 return (
                   <li key={n.idNotificacion} className={itemClassName}>
-                    {href ? (
+                    {idInvitacion !== null ? (
+                      <>
+                        {content}
+                        <InvitacionAcciones
+                          idInvitacion={idInvitacion}
+                          onResuelta={() => marcarLeida.mutate(n.idNotificacion)}
+                        />
+                      </>
+                    ) : href ? (
                       <Link
                         href={href}
                         onClick={() => {

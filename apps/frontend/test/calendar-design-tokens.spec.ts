@@ -39,7 +39,7 @@ describe('calendario — tokens de tipografía y radios (G04-C10, UI-33)', () =>
   });
 
   it('el titular de la página usa type-display y las filas de agenda el radio de control', () => {
-    expect(leer(join('app', 'dashboard', 'calendario', 'page.tsx'))).toMatch(/<h1 className="type-display mb-1">/);
+    expect(leer(join('app', 'dashboard', 'calendario', 'page.tsx'))).toMatch(/<PageTitle className="type-display mb-1">/);
     const fila = leer(join('components', 'calendar', 'agenda-item-row.tsx'));
     expect(fila.match(/rounded-control border-l-4/g)).toHaveLength(2);
   });

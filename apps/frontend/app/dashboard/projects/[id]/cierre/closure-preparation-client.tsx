@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -277,9 +278,9 @@ function ClosurePreparationView({ proyecto }: { proyecto: ProyectoDetalleDTO }) 
           <FileText className="size-8" />
         </span>
         <div className="min-w-0 space-y-2">
-          <h1 className="type-display line-clamp-2">
+          <PageTitle className="type-display line-clamp-2">
             {proyecto.tituloProyecto}
-          </h1>
+          </PageTitle>
           <p className="text-sm text-tertiary">
             Preparación del cierre{draft ? ` — entrega #${draft.numeroRevision}` : ''}
           </p>
@@ -492,9 +493,9 @@ export default function ClosurePreparationClient({ id }: Props) {
   if (isError || !proyecto) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-        <h1 className="text-lg font-bold text-on-surface">
+        <PageTitle className="text-lg font-bold text-on-surface">
           {getApiErrorStatus(error) === 404 ? 'Este proyecto ya no existe.' : 'No fue posible cargar el proyecto.'}
-        </h1>
+        </PageTitle>
         <div className="mt-5 flex justify-center gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             Reintentar

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { abrirChatIndividualCon } from './support/chat';
 
 // Mismo par de cuentas sembradas que chat-mensajeria.spec.ts.
 const PROYECTO_ID = 1;
@@ -16,20 +17,6 @@ async function desactivarTour(page: Page) {
       return originalGetItem.call(this, key);
     };
   });
-}
-
-async function abrirChatIndividualCon(page: Page, nombreOtro: string) {
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  const existente = page.getByRole('button', { name: new RegExp(nombreOtro) });
-  if (await existente.count()) {
-    await existente.first().click();
-    return;
-  }
-  await page.getByRole('button', { name: /^mensajes/i }).click();
-  await page.getByRole('button', { name: /nuevo chat/i }).click();
-  await page.getByRole('button', { name: 'Individual' }).click();
-  await page.getByRole('checkbox', { name: new RegExp(nombreOtro) }).click();
-  await page.getByRole('button', { name: 'Crear chat' }).click();
 }
 
 test('el tema de color es propio: A lo cambia y B sigue viendo el suyo', async ({ browser }) => {
@@ -57,19 +44,19 @@ test('el tema de color es propio: A lo cambia y B sigue viendo el suyo', async (
     const mensaje = `Tema azul ${Math.random().toString(36).slice(2)}`;
     await pageA.getByPlaceholder('Escribe un mensaje…').fill(mensaje);
     await pageA.getByRole('button', { name: 'Enviar mensaje' }).click();
-    await expect(pageA.getByText(mensaje).first().locator('..')).toHaveClass(/bg-blue-700/);
+    await expect(pageA.locator('main section').getByText(mensaje).first().locator('..')).toHaveClass(/bg-blue-700/);
 
     // El tema persiste al recargar (viene del backend, no del navegador).
     await pageA.reload();
     await abrirChatIndividualCon(pageA, 'María');
-    await expect(pageA.getByText(mensaje).first().locator('..')).toHaveClass(/bg-blue-700/);
+    await expect(pageA.locator('main section').getByText(mensaje).first().locator('..')).toHaveClass(/bg-blue-700/);
 
     // B no tiene tema: su propia burbuja conserva el color por defecto.
     await abrirChatIndividualCon(pageB, 'Carlos');
     await pageB.getByPlaceholder('Escribe un mensaje…').fill('Respuesta de B');
     await pageB.getByRole('button', { name: 'Enviar mensaje' }).click();
-    await expect(pageB.getByText('Respuesta de B').first().locator('..')).toHaveClass(/bg-primary/);
-    await expect(pageB.getByText('Respuesta de B').first().locator('..')).not.toHaveClass(/bg-blue-700/);
+    await expect(pageB.locator('main section').getByText('Respuesta de B').first().locator('..')).toHaveClass(/bg-primary/);
+    await expect(pageB.locator('main section').getByText('Respuesta de B').first().locator('..')).not.toHaveClass(/bg-blue-700/);
   } finally {
     await contextA.close();
     await contextB.close();

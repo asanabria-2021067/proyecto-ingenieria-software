@@ -32,7 +32,7 @@ import { ESTADO_CHAT_SELECT, estadoVigente } from './chat-estado.service';
  * (CERRADO es, hoy, un estado terminal: no hay ningún camino de código que
  * revierta un proyecto ya CERRADO a otro estado).
  */
-function chatArchivado(estadoProyecto: EstadoProyecto): boolean {
+function chatArchivado(estadoProyecto: EstadoProyecto | undefined): boolean {
   return estadoProyecto === EstadoProyecto.CERRADO;
 }
 
@@ -63,7 +63,7 @@ const MENSAJE_SELECT = {
 
 const URL_ADJUNTO_TTL_SEGUNDOS = 60;
 
-const MENSAJE_CON_CITA_SELECT = {
+export const MENSAJE_CON_CITA_SELECT = {
   ...MENSAJE_SELECT,
   idMensajeCitado: true,
   citado: { select: { idMensaje: true, contenido: true, eliminadoEn: true, remitente: USUARIO_SELECT } },
@@ -72,7 +72,7 @@ const MENSAJE_CON_CITA_SELECT = {
 const EXTRACTO_CITA_MAX = 120;
 
 /** Reemplaza el mensaje citado completo por un resumen (id, remitente, extracto). */
-function conResumenDeCita<
+export function conResumenDeCita<
   T extends { citado: { idMensaje: number; contenido: string; eliminadoEn: Date | null; remitente: unknown } | null },
 >(
   mensaje: T,
@@ -113,7 +113,7 @@ function reaccionesParaUsuario(grupos: ReturnType<typeof agruparReacciones>, use
 }
 
 /** El contenido de un mensaje eliminado nunca sale del servidor. */
-function ocultarEliminado<T extends { contenido: string; eliminadoEn: Date | null }>(mensaje: T): T {
+export function ocultarEliminado<T extends { contenido: string; eliminadoEn: Date | null }>(mensaje: T): T {
   if (!mensaje.eliminadoEn) return mensaje;
   return { ...mensaje, contenido: '', ...('adjunto' in mensaje ? { adjunto: null } : {}) };
 }
@@ -319,6 +319,11 @@ export class ChatService {
   /** Historial paginado: 30 mensajes más recientes, o los 30 anteriores a `cursorId`. */
   async getMessages(idProyecto: number, idConversacion: number, userId: number, cursorId?: number) {
     await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    return this.mensajesDe(idConversacion, userId, cursorId);
+  }
+
+  /** Página de historial sin chequeo de acceso: el llamador ya verificó que `userId` puede leer la conversación. */
+  async mensajesDe(idConversacion: number, userId: number, cursorId?: number) {
     const mensajes = await this.prisma.mensajeChat.findMany({
       where: { idConversacion, ...(cursorId ? { idMensaje: { lt: cursorId } } : {}) },
       orderBy: { idMensaje: 'desc' },
@@ -383,7 +388,7 @@ export class ChatService {
     emoji: string,
   ) {
     const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
-    if (chatArchivado(conversacion.proyecto.estadoProyecto)) {
+    if (chatArchivado(conversacion.proyecto?.estadoProyecto)) {
       throw new ForbiddenException('Esta conversación está archivada: no se puede reaccionar.');
     }
     const mensaje = await this.prisma.mensajeChat.findFirst({
@@ -558,7 +563,7 @@ export class ChatService {
     // desde aquí). Bloquear acá cubre API y socket a la vez: si esto lanza,
     // broadcastMessage nunca se invoca, así que tampoco sale un evento en
     // vivo para un mensaje que nunca existió.
-    if (chatArchivado(conversacion.proyecto.estadoProyecto)) {
+    if (chatArchivado(conversacion.proyecto?.estadoProyecto)) {
       throw new ForbiddenException(
         'Esta conversación está archivada: el proyecto ya cerró y no se pueden enviar mensajes nuevos.',
       );
@@ -631,7 +636,7 @@ export class ChatService {
     userId: number,
   ) {
     const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
-    if (chatArchivado(conversacion.proyecto.estadoProyecto)) {
+    if (chatArchivado(conversacion.proyecto?.estadoProyecto)) {
       throw new ForbiddenException('Esta conversación está archivada: no se pueden modificar mensajes.');
     }
     const mensaje = await this.prisma.mensajeChat.findFirst({

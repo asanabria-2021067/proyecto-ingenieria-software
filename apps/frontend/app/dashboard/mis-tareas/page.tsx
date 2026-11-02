@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -389,7 +390,7 @@ export default function MisTareasPage() {
   return (
     <div className={dashboardPage('@container/mis-tareas flex flex-col gap-section py-section lg:py-page')}>
       <header>
-        <h1 className="type-display">Mis Tareas</h1>
+        <PageTitle className="type-display">Mis Tareas</PageTitle>
         <p className="type-body mt-micro text-text-secondary">
           Todas las tareas asignadas en tus proyectos, ordenadas por lo que requiere atención primero.
         </p>

@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -261,7 +262,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
               </span>
               <TipoBadge tipo={vista.tipo} />
             </div>
-            <h1 className="type-display break-words">{vista.titulo}</h1>
+            <PageTitle className="type-display break-words">{vista.titulo}</PageTitle>
             <p className="max-w-3xl text-sm leading-relaxed text-on-surface-variant">
               {vista.descripcion || 'Sin descripción disponible.'}
             </p>

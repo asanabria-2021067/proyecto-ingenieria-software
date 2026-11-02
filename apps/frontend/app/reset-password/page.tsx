@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState, type FormEvent, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Lock, CheckCircle } from 'lucide-react';
@@ -114,9 +115,9 @@ function ResetPasswordForm() {
           <div className="w-full max-w-md">
             <div className="mb-10 text-left">
               <Image src={logo} alt="UVGENIUS" className="h-40 w-auto mx-auto mb-4" />
-              <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
+              <PageTitle className="text-3xl font-extrabold tracking-tight text-on-surface">
                 Restablecer contraseña
-              </h1>
+              </PageTitle>
               <p className="mt-2 text-base text-tertiary">
                 Ingresa tu nueva contraseña a continuación
               </p>
@@ -163,7 +164,7 @@ function ResetPasswordForm() {
                 <button
                   type="submit"
                   disabled={enviando}
-                  className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-white shadow-lg shadow-green-900/20 transition-all hover:bg-primary dark:hover:bg-[#153e26] active:scale-[0.98] disabled:opacity-60"
+                  className="w-full rounded-xl bg-primary-container py-4 font-headline font-bold text-on-primary-container shadow-lg shadow-primary/20 transition-all hover:bg-primary hover:text-on-primary active:scale-[0.98] disabled:opacity-60"
                 >
                   {enviando ? 'Restableciendo...' : 'Restablecer contraseña'}
                 </button>

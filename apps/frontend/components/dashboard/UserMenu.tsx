@@ -12,6 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { asociacionDeRuta, rutaAsociacion } from '@/lib/asociaciones/vista';
+import type { MiJunta } from '@/lib/services/asociaciones';
 import { cn } from '@/lib/utils';
 
 interface UserMenuUser {
@@ -31,6 +33,8 @@ interface UserMenuProps {
   theme?: 'default' | 'admin';
   /** Clase extra del menú desplegable (se pinta en un portal): p. ej. la paleta salvia del estudiante. */
   menuClassName?: string;
+  /** Juntas del usuario: con alguna, el menú ofrece cambiar entre la vista Estudiante y «Asociación <nombre>». */
+  juntas?: MiJunta[];
 }
 
 function UserAvatar({ user, theme }: { user: UserMenuUser | null | undefined; theme: 'default' | 'admin' }) {
@@ -70,13 +74,20 @@ function UserMenuContent({
   onLogout,
   theme,
   menuClassName,
+  juntas,
 }: {
   user: UserMenuUser | null | undefined;
   onLogout: () => void;
   theme: 'default' | 'admin';
   menuClassName?: string;
+  juntas: MiJunta[];
 }) {
   const pathname = usePathname();
+  const vista = String(asociacionDeRuta(pathname) ?? 'estudiante');
+  const vistas = [
+    { clave: 'estudiante', href: '/dashboard', etiqueta: 'Estudiante' },
+    ...juntas.map((j) => ({ clave: String(j.idAsociacion), href: rutaAsociacion(j.idAsociacion), etiqueta: `Asociación ${j.nombre}` })),
+  ];
   return (
     // `admin-account-menu` solo cambia colores (paleta Forest Graphite); el
     // menú se pinta en un portal, fuera de `.admin-sidebar`.
@@ -89,6 +100,23 @@ function UserMenuContent({
             </p>
             <p className="type-meta truncate">{user.correo}</p>
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+        </>
+      )}
+      {juntas.length > 0 && (
+        <>
+          <DropdownMenuLabel className="type-meta">Vista</DropdownMenuLabel>
+          {vistas.map(({ clave, href, etiqueta }) => (
+            <DropdownMenuItem
+              key={clave}
+              asChild
+              className="cursor-pointer aria-[current=page]:bg-muted aria-[current=page]:font-semibold"
+            >
+              <Link href={href} aria-current={vista === clave ? 'page' : undefined}>
+                <span className="truncate">{etiqueta}</span>
+              </Link>
+            </DropdownMenuItem>
+          ))}
           <DropdownMenuSeparator />
         </>
       )}
@@ -128,7 +156,7 @@ function UserMenuContent({
  *  (avatar/nombre del usuario), reutilizado por DashboardLayout y AdminLayout tanto en
  *  el pie del sidebar de escritorio como en la barra inferior móvil. Es el único acceso a la
  *  cuenta en cada ancho: la barra superior no lo repite. */
-export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default', menuClassName }: UserMenuProps) {
+export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default', menuClassName, juntas = [] }: UserMenuProps) {
   const isAdmin = theme === 'admin';
 
   if (variant === 'compact') {
@@ -147,7 +175,7 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
             <UserAvatar user={user} theme={theme} />
           </button>
         </DropdownMenuTrigger>
-        <UserMenuContent user={user} onLogout={onLogout} theme={theme} menuClassName={menuClassName} />
+        <UserMenuContent user={user} onLogout={onLogout} theme={theme} menuClassName={menuClassName} juntas={juntas} />
       </DropdownMenu>
     );
   }
@@ -180,7 +208,7 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
           />
         </button>
       </DropdownMenuTrigger>
-      <UserMenuContent user={user} onLogout={onLogout} theme={theme} menuClassName={menuClassName} />
+      <UserMenuContent user={user} onLogout={onLogout} theme={theme} menuClassName={menuClassName} juntas={juntas} />
     </DropdownMenu>
   );
 }

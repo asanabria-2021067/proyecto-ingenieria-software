@@ -6,6 +6,8 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import type { MisHorasProyecto, MisHorasTarea, MisHorasView } from '../lib/services/users';
 
 vi.mock('../hooks/use-my-hours', () => ({ useMisHoras: vi.fn() }));
+vi.mock('../components/hours/semestre-horas-card', () => ({ SemestreHorasCard: () => null }));
+vi.mock('../components/hours/semestre-horas-historial', () => ({ SemestreHorasHistorial: () => null }));
 
 import MisHorasPage from '../app/dashboard/mis-horas/page';
 import { useMisHoras } from '../hooks/use-my-hours';

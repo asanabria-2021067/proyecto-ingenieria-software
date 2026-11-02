@@ -13,8 +13,10 @@ export const VISTAS_ADMIN: Record<string, string> = {
   '/dashboard/admin/solicitudes-recuperacion': 'app/dashboard/admin/solicitudes-recuperacion/page.tsx',
   '/dashboard/admin/cuentas-pendientes': 'app/dashboard/admin/cuentas-pendientes/page.tsx',
   '/dashboard/admin/metricas': 'app/dashboard/admin/metricas/page.tsx',
+  '/dashboard/admin/horas': 'app/dashboard/admin/horas/page.tsx',
   '/dashboard/admin/seguridad': 'app/dashboard/admin/seguridad/page.tsx',
   '/dashboard/admin/anuncios': 'app/dashboard/admin/anuncios/page.tsx',
+  '/dashboard/admin/asociaciones': 'app/dashboard/admin/asociaciones/page.tsx',
   '/dashboard/admin/apelaciones': 'app/dashboard/admin/apelaciones/appeals-inbox-client.tsx',
   '/dashboard/admin/apelaciones/[apelacionId]': 'app/dashboard/admin/apelaciones/[apelacionId]/appeal-review-client.tsx',
   '/dashboard/admin/proyectos': 'app/dashboard/admin/proyectos/admin-projects-client.tsx',
@@ -40,7 +42,7 @@ export interface Medida {
 export function medir(fuente: string): Medida {
   const contar = (patron: RegExp) => fuente.match(patron)?.length ?? 0;
   // El titular puede llevar la clase escrita o la primitiva compartida `ADMIN_PAGE_TITLE` (= type-display).
-  const h1 = fuente.match(/<h1[^>]*className=(?:"([^"]*)"|\{(ADMIN_PAGE_TITLE)\})/);
+  const h1 = fuente.match(/<(?:h1|PageTitle)[^>]*className=(?:"([^"]*)"|\{(ADMIN_PAGE_TITLE)\})/);
   return {
     px: contar(/\btext-\[[0-9.]+px\]/g),
     radio: contar(/\brounded-(?:md|lg|xl|2xl|3xl)\b/g),

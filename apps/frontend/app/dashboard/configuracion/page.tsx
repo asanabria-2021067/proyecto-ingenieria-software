@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { Settings } from 'lucide-react';
 import { NotificationPreferencesSection } from '@/components/profile/notification-preferences-section';
 import { dashboardPage } from '@/components/layout/dashboard-page';
@@ -18,7 +19,7 @@ export default function ConfiguracionPage() {
           <Settings className="h-5 w-5" aria-hidden="true" />
         </div>
         <div>
-          <h1 className="type-display">Configuración</h1>
+          <PageTitle className="type-display">Configuración</PageTitle>
           <p className="type-meta mt-micro">Administra qué notificaciones deseas recibir en UVGenius.</p>
         </div>
       </div>

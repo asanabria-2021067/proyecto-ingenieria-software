@@ -40,13 +40,15 @@ afterEach(() => {
 const FAMILIAS = [
   // HU-200: + MENCION_COMENTARIO.
   ['Tareas e hitos', 8],
-  ['Postulaciones y equipo', 7],
+  // ORG-1: + INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA.
+  ['Postulaciones y equipo', 10],
   ['Proyectos', 17],
   ['Horas y reconocimiento', 5],
   // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA.
   ['Recordatorios y calendario', 5],
   ['Red de contactos', 3],
-  ['Cuenta y seguridad', 5],
+  // ASO-1: + JUNTA_ASOCIACION.
+  ['Cuenta y seguridad', 6],
 ] as const;
 
 const familia = (titulo: string) => screen.getByRole('button', { name: new RegExp(`^${titulo}`) });
@@ -141,7 +143,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
 
   it('la vista solo contiene las preferencias de notificación', () => {
     const pagina = fuente('app/dashboard/configuracion/page.tsx');
-    expect(pagina).toContain('<h1 className="type-display">Configuración</h1>');
+    expect(pagina).toContain('<PageTitle className="type-display">Configuración</PageTitle>');
     expect(pagina).toContain('Administra qué notificaciones deseas recibir en UVGenius.');
     expect(pagina).not.toMatch(/Próximamente|Apariencia|Contraseña|Sesiones|Privacidad|<Tabs/i);
   });

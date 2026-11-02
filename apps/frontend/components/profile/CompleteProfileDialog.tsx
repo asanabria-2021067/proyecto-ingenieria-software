@@ -32,12 +32,17 @@ import {
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { normalizeUrlInput } from '@/lib/security/safe-url';
+import { SemestreHorasFields } from '@/components/hours/semestre-horas-fields';
+import { useGuardarHorasActual, useHorasActual } from '@/hooks/use-horas-semestre';
+import { datosDeForm, erroresForm, etiquetaSemestre, formDesdeRegistro, HORAS_FORM_VACIO } from '@/lib/hours/semestre';
 
 interface Props {
   open: boolean;
   onComplete: () => void;
   allowClose?: boolean;
   onDefer?: () => void;
+  /** Solo el paso de horas del semestre (perfil ya completo, falta el registro del semestre). */
+  soloHoras?: boolean;
 }
 
 type NivelHabilidad = 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
@@ -53,11 +58,14 @@ interface ExperienciaForm {
   tipoExperiencia: string;
 }
 
-export default function CompleteProfileDialog({ open, onComplete, allowClose = false, onDefer }: Props) {
+export default function CompleteProfileDialog({ open, onComplete, allowClose = false, onDefer, soloHoras = false }: Props) {
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const { data: horasActual } = useHorasActual();
+  const guardarHoras = useGuardarHorasActual();
+  const [horasForm, setHorasForm] = useState(HORAS_FORM_VACIO);
 
   // Step 1
   const [foto, setFoto] = useState<File | null>(null);
@@ -123,6 +131,11 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
     setSelectedIntereses(currentUser.intereses.map((i) => i.idInteres));
     setSelectedCualidades(currentUser.cualidades.map((c) => c.idCualidad));
   }, [open, currentUser]);
+
+  useEffect(() => {
+    if (!open || !horasActual) return;
+    setHorasForm(formDesdeRegistro(horasActual.registro, currentUser?.perfil ?? undefined));
+  }, [open, horasActual, currentUser?.perfil]);
 
   const normalizeText = (text: string) =>
     text
@@ -303,10 +316,27 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
     );
   };
 
+  const NOMBRES = {
+    datos: 'Datos personales',
+    horas: 'Horas del semestre',
+    habilidades: 'Habilidades',
+    intereses: 'Intereses',
+    cualidades: 'Cualidades',
+    links: 'Links y experiencia',
+  } as const;
+  const keys: (keyof typeof NOMBRES)[] = soloHoras
+    ? ['horas']
+    : ['datos', 'horas', 'habilidades', 'intereses', 'cualidades', 'links'];
+  const steps = keys.map((k) => NOMBRES[k]);
+  const key = keys[step];
+  const horasInvalidas = key === 'horas' && Object.keys(erroresForm(horasForm)).length > 0;
+
   const saveStep = async () => {
     setSaving(true);
     try {
-      if (step === 0) {
+      if (key === 'horas') {
+        await guardarHoras.mutateAsync(datosDeForm(horasForm));
+      } else if (key === 'datos') {
         let fotoUrl: string | undefined;
         if (foto) {
           const res = await uploadToCloudinary(foto, 'profile-photos');
@@ -321,13 +351,21 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
             : null,
           ...(fotoUrl && { fotoUrl }),
         });
-      } else if (step === 1) {
+        // Sin registro del semestre, la meta que acaba de indicar es el valor inicial del paso de horas.
+        if (!horasActual?.registro) {
+          setHorasForm((f) => ({
+            ...f,
+            metaBeca: requiereHorasBeca ? String(horasBecaRequeridas) : '',
+            metaExtension: requiereHorasExtension ? String(horasExtensionRequeridas) : '',
+          }));
+        }
+      } else if (key === 'habilidades') {
         await replaceHabilidades(selectedHabilidades);
-      } else if (step === 2) {
+      } else if (key === 'intereses') {
         await replaceIntereses(selectedIntereses);
-      } else if (step === 3) {
+      } else if (key === 'cualidades') {
         await replaceCualidades(selectedCualidades);
-      } else if (step === 4) {
+      } else if (key === 'links') {
         let urlCv: string | undefined;
         if (cv) {
           const res = await uploadToCloudinary(cv, 'cvs');
@@ -345,6 +383,8 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
             await addExperiencia(exp);
           }
         }
+      }
+      if (step === keys.length - 1) {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ['currentUser'] }),
           queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] }),
@@ -362,13 +402,6 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
     }
   };
 
-  const steps = [
-    'Datos personales',
-    'Habilidades',
-    'Intereses',
-    'Cualidades',
-    'Links y experiencia',
-  ];
 
   const inputClass =
     'w-full rounded-xl border border-surface-container-highest bg-white px-4 py-3 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
@@ -407,8 +440,17 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
           ))}
         </div>
 
+        {key === 'horas' && (
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-tertiary">
+              {horasActual ? etiquetaSemestre(horasActual.semestre) : 'Semestre actual'}
+            </p>
+            <SemestreHorasFields value={horasForm} onChange={setHorasForm} />
+          </div>
+        )}
+
         {/* Step 1: Datos personales */}
-        {step === 0 && (
+        {key === 'datos' && (
           <div className="space-y-4 py-2">
             <div className="flex items-center gap-4">
               <div className="relative">
@@ -535,7 +577,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
         )}
 
         {/* Step 2: Habilidades */}
-        {step === 1 && (
+        {key === 'habilidades' && (
           <div className="space-y-5 py-2">
             <p className="text-sm text-tertiary">
               Esto nos ayudará a mostrarte proyectos más relacionados a tu perfil
@@ -601,7 +643,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
         )}
 
         {/* Step 3: Intereses */}
-        {step === 2 && (
+        {key === 'intereses' && (
           <div className="space-y-5 py-2">
             <p className="text-sm text-tertiary">
               Agrega tus intereses. Si no existen, se crean automáticamente.
@@ -649,7 +691,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
         )}
 
         {/* Step 4: Cualidades */}
-        {step === 3 && (
+        {key === 'cualidades' && (
           <div className="space-y-5 py-2">
             <p className="text-sm text-tertiary">
               Agrega cualidades personales. Si no existe una, se crea y se selecciona.
@@ -684,7 +726,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                     onClick={() => toggleCualidad(c.idCualidad)}
                     className={`rounded-full px-3 py-1 text-xs font-medium motion-select ${
                       selectedCualidades.includes(c.idCualidad)
-                        ? 'bg-tertiary text-white'
+                        ? 'bg-tertiary text-on-tertiary'
                         : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'
                     }`}
                   >
@@ -697,7 +739,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
         )}
 
         {/* Step 5: Links y experiencia */}
-        {step === 4 && (
+        {key === 'links' && (
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-widest text-tertiary">
@@ -855,12 +897,12 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
             <Button
               type="button"
               onClick={saveStep}
-              disabled={saving}
+              disabled={saving || horasInvalidas}
               className="h-auto gap-1 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-on-primary shadow-sm hover:bg-primary-container has-[>svg]:px-6 disabled:opacity-60 motion-glow-primary"
             >
               {saving
                 ? 'Guardando...'
-                : step === 4
+                : step === keys.length - 1
                   ? <>Finalizar <Check className="h-4 w-4" /></>
                   : <>Siguiente <ChevronRight className="h-4 w-4" /></>}
             </Button>

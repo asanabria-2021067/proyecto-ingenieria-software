@@ -86,9 +86,11 @@ describe('DashboardLayout — «Mis Horas» en «Mi trabajo»', () => {
     const destinos = within(movil).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
     expect(destinos).toEqual([
       'Dashboard',
+      'Mensajes',
       'Personas',
       'Explorar Proyectos',
       'Mis Proyectos',
+      'Mis Organizaciones',
       'Mis Tareas',
       'Mis Horas',
       'Calendario',
@@ -154,11 +156,13 @@ describe('DashboardLayout — navegación global del estudiante', () => {
 
   const DESTINOS = [
     ['Dashboard', '/dashboard'],
+    ['Mensajes', '/dashboard/mensajes'],
     ['Descubrir personas', '/dashboard/personas'],
     ['Mis amigos', '/dashboard/personas?seccion=amigos'],
     ['Amigos de amigos', '/dashboard/personas?seccion=amigos-de-amigos'],
     ['Explorar Proyectos', '/dashboard/proyectos'],
     ['Mis Proyectos', '/dashboard/projects/mine'],
+    ['Mis Organizaciones', '/dashboard/organizaciones'],
     ['Mis Tareas', '/dashboard/mis-tareas'],
     ['Mis Horas', '/dashboard/mis-horas'],
     ['Calendario', '/dashboard/calendario'],
@@ -189,7 +193,7 @@ describe('DashboardLayout — navegación global del estudiante', () => {
       'Amigos de amigos',
     ]);
     const hijosProyectos = escritorio.querySelector(`#${proyectos.getAttribute('aria-controls')}`) as HTMLElement;
-    expect(within(hijosProyectos).getAllByRole('link').map((a) => a.textContent)).toEqual(['Explorar Proyectos', 'Mis Proyectos']);
+    expect(within(hijosProyectos).getAllByRole('link').map((a) => a.textContent)).toEqual(['Explorar Proyectos', 'Mis Proyectos', 'Mis Organizaciones']);
     const hijosTrabajo = escritorio.querySelector(`#${trabajo.getAttribute('aria-controls')}`) as HTMLElement;
     expect(within(hijosTrabajo).getAllByRole('link')).toHaveLength(5);
   });

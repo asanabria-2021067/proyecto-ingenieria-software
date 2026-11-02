@@ -1,19 +1,52 @@
 'use client';
 
-import { useChatDock } from '@/components/chat-dock/chat-dock-context';
+import { createContext, useContext, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
+import { RUTA_MENSAJES, idConversacionDeRuta, useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { ChatListLauncher } from '@/components/chat-dock/chat-list-launcher';
 import { ChatWindow } from '@/components/chat-dock/chat-window';
 import { useGlobalChatSocket } from '@/hooks/use-chat';
 
+type ChatSocket = ReturnType<typeof useGlobalChatSocket>;
+
+const ChatSocketContext = createContext<ChatSocket>({ isConnected: false, typingByConversation: {}, emitTyping: () => {} });
+
+/** Un solo socket de chat para el dock y la página de mensajes; se une a las ventanas abiertas y a la conversación de la página. */
+export function ChatSocketProvider({ children }: { children: ReactNode }) {
+  const { windows } = useChatDock();
+  const idPagina = idConversacionDeRuta(usePathname());
+  const ids = windows.map((w) => w.idConversacion);
+  const socket = useGlobalChatSocket(idPagina && !ids.includes(idPagina) ? [...ids, idPagina] : ids);
+  return <ChatSocketContext.Provider value={socket}>{children}</ChatSocketContext.Provider>;
+}
+
+export const useChatSocket = () => useContext(ChatSocketContext);
+
+/** Punto de estado del chat en la barra superior, junto al de las notificaciones. */
+export function ChatConexion() {
+  const { isConnected } = useChatSocket();
+  return (
+    <span
+      role="status"
+      title={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo…'}
+      aria-label={isConnected ? 'Chat en vivo conectado' : 'Reconectando chat en vivo'}
+      className={`size-2 shrink-0 rounded-full ${isConnected ? 'bg-status-success' : 'animate-pulse bg-status-warning'}`}
+    />
+  );
+}
+
 /**
  * Dock global de chat (estilo LinkedIn): ventanas de conversación fijas abajo a
- * la derecha en cualquier página del dashboard; aquí vive el socket global. El
- * punto de entrada principal es el icono de la barra superior; el botón flotante
- * «Mensajes» queda solo en pantallas angostas (sobre la barra de navegación inferior).
+ * la derecha en cualquier página del dashboard. El punto de entrada principal es
+ * el icono de la barra superior, que lleva a /dashboard/mensajes; el dock queda
+ * para el móvil y para abrir un chat desde un proyecto, y no se pinta dentro de
+ * la propia página de mensajes.
  */
 export function ChatDock() {
   const { windows, minimizedIds, cerrarChat, toggleMinimize } = useChatDock();
-  const { isConnected: chatConnected, typingByConversation, emitTyping } = useGlobalChatSocket(windows.map((w) => w.idConversacion));
+  const { typingByConversation, emitTyping } = useChatSocket();
+  const enPaginaMensajes = usePathname()?.startsWith(RUTA_MENSAJES);
+  if (enPaginaMensajes) return null;
 
   return (
     // En móvil se apoya sobre la barra de navegación inferior (h-16) y apila el botón bajo las ventanas.
@@ -33,7 +66,7 @@ export function ChatDock() {
         ))}
       </div>
 
-      <ChatListLauncher variante="flotante" conectado={chatConnected} />
+      <ChatListLauncher variante="flotante" />
     </div>
   );
 }

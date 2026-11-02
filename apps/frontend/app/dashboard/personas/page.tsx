@@ -19,6 +19,7 @@
       "Ver perfil" lleva a /dashboard/personas/[id], no a un panel lateral.
    =========================================================================== */
 
+import { PageTitle } from '@/components/ui/page-title';
 import { Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -461,7 +462,7 @@ function PersonasView() {
       <div className={dashboardPage('@container/personas pt-7 pb-10')}>
         {/* Jerarquía de encabezado de Mis Proyectos. */}
         <header className="mb-section">
-          <h1 className="type-display">{encabezado.titulo}</h1>
+          <PageTitle className="type-display">{encabezado.titulo}</PageTitle>
           <p className="mt-1 text-[14px] font-normal text-tertiary">{encabezado.descripcion}</p>
         </header>
 
@@ -649,7 +650,7 @@ function PersonasView() {
                       type="button"
                       aria-label={`Quitar filtro ${chip.label}`}
                       onClick={chip.quitar}
-                      className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-on-surface/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                     >
                       <X aria-hidden="true" className="size-3" />
                     </button>

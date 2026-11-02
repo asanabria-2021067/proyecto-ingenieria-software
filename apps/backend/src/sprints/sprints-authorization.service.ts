@@ -69,7 +69,19 @@ export class SprintsAuthorizationService {
    * líder vía sus propios `assertCan*`.
    */
   async assertCanListSprintHistory(projectId: number, userId: number, tx?: TxClient): Promise<void> {
-    await this.sprintsContext.assertActiveProjectParticipant(projectId, userId, tx);
+    await this.assertCanReadProject(projectId, userId, tx);
+  }
+
+  /** Lectura del proyecto: participante activo (el líder cuenta) o miembro de la organización dueña. */
+  private async assertCanReadProject(projectId: number, userId: number, tx?: TxClient): Promise<void> {
+    try {
+      await this.sprintsContext.assertActiveProjectParticipant(projectId, userId, tx);
+    } catch (error) {
+      if (error instanceof ForbiddenException && (await this.sprintsContext.esMiembroDeOrganizacionDelProyecto(projectId, userId, tx))) {
+        return;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -103,7 +115,7 @@ export class SprintsAuthorizationService {
     tx?: TxClient,
   ) {
     const sprint = await this.sprintsContext.getSprintInProjectOrThrow(projectId, sprintId, tx);
-    await this.sprintsContext.assertActiveProjectParticipant(projectId, userId, tx);
+    await this.assertCanReadProject(projectId, userId, tx);
     return sprint;
   }
 
@@ -113,7 +125,7 @@ export class SprintsAuthorizationService {
    * — líder o integrante con participación activa.
    */
   async assertCanListSprintAnalytics(projectId: number, userId: number, tx?: TxClient): Promise<void> {
-    await this.sprintsContext.assertActiveProjectParticipant(projectId, userId, tx);
+    await this.assertCanReadProject(projectId, userId, tx);
   }
 
   /**

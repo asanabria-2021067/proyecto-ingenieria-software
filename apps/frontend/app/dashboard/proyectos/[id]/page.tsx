@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { ESTADO_REVISION_LABEL } from '@/components/projects/closure-review-status.utils';
 import type { EstadoRevisionCierre } from '@/lib/types/closure';
 
@@ -67,6 +68,7 @@ import { useProjectRoles } from '@/hooks/use-project-roles';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ReadOnlyProjectBanner } from '@/components/projects/read-only-project-banner';
+import { OrgSoloLecturaBanner } from '@/components/organizations/org-solo-lectura-banner';
 import { ClosureDocumentViewer, formatearTamano } from '@/components/closure/closure-document-viewer';
 import { useHistoricalProject } from '@/hooks/use-historical-project';
 import { useProjectDetail } from '@/hooks/use-project-detail';
@@ -244,6 +246,7 @@ export default function ProyectoDetallePage() {
             modalidadProyecto={proyecto.modalidadProyecto}
             etiquetas={proyecto.intereses.map(({ interes }) => interes.nombreInteres)}
           />
+          <OrgSoloLecturaBanner proyecto={detalle.data} participantes={isLoadingMembers ? undefined : members} />
         </ProjectGridFull>
 
         {/* HU-154 (T-215): la barra local «Resumen / Solicitud de salida /
@@ -454,7 +457,7 @@ export default function ProyectoDetallePage() {
                 label="Modalidad"
                 value={MODALIDAD_LABEL[proyecto.modalidadProyecto]}
               />
-              {organizacion && <DetalleRow icon={Building2} label="Organización" value={organizacion} />}
+              {organizacion && <DetalleRow icon={Building2} label="Publicado por" value={organizacion} />}
             </ul>
           </CardShell>
 
@@ -687,7 +690,7 @@ function HistoricalProjectPage({
               </span>
             )}
           </div>
-          <h1 className="type-display mt-3.5 line-clamp-2">{resumen.tituloProyecto}</h1>
+          <PageTitle className="type-display mt-3.5 line-clamp-2">{resumen.tituloProyecto}</PageTitle>
           <p className="mt-2 text-[14px] leading-5.25 text-on-surface-variant">
             {resumen.descripcionProyecto || 'Sin descripción disponible.'}
           </p>

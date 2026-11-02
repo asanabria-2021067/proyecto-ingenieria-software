@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { useJoyride, STATUS } from 'react-joyride';
 import { useCurrentUser, isProfileIncomplete, perfilPospuesto } from '@/hooks/use-current-user';
+import { useHorasActual } from '@/hooks/use-horas-semestre';
 import { Button } from '@/components/ui/button';
 
 // Custom Tooltip component for React Joyride
@@ -73,7 +74,7 @@ const CustomTooltip = ({
           <Button
             type="button"
             {...primaryProps}
-            className="h-auto rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-primary/95 motion-glow-primary"
+            className="h-auto rounded-xl bg-primary px-4 py-2 text-xs font-bold text-on-primary shadow-md hover:bg-primary/95 motion-glow-primary"
           >
             {isLastStep ? 'Finalizar' : 'Siguiente'}
           </Button>
@@ -90,8 +91,14 @@ const RUTA_TOUR = '/dashboard';
 
 export default function OnboardingTour() {
   const { data: user } = useCurrentUser();
+  const { data: horasActual, isPending: horasPendientes } = useHorasActual();
   const pathname = usePathname();
   const [run, setRun] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelTimer = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }, []);
 
   const startTour = useCallback(
     (force = false) => {
@@ -100,7 +107,9 @@ export default function OnboardingTour() {
       // Si el perfil está incompleto (sale la pantalla de "Completa tu perfil"),
       // no mostramos el tour hasta que termine de completarlo, a menos que sea forzado (ayuda)
       // Si el usuario aplazó el asistente, el diálogo ya está cerrado y el tour puede correr.
-      if (isProfileIncomplete(user) && !force && !perfilPospuesto(user.idUsuario)) {
+      // El paso de horas del semestre también abre el diálogo (perfil completo, sin registro).
+      const asistenteAbierto = isProfileIncomplete(user) || horasPendientes || horasActual?.necesitaRegistro === true;
+      if (asistenteAbierto && !force && !perfilPospuesto(user.idUsuario)) {
         return;
       }
 
@@ -112,12 +121,25 @@ export default function OnboardingTour() {
       }
 
       // Retardo para asegurar que los elementos del DOM estén completamente listos
-      setTimeout(() => {
+      cancelTimer();
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
         setRun(true);
       }, 800);
     },
-    [user],
+    [user, horasPendientes, horasActual?.necesitaRegistro, cancelTimer],
   );
+
+  useEffect(() => cancelTimer, [cancelTimer]);
+
+  useEffect(() => {
+    const handleReabierto = () => {
+      cancelTimer();
+      setRun(false);
+    };
+    window.addEventListener('perfil-asistente-reabierto', handleReabierto);
+    return () => window.removeEventListener('perfil-asistente-reabierto', handleReabierto);
+  }, [cancelTimer]);
 
   useEffect(() => {
     if (user) {

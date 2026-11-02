@@ -23,6 +23,8 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 vi.mock('@/hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
 vi.mock('@/hooks/use-project-members', () => ({ useProjectMembers: vi.fn() }));
+const misOrganizacionesMock = vi.fn((): { data: { idOrganizacion: number }[] } => ({ data: [] }));
+vi.mock('@/hooks/use-organizations', () => ({ useMisOrganizaciones: () => misOrganizacionesMock() }));
 vi.mock('@/hooks/use-exit-request', () => ({ useCurrentExitRequest: vi.fn(() => ({ request: null })) }));
 vi.mock('@/components/projects/leave-project-modal', () => ({ LeaveProjectModal: () => null }));
 
@@ -39,14 +41,22 @@ import { useProjectMembers } from '@/hooks/use-project-members';
 const ESCENARIOS: Record<ProjectNavActor, { userId: number; members: { idUsuario: number }[] }> = {
   leader: { userId: 1, members: [] },
   participant: { userId: 2, members: [{ idUsuario: 2 }] },
+  'org-reader': { userId: 9, members: [] },
   visitor: { userId: 9, members: [] },
 };
 
 function mockActor(actor: ProjectNavActor, estadoProyecto = 'EN_PROGRESO') {
   const { userId, members } = ESCENARIOS[actor];
+  misOrganizacionesMock.mockReturnValue({ data: actor === 'org-reader' ? [{ idOrganizacion: 7 }] : [] });
   (useCurrentUser as any).mockReturnValue({ data: { idUsuario: userId } });
   (useProjectDetail as any).mockReturnValue({
-    data: { idProyecto: 42, tituloProyecto: 'Proyecto de prueba', estadoProyecto, creador: { idUsuario: 1 } },
+    data: {
+      idProyecto: 42,
+      tituloProyecto: 'Proyecto de prueba',
+      estadoProyecto,
+      creador: { idUsuario: 1 },
+      organizaciones: [{ idOrganizacion: 7, organizacion: { nombreOrganizacion: 'Org' } }],
+    },
   });
   (useProjectMembers as any).mockReturnValue({ members });
 }
@@ -155,6 +165,17 @@ describe('ProjectMobileNav', () => {
     renderNav();
 
     expect(screen.getByRole('button', { name: 'Acciones del proyecto' })).toHaveTextContent('Acciones');
+  });
+
+  it('org-reader: chip «Solo lectura», tablero y tareas, sin chat del equipo', () => {
+    mockActor('org-reader');
+    renderNav();
+
+    const sheet = abrirSecciones();
+    expect(within(sheet).getByText('Solo lectura')).toHaveClass('pill');
+    expect(within(sheet).getByRole('link', { name: 'Tablero (Kanban)' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('link', { name: 'Todas las tareas' })).toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: 'Chat del equipo' })).not.toBeInTheDocument();
   });
 
   it('un visitante (solo «Resumen», sin acciones) no ve la barra', () => {

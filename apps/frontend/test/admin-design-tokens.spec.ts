@@ -23,9 +23,11 @@ const LINEA_BASE: Record<string, Medida> = {
   '/dashboard/admin/cuentas-pendientes': { px: 1, radio: 5, hex: 0, boton: 3, titular: false },
   // Página propia de «Tendencias de uso»: nació ya con los tokens; su línea base es su primera medición.
   '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/horas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   // HU-191 (T-352): nació ya con los tokens; su línea base es su primera medición.
   '/dashboard/admin/anuncios': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/asociaciones': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/apelaciones': { px: 1, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/apelaciones/[apelacionId]': { px: 1, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/proyectos': { px: 0, radio: 2, hex: 0, boton: 0, titular: true },
@@ -43,8 +45,10 @@ const ESTADO_ACTUAL: Record<string, Medida> = {
   // Al pasar a la tabla compartida perdió su radio literal y sus tres `<button>` propios.
   '/dashboard/admin/cuentas-pendientes': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/horas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/anuncios': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/asociaciones': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/apelaciones': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/apelaciones/[apelacionId]': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/proyectos': { px: 0, radio: 1, hex: 0, boton: 0, titular: true },
@@ -116,7 +120,7 @@ describe('FG07-C01: inventario de las vistas administrativas', () => {
     // La revisión de una apelación es una vista de lectura: usa a propósito un ancho menor (1100 px).
     const ancho = ruta === '/dashboard/admin/apelaciones/[apelacionId]' ? /max-w-\[1100px\]|ADMIN_PAGE_NARROW/ : /max-w-\[1400px\]|ADMIN_PAGE/;
     expect(fuente).toMatch(ancho);
-    expect(fuente.match(/<h1\b/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
+    expect(fuente.match(/<(?:h1|PageTitle)\b/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
   });
 
   it.each(Object.entries(VISTAS_ADMIN))('%s: la medición actual es la registrada y ninguna cifra empeora respecto a la línea base', (ruta, archivo) => {

@@ -1,9 +1,18 @@
 'use client';
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { createConversation } from '@/lib/services/chat';
 import { allConversationsQueryKey, projectConversationsQueryKey } from '@/lib/query-keys/chat';
+
+export const RUTA_MENSAJES = '/dashboard/mensajes';
+
+/** Id de la conversación abierta en /dashboard/mensajes/<id>, o null fuera de esa página. */
+export function idConversacionDeRuta(pathname: string | null): number | null {
+  const id = pathname?.match(/^\/dashboard\/mensajes\/(\d+)\/?$/)?.[1];
+  return id ? Number(id) : null;
+}
 
 export interface ChatDockWindow {
   idProyecto: number;
@@ -41,6 +50,8 @@ const MAX_VENTANAS = 6;
 
 export function ChatDockProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const pathname = usePathname();
   const [windows, setWindows] = useState<ChatDockWindow[]>([]);
   const [minimizedIds, setMinimizedIds] = useState<Set<number>>(new Set());
 
@@ -57,6 +68,11 @@ export function ChatDockProvider({ children }: { children: ReactNode }) {
 
   const abrirChat = useCallback(
     (idProyecto: number, idConversacion: number) => {
+      // En la página de mensajes la conversación se abre a pantalla completa, no como ventana flotante.
+      if (pathname?.startsWith(RUTA_MENSAJES)) {
+        router.push(`${RUTA_MENSAJES}/${idConversacion}`);
+        return;
+      }
       setWindows((actuales) => {
         const yaAbierta = actuales.some((w) => w.idConversacion === idConversacion);
         const sinEsta = actuales.filter((w) => w.idConversacion !== idConversacion);
@@ -73,7 +89,7 @@ export function ChatDockProvider({ children }: { children: ReactNode }) {
         return siguiente;
       });
     },
-    [windows, minimizarElMasAntiguoExpandido],
+    [windows, minimizarElMasAntiguoExpandido, pathname, router],
   );
 
   const cerrarChat = useCallback((idConversacion: number) => {

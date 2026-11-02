@@ -167,4 +167,17 @@ describe('ChatListPopover', () => {
 
     expect(screen.queryByRole('button', { name: 'Ver mensajes guardados' })).not.toBeInTheDocument();
   });
+
+  it('en la página de mensajes marca la conversación abierta', async () => {
+    listAllConversationsMock.mockResolvedValue([conversacion(), conversacion({ idConversacion: 2, participantes: [
+      { idUsuario: 1, nombre: 'Yo', apellido: 'Usuario', fotoUrl: null },
+      { idUsuario: 3, nombre: 'Luis', apellido: 'Perez', fotoUrl: null },
+    ] })]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(createElement(QueryClientProvider, { client }, createElement(ChatListPopover, { onClose: vi.fn(), pagina: true, idActiva: 2 })));
+
+    const activa = (await screen.findByText('Luis Perez')).closest('button');
+    expect(activa).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByText('Rosa Fuentes').closest('button')).not.toHaveAttribute('aria-current');
+  });
 });

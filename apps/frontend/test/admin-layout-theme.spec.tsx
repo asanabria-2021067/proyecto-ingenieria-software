@@ -65,7 +65,7 @@ describe('FG07-C03: superficies administrativas sobre tokens', () => {
       expect(medir(leer(archivo)).titular, ruta).toBe(true);
     }
     const detalle = leer(VISTAS_ADMIN['/dashboard/admin/proyectos/[id]']);
-    expect(detalle).toContain('<h1 className="type-display break-words">');
+    expect(detalle).toContain('<PageTitle className="type-display break-words">');
     expect(detalle).not.toMatch(/font-headline text-2xl font-black/);
   });
 
@@ -82,17 +82,10 @@ describe('FG07-C03: superficies administrativas sobre tokens', () => {
     }
   });
 
-  it('la paleta cruda de Tailwind solo aparece en el botón ámbar de «Revisar», pendiente de decisión de diseño', () => {
+  it('la paleta cruda de Tailwind no aparece en ninguna vista de admin', () => {
     const cruda = /\b(?:bg|text|border)-(?:red|green|blue|amber|yellow|gray|zinc)-\d{2,3}\b/g;
     const usos = ARBOL.flatMap((archivo) => (leer(archivo).match(cruda) ?? []).map((clase) => `${archivo}: ${clase}`));
-    // Excepción registrada en el inventario: no hay un token de «acción de advertencia» y el tono
-    // de ese botón es una decisión de diseño abierta. No se cambia en T-320.
-    expect(usos.sort()).toEqual([
-      'components/admin/ConfirmActionDialog.tsx: bg-amber-600',
-      'components/admin/ConfirmActionDialog.tsx: bg-amber-700',
-      'components/admin/request-inbox.tsx: bg-amber-600',
-      'components/admin/request-inbox.tsx: bg-amber-700',
-    ]);
+    expect(usos).toEqual([]);
   });
 
   it('«Eventos de seguridad» no duplica el «Actualizar» de la barra superior', () => {
