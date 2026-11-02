@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
-/** Enlace «Mensajes» de la barra superior: lleva a /dashboard/mensajes (el botón flotante de móvil no tiene title). */
-export const iconoMensajes = (page: Page) => page.getByTitle('Mensajes', { exact: true });
+/** Enlace «Mensajes» de la barra superior: lleva a /dashboard/mensajes. Se acota a la cabecera: la barra inferior móvil también lo titula. */
+export const iconoMensajes = (page: Page) => page.locator('main > header').getByTitle('Mensajes', { exact: true });
 
 /**
  * Crea el chat individual con `nombreOtro` desde «Nuevo chat» de la lista. El diálogo no trae proyecto fijo:

@@ -44,7 +44,7 @@ import { resolveAssignedTaskToastLink } from '@/components/notifications/task-no
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
 import { AnuncioBanner } from '@/components/anuncios/anuncio-banner';
 import { ChatDockProvider, RUTA_MENSAJES } from '@/components/chat-dock/chat-dock-context';
-import { ChatDock, ChatSocketProvider } from '@/components/chat-dock/chat-dock';
+import { ChatConexion, ChatDock, ChatSocketProvider } from '@/components/chat-dock/chat-dock';
 import { ChatListLauncher } from '@/components/chat-dock/chat-list-launcher';
 import { useChatNoLeidos } from '@/components/chat-dock/use-chat-no-leidos';
 import { toast } from 'sonner';
@@ -310,6 +310,7 @@ export default function DashboardLayout({
               />
             )}
             <NotificationsBell onlyIcon />
+            <ChatConexion />
             <ChatListLauncher variante="barra" />
             <Link
               href="/contacto"

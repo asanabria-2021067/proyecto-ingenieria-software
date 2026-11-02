@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { hashSync } from 'bcryptjs';
 import { InsigniasService } from '../src/insignias/insignias.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
+import { semestreDe } from '../src/horas-semestre/semestre';
 
 const prisma = new PrismaClient();
 
@@ -1733,6 +1734,15 @@ async function main() {
       idRemitente: jose.idUsuario,
       contenido: 'Voy avanzado, la termino esta semana.',
     },
+  });
+
+  // HRS: sin registro del semestre actual el asistente de perfil se abre sobre el dashboard de cada
+  // estudiante y tapa la pantalla; los sembrados nacen con el semestre ya registrado.
+  const { anio, periodo } = semestreDe(new Date());
+  const estudiantes = await prisma.usuario.findMany({ where: { perfil: { isNot: null } }, select: { idUsuario: true } });
+  await prisma.registroHorasSemestre.createMany({
+    data: estudiantes.map(({ idUsuario }) => ({ idUsuario, anio, periodo })),
+    skipDuplicates: true,
   });
 
   // conversacion/mensaje_chat/evento_proyecto se siembran con id explícito

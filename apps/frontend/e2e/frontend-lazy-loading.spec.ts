@@ -2,6 +2,7 @@ import type { Browser, Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
 import { desactivarTour } from './support/realtime';
+import { esperarAnimaciones } from './support/accesibilidad';
 
 /**
  * T-293 (FG12): los módulos diferidos llegan a demanda y la pantalla no se
@@ -97,6 +98,8 @@ test.describe('T-293: carga diferida', () => {
       // Mientras no llega la sección: el titular ya está y el hueco se anuncia como carga.
       await expect(hueco).toBeVisible();
       await expect(periodo).toHaveCount(0);
+      // El título sube 8px al entrar (UI-2): se mide cuando termina, no a mitad de la animación.
+      await esperarAnimaciones(page);
       const antes = await titulo.boundingBox();
 
       // Llega la sección: el selector aparece y el título no se mueve. Los gráficos aún no.

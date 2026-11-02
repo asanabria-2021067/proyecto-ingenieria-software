@@ -43,47 +43,47 @@ test('el autor edita y elimina su mensaje y el otro participante lo ve en vivo',
 
     await pageA.getByPlaceholder('Escribe un mensaje…').fill(original);
     await pageA.getByRole('button', { name: 'Enviar mensaje' }).click();
-    await expect(pageA.getByText(original)).toBeVisible();
-    await expect(pageB.getByText(original)).toBeVisible();
+    await expect(pageA.locator('main section').getByText(original)).toBeVisible();
+    await expect(pageB.locator('main section').getByText(original)).toBeVisible();
 
     // B no ve acciones sobre un mensaje ajeno.
     await expect(pageB.getByRole('button', { name: 'Acciones del mensaje' })).toHaveCount(0);
 
     // A edita con Enter.
-    await pageA.getByText(original).hover();
+    await pageA.locator('main section').getByText(original).hover();
     await pageA.getByRole('button', { name: 'Acciones del mensaje' }).last().click();
     await pageA.getByRole('menuitem', { name: 'Editar' }).click();
     const campo = pageA.getByRole('textbox', { name: 'Editar mensaje' });
     await campo.fill(editado);
     await campo.press('Enter');
-    await expect(pageA.getByText(editado)).toBeVisible();
-    await expect(pageA.getByText('(editado)')).toBeVisible();
+    await expect(pageA.locator('main section').getByText(editado)).toBeVisible();
+    await expect(pageA.locator('main section').getByText('(editado)')).toBeVisible();
 
     // B lo ve actualizado sin recargar.
-    await expect(pageB.getByText(editado)).toBeVisible();
-    await expect(pageB.getByText('(editado)')).toBeVisible();
-    await expect(pageB.getByText(original)).toHaveCount(0);
+    await expect(pageB.locator('main section').getByText(editado)).toBeVisible();
+    await expect(pageB.locator('main section').getByText('(editado)')).toBeVisible();
+    await expect(pageB.locator('main section').getByText(original)).toHaveCount(0);
 
     // Esc cancela la edicion sin cambios.
-    await pageA.getByText(editado).hover();
+    await pageA.locator('main section').getByText(editado).hover();
     await pageA.getByRole('button', { name: 'Acciones del mensaje' }).last().click();
     await pageA.getByRole('menuitem', { name: 'Editar' }).click();
     const campo2 = pageA.getByRole('textbox', { name: 'Editar mensaje' });
     await campo2.fill('no deberia guardarse');
     await campo2.press('Escape');
-    await expect(pageA.getByText(editado)).toBeVisible();
-    await expect(pageA.getByText('no deberia guardarse')).toHaveCount(0);
+    await expect(pageA.locator('main section').getByText(editado)).toBeVisible();
+    await expect(pageA.locator('main section').getByText('no deberia guardarse')).toHaveCount(0);
 
     // A elimina con confirmacion.
-    await pageA.getByText(editado).hover();
+    await pageA.locator('main section').getByText(editado).hover();
     await pageA.getByRole('button', { name: 'Acciones del mensaje' }).last().click();
     await pageA.getByRole('menuitem', { name: 'Eliminar' }).click();
     await pageA.getByRole('button', { name: 'Eliminar mensaje' }).click();
 
-    await expect(pageA.getByText('Mensaje eliminado').last()).toBeVisible();
-    await expect(pageB.getByText('Mensaje eliminado').last()).toBeVisible();
-    await expect(pageA.getByText(editado)).toHaveCount(0);
-    await expect(pageB.getByText(editado)).toHaveCount(0);
+    await expect(pageA.locator('main section').getByText('Mensaje eliminado').last()).toBeVisible();
+    await expect(pageB.locator('main section').getByText('Mensaje eliminado').last()).toBeVisible();
+    await expect(pageA.locator('main section').getByText(editado)).toHaveCount(0);
+    await expect(pageB.locator('main section').getByText(editado)).toHaveCount(0);
   } finally {
     await contextA.close();
     await contextB.close();
