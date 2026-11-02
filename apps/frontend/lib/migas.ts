@@ -101,10 +101,16 @@ const CON_MIGA_PROPIA = [
   /^\/dashboard\/admin(\/|$)/,
   /^\/dashboard\/projects\/admin(\/|$)/,
   /^\/dashboard\/mensajes(\/|$)/, // pantalla completa del chat
+  /^\/dashboard\/notificaciones$/, // bandeja a la altura de la ventana
   /^\/dashboard\/projects\/[^/]+\/kanban\/tasks\//,
   /^\/dashboard\/projects\/[^/]+\/(cierre|salida)(\/|$)/,
   /^\/dashboard\/proyectos\/[^/]+$/,
 ];
+
+// Layouts que ya fijan la altura de la ventana (h-[calc(100vh-4rem)]): la miga va dentro de ellos, no encima.
+const EN_LAYOUT_DE_PROYECTO = /^\/dashboard\/(projects|proyectos)\/(?!mine|admin)[^/]+(\/|$)/;
+
+export const migaEnLayout = (pathname: string) => EN_LAYOUT_DE_PROYECTO.test(limpiar(pathname));
 
 const esId = (s: string) => /^\d+$/.test(s) || /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(s);
 

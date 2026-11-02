@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { etiquetaDeRuta, migasDe } from '../lib/migas';
+import { etiquetaDeRuta, migaEnLayout, migasDe } from '../lib/migas';
 
 describe('migasDe (MEJ-74)', () => {
   it('pagina de primer nivel: Inicio > Pagina, la actual sin enlace', () => {
@@ -30,6 +30,13 @@ describe('migasDe (MEJ-74)', () => {
     expect(migasDe('/dashboard/chats/archivados')![1]).toEqual({ label: 'Chats', href: undefined });
   });
 
+  it('migaEnLayout: la miga de las rutas de un proyecto la dibuja su layout, no el del dashboard', () => {
+    expect(migaEnLayout('/dashboard/projects/3/kanban')).toBe(true);
+    expect(migaEnLayout('/dashboard/proyectos/12/sprints/5')).toBe(true);
+    expect(migaEnLayout('/dashboard/projects/mine')).toBe(false);
+    expect(migaEnLayout('/dashboard/personas')).toBe(false);
+  });
+
   it('ignora query y barra final', () => {
     expect(migasDe('/dashboard/personas/?seccion=amigos')?.map((m) => m.label)).toEqual(['Inicio', 'Personas']);
   });
@@ -40,6 +47,7 @@ describe('migasDe (MEJ-74)', () => {
       '/dashboard/admin/usuarios',
       '/dashboard/projects/admin/reviews',
       '/dashboard/mensajes/9',
+      '/dashboard/notificaciones',
       '/dashboard/proyectos/12',
       '/dashboard/projects/3/kanban/tasks/8',
       '/dashboard/projects/3/cierre',

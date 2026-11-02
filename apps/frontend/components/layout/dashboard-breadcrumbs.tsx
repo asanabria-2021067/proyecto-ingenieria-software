@@ -11,13 +11,14 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import { migasDe } from '@/lib/migas';
+import { migaEnLayout, migasDe } from '@/lib/migas';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 
 /** Migas de pan de las paginas internas, calculadas desde la ruta (MEJ-74). */
-export function DashboardBreadcrumbs() {
-  const migas = migasDe(usePathname() ?? '');
-  if (!migas) return null;
+export function DashboardBreadcrumbs({ enLayout = false }: { enLayout?: boolean }) {
+  const pathname = usePathname() ?? '';
+  const migas = migasDe(pathname);
+  if (!migas || migaEnLayout(pathname) !== enLayout) return null;
 
   return (
     <div className={dashboardPage('pt-stack')}>
