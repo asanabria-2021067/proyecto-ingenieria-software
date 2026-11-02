@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayUnique,
   IsArray,
   IsEnum,
@@ -11,7 +12,7 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
-import { Prioridad } from '@prisma/client';
+import { Prioridad, RepeticionTarea } from '@prisma/client';
 import { IsFutureCalendarDate } from './validators/is-future-calendar-date.validator';
 
 export class CreateTaskDto {
@@ -80,4 +81,25 @@ export class CreateTaskDto {
   @IsInt({ each: true })
   @Min(1, { each: true })
   idsEtiquetas?: number[];
+
+  // MEJ-48: tarea que debe estar HECHO antes de iniciar esta.
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  idTareaBloqueante?: number;
+
+  // MEJ-47: la tarea se repite; el cron crea una copia por ocurrencia.
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsEnum(RepeticionTarea)
+  repeticion?: RepeticionTarea;
+
+  // MEJ-6/52: items iniciales del checklist (p. ej. al crear desde una plantilla).
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsArray()
+  @ArrayMaxSize(50)
+  @Transform(({ value }) => (Array.isArray(value) ? value.map((v) => (typeof v === 'string' ? v.trim() : v)) : value))
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(200, { each: true })
+  checklist?: string[];
 }

@@ -32,6 +32,7 @@ import {
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { normalizeUrlInput } from '@/lib/security/safe-url';
+import { FormStepper } from '@/components/ui/form-stepper';
 import { SemestreHorasFields } from '@/components/hours/semestre-horas-fields';
 import { useGuardarHorasActual, useHorasActual } from '@/hooks/use-horas-semestre';
 import { datosDeForm, erroresForm, etiquetaSemestre, formDesdeRegistro, HORAS_FORM_VACIO } from '@/lib/hours/semestre';
@@ -429,16 +430,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
         </DialogHeader>
 
         {/* Progress bar */}
-        <div className="flex gap-2">
-          {steps.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${
-                i <= step ? 'bg-primary' : 'bg-surface-container-highest'
-              }`}
-            />
-          ))}
-        </div>
+        <FormStepper pasos={steps} actual={step} />
 
         {key === 'horas' && (
           <div className="space-y-4 py-2">

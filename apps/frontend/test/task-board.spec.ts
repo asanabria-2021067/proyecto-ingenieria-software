@@ -20,11 +20,21 @@ beforeAll(() => {
   }
 });
 
+// TaskFormDialog usa useFormDraft, que lee la cuenta con useCurrentUser (necesita QueryClient).
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 } }) }));
+
 // TaskCommentsDialog no es el objeto principal de esta prueba (TaskBoard lo
 // es): se stubea, igual que en hitos-section.spec.ts, para no arrastrar
 // QueryClient/useCurrentUser/red.
 vi.mock('../components/projects/task-comments-dialog', () => ({
   TaskCommentsDialog: () => null,
+}));
+
+// Plantilla/bloqueo/repetición (MEJ-47/48/52) piden datos al servidor con
+// QueryClient; aquí se stubea, igual que los comentarios. Se prueba en
+// tasks-mej-f.spec.tsx.
+vi.mock('../components/projects/task-form-extras', () => ({
+  TaskFormExtras: () => null,
 }));
 
 // El detalle de tarea es ahora una ruta dedicada: el tablero navega hacia ella
@@ -58,6 +68,11 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     hito: null,
     etiquetas: [],
     cantidadComentarios: 0,
+    idTareaBloqueante: null,
+    bloqueadaPor: null,
+    repeticion: null,
+    repeticionProxima: null,
+    checklist: [],
     ...overrides,
   };
 }

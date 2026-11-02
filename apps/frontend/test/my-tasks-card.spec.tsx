@@ -33,6 +33,11 @@ function tarea(idTarea: number, titulo: string, idUsuario: number | null): Tarea
     hito: null,
     etiquetas: [],
     cantidadComentarios: 0,
+    idTareaBloqueante: null,
+    bloqueadaPor: null,
+    repeticion: null,
+    repeticionProxima: null,
+    checklist: [],
   };
 }
 

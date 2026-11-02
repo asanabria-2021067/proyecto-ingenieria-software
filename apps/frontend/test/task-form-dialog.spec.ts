@@ -3,6 +3,9 @@ import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 } }) }));
+// Los extras (plantilla, bloqueo, repetición) hacen consultas; sus pruebas viven en tasks-mej-f.spec.tsx.
+vi.mock('../components/projects/task-form-extras', () => ({ TaskFormExtras: () => null }));
 vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }),
 }));
@@ -32,6 +35,8 @@ beforeAll(() => {
 
 function cleanupDialog() {
   cleanup();
+  // El borrador automático vive en localStorage: no debe filtrarse entre pruebas.
+  localStorage.clear();
   vi.mocked(toast.success).mockClear();
 }
 
@@ -56,6 +61,11 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     hito: null,
     etiquetas: [],
     cantidadComentarios: 0,
+    idTareaBloqueante: null,
+    bloqueadaPor: null,
+    repeticion: null,
+    repeticionProxima: null,
+    checklist: [],
     ...overrides,
   };
 }
@@ -110,6 +120,11 @@ function renderDialog(overrides: Record<string, unknown> = {}) {
   return { ...utils, props };
 }
 
+/** La creación es por pasos: el selector de pasos lleva al último, donde está «Crear tarea». */
+function irAlUltimoPaso() {
+  fireEvent.click(screen.getByRole('button', { name: /^Paso 3 de 3/ }));
+}
+
 async function llenarTitulo(texto: string) {
   const input = screen.getByLabelText('Título de la tarea', { exact: false });
   fireEvent.change(input, { target: { value: texto } });
@@ -141,6 +156,7 @@ describe('TaskFormDialog — reutilización', () => {
   it('el mismo componente muestra el título "Crear nueva tarea" en modo creación', () => {
     renderDialog({ mode: 'create', task: null });
     expect(screen.getByText('Crear nueva tarea')).toBeInTheDocument();
+    irAlUltimoPaso();
     expect(screen.getByRole('button', { name: 'Crear tarea' })).toBeInTheDocument();
   });
 
@@ -162,14 +178,14 @@ describe('TaskFormDialog — reutilización', () => {
   it('muestra las tres secciones numeradas en ambos modos', () => {
     const { unmount } = renderDialog({ mode: 'create', task: null });
     expect(screen.getByText('Información básica')).toBeInTheDocument();
-    expect(screen.getByText('Organización')).toBeInTheDocument();
-    expect(screen.getByText('Etiquetas')).toBeInTheDocument();
+    expect(screen.getByText('Planificación')).toBeInTheDocument();
+    expect(screen.getByText('Asignación y etiquetas')).toBeInTheDocument();
     unmount();
 
     renderDialog({ mode: 'edit', task: tarea() });
     expect(screen.getByText('Información básica')).toBeInTheDocument();
-    expect(screen.getByText('Organización')).toBeInTheDocument();
-    expect(screen.getByText('Etiquetas')).toBeInTheDocument();
+    expect(screen.getByText('Planificación')).toBeInTheDocument();
+    expect(screen.getByText('Asignación y etiquetas')).toBeInTheDocument();
   });
 
   it('no existe un selector de estado dentro del formulario', () => {
@@ -191,12 +207,13 @@ describe('TaskFormDialog — creación', () => {
     const crearTarea = mutationStub();
     renderDialog({ mode: 'create', task: null, crearTarea });
 
-    const crear = screen.getByRole('button', { name: 'Crear tarea' });
-    fireEvent.click(crear);
+    irAlUltimoPaso();
+    fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
 
     expect(await screen.findByText('El título no puede estar vacío.')).toBeInTheDocument();
     expect(screen.getByText('Selecciona una fecha límite válida.')).toBeInTheDocument();
-    expect(crear).toBeEnabled();
+    // El error de otro paso lleva a ese paso (el título), donde se sigue con «Siguiente».
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeEnabled();
     expect(crearTarea.mutateAsync).not.toHaveBeenCalled();
   });
 
@@ -208,6 +225,7 @@ describe('TaskFormDialog — creación', () => {
     await llenarTitulo('Nueva tarea de prueba');
     await llenarFecha('2027-01-01');
     await seleccionarHito('Entrega 1');
+    irAlUltimoPaso();
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
 
     await waitFor(() => expect(crearTarea.mutateAsync).toHaveBeenCalledTimes(1));
@@ -234,6 +252,7 @@ describe('TaskFormDialog — creación', () => {
     fireEvent.keyDown(selectAsignado, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('option', { name: /Ana Lopez/i }));
 
+    irAlUltimoPaso();
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
     await waitFor(() => expect(crearTarea.mutateAsync).toHaveBeenCalledTimes(1));
     expect(crearTarea.mutateAsync.mock.calls[0][0].idUsuarioAsignado).toBe(5);
@@ -312,6 +331,7 @@ describe('TaskFormDialog — creación', () => {
     await seleccionarHito('Entrega 1');
     await alternarEtiqueta(/Urgente/i);
 
+    irAlUltimoPaso();
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
     await waitFor(() => expect(crearTarea.mutateAsync).toHaveBeenCalledTimes(1));
     expect(crearTarea.mutateAsync.mock.calls[0][0].idsEtiquetas).toEqual([1]);
@@ -332,6 +352,7 @@ describe('TaskFormDialog — creación', () => {
     await llenarTitulo('Tarea exitosa');
     await llenarFecha('2027-01-01');
     await seleccionarHito('Entrega 1');
+    irAlUltimoPaso();
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
@@ -345,6 +366,7 @@ describe('TaskFormDialog — creación', () => {
     await llenarTitulo('Tarea con error');
     await llenarFecha('2027-01-01');
     await seleccionarHito('Entrega 1');
+    irAlUltimoPaso();
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
 
     // HU-147/T-185: el scope 'task' en 400 ahora muestra el mensaje real del
@@ -587,6 +609,7 @@ describe('TaskFormDialog — eliminar desde edición', () => {
     expect(screen.queryByRole('button', { name: 'Eliminar tarea' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Desasignar tarea' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
+    irAlUltimoPaso();
     expect(screen.getByRole('button', { name: 'Crear tarea' })).toBeInTheDocument();
   });
 });
@@ -660,5 +683,89 @@ describe('TaskFormDialog — desasignar desde el pie', () => {
   it('no aparece cuando ni es líder ni comparte el rol de la tarea (puedeGestionarTarea: false)', () => {
     renderDialog({ mode: 'edit', task: asignada(), isLeader: false, puedeGestionarTarea: false });
     expect(screen.queryByRole('button', { name: 'Desasignar tarea' })).not.toBeInTheDocument();
+  });
+});
+
+describe('TaskFormDialog — creación por pasos (MEJ-2)', () => {
+  afterEach(() => cleanupDialog());
+
+  it('arranca en el paso 1 con Siguiente y sin Anterior ni Crear tarea', () => {
+    renderDialog({ mode: 'create', task: null });
+    expect(screen.getByRole('button', { name: /^Paso 1 de 3: Información básica/ })).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Crear tarea' })).not.toBeInTheDocument();
+  });
+
+  it('Siguiente no avanza si el paso tiene errores y los muestra junto al campo', async () => {
+    renderDialog({ mode: 'create', task: null });
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    expect(await screen.findByText('El título no puede estar vacío.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Paso 1 de 3/ })).toHaveAttribute('aria-current', 'step');
+  });
+
+  it('con datos válidos recorre los tres pasos y Anterior regresa', async () => {
+    renderDialog({ mode: 'create', task: null });
+    await llenarTitulo('Tarea por pasos');
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Paso 2 de 3/ })).toHaveAttribute('aria-current', 'step'));
+
+    await llenarFecha('2027-01-01');
+    await seleccionarHito('Entrega 1');
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Crear tarea' })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Anterior' }));
+    expect(screen.getByRole('button', { name: /^Paso 2 de 3/ })).toHaveAttribute('aria-current', 'step');
+  });
+});
+
+describe('TaskFormDialog — borrador automático (MEJ-4)', () => {
+  afterEach(() => cleanupDialog());
+
+  it('guarda lo escrito, lo recupera al reabrir y ofrece descartarlo', async () => {
+    const primera = renderDialog({ mode: 'create', task: null, idProyecto: 10 });
+    await llenarTitulo('Borrador de tarea');
+    await waitFor(() => expect(localStorage.getItem('uvg-borrador:1-tarea-nueva-10')).toContain('Borrador de tarea'));
+    primera.unmount();
+
+    renderDialog({ mode: 'create', task: null, idProyecto: 10 });
+    expect(await screen.findByText('Recuperamos un borrador que no habías enviado.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Título de la tarea', { exact: false })).toHaveValue('Borrador de tarea');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar borrador' }));
+    expect(screen.getByLabelText('Título de la tarea', { exact: false })).toHaveValue('');
+    expect(localStorage.getItem('uvg-borrador:1-tarea-nueva-10')).toBeNull();
+    expect(screen.queryByText('Recuperamos un borrador que no habías enviado.')).not.toBeInTheDocument();
+  });
+
+  it('enviar con éxito borra el borrador', async () => {
+    const crearTarea = mutationStub();
+    renderDialog({ mode: 'create', task: null, idProyecto: 10, crearTarea });
+    await llenarTitulo('Se envía');
+    await llenarFecha('2027-01-01');
+    await seleccionarHito('Entrega 1');
+    await waitFor(() => expect(localStorage.getItem('uvg-borrador:1-tarea-nueva-10')).not.toBeNull());
+
+    irAlUltimoPaso();
+    fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
+    await waitFor(() => expect(crearTarea.mutateAsync).toHaveBeenCalledTimes(1));
+    expect(localStorage.getItem('uvg-borrador:1-tarea-nueva-10')).toBeNull();
+  });
+
+  it('un formulario sin cambios no deja borrador', async () => {
+    renderDialog({ mode: 'create', task: null, idProyecto: 10 });
+    await new Promise((r) => setTimeout(r, 600));
+    expect(localStorage.getItem('uvg-borrador:1-tarea-nueva-10')).toBeNull();
+  });
+
+  it('en edición el borrador es por tarea y no pisa a otra', async () => {
+    const primera = renderDialog({ mode: 'edit', task: tarea({ idTarea: 7, tituloTarea: 'Original' }) });
+    await llenarTitulo('Cambio sin guardar');
+    await waitFor(() => expect(localStorage.getItem('uvg-borrador:1-tarea-7')).toContain('Cambio sin guardar'));
+    primera.unmount();
+
+    renderDialog({ mode: 'edit', task: tarea({ idTarea: 8, tituloTarea: 'Otra' }) });
+    expect(screen.getByLabelText('Título de la tarea', { exact: false })).toHaveValue('Otra');
   });
 });

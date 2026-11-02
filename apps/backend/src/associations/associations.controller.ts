@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AssociationsService } from './associations.service';
@@ -13,6 +13,17 @@ export class AssociationsController {
   @Get('mis-juntas')
   misJuntas(@CurrentUser() user: { userId: number }) {
     return this.service.misJuntas(user.userId);
+  }
+
+  /** Paso «Participantes» al crear un proyecto a nombre de la asociación; el servicio exige Presidente o Editor. */
+  @Get(':idAsociacion/candidatos-participantes')
+  @UseGuards(JuntaGuard)
+  candidatosParticipantes(
+    @Param('idAsociacion', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+    @Query('q') q?: string,
+  ) {
+    return this.service.candidatosParticipantes(id, user.userId, q);
   }
 
   /** Membresía propia en la junta; las rutas del dashboard de asociación reutilizan `JuntaGuard`. */

@@ -11,7 +11,7 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
-import { Prioridad } from '@prisma/client';
+import { Prioridad, RepeticionTarea } from '@prisma/client';
 import { IsFutureCalendarDate } from './validators/is-future-calendar-date.validator';
 
 // No se usa `PartialType` de `@nestjs/mapped-types` porque el paquete no
@@ -88,4 +88,15 @@ export class UpdateTaskDto {
   @IsInt({ each: true })
   @Min(1, { each: true })
   idsEtiquetas?: number[];
+
+  // MEJ-48: null quita el bloqueo.
+  @ValidateIf((_object, value) => value !== undefined && value !== null)
+  @IsInt()
+  @Min(1)
+  idTareaBloqueante?: number | null;
+
+  // MEJ-47: null detiene la repeticion.
+  @ValidateIf((_object, value) => value !== undefined && value !== null)
+  @IsEnum(RepeticionTarea)
+  repeticion?: RepeticionTarea | null;
 }

@@ -889,6 +889,11 @@ describe('TasksService.create', () => {
           'hito',
           'etiquetas',
           'cantidadComentarios',
+          'idTareaBloqueante',
+          'bloqueadaPor',
+          'repeticion',
+          'repeticionProxima',
+          'checklist',
         ].sort(),
       );
     });

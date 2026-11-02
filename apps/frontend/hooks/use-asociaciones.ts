@@ -8,6 +8,7 @@ import {
   asignarJunta,
   crearAsociacion,
   getAsociacionesAdmin,
+  getCandidatosParticipantes,
   getEstudiantesAsociacion,
   getMisJuntas,
   getProyectosAsociacion,
@@ -30,6 +31,13 @@ export const useEstudiantesAsociacion = (id: number, filtros: FiltrosAsociacion,
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (ultima) => ultima.siguienteCursor ?? undefined,
     enabled,
+  });
+
+export const useCandidatosParticipantes = (id: number | null, q: string) =>
+  useQuery({
+    queryKey: asociacionesKeys.candidatos(id ?? 0, q),
+    queryFn: () => getCandidatosParticipantes(id!, q),
+    enabled: id !== null,
   });
 
 export const useProyectosAsociacion = (id: number) =>

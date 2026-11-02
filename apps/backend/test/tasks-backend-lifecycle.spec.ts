@@ -102,6 +102,11 @@ const PUBLIC_TAREA_KEYS = [
   'hito',
   'etiquetas',
   'cantidadComentarios',
+  'idTareaBloqueante',
+  'bloqueadaPor',
+  'repeticion',
+  'repeticionProxima',
+  'checklist',
 ].sort();
 
 function expectPublicContract(tareaValue: object) {

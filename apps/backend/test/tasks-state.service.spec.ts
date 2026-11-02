@@ -412,6 +412,11 @@ describe('TasksService.updateEstado', () => {
           'hito',
           'etiquetas',
           'cantidadComentarios',
+          'idTareaBloqueante',
+          'bloqueadaPor',
+          'repeticion',
+          'repeticionProxima',
+          'checklist',
         ].sort(),
       );
       expect(result).not.toHaveProperty('eliminadoEn');

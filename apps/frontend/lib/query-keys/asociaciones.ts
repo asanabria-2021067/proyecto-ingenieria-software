@@ -4,5 +4,6 @@ export const asociacionesKeys = {
   misJuntas: ['asociaciones', 'mis-juntas'] as const,
   estudiantes: (id: number, filtros: FiltrosAsociacion) => ['asociaciones', id, 'estudiantes', filtros] as const,
   proyectos: (id: number) => ['asociaciones', id, 'proyectos'] as const,
+  candidatos: (id: number, q: string) => ['asociaciones', id, 'candidatos-participantes', q] as const,
   admin: ['admin', 'asociaciones'] as const,
 };

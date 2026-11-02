@@ -5,6 +5,7 @@ import { OptionalJwtAuthGuard } from '../src/auth/optional-jwt-auth.guard';
 import { cargarRutas, RUTAS_PUBLICAS as PUBLICAS, type Ruta } from './helpers/route-inventory';
 import { RolesGuard } from '../src/common/guards/roles.guard';
 import { JuntaGuard } from '../src/associations/junta.guard';
+import { ProjectWriteGuard } from '../src/common/guards/project-write.guard';
 
 describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de admin', () => {
   let rutas: Ruta[];
@@ -99,6 +100,43 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     expect(deChat.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
   });
 
+  // MEJ-6/10/49/52: checklist, historial, evidencias y plantillas de tarea (permisos por actor en el servicio).
+  it('las rutas de checklist, historial, evidencias y plantillas existen todas, con JwtAuthGuard y escrituras con ProjectWriteGuard', () => {
+    const esperadas = {
+      TasksExtrasController: [
+        'GET /api/proyectos/:projectId/tareas/:taskId/historial',
+        'POST /api/proyectos/:projectId/tareas/:taskId/checklist',
+        'PATCH /api/proyectos/:projectId/tareas/:taskId/checklist/:itemId',
+        'DELETE /api/proyectos/:projectId/tareas/:taskId/checklist/:itemId',
+      ],
+      EvidenceController: [
+        'GET /api/proyectos/:projectId/tareas/:taskId/evidencias',
+        'POST /api/proyectos/:projectId/tareas/:taskId/evidencias',
+        'DELETE /api/proyectos/:projectId/tareas/:taskId/evidencias/:evidenceId',
+      ],
+      PlantillasTareaController: [
+        'GET /api/proyectos/:projectId/plantillas-tarea',
+        'POST /api/proyectos/:projectId/plantillas-tarea',
+        'DELETE /api/proyectos/:projectId/plantillas-tarea/:plantillaId',
+      ],
+    };
+    for (const [controlador, ids] of Object.entries(esperadas)) {
+      const propias = rutas.filter((r) => r.controller.startsWith(`${controlador}.`));
+      expect(propias.map((r) => r.id).sort()).toEqual([...ids].sort());
+      expect(propias.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+      expect(propias.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+    }
+    const escriben = rutas.filter(
+      (r) =>
+        (r.controller.startsWith('TasksExtrasController.') ||
+          r.controller.startsWith('EvidenceController.') ||
+          r.controller.startsWith('PlantillasTareaController.')) &&
+        r.metodo !== 'GET',
+    );
+    expect(escriben.length).toBe(7);
+    expect(escriben.filter((r) => !r.guards.includes(ProjectWriteGuard)).map((r) => r.id)).toEqual([]);
+  });
+
   it('toda ruta de administracion exige RolesGuard y @Roles("administrador")', () => {
     const admin = rutas.filter((r) => r.adminPath);
     expect(admin.length).toBeGreaterThan(20);
@@ -134,6 +172,7 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     ]);
     expect(ids((r) => r.path.startsWith('asociaciones'))).toEqual([
       'GET /api/asociaciones/:idAsociacion/anuncios',
+      'GET /api/asociaciones/:idAsociacion/candidatos-participantes',
       'GET /api/asociaciones/:idAsociacion/estudiantes',
       'GET /api/asociaciones/:idAsociacion/estudiantes/csv',
       'GET /api/asociaciones/:idAsociacion/estudiantes/pdf',

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { logout } from '@/lib/services/auth';
+import { descartarTodosLosBorradores } from '@/lib/forms/borrador';
 import uvgSwal from '@/lib/swal';
 
 /** Confirmación + limpieza de sesión compartida entre DashboardLayout y AdminLayout. */
@@ -24,6 +25,7 @@ export function useLogout() {
 
     await logout().catch(() => null);
     queryClient.clear();
+    descartarTodosLosBorradores();
     router.replace('/login');
   };
 }
