@@ -1,5 +1,6 @@
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { EstadoUsuario, type Prisma } from '@prisma/client';
+import { readSmtpConfig } from './smtp-config';
 import { assertJwtSecret, JWT_SECRET_MIN_LENGTH, JWT_SECRET_VARIABLE } from './jwt-secret';
 
 /**
@@ -361,6 +362,12 @@ export function validateEnvironment(raw: RawEnvironment): ValidatedEnvironment {
     }
   }
   const closure = deriveClosureAvailability(raw);
+
+  // MEJ-80: el correo es opcional; una configuración a medias lo desactiva con un aviso, no impide arrancar.
+  const smtp = readSmtpConfig(raw);
+  if (smtp.motivos.length > 0) {
+    logger.warn(`Correo SMTP desactivado: ${smtp.motivos.join('; ')}`);
+  }
 
   if (!closure.disponible) {
     logger.warn(

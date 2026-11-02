@@ -50,6 +50,7 @@ const GROUP_ICON: Record<NotificationGroupId, LucideIcon> = {
   horas: Clock3,
   recordatorios: CalendarClock,
   contactos: UserPlus,
+  organizaciones: Users,
   cuenta: ShieldCheck,
   otras: Bell,
 };
@@ -167,6 +168,40 @@ export function agruparPorDia<T extends { creadaEn: string }>(items: readonly T[
     else grupos.push({ clave, etiqueta: etiquetaDeDia(fecha, ahora), items: [item] });
   }
   return grupos;
+}
+
+export interface AvisoAgrupado<T> {
+  principal: T;
+  /** Avisos repetidos que se pliegan bajo el principal (el más reciente de su día). */
+  resto: T[];
+}
+
+/**
+ * MEJ-29: dentro de un día, los avisos del mismo tipo sobre el mismo proyecto se pliegan en uno
+ * («3 avisos: Tarea asignada en Feria de Ciencias»). Sin proyecto en el payload, o en Cuenta y
+ * seguridad, nunca se pliegan. Conserva el orden de entrada; el grupo ocupa el lugar de su primer aviso.
+ */
+export function agruparRepetidas<T extends Pick<Notificacion, 'tipoNotificacion' | 'datosJson'>>(items: readonly T[]): AvisoAgrupado<T>[] {
+  const grupos: AvisoAgrupado<T>[] = [];
+  const porClave = new Map<string, AvisoAgrupado<T>>();
+  for (const item of items) {
+    const id = categoriaDeTipo(item.tipoNotificacion) === 'cuenta' ? null : proyectoDeAviso(item)?.id;
+    const clave = id == null ? null : `${item.tipoNotificacion}|${id}`;
+    const existente = clave ? porClave.get(clave) : undefined;
+    if (existente) {
+      existente.resto.push(item);
+      continue;
+    }
+    const grupo = { principal: item, resto: [] };
+    grupos.push(grupo);
+    if (clave) porClave.set(clave, grupo);
+  }
+  return grupos;
+}
+
+/** Filas que se ven en la bandeja: avisos agrupados por día y con los repetidos plegados. */
+export function filasVisibles<T extends Notificacion>(items: readonly T[]): AvisoAgrupado<T>[] {
+  return agruparPorDia(items).flatMap((dia) => agruparRepetidas(dia.items));
 }
 
 /** Hora para avisos de hoy; día y mes corto para el resto (columna derecha de la fila). */

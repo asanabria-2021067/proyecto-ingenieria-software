@@ -121,7 +121,7 @@ describe('FG03-C01: groupNotificationPreferences', () => {
 
   it('usa los grupos en un orden estable y omite «Otras» cuando no hay tipos desconocidos', () => {
     const grupos = groupNotificationPreferences(porDefecto());
-    expect(grupos.map((grupo) => grupo.id)).toEqual(['tareas', 'postulaciones', 'proyectos', 'horas', 'recordatorios', 'contactos', 'cuenta']);
+    expect(grupos.map((grupo) => grupo.id)).toEqual(['tareas', 'postulaciones', 'proyectos', 'horas', 'recordatorios', 'contactos', 'organizaciones', 'cuenta']);
     expect(grupos.map((grupo) => grupo.titulo)).toEqual([
       'Tareas e hitos',
       'Postulaciones y equipo',
@@ -129,6 +129,7 @@ describe('FG03-C01: groupNotificationPreferences', () => {
       'Horas y reconocimiento',
       'Recordatorios y calendario',
       'Red de contactos',
+      'Organizaciones y asociaciones',
       'Cuenta y seguridad',
     ]);
   });

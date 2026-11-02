@@ -176,6 +176,21 @@ describe('NotificationInbox', () => {
     expect(within(filas()[2]).getByRole('button')).toHaveAttribute('aria-current', 'true');
   });
 
+  it('MEJ-29: anterior y siguiente saltan los avisos plegados y siguen las filas visibles', async () => {
+    const repetido = (id: number, horas: number) => ({ ...AVISOS[0], idNotificacion: id, creadaEn: iso(horas) });
+    const datos = [repetido(11, 1), repetido(12, 2), repetido(13, 3), AVISOS[1]];
+    vi.mocked(getNotificacionesPagina).mockResolvedValue({ data: datos, total: 4, page: 1, totalPages: 1 });
+    renderInbox();
+    await waitFor(() => expect(filas()).toHaveLength(2));
+    fireEvent.click(within(filas()[0]).getByRole('button'));
+    expect(screen.getByRole('button', { name: 'Notificación anterior' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Notificación siguiente' }));
+    expect(within(filas()[1]).getByRole('button')).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: 'Notificación siguiente' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Notificación anterior' }));
+    expect(within(filas()[0]).getByRole('button')).toHaveAttribute('aria-current', 'true');
+  });
+
   it('las pestañas y las categorías cambian el filtro del servidor y el texto del marcado', async () => {
     renderInbox();
     await within(lista()).findByText('3 avisos · 2 sin leer');

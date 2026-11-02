@@ -21,6 +21,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MailService } from '../mail/mail.service';
+import { correoCuentaAprobada, correoRecuperacion, urlApp } from '../mail/mail-templates';
 import { ADMIN_ACTIVE_PROJECT_STATES } from '../common/project-policy/admin-active-project-states';
 import { SecurityEventsService } from '../security-events/security-events.service';
 import { TipoEventoSeguridad } from '../security-events/tipos-evento-seguridad';
@@ -42,6 +44,7 @@ export class AdminService {
     // G07: EventEmitter global de la app; ausente en instancias manuales (tests).
     @Optional() private readonly events?: EventEmitter2,
     @Optional() private readonly notifications?: NotificationsService,
+    @Optional() private readonly mail?: MailService,
   ) {}
 
   // ─── Guards ──────────────────────────────────────────────────────────────────
@@ -777,6 +780,8 @@ export class AdminService {
     await this.notifications?.notifyFromTemplate([cuenta.idUsuario], 'CUENTA_VERIFICADA', {
       userName: cuenta.nombre,
     });
+    const correo = correoCuentaAprobada(cuenta.nombre, urlApp('/login'));
+    await this.mail?.enviar(cuenta.correo, correo.asunto, correo.texto);
 
     return cuenta;
   }
@@ -950,6 +955,9 @@ export class AdminService {
       idUsuarioAfectado: solicitud.usuario.idUsuario,
       detalle: { idSolicitud, expiraEn },
     });
+
+    const correo = correoRecuperacion(resetUrl);
+    await this.mail?.enviar(solicitud.usuario.correo, correo.asunto, correo.texto);
 
     return { resetUrl, resetToken, expiraEn };
   }

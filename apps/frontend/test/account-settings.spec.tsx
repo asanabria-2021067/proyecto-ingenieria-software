@@ -38,11 +38,10 @@ afterEach(() => {
 });
 
 const FAMILIAS = [
-  // HU-200: + MENCION_COMENTARIO. MEJ-54: + HITO_ATRASADO.
-  ['Tareas e hitos', 9],
-  // ORG-1: + INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA.
+  // HU-200: + MENCION_COMENTARIO. MEJ-54: + HITO_ATRASADO. MEJ-31: + TU_SEMANA.
+  ['Tareas e hitos', 10],
   // MEJ-22: + INVITACION_ROL_PROYECTO.
-  ['Postulaciones y equipo', 11],
+  ['Postulaciones y equipo', 8],
   // MEJ-16/17: + PROYECTO_NUEVO_PARA_TI, PROYECTO_GUARDADO_AVISO.
   ['Proyectos', 19],
   // MEJ-57: + RECONOCIMIENTO_RECIBIDO.
@@ -51,8 +50,9 @@ const FAMILIAS = [
   ['Recordatorios y calendario', 6],
   // MEJ-44: + MENCION_CHAT.
   ['Red de contactos', 4],
-  // ASO-1: + JUNTA_ASOCIACION.
-  ['Cuenta y seguridad', 6],
+  // ORG-1 y ASO-1: INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA, JUNTA_ASOCIACION.
+  ['Organizaciones y asociaciones', 4],
+  ['Cuenta y seguridad', 5],
 ] as const;
 
 const familia = (titulo: string) => screen.getByRole('button', { name: new RegExp(`^${titulo}`) });
@@ -64,7 +64,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     await screen.findByRole('button', { name: /^Tareas e hitos/ });
   }
 
-  it('muestra las siete familias cerradas, con su descripción y su contador', async () => {
+  it('muestra las ocho familias cerradas, con su descripción y su contador', async () => {
     await montarCerrada(['TAREA_ASIGNADA', 'NUEVO_SEGUIDOR']);
     for (const [titulo, total] of FAMILIAS) {
       const activas = titulo === 'Tareas e hitos' || titulo === 'Red de contactos' ? total - 1 : total;
@@ -75,7 +75,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     expect(screen.queryAllByRole('switch')).toHaveLength(0);
   });
 
-  it('las siete familias reúnen todas las preferencias del backend, sin perder ni repetir ninguna', async () => {
+  it('las ocho familias reúnen todas las preferencias del backend, sin perder ni repetir ninguna', async () => {
     await montarCerrada();
     const total = FAMILIAS.reduce((suma, [, n]) => suma + n, 0);
     expect(total).toBe(preferencias().length);
@@ -133,7 +133,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     guardado.resolver(preferencias(['NUEVO_SEGUIDOR']));
     await waitFor(() => expect(familia('Red de contactos')).toHaveTextContent('3 de 4 activas'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'true');
-    expect(familia('Tareas e hitos')).toHaveTextContent('9 de 9 activas');
+    expect(familia('Tareas e hitos')).toHaveTextContent('10 de 10 activas');
   });
 
   it('si el guardado falla, el contador no se mueve', async () => {

@@ -66,6 +66,7 @@ describe('FG04-C01: sección de notificaciones en el perfil', () => {
       'Horas y reconocimiento',
       'Recordatorios y calendario',
       'Red de contactos',
+      'Organizaciones y asociaciones',
       'Cuenta y seguridad',
     ]);
     expect(within(seccion()).getAllByRole('listitem')).toHaveLength(TIPOS_BACKEND.length);

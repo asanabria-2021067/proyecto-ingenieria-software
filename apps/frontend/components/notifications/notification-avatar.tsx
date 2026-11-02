@@ -34,6 +34,7 @@ export const COLOR_DE_CATEGORIA: Record<NotificationGroupId, string> = {
   horas: 'bg-tag-amber text-on-tag-amber',
   recordatorios: 'bg-tag-orange text-on-tag-orange',
   contactos: 'bg-tag-violet text-on-tag-violet',
+  organizaciones: 'bg-tag-forest text-on-tag-forest',
   cuenta: 'bg-tag-slate text-on-tag-slate',
   otras: 'bg-tag-neutral text-on-tag-neutral',
 };

@@ -32,6 +32,7 @@ export const NOTIFICATION_GROUP_IDS = [
   'horas',
   'recordatorios',
   'contactos',
+  'organizaciones',
   'cuenta',
   'otras',
 ] as const;
@@ -44,6 +45,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroupId, { titulo: str
   horas: { titulo: 'Horas y reconocimiento', descripcion: 'Validación y acreditación de tus horas.' },
   recordatorios: { titulo: 'Recordatorios y calendario', descripcion: 'Eventos próximos, reuniones de Administración y calendarios compartidos.' },
   contactos: { titulo: 'Red de contactos', descripcion: 'Solicitudes de amistad y seguidores.' },
+  organizaciones: { titulo: 'Organizaciones y asociaciones', descripcion: 'Invitaciones, solicitudes y cambios en organizaciones y juntas de asociación.' },
   cuenta: { titulo: 'Cuenta y seguridad', descripcion: 'Avisos sobre accesos y recuperación de contraseñas.' },
   otras: { titulo: 'Otras notificaciones', descripcion: 'Tipos que la plataforma añadió y aún no tienen una descripción propia.' },
 };
@@ -69,6 +71,7 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   EVIDENCIA_REVISADA: { grupo: 'tareas', etiqueta: 'Evidencia revisada', descripcion: 'Revisan una evidencia que entregaste.' },
   TAREA_POR_VENCER: { grupo: 'tareas', etiqueta: 'Tarea por vencer', descripcion: 'Una tarea tuya está cerca de su fecha límite.' },
   HITO_ATRASADO: { grupo: 'tareas', etiqueta: 'Hito atrasado', descripcion: 'Un hito de un proyecto que lideras pasó su fecha límite sin completarse.' },
+  TU_SEMANA: { grupo: 'tareas', etiqueta: 'Tu semana', descripcion: 'Cada lunes: tareas por vencer, horas de la semana pasada y postulaciones pendientes.' },
 
   NUEVA_POSTULACION: { grupo: 'postulaciones', etiqueta: 'Nueva postulación', descripcion: 'Alguien se postula a un rol de tu proyecto.' },
   POSTULACION_RESUELTA: { grupo: 'postulaciones', etiqueta: 'Postulación resuelta', descripcion: 'Aceptan o rechazan tu postulación.' },
@@ -82,17 +85,17 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   ROL_ASIGNADO_LIDER: { grupo: 'postulaciones', etiqueta: 'Rol asignado por el líder', descripcion: 'El líder te asigna un rol.' },
   ROL_ACTUALIZADO: { grupo: 'postulaciones', etiqueta: 'Rol actualizado', descripcion: 'Cambia un rol del proyecto.' },
   INVITACION_ORGANIZACION: {
-    grupo: 'postulaciones',
+    grupo: 'organizaciones',
     etiqueta: 'Invitación a una organización',
     descripcion: 'Te invitan a unirte a una organización.',
   },
   SOLICITUD_UNIRSE_ORGANIZACION: {
-    grupo: 'postulaciones',
+    grupo: 'organizaciones',
     etiqueta: 'Solicitud para unirse a una organización',
     descripcion: 'Alguien pide unirse a una organización que administras.',
   },
   ORGANIZACION_ACTUALIZADA: {
-    grupo: 'postulaciones',
+    grupo: 'organizaciones',
     etiqueta: 'Organización actualizada',
     descripcion: 'Cambia tu pertenencia o rol en una organización, o responden a tu invitación.',
   },
@@ -177,7 +180,7 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   CUENTA_VERIFICADA: { grupo: 'cuenta', etiqueta: 'Cuenta verificada', descripcion: 'Administración verifica tu cuenta.' },
   ALERTA_SEGURIDAD: { grupo: 'cuenta', etiqueta: 'Alerta de seguridad', descripcion: 'La plataforma detecta actividad inusual de acceso.' },
   JUNTA_ASOCIACION: {
-    grupo: 'cuenta',
+    grupo: 'organizaciones',
     etiqueta: 'Junta de asociación',
     descripcion: 'Administración te nombra, cambia o quita de la junta de una asociación.',
   },

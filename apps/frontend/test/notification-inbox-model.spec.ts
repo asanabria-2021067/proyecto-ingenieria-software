@@ -4,6 +4,7 @@ import {
   INBOX_CATEGORIES,
   accionDeAviso,
   agruparPorDia,
+  agruparRepetidas,
   categoriaDeTipo,
   detallesDeAviso,
   estadoDeReunion,
@@ -25,7 +26,7 @@ const aviso = (tipoNotificacion: string, datosJson: Record<string, unknown> | nu
 
 describe('categorías de la bandeja', () => {
   it('son los grupos de preference-groups.ts, cada uno con sus tipos reales y sin «otras»', () => {
-    expect(INBOX_CATEGORIES.map((c) => c.id)).toEqual(['tareas', 'postulaciones', 'proyectos', 'horas', 'recordatorios', 'contactos', 'cuenta']);
+    expect(INBOX_CATEGORIES.map((c) => c.id)).toEqual(['tareas', 'postulaciones', 'proyectos', 'horas', 'recordatorios', 'contactos', 'organizaciones', 'cuenta']);
     const todos = INBOX_CATEGORIES.flatMap((c) => c.tipos);
     expect(new Set(todos).size).toBe(todos.length);
     expect(todos.sort()).toEqual(Object.keys(NOTIFICATION_TYPE_PRESENTATION).sort());
@@ -211,5 +212,25 @@ describe('segmentosDeMensaje: el asunto citado de la vista previa', () => {
     expect(segmentosDeMensaje('Se consolidaron 5 horas.')).toEqual([{ texto: 'Se consolidaron 5 horas.', destacado: false }]);
     // Una comilla suelta no destaca nada.
     expect(destacados('Pulgadas: 5" de margen')).toEqual([]);
+  });
+});
+
+describe('MEJ-29: agruparRepetidas', () => {
+  it('pliega mismo tipo y proyecto, conserva el orden y no mezcla proyectos ni tipos', () => {
+    const a = aviso('TAREA_ASIGNADA', { projectId: 1 });
+    const b = aviso('TAREA_ASIGNADA', { projectId: 2 });
+    const c = aviso('TAREA_ASIGNADA', { projectId: 1 });
+    const d = aviso('COMENTARIO_TAREA', { projectId: 1 });
+    const e = aviso('TAREA_ASIGNADA', { projectId: 1 });
+    const grupos = agruparRepetidas([a, b, c, d, e]);
+    expect(grupos.map((g) => g.principal)).toEqual([a, b, d]);
+    expect(grupos[0].resto).toEqual([c, e]);
+    expect(grupos[1].resto).toEqual([]);
+  });
+
+  it('no pliega avisos sin proyecto ni los de Cuenta y seguridad', () => {
+    expect(agruparRepetidas([aviso('TAREA_ASIGNADA'), aviso('TAREA_ASIGNADA')])).toHaveLength(2);
+    const alertas = [aviso('ALERTA_SEGURIDAD', { projectId: 1 }), aviso('ALERTA_SEGURIDAD', { projectId: 1 })];
+    expect(agruparRepetidas(alertas)).toHaveLength(2);
   });
 });

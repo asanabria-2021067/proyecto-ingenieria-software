@@ -1,7 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService, type PostCommitEffect } from '../notifications/notifications.service';
+import { MailService } from '../mail/mail.service';
+import { correoJuntaAsociacion } from '../mail/mail-templates';
 import { CARGO_ETIQUETA, NIVEL_POR_CARGO } from './associations.rules';
 import { assertPuedePublicarComoAsociacion } from './junta-access';
 import { whereCandidatoAsociacion } from '../organizations/organization-projects';
@@ -31,6 +33,7 @@ export class AssociationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly mail?: MailService,
   ) {}
 
   list() {
@@ -240,6 +243,16 @@ export class AssociationsService {
     cargo: keyof typeof CARGO_ETIQUETA,
     nivelPermiso: string | null,
   ) {
+    // MEJ-80: correo después del commit, junto al aviso por socket.
+    effects.push({
+      key: `correo-junta:${idUsuario}:${accion}`,
+      publish: async () => {
+        const u = await this.prisma.usuario.findUnique({ where: { idUsuario }, select: { correo: true } });
+        if (!u) return;
+        const correo = correoJuntaAsociacion(asociacion.nombre, accion, CARGO_ETIQUETA[cargo]);
+        await this.mail?.enviar(u.correo, correo.asunto, correo.texto);
+      },
+    });
     return this.notifications.persistTemplateTx(
       tx,
       [idUsuario],
