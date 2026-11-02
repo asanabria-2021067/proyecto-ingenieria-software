@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import {
   EstadoInvitacionOrganizacion,
   EstadoMembresia,
@@ -10,6 +10,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MailService } from '../mail/mail.service';
+import { correoInvitacionOrganizacion, urlApp } from '../mail/mail-templates';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { OrganizationChatService } from './organization-chat.service';
 import {
@@ -37,6 +39,7 @@ export class OrganizationInvitationsService {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private chat: OrganizationChatService,
+    @Optional() private mail?: MailService,
   ) {}
 
   /** Usuarios activos, sin administradores del sistema y que aún no son miembros. */
@@ -76,7 +79,7 @@ export class OrganizationInvitationsService {
 
         const invitado = await tx.usuario.findFirst({
           where: dto.idUsuario !== undefined ? { idUsuario: dto.idUsuario } : { correo: { equals: dto.correo, mode: 'insensitive' } },
-          select: { ...USUARIO_SELECT, estado: true, rolesAcceso: { where: { rolAcceso: { nombrePerfil: 'administrador' } }, select: { idUsuarioRolAcceso: true } } },
+          select: { ...USUARIO_SELECT, correo: true, estado: true, rolesAcceso: { where: { rolAcceso: { nombrePerfil: 'administrador' } }, select: { idUsuarioRolAcceso: true } } },
         });
         if (!invitado || invitado.estado !== EstadoUsuario.ACTIVO || invitado.rolesAcceso.length > 0) {
           throw new BadRequestException('Solo se puede invitar a usuarios activos que no sean administradores del sistema');
@@ -106,7 +109,7 @@ export class OrganizationInvitationsService {
           rol: dto.rolOrganizacion,
         });
         const invitador = await tx.usuario.findUniqueOrThrow({ where: { idUsuario: userId }, select: { nombre: true, apellido: true } });
-        return { invitacion, nombre: ctx.org.nombreOrganizacion, invitador: nombreCompleto(invitador) };
+        return { invitacion, nombre: ctx.org.nombreOrganizacion, invitador: nombreCompleto(invitador), correoInvitado: invitado.correo };
       })
       .catch(traducirPendienteDuplicada('Esa persona ya tiene una invitación pendiente'));
     await notificar(this.notifications, [creada.invitacion.invitado.idUsuario], 'INVITACION_ORGANIZACION', {
@@ -116,6 +119,8 @@ export class OrganizationInvitationsService {
       invitedBy: creada.invitador,
       roleName: dto.rolOrganizacion,
     });
+    const correo = correoInvitacionOrganizacion(creada.nombre, creada.invitador, urlApp('/dashboard/organizaciones'));
+    await this.mail?.enviar(creada.correoInvitado, correo.asunto, correo.texto);
     return creada.invitacion;
   }
 

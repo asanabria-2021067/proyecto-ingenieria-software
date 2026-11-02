@@ -340,6 +340,12 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          # MEJ-80: correo SMTP opcional. Sin SMTP_HOST el backend arranca con el correo desactivado.
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
           # G07 (P2/P4): la misma expresion que la variante y el build.
           NEXT_PUBLIC_API_URL: ${{ (vars.PUBLIC_API_URL || 'direct') != 'same-origin' && ((vars.PUBLIC_API_URL || 'direct') != 'direct' && (vars.PUBLIC_API_URL || 'direct') || secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001') || '' }}
           NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
@@ -408,6 +414,13 @@ jobs:
             printf 'FRONTEND_URL=%s\n' "$FRONTEND_URL"
             if [ -n "$CLOUDINARY_CLOUD_NAME" ]; then
               printf 'CLOUDINARY_CLOUD_NAME=%s\n' "$CLOUDINARY_CLOUD_NAME"
+            fi
+            if [ -n "$SMTP_HOST" ]; then
+              printf 'SMTP_HOST=%s\n' "$SMTP_HOST"
+              printf 'SMTP_PORT=%s\n' "$SMTP_PORT"
+              printf 'SMTP_USER=%s\n' "$SMTP_USER"
+              printf 'SMTP_PASSWORD=%s\n' "$SMTP_PASSWORD"
+              printf 'SMTP_FROM=%s\n' "$SMTP_FROM"
             fi
             printf 'BACKEND_IMAGE=%s\n' "$BACKEND_IMAGE"
             printf 'FRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE"

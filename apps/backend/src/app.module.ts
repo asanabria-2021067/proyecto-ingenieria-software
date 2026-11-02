@@ -12,6 +12,7 @@ import { isThrottlerDisabled } from './config/throttler';
 import { AppController } from './app.controller';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { PrismaModule } from './prisma/prisma.module';
+import { MailModule } from './mail/mail.module';
 import { ProjectPolicyModule } from './common/project-policy/project-policy.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -101,6 +102,7 @@ const skipThrottling = () => isThrottlerDisabled();
       }),
     }),
     PrismaModule,
+    MailModule,
     ProjectPolicyModule,
     AuthModule,
     UsersModule,
