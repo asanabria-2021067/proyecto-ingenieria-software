@@ -87,7 +87,7 @@ describe('ASO: dashboard de asociación', () => {
     });
     montar();
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Asociación AEC' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'AEC' })).toBeInTheDocument();
     const tabla = await screen.findByRole('table', { name: /estudiante de la asociación/i });
     expect(within(tabla).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
       'Estudiante',
@@ -103,6 +103,20 @@ describe('ASO: dashboard de asociación', () => {
     expect(within(filas[2]).getByText('En riesgo')).toHaveClass('pill');
     expect(screen.getByText(/más de 20 puntos por debajo de lo esperado/)).toBeVisible();
     expect(screen.queryByText(/tel[eé]fono/i)).toBeNull();
+  });
+
+  it('el título muestra solo el nombre, sin anteponer «Asociación» (FIX-A1)', async () => {
+    vi.mocked(getEstudiantesAsociacion).mockResolvedValue({ semestre: SEMESTRE, filas: [], siguienteCursor: null });
+    montar([{ idAsociacion: 7, nombre: 'Asociación de Estudiantes de Computación', logoUrl: null, cargo: 'PRESIDENTE', nivelPermiso: 'ADMINISTRADOR' }]);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Asociación de Estudiantes de Computación' })).toBeInTheDocument();
+  });
+
+  it('el estudiante sin metas se rotula con texto claro en vez de «—» (FIX-A2)', async () => {
+    vi.mocked(getEstudiantesAsociacion).mockResolvedValue({ semestre: SEMESTRE, filas: [fila(1, { metaBeca: null, becaDeclarada: 0, becaAcreditada: 0, faltaBeca: null })], siguienteCursor: null });
+    montar();
+    const tabla = await screen.findByRole('table', { name: /estudiante de la asociación/i });
+    expect(within(tabla).getAllByText('Aún no registra sus metas del semestre')).toHaveLength(2);
+    expect(within(tabla).queryByText('—')).toBeNull();
   });
 
   it('los filtros llegan al servidor: en riesgo, tipo de horas y búsqueda', async () => {

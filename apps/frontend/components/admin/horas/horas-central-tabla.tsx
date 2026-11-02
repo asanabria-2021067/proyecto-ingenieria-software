@@ -12,19 +12,27 @@ import type { FilaHorasCentral } from '@/lib/services/horas-semestre';
 const TH = `h-auto whitespace-normal px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
 const TD = 'whitespace-normal px-stack py-inline align-top';
 
-const horas = (n: number | null) => (n === null ? '—' : `${n} h`);
+const horas = (n: number | null) => `${n ?? 0} h`;
 
 export function Horas({ meta, declaradas, acreditadas, falta }: { meta: number | null; declaradas: number; acreditadas: number; falta: number | null }) {
   return (
     <dl className="grid grid-cols-2 gap-x-inline gap-y-micro type-meta tabular-nums">
-      <div>
-        <dt>Meta</dt>
-        <dd className="type-body font-semibold text-text-primary">{horas(meta)}</dd>
-      </div>
-      <div>
-        <dt>Falta</dt>
-        <dd className="type-body font-semibold text-text-primary">{horas(falta)}</dd>
-      </div>
+      {meta === null ? (
+        <div className="col-span-2">
+          <dd>Aún no registra sus metas del semestre</dd>
+        </div>
+      ) : (
+        <>
+          <div>
+            <dt>Meta</dt>
+            <dd className="type-body font-semibold text-text-primary">{horas(meta)}</dd>
+          </div>
+          <div>
+            <dt>Falta</dt>
+            <dd className="type-body font-semibold text-text-primary">{horas(falta)}</dd>
+          </div>
+        </>
+      )}
       <div>
         <dt>Declaradas</dt>
         <dd className="type-body text-text-primary">{declaradas} h</dd>
