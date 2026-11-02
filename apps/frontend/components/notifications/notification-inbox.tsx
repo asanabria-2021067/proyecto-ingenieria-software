@@ -165,10 +165,12 @@ export function NotificationInbox() {
   );
 
   const seleccionar = useCallback(
-    (n: Notificacion) => {
+    (n: Notificacion, repetidas: Notificacion[] = []) => {
       setSeleccionada(n);
       setVistaMovil('detalle');
       leerAlAbrir(n);
+      // MEJ-29: abrir el grupo marca también los avisos repetidos que contiene.
+      repetidas.forEach(leerAlAbrir);
     },
     [leerAlAbrir, setSeleccionada],
   );

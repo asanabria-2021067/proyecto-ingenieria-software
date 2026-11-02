@@ -85,8 +85,18 @@ export function getConteoNoLeidas(): Promise<ConteoNoLeidas> {
   return apiFetch<ConteoNoLeidas>('/notificaciones/mias/conteo-no-leidas');
 }
 
-export function marcarLeida(id: number): Promise<Notificacion> {
-  return apiFetch<Notificacion>(`/notificaciones/${id}/leer`, { method: 'PATCH' });
+/**
+ * MEJ-30: al leer un aviso de mensaje de revisión se acusan también los mensajes del canal del
+ * proyecto (PATCH /mensajes-revision/proyectos/:id/marcar-leidos). Es un acuse accesorio: si falla
+ * (canal cerrado, sin acceso) el aviso queda leído igual.
+ */
+export async function marcarLeida(id: number): Promise<Notificacion> {
+  const leida = await apiFetch<Notificacion>(`/notificaciones/${id}/leer`, { method: 'PATCH' });
+  const idProyecto = idUsuarioSeguro(leida.datosJson?.idProyecto);
+  if (leida.tipoNotificacion === 'MENSAJE_REVISION' && idProyecto !== null) {
+    await apiFetch(`/mensajes-revision/proyectos/${idProyecto}/marcar-leidos`, { method: 'PATCH' }).catch(() => undefined);
+  }
+  return leida;
 }
 
 /** Sin filtros marca todas las propias; con ellos, exactamente lo que la lista filtrada muestra. */
@@ -164,6 +174,8 @@ export function getNotificationLink(n: {
         : null;
     case 'POSTULACION_RESUELTA':
       return '/dashboard/mis-postulaciones';
+    case 'TU_SEMANA':
+      return '/dashboard/mis-tareas';
     // ORG: la invitación se responde desde el listado (la organización puede ser privada y aún no ser visible).
     case 'INVITACION_ORGANIZACION':
       return '/dashboard/organizaciones';

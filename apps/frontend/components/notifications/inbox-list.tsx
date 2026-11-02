@@ -10,6 +10,8 @@ import { DATA_TABLE_HEAD_ROW, DATA_TABLE_HEAD_TEXT, DATA_TABLE_ROW_HOVER, DATA_T
 import type { Notificacion } from '@/lib/services/notifications';
 import {
   agruparPorDia,
+  agruparRepetidas,
+  etiquetaDeTipo,
   categoriaDeTipo,
   fechaCompacta,
   identidadDeAviso,
@@ -60,6 +62,8 @@ interface InboxRowProps {
   seleccionada: boolean;
   onSeleccionar: () => void;
   ahora: Date;
+  /** MEJ-29: avisos repetidos plegados bajo esta fila. */
+  repetidas?: Notificacion[];
 }
 
 /**
@@ -72,14 +76,19 @@ interface InboxRowProps {
  * con barra verde; sin leer, su barra y la de no leída son una sola más gruesa.
  * El avatar lleva el color de la categoría sin leer y queda gris leído.
  */
-export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }: InboxRowProps) {
-  const noLeida = n.leidaEn === null;
+export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora, repetidas = [] }: InboxRowProps) {
+  const noLeida = n.leidaEn === null || repetidas.some((r) => r.leidaEn === null);
   const identidad = identidadDeAviso(n);
   const origen = origenDeAviso(n);
   const proyecto = proyectoDeAviso(n);
   const idCategoria = categoriaDeTipo(n.tipoNotificacion);
   const categoria = tituloDeCategoria(idCategoria);
   const fecha = fechaCompacta(n.creadaEn, ahora);
+  const total = repetidas.length + 1;
+  const titulo =
+    total > 1
+      ? `${total} avisos: ${etiquetaDeTipo(n.tipoNotificacion)}${proyecto?.titulo ? ` en ${proyecto.titulo}` : ''}`
+      : n.tituloNotificacion;
 
   return (
     <li className="relative" data-notificacion={n.idNotificacion} data-leida={noLeida ? 'false' : 'true'}>
@@ -87,7 +96,7 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
         type="button"
         onClick={onSeleccionar}
         aria-current={seleccionada ? 'true' : undefined}
-        aria-label={`${noLeida ? 'No leída: ' : ''}${n.tituloNotificacion}${fecha ? `, ${fecha}` : ''}`}
+        aria-label={`${noLeida ? 'No leída: ' : ''}${titulo}${fecha ? `, ${fecha}` : ''}`}
         className={cn(
           'group/fila flex w-full items-start gap-inline px-inline py-inline text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40',
           seleccionada
@@ -105,7 +114,7 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
             <span className="type-meta block truncate text-[11px] uppercase tracking-wide text-text-secondary">{origen}</span>
           )}
           <span className={cn('block truncate text-sm', noLeida ? 'font-bold text-on-surface' : 'font-medium text-on-surface-variant')}>
-            {n.tituloNotificacion}
+            {titulo}
           </span>
           {n.mensajeNotificacion && (
             <span className={cn('mt-0.5 line-clamp-2 text-xs leading-snug', noLeida ? 'text-on-surface-variant' : 'text-tertiary')}>
@@ -139,7 +148,7 @@ export function InboxRow({ notificacion: n, seleccionada, onSeleccionar, ahora }
 interface InboxListProps {
   notificaciones: Notificacion[];
   seleccionadaId: number | null;
-  onSeleccionar: (n: Notificacion) => void;
+  onSeleccionar: (n: Notificacion, repetidas?: Notificacion[]) => void;
   isLoading: boolean;
   isError: boolean;
   onReintentar: () => void;
@@ -175,12 +184,14 @@ export function InboxList({
       if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
       if (notificaciones.length === 0) return;
       event.preventDefault();
-      const indice = notificaciones.findIndex((n) => n.idNotificacion === seleccionadaId);
-      const siguiente = event.key === 'ArrowDown' ? Math.min(indice + 1, notificaciones.length - 1) : Math.max(indice - 1, 0);
-      const destino = notificaciones[siguiente];
-      if (!destino || destino.idNotificacion === seleccionadaId) return;
-      onSeleccionar(destino);
-      event.currentTarget.querySelector<HTMLButtonElement>(`[data-notificacion="${destino.idNotificacion}"] button`)?.focus();
+      // Solo las filas visibles: los avisos plegados (MEJ-29) no tienen fila propia.
+      const visibles = agruparPorDia(notificaciones).flatMap((dia) => agruparRepetidas(dia.items));
+      const indice = visibles.findIndex((g) => g.principal.idNotificacion === seleccionadaId);
+      const siguiente = event.key === 'ArrowDown' ? Math.min(indice + 1, visibles.length - 1) : Math.max(indice - 1, 0);
+      const destino = visibles[siguiente];
+      if (!destino || destino.principal.idNotificacion === seleccionadaId) return;
+      onSeleccionar(destino.principal, destino.resto);
+      event.currentTarget.querySelector<HTMLButtonElement>(`[data-notificacion="${destino.principal.idNotificacion}"] button`)?.focus();
     },
     [notificaciones, seleccionadaId, onSeleccionar],
   );
@@ -246,12 +257,13 @@ export function InboxList({
             {grupo.etiqueta}
           </h3>
           <ul className={DATA_TABLE_ROWS} onKeyDown={onKeyDown}>
-            {grupo.items.map((n) => (
+            {agruparRepetidas(grupo.items).map(({ principal: n, resto }) => (
               <InboxRow
                 key={n.idNotificacion}
                 notificacion={n}
+                repetidas={resto}
                 seleccionada={n.idNotificacion === seleccionadaId}
-                onSeleccionar={() => onSeleccionar(n)}
+                onSeleccionar={() => onSeleccionar(n, resto)}
                 ahora={ahora}
               />
             ))}
