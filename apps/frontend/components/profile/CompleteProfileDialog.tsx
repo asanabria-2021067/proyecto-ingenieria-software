@@ -854,7 +854,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
         )}
 
         {/* Navigation buttons */}
-        <div className="flex justify-between pt-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
           {step > 0 ? (
             <button
               type="button"
@@ -866,7 +866,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
           ) : (
             <div />
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {onDefer && (
               <button
                 type="button"
