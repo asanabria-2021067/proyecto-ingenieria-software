@@ -337,6 +337,10 @@ enum TipoNotificacion {
   PROYECTO_GUARDADO_AVISO
   // MEJ-22: el líder invita directo a un rol.
   INVITACION_ROL_PROYECTO
+  // MEJ-54: un hito del proyecto pasó su fecha límite sin completarse (aviso al líder).
+  HITO_ATRASADO
+  // MEJ-57: un compañero te reconoció en un sprint.
+  RECONOCIMIENTO_RECIBIDO
 }
 
 enum EstadoAmistad {
@@ -431,6 +435,9 @@ model Usuario {
   mensajesRevisionEnviados         MensajeRevisionProyecto[]    @relation("MensajesEnviados")
   solicitudesSalidaSolicitadas     SolicitudSalidaProyecto[]    @relation("SolicitudSalidaSolicitante")
   solicitudesSalidaResueltas       SolicitudSalidaProyecto[]    @relation("SolicitudSalidaResolutor")
+  retrospectivasSprint             RetrospectivaSprint[]        @relation("RetrospectivaAutor")
+  reconocimientosDados             ReconocimientoCompanero[]    @relation("ReconocimientoAutor")
+  reconocimientosRecibidos         ReconocimientoCompanero[]    @relation("ReconocimientoReceptor")
   sprintsCerrados                  Sprint[]
   registrosAvanceEscritos          RegistroAvanceAsignacion[]
   registrosTiempoRegistrados       RegistroTiempoTarea[]
@@ -1190,6 +1197,8 @@ model Hito {
   fechaLimite     DateTime?  @map("fecha_limite") @db.Date
   estadoHito      EstadoHito @default(PENDIENTE) @map("estado_hito")
   orden           Int
+  /// MEJ-54: instante en que se avisó al líder del atraso; null = sin avisar (un aviso por hito).
+  alertaAtrasoEnviadaEn DateTime? @map("alerta_atraso_enviada_en")
 
   proyecto    Proyecto     @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
   tareas      Tarea[]
@@ -1230,6 +1239,8 @@ model Sprint {
   tareas             Tarea[]
   horasParticipacion HorasParticipacion[]
   instantaneas       InstantaneaSprint[]
+  retrospectiva      RetrospectivaSprint?
+  reconocimientos    ReconocimientoCompanero[]
 
   @@index([idProyecto, estado])
   @@map("sprint")
@@ -2375,4 +2386,42 @@ model AnuncioCierre {
   @@unique([idAnuncio, idUsuario])
   @@index([idUsuario])
   @@map("anuncio_cierre")
+}
+
+/// MEJ-24: retrospectiva opcional de un Sprint (una por Sprint), escrita por el líder.
+model RetrospectivaSprint {
+  idRetrospectiva  Int      @id @default(autoincrement()) @map("id_retrospectiva")
+  idSprint         Int      @unique @map("id_sprint")
+  idProyecto       Int      @map("id_proyecto")
+  quePaso          String   @map("que_paso") @db.VarChar(1000)
+  quePodriaMejorar String   @map("que_podria_mejorar") @db.VarChar(1000)
+  acuerdos         String   @db.VarChar(1000)
+  creadaPor        Int      @map("creada_por")
+  actualizadaEn    DateTime @default(now()) @map("actualizada_en")
+
+  sprint Sprint  @relation(fields: [idSprint], references: [idSprint], onDelete: Restrict)
+  autor  Usuario @relation("RetrospectivaAutor", fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
+
+  @@index([idProyecto])
+  @@map("retrospectiva_sprint")
+}
+
+/// MEJ-57: reconocimiento entre compañeros. `@@unique([idSprint, idAutor])` = uno por persona por Sprint.
+model ReconocimientoCompanero {
+  idReconocimiento Int      @id @default(autoincrement()) @map("id_reconocimiento")
+  idSprint         Int      @map("id_sprint")
+  idProyecto       Int      @map("id_proyecto")
+  idAutor          Int      @map("id_autor")
+  idReceptor       Int      @map("id_receptor")
+  mensaje          String   @db.VarChar(280)
+  creadoEn         DateTime @default(now()) @map("creado_en")
+
+  sprint   Sprint  @relation(fields: [idSprint], references: [idSprint], onDelete: Restrict)
+  autor    Usuario @relation("ReconocimientoAutor", fields: [idAutor], references: [idUsuario], onDelete: Restrict)
+  receptor Usuario @relation("ReconocimientoReceptor", fields: [idReceptor], references: [idUsuario], onDelete: Restrict)
+
+  @@unique([idSprint, idAutor])
+  @@index([idReceptor])
+  @@index([idProyecto])
+  @@map("reconocimiento_companero")
 }

@@ -3,7 +3,7 @@ import { ClaveInsignia } from './insignias.catalog';
 
 type Db = Pick<
   PrismaClient,
-  'tarea' | 'horasParticipacion' | 'proyecto' | 'postulacion' | 'comentario' | 'sprint'
+  'tarea' | 'horasParticipacion' | 'proyecto' | 'postulacion' | 'comentario' | 'sprint' | 'reconocimientoCompanero'
 >;
 
 const tareaHechaDe = (idUsuario: number) => ({
@@ -45,5 +45,7 @@ export async function calcularMetrica(db: Db, clave: ClaveInsignia, idUsuario: n
       return db.comentario.count({ where: { idAutor: idUsuario, idTarea: { not: null }, eliminadoEn: null } });
     case 'sprints':
       return db.sprint.count({ where: { estado: 'CERRADO', tareas: { some: tareaHechaDe(idUsuario) } } });
+    case 'companerismo':
+      return db.reconocimientoCompanero.count({ where: { idReceptor: idUsuario } });
   }
 }

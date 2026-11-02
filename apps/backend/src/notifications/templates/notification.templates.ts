@@ -337,6 +337,21 @@ export interface NotificationTemplateData {
     idConversacion: number;
     idMensaje: number;
   };
+  // MEJ-54: hito sin completar con la fecha límite vencida (aviso al líder).
+  HITO_ATRASADO: {
+    hitoTitle: string;
+    projectTitle: string;
+    projectId: number;
+    hitoId: number;
+    diasAtraso: number;
+  };
+  // MEJ-57: reconocimiento de un compañero en un sprint.
+  RECONOCIMIENTO_RECIBIDO: {
+    autorNombre: string;
+    projectTitle: string;
+    projectId: number;
+    sprintNumero: number;
+  };
 
   SOLICITUD_CONTACTO: {
     nombre: string;
@@ -685,6 +700,18 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Recordatorio de un mensaje',
     message: (data: NotificationTemplateData['RECORDATORIO_MENSAJE']) =>
       `Pediste que te recordáramos este mensaje de ${data.autorNombre}: "${data.extracto}".`,
+  },
+
+  HITO_ATRASADO: {
+    title: 'Un hito está atrasado',
+    message: (data: NotificationTemplateData['HITO_ATRASADO']) =>
+      `El hito "${data.hitoTitle}" del proyecto "${data.projectTitle}" lleva ${data.diasAtraso} ${data.diasAtraso === 1 ? 'día' : 'días'} de atraso.`,
+  },
+
+  RECONOCIMIENTO_RECIBIDO: {
+    title: 'Te reconocieron en el sprint',
+    message: (data: NotificationTemplateData['RECONOCIMIENTO_RECIBIDO']) =>
+      `${data.autorNombre} te reconoció en el sprint ${data.sprintNumero} del proyecto "${data.projectTitle}".`,
   },
 
   SOLICITUD_CONTACTO: {
