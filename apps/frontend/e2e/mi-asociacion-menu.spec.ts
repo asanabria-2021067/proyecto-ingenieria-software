@@ -17,6 +17,8 @@ async function abrirDashboard(page: Page, juntas: ReturnType<typeof junta>[]) {
   await desactivarTour(page);
   await login(page, ESTUDIANTE);
   await page.goto('/dashboard');
+  // El asistente de horas del semestre se abre solo sin registro y deja el menú inerte (aria-hidden): se pospone.
+  await page.getByRole('button', { name: 'Hacerlo después' }).click();
   await expect(page.getByRole('link', { name: 'Mis Tareas' }).first()).toBeVisible();
 }
 
