@@ -119,6 +119,14 @@ describe('ASO: dashboard de asociación', () => {
     expect(within(tabla).queryByText('—')).toBeNull();
   });
 
+  it('con solo la meta de beca registrada, extensión dice que falta su meta y no el mensaje general', async () => {
+    vi.mocked(getEstudiantesAsociacion).mockResolvedValue({ semestre: SEMESTRE, filas: [fila(1)], siguienteCursor: null });
+    montar();
+    const tabla = await screen.findByRole('table', { name: /estudiante de la asociación/i });
+    expect(within(tabla).getByText('Sin meta de extensión registrada')).toBeInTheDocument();
+    expect(within(tabla).queryByText('Aún no registra sus metas del semestre')).toBeNull();
+  });
+
   it('los filtros llegan al servidor: en riesgo, tipo de horas y búsqueda', async () => {
     vi.mocked(getEstudiantesAsociacion).mockResolvedValue({ semestre: SEMESTRE, filas: [fila(1)], siguienteCursor: null });
     montar();
