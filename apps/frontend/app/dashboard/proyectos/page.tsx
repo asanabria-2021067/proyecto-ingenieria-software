@@ -26,18 +26,16 @@ import { apiFetch } from '@/lib/api/client';
 import { TIPO_LABEL } from '@/types';
 import type { TipoProyecto } from '@/types';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, Bookmark, FolderOpen, SearchX } from 'lucide-react';
+import { AlertCircle, Bookmark, FolderOpen, SearchX, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { useProyectosParaTi } from '@/hooks/use-descubrimiento';
+import { DUENIO_LABEL, type DuenioProyecto } from '@/lib/services/descubrimiento';
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import { SkeletonRegion } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-
-type OrganizacionFiltro = {
-  idOrganizacion: number;
-  nombreOrganizacion: string;
-};
 
 const CHIP_BASE =
   'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold motion-select focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
@@ -70,34 +68,24 @@ function ProyectosContenido() {
   const [soloVacantes, setSoloVacantes] = useState(false);
   const [soloMiCarrera, setSoloMiCarrera] = useState(false);
   const [tipoFiltro, setTipoFiltro] = useState('');
-  const [organizacionFiltro, setOrganizacionFiltro] = useState('');
+  const [duenioFiltro, setDuenioFiltro] = useState<DuenioProyecto | ''>('');
+  const [soloParaTi, setSoloParaTi] = useState(false);
   const [soloGuardados, setSoloGuardados] = useState(false);
 
-  const {
-    data: proyectos = [],
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery<ProyectoDisponibleResumen[]>({
-    queryKey: ['proyectos', organizacionFiltro, qParam],
+  const catalogo = useQuery<ProyectoDisponibleResumen[]>({
+    queryKey: ['proyectos', duenioFiltro, qParam],
     queryFn: () => {
       // El backend devuelve solo 20 y filtra `q` por título: con `q` en la URL se lo pedimos a él.
       const params = new URLSearchParams();
-      if (organizacionFiltro) params.set('organizacionId', organizacionFiltro);
+      if (duenioFiltro) params.set('duenio', duenioFiltro);
       if (qParam) params.set('q', qParam);
       const qs = params.toString();
       return apiFetch(qs ? `/proyectos?${qs}` : '/proyectos');
     },
   });
-
-  const {
-    data: organizaciones = [],
-    isLoading: isLoadingOrganizaciones,
-    isError: isErrorOrganizaciones,
-  } = useQuery<OrganizacionFiltro[]>({
-    queryKey: ['organizaciones'],
-    queryFn: () => apiFetch('/organizaciones'),
-  });
+  // MEJ-15: «Para ti» es otra consulta (ordenada por coincidencia), no un filtro del navegador.
+  const paraTi = useProyectosParaTi(soloParaTi, duenioFiltro);
+  const { data: proyectos = [], isLoading, isError, refetch } = soloParaTi ? paraTi : catalogo;
 
   const filtrados = proyectos
     .filter((p) => {
@@ -114,9 +102,10 @@ function ProyectosContenido() {
       return coincideBusqueda && coincideTipo && coincideGuardado && coincideVacantes && coincideCarrera;
     })
     // S7 (VIEW-09): los cerrados no aceptan postulaciones; van al final y solo se consultan.
+    // «Para ti» conserva el orden por coincidencia del servidor (sort es estable).
     .sort((a, b) => Number(a.estadoProyecto === 'CERRADO') - Number(b.estadoProyecto === 'CERRADO'));
   const cerrados = filtrados.filter((p) => p.estadoProyecto === 'CERRADO').length;
-  const hasActiveFilters = Boolean(busqueda || tipoFiltro || organizacionFiltro || soloGuardados || soloVacantes || soloMiCarrera);
+  const hasActiveFilters = Boolean(busqueda || tipoFiltro || duenioFiltro || soloParaTi || soloGuardados || soloVacantes || soloMiCarrera);
   const activos = proyectos.filter((p) => p.estadoProyecto !== 'CERRADO').length;
   const hayMiCarrera = proyectos.some((p) => p.mismaCarrera);
   const totalGuardados = proyectos.filter((p) => p.guardado).length;
@@ -129,7 +118,8 @@ function ProyectosContenido() {
   const limpiarFiltros = () => {
     setBusqueda('');
     setTipoFiltro('');
-    setOrganizacionFiltro('');
+    setDuenioFiltro('');
+    setSoloParaTi(false);
     setSoloGuardados(false);
     setSoloVacantes(false);
     setSoloMiCarrera(false);
@@ -183,36 +173,17 @@ function ProyectosContenido() {
               onChange={(e) => setBusqueda(e.target.value)}
             />
 
-            <Select
-              value={organizacionFiltro || '__ALL__'}
-              onValueChange={(v) => setOrganizacionFiltro(v === '__ALL__' ? '' : v)}
-              disabled={isLoadingOrganizaciones || isErrorOrganizaciones}
-            >
-              <SelectTrigger
-                aria-label="Filtrar proyectos por organización"
-                className={`w-full sm:w-60 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}
-              >
-                <SelectValue
-                  placeholder={
-                    isLoadingOrganizaciones
-                      ? 'Cargando organizaciones...'
-                      : isErrorOrganizaciones
-                        ? 'Error al cargar organizaciones'
-                        : 'Todas las organizaciones'
-                  }
-                />
+            <Select value={duenioFiltro || '__ALL__'} onValueChange={(v) => setDuenioFiltro(v === '__ALL__' ? '' : (v as DuenioProyecto))}>
+              <SelectTrigger aria-label="Filtrar proyectos por dueño" className={`w-full sm:w-60 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}>
+                <SelectValue placeholder="Todos los dueños" />
               </SelectTrigger>
               <SelectContent className="z-50">
                 <SelectItem value="__ALL__" className="focus:bg-primary focus:text-on-primary">
-                  Todas las organizaciones
+                  Todos los dueños
                 </SelectItem>
-                {organizaciones.map((organizacion) => (
-                  <SelectItem
-                    key={organizacion.idOrganizacion}
-                    value={String(organizacion.idOrganizacion)}
-                    className="focus:bg-primary focus:text-on-primary"
-                  >
-                    {organizacion.nombreOrganizacion}
+                {(Object.entries(DUENIO_LABEL) as [DuenioProyecto, string][]).map(([valor, etiqueta]) => (
+                  <SelectItem key={valor} value={valor} className="focus:bg-primary focus:text-on-primary">
+                    {etiqueta}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -220,12 +191,16 @@ function ProyectosContenido() {
           </div>
 
           {/* Filtros principales siempre visibles; los tipos son los del enum real (TIPO_LABEL). */}
-          {!isLoading && !isError && proyectos.length > 0 && (
+          {(soloParaTi || (!isLoading && !isError && proyectos.length > 0)) && (
             <div
               role="group"
               aria-label="Filtros de proyectos"
               className="flex items-center gap-tight overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
+              <button type="button" onClick={() => setSoloParaTi((v) => !v)} aria-pressed={soloParaTi} className={`inline-flex items-center gap-1.5 ${chipClase(soloParaTi)}`}>
+                <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
+                Para ti
+              </button>
               <button type="button" onClick={() => setTipoFiltro('')} aria-pressed={tipoFiltro === ''} className={chipClase(tipoFiltro === '')}>
                 Todos <span className="opacity-80">{proyectos.length}</span>
               </button>
@@ -251,12 +226,6 @@ function ProyectosContenido() {
             </div>
           )}
         </div>
-
-        {isErrorOrganizaciones && (
-          <div className="mb-stack type-meta text-error">
-            No se pudieron cargar las organizaciones para filtrar.
-          </div>
-        )}
 
         {isLoading && (
           <SkeletonRegion className={PROJECT_CARD_GRID} label="Cargando proyectos">
@@ -297,9 +266,14 @@ function ProyectosContenido() {
             </EmptyMedia>
             <EmptyHeader>
               <EmptyTitle>
-                {hasActiveFilters ? 'Sin resultados' : 'Todavía no hay proyectos disponibles.'}
+                {soloParaTi && !busqueda ? 'Aún no hay proyectos para ti' : hasActiveFilters ? 'Sin resultados' : 'Todavía no hay proyectos disponibles.'}
               </EmptyTitle>
-              {hasActiveFilters && (
+              {soloParaTi && !busqueda && (
+                <EmptyDescription>
+                  Comparamos tus habilidades e intereses con los roles abiertos. Agrega más a tu perfil para ver coincidencias.
+                </EmptyDescription>
+              )}
+              {hasActiveFilters && !(soloParaTi && !busqueda) && (
                 <EmptyDescription>
                   No encontramos proyectos con {busqueda ? `«${busqueda}»` : 'esos filtros'}. Prueba una de estas opciones.
                 </EmptyDescription>
@@ -307,6 +281,11 @@ function ProyectosContenido() {
             </EmptyHeader>
             {hasActiveFilters && (
               <EmptyContent className="flex-row flex-wrap justify-center">
+                {soloParaTi && !busqueda && (
+                  <Button asChild variant="outline" className="h-auto px-5 py-2.5 text-sm font-bold">
+                    <Link href="/dashboard/perfil">Completar mi perfil</Link>
+                  </Button>
+                )}
                 {busqueda && (
                   <Button type="button" variant="outline" onClick={() => setBusqueda('')} className="h-auto px-5 py-2.5 text-sm font-bold">
                     Quitar el texto

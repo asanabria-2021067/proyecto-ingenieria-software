@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle, XCircle, User } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, User, Sparkles } from 'lucide-react';
 import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
 import { Tag } from '@/components/ui/tag';
 import { apiFetch } from '@/lib/api/client';
@@ -27,6 +27,8 @@ type ModalState = {
 export default function PostulacionesProyectoPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  // MEJ-21: por fecha (como siempre) o por coincidencia de habilidades.
+  const [orden, setOrden] = useState<'fecha' | 'coincidencia'>('fecha');
 
   const [modal, setModal] = useState<ModalState>({
     open: false,
@@ -41,8 +43,8 @@ export default function PostulacionesProyectoPage() {
     isError,
     error,
   } = useQuery<PostulacionRecibida[]>({
-    queryKey: projectAllPostulationsQueryKey(id),
-    queryFn: () => apiFetch(`/proyectos/${id}/postulaciones`),
+    queryKey: [...projectAllPostulationsQueryKey(id), orden],
+    queryFn: () => apiFetch(orden === 'coincidencia' ? `/proyectos/${id}/postulaciones?orden=coincidencia` : `/proyectos/${id}/postulaciones`),
   });
 
   const { denegado } = useRequireCan('proyecto.postulaciones.resolver', {
@@ -109,6 +111,19 @@ export default function PostulacionesProyectoPage() {
           </p>
         </div>
 
+        {postulaciones.length > 1 && (
+          <div role="group" aria-label="Ordenar postulaciones" className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wide text-tertiary">Ordenar por</span>
+            <Button type="button" size="sm" variant={orden === 'fecha' ? 'default' : 'outline'} aria-pressed={orden === 'fecha'} onClick={() => setOrden('fecha')}>
+              Más recientes
+            </Button>
+            <Button type="button" size="sm" variant={orden === 'coincidencia' ? 'default' : 'outline'} aria-pressed={orden === 'coincidencia'} onClick={() => setOrden('coincidencia')}>
+              <Sparkles aria-hidden="true" />
+              Coincidencia de habilidades
+            </Button>
+          </div>
+        )}
+
         {isLoading && (
           <SkeletonList label="Cargando postulaciones" count={3} lines={2} avatar="circle" trailing={1} />
         )}
@@ -149,10 +164,18 @@ export default function PostulacionesProyectoPage() {
                     </div>
                   </div>
 
-                  <Tag tone={config.tone} className="shrink-0">
-                    <Icon aria-hidden="true" />
-                    {config.label}
-                  </Tag>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                    {p.coincidencia && (
+                      <Tag tone={p.coincidencia.porcentaje >= 50 ? 'lime' : 'neutral'} title={`Cumple ${p.coincidencia.cumplidos} de ${p.coincidencia.total} habilidades del rol`}>
+                        <Sparkles aria-hidden="true" />
+                        {p.coincidencia.porcentaje}% coincide
+                      </Tag>
+                    )}
+                    <Tag tone={config.tone}>
+                      <Icon aria-hidden="true" />
+                      {config.label}
+                    </Tag>
+                  </div>
                 </div>
 
                 {/* Rol */}

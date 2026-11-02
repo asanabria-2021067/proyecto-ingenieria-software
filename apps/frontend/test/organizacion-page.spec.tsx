@@ -15,6 +15,8 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-current-user', () => ({
   useCurrentUser: () => ({ data: { idUsuario: 1, nombre: 'Ana', apellido: 'Paz', roles: [] } }),
 }));
+// MEJ-18: el botón «Seguir» usa TanStack Query; aquí solo importa la página.
+vi.mock('@/components/organizations/boton-seguir', () => ({ SeguirOrganizacion: () => null }));
 vi.mock('@/lib/mensajes', () => ({
   aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() },
   confirmar: vi.fn().mockResolvedValue(true),

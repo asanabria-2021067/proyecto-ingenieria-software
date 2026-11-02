@@ -31,6 +31,7 @@ import { useAccionesAmistad, usePerfilUsuario } from '@/hooks/use-social';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
 import { aviso } from '@/lib/mensajes';
 import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
+import { InvitarARolDialog } from '@/components/projects/invitar-a-rol-dialog';
 
 function compartirPerfil() {
   navigator.clipboard
@@ -154,6 +155,9 @@ export default function PerfilPersonaPage() {
                 <Button variant="outline" disabled={seguimiento.disabled} onClick={seguimiento.onClick} className="h-9.5 rounded-md px-4.5 text-[13px] font-semibold">
                   {seguimiento.label}
                 </Button>
+                <div className="col-span-2 flex justify-center sm:justify-start">
+                  <InvitarARolDialog idUsuario={perfil.idUsuario} nombre={nombreCompleto} />
+                </div>
               </div>
             </div>
           </section>

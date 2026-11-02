@@ -9,6 +9,7 @@ import { dashboardPage } from '@/components/layout/dashboard-page';
 import { PROJECT_CARD_GRID, AvailableProjectCardSkeleton } from '@/components/projects/available-project-card';
 import { OrgCard } from '@/components/organizations/org-card';
 import { MisInvitaciones } from '@/components/organizations/mis-invitaciones';
+import { AsociacionesSeguibles } from '@/components/organizations/asociaciones-seguibles';
 import { Button } from '@/components/ui/button';
 import {
   Empty,
@@ -209,12 +210,16 @@ export default function OrganizacionesPage() {
         <TabsList className="mb-4.5">
           <TabsTrigger value="mias">Mis organizaciones</TabsTrigger>
           <TabsTrigger value="explorar">Explorar</TabsTrigger>
+          <TabsTrigger value="asociaciones">Asociaciones</TabsTrigger>
         </TabsList>
         <TabsContent value="mias">
           <MisOrganizaciones />
         </TabsContent>
         <TabsContent value="explorar">
           <ExplorarOrganizaciones />
+        </TabsContent>
+        <TabsContent value="asociaciones">
+          <AsociacionesSeguibles />
         </TabsContent>
       </Tabs>
     </div>
