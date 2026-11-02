@@ -160,13 +160,18 @@ function TaskFormDialogContent({
   const porPasos = mode === 'create';
   const [paso, setPaso] = useState<0 | 1 | 2>(0);
 
-  const borrador = useFormDraft<TaskFormValues>({
+  const borrador = useFormDraft<Partial<TaskFormValues>>({
     clave:
       mode === 'create'
         ? idProyecto === undefined ? null : `tarea-nueva-${idProyecto}`
         : task ? `tarea-${task.idTarea}` : null,
-    valor: form.watch(),
-    alRestaurar: (valores) => form.reset(valores),
+    // Solo lo que cambió el usuario: lo que otro miembro cambie en el servidor no se pisa al restaurar.
+    valor: Object.fromEntries(
+      Object.entries(form.watch()).filter(
+        ([k, v]) => JSON.stringify(v) !== JSON.stringify(defaultTaskFormValues(task)[k as keyof TaskFormValues]),
+      ),
+    ) as Partial<TaskFormValues>,
+    alRestaurar: (cambios) => form.reset({ ...defaultTaskFormValues(task), ...cambios }),
     alDescartar: () => {
       form.reset(defaultTaskFormValues(task));
       setPaso(0);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { descartarBorrador, guardarBorrador, leerBorrador } from '@/lib/forms/borrador';
 
 interface Opciones<T> {
@@ -21,7 +22,10 @@ const ESPERA_MS = 400;
  * se descarta al enviar (`limpiar`) o con «Descartar borrador» (`descartar`).
  * Un formulario sin cambios respecto al inicial no deja borrador.
  */
-export function useFormDraft<T>({ clave, valor, alRestaurar, alDescartar }: Opciones<T>) {
+export function useFormDraft<T>({ clave: claveBase, valor, alRestaurar, alDescartar }: Opciones<T>) {
+  // El borrador es de la cuenta: otra cuenta en el mismo navegador no lo ve ni lo envía.
+  const { data: usuario } = useCurrentUser();
+  const clave = claveBase && usuario ? `${usuario.idUsuario}-${claveBase}` : null;
   const [restaurado, setRestaurado] = useState(false);
   const inicial = useRef<string | null>(null);
   const bloqueado = useRef(false);

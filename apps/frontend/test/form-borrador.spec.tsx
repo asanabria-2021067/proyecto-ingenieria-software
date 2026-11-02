@@ -8,11 +8,16 @@ import {
   guardarBorrador,
   leerBorrador,
 } from '../lib/forms/borrador';
+const usuarioMock = vi.hoisted(() => ({ actual: { idUsuario: 1 } as { idUsuario: number } | undefined }));
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: usuarioMock.actual }) }));
 import { useFormDraft } from '../hooks/use-form-draft';
 import { FormStepper } from '../components/ui/form-stepper';
 import { caracteresFaltantes, JUSTIFICACION_MIN } from '../lib/forms/postulacion';
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  usuarioMock.actual = { idUsuario: 1 };
+});
 afterEach(() => cleanup());
 
 describe('lib/forms/borrador', () => {
@@ -64,14 +69,14 @@ describe('useFormDraft', () => {
   it('guarda tras un cambio y no guarda el estado inicial', async () => {
     const { rerender } = renderHook((o) => useFormDraft(o), { initialProps: opciones({ t: '' }) });
     await new Promise((r) => setTimeout(r, 500));
-    expect(localStorage.getItem('uvg-borrador:k')).toBeNull();
+    expect(localStorage.getItem('uvg-borrador:1-k')).toBeNull();
 
     rerender(opciones({ t: 'hola' }));
-    await waitFor(() => expect(leerBorrador<{ t: string }>('k')?.valor).toEqual({ t: 'hola' }));
+    await waitFor(() => expect(leerBorrador<{ t: string }>('1-k')?.valor).toEqual({ t: 'hola' }));
   });
 
   it('restaura un borrador existente al montar y lo marca como restaurado', () => {
-    guardarBorrador('k', { t: 'guardado' });
+    guardarBorrador('1-k', { t: 'guardado' });
     const alRestaurar = vi.fn();
     const { result } = renderHook(() => useFormDraft(opciones({ t: '' }, { alRestaurar })));
     expect(alRestaurar).toHaveBeenCalledWith({ t: 'guardado' });
@@ -79,13 +84,13 @@ describe('useFormDraft', () => {
   });
 
   it('descartar borra el borrador y devuelve el formulario a su estado inicial', () => {
-    guardarBorrador('k', { t: 'guardado' });
+    guardarBorrador('1-k', { t: 'guardado' });
     const alDescartar = vi.fn();
     const { result } = renderHook(() => useFormDraft(opciones({ t: '' }, { alDescartar })));
     act(() => result.current.descartar());
     expect(alDescartar).toHaveBeenCalledTimes(1);
     expect(result.current.restaurado).toBe(false);
-    expect(leerBorrador('k')).toBeNull();
+    expect(leerBorrador('1-k')).toBeNull();
   });
 
   it('limpiar borra el borrador y no se vuelve a guardar aunque el formulario cambie', async () => {
@@ -94,7 +99,7 @@ describe('useFormDraft', () => {
     act(() => result.current.limpiar());
     rerender(opciones({ t: 'enviado y editado' }));
     await new Promise((r) => setTimeout(r, 600));
-    expect(leerBorrador('k')).toBeNull();
+    expect(leerBorrador('1-k')).toBeNull();
   });
 
   it('sin clave el borrador está desactivado', async () => {
@@ -102,6 +107,18 @@ describe('useFormDraft', () => {
     rerender(opciones({ t: 'x' }, { clave: null }));
     await new Promise((r) => setTimeout(r, 600));
     expect(localStorage.length).toBe(0);
+  });
+});
+
+describe('useFormDraft por cuenta', () => {
+  it('otra cuenta no ve el borrador de la anterior, y sin usuario no hay borrador', () => {
+    guardarBorrador('1-k', { t: 'de la cuenta 1' });
+    const alRestaurar = vi.fn();
+    usuarioMock.actual = { idUsuario: 2 };
+    renderHook(() => useFormDraft({ clave: 'k', valor: { t: '' }, alRestaurar, alDescartar: vi.fn() }));
+    usuarioMock.actual = undefined;
+    renderHook(() => useFormDraft({ clave: 'k', valor: { t: '' }, alRestaurar, alDescartar: vi.fn() }));
+    expect(alRestaurar).not.toHaveBeenCalled();
   });
 });
 

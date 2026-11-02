@@ -48,10 +48,11 @@ vi.mock('../hooks/use-asociaciones', () => ({ useMisJuntas: () => ({ data: [] })
 vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 }, isLoading: false }) }));
 vi.mock('../hooks/use-can', () => ({ useRequireCan: () => ({ denegado: false }) }));
 
+const searchMock = vi.hoisted(() => ({ actual: '' }));
 const routerMock = { push: vi.fn(), replace: vi.fn() };
 vi.mock('next/navigation', () => ({
   useRouter: () => routerMock,
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(searchMock.actual),
 }));
 
 import { guardarBorrador } from '../lib/forms/borrador';
@@ -65,7 +66,10 @@ function renderForm() {
 const paso = (n: number, total: number, nombre: string) =>
   screen.getByRole('button', { name: `Paso ${n} de ${total}: ${nombre}` });
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  searchMock.actual = '';
+});
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -91,7 +95,7 @@ describe('Crear proyecto en pasos (MEJ-1)', () => {
 
   it('el segundo paso ofrece Personal y las organizaciones; elegir una suma el paso de integrantes', async () => {
     // Un borrador con datos válidos permite avanzar sin rellenar los selectores a mano.
-    guardarBorrador('proyecto-nuevo', {
+    guardarBorrador('1-proyecto-nuevo', {
       form: {
         tituloProyecto: 'Proyecto de prueba',
         descripcionProyecto: 'Una descripcion suficientemente larga',
@@ -125,7 +129,7 @@ describe('Crear proyecto: borrador automático (MEJ-4)', () => {
     const primera = renderForm();
     const titulo = await screen.findByLabelText('Título del proyecto', { exact: false });
     fireEvent.change(titulo, { target: { value: 'Proyecto sin terminar' } });
-    await waitFor(() => expect(localStorage.getItem('uvg-borrador:proyecto-nuevo')).toContain('Proyecto sin terminar'));
+    await waitFor(() => expect(localStorage.getItem('uvg-borrador:1-proyecto-nuevo')).toContain('Proyecto sin terminar'));
     primera.unmount();
 
     renderForm();
@@ -136,7 +140,15 @@ describe('Crear proyecto: borrador automático (MEJ-4)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Descartar borrador' }));
     expect(screen.getByLabelText('Título del proyecto', { exact: false })).toHaveValue('');
-    expect(localStorage.getItem('uvg-borrador:proyecto-nuevo')).toBeNull();
+    expect(localStorage.getItem('uvg-borrador:1-proyecto-nuevo')).toBeNull();
     expect(screen.queryByText('Recuperamos un borrador que no habías enviado.')).not.toBeInTheDocument();
+  });
+
+  it('la organización preseleccionada con ?org= no deja borrador si el usuario no escribe nada', async () => {
+    searchMock.actual = 'org=3';
+    renderForm();
+    await screen.findByLabelText('Título del proyecto', { exact: false });
+    await new Promise((r) => setTimeout(r, 700));
+    expect(localStorage.getItem('uvg-borrador:1-proyecto-nuevo')).toBeNull();
   });
 });

@@ -92,7 +92,7 @@ describe('Postulación: contador, vista previa y borrador (MEJ-4 y MEJ-5)', () =
       ),
     );
     expect(await screen.findByText('¡Postulación enviada!')).toBeInTheDocument();
-    expect(localStorage.getItem('uvg-borrador:postulacion-5-9')).toBeNull();
+    expect(localStorage.getItem('uvg-borrador:1-postulacion-5-9')).toBeNull();
   });
 
   it('«Seguir editando» vuelve al texto sin perderlo', async () => {
@@ -109,7 +109,7 @@ describe('Postulación: contador, vista previa y borrador (MEJ-4 y MEJ-5)', () =
   it('el texto sobrevive a una recarga y se puede descartar', async () => {
     const primera = renderPagina();
     await escribir(TEXTO_VALIDO);
-    await waitFor(() => expect(localStorage.getItem('uvg-borrador:postulacion-5-9')).toContain('experiencia'));
+    await waitFor(() => expect(localStorage.getItem('uvg-borrador:1-postulacion-5-9')).toContain('experiencia'));
     primera.unmount();
 
     renderPagina();
@@ -118,6 +118,6 @@ describe('Postulación: contador, vista previa y borrador (MEJ-4 y MEJ-5)', () =
 
     fireEvent.click(screen.getByRole('button', { name: 'Descartar borrador' }));
     expect(screen.getByLabelText('Justificación', { exact: false })).toHaveValue('');
-    expect(localStorage.getItem('uvg-borrador:postulacion-5-9')).toBeNull();
+    expect(localStorage.getItem('uvg-borrador:1-postulacion-5-9')).toBeNull();
   });
 });

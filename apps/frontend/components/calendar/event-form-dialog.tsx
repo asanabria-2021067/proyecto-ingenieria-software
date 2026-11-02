@@ -199,14 +199,17 @@ export function EventFormDialog({
     aviso.advertencia('Revisa los campos marcados', 'Hay datos del evento que faltan o no son válidos.');
     const claves = Object.keys(errores).filter((k) => k !== 'root');
     const soloUbicacion = claves.length > 0 && claves.every((k) => k === 'ubicacionLat' || k === 'ubicacionNombre');
-    if (soloUbicacion) ubicacionInputRef.current?.focus();
-    if (!porPasos) return;
+    if (!porPasos) {
+      if (soloUbicacion) ubicacionInputRef.current?.focus();
+      return;
+    }
     // Un error en otro paso: se muestra ese paso y se enfoca allí (en un panel oculto no se puede enfocar).
     const destino = CAMPOS_POR_PASO.findIndex((campos) => campos.some((c) => c in errores));
     if (destino < 0) return;
     setPaso(destino as 0 | 1 | 2);
     const campo = CAMPOS_POR_PASO[destino].find((c) => c in errores);
-    if (campo && !soloUbicacion) setTimeout(() => form.setFocus(campo), 0);
+    // El input de ubicación sigue oculto hasta que se muestre su paso: se enfoca después de setPaso.
+    setTimeout(() => (soloUbicacion ? ubicacionInputRef.current?.focus() : campo && form.setFocus(campo)), 0);
   };
 
   const siguiente = async () => {

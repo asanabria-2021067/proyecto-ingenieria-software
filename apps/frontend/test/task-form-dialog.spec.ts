@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 } }) }));
 vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }),
 }));
@@ -718,7 +719,7 @@ describe('TaskFormDialog — borrador automático (MEJ-4)', () => {
   it('guarda lo escrito, lo recupera al reabrir y ofrece descartarlo', async () => {
     const primera = renderDialog({ mode: 'create', task: null, idProyecto: 10 });
     await llenarTitulo('Borrador de tarea');
-    await waitFor(() => expect(localStorage.getItem('uvg-borrador:tarea-nueva-10')).toContain('Borrador de tarea'));
+    await waitFor(() => expect(localStorage.getItem('uvg-borrador:1-tarea-nueva-10')).toContain('Borrador de tarea'));
     primera.unmount();
 
     renderDialog({ mode: 'create', task: null, idProyecto: 10 });
@@ -727,7 +728,7 @@ describe('TaskFormDialog — borrador automático (MEJ-4)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Descartar borrador' }));
     expect(screen.getByLabelText('Título de la tarea', { exact: false })).toHaveValue('');
-    expect(localStorage.getItem('uvg-borrador:tarea-nueva-10')).toBeNull();
+    expect(localStorage.getItem('uvg-borrador:1-tarea-nueva-10')).toBeNull();
     expect(screen.queryByText('Recuperamos un borrador que no habías enviado.')).not.toBeInTheDocument();
   });
 
@@ -737,24 +738,24 @@ describe('TaskFormDialog — borrador automático (MEJ-4)', () => {
     await llenarTitulo('Se envía');
     await llenarFecha('2027-01-01');
     await seleccionarHito('Entrega 1');
-    await waitFor(() => expect(localStorage.getItem('uvg-borrador:tarea-nueva-10')).not.toBeNull());
+    await waitFor(() => expect(localStorage.getItem('uvg-borrador:1-tarea-nueva-10')).not.toBeNull());
 
     irAlUltimoPaso();
     fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
     await waitFor(() => expect(crearTarea.mutateAsync).toHaveBeenCalledTimes(1));
-    expect(localStorage.getItem('uvg-borrador:tarea-nueva-10')).toBeNull();
+    expect(localStorage.getItem('uvg-borrador:1-tarea-nueva-10')).toBeNull();
   });
 
   it('un formulario sin cambios no deja borrador', async () => {
     renderDialog({ mode: 'create', task: null, idProyecto: 10 });
     await new Promise((r) => setTimeout(r, 600));
-    expect(localStorage.getItem('uvg-borrador:tarea-nueva-10')).toBeNull();
+    expect(localStorage.getItem('uvg-borrador:1-tarea-nueva-10')).toBeNull();
   });
 
   it('en edición el borrador es por tarea y no pisa a otra', async () => {
     const primera = renderDialog({ mode: 'edit', task: tarea({ idTarea: 7, tituloTarea: 'Original' }) });
     await llenarTitulo('Cambio sin guardar');
-    await waitFor(() => expect(localStorage.getItem('uvg-borrador:tarea-7')).toContain('Cambio sin guardar'));
+    await waitFor(() => expect(localStorage.getItem('uvg-borrador:1-tarea-7')).toContain('Cambio sin guardar'));
     primera.unmount();
 
     renderDialog({ mode: 'edit', task: tarea({ idTarea: 8, tituloTarea: 'Otra' }) });

@@ -102,7 +102,8 @@ function NewProjectFormContent() {
   // Borrador automático solo al crear: sobrevive a recargas y se descarta al enviar.
   const borrador = useFormDraft<BorradorProyecto>({
     clave: editId === null ? 'proyecto-nuevo' : null,
-    valor: { form, idOrganizacion, idAsociacion, participantes },
+    // La organización que llega por `?org=` no cuenta como cambio del usuario.
+    valor: { form, idOrganizacion: idOrganizacion === orgParam ? null : idOrganizacion, idAsociacion, participantes },
     alRestaurar: (b) => {
       setForm(b.form);
       // `?org=` manda sobre el borrador: sus participantes no calzarían con otra organización.
