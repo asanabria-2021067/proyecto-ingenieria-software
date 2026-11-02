@@ -28,9 +28,10 @@ export class HorasAvisosService {
 
   @Cron('0 9 * * *', { timeZone: GUATEMALA_TIME_ZONE })
   async correr(): Promise<void> {
-    for (const tarea of [this.avisarEnRiesgo(), this.recordarRegistroDeHoras()]) {
+    // Funciones, no promesas: un rechazo de la segunda no debe quedar sin handler mientras corre la primera.
+    for (const tarea of [() => this.avisarEnRiesgo(), () => this.recordarRegistroDeHoras()]) {
       try {
-        await tarea;
+        await tarea();
       } catch (error) {
         this.logger.warn(`Fallo en el aviso de horas: ${(error as Error)?.message ?? error}`);
       }
@@ -81,24 +82,34 @@ export class HorasAvisosService {
         desasignadaEn: null,
         fechaAsignacion: { lt: inicioDeDia(desdeSinRegistrar) },
         usuario: { estado: 'ACTIVO' },
-        participacion: { estadoParticipacion: 'ACTIVO' },
+        origenReporte: 'GRANULAR',
+        reconocidoEn: null,
+        // Sin participacion = tarea autoasignada del lider; se valida contra proyecto.creadoPor mas abajo.
+        OR: [{ participacion: { estadoParticipacion: 'ACTIVO' } }, { idParticipacion: null }],
         tarea: {
           estadoTarea: 'EN_PROGRESO',
           eliminadoEn: null,
           proyecto: { eliminadoEn: null, estadoProyecto: { in: ['PUBLICADO', 'EN_PROGRESO'] } },
-          sprint: { estado: 'ACTIVO' },
+          // Sin sprint, time-records solo exige un sprint operable en el proyecto (assertWriteTx).
+          OR: [{ idSprint: null }, { sprint: { estado: 'ACTIVO' } }],
         },
       },
       orderBy: { fechaAsignacion: 'asc' },
-      select: { idAsignacion: true, idUsuario: true, tarea: { select: { idTarea: true, idProyecto: true, tituloTarea: true } } },
+      select: {
+        idAsignacion: true,
+        idUsuario: true,
+        idParticipacion: true,
+        tarea: { select: { idTarea: true, idProyecto: true, tituloTarea: true, proyecto: { select: { creadoPor: true } } } },
+      },
     });
-    if (candidatas.length === 0) return 0;
+    const registrables = candidatas.filter((a) => a.idParticipacion !== null || a.tarea.proyecto.creadoPor === a.idUsuario);
+    if (registrables.length === 0) return 0;
 
-    const idsUsuario = [...new Set(candidatas.map((a) => a.idUsuario))];
+    const idsUsuario = [...new Set(registrables.map((a) => a.idUsuario))];
     const [conRegistro, avisados] = await Promise.all([
       this.prisma.registroTiempoTarea.findMany({
         where: {
-          idAsignacion: { in: candidatas.map((a) => a.idAsignacion) },
+          idAsignacion: { in: registrables.map((a) => a.idAsignacion) },
           revocadoEn: null,
           fecha: { gte: new Date(`${desdeSinRegistrar}T00:00:00Z`) },
         },
@@ -108,8 +119,8 @@ export class HorasAvisosService {
       this.yaAvisados('RECORDATORIO_HORAS', inicioDeDia(addDaysToDay(hoy, -(DIAS_ENTRE_RECORDATORIOS_HORAS - 1))), idsUsuario),
     ]);
     const conHoras = new Set(conRegistro.map((r) => r.idAsignacion));
-    const porUsuario = new Map<number, typeof candidatas>();
-    for (const a of candidatas) {
+    const porUsuario = new Map<number, typeof registrables>();
+    for (const a of registrables) {
       if (conHoras.has(a.idAsignacion) || avisados.has(a.idUsuario)) continue;
       const lista = porUsuario.get(a.idUsuario);
       if (lista) lista.push(a);

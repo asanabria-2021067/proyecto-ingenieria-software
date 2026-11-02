@@ -6,7 +6,7 @@ const HOY = '2026-11-02';
 function crear(opts: {
   enRiesgo?: { BECA?: number[]; EXTENSION?: number[] };
   yaAvisados?: number[];
-  asignaciones?: { idAsignacion: number; idUsuario: number; tarea: { idTarea: number; idProyecto: number; tituloTarea: string } }[];
+  asignaciones?: { idAsignacion: number; idUsuario: number; idParticipacion: number | null; tarea: { idTarea: number; idProyecto: number; tituloTarea: string; proyecto: { creadoPor: number } } }[];
   conRegistro?: number[]; // idAsignacion con horas recientes
 }) {
   const prisma = {
@@ -25,10 +25,11 @@ function crear(opts: {
 }
 
 // idAsignacion = idTarea para simplificar los casos.
-const asignacion = (idUsuario: number, idTarea: number) => ({
+const asignacion = (idUsuario: number, idTarea: number, idParticipacion: number | null = 1, creadoPor = 99) => ({
   idAsignacion: idTarea,
   idUsuario,
-  tarea: { idTarea, idProyecto: 5, tituloTarea: `Tarea ${idTarea}` },
+  idParticipacion,
+  tarea: { idTarea, idProyecto: 5, tituloTarea: `Tarea ${idTarea}`, proyecto: { creadoPor } },
 });
 
 describe('HorasAvisosService.avisarEnRiesgo (MEJ-13)', () => {
@@ -97,9 +98,29 @@ describe('HorasAvisosService.recordarRegistroDeHoras (MEJ-60)', () => {
     await service.recordarRegistroDeHoras(HOY);
     const where = (prisma.asignacionTarea.findMany.mock.calls[0] as unknown as [{ where: Record<string, unknown> }])[0].where;
     expect(where).toMatchObject({
-      participacion: { estadoParticipacion: 'ACTIVO' },
-      tarea: { sprint: { estado: 'ACTIVO' }, proyecto: { estadoProyecto: { in: ['PUBLICADO', 'EN_PROGRESO'] } } },
+      origenReporte: 'GRANULAR',
+      reconocidoEn: null,
+      OR: [{ participacion: { estadoParticipacion: 'ACTIVO' } }, { idParticipacion: null }],
+      tarea: {
+        OR: [{ idSprint: null }, { sprint: { estado: 'ACTIVO' } }],
+        proyecto: { estadoProyecto: { in: ['PUBLICADO', 'EN_PROGRESO'] } },
+      },
     });
+  });
+
+  it('avisa al lider por sus tareas autoasignadas pero no a un usuario sin participacion que no es el creador', async () => {
+    const { service, notifications } = crear({ asignaciones: [asignacion(1, 10, null, 1), asignacion(2, 11, null, 99)] });
+    expect(await service.recordarRegistroDeHoras(HOY)).toBe(1);
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledTimes(1);
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([1], 'RECORDATORIO_HORAS', expect.objectContaining({ taskId: 10 }));
+  });
+
+  it('correr sigue con el recordatorio aunque el aviso de riesgo falle, sin rechazos sin manejar', async () => {
+    const { service } = crear({});
+    vi.spyOn(service, 'avisarEnRiesgo').mockRejectedValue(new Error('x'));
+    const recordar = vi.spyOn(service, 'recordarRegistroDeHoras').mockResolvedValue(0);
+    await service.correr();
+    expect(recordar).toHaveBeenCalled();
   });
 
   it('la ventana de 3 dias deja pasar el siguiente recordatorio exactamente 3 dias despues', async () => {
