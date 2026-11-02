@@ -467,7 +467,7 @@ export class ProjectsService {
       async ({ tx, effects }) => {
       if (rest.idAsociacion != null) await assertPuedePublicarComoAsociacion(tx, rest.idAsociacion, creadoPor);
       await assertPuedePublicar(tx, creadoPor, idsOrganizacion);
-      await validarParticipantes(tx, creadoPor, idOrganizacion, participantes ?? [], roles ?? []);
+      await validarParticipantes(tx, creadoPor, idOrganizacion, participantes ?? [], roles ?? [], rest.idAsociacion);
       const proyecto = await tx.proyecto.create({
         data: {
           ...rest,

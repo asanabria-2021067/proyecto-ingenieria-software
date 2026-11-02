@@ -44,7 +44,19 @@ vi.mock('../hooks/use-organizations', () => ({
   useMisOrganizaciones: () => ({ data: [ORG], isLoading: false }),
   useOrganizacion: () => ({ data: undefined, isLoading: false }),
 }));
-vi.mock('../hooks/use-asociaciones', () => ({ useMisJuntas: () => ({ data: [] }) }));
+const juntasMock = vi.hoisted(() => ({
+  juntas: [] as { idAsociacion: number; nombre: string; logoUrl: null; cargo: string; nivelPermiso: string }[],
+}));
+vi.mock('../hooks/use-asociaciones', () => ({
+  useMisJuntas: () => ({ data: juntasMock.juntas }),
+  useCandidatosParticipantes: (id: number | null) => ({
+    data: id === null ? [] : [
+      { idUsuario: 7, nombre: 'Ana', apellido: 'Ruiz', carne: '21001', cargo: null },
+      { idUsuario: 8, nombre: 'Beto', apellido: 'Paz', carne: null, cargo: 'VOCAL' },
+    ],
+    isLoading: false,
+  }),
+}));
 vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 }, isLoading: false }) }));
 vi.mock('../hooks/use-can', () => ({ useRequireCan: () => ({ denegado: false }) }));
 
@@ -69,6 +81,7 @@ const paso = (n: number, total: number, nombre: string) =>
 beforeEach(() => {
   localStorage.clear();
   searchMock.actual = '';
+  juntasMock.juntas = [];
 });
 afterEach(() => {
   cleanup();
@@ -119,8 +132,42 @@ describe('Crear proyecto en pasos (MEJ-1)', () => {
     expect(screen.getByRole('radio', { name: /Personal/ })).toBeChecked();
 
     fireEvent.click(screen.getByRole('radio', { name: /Grupo Robotica/ }));
-    expect(paso(4, 5, 'Participantes de la organización')).toBeInTheDocument();
+    expect(paso(4, 5, 'Integrantes')).toBeInTheDocument();
     expect(paso(5, 5, 'Revisar y enviar')).toBeInTheDocument();
+  });
+});
+
+describe('Crear proyecto a nombre de una asociación (MEJ-1)', () => {
+  it('elegir la asociación suma el paso de integrantes con la junta y los estudiantes de sus carreras', async () => {
+    juntasMock.juntas = [{ idAsociacion: 4, nombre: 'AEC', logoUrl: null, cargo: 'PRESIDENTE', nivelPermiso: 'ADMINISTRADOR' }];
+    guardarBorrador('1-proyecto-nuevo', {
+      form: {
+        tituloProyecto: 'Proyecto de prueba',
+        descripcionProyecto: 'Una descripcion suficientemente larga',
+        tipoProyecto: 'ACADEMICO_HORAS_BECA',
+        modalidadProyecto: 'VIRTUAL',
+        objetivosProyecto: '',
+        ubicacionProyecto: '',
+        contextoAcademico: '',
+        urlRecursoExterno: '',
+        fechaInicio: '',
+        fechaFinEstimada: '',
+        roles: [{ id: 'r1', nombreRol: 'Desarrollo', descripcionRolProyecto: '', idCarreraRequerida: null, cupos: 2, horasSemanalesEstimadas: '', requisitos: [] }],
+      },
+      idOrganizacion: null,
+      idAsociacion: null,
+      participantes: [],
+    });
+    renderForm();
+    await screen.findByText('Recuperamos un borrador que no habías enviado.');
+    fireEvent.click(paso(2, 4, '¿A nombre de quién?'));
+    fireEvent.click(screen.getByRole('radio', { name: /AEC/ }));
+    expect(paso(4, 5, 'Integrantes')).toBeInTheDocument();
+
+    fireEvent.click(paso(4, 5, 'Integrantes'));
+    expect(await screen.findByRole('checkbox', { name: 'Sumar a Ana Ruiz' })).toBeInTheDocument();
+    expect(screen.getByText('Vocal')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Buscar participantes' })).toBeInTheDocument();
   });
 });
 

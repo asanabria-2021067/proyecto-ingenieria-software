@@ -7,20 +7,29 @@ import { Tag } from '@/components/ui/tag';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { ROL_LABEL } from '@/lib/organizations/roles';
 import { cuposLibres, primerRolConCupo, type ParticipanteForm } from '@/lib/organizations/proyecto';
+import { Input } from '@/components/ui/input';
 import type { MiembroOrganizacion } from '@/lib/types/organizations';
 import type { RolFormItem } from './types';
 
+/** De una asociación no hay rol de organización: la etiqueta es el cargo en la junta o «Estudiante». */
+export type CandidatoParticipante = Pick<MiembroOrganizacion, 'idUsuario' | 'nombre' | 'apellido' | 'fotoUrl'> & {
+  rolOrganizacion?: MiembroOrganizacion['rolOrganizacion'];
+  etiqueta?: string;
+};
+
 type Props = {
-  miembros: MiembroOrganizacion[];
+  miembros: CandidatoParticipante[];
   roles: RolFormItem[];
   participantes: ParticipanteForm[];
   error: string | null;
   cargando: boolean;
   onChange: (participantes: ParticipanteForm[]) => void;
+  /** Si se pasa, los candidatos son de una asociación (junta y estudiantes de sus carreras) y se pueden buscar. */
+  asociacion?: { busqueda: string; onBuscar: (q: string) => void };
 };
 
 /** Miembros que entran directo como participantes activos, con su rol de proyecto; ocupan los cupos de ese rol. */
-export function StepParticipantes({ miembros, roles, participantes, error, cargando, onChange }: Props) {
+export function StepParticipantes({ miembros, roles, participantes, error, cargando, onChange, asociacion }: Props) {
   const libres = cuposLibres(roles, participantes);
 
   const alternar = (idUsuario: number, marcado: boolean) => {
@@ -43,9 +52,20 @@ export function StepParticipantes({ miembros, roles, participantes, error, carga
   return (
     <div className="space-y-4">
       <p className="text-sm text-tertiary">
-        Elige qué miembros de la organización participan y con qué rol. Entran directo, sin postularse, y ocupan cupos.
-        Los demás miembros verán el proyecto en solo lectura.
+        {asociacion
+          ? 'Elige qué integrantes de la junta o estudiantes de las carreras de la asociación participan y con qué rol. Entran directo, sin postularse, y ocupan cupos.'
+          : 'Elige qué miembros de la organización participan y con qué rol. Entran directo, sin postularse, y ocupan cupos. Los demás miembros verán el proyecto en solo lectura.'}
       </p>
+
+      {asociacion && (
+        <Input
+          type="search"
+          value={asociacion.busqueda}
+          onChange={(e) => asociacion.onBuscar(e.target.value)}
+          placeholder="Buscar por nombre o carné"
+          aria-label="Buscar participantes"
+        />
+      )}
 
       {error && (
         <p role="alert" className="text-xs text-error">
@@ -53,9 +73,13 @@ export function StepParticipantes({ miembros, roles, participantes, error, carga
         </p>
       )}
 
-      {cargando && <p className="text-sm text-tertiary">Cargando miembros...</p>}
+      {cargando && <p className="text-sm text-tertiary">Cargando {asociacion ? 'candidatos' : 'miembros'}...</p>}
       {!cargando && miembros.length === 0 && (
-        <p className="text-sm text-tertiary">No hay otros miembros con rol de Propietario, Administrador o Editor.</p>
+        <p className="text-sm text-tertiary">
+          {asociacion
+            ? 'No hay integrantes de la junta ni estudiantes activos que coincidan.'
+            : 'No hay otros miembros con rol de Propietario, Administrador o Editor.'}
+        </p>
       )}
 
       <ul className="divide-y divide-outline-variant/40 rounded-xl border border-outline-variant">
@@ -77,7 +101,7 @@ export function StepParticipantes({ miembros, roles, participantes, error, carga
               <label htmlFor={`participante-${m.idUsuario}`} className="min-w-0 flex-1 cursor-pointer">
                 <span className="block truncate text-sm font-semibold text-on-surface">{nombre}</span>
                 <Tag size="sm" tone="neutral">
-                  {ROL_LABEL[m.rolOrganizacion]}
+                  {m.etiqueta ?? (m.rolOrganizacion ? ROL_LABEL[m.rolOrganizacion] : '')}
                 </Tag>
               </label>
               {actual && (

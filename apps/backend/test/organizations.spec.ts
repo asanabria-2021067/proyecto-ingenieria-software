@@ -137,6 +137,28 @@ describe('organization-projects', () => {
     await expect(intento(9, [{ idUsuario: 2, indiceRol: 0 }, { idUsuario: 3, indiceRol: 0 }, { idUsuario: 4, indiceRol: 1 }])).resolves.toBeUndefined();
   });
 
+  it('en un proyecto de asociación valida junta y estudiantes de sus carreras (usuarios activos)', async () => {
+    const count = vi.fn().mockResolvedValue(2);
+    const cliente = { usuario: { count } } as unknown as Prisma.TransactionClient;
+    const participantes = [{ idUsuario: 2, indiceRol: 0 }, { idUsuario: 3, indiceRol: 0 }];
+
+    await expect(validarParticipantes(cliente, 1, undefined, participantes, roles, 5)).resolves.toBeUndefined();
+    expect(count).toHaveBeenCalledWith({
+      where: {
+        idUsuario: { in: [2, 3] },
+        estado: 'ACTIVO',
+        OR: [
+          { juntasAsociacion: { some: { idAsociacion: 5 } } },
+          { perfil: { is: { carrera: { asociaciones: { some: { idAsociacion: 5 } } } } } },
+        ],
+      },
+    });
+
+    count.mockResolvedValue(1);
+    await expect(validarParticipantes(cliente, 1, undefined, participantes, roles, 5)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(validarParticipantes(cliente, 1, undefined, [{ idUsuario: 1, indiceRol: 0 }], roles, 5)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('crea las participaciones activas en el rol que corresponde a cada posición', async () => {
     const createMany = vi.fn();
     const cliente = { participacionProyecto: { createMany } } as unknown as Prisma.TransactionClient;

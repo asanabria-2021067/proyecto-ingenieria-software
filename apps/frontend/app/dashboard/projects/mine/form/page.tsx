@@ -9,8 +9,8 @@ import { createProject, updateProject, getMyProjectById, submitProjectForReview 
 import { getCarreras, getHabilidades, type Carrera, type Habilidad } from '@/lib/services/catalogs';
 import { useMisOrganizaciones, useOrganizacion } from '@/hooks/use-organizations';
 import { useCurrentUser } from '@/hooks/use-current-user';
-import { useMisJuntas } from '@/hooks/use-asociaciones';
-import { puedePublicarComoAsociacion } from '@/lib/asociaciones/vista';
+import { useCandidatosParticipantes, useMisJuntas } from '@/hooks/use-asociaciones';
+import { CARGO_LABEL, puedePublicarComoAsociacion } from '@/lib/asociaciones/vista';
 import {
   errorParticipantes,
   miembrosElegibles,
@@ -26,7 +26,7 @@ import { Step1 } from './Step1';
 import { Step2 } from './Step2';
 import { Step3 } from './Step3';
 import { StepPropietario } from './StepPropietario';
-import { StepParticipantes } from './StepParticipantes';
+import { StepParticipantes, type CandidatoParticipante } from './StepParticipantes';
 import {
   newRol, newRequisito, safeId, step1Schema, rolSchema, formSchema, partialProjectSchema, zodToFieldErrors,
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
@@ -50,7 +50,7 @@ const TITULO_PASO: Record<PasoKey, string> = {
   datos: 'Datos generales',
   propietario: '¿A nombre de quién?',
   roles: 'Roles y habilidades',
-  participantes: 'Participantes de la organización',
+  participantes: 'Integrantes',
   resumen: 'Revisar y enviar',
 };
 
@@ -98,6 +98,28 @@ function NewProjectFormContent() {
   const asociacionesPublicables = misJuntas.filter(puedePublicarComoAsociacion);
   const { data: orgElegida, isLoading: cargandoOrg } = useOrganizacion(idOrganizacion ?? 0);
   const orgParam = Number(searchParams.get('org')) || null;
+
+  // Candidatos de la asociación (junta y estudiantes de sus carreras); la búsqueda espera a que se deje de escribir.
+  const [busquedaCandidatos, setBusquedaCandidatos] = useState('');
+  const [busquedaAplicada, setBusquedaAplicada] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setBusquedaAplicada(busquedaCandidatos), 300);
+    return () => clearTimeout(t);
+  }, [busquedaCandidatos]);
+  const { data: candidatosAsociacion = [], isLoading: cargandoCandidatos } = useCandidatosParticipantes(
+    editId === null ? idAsociacion : null,
+    busquedaAplicada,
+  );
+  // Quienes ya se eligieron siguen con nombre en el resumen aunque la búsqueda cambie.
+  const candidatosVistos = useRef(new Map<number, CandidatoParticipante>());
+  const candidatos: CandidatoParticipante[] = candidatosAsociacion.map((c) => ({
+    idUsuario: c.idUsuario,
+    nombre: c.nombre,
+    apellido: c.apellido,
+    fotoUrl: null,
+    etiqueta: c.cargo ? CARGO_LABEL[c.cargo] : `Estudiante${c.carne ? ` · ${c.carne}` : ''}`,
+  }));
+  for (const c of candidatos) candidatosVistos.current.set(c.idUsuario, c);
 
   // Borrador automático solo al crear: sobrevive a recargas y se descarta al enviar.
   const borrador = useFormDraft<BorradorProyecto>({
@@ -191,9 +213,9 @@ function NewProjectFormContent() {
 
   const pasos: PasoKey[] = editId
     ? ['datos', 'roles', 'resumen']
-    : ['datos', 'propietario', 'roles', ...(idOrganizacion !== null ? (['participantes'] as const) : []), 'resumen'];
+    : ['datos', 'propietario', 'roles', ...(idOrganizacion !== null || idAsociacion !== null ? (['participantes'] as const) : []), 'resumen'];
   const pasoActual = pasos[Math.min(step, pasos.length - 1)];
-  const errorDeParticipantes = idOrganizacion === null ? null : errorParticipantes(form.roles, participantes);
+  const errorDeParticipantes = idOrganizacion === null && idAsociacion === null ? null : errorParticipantes(form.roles, participantes);
 
   const goTo = (target: number) => {
     if (target > step) {
@@ -263,9 +285,9 @@ function NewProjectFormContent() {
         .map((req) => ({ idHabilidad: req.idHabilidad!, nivelMinimo: req.nivelMinimo as NivelHabilidad, obligatorio: req.obligatorio })),
     })) : undefined,
     ...(!editId && idAsociacion !== null && { idAsociacion }),
-    ...(!editId && idOrganizacion !== null && {
-      idOrganizacion,
-      ...(participantes.length > 0 && { participantes: participantesPayload(form.roles, participantes) }),
+    ...(!editId && idOrganizacion !== null && { idOrganizacion }),
+    ...(!editId && (idOrganizacion !== null || idAsociacion !== null) && participantes.length > 0 && {
+      participantes: participantesPayload(form.roles, participantes),
     }),
   });
 
@@ -534,12 +556,13 @@ function NewProjectFormContent() {
             )}
             {pasoActual === 'participantes' && (
               <StepParticipantes
-                miembros={miembrosElegibles(orgElegida?.miembros ?? [], usuarioActual?.idUsuario ?? null)}
+                miembros={idAsociacion !== null ? candidatos : miembrosElegibles(orgElegida?.miembros ?? [], usuarioActual?.idUsuario ?? null)}
                 roles={form.roles}
                 participantes={participantes}
                 error={triedParticipantes ? errorDeParticipantes : null}
-                cargando={cargandoOrg}
+                cargando={idAsociacion !== null ? cargandoCandidatos : cargandoOrg}
                 onChange={setParticipantes}
+                asociacion={idAsociacion !== null ? { busqueda: busquedaCandidatos, onBuscar: setBusquedaCandidatos } : undefined}
               />
             )}
             {pasoActual === 'resumen' && (
@@ -557,7 +580,9 @@ function NewProjectFormContent() {
                         : null
                 }
                 participantes={participantes.map((p) => {
-                  const m = orgElegida?.miembros?.find((x) => x.idUsuario === p.idUsuario);
+                  const m = idAsociacion !== null
+                    ? candidatosVistos.current.get(p.idUsuario)
+                    : orgElegida?.miembros?.find((x) => x.idUsuario === p.idUsuario);
                   return {
                     nombre: m ? `${m.nombre} ${m.apellido}` : `Usuario ${p.idUsuario}`,
                     rol: form.roles.find((r) => r.id === p.idRol)?.nombreRol ?? '',

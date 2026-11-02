@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { EstadoMembresia, EstadoParticipacion, Prisma } from '@prisma/client';
+import { EstadoMembresia, EstadoParticipacion, EstadoUsuario, Prisma } from '@prisma/client';
 import { ROLES_PUBLICAN } from './organization-access';
 
 export interface ParticipanteOrganizacion {
@@ -12,7 +12,8 @@ export interface ParticipanteOrganizacion {
  * Participantes elegidos entre los miembros de la organización: deben ser
  * miembros activos con rol Propietario, Administrador o Editor (Lectura solo
  * observa), distintos del líder, sin repetirse, y ocupan cupos del rol elegido
- * sin pasarse de ellos.
+ * sin pasarse de ellos. En un proyecto de asociación, pueden ser integrantes
+ * de su junta o estudiantes activos de las carreras que representa.
  */
 export async function validarParticipantes(
   tx: Prisma.TransactionClient,
@@ -20,10 +21,11 @@ export async function validarParticipantes(
   idOrganizacion: number | undefined,
   participantes: ParticipanteOrganizacion[],
   roles: { cupos: number }[],
+  idAsociacion?: number,
 ): Promise<void> {
   if (participantes.length === 0) return;
-  if (idOrganizacion === undefined) {
-    throw new BadRequestException('Los participantes solo se eligen cuando el proyecto es de una organización');
+  if (idOrganizacion === undefined && idAsociacion === undefined) {
+    throw new BadRequestException('Los participantes solo se eligen cuando el proyecto es de una organización o una asociación');
   }
   const ids = participantes.map((p) => p.idUsuario);
   if (new Set(ids).size !== ids.length) throw new BadRequestException('Un participante no puede repetirse');
@@ -38,6 +40,22 @@ export async function validarParticipantes(
     if (total > roles[indiceRol].cupos) throw new BadRequestException('Hay más participantes que cupos en un rol');
   }
 
+  if (idOrganizacion === undefined) {
+    const validos = await tx.usuario.count({
+      where: {
+        idUsuario: { in: ids },
+        estado: EstadoUsuario.ACTIVO,
+        OR: [
+          { juntasAsociacion: { some: { idAsociacion } } },
+          { perfil: { is: { carrera: { asociaciones: { some: { idAsociacion } } } } } },
+        ],
+      },
+    });
+    if (validos !== ids.length) {
+      throw new BadRequestException('Solo pueden participar integrantes de la junta o estudiantes activos de las carreras de la asociación');
+    }
+    return;
+  }
   const validos = await tx.usuarioOrganizacion.count({
     where: {
       idOrganizacion,

@@ -202,3 +202,40 @@ describe('verificacion de membresia', () => {
     ).resolves.toBeUndefined();
   });
 });
+
+describe('candidatos a participante de un proyecto de asociacion', () => {
+  const montarCandidatos = (membresia: unknown) => {
+    const { service, prisma } = montar();
+    (prisma.juntaAsociacion as Record<string, unknown>).findUnique = vi.fn().mockResolvedValue(membresia);
+    const findMany = vi.fn().mockResolvedValue([
+      { idUsuario: 7, nombre: 'Ana', apellido: 'Ruiz', perfil: { carne: '21001' }, juntasAsociacion: [{ cargo: 'VOCAL' }] },
+      { idUsuario: 8, nombre: 'Beto', apellido: 'Paz', perfil: null, juntasAsociacion: [] },
+    ]);
+    (prisma.usuario as Record<string, unknown>).findMany = findMany;
+    return { service, findMany };
+  };
+
+  it('Presidente o Editor ven junta y estudiantes de sus carreras, sin contacto ni a si mismos', async () => {
+    const { service, findMany } = montarCandidatos({ cargo: 'TESORERO', nivelPermiso: 'EDITOR', asociacion: { archivada: false } });
+    await expect(service.candidatosParticipantes(1, 5)).resolves.toEqual([
+      { idUsuario: 7, nombre: 'Ana', apellido: 'Ruiz', carne: '21001', cargo: 'VOCAL' },
+      { idUsuario: 8, nombre: 'Beto', apellido: 'Paz', carne: null, cargo: null },
+    ]);
+    expect(findMany.mock.calls[0][0].where).toMatchObject({
+      estado: 'ACTIVO',
+      idUsuario: { not: 5 },
+      OR: [
+        { juntasAsociacion: { some: { idAsociacion: 1 } } },
+        { perfil: { is: { carrera: { asociaciones: { some: { idAsociacion: 1 } } } } } },
+      ],
+    });
+  });
+
+  it('un Vocal (Lectura) o quien no es de la junta recibe 403 sin consultar usuarios', async () => {
+    for (const membresia of [{ cargo: 'VOCAL', nivelPermiso: 'LECTURA', asociacion: { archivada: false } }, null]) {
+      const { service, findMany } = montarCandidatos(membresia);
+      await expect(service.candidatosParticipantes(1, 5)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(findMany).not.toHaveBeenCalled();
+    }
+  });
+});

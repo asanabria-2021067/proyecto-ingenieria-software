@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService, type PostCommitEffect } from '../notifications/notifications.service';
 import { CARGO_ETIQUETA, NIVEL_POR_CARGO } from './associations.rules';
+import { assertPuedePublicarComoAsociacion } from './junta-access';
 import { CreateAsociacionDto } from './dto/create-asociacion.dto';
 import { UpdateAsociacionDto } from './dto/update-asociacion.dto';
 import { ActualizarJuntaDto, AsignarJuntaDto } from './dto/junta.dto';
@@ -172,6 +173,53 @@ export class AssociationsService {
       logoUrl: j.asociacion.logoUrl,
       cargo: j.cargo,
       nivelPermiso: j.nivelPermiso,
+    }));
+  }
+
+  /**
+   * Quienes pueden ocupar cupos de un proyecto de la asociación: junta y estudiantes activos
+   * de sus carreras. Solo nombre y carné (sin contacto). Mismo criterio que `validarParticipantes`.
+   * ponytail: tope de 100 resultados; se afina con `q`.
+   */
+  async candidatosParticipantes(idAsociacion: number, idUsuario: number, q?: string) {
+    await assertPuedePublicarComoAsociacion(this.prisma, idAsociacion, idUsuario);
+    const termino = q?.trim();
+    const usuarios = await this.prisma.usuario.findMany({
+      where: {
+        estado: 'ACTIVO',
+        idUsuario: { not: idUsuario },
+        OR: [
+          { juntasAsociacion: { some: { idAsociacion } } },
+          { perfil: { is: { carrera: { asociaciones: { some: { idAsociacion } } } } } },
+        ],
+        ...(termino
+          ? {
+              AND: termino.split(/\s+/).map((t) => ({
+                OR: [
+                  { nombre: { contains: t, mode: 'insensitive' as const } },
+                  { apellido: { contains: t, mode: 'insensitive' as const } },
+                  { perfil: { is: { carne: { contains: t, mode: 'insensitive' as const } } } },
+                ],
+              })),
+            }
+          : {}),
+      },
+      orderBy: [{ nombre: 'asc' }, { idUsuario: 'asc' }],
+      take: 100,
+      select: {
+        idUsuario: true,
+        nombre: true,
+        apellido: true,
+        perfil: { select: { carne: true } },
+        juntasAsociacion: { where: { idAsociacion }, select: { cargo: true } },
+      },
+    });
+    return usuarios.map((u) => ({
+      idUsuario: u.idUsuario,
+      nombre: u.nombre,
+      apellido: u.apellido,
+      carne: u.perfil?.carne ?? null,
+      cargo: u.juntasAsociacion[0]?.cargo ?? null,
     }));
   }
 
