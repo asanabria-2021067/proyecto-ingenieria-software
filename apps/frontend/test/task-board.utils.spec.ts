@@ -12,6 +12,7 @@ import {
   filtrarTareas,
   formatearFechaLimite,
   ordenarTareas,
+  siguienteTareaEnTablero,
 } from '../components/projects/task-board.utils';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 
@@ -36,6 +37,11 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     hito: null,
     etiquetas: [],
     cantidadComentarios: 0,
+    idTareaBloqueante: null,
+    bloqueadaPor: null,
+    repeticion: null,
+    repeticionProxima: null,
+    checklist: [],
     ...overrides,
   };
 }
@@ -222,5 +228,29 @@ describe('filtrarTareas / coincideFiltroRol / coincideFiltroHito', () => {
     expect(coincideFiltroRol(tareas[0], '1')).toBe(true);
     expect(coincideFiltroRol(tareas[1], '1')).toBe(false);
     expect(coincideFiltroHito(tareas[2], FILTRO_SIN_HITO)).toBe(true);
+  });
+});
+
+describe('siguienteTareaEnTablero (MEJ-79)', () => {
+  const columnas = [[1, 2, 3], [], [4], [5, 6]];
+
+  it('sin tarjeta actual entra por la primera con tareas', () => {
+    expect(siguienteTareaEnTablero(columnas, null, 'ArrowDown')).toBe(1);
+    expect(siguienteTareaEnTablero([[], []], null, 'ArrowDown')).toBeNull();
+  });
+
+  it('arriba y abajo recorren la columna sin salirse', () => {
+    expect(siguienteTareaEnTablero(columnas, 1, 'ArrowDown')).toBe(2);
+    expect(siguienteTareaEnTablero(columnas, 3, 'ArrowDown')).toBe(3);
+    expect(siguienteTareaEnTablero(columnas, 2, 'ArrowUp')).toBe(1);
+    expect(siguienteTareaEnTablero(columnas, 1, 'ArrowUp')).toBe(1);
+  });
+
+  it('izquierda y derecha saltan columnas vacias y conservan la altura o la ultima tarjeta', () => {
+    expect(siguienteTareaEnTablero(columnas, 2, 'ArrowRight')).toBe(4);
+    expect(siguienteTareaEnTablero(columnas, 4, 'ArrowRight')).toBe(5);
+    expect(siguienteTareaEnTablero(columnas, 6, 'ArrowLeft')).toBe(4);
+    expect(siguienteTareaEnTablero(columnas, 6, 'ArrowRight')).toBe(6);
+    expect(siguienteTareaEnTablero(columnas, 1, 'ArrowLeft')).toBe(1);
   });
 });

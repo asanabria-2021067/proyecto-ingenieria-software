@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { Blend, Bookmark, Building2, Check, Clock, Eye, Lock, MapPin, Monitor, Pencil, Pin, Trash2, Users } from 'lucide-react';
+import { Blend, Bookmark, Building2, Check, Clock, Copy, Eye, Lock, MapPin, Monitor, Pencil, Pin, Sparkles, Trash2, Users } from 'lucide-react';
+import { Tag } from '@/components/ui/tag';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { usePinnedProjects } from '@/hooks/use-pinned-projects';
@@ -26,6 +28,8 @@ export type ProyectoDisponibleResumen = Omit<ProyectoResumen, 'roles'> & {
   roles?: { cupos: number; cuposDisponibles?: number }[];
   /** Llega con sesión y sin q: algún rol pide la carrera del usuario. */
   mismaCarrera?: boolean;
+  /** Solo en «Para ti» (MEJ-15): cuánto coincide el proyecto con las habilidades e intereses de quien lo ve. */
+  coincidencia?: { porcentaje: number; interesesCompartidos: number; coincideHabilidades: boolean };
 };
 
 // Los badges se pintan por clase, nunca por `style` inline: cada tono
@@ -274,9 +278,35 @@ const PROJECT_CARD_SHELL = 'card-base flex min-h-56 flex-col';
  */
 export const PROJECT_CARD_GRID = 'grid grid-cols-1 gap-grid lg:grid-cols-2';
 
+/** MEJ-25: % de tareas del proyecto y del sprint actual, solo en «Mis proyectos» y si hay tareas. */
+function AvanceTarjeta({ proyecto }: { proyecto: MiProyectoListItemDTO }) {
+  const tareas = proyecto.avanceProyecto?.tareas;
+  if (!tareas || tareas.total === 0) return null;
+  const sprint = proyecto.sprintActual;
+  return (
+    <div className="mt-stack flex flex-col gap-tight text-[12px] text-on-surface-variant">
+      <div className="flex items-center justify-between gap-inline">
+        <span>
+          Tareas: {tareas.hecho}/{tareas.total}
+        </span>
+        <span className="font-semibold text-on-surface tabular-nums">{tareas.porcentaje} %</span>
+      </div>
+      <Progress value={tareas.porcentaje} aria-label={`Avance de tareas de ${proyecto.tituloProyecto}`} className="h-1.5 bg-primary/10" />
+      {sprint && sprint.total > 0 && (
+        <div className="flex items-center justify-between gap-inline">
+          <span>
+            Sprint {sprint.numero}: {sprint.hecho}/{sprint.total}
+          </span>
+          <span className="font-semibold text-on-surface tabular-nums">{sprint.porcentaje} %</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export type AvailableProjectCardProps =
   | { context?: 'explore'; proyecto: ProyectoDisponibleResumen }
-  | { context: 'mine'; proyecto: MiProyectoListItemDTO; onDelete?: () => void };
+  | { context: 'mine'; proyecto: MiProyectoListItemDTO; onDelete?: () => void; onDuplicate?: () => void };
 
 /**
  * Tarjeta compartida entre "Explorar Proyectos" y "Mis Proyectos". La
@@ -341,8 +371,22 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
     const Icon = cfg.buttonIcon;
     const SecondaryIcon = cfg.secondaryIcon;
     const onDelete = props.onDelete;
+    const onDuplicate = props.onDuplicate;
     footerAction = (
       <>
+        {onDuplicate && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={onDuplicate}
+            aria-label={`Duplicar proyecto ${tituloProyecto}`}
+            title="Duplicar como borrador"
+            className="h-9.5 w-9.5"
+          >
+            <Copy aria-hidden="true" />
+          </Button>
+        )}
         <Button
           asChild
           className={`h-9.5 w-56 min-w-0 shrink gap-1.5 rounded-md px-4.5 text-[13px] font-semibold shadow-none ${
@@ -492,6 +536,15 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
         {descripcionProyecto || 'Sin descripción disponible.'}
       </p>
 
+      {esExplorar && (proyecto as ProyectoDisponibleResumen).coincidencia?.coincideHabilidades && (
+        <p className="mt-inline">
+          <Tag tone="lime" size="sm">
+            <Sparkles aria-hidden="true" />
+            Coincide con tus habilidades ({(proyecto as ProyectoDisponibleResumen).coincidencia?.porcentaje}%)
+          </Tag>
+        </p>
+      )}
+
       {publicadoPor && (
         <p className="mt-inline flex items-center gap-1.5 text-[12px] text-on-surface-variant">
           <Building2 aria-hidden="true" className="size-4 shrink-0" />
@@ -511,6 +564,8 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
         </span>
         {metadataExtra}
       </div>
+
+      {props.context === 'mine' && <AvanceTarjeta proyecto={props.proyecto} />}
 
       {/* Footer: línea divisoria + acciones, anclados al borde inferior. */}
       <div className="mt-auto pt-card">

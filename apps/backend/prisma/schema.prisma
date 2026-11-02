@@ -67,6 +67,12 @@ enum VisibilidadOrganizacion {
   PRIVADA
 }
 
+enum EstadoInvitacionRol {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
+}
+
 enum EstadoInvitacionOrganizacion {
   PENDIENTE
   ACEPTADA
@@ -169,6 +175,13 @@ enum EstadoTarea {
   EN_PROGRESO
   EN_REVISION
   HECHO
+}
+
+/// MEJ-47: frecuencia de las tareas repetitivas; el cron crea una copia por ocurrencia.
+enum RepeticionTarea {
+  DIARIA
+  SEMANAL
+  MENSUAL
 }
 
 enum Prioridad {
@@ -314,6 +327,26 @@ enum TipoNotificacion {
   INVITACION_ORGANIZACION
   SOLICITUD_UNIRSE_ORGANIZACION
   ORGANIZACION_ACTUALIZADA
+  // MEJ-44: alguien mencionó al usuario con @ en un mensaje del chat.
+  MENCION_CHAT
+  // MEJ-46: recordatorio programado de un mensaje del chat.
+  RECORDATORIO_MENSAJE
+  // MEJ-16: proyecto nuevo de mi carrera, mis intereses o una organización/asociación que sigo.
+  PROYECTO_NUEVO_PARA_TI
+  // MEJ-17: un proyecto guardado queda con 1-2 cupos o pasa a solicitud de cierre.
+  PROYECTO_GUARDADO_AVISO
+  // MEJ-22: el líder invita directo a un rol.
+  INVITACION_ROL_PROYECTO
+  // MEJ-54: un hito del proyecto pasó su fecha límite sin completarse (aviso al líder).
+  HITO_ATRASADO
+  // MEJ-57: un compañero te reconoció en un sprint.
+  RECONOCIMIENTO_RECIBIDO
+  // MEJ-31: resumen semanal de los lunes.
+  TU_SEMANA
+  // MEJ-13: aviso al estudiante cuyo avance de horas del semestre va en riesgo (max uno por semana).
+  HORAS_EN_RIESGO
+  // MEJ-60: recordatorio de registrar horas en tareas en progreso (max uno cada 3 dias).
+  RECORDATORIO_HORAS
 }
 
 enum EstadoAmistad {
@@ -374,6 +407,9 @@ model Usuario {
   experiencias                     ExperienciaPrevia[]
   organizacionesCreadas            Organizacion[]
   membresiasOrganizacion           UsuarioOrganizacion[]
+  seguimientosEntidad              SeguimientoEntidad[]
+  invitacionesRolRecibidas         InvitacionRolProyecto[]      @relation("InvitacionesRolRecibidas")
+  invitacionesRolEnviadas          InvitacionRolProyecto[]      @relation("InvitacionesRolEnviadas")
   juntasAsociacion                 JuntaAsociacion[]
   invitacionesOrganizacionRecibidas      InvitacionOrganizacion[]      @relation("InvitacionesOrganizacionRecibidas")
   invitacionesOrganizacionEnviadas       InvitacionOrganizacion[]      @relation("InvitacionesOrganizacionEnviadas")
@@ -405,6 +441,9 @@ model Usuario {
   mensajesRevisionEnviados         MensajeRevisionProyecto[]    @relation("MensajesEnviados")
   solicitudesSalidaSolicitadas     SolicitudSalidaProyecto[]    @relation("SolicitudSalidaSolicitante")
   solicitudesSalidaResueltas       SolicitudSalidaProyecto[]    @relation("SolicitudSalidaResolutor")
+  retrospectivasSprint             RetrospectivaSprint[]        @relation("RetrospectivaAutor")
+  reconocimientosDados             ReconocimientoCompanero[]    @relation("ReconocimientoAutor")
+  reconocimientosRecibidos         ReconocimientoCompanero[]    @relation("ReconocimientoReceptor")
   sprintsCerrados                  Sprint[]
   registrosAvanceEscritos          RegistroAvanceAsignacion[]
   registrosTiempoRegistrados       RegistroTiempoTarea[]
@@ -430,6 +469,7 @@ model Usuario {
   apodosDefinidos                  ApodoConversacion[]          @relation("ApodosDefinidos")
   apodosRecibidos                  ApodoConversacion[]          @relation("ApodosRecibidos")
   mensajesProgramadosChat          MensajeProgramado[]          @relation("MensajesProgramadosChat")
+  recordatorios                    RecordatorioMensaje[]
   tokensRefresco                   TokenRefresco[]
   proyectosGuardados               ProyectoGuardado[]
   estadoChat                       EstadoChatUsuario?
@@ -441,6 +481,7 @@ model Usuario {
   insignias                        InsigniaUsuario[]
   reaccionesChat                   ReaccionMensajeChat[]
   mensajesGuardados                MensajeGuardado[]
+  votosEncuestaChat                VotoEncuestaChat[]
   reunionesAdministracionCreadas   ReunionAdministracion[]      @relation("ReunionesAdministracionCreadas")
   reunionesAdministracionEditables ReunionAdministradorEditor[] @relation("ReunionesAdministracionEditables")
 
@@ -488,6 +529,45 @@ model Seguimiento {
 
   @@unique([idSeguidor, idSeguido])
   @@map("seguimiento")
+}
+
+/// MEJ-18: un usuario sigue a UNA organización o a UNA asociación (exactamente una de las dos; CHECK en la migración).
+model SeguimientoEntidad {
+  idSeguimientoEntidad Int      @id @default(autoincrement()) @map("id_seguimiento_entidad")
+  idUsuario            Int      @map("id_usuario")
+  idOrganizacion       Int?     @map("id_organizacion")
+  idAsociacion         Int?     @map("id_asociacion")
+  fechaCreacion        DateTime @default(now()) @map("fecha_creacion")
+
+  usuario      Usuario       @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  organizacion Organizacion? @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Cascade)
+  asociacion   Asociacion?   @relation(fields: [idAsociacion], references: [idAsociacion], onDelete: Cascade)
+
+  @@unique([idUsuario, idOrganizacion])
+  @@unique([idUsuario, idAsociacion])
+  @@index([idOrganizacion])
+  @@index([idAsociacion])
+  @@map("seguimiento_entidad")
+}
+
+/// MEJ-22: invitación directa del líder a un estudiante para un rol. Aceptarla crea la participación (sin postulación). Una sola PENDIENTE por (rol, invitado), garantizada por el lock del proyecto.
+model InvitacionRolProyecto {
+  idInvitacionRol Int                     @id @default(autoincrement()) @map("id_invitacion_rol")
+  idRolProyecto   Int                     @map("id_rol_proyecto")
+  idInvitado      Int                     @map("id_invitado")
+  idInvitadoPor   Int                     @map("id_invitado_por")
+  mensaje         String?                 @db.VarChar(500)
+  estado          EstadoInvitacionRol     @default(PENDIENTE)
+  creadaEn        DateTime                @default(now()) @map("creada_en")
+  resueltaEn      DateTime?               @map("resuelta_en")
+
+  rolProyecto RolProyecto @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: Cascade)
+  invitado    Usuario     @relation("InvitacionesRolRecibidas", fields: [idInvitado], references: [idUsuario], onDelete: Restrict)
+  invitadoPor Usuario     @relation("InvitacionesRolEnviadas", fields: [idInvitadoPor], references: [idUsuario], onDelete: Restrict)
+
+  @@index([idInvitado, estado])
+  @@index([idRolProyecto, estado])
+  @@map("invitacion_rol_proyecto")
 }
 
 model UsuarioTelefono {
@@ -668,6 +748,8 @@ model Organizacion {
   invitaciones   InvitacionOrganizacion[]
   solicitudes    SolicitudUnirseOrganizacion[]
   conversaciones Conversacion[]
+  seguidores     SeguimientoEntidad[]
+  anuncios       Anuncio[]
 
   @@map("organizacion")
 }
@@ -757,6 +839,7 @@ model Proyecto {
   roles             RolProyecto[]
   hitos             Hito[]
   tareas            Tarea[]
+  plantillasTarea   PlantillaTarea[]
   revisiones        RevisionProyecto[]
   comentarios       Comentario[]
   mensajesRevision  MensajeRevisionProyecto[]
@@ -791,6 +874,8 @@ model Asociacion {
   carreras  AsociacionCarrera[]
   junta     JuntaAsociacion[]
   proyectos Proyecto[]
+  seguidores SeguimientoEntidad[]
+  anuncios   Anuncio[]
 
   @@map("asociacion")
 }
@@ -1012,6 +1097,7 @@ model RolProyecto {
   postulaciones    Postulacion[]
   participaciones  ParticipacionProyecto[]
   tareas           Tarea[]
+  invitaciones     InvitacionRolProyecto[]
 
   @@index([idProyecto])
   @@map("rol_proyecto")
@@ -1117,6 +1203,8 @@ model Hito {
   fechaLimite     DateTime?  @map("fecha_limite") @db.Date
   estadoHito      EstadoHito @default(PENDIENTE) @map("estado_hito")
   orden           Int
+  /// MEJ-54: instante en que se avisó al líder del atraso; null = sin avisar (un aviso por hito).
+  alertaAtrasoEnviadaEn DateTime? @map("alerta_atraso_enviada_en")
 
   proyecto    Proyecto     @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
   tareas      Tarea[]
@@ -1157,6 +1245,8 @@ model Sprint {
   tareas             Tarea[]
   horasParticipacion HorasParticipacion[]
   instantaneas       InstantaneaSprint[]
+  retrospectiva      RetrospectivaSprint?
+  reconocimientos    ReconocimientoCompanero[]
 
   @@index([idProyecto, estado])
   @@map("sprint")
@@ -1202,8 +1292,19 @@ model Tarea {
   actualizadaEn       DateTime?        @map("actualizada_en")
   eliminadoEn         DateTime?        @map("eliminado_en")
   destinoArrastre     DestinoArrastre? @map("destino_arrastre")
+  /// MEJ-48: tarea que debe estar HECHO antes de iniciar esta (sin ciclos, validado en el servicio).
+  idTareaBloqueante   Int?             @map("id_tarea_bloqueante")
+  /// MEJ-47: la tarea maestra repite; `repeticionProxima` es el dia de la siguiente copia.
+  repeticion          RepeticionTarea?
+  repeticionProxima   DateTime?        @map("repeticion_proxima") @db.Date
+  idTareaOrigen       Int?             @map("id_tarea_origen")
 
   proyecto      Proyecto            @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  bloqueante    Tarea?               @relation("TareaBloqueo", fields: [idTareaBloqueante], references: [idTarea], onDelete: SetNull)
+  bloqueadas    Tarea[]              @relation("TareaBloqueo")
+  origen        Tarea?               @relation("TareaRepetida", fields: [idTareaOrigen], references: [idTarea], onDelete: SetNull)
+  copias        Tarea[]              @relation("TareaRepetida")
+  checklist     TareaChecklistItem[]
   hito          Hito?               @relation(fields: [idHito], references: [idHito], onDelete: SetNull)
   rolProyecto   RolProyecto?        @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
   sprint        Sprint?             @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
@@ -1219,7 +1320,42 @@ model Tarea {
   @@index([idProyecto, idRolProyecto])
   @@index([idHito])
   @@index([idSprint])
+  @@index([idTareaBloqueante])
+  @@index([repeticionProxima])
   @@map("tarea")
+}
+
+/// MEJ-6: items de checklist de una tarea.
+model TareaChecklistItem {
+  idItem     Int     @id @default(autoincrement()) @map("id_item")
+  idTarea    Int     @map("id_tarea")
+  texto      String  @db.VarChar(200)
+  completado Boolean @default(false)
+  orden      Int     @default(0)
+
+  tarea Tarea @relation(fields: [idTarea], references: [idTarea], onDelete: Cascade)
+
+  @@index([idTarea])
+  @@map("tarea_checklist_item")
+}
+
+/// MEJ-52: plantillas de tarea del proyecto (el checklist es un arreglo JSON de textos).
+model PlantillaTarea {
+  idPlantilla         Int       @id @default(autoincrement()) @map("id_plantilla")
+  idProyecto          Int       @map("id_proyecto")
+  nombre              String    @db.VarChar(100)
+  tituloTarea         String    @map("titulo_tarea") @db.VarChar(150)
+  descripcionTarea    String?   @map("descripcion_tarea") @db.Text
+  prioridad           Prioridad @default(MEDIA)
+  tiempoEstimadoHoras Int?      @map("tiempo_estimado_horas")
+  checklist           Json      @default("[]")
+  creadaPor           Int       @map("creada_por")
+  creadaEn            DateTime  @default(now()) @map("creada_en")
+
+  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto], onDelete: Cascade)
+
+  @@index([idProyecto])
+  @@map("plantilla_tarea")
 }
 
 /// HU-186 (T-329): registro de los avisos de vencimiento ya enviados. Una fila
@@ -1966,6 +2102,8 @@ model MensajeChat {
   editadoEn       DateTime? @map("editado_en")
   eliminadoEn     DateTime? @map("eliminado_en")
   idMensajeCitado Int?      @map("id_mensaje_citado")
+  // MEJ-43: mensaje fijado (hasta 3 por conversacion, validado en ChatService).
+  fijadoEn        DateTime? @map("fijado_en")
 
   conversacion Conversacion          @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
   remitente    Usuario               @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario], onDelete: Restrict)
@@ -1974,8 +2112,11 @@ model MensajeChat {
   respuestas   MensajeChat[]         @relation("MensajeCitado")
   reacciones   ReaccionMensajeChat[]
   guardadoPor  MensajeGuardado[]
+  encuesta     EncuestaChat?
+  recordatorios RecordatorioMensaje[]
 
   @@index([idConversacion, enviadoEn])
+  @@index([idConversacion, fijadoEn])
   @@map("mensaje_chat")
 }
 
@@ -1990,12 +2131,56 @@ model AdjuntoMensajeChat {
   tamanoBytes         Int      @map("tamano_bytes")
   claveAlmacenamiento String   @map("clave_almacenamiento") @db.VarChar(255)
   creadoEn            DateTime @default(now()) @map("creado_en")
+  // MEJ-41: solo en notas de voz (audio), duracion declarada por el cliente (max 120 s).
+  duracionSegundos    Int?     @map("duracion_segundos")
 
   mensaje      MensajeChat  @relation(fields: [idMensaje], references: [idMensaje], onDelete: Restrict)
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
 
   @@index([idConversacion, idMensaje])
   @@map("adjunto_mensaje_chat")
+}
+
+/// MEJ-42: encuesta de un mensaje del chat (2 a 6 opciones, voto unico o multiple).
+model EncuestaChat {
+  idEncuesta Int       @id @default(autoincrement()) @map("id_encuesta")
+  idMensaje  Int       @unique @map("id_mensaje")
+  pregunta   String    @db.VarChar(300)
+  multiple   Boolean   @default(false)
+  // Cierre opcional: programado (cierraEn) o manual (cerradaEn).
+  cierraEn   DateTime? @map("cierra_en")
+  cerradaEn  DateTime? @map("cerrada_en")
+
+  mensaje  MensajeChat          @relation(fields: [idMensaje], references: [idMensaje], onDelete: Restrict)
+  opciones OpcionEncuestaChat[]
+
+  @@map("encuesta_chat")
+}
+
+model OpcionEncuestaChat {
+  idOpcion   Int    @id @default(autoincrement()) @map("id_opcion")
+  idEncuesta Int    @map("id_encuesta")
+  texto      String @db.VarChar(120)
+  orden      Int
+
+  encuesta EncuestaChat       @relation(fields: [idEncuesta], references: [idEncuesta], onDelete: Cascade)
+  votos    VotoEncuestaChat[]
+
+  @@index([idEncuesta])
+  @@map("opcion_encuesta_chat")
+}
+
+model VotoEncuestaChat {
+  idOpcion  Int      @map("id_opcion")
+  idUsuario Int      @map("id_usuario")
+  votadoEn  DateTime @default(now()) @map("votado_en")
+
+  opcion  OpcionEncuestaChat @relation(fields: [idOpcion], references: [idOpcion], onDelete: Cascade)
+  usuario Usuario            @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@id([idOpcion, idUsuario])
+  @@index([idUsuario])
+  @@map("voto_encuesta_chat")
 }
 
 /// Reacción con emoji de un usuario a un mensaje del chat (una por mensaje+usuario+emoji).
@@ -2093,6 +2278,24 @@ model MensajeProgramado {
   @@map("mensaje_programado")
 }
 
+/// MEJ-46: «Recuérdamelo» sobre un mensaje del chat. El job reclama la fila
+/// con un UPDATE condicional PENDIENTE -> ENVIADO antes de notificar.
+model RecordatorioMensaje {
+  idRecordatorio Int                     @id @default(autoincrement()) @map("id_recordatorio")
+  idUsuario      Int                     @map("id_usuario")
+  idMensaje      Int                     @map("id_mensaje")
+  recordarEn     DateTime                @map("recordar_en")
+  estado         EstadoMensajeProgramado @default(PENDIENTE)
+  creadoEn       DateTime                @default(now()) @map("creado_en")
+
+  usuario Usuario     @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  mensaje MensajeChat @relation(fields: [idMensaje], references: [idMensaje], onDelete: Restrict)
+
+  @@index([estado, recordarEn])
+  @@index([idUsuario, estado])
+  @@map("recordatorio_mensaje")
+}
+
 // HU-190 (T-346): niveles de una insignia. Sin nivel (null) = aún sin umbral alcanzado.
 enum NivelInsignia {
   BRONCE
@@ -2162,9 +2365,17 @@ model Anuncio {
   fechaFin      DateTime         @map("fecha_fin")
   activo        Boolean          @default(true)
   fechaCreacion DateTime         @default(now()) @map("fecha_creacion")
+  /// MEJ-66: ambos null = anuncio global de administracion. A lo mucho uno con valor (CHECK en la migracion).
+  idOrganizacion Int?            @map("id_organizacion")
+  idAsociacion   Int?            @map("id_asociacion")
+  creadoPor      Int?            @map("creado_por")
 
-  cierres AnuncioCierre[]
+  organizacion Organizacion? @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Cascade)
+  asociacion   Asociacion?   @relation(fields: [idAsociacion], references: [idAsociacion], onDelete: Cascade)
+  cierres      AnuncioCierre[]
 
+  @@index([idOrganizacion])
+  @@index([idAsociacion])
   @@index([activo, fechaInicio, fechaFin])
   @@map("anuncio")
 }
@@ -2181,4 +2392,42 @@ model AnuncioCierre {
   @@unique([idAnuncio, idUsuario])
   @@index([idUsuario])
   @@map("anuncio_cierre")
+}
+
+/// MEJ-24: retrospectiva opcional de un Sprint (una por Sprint), escrita por el líder.
+model RetrospectivaSprint {
+  idRetrospectiva  Int      @id @default(autoincrement()) @map("id_retrospectiva")
+  idSprint         Int      @unique @map("id_sprint")
+  idProyecto       Int      @map("id_proyecto")
+  quePaso          String   @map("que_paso") @db.VarChar(1000)
+  quePodriaMejorar String   @map("que_podria_mejorar") @db.VarChar(1000)
+  acuerdos         String   @db.VarChar(1000)
+  creadaPor        Int      @map("creada_por")
+  actualizadaEn    DateTime @default(now()) @map("actualizada_en")
+
+  sprint Sprint  @relation(fields: [idSprint], references: [idSprint], onDelete: Restrict)
+  autor  Usuario @relation("RetrospectivaAutor", fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
+
+  @@index([idProyecto])
+  @@map("retrospectiva_sprint")
+}
+
+/// MEJ-57: reconocimiento entre compañeros. `@@unique([idSprint, idAutor])` = uno por persona por Sprint.
+model ReconocimientoCompanero {
+  idReconocimiento Int      @id @default(autoincrement()) @map("id_reconocimiento")
+  idSprint         Int      @map("id_sprint")
+  idProyecto       Int      @map("id_proyecto")
+  idAutor          Int      @map("id_autor")
+  idReceptor       Int      @map("id_receptor")
+  mensaje          String   @db.VarChar(280)
+  creadoEn         DateTime @default(now()) @map("creado_en")
+
+  sprint   Sprint  @relation(fields: [idSprint], references: [idSprint], onDelete: Restrict)
+  autor    Usuario @relation("ReconocimientoAutor", fields: [idAutor], references: [idUsuario], onDelete: Restrict)
+  receptor Usuario @relation("ReconocimientoReceptor", fields: [idReceptor], references: [idUsuario], onDelete: Restrict)
+
+  @@unique([idSprint, idAutor])
+  @@index([idReceptor])
+  @@index([idProyecto])
+  @@map("reconocimiento_companero")
 }

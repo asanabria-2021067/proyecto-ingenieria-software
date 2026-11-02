@@ -15,8 +15,7 @@ import { API_URL, desactivarTour } from './support/realtime';
  *  - Fallo del backend (inducido interceptando la respuesta): el interruptor
  *    conserva su valor y lo explica.
  *  - Política real de tipos obligatorios: el backend no define ninguna.
- *  - Chat: no existe tipo de notificación; no hay interruptor. BLOQUEO de ese
- *    criterio, registrado como dependencia del backend (no se simula).
+ *  - Chat: solo la mención (MEJ-44) es un tipo; los mensajes no crean notificación.
  *
  * Todo cambio se revierte al final: las cuentas terminan con todo activo.
  */
@@ -144,6 +143,7 @@ test.describe('FG05-C03: preferencias de notificación por tipo en el perfil', (
       'Horas y reconocimiento',
       'Recordatorios y calendario',
       'Red de contactos',
+      'Organizaciones y asociaciones',
       'Cuenta y seguridad',
     ]);
     // El perfil sigue ahí, ya sin las preferencias.
@@ -152,13 +152,9 @@ test.describe('FG05-C03: preferencias de notificación por tipo en el perfil', (
     await expect(carlos.getByRole('switch')).toHaveCount(0);
   });
 
-  test('Chat: no hay interruptor porque el backend no tiene ese tipo (criterio bloqueado, no simulado)', async () => {
-    test.info().annotations.push({
-      type: 'BLOCKED_DEPENDENCY',
-      description: 'T-328 · interruptor de Chat: TipoNotificacion no tiene un tipo de chat y el chat no crea notificaciones. Requiere decisión y cambio del backend (HU-185).',
-    });
+  test('Chat: solo la mención (MEJ-44) tiene interruptor; los mensajes no generan notificaciones', async () => {
     const tipos = (await leer(carlos)).map((p) => p.tipo);
-    expect(tipos.filter((tipo) => /CHAT/.test(tipo))).toEqual([]);
+    expect(tipos.filter((tipo) => /CHAT/.test(tipo))).toEqual(['MENCION_CHAT']);
     expect((await guardar(carlos, 'MENSAJE_CHAT', false)).status()).toBe(400);
 
     const seccion = await abrirPerfil(carlos);

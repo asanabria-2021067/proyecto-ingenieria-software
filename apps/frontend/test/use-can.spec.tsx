@@ -34,6 +34,7 @@ vi.mock('../hooks/use-logout', () => ({ useLogout: () => vi.fn() }));
 vi.mock('../hooks/use-cuentas-pendientes', () => ({ useCuentasPendientes: () => ({ data: undefined }) }));
 vi.mock('../components/layout/notifications-bell', () => ({ NotificationsBell: () => null }));
 vi.mock('../components/theme-toggle', () => ({ ThemeToggle: () => null }));
+vi.mock('../components/layout/dashboard-extras', () => ({ DashboardExtras: () => null }));
 vi.mock('../components/dashboard/UserMenu', () => ({ UserMenu: () => null }));
 vi.mock('../components/dashboard/DashboardLayout', () => ({
   default: (props: { children: React.ReactNode }) => createElement('div', { 'data-testid': 'shell-estudiante' }, props.children),

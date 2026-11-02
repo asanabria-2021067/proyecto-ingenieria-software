@@ -13,6 +13,7 @@ import { NewChatDialog } from '@/components/chat-dock/new-chat-dialog';
 import { estaSilenciada } from '@/lib/chat-silencio';
 import { EstadoIndicador, MiEstadoBoton } from '@/components/chat-dock/estado-chat';
 import { ChannelDialog, useProyectosQueLidero } from '@/components/chat-dock/channel-dialog';
+import { contenidoAEditable } from '@/lib/mentions/mention-tokens';
 import type { ChatConversacionGlobal } from '@/lib/types/chat';
 import { SkeletonList } from '@/components/ui/skeleton';
 
@@ -247,7 +248,7 @@ export function ChatListPopover({ onClose, onOpenSaved, pagina = false, idActiva
                 </span>
                 {otro && <EstadoIndicador estado={otro.estado} />}
                 <p className="mt-0.5 truncate text-xs text-tertiary">
-                  {c.ultimoMensaje ? (c.ultimoMensaje.eliminadoEn ? 'Mensaje eliminado' : c.ultimoMensaje.contenido) : 'Sin mensajes todavía'}
+                  {c.ultimoMensaje ? (c.ultimoMensaje.eliminadoEn ? 'Mensaje eliminado' : contenidoAEditable(c.ultimoMensaje.contenido).texto) : 'Sin mensajes todavía'}
                   {estado ? ` · ${estado}` : ''}
                 </p>
               </div>

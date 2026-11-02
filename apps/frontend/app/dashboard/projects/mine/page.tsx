@@ -12,6 +12,7 @@ import {
   PROJECT_CARD_GRID,
 } from '@/components/projects/available-project-card';
 import { getMyProjects, getContributorProjects, deleteProject } from '@/lib/services/projects';
+import { useDuplicarProyecto } from '@/hooks/use-descubrimiento';
 import { TIPO_LABEL } from '@/types';
 import type { MiProyectoListItemDTO } from '@/lib/dto/project.dto';
 import { aviso, confirmar } from '@/lib/mensajes';
@@ -82,6 +83,19 @@ export default function MyProjectsPage() {
     queryFn: () => getContributorProjects(),
   });
   const participoFiltrados = proyectosParticipo.filter((p) => !idsPropios.has(p.idProyecto));
+
+  const duplicar = useDuplicarProyecto();
+  // MEJ-20: la copia es un borrador nuevo; aparece en esta misma lista.
+  function handleDuplicate(proyecto: MiProyectoListItemDTO) {
+    if (duplicar.isPending) return;
+    duplicar.mutate(proyecto.idProyecto, {
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: ['mis-proyectos'] });
+        aviso.exito('Proyecto duplicado', `Creamos un borrador a partir de "${proyecto.tituloProyecto}".`);
+      },
+      onError: (err) => aviso.error('No se pudo duplicar el proyecto', getApiErrorMessage(err, 'general')),
+    });
+  }
 
   async function handleDelete(proyecto: MiProyectoListItemDTO) {
     if (proyecto.estadoProyecto === 'CERRADO') return;
@@ -282,6 +296,7 @@ export default function MyProjectsPage() {
                 context="mine"
                 proyecto={proyecto}
                 onDelete={proyecto.estadoProyecto === 'CERRADO' ? undefined : () => handleDelete(proyecto)}
+                onDuplicate={() => handleDuplicate(proyecto)}
               />
             ))}
           </div>

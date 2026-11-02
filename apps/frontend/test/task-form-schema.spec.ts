@@ -65,6 +65,11 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     hito: null,
     etiquetas: [],
     cantidadComentarios: 0,
+    idTareaBloqueante: null,
+    bloqueadaPor: null,
+    repeticion: null,
+    repeticionProxima: null,
+    checklist: [],
     ...overrides,
   };
 }

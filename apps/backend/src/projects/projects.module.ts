@@ -8,11 +8,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { ProjectPolicyModule } from '../common/project-policy/project-policy.module';
 import { SocialModule } from '../social/social.module';
 import { DraftInactivityService } from './draft-inactivity.service';
+import { SavedProjectAlertsService } from './saved-project-alerts.service';
 
 @Module({
   imports: [ProjectPolicyModule, NotificationsModule, SocialModule],
   controllers: [ProjectsController],
-  providers: [ProjectsService, ProjectsCacheService, ProjectsAffinityService, ProjectsRevisionsService, DraftInactivityService],
+  providers: [ProjectsService, ProjectsCacheService, ProjectsAffinityService, ProjectsRevisionsService, DraftInactivityService, SavedProjectAlertsService],
   exports: [ProjectsService],
 })
 export class ProjectsModule {}

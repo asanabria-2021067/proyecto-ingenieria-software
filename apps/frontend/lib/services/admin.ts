@@ -306,6 +306,60 @@ export async function rechazarCuentaPendiente(
   );
 }
 
+export interface AprobarCuentasLoteResponse {
+  aprobadas: number[];
+  omitidas: { idUsuario: number; motivo: string }[];
+}
+
+export async function aprobarCuentasLote(ids: number[]): Promise<AprobarCuentasLoteResponse> {
+  return apiFetch<AprobarCuentasLoteResponse>('/admin/cuentas-pendientes/aprobar-lote', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+}
+
+// ─── GET /admin/pendientes ───────────────────────────────────────────────────
+
+export type ClavePendiente = 'cuentas' | 'revisiones' | 'cierres' | 'recuperaciones' | 'apelaciones';
+
+export interface AdminPendientes {
+  total: number;
+  items: { clave: ClavePendiente; total: number }[];
+}
+
+export const getAdminPendientes = () => apiFetch<AdminPendientes>('/admin/pendientes');
+
+// ─── GET /admin/metricas/entidades ───────────────────────────────────────────
+
+interface MetricasProyectos {
+  proyectosTotales: number;
+  proyectosActivos: number;
+  proyectosCerrados: number;
+}
+
+export interface MetricasAsociacion extends MetricasProyectos {
+  idAsociacion: number;
+  nombre: string;
+  archivada: boolean;
+  integrantesJunta: number;
+  carreras: number;
+}
+
+export interface MetricasOrganizacion extends MetricasProyectos {
+  idOrganizacion: number;
+  nombre: string;
+  archivada: boolean;
+  visibilidad: 'PUBLICA' | 'PRIVADA';
+  miembros: number;
+}
+
+export interface AdminMetricasEntidades {
+  asociaciones: MetricasAsociacion[];
+  organizaciones: MetricasOrganizacion[];
+}
+
+export const getAdminMetricasEntidades = () => apiFetch<AdminMetricasEntidades>('/admin/metricas/entidades');
+
 // ─── GET /admin/password-reset-requests ──────────────────────────────────────
 
 export type EstadoSolicitudRecuperacion = 'PENDIENTE' | 'ATENDIDA';

@@ -56,6 +56,7 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { aviso } from '@/lib/mensajes';
 import { getCalendariosCompartidos, type EventoCompartidoDTO } from '@/lib/services/calendar-shares';
+import { ExportarIcsBoton } from '@/components/calendar/exportar-ics-boton';
 import { MonthView } from '@/components/calendar/month-view';
 import { WeekView } from '@/components/calendar/week-view';
 import { TimeGridView } from '@/components/calendar/time-grid-view';
@@ -588,6 +589,7 @@ export default function CalendarioPage() {
             <Share2 className="size-4" aria-hidden="true" />
             Compartir agenda
           </Button>
+          <ExportarIcsBoton className="h-9 gap-1.5 rounded-pill border-outline-variant text-xs font-bold" />
           {misProyectos.length > 0 && (
             <Button
               ref={botonAgendarRef}

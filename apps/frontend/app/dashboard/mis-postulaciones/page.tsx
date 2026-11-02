@@ -22,6 +22,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { MisInvitacionesRol } from '@/components/projects/mis-invitaciones-rol';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import {
   Select,
@@ -118,6 +119,8 @@ export default function MisPostulacionesPage() {
             <ChevronRight aria-hidden="true" className="h-4 w-4" />
           </Link>
         </div>
+
+        <MisInvitacionesRol />
 
         {!isLoading && !isError && postulaciones.length > 0 && (
           <div className="mb-section grid grid-cols-2 gap-tight sm:grid-cols-4">

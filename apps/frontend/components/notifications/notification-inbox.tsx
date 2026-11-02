@@ -16,7 +16,7 @@ import {
   type Notificacion,
   type NotificacionesPagina,
 } from '@/lib/services/notifications';
-import { INBOX_CATEGORIES } from '@/lib/notifications/inbox-model';
+import { INBOX_CATEGORIES, filasVisibles } from '@/lib/notifications/inbox-model';
 import type { NotificationGroupId } from '@/lib/notifications/preference-groups';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { InboxList } from './inbox-list';
@@ -165,10 +165,12 @@ export function NotificationInbox() {
   );
 
   const seleccionar = useCallback(
-    (n: Notificacion) => {
+    (n: Notificacion, repetidas: Notificacion[] = []) => {
       setSeleccionada(n);
       setVistaMovil('detalle');
       leerAlAbrir(n);
+      // MEJ-29: abrir el grupo marca también los avisos repetidos que contiene.
+      repetidas.forEach(leerAlAbrir);
     },
     [leerAlAbrir, setSeleccionada],
   );
@@ -178,12 +180,17 @@ export function NotificationInbox() {
   // (o la lista aún carga); con otro filtro, el visor se vacía.
   const indice = seleccionada ? notificaciones.findIndex((n) => n.idNotificacion === seleccionada.idNotificacion) : -1;
   const mostrada = indice >= 0 ? notificaciones[indice] : seleccion && (seleccion.clave === claveFiltros || lista.isPending) ? seleccionada : null;
-  const anterior = indice > 0 ? notificaciones[indice - 1] : null;
-  const siguiente = indice >= 0 && indice < notificaciones.length - 1 ? notificaciones[indice + 1] : null;
-  const irAnterior = anterior ? () => seleccionar(anterior) : undefined;
+  // MEJ-29: anterior/siguiente recorren las filas visibles (principal + resto), igual que la lista.
+  const visibles = useMemo(() => filasVisibles(notificaciones), [notificaciones]);
+  const indiceGrupo = seleccionada
+    ? visibles.findIndex((g) => g.principal.idNotificacion === seleccionada.idNotificacion || g.resto.some((n) => n.idNotificacion === seleccionada.idNotificacion))
+    : -1;
+  const anterior = indiceGrupo > 0 ? visibles[indiceGrupo - 1] : null;
+  const siguiente = indiceGrupo >= 0 && indiceGrupo < visibles.length - 1 ? visibles[indiceGrupo + 1] : null;
+  const irAnterior = anterior ? () => seleccionar(anterior.principal, anterior.resto) : undefined;
   const irSiguiente = siguiente
-    ? () => seleccionar(siguiente)
-    : indice >= 0 && lista.hasNextPage
+    ? () => seleccionar(siguiente.principal, siguiente.resto)
+    : indiceGrupo >= 0 && lista.hasNextPage
       ? () => {
           if (!lista.isFetchingNextPage) lista.fetchNextPage();
         }

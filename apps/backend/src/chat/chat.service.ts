@@ -1,10 +1,12 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { EstadoProyecto, Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CHAT_STORAGE_PORT, type ChatStoragePort } from '../storage/chat-storage.port';
 import { ChatGateway } from './chat.gateway';
 import { ADJUNTO_MAX_BYTES, validarAdjunto, type ArchivoSubido } from './chat-adjuntos';
+import { NOTA_VOZ_MAX_BYTES, validarNotaVoz } from './chat-nota-voz';
+import { CreatePollDto } from './dto/create-poll.dto';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
 import { DuracionSilencio } from './dto/silenciar-conversation.dto';
@@ -17,6 +19,9 @@ import { estaEnNoMolestar, estaSilenciada } from './chat-silencio.util';
 import { UpdateNoMolestarDto } from './dto/update-no-molestar.dto';
 import { UpdateChatThemeDto } from './dto/update-chat-theme.dto';
 import { ESTADO_CHAT_SELECT, estadoVigente } from './chat-estado.service';
+import { prepararMencionesChat } from './chat-menciones';
+import { normalizarMenciones } from '../comentarios/menciones/menciones.parser';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /**
  * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
@@ -49,6 +54,20 @@ function conEstado<T extends { estadoChat: Parameters<typeof estadoVigente>[0] }
   return { ...usuario, estado: estadoVigente(estadoChat) };
 }
 
+const ENCUESTA_SELECT = {
+  select: {
+    idEncuesta: true,
+    pregunta: true,
+    multiple: true,
+    cierraEn: true,
+    cerradaEn: true,
+    opciones: {
+      orderBy: { orden: 'asc' },
+      select: { idOpcion: true, texto: true, votos: { select: { idUsuario: true } } },
+    },
+  },
+} as const;
+
 const MENSAJE_SELECT = {
   idMensaje: true,
   idConversacion: true,
@@ -56,10 +75,14 @@ const MENSAJE_SELECT = {
   enviadoEn: true,
   editadoEn: true,
   eliminadoEn: true,
+  fijadoEn: true,
   remitente: USUARIO_SELECT,
   // Solo metadatos: la clave de almacenamiento y las URL nunca salen en el listado.
-  adjunto: { select: { idAdjunto: true, nombreOriginal: true, mime: true, tamanoBytes: true } },
+  adjunto: { select: { idAdjunto: true, nombreOriginal: true, mime: true, tamanoBytes: true, duracionSegundos: true } },
+  encuesta: ENCUESTA_SELECT,
 } as const;
+
+const MAX_FIJADOS = 3;
 
 const URL_ADJUNTO_TTL_SEGUNDOS = 60;
 
@@ -79,7 +102,10 @@ export function conResumenDeCita<
 ) {
   const { citado, ...resto } = mensaje;
   if (!citado) return { ...resto, citado: null };
-  const texto = ocultarEliminado(citado).contenido.replace(/\s+/g, ' ').trim();
+  // MEJ-44: el token `@[Nombre](id)` se muestra como `@Nombre`.
+  const texto = normalizarMenciones(ocultarEliminado(citado).contenido, new Set())
+    .replace(/\s+/g, ' ')
+    .trim();
   const extracto = texto.length > EXTRACTO_CITA_MAX ? `${texto.slice(0, EXTRACTO_CITA_MAX)}…` : texto;
   return {
     ...resto,
@@ -115,7 +141,12 @@ function reaccionesParaUsuario(grupos: ReturnType<typeof agruparReacciones>, use
 /** El contenido de un mensaje eliminado nunca sale del servidor. */
 export function ocultarEliminado<T extends { contenido: string; eliminadoEn: Date | null }>(mensaje: T): T {
   if (!mensaje.eliminadoEn) return mensaje;
-  return { ...mensaje, contenido: '', ...('adjunto' in mensaje ? { adjunto: null } : {}) };
+  return {
+    ...mensaje,
+    contenido: '',
+    ...('adjunto' in mensaje ? { adjunto: null } : {}),
+    ...('encuesta' in mensaje ? { encuesta: null } : {}),
+  };
 }
 
 const ARCHIVADOS_PAGE_SIZE = 20;
@@ -146,6 +177,7 @@ export class ChatService {
     private prisma: PrismaService,
     private gateway: ChatGateway,
     @Inject(CHAT_STORAGE_PORT) private storage: ChatStoragePort,
+    @Optional() private notifications?: NotificationsService,
   ) {}
 
   /** Líder o participante con participación ACTIVO en algún rol del proyecto. */
@@ -169,12 +201,26 @@ export class ChatService {
     return proyecto;
   }
 
+  /** Ids mencionables: en canales las filas de participante pueden ser de ex miembros, asi que se exige membresia vigente. */
+  private async idsMencionables(
+    conversacion: { esCanal: boolean; idProyecto: number | null; participantes: { idUsuario: number }[]; proyecto: { creadoPor: number } | null },
+  ) {
+    const ids = conversacion.participantes.map((p) => p.idUsuario);
+    if (!conversacion.esCanal || conversacion.idProyecto === null) return ids;
+    const activos = await this.prisma.participacionProyecto.findMany({
+      where: { idUsuario: { in: ids }, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: conversacion.idProyecto } },
+      select: { idUsuario: true },
+    });
+    const vigentes = new Set(activos.map((a) => a.idUsuario));
+    return ids.filter((id) => vigentes.has(id) || id === conversacion.proyecto?.creadoPor);
+  }
+
   private async getConversacionOrThrow(idProyecto: number, idConversacion: number, userId: number) {
     const conversacion = await this.prisma.conversacion.findFirst({
       where: { idConversacion, idProyecto, eliminadaEn: null },
       include: {
         participantes: { select: { idUsuario: true } },
-        proyecto: { select: { estadoProyecto: true } },
+        proyecto: { select: { estadoProyecto: true, creadoPor: true } },
       },
     });
     if (!conversacion) {
@@ -292,6 +338,7 @@ export class ChatService {
         where: {
           idProyecto,
           tipo: 'INDIVIDUAL',
+          eliminadaEn: null,
           AND: idsUnicos.map((idUsuario) => ({ participantes: { some: { idUsuario } } })),
         },
         include: { participantes: { select: { idUsuario: true, usuario: USUARIO_SELECT } } },
@@ -458,7 +505,8 @@ export class ChatService {
     await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     const limite = query.limite ?? 20;
     const filas = await this.prisma.adjuntoMensajeChat.findMany({
-      where: { idConversacion, mensaje: { eliminadoEn: null }, ...(query.cursor ? { idAdjunto: { lt: query.cursor } } : {}) },
+      // Las notas de voz tienen su reproductor en el mensaje: no van a la galeria de archivos.
+      where: { idConversacion, duracionSegundos: null, mensaje: { eliminadoEn: null }, ...(query.cursor ? { idAdjunto: { lt: query.cursor } } : {}) },
       orderBy: { idAdjunto: 'desc' },
       take: limite,
       select: {
@@ -511,6 +559,29 @@ export class ChatService {
     return { datos, mime: adjunto.mime };
   }
 
+  /**
+   * Bytes de una nota de voz para el reproductor: mismo criterio que la miniatura
+   * (descarga en el servidor para que el navegador solo hable con el mismo origen),
+   * solo participantes, solo audio y con el tope de NOTA_VOZ_MAX_BYTES.
+   */
+  async getAdjuntoAudio(idProyecto: number, idConversacion: number, idAdjunto: number, userId: number) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    const adjunto = await this.prisma.adjuntoMensajeChat.findFirst({
+      where: { idAdjunto, idConversacion, mensaje: { eliminadoEn: null } },
+      select: { claveAlmacenamiento: true, mime: true, tamanoBytes: true },
+    });
+    if (!adjunto) throw new NotFoundException('Archivo no encontrado');
+    if (!adjunto.mime.startsWith('audio/') || adjunto.tamanoBytes > NOTA_VOZ_MAX_BYTES) {
+      throw new BadRequestException('El archivo no es una nota de voz');
+    }
+    const url = await this.storage.signedUrl(adjunto.claveAlmacenamiento, URL_ADJUNTO_TTL_SEGUNDOS);
+    const respuesta = await fetch(url);
+    if (!respuesta.ok) throw new NotFoundException('Archivo no disponible');
+    const datos = Buffer.from(await respuesta.arrayBuffer());
+    if (datos.length > NOTA_VOZ_MAX_BYTES) throw new BadRequestException('El archivo no es una nota de voz');
+    return { datos, mime: adjunto.mime };
+  }
+
   /** Busca en una conversación por texto (parcial, sin acentos ni mayúsculas), autor y rango de fechas. */
   async searchMessages(idProyecto: number, idConversacion: number, userId: number, filtros: SearchMessagesQueryDto) {
     await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
@@ -555,6 +626,7 @@ export class ChatService {
     contenido: string,
     archivo?: ArchivoSubido,
     idMensajeCitado?: number,
+    extra: { duracionSegundos?: number; encuesta?: CreatePollDto } = {},
   ) {
     const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     // T-234: único punto real de creación de mensajes (REST) — el gateway de
@@ -580,9 +652,25 @@ export class ChatService {
       }
     }
 
+    // MEJ-44: las menciones validas conservan su token; el resto queda como texto.
+    const menciones = prepararMencionesChat(contenido, await this.idsMencionables(conversacion), userId);
+    contenido = menciones.contenido;
+
+    const { encuesta } = extra;
+    if (encuesta) {
+      const cierra = encuesta.cierraEn ? new Date(encuesta.cierraEn) : null;
+      if (cierra && cierra.getTime() <= Date.now()) {
+        throw new BadRequestException('El cierre de la encuesta debe ser una fecha futura');
+      }
+      if (new Set(encuesta.opciones.map((o) => o.toLowerCase())).size !== encuesta.opciones.length) {
+        throw new BadRequestException('Las opciones de la encuesta no se pueden repetir');
+      }
+    }
+
     let adjunto: Prisma.AdjuntoMensajeChatCreateWithoutMensajeInput | undefined;
     if (archivo) {
-      const { mime, nombre } = validarAdjunto(archivo);
+      const esVoz = extra.duracionSegundos !== undefined;
+      const { mime, nombre } = esVoz ? validarNotaVoz(archivo) : validarAdjunto(archivo);
       const clave = `chat/${idConversacion}/${randomUUID()}.${nombre.split('.').pop()!.toLowerCase()}`;
       await this.storage.upload(clave, archivo.buffer);
       adjunto = {
@@ -591,6 +679,7 @@ export class ChatService {
         mime,
         tamanoBytes: archivo.buffer.length,
         claveAlmacenamiento: clave,
+        duracionSegundos: extra.duracionSegundos,
       };
     }
 
@@ -604,9 +693,21 @@ export class ChatService {
             data: {
               idConversacion,
               idRemitente: userId,
-              contenido: contenido.trim(),
+              contenido: encuesta ? encuesta.pregunta : contenido.trim(),
               idMensajeCitado,
               ...(adjunto ? { adjunto: { create: adjunto } } : {}),
+              ...(encuesta
+                ? {
+                    encuesta: {
+                      create: {
+                        pregunta: encuesta.pregunta,
+                        multiple: encuesta.multiple ?? false,
+                        cierraEn: encuesta.cierraEn ? new Date(encuesta.cierraEn) : null,
+                        opciones: { create: encuesta.opciones.map((texto, orden) => ({ texto, orden })) },
+                      },
+                    },
+                  }
+                : {}),
             },
             select: MENSAJE_CON_CITA_SELECT,
           });
@@ -624,7 +725,167 @@ export class ChatService {
 
     const destinatarios = conversacion.participantes.map((p) => p.idUsuario).filter((id) => id !== userId);
     this.gateway.broadcastMessage(idConversacion, destinatarios, mensaje);
+    await this.notificarMenciones(idProyecto, idConversacion, mensaje.idMensaje, userId, menciones.mencionados);
 
+    return mensaje;
+  }
+
+  /**
+   * MEJ-44: aviso a los mencionados. Es una `Notificacion` propia del usuario, asi que
+   * llega aunque la conversacion este silenciada; solo la preferencia del tipo la apaga.
+   * Un fallo aqui nunca debe tumbar un mensaje ya persistido.
+   */
+  private async notificarMenciones(
+    idProyecto: number,
+    idConversacion: number,
+    idMensaje: number,
+    autorId: number,
+    mencionados: number[],
+  ): Promise<void> {
+    if (!this.notifications || mencionados.length === 0) return;
+    try {
+      const [autor, proyecto] = await Promise.all([
+        this.prisma.usuario.findUnique({ where: { idUsuario: autorId }, select: { nombre: true, apellido: true } }),
+        this.prisma.proyecto.findUnique({ where: { idProyecto }, select: { tituloProyecto: true } }),
+      ]);
+      await this.notifications.notifyFromTemplate(mencionados, 'MENCION_CHAT', {
+        autorNombre: autor ? `${autor.nombre} ${autor.apellido}` : 'Un integrante',
+        tituloProyecto: proyecto?.tituloProyecto ?? '',
+        idProyecto,
+        idConversacion,
+        idMensaje,
+      });
+    } catch {
+      // best effort: el mensaje ya se guardo y difundio
+    }
+  }
+
+  /** Encuesta de un mensaje vivo de la conversacion, con sus opciones y votos. */
+  private async getEncuestaOrThrow(idConversacion: number, idMensaje: number) {
+    const mensaje = await this.prisma.mensajeChat.findFirst({
+      where: { idMensaje, idConversacion, eliminadoEn: null, encuesta: { isNot: null } },
+      select: { idRemitente: true, encuesta: ENCUESTA_SELECT },
+    });
+    if (!mensaje?.encuesta) throw new NotFoundException('Encuesta no encontrada');
+    return { idRemitente: mensaje.idRemitente, encuesta: mensaje.encuesta };
+  }
+
+  /** Reemplaza los votos del usuario en la encuesta (arreglo vacio = retirar voto) y avisa en vivo. */
+  async votarEncuesta(idProyecto: number, idConversacion: number, idMensaje: number, userId: number, idsOpciones: number[]) {
+    const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    if (chatArchivado(conversacion.proyecto?.estadoProyecto)) {
+      throw new ForbiddenException('Esta conversación está archivada: no se puede votar.');
+    }
+    const { encuesta } = await this.getEncuestaOrThrow(idConversacion, idMensaje);
+    if (encuesta.cerradaEn || (encuesta.cierraEn && encuesta.cierraEn.getTime() <= Date.now())) {
+      throw new BadRequestException('La encuesta está cerrada');
+    }
+    const validas = new Set(encuesta.opciones.map((o) => o.idOpcion));
+    if (idsOpciones.some((id) => !validas.has(id))) throw new BadRequestException('Opción inválida para esta encuesta');
+    if (!encuesta.multiple && idsOpciones.length > 1) {
+      throw new BadRequestException('Esta encuesta admite un solo voto');
+    }
+
+    // Bloquea la encuesta para que dos reemplazos simultaneos del mismo usuario no dejen 2 votos
+    // en una encuesta de voto unico, y para releer el cierre justo antes de escribir.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM "encuesta_chat" WHERE "id_encuesta" = ${encuesta.idEncuesta} FOR UPDATE`;
+      const actual = await tx.encuestaChat.findUniqueOrThrow({
+        where: { idEncuesta: encuesta.idEncuesta },
+        select: { cerradaEn: true, cierraEn: true },
+      });
+      if (actual.cerradaEn || (actual.cierraEn && actual.cierraEn.getTime() <= Date.now())) {
+        throw new BadRequestException('La encuesta está cerrada');
+      }
+      await tx.votoEncuestaChat.deleteMany({ where: { idUsuario: userId, opcion: { idEncuesta: encuesta.idEncuesta } } });
+      await tx.votoEncuestaChat.createMany({ data: idsOpciones.map((idOpcion) => ({ idOpcion, idUsuario: userId })) });
+    });
+    return this.publicarEncuesta(idConversacion, idMensaje);
+  }
+
+  /** Cierre manual: solo quien la creo o el lider del proyecto. */
+  async cerrarEncuesta(idProyecto: number, idConversacion: number, idMensaje: number, userId: number) {
+    const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    if (chatArchivado(conversacion.proyecto?.estadoProyecto)) {
+      throw new ForbiddenException('Esta conversación está archivada: no se puede cerrar la encuesta.');
+    }
+    const { idRemitente, encuesta } = await this.getEncuestaOrThrow(idConversacion, idMensaje);
+    if (idRemitente !== userId && conversacion.proyecto?.creadoPor !== userId) {
+      throw new ForbiddenException('Solo quien creó la encuesta o el líder del proyecto puede cerrarla');
+    }
+    if (!encuesta.cerradaEn) {
+      await this.prisma.encuestaChat.update({ where: { idEncuesta: encuesta.idEncuesta }, data: { cerradaEn: new Date() } });
+    }
+    return this.publicarEncuesta(idConversacion, idMensaje);
+  }
+
+  private async publicarEncuesta(idConversacion: number, idMensaje: number) {
+    const { encuesta } = await this.getEncuestaOrThrow(idConversacion, idMensaje);
+    this.gateway.broadcastPollUpdated(idConversacion, idMensaje, encuesta);
+    return encuesta;
+  }
+
+  /** Fijados vigentes de la conversacion, en el orden en que se fijaron. Sin chequeo de acceso: lo hace el llamador. */
+  async fijadosDe(idConversacion: number) {
+    const mensajes = await this.prisma.mensajeChat.findMany({
+      where: { idConversacion, eliminadoEn: null, fijadoEn: { not: null } },
+      orderBy: { fijadoEn: 'asc' },
+      take: MAX_FIJADOS,
+      select: MENSAJE_CON_CITA_SELECT,
+    });
+    return mensajes.map((m) => conResumenDeCita(m));
+  }
+
+  async getFijados(idProyecto: number, idConversacion: number, userId: number) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    return this.fijadosDe(idConversacion);
+  }
+
+  /** Proyecto: puede fijar/desfijar el lider del proyecto o el autor del mensaje. */
+  async fijarMensaje(idProyecto: number, idConversacion: number, idMensaje: number, userId: number, fijar: boolean) {
+    const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    if (chatArchivado(conversacion.proyecto?.estadoProyecto)) {
+      throw new ForbiddenException('Esta conversación está archivada: no se pueden fijar mensajes.');
+    }
+    const autor = await this.prisma.mensajeChat.findFirst({
+      where: { idMensaje, idConversacion, eliminadoEn: null },
+      select: { idRemitente: true },
+    });
+    if (!autor) throw new NotFoundException(`Mensaje con id ${idMensaje} no encontrado`);
+    if (autor.idRemitente !== userId && conversacion.proyecto?.creadoPor !== userId) {
+      throw new ForbiddenException('Solo el líder del proyecto o el autor del mensaje puede fijarlo');
+    }
+    return this.aplicarFijado(idConversacion, idMensaje, fijar, conversacion.participantes.map((p) => p.idUsuario));
+  }
+
+  /**
+   * Fija o desfija sin chequear permisos (los verifica cada tipo de chat).
+   * El tope de MAX_FIJADOS se cuenta bajo bloqueo de la conversacion para que
+   * dos fijados simultaneos no lo superen.
+   */
+  async aplicarFijado(idConversacion: number, idMensaje: number, fijar: boolean, participantes: number[]) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM "conversacion" WHERE "id_conversacion" = ${idConversacion} FOR UPDATE`;
+      const mensaje = await tx.mensajeChat.findFirst({
+        where: { idMensaje, idConversacion, eliminadoEn: null },
+        select: { fijadoEn: true },
+      });
+      if (!mensaje) throw new NotFoundException(`Mensaje con id ${idMensaje} no encontrado`);
+      if (!fijar) {
+        if (mensaje.fijadoEn) await tx.mensajeChat.update({ where: { idMensaje }, data: { fijadoEn: null } });
+        return;
+      }
+      if (mensaje.fijadoEn) return;
+      const fijados = await tx.mensajeChat.count({ where: { idConversacion, eliminadoEn: null, fijadoEn: { not: null } } });
+      if (fijados >= MAX_FIJADOS) {
+        throw new BadRequestException(`Solo se pueden fijar hasta ${MAX_FIJADOS} mensajes: desfija uno primero`);
+      }
+      await tx.mensajeChat.update({ where: { idMensaje }, data: { fijadoEn: new Date() } });
+    });
+    const mensaje = conResumenDeCita(
+      await this.prisma.mensajeChat.findUniqueOrThrow({ where: { idMensaje }, select: MENSAJE_CON_CITA_SELECT }),
+    );
+    this.gateway.broadcastMessageChange('messageUpdated', idConversacion, participantes, mensaje);
     return mensaje;
   }
 
@@ -641,14 +902,14 @@ export class ChatService {
     }
     const mensaje = await this.prisma.mensajeChat.findFirst({
       where: { idMensaje, idConversacion },
-      select: { idRemitente: true, eliminadoEn: true },
+      select: { idRemitente: true, eliminadoEn: true, contenido: true },
     });
     if (!mensaje) throw new NotFoundException(`Mensaje con id ${idMensaje} no encontrado`);
     if (mensaje.idRemitente !== userId) {
       throw new ForbiddenException('Solo puedes modificar tus propios mensajes');
     }
     if (mensaje.eliminadoEn) throw new BadRequestException('El mensaje ya fue eliminado');
-    return conversacion;
+    return { ...conversacion, contenidoActual: mensaje.contenido };
   }
 
   async editMessage(
@@ -659,15 +920,26 @@ export class ChatService {
     contenido: string,
   ) {
     const conversacion = await this.getOwnMessageOrThrow(idProyecto, idConversacion, idMensaje, userId);
+    const participantes = await this.idsMencionables(conversacion);
+    const menciones = prepararMencionesChat(contenido.trim(), participantes, userId);
     const mensaje = conResumenDeCita(
       await this.prisma.mensajeChat.update({
         where: { idMensaje },
-        data: { contenido: contenido.trim(), editadoEn: new Date() },
+        data: { contenido: menciones.contenido, editadoEn: new Date() },
         select: MENSAJE_CON_CITA_SELECT,
       }),
     );
     const destinatarios = conversacion.participantes.map((p) => p.idUsuario).filter((id) => id !== userId);
     this.gateway.broadcastMessageChange('messageUpdated', idConversacion, destinatarios, mensaje);
+    // Al editar solo se avisa a quien no estaba ya mencionado.
+    const previos = prepararMencionesChat(conversacion.contenidoActual, participantes, userId).mencionados;
+    await this.notificarMenciones(
+      idProyecto,
+      idConversacion,
+      idMensaje,
+      userId,
+      menciones.mencionados.filter((id) => !previos.includes(id)),
+    );
     return mensaje;
   }
 
@@ -792,7 +1064,8 @@ export class ChatService {
           : {}),
       },
       include: {
-        proyecto: { select: { idProyecto: true, tituloProyecto: true } },
+        // creadoPor: el cliente sabe si es el lider (puede fijar mensajes ajenos).
+        proyecto: { select: { idProyecto: true, tituloProyecto: true, creadoPor: true } },
         apodos: apodosPropios(userId),
         participantes: {
           select: {

@@ -78,6 +78,7 @@ import { formatMotivoRecomendacion } from '@/lib/social/recomendaciones';
 import uvgSwal from '@/lib/swal';
 import type { SemestreRango, SolicitudAmistadPendienteDto, UsuarioBusquedaDto } from '@/lib/types/social';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { InvitarARolDialog } from '@/components/projects/invitar-a-rol-dialog';
 import {
   PersonasMobileNav,
   SECCIONES_PERSONAS,
@@ -143,6 +144,7 @@ function BotonesPersona({
       >
         {amistad.label}
       </Button>
+      <InvitarARolDialog idUsuario={usuario.idUsuario} nombre={`${usuario.nombre} ${usuario.apellido}`} />
     </>
   );
 }

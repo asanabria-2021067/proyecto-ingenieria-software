@@ -2,6 +2,11 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { OrgCard } from '@/components/organizations/org-card';
+
+// MEJ-18: el botón «Seguir» consulta mis seguimientos con TanStack Query; aquí solo importa la tarjeta.
+vi.mock('@/components/organizations/boton-seguir', () => ({
+  SeguirOrganizacion: ({ nombre }: { nombre: string }) => <button type="button">{`Seguir ${nombre}`}</button>,
+}));
 import type { MiOrganizacion, OrganizacionPublica } from '@/lib/types/organizations';
 
 const base = {

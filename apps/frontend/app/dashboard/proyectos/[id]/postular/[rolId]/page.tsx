@@ -14,12 +14,17 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Postulacion, Proyecto } from '@/types';
 import { SkeletonCard, SkeletonDetail } from '@/components/ui/skeleton';
+import { DraftNotice } from '@/components/ui/draft-notice';
+import { PostulacionVistaPrevia } from '@/components/projects/postulacion-vista-previa';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { useFormDraft } from '@/hooks/use-form-draft';
+import { JUSTIFICACION_MAX, JUSTIFICACION_MIN, caracteresFaltantes } from '@/lib/forms/postulacion';
 
 export const postulacionSchema = z.object({
   justificacion: z
     .string()
-    .min(40, 'La justificación debe tener al menos 40 caracteres.')
-    .max(1000, 'La justificación no puede exceder 1000 caracteres.'),
+    .min(JUSTIFICACION_MIN, `La justificación debe tener al menos ${JUSTIFICACION_MIN} caracteres.`)
+    .max(JUSTIFICACION_MAX, `La justificación no puede exceder ${JUSTIFICACION_MAX} caracteres.`),
 });
 
 type FormData = z.infer<typeof postulacionSchema>;
@@ -29,6 +34,8 @@ export default function PostularPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState('');
+  const [vistaPrevia, setVistaPrevia] = useState(false);
+  const { data: usuario } = useCurrentUser();
 
   const { data: proyecto, isLoading } = useQuery<Proyecto>({
     queryKey: ['proyecto', id],
@@ -57,10 +64,27 @@ export default function PostularPage() {
     register,
     handleSubmit,
     control,
+    setValue,
+    trigger,
     formState: { errors },
   } = useForm<FormData>({ resolver: zodResolver(postulacionSchema) });
 
   const justificacion = useWatch({ control, name: 'justificacion', defaultValue: '' });
+  const faltan = caracteresFaltantes(justificacion ?? '');
+
+  const borrador = useFormDraft<{ justificacion: string }>({
+    clave: `postulacion-${id}-${rolId}`,
+    valor: { justificacion: justificacion ?? '' },
+    alRestaurar: (b) => setValue('justificacion', b.justificacion),
+    alDescartar: () => {
+      setValue('justificacion', '');
+      setVistaPrevia(false);
+    },
+  });
+
+  const verVistaPrevia = async () => {
+    if (await trigger('justificacion')) setVistaPrevia(true);
+  };
 
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
@@ -79,6 +103,7 @@ export default function PostularPage() {
       setErrorMsg(msg);
     },
     onSuccess: async () => {
+      borrador.limpiar();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['mis-postulaciones'] }),
         queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] }),
@@ -187,7 +212,10 @@ export default function PostularPage() {
               <form noValidate onSubmit={handleSubmit((data) => {
                 if (!mutation.isPending) mutation.mutate(data);
               })} className="space-y-5">
-                <div>
+                {borrador.restaurado && <DraftNotice onDescartar={borrador.descartar} />}
+
+                {/* El campo sigue montado en la vista previa: conserva valor y errores. */}
+                <div className={vistaPrevia ? 'hidden' : undefined}>
                   <label htmlFor="justificacion" className="block text-sm font-semibold text-on-surface mb-1.5">
                     Justificación <span className="text-error">*</span>
                   </label>
@@ -201,24 +229,42 @@ export default function PostularPage() {
                     rows={8}
                     placeholder="Escribe tu justificación aquí..."
                     aria-invalid={errors.justificacion ? 'true' : undefined}
-                    aria-describedby={errors.justificacion ? 'justificacion-error' : undefined}
+                    aria-describedby={errors.justificacion ? 'justificacion-error' : 'justificacion-ayuda'}
                     className={`w-full px-4 py-3 rounded-xl border text-on-surface text-sm leading-relaxed outline-none resize-none transition-colors ${
                       errors.justificacion
                         ? 'border-error bg-error-container/10 focus:ring-2 focus:ring-error'
                         : 'border-outline-variant bg-surface-container-lowest focus:ring-2 focus:ring-primary'
                     }`}
                   />
-                  <div className="flex items-start justify-between mt-1.5">
+                  <div className="flex items-start justify-between gap-3 mt-1.5">
                     {errors.justificacion ? (
                       <p id="justificacion-error" role="alert" className="text-xs text-error">{errors.justificacion.message}</p>
                     ) : (
-                      <span />
+                      <p id="justificacion-ayuda" className="text-xs text-tertiary">
+                        {faltan > 0
+                          ? `Mínimo ${JUSTIFICACION_MIN} caracteres: ${faltan === 1 ? 'te falta 1' : `te faltan ${faltan}`}.`
+                          : 'Cumples el mínimo de caracteres.'}
+                      </p>
                     )}
-                    <span className="text-xs text-tertiary ml-auto">
-                      {justificacion?.length ?? 0} / 1000
+                    <span className="text-xs text-tertiary ml-auto shrink-0">
+                      {justificacion?.length ?? 0} / {JUSTIFICACION_MAX}
                     </span>
                   </div>
                 </div>
+
+                {vistaPrevia && rol && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-tertiary">
+                      Así verá tu postulación el líder del proyecto. Revisa que todo esté bien antes de enviarla.
+                    </p>
+                    <PostulacionVistaPrevia
+                      nombre={usuario ? `${usuario.nombre} ${usuario.apellido}` : 'Tú'}
+                      correo={usuario?.correo ?? ''}
+                      nombreRol={rol.nombreRol}
+                      justificacion={justificacion ?? ''}
+                    />
+                  </div>
+                )}
 
                 {mutation.isError && (
                   <div className="flex items-start gap-2 bg-error-container text-error rounded-xl px-4 py-3 text-sm">
@@ -228,21 +274,46 @@ export default function PostularPage() {
                 )}
 
                 <div className="flex gap-3 pt-2">
-                  <Link
-                    href={`/dashboard/proyectos/${id}`}
-                    className="flex-1 text-center px-5 py-3 rounded-xl border border-outline-variant text-on-surface text-sm font-semibold hover:bg-surface-container transition-colors"
-                  >
-                    Cancelar
-                  </Link>
-                  <Button
-                    type="submit"
-                    disabled={mutation.isPending}
-                    aria-busy={mutation.isPending}
-                    className="h-auto flex-1 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary hover:bg-primary disabled:opacity-60 motion-glow-primary"
-                  >
-                    {mutation.isPending && <Spinner aria-label="Cargando" />}
-                    {mutation.isPending ? 'Enviando...' : 'Enviar Postulación'}
-                  </Button>
+                  {vistaPrevia ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setVistaPrevia(false)}
+                        disabled={mutation.isPending}
+                        className="h-auto flex-1 rounded-xl px-5 py-3 text-sm font-semibold"
+                      >
+                        Seguir editando
+                      </Button>
+                      <Button
+                        key="enviar"
+                        type="submit"
+                        disabled={mutation.isPending}
+                        aria-busy={mutation.isPending}
+                        className="h-auto flex-1 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary hover:bg-primary disabled:opacity-60 motion-glow-primary"
+                      >
+                        {mutation.isPending && <Spinner aria-label="Cargando" />}
+                        {mutation.isPending ? 'Enviando...' : 'Enviar Postulación'}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href={`/dashboard/proyectos/${id}`}
+                        className="flex-1 text-center px-5 py-3 rounded-xl border border-outline-variant text-on-surface text-sm font-semibold hover:bg-surface-container transition-colors"
+                      >
+                        Cancelar
+                      </Link>
+                      <Button
+                        key="vista-previa"
+                        type="button"
+                        onClick={() => void verVistaPrevia()}
+                        className="h-auto flex-1 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary hover:bg-primary motion-glow-primary"
+                      >
+                        Vista previa
+                      </Button>
+                    </>
+                  )}
                 </div>
               </form>
             )}

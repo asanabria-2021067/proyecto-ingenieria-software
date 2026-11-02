@@ -66,9 +66,9 @@ describe('MyEventsController', () => {
     expect(Reflect.getMetadata(PATH_METADATA, MyEventsController)).toBe('usuarios/me/eventos');
   });
 
-  it('expone exactamente findInRange', () => {
+  it('expone exactamente findInRange y, desde MEJ-33, exportIcs', () => {
     const propios = Object.getOwnPropertyNames(MyEventsController.prototype).filter((n) => n !== 'constructor');
-    expect(propios.sort()).toEqual(['findInRange']);
+    expect(propios.sort()).toEqual(['exportIcs', 'findInRange']);
   });
 });
 

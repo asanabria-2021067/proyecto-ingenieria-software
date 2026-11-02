@@ -15,6 +15,8 @@
  *   variante ws/wss para Socket.IO (hooks/use-chat.ts y
  *   useRealtimeNotifications eligen ws o wss según la página), más
  *   api.cloudinary.com (lib/cloudinary.ts sube archivos desde el navegador).
+ * - media-src blob:: el reproductor de notas de voz del chat baja el audio por
+ *   el backend (mismo origen, como las miniaturas) y lo reproduce desde un objectURL.
  * - frame-src blob:: el visor de documentos de cierre embebe un objectURL.
  */
 
@@ -40,6 +42,7 @@ export function cspDirectives(apiUrl: string | undefined): Array<[string, string
     ['style-src', ["'self'", "'unsafe-inline'"]],
     ['img-src', ["'self'", 'data:', 'blob:', CLOUDINARY_DELIVERY_ORIGIN]],
     ['font-src', ["'self'"]],
+    ['media-src', ["'self'", 'blob:']],
     ['connect-src', ["'self'", ...apiConnectSources(apiUrl), CLOUDINARY_UPLOAD_ORIGIN]],
     ['frame-src', ['blob:']],
     ['object-src', ["'none'"]],

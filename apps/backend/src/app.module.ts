@@ -12,6 +12,7 @@ import { isThrottlerDisabled } from './config/throttler';
 import { AppController } from './app.controller';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { PrismaModule } from './prisma/prisma.module';
+import { MailModule } from './mail/mail.module';
 import { ProjectPolicyModule } from './common/project-policy/project-policy.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -41,6 +42,7 @@ import { ChatModule } from './chat/chat.module';
 import { BitacoraModule } from './bitacora/bitacora.module';
 import { GlobalSearchModule } from './search/global-search.module';
 import { ExportsModule } from './exports/exports.module';
+import { SeguimientoModule } from './seguimiento/seguimiento.module';
 import { HorasSemestreModule } from './horas-semestre/horas-semestre.module';
 import { SecurityEventsModule } from './security-events/security-events.module';
 import { EventsModule } from './events/events.module';
@@ -51,6 +53,8 @@ import { AnunciosModule } from './anuncios/anuncios.module';
 import { ContactoModule } from './contacto/contacto.module';
 import { AssociationsModule } from './associations/associations.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { FollowsModule } from './follows/follows.module';
+import { RoleInvitationsModule } from './role-invitations/role-invitations.module';
 
 const skipThrottling = () => isThrottlerDisabled();
 
@@ -98,6 +102,7 @@ const skipThrottling = () => isThrottlerDisabled();
       }),
     }),
     PrismaModule,
+    MailModule,
     ProjectPolicyModule,
     AuthModule,
     UsersModule,
@@ -127,6 +132,7 @@ const skipThrottling = () => isThrottlerDisabled();
     BitacoraModule,
     GlobalSearchModule,
     ExportsModule,
+    SeguimientoModule,
     HorasSemestreModule,
     // G05 (OWASP25-C037): writer best-effort de eventos de seguridad (global).
     SecurityEventsModule,
@@ -138,6 +144,8 @@ const skipThrottling = () => isThrottlerDisabled();
     ContactoModule,
     AssociationsModule,
     OrganizationsModule,
+    FollowsModule,
+    RoleInvitationsModule,
   ],
   controllers: [AppController],
   providers: [

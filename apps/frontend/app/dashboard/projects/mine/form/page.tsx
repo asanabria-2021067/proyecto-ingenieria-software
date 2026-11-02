@@ -9,8 +9,8 @@ import { createProject, updateProject, getMyProjectById, submitProjectForReview 
 import { getCarreras, getHabilidades, type Carrera, type Habilidad } from '@/lib/services/catalogs';
 import { useMisOrganizaciones, useOrganizacion } from '@/hooks/use-organizations';
 import { useCurrentUser } from '@/hooks/use-current-user';
-import { useMisJuntas } from '@/hooks/use-asociaciones';
-import { puedePublicarComoAsociacion } from '@/lib/asociaciones/vista';
+import { useCandidatosParticipantes, useMisJuntas } from '@/hooks/use-asociaciones';
+import { CARGO_LABEL, puedePublicarComoAsociacion } from '@/lib/asociaciones/vista';
 import {
   errorParticipantes,
   miembrosElegibles,
@@ -26,7 +26,7 @@ import { Step1 } from './Step1';
 import { Step2 } from './Step2';
 import { Step3 } from './Step3';
 import { StepPropietario } from './StepPropietario';
-import { StepParticipantes } from './StepParticipantes';
+import { StepParticipantes, type CandidatoVista } from './StepParticipantes';
 import {
   newRol, newRequisito, safeId, step1Schema, rolSchema, formSchema, partialProjectSchema, zodToFieldErrors,
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
@@ -34,6 +34,9 @@ import {
 import { normalizeUrlInput } from '@/lib/security/safe-url';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { FormStepper } from '@/components/ui/form-stepper';
+import { DraftNotice } from '@/components/ui/draft-notice';
+import { useFormDraft } from '@/hooks/use-form-draft';
 
 // Estados con edición completa (asistente de 3 pasos) vs. edición PARCIAL
 // (subconjunto seguro: proyecto ya publicado / en progreso). El resto no es
@@ -44,12 +47,26 @@ const ALLOWED_EDIT_STATES = [...FULL_EDIT_STATES, ...PARTIAL_EDIT_STATES];
 
 type PasoKey = 'propietario' | 'datos' | 'roles' | 'participantes' | 'resumen';
 const TITULO_PASO: Record<PasoKey, string> = {
-  propietario: '¿A nombre de quién?',
   datos: 'Datos generales',
+  propietario: '¿A nombre de quién?',
   roles: 'Roles y habilidades',
-  participantes: 'Participantes de la organización',
-  resumen: 'Resumen',
+  participantes: 'Integrantes',
+  resumen: 'Revisar y enviar',
 };
+
+const FORM_VACIO: FormData = {
+  tituloProyecto: '', descripcionProyecto: '', tipoProyecto: '',
+  modalidadProyecto: '', objetivosProyecto: '', ubicacionProyecto: '',
+  contextoAcademico: '', urlRecursoExterno: '', fechaInicio: '',
+  fechaFinEstimada: '', roles: [],
+};
+
+interface BorradorProyecto {
+  form: FormData;
+  idOrganizacion: number | null;
+  idAsociacion: number | null;
+  participantes: ParticipanteForm[];
+}
 
 function NewProjectFormContent() {
   const router = useRouter();
@@ -69,12 +86,7 @@ function NewProjectFormContent() {
   const [participantes, setParticipantes] = useState<ParticipanteForm[]>([]);
   const orgPreseleccionada = useRef(false);
 
-  const [form, setForm] = useState<FormData>({
-    tituloProyecto: '', descripcionProyecto: '', tipoProyecto: '',
-    modalidadProyecto: '', objetivosProyecto: '', ubicacionProyecto: '',
-    contextoAcademico: '', urlRecursoExterno: '', fechaInicio: '',
-    fechaFinEstimada: '', roles: [],
-  });
+  const [form, setForm] = useState<FormData>(FORM_VACIO);
 
   const { data: carreras = [] } = useQuery<Carrera[]>({ queryKey: ['carreras'], queryFn: getCarreras });
   const { data: habilidades = [] } = useQuery<Habilidad[]>({ queryKey: ['habilidades'], queryFn: getHabilidades });
@@ -86,6 +98,54 @@ function NewProjectFormContent() {
   const asociacionesPublicables = misJuntas.filter(puedePublicarComoAsociacion);
   const { data: orgElegida, isLoading: cargandoOrg } = useOrganizacion(idOrganizacion ?? 0);
   const orgParam = Number(searchParams.get('org')) || null;
+
+  // Candidatos de la asociación (junta y estudiantes de sus carreras); la búsqueda espera a que se deje de escribir.
+  const [busquedaCandidatos, setBusquedaCandidatos] = useState('');
+  const [busquedaAplicada, setBusquedaAplicada] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setBusquedaAplicada(busquedaCandidatos), 300);
+    return () => clearTimeout(t);
+  }, [busquedaCandidatos]);
+  const { data: candidatosAsociacion = [], isLoading: cargandoCandidatos } = useCandidatosParticipantes(
+    editId === null ? idAsociacion : null,
+    busquedaAplicada,
+  );
+  // Quienes ya se eligieron siguen con nombre en el resumen aunque la búsqueda cambie.
+  const candidatosVistos = useRef(new Map<number, CandidatoVista>());
+  const candidatos: CandidatoVista[] = candidatosAsociacion.map((c) => ({
+    idUsuario: c.idUsuario,
+    nombre: c.nombre,
+    apellido: c.apellido,
+    fotoUrl: null,
+    etiqueta: c.cargo ? CARGO_LABEL[c.cargo] : `Estudiante${c.carne ? ` · ${c.carne}` : ''}`,
+  }));
+  for (const c of candidatos) candidatosVistos.current.set(c.idUsuario, c);
+
+  // Borrador automático solo al crear: sobrevive a recargas y se descarta al enviar.
+  const borrador = useFormDraft<BorradorProyecto>({
+    clave: editId === null ? 'proyecto-nuevo' : null,
+    // La organización que llega por `?org=` no cuenta como cambio del usuario.
+    valor: { form, idOrganizacion: idOrganizacion === orgParam ? null : idOrganizacion, idAsociacion, participantes },
+    alRestaurar: (b) => {
+      setForm(b.form);
+      // `?org=` manda sobre el borrador: sus participantes no calzarían con otra organización.
+      if (orgParam === null) {
+        setIdOrganizacion(b.idOrganizacion);
+        setIdAsociacion(b.idAsociacion);
+        setParticipantes(b.participantes);
+      }
+    },
+    alDescartar: () => {
+      setForm(FORM_VACIO);
+      setIdOrganizacion(null);
+      setIdAsociacion(null);
+      setParticipantes([]);
+      setStep(0);
+      setTriedStep1(false);
+      setTriedStep2(false);
+      setTriedParticipantes(false);
+    },
+  });
 
   // `?org=<id>` (desde la página de la organización) llega con la organización ya elegida.
   useEffect(() => {
@@ -153,9 +213,9 @@ function NewProjectFormContent() {
 
   const pasos: PasoKey[] = editId
     ? ['datos', 'roles', 'resumen']
-    : ['propietario', 'datos', 'roles', ...(idOrganizacion !== null ? (['participantes'] as const) : []), 'resumen'];
+    : ['datos', 'propietario', 'roles', ...(idOrganizacion !== null || idAsociacion !== null ? (['participantes'] as const) : []), 'resumen'];
   const pasoActual = pasos[Math.min(step, pasos.length - 1)];
-  const errorDeParticipantes = idOrganizacion === null ? null : errorParticipantes(form.roles, participantes);
+  const errorDeParticipantes = idOrganizacion === null && idAsociacion === null ? null : errorParticipantes(form.roles, participantes);
 
   const goTo = (target: number) => {
     if (target > step) {
@@ -225,9 +285,9 @@ function NewProjectFormContent() {
         .map((req) => ({ idHabilidad: req.idHabilidad!, nivelMinimo: req.nivelMinimo as NivelHabilidad, obligatorio: req.obligatorio })),
     })) : undefined,
     ...(!editId && idAsociacion !== null && { idAsociacion }),
-    ...(!editId && idOrganizacion !== null && {
-      idOrganizacion,
-      ...(participantes.length > 0 && { participantes: participantesPayload(form.roles, participantes) }),
+    ...(!editId && idOrganizacion !== null && { idOrganizacion }),
+    ...(!editId && (idOrganizacion !== null || idAsociacion !== null) && participantes.length > 0 && {
+      participantes: participantesPayload(form.roles, participantes),
     }),
   });
 
@@ -314,6 +374,7 @@ function NewProjectFormContent() {
         router.push('/dashboard/projects/mine');
       } else {
         await createProject({ ...buildDataPayload(), accion });
+        borrador.limpiar();
         await queryClient.invalidateQueries({ queryKey: ['mis-proyectos'] });
         await uvgSwal.fire({
           icon: 'success',
@@ -458,11 +519,18 @@ function NewProjectFormContent() {
           </div>
 
           {/* Barra de progreso */}
-          <div className="flex gap-2 px-8 pb-6">
-            {pasos.map((_, i) => (
-              <button key={i} onClick={() => goTo(i)} className={`h-1.5 flex-1 rounded-full cursor-pointer transition-colors duration-200 ${i <= step ? 'bg-primary' : 'bg-surface-container-highest'}`} />
-            ))}
-          </div>
+          <FormStepper
+            pasos={pasos.map((k) => TITULO_PASO[k])}
+            actual={step}
+            onSeleccionar={goTo}
+            className="px-8 pb-6"
+          />
+
+          {borrador.restaurado && (
+            <div className="px-8 pb-4">
+              <DraftNotice onDescartar={borrador.descartar} />
+            </div>
+          )}
 
           {/* Contenido animado */}
           <div key={step} className={`px-8 pb-6 ${animClass}`}>
@@ -481,19 +549,20 @@ function NewProjectFormContent() {
             {pasoActual === 'roles' && (
               <Step2
                 roles={form.roles} carreras={carreras} habilidades={habilidades}
-                errors={step2Errors}
+                errors={step2Errors} idProyecto={editId ?? undefined}
                 onAddRol={addRol} onRemoveRol={removeRol} onUpdateRol={updateRol}
                 onAddRequisito={addRequisito} onRemoveRequisito={removeRequisito} onUpdateRequisito={updateRequisito}
               />
             )}
             {pasoActual === 'participantes' && (
               <StepParticipantes
-                miembros={miembrosElegibles(orgElegida?.miembros ?? [], usuarioActual?.idUsuario ?? null)}
+                miembros={idAsociacion !== null ? candidatos : miembrosElegibles(orgElegida?.miembros ?? [], usuarioActual?.idUsuario ?? null)}
                 roles={form.roles}
                 participantes={participantes}
                 error={triedParticipantes ? errorDeParticipantes : null}
-                cargando={cargandoOrg}
+                cargando={idAsociacion !== null ? cargandoCandidatos : cargandoOrg}
                 onChange={setParticipantes}
+                asociacion={idAsociacion !== null ? { busqueda: busquedaCandidatos, onBuscar: setBusquedaCandidatos } : undefined}
               />
             )}
             {pasoActual === 'resumen' && (
@@ -511,7 +580,9 @@ function NewProjectFormContent() {
                         : null
                 }
                 participantes={participantes.map((p) => {
-                  const m = orgElegida?.miembros?.find((x) => x.idUsuario === p.idUsuario);
+                  const m = idAsociacion !== null
+                    ? candidatosVistos.current.get(p.idUsuario)
+                    : orgElegida?.miembros?.find((x) => x.idUsuario === p.idUsuario);
                   return {
                     nombre: m ? `${m.nombre} ${m.apellido}` : `Usuario ${p.idUsuario}`,
                     rol: form.roles.find((r) => r.id === p.idRol)?.nombreRol ?? '',

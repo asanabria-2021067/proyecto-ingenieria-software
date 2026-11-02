@@ -29,3 +29,14 @@ export const taskHoursQueryKey = (idProyecto: number, idTarea: number) =>
  */
 export const taskHoursSummaryQueryKey = (idProyecto: number, idTarea: number) =>
   ['task-hours-summary', idProyecto, idTarea] as const;
+
+/** MEJ-10: historial de la tarea (bitácora de la tarea). */
+export const taskHistoryQueryKey = (idProyecto: number, idTarea: number) =>
+  ['task-history', idProyecto, idTarea] as const;
+
+/** MEJ-49 */
+export const taskEvidenceQueryKey = (idProyecto: number, idTarea: number) =>
+  ['task-evidence', idProyecto, idTarea] as const;
+
+/** MEJ-52 */
+export const taskTemplatesQueryKey = (idProyecto: number) => ['task-templates', idProyecto] as const;

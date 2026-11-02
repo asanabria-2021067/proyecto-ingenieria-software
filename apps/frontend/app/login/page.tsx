@@ -216,30 +216,6 @@ export default function LoginPage() {
               </button>
             </form>
 
-            {/* Divider */}
-            <div className="my-8 flex w-full items-center">
-              <div className="h-px flex-1 bg-surface-container-highest" />
-              <span className="px-4 font-label text-[10px] font-bold uppercase tracking-widest text-outline-variant">
-                O continúa con
-              </span>
-              <div className="h-px flex-1 bg-surface-container-highest" />
-            </div>
-
-            {/* Microsoft Login */}
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-surface-container-highest bg-surface-container-lowest py-4 font-headline font-bold text-on-surface shadow-sm transition-all hover:bg-surface-container-low active:scale-[0.98]"
-            >
-              {/* Colores de marca de Microsoft: fijos por identidad visual. */}
-              <svg className="h-5 w-5" viewBox="0 0 21 21" aria-hidden="true">
-                <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-                <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-                <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-                <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-              </svg>
-              <span>Microsoft</span>
-            </button>
-
             <p className="mt-10 text-center text-xs text-tertiary">
               ¿No tienes cuenta?{' '}
               <Link href="/registro" className="font-bold text-primary motion-link">

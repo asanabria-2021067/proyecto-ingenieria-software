@@ -32,6 +32,7 @@ export const NOTIFICATION_GROUP_IDS = [
   'horas',
   'recordatorios',
   'contactos',
+  'organizaciones',
   'cuenta',
   'otras',
 ] as const;
@@ -44,6 +45,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroupId, { titulo: str
   horas: { titulo: 'Horas y reconocimiento', descripcion: 'Validación y acreditación de tus horas.' },
   recordatorios: { titulo: 'Recordatorios y calendario', descripcion: 'Eventos próximos, reuniones de Administración y calendarios compartidos.' },
   contactos: { titulo: 'Red de contactos', descripcion: 'Solicitudes de amistad y seguidores.' },
+  organizaciones: { titulo: 'Organizaciones y asociaciones', descripcion: 'Invitaciones, solicitudes y cambios en organizaciones y juntas de asociación.' },
   cuenta: { titulo: 'Cuenta y seguridad', descripcion: 'Avisos sobre accesos y recuperación de contraseñas.' },
   otras: { titulo: 'Otras notificaciones', descripcion: 'Tipos que la plataforma añadió y aún no tienen una descripción propia.' },
 };
@@ -68,6 +70,8 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   },
   EVIDENCIA_REVISADA: { grupo: 'tareas', etiqueta: 'Evidencia revisada', descripcion: 'Revisan una evidencia que entregaste.' },
   TAREA_POR_VENCER: { grupo: 'tareas', etiqueta: 'Tarea por vencer', descripcion: 'Una tarea tuya está cerca de su fecha límite.' },
+  HITO_ATRASADO: { grupo: 'tareas', etiqueta: 'Hito atrasado', descripcion: 'Un hito de un proyecto que lideras pasó su fecha límite sin completarse.' },
+  TU_SEMANA: { grupo: 'tareas', etiqueta: 'Tu semana', descripcion: 'Cada lunes: tareas por vencer, horas de la semana pasada y postulaciones pendientes.' },
 
   NUEVA_POSTULACION: { grupo: 'postulaciones', etiqueta: 'Nueva postulación', descripcion: 'Alguien se postula a un rol de tu proyecto.' },
   POSTULACION_RESUELTA: { grupo: 'postulaciones', etiqueta: 'Postulación resuelta', descripcion: 'Aceptan o rechazan tu postulación.' },
@@ -81,19 +85,35 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   ROL_ASIGNADO_LIDER: { grupo: 'postulaciones', etiqueta: 'Rol asignado por el líder', descripcion: 'El líder te asigna un rol.' },
   ROL_ACTUALIZADO: { grupo: 'postulaciones', etiqueta: 'Rol actualizado', descripcion: 'Cambia un rol del proyecto.' },
   INVITACION_ORGANIZACION: {
-    grupo: 'postulaciones',
+    grupo: 'organizaciones',
     etiqueta: 'Invitación a una organización',
     descripcion: 'Te invitan a unirte a una organización.',
   },
   SOLICITUD_UNIRSE_ORGANIZACION: {
-    grupo: 'postulaciones',
+    grupo: 'organizaciones',
     etiqueta: 'Solicitud para unirse a una organización',
     descripcion: 'Alguien pide unirse a una organización que administras.',
   },
   ORGANIZACION_ACTUALIZADA: {
-    grupo: 'postulaciones',
+    grupo: 'organizaciones',
     etiqueta: 'Organización actualizada',
     descripcion: 'Cambia tu pertenencia o rol en una organización, o responden a tu invitación.',
+  },
+
+  PROYECTO_NUEVO_PARA_TI: {
+    grupo: 'proyectos',
+    etiqueta: 'Proyecto nuevo para ti',
+    descripcion: 'Se publica un proyecto de tu carrera, de tus intereses o de una organización o asociación que sigues.',
+  },
+  PROYECTO_GUARDADO_AVISO: {
+    grupo: 'proyectos',
+    etiqueta: 'Aviso de un proyecto guardado',
+    descripcion: 'A un proyecto que guardaste le quedan pocos cupos o pasa a solicitud de cierre.',
+  },
+  INVITACION_ROL_PROYECTO: {
+    grupo: 'postulaciones',
+    etiqueta: 'Invitación a un rol',
+    descripcion: 'Un líder te invita a un rol, o responde a tu invitación.',
   },
 
   PROYECTO_PUBLICADO: { grupo: 'proyectos', etiqueta: 'Proyecto publicado', descripcion: 'Se publica un proyecto.' },
@@ -131,17 +151,23 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   HORAS_ACREDITADAS: { grupo: 'horas', etiqueta: 'Horas acreditadas', descripcion: 'Se acreditan tus horas al cerrar un proyecto.' },
   CERTIFICADO_EMITIDO: { grupo: 'horas', etiqueta: 'Certificado emitido', descripcion: 'Se emite un certificado a tu nombre.' },
   INSIGNIA_OBTENIDA: { grupo: 'horas', etiqueta: 'Insignia obtenida', descripcion: 'Subes de nivel en una insignia.' },
+  RECONOCIMIENTO_RECIBIDO: { grupo: 'horas', etiqueta: 'Reconocimiento de un compañero', descripcion: 'Un compañero te reconoce durante un sprint.' },
 
   RECORDATORIO_EVENTO: { grupo: 'recordatorios', etiqueta: 'Recordatorio de evento', descripcion: 'Un evento de tu calendario está por empezar.' },
   CALENDARIO_COMPARTIDO: { grupo: 'recordatorios', etiqueta: 'Calendario compartido', descripcion: 'Alguien comparte su calendario contigo.' },
   // HU-195: reuniones que Administración convoca con el equipo de tus proyectos.
   REUNION_PROGRAMADA: { grupo: 'recordatorios', etiqueta: 'Reunión programada', descripcion: 'Administración convoca a tu equipo a una reunión.' },
   REUNION_ACTUALIZADA: { grupo: 'recordatorios', etiqueta: 'Reunión actualizada', descripcion: 'Cambia la fecha, el lugar o el enlace de una reunión de tu equipo.' },
+  RECORDATORIO_MENSAJE: { grupo: 'recordatorios', etiqueta: 'Recordatorio de un mensaje', descripcion: 'Un mensaje que pediste que te recordáramos.' },
+  HORAS_EN_RIESGO: { grupo: 'horas', etiqueta: 'Horas en riesgo', descripcion: 'Tu avance de horas del semestre va por debajo de lo esperado (máximo un aviso por semana).' },
+  RECORDATORIO_HORAS: { grupo: 'recordatorios', etiqueta: 'Recordatorio de registrar horas', descripcion: 'Tienes tareas en progreso sin horas registradas en 3 días.' },
   REUNION_CANCELADA: { grupo: 'recordatorios', etiqueta: 'Reunión cancelada', descripcion: 'Administración cancela una reunión de tu equipo.' },
 
   SOLICITUD_AMISTAD: { grupo: 'contactos', etiqueta: 'Solicitud de amistad', descripcion: 'Recibes una solicitud de amistad.' },
   AMISTAD_ACEPTADA: { grupo: 'contactos', etiqueta: 'Amistad aceptada', descripcion: 'Aceptan tu solicitud de amistad.' },
   NUEVO_SEGUIDOR: { grupo: 'contactos', etiqueta: 'Nuevo seguidor', descripcion: 'Alguien empieza a seguirte.' },
+  // MEJ-44: llega aunque la conversacion este silenciada; solo esta preferencia la apaga.
+  MENCION_CHAT: { grupo: 'contactos', etiqueta: 'Menciones en conversaciones', descripcion: 'Alguien te menciona con @ en una conversación de proyecto, aunque esté silenciada.' },
 
   SOLICITUD_RECUPERACION_CONTRASENA: {
     grupo: 'cuenta',
@@ -156,7 +182,7 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   CUENTA_VERIFICADA: { grupo: 'cuenta', etiqueta: 'Cuenta verificada', descripcion: 'Administración verifica tu cuenta.' },
   ALERTA_SEGURIDAD: { grupo: 'cuenta', etiqueta: 'Alerta de seguridad', descripcion: 'La plataforma detecta actividad inusual de acceso.' },
   JUNTA_ASOCIACION: {
-    grupo: 'cuenta',
+    grupo: 'organizaciones',
     etiqueta: 'Junta de asociación',
     descripcion: 'Administración te nombra, cambia o quita de la junta de una asociación.',
   },

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, Trash2, UserMinus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Trash2, UserMinus, X } from 'lucide-react';
 import {
   Dialog,
   DialogClose,
@@ -15,9 +15,15 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
+import { FormStepper } from '@/components/ui/form-stepper';
+import { DraftNotice } from '@/components/ui/draft-notice';
+import { useFormDraft } from '@/hooks/use-form-draft';
 import { TaskFormFields } from '@/components/projects/task-form-fields';
+import { TaskFormExtras } from '@/components/projects/task-form-extras';
+import { extrasIniciales, extrasParaCrear, extrasParaEditar, type TaskExtrasValue } from '@/lib/tasks/extras';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { toast } from 'sonner';
+import type { FieldErrors } from 'react-hook-form';
 import {
   SIN_ASIGNAR,
   buildCreatePayload,
@@ -57,6 +63,11 @@ export interface TaskFormDialogProps {
   open: boolean;
   mode: 'create' | 'edit';
   task: TareaPublicaDTO | null;
+  /**
+   * Proyecto de la tarea: el borrador de «Nueva tarea» es por proyecto y habilita plantilla,
+   * «Bloqueada por» y «Repetir» (MEJ-48/47/52). Sin él el formulario queda como antes.
+   */
+  idProyecto?: number;
   roles: RolOpcion[];
   milestones: HitoOpcion[];
   members: MiembroProyecto[];
@@ -76,6 +87,14 @@ export interface TaskFormDialogProps {
    */
   onManageLabels?: () => void;
 }
+
+const PASOS_CREACION = ['Información básica', 'Planificación', 'Asignación y etiquetas'];
+
+const CAMPOS_POR_PASO: (keyof TaskFormValues)[][] = [
+  ['tituloTarea', 'descripcionTarea'],
+  ['prioridad', 'fechaLimite', 'tiempoEstimadoHoras', 'puntosHistoria', 'idHito'],
+  ['idRolProyecto', 'idUsuarioAsignado', 'idsEtiquetas'],
+];
 
 function stepLabel(step: TaskEditStep): string {
   if (step.kind === 'unassign') return 'Desasignar al usuario anterior';
@@ -112,6 +131,7 @@ export function TaskFormDialog(props: TaskFormDialogProps) {
 function TaskFormDialogContent({
   mode,
   task,
+  idProyecto,
   roles,
   milestones,
   members,
@@ -137,14 +157,52 @@ function TaskFormDialogContent({
     [task, members, mode],
   );
 
+  const valoresBase = useMemo(() => defaultTaskFormValues(task), [task]);
+
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: defaultTaskFormValues(task),
+    defaultValues: valoresBase,
   });
+
+  const porPasos = mode === 'create';
+  const [paso, setPaso] = useState<0 | 1 | 2>(0);
+
+  const borrador = useFormDraft<Partial<TaskFormValues>>({
+    clave:
+      mode === 'create'
+        ? idProyecto === undefined ? null : `tarea-nueva-${idProyecto}`
+        : task ? `tarea-${task.idTarea}` : null,
+    // Solo lo que cambió el usuario: lo que otro miembro cambie en el servidor no se pisa al restaurar.
+    valor: Object.fromEntries(
+      Object.entries(form.watch()).filter(
+        ([k, v]) => JSON.stringify(v) !== JSON.stringify(valoresBase[k as keyof TaskFormValues]),
+      ),
+    ) as Partial<TaskFormValues>,
+    alRestaurar: (cambios) => form.reset({ ...valoresBase, ...cambios }),
+    alDescartar: () => {
+      form.reset(valoresBase);
+      setPaso(0);
+    },
+  });
+
+  const siguiente = async () => {
+    if (await form.trigger(CAMPOS_POR_PASO[paso])) setPaso((p) => (p < 2 ? ((p + 1) as 1 | 2) : p));
+  };
+
+  // Si el envío falla por un campo de otro paso, se muestra ese paso y se enfoca el campo.
+  const onInvalid = (errores: FieldErrors<TaskFormValues>) => {
+    if (!porPasos) return;
+    const campo = Object.keys(errores)[0] as keyof TaskFormValues | undefined;
+    const destino = CAMPOS_POR_PASO.findIndex((c) => campo && c.includes(campo));
+    if (destino < 0) return;
+    setPaso(destino as 0 | 1 | 2);
+    if (campo) setTimeout(() => form.setFocus(campo), 0);
+  };
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [progreso, setProgreso] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [extras, setExtras] = useState<TaskExtrasValue>(() => extrasIniciales(task));
 
   const asignadoActual = form.watch('idUsuarioAsignado');
   // "Desasignar" (Sección 42): solo cuando la tarea tiene una asignación activa
@@ -164,7 +222,8 @@ function TaskFormDialogContent({
 
     try {
       if (mode === 'create') {
-        await crearTarea.mutateAsync(buildCreatePayload(values));
+        await crearTarea.mutateAsync({ ...buildCreatePayload(values), ...extrasParaCrear(extras) });
+        borrador.limpiar();
         mostrarAvisoTareaGuardada('create');
         onOpenChange(false);
         return;
@@ -173,7 +232,9 @@ function TaskFormDialogContent({
       if (!task) return;
 
       const steps = planTaskEditSteps(task, values);
-      if (steps.length === 0) {
+      const cambiosExtras = idProyecto !== undefined ? extrasParaEditar(task, extras) : null;
+      if (steps.length === 0 && !cambiosExtras) {
+        borrador.limpiar();
         onOpenChange(false);
         return;
       }
@@ -199,6 +260,18 @@ function TaskFormDialogContent({
         }
       }
 
+      if (cambiosExtras) {
+        setProgreso('Guardar dependencia y repetición');
+        try {
+          await editarTarea.mutateAsync({ taskId: task.idTarea, input: cambiosExtras });
+        } catch (error) {
+          const prefijo = steps.length > 0 ? 'Los cambios anteriores se guardaron correctamente. ' : '';
+          setSubmitError(`${prefijo}No se pudo guardar la dependencia o la repetición. ${getApiErrorMessage(error, 'task')}`);
+          return;
+        }
+      }
+
+      borrador.limpiar();
       mostrarAvisoTareaGuardada('edit');
       onOpenChange(false);
     } catch (error) {
@@ -214,7 +287,7 @@ function TaskFormDialogContent({
 
   return (
     <Form {...form}>
-      <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="flex max-h-[90vh] min-h-0 flex-col">
+      <form noValidate onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="flex max-h-[90vh] min-h-0 flex-col">
         <DialogHeader className="relative shrink-0 space-y-1 border-b border-outline-variant/40 px-6 py-4 text-left">
           <DialogTitle className="text-xl font-bold text-on-surface">
             {mode === 'create' ? 'Crear nueva tarea' : 'Editar tarea'}
@@ -232,8 +305,19 @@ function TaskFormDialogContent({
           </DialogClose>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        {porPasos && (
+          <FormStepper
+            pasos={PASOS_CREACION}
+            actual={paso}
+            onSeleccionar={(i) => setPaso(i as 0 | 1 | 2)}
+            className="shrink-0 px-6 pt-3"
+          />
+        )}
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+          {borrador.restaurado && <DraftNotice onDescartar={borrador.descartar} />}
           <TaskFormFields
+            paso={porPasos ? paso : undefined}
             roles={roles}
             milestones={milestones}
             members={members}
@@ -242,6 +326,16 @@ function TaskFormDialogContent({
             mode={mode}
             hitoOriginal={task?.idHito ?? null}
           />
+
+          {idProyecto !== undefined && (
+            <TaskFormExtras
+              idProyecto={idProyecto}
+              mode={mode}
+              idTareaActual={task?.idTarea ?? null}
+              value={extras}
+              onChange={setExtras}
+            />
+          )}
 
           {progreso && (
             <p role="status" className="mt-4 text-xs text-tertiary">
@@ -303,7 +397,31 @@ function TaskFormDialogContent({
             >
               Cancelar
             </Button>
+            {porPasos && paso > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={isRunning}
+                onClick={() => setPaso((p) => (p - 1) as 0 | 1)}
+                className="h-10 gap-1.5"
+              >
+                <ChevronLeft className="size-4" aria-hidden="true" />
+                Anterior
+              </Button>
+            )}
+            {porPasos && paso < 2 ? (
+              <Button
+                key="siguiente"
+                type="button"
+                onClick={() => void siguiente()}
+                className="h-10 gap-1.5 rounded-md bg-primary font-bold text-on-primary hover:bg-primary/90"
+              >
+                Siguiente
+                <ChevronRight className="size-4" aria-hidden="true" />
+              </Button>
+            ) : (
             <Button
+              key="enviar"
               type="submit"
               disabled={isRunning}
               aria-label={mode === 'create' ? 'Crear tarea' : 'Guardar cambios de la tarea'}
@@ -318,6 +436,7 @@ function TaskFormDialogContent({
                   ? 'Crear tarea'
                   : 'Guardar cambios'}
             </Button>
+            )}
           </div>
         </DialogFooter>
       </form>

@@ -38,17 +38,21 @@ afterEach(() => {
 });
 
 const FAMILIAS = [
-  // HU-200: + MENCION_COMENTARIO.
-  ['Tareas e hitos', 8],
-  // ORG-1: + INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA.
-  ['Postulaciones y equipo', 10],
-  ['Proyectos', 17],
-  ['Horas y reconocimiento', 5],
-  // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA.
-  ['Recordatorios y calendario', 5],
-  ['Red de contactos', 3],
-  // ASO-1: + JUNTA_ASOCIACION.
-  ['Cuenta y seguridad', 6],
+  // HU-200: + MENCION_COMENTARIO. MEJ-54: + HITO_ATRASADO. MEJ-31: + TU_SEMANA.
+  ['Tareas e hitos', 10],
+  // MEJ-22: + INVITACION_ROL_PROYECTO.
+  ['Postulaciones y equipo', 8],
+  // MEJ-16/17: + PROYECTO_NUEVO_PARA_TI, PROYECTO_GUARDADO_AVISO.
+  ['Proyectos', 19],
+  // MEJ-57: + RECONOCIMIENTO_RECIBIDO. MEJ-13: + HORAS_EN_RIESGO.
+  ['Horas y reconocimiento', 7],
+  // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA. MEJ-46: + RECORDATORIO_MENSAJE. MEJ-60: + RECORDATORIO_HORAS.
+  ['Recordatorios y calendario', 7],
+  // MEJ-44: + MENCION_CHAT.
+  ['Red de contactos', 4],
+  // ORG-1 y ASO-1: INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA, JUNTA_ASOCIACION.
+  ['Organizaciones y asociaciones', 4],
+  ['Cuenta y seguridad', 5],
 ] as const;
 
 const familia = (titulo: string) => screen.getByRole('button', { name: new RegExp(`^${titulo}`) });
@@ -60,7 +64,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     await screen.findByRole('button', { name: /^Tareas e hitos/ });
   }
 
-  it('muestra las siete familias cerradas, con su descripción y su contador', async () => {
+  it('muestra las ocho familias cerradas, con su descripción y su contador', async () => {
     await montarCerrada(['TAREA_ASIGNADA', 'NUEVO_SEGUIDOR']);
     for (const [titulo, total] of FAMILIAS) {
       const activas = titulo === 'Tareas e hitos' || titulo === 'Red de contactos' ? total - 1 : total;
@@ -71,7 +75,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     expect(screen.queryAllByRole('switch')).toHaveLength(0);
   });
 
-  it('las siete familias reúnen todas las preferencias del backend, sin perder ni repetir ninguna', async () => {
+  it('las ocho familias reúnen todas las preferencias del backend, sin perder ni repetir ninguna', async () => {
     await montarCerrada();
     const total = FAMILIAS.reduce((suma, [, n]) => suma + n, 0);
     expect(total).toBe(preferencias().length);
@@ -87,11 +91,11 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     fireEvent.click(familia('Horas y reconocimiento'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'true');
     expect(familia('Horas y reconocimiento')).toHaveAttribute('aria-expanded', 'true');
-    expect(within(screen.getByRole('region', { name: 'Red de contactos' })).getAllByRole('switch')).toHaveLength(3);
+    expect(within(screen.getByRole('region', { name: 'Red de contactos' })).getAllByRole('switch')).toHaveLength(4);
 
     fireEvent.click(familia('Red de contactos'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getAllByRole('switch')).toHaveLength(5);
+    expect(screen.getAllByRole('switch')).toHaveLength(7);
   });
 
   it('el disparador es un botón dentro de un encabezado: se alcanza y se acciona con teclado', async () => {
@@ -124,12 +128,12 @@ describe('Configuración: preferencias en acordeones por familia', () => {
 
     fireEvent.click(screen.getByRole('switch', { name: 'Nuevo seguidor' }));
     expect(updateNotificationPreference).toHaveBeenCalledWith('NUEVO_SEGUIDOR', false);
-    expect(familia('Red de contactos')).toHaveTextContent('3 de 3 activas');
+    expect(familia('Red de contactos')).toHaveTextContent('4 de 4 activas');
 
     guardado.resolver(preferencias(['NUEVO_SEGUIDOR']));
-    await waitFor(() => expect(familia('Red de contactos')).toHaveTextContent('2 de 3 activas'));
+    await waitFor(() => expect(familia('Red de contactos')).toHaveTextContent('3 de 4 activas'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'true');
-    expect(familia('Tareas e hitos')).toHaveTextContent('8 de 8 activas');
+    expect(familia('Tareas e hitos')).toHaveTextContent('10 de 10 activas');
   });
 
   it('si el guardado falla, el contador no se mueve', async () => {
@@ -138,7 +142,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     vi.mocked(updateNotificationPreference).mockRejectedValue(Object.assign(new Error('falló'), { statusCode: 500 }));
     fireEvent.click(screen.getByRole('switch', { name: 'Nuevo seguidor' }));
     await screen.findByRole('alert');
-    expect(familia('Red de contactos')).toHaveTextContent('3 de 3 activas');
+    expect(familia('Red de contactos')).toHaveTextContent('4 de 4 activas');
   });
 
   it('la vista solo contiene las preferencias de notificación', () => {

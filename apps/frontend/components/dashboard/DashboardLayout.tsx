@@ -52,6 +52,8 @@ import logo from '@/public/logo.png';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { FontScaleToggle } from '@/components/font-scale-toggle';
 import { ShellSkeleton } from '@/components/layout/shell-skeleton';
+import { DashboardBreadcrumbs } from '@/components/layout/dashboard-breadcrumbs';
+import { DashboardExtras } from '@/components/layout/dashboard-extras';
 
 // T-293: la guía solo se muestra a quien entra por primera vez, pero react-joyride viajaba en el
 // JS inicial de todas las rutas del estudiante. Se carga aparte; no pinta nada hasta arrancar.
@@ -356,6 +358,7 @@ export default function DashboardLayout({
 
         {/* Scrollable page body */}
         <div className="min-h-0 flex-1 overflow-auto overscroll-contain pb-32 md:pb-0">
+          <DashboardBreadcrumbs />
           {children}
         </div>
       </main>
@@ -387,6 +390,7 @@ export default function DashboardLayout({
 
       <OnboardingTour />
       <ChatDock />
+      <DashboardExtras destinos={entries.flatMap((e) => (e.type === 'group' ? e.items : [e]))} />
     </div>
     </ChatSocketProvider>
     </ChatDockProvider>

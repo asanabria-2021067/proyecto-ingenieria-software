@@ -46,8 +46,14 @@ test('el autor edita y elimina su mensaje y el otro participante lo ve en vivo',
     await expect(pageA.locator('main section').getByText(original)).toBeVisible();
     await expect(pageB.locator('main section').getByText(original)).toBeVisible();
 
-    // B no ve acciones sobre un mensaje ajeno.
-    await expect(pageB.getByRole('button', { name: 'Acciones del mensaje' })).toHaveCount(0);
+    // B no puede editar ni eliminar un mensaje ajeno. Desde MEJ-44/46 el menu existe para todos
+    // (Recuerdamelo, crear tarea), asi que se comprueba que no ofrece Editar ni Eliminar.
+    await pageB.locator('main section').getByText(original).hover();
+    await pageB.getByRole('button', { name: 'Acciones del mensaje' }).last().click();
+    await expect(pageB.getByRole('menuitem').first()).toBeVisible();
+    await expect(pageB.getByRole('menuitem', { name: 'Editar' })).toHaveCount(0);
+    await expect(pageB.getByRole('menuitem', { name: 'Eliminar' })).toHaveCount(0);
+    await pageB.keyboard.press('Escape');
 
     // A edita con Enter.
     await pageA.locator('main section').getByText(original).hover();

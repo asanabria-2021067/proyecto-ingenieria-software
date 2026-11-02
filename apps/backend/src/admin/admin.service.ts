@@ -21,6 +21,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MailService } from '../mail/mail.service';
+import { correoCuentaAprobada, correoRecuperacion, urlApp } from '../mail/mail-templates';
 import { ADMIN_ACTIVE_PROJECT_STATES } from '../common/project-policy/admin-active-project-states';
 import { SecurityEventsService } from '../security-events/security-events.service';
 import { TipoEventoSeguridad } from '../security-events/tipos-evento-seguridad';
@@ -42,6 +44,7 @@ export class AdminService {
     // G07: EventEmitter global de la app; ausente en instancias manuales (tests).
     @Optional() private readonly events?: EventEmitter2,
     @Optional() private readonly notifications?: NotificationsService,
+    @Optional() private readonly mail?: MailService,
   ) {}
 
   // ─── Guards ──────────────────────────────────────────────────────────────────
@@ -777,8 +780,47 @@ export class AdminService {
     await this.notifications?.notifyFromTemplate([cuenta.idUsuario], 'CUENTA_VERIFICADA', {
       userName: cuenta.nombre,
     });
+    const correo = correoCuentaAprobada(cuenta.nombre, urlApp('/login'));
+    await this.mail?.enviar(cuenta.correo, correo.asunto, correo.texto);
 
     return cuenta;
+  }
+
+  /** Aprueba varias cuentas; las que ya no estan pendientes se informan como omitidas sin frenar el resto. */
+  async aprobarCuentasLote(callerId: number, ids: number[], origen?: SecurityRequestContext) {
+    await this.requireAdmin(callerId);
+    const aprobadas: number[] = [];
+    const omitidas: { idUsuario: number; motivo: string }[] = [];
+    for (const id of ids) {
+      try {
+        await this.aprobarCuentaPendiente(callerId, id, origen);
+        aprobadas.push(id);
+      } catch (error) {
+        if (!(error instanceof ConflictException || error instanceof NotFoundException)) throw error;
+        omitidas.push({ idUsuario: id, motivo: error.message });
+      }
+    }
+    return { aprobadas, omitidas };
+  }
+
+  /** MEJ-69: todo lo que espera una decision del administrador, con su contador. */
+  async getPendientes(callerId: number) {
+    await this.requireAdmin(callerId);
+    const [cuentas, revisiones, cierres, recuperaciones, apelaciones] = await Promise.all([
+      this.prisma.usuario.count({ where: { estado: EstadoUsuario.PENDIENTE_VERIFICACION } }),
+      this.prisma.proyecto.count({ where: { estadoProyecto: EstadoProyecto.EN_REVISION, eliminadoEn: null } }),
+      this.prisma.proyecto.count({ where: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE, eliminadoEn: null } }),
+      this.prisma.solicitudRecuperacion.count({ where: { estado: EstadoSolicitudRecuperacion.PENDIENTE } }),
+      this.prisma.apelacionLiderazgo.count({ where: { estadoApelacion: 'PENDIENTE' } }),
+    ]);
+    const items = [
+      { clave: 'cuentas', total: cuentas },
+      { clave: 'revisiones', total: revisiones },
+      { clave: 'cierres', total: cierres },
+      { clave: 'recuperaciones', total: recuperaciones },
+      { clave: 'apelaciones', total: apelaciones },
+    ];
+    return { total: items.reduce((suma, i) => suma + i.total, 0), items };
   }
 
   async rechazarCuentaPendiente(callerId: number, targetId: number, origen?: SecurityRequestContext) {
@@ -913,6 +955,9 @@ export class AdminService {
       idUsuarioAfectado: solicitud.usuario.idUsuario,
       detalle: { idSolicitud, expiraEn },
     });
+
+    const correo = correoRecuperacion(resetUrl);
+    await this.mail?.enviar(solicitud.usuario.correo, correo.asunto, correo.texto);
 
     return { resetUrl, resetToken, expiraEn };
   }

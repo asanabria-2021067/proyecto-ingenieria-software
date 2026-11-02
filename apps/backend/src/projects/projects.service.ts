@@ -18,7 +18,8 @@ import {
   EstadoProyectoCreador,
   TRANSICIONES_PERMITIDAS,
 } from './dto/update-estado-proyecto.dto';
-import { EstadoHito, EstadoProyecto, EstadoSprint, ModalidadProyecto, Prisma, TipoProyecto } from '@prisma/client';
+import { EstadoHito, EstadoProyecto, EstadoSprint, ModalidadProyecto, NivelHabilidad, Prisma, TipoProyecto } from '@prisma/client';
+import { calcularCoincidencia } from '../common/coincidencia-habilidades';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SocialService } from '../social/social.service';
 import { calcularProgresoHito } from '../common/hito-progreso';
@@ -35,8 +36,10 @@ import {
   ESTADOS_EDITABLES,
   ESTADOS_EDITABLE_PARCIAL,
   ESTADOS_VISIBLES,
+  avanceParaTarjeta,
   calcularAvanceProyecto,
   conCuposDisponibles,
+  sprintActivoSelect,
   proyectoDetalleAnonimoSelect,
   proyectoDetallePublicoSelect,
   proyectoDetalleSelect,
@@ -109,8 +112,9 @@ export class ProjectsService {
     modalidad?: string;
     organizacionId?: number;
     habilidadId?: number;
+    duenio?: string;
   }): Prisma.ProyectoWhereInput[] {
-    const { q, tipoProyecto, modalidad, organizacionId, habilidadId } = filters;
+    const { q, tipoProyecto, modalidad, organizacionId, habilidadId, duenio } = filters;
     const andConditions: Prisma.ProyectoWhereInput[] = [
       { estadoProyecto: { in: ESTADOS_VISIBLES } },
       { eliminadoEn: null },
@@ -127,6 +131,10 @@ export class ProjectsService {
     if (organizacionId) {
       andConditions.push({ organizaciones: { some: { idOrganizacion: organizacionId } } });
     }
+    // MEJ-19: dueño personal, de una organización o de una asociación; un valor desconocido se ignora.
+    if (duenio === 'ORGANIZACION') andConditions.push({ organizaciones: { some: {} } });
+    else if (duenio === 'ASOCIACION') andConditions.push({ idAsociacion: { not: null } });
+    else if (duenio === 'PERSONAL') andConditions.push({ organizaciones: { none: {} }, idAsociacion: null });
     if (habilidadId) {
       andConditions.push({
         roles: { some: { requisitos: { some: { idHabilidad: habilidadId } } } },
@@ -159,6 +167,7 @@ export class ProjectsService {
       modalidad?: string;
       organizacionId?: number;
       habilidadId?: number;
+      duenio?: string;
     } = {},
     userId?: number,
   ) {
@@ -206,6 +215,7 @@ export class ProjectsService {
     modalidad?: string;
     organizacionId?: number;
     habilidadId?: number;
+    duenio?: string;
     page: number;
     limit: number;
   }) {
@@ -230,6 +240,98 @@ export class ProjectsService {
       page,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  /** MEJ-15: ver `ProjectsAffinityService.paraTi`. Respeta los mismos filtros de dueño que el catálogo. */
+  async paraTi(userId: number, duenio?: string) {
+    return this.affinity.paraTi(userId, this._buildListConditions({ duenio }));
+  }
+
+  /**
+   * MEJ-20: copia el proyecto PROPIO como borrador nuevo (descripción, intereses, roles con sus
+   * requisitos e hitos). No copia integrantes, postulaciones, tareas, sprints ni fechas, y la
+   * copia sale personal: se vincula a la misma organización/asociación solo si el líder todavía
+   * puede publicar a su nombre (así duplicar nunca otorga un permiso que ya se perdió).
+   */
+  async duplicar(id: number, userId: number) {
+    const origen = await this._requireOwner(id, userId);
+    const fuente = await this.prisma.proyecto.findUniqueOrThrow({
+      where: { idProyecto: origen.idProyecto },
+      select: {
+        tituloProyecto: true,
+        descripcionProyecto: true,
+        objetivosProyecto: true,
+        tipoProyecto: true,
+        modalidadProyecto: true,
+        ubicacionProyecto: true,
+        contextoAcademico: true,
+        urlRecursoExterno: true,
+        idAsociacion: true,
+        organizaciones: { select: { idOrganizacion: true, rolOrganizacion: true } },
+        intereses: { select: { idInteres: true } },
+        hitos: { select: { tituloHito: true, descripcionHito: true, orden: true }, orderBy: { orden: 'asc' } },
+        roles: {
+          select: {
+            nombreRol: true,
+            descripcionRolProyecto: true,
+            idCarreraRequerida: true,
+            cupos: true,
+            horasSemanalesEstimadas: true,
+            requisitos: { select: { idHabilidad: true, nivelMinimo: true, obligatorio: true } },
+          },
+          orderBy: { idRolProyecto: 'asc' },
+        },
+      },
+    });
+
+    return this.projectTx.run(
+      null,
+      userId,
+      'projects.duplicar',
+      async ({ tx }) => {
+        const organizaciones = [];
+        for (const o of fuente.organizaciones) {
+          try {
+            await assertPuedePublicar(tx, userId, [o.idOrganizacion]);
+            organizaciones.push(o);
+          } catch (error) {
+            if (!(error instanceof ForbiddenException)) throw error;
+          }
+        }
+        let idAsociacion: number | null = null;
+        if (fuente.idAsociacion != null) {
+          try {
+            await assertPuedePublicarComoAsociacion(tx, fuente.idAsociacion, userId);
+            idAsociacion = fuente.idAsociacion;
+          } catch (error) {
+            if (!(error instanceof ForbiddenException)) throw error;
+          }
+        }
+        return tx.proyecto.create({
+          data: {
+            tituloProyecto: `${fuente.tituloProyecto} (copia)`.slice(0, 200),
+            descripcionProyecto: fuente.descripcionProyecto,
+            objetivosProyecto: fuente.objetivosProyecto,
+            tipoProyecto: fuente.tipoProyecto,
+            modalidadProyecto: fuente.modalidadProyecto,
+            ubicacionProyecto: fuente.ubicacionProyecto,
+            contextoAcademico: fuente.contextoAcademico,
+            urlRecursoExterno: fuente.urlRecursoExterno,
+            estadoProyecto: EstadoProyecto.BORRADOR,
+            creadoPor: userId,
+            idAsociacion,
+            organizaciones: { create: organizaciones },
+            intereses: { create: fuente.intereses },
+            hitos: { create: fuente.hitos },
+            roles: {
+              create: fuente.roles.map(({ requisitos, ...rol }) => ({ ...rol, requisitos: { create: requisitos } })),
+            },
+          },
+          select: { idProyecto: true, tituloProyecto: true, estadoProyecto: true },
+        });
+      },
+      { createsProject: true },
+    );
   }
 
   async findOne(id: number, conSesion: boolean) {
@@ -362,6 +464,7 @@ export class ProjectsService {
         // soft delete no debe contarse en avanceProyecto.
         tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true, idHito: true } },
         hitos: { select: { idHito: true } },
+        sprints: sprintActivoSelect,
         revisiones: {
           select: {
             idRevisionProyecto: true,
@@ -393,10 +496,15 @@ export class ProjectsService {
         roles: proyecto.roles.map((rol) => ({ idRolProyecto: rol.idRolProyecto })),
         tareas: undefined,
         hitos: undefined,
+        sprints: undefined,
         cantidadPostulaciones,
         rolesCubiertos,
         rolesTotales: proyecto.roles.length,
-        avanceProyecto: calcularAvanceProyecto(proyecto.tareas ?? [], proyecto.hitos ?? []),
+        ...avanceParaTarjeta({
+          tareas: proyecto.tareas ?? [],
+          hitos: proyecto.hitos ?? [],
+          sprints: proyecto.sprints ?? [],
+        }),
       };
     });
   }
@@ -422,7 +530,22 @@ export class ProjectsService {
       },
       orderBy: { fechaCreacion: 'desc' },
     });
-    return proyectos.map(conCuposDisponibles);
+
+    // MEJ-25: el avance solo se expone donde ya se podia ver (getAvance): a participantes ACTIVOS.
+    const activos = await this.prisma.proyecto.findMany({
+      where: {
+        idProyecto: { in: proyectos.map((p) => p.idProyecto) },
+        roles: { some: { participaciones: { some: { idUsuario: userId, estadoParticipacion: 'ACTIVO' } } } },
+      },
+      select: {
+        idProyecto: true,
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true, idHito: true } },
+        hitos: { select: { idHito: true } },
+        sprints: sprintActivoSelect,
+      },
+    });
+    const avances = new Map(activos.map((p) => [p.idProyecto, avanceParaTarjeta(p)]));
+    return proyectos.map((p) => ({ ...conCuposDisponibles(p), ...(avances.get(p.idProyecto) ?? {}) }));
   }
 
   async findFeatured() {
@@ -467,7 +590,7 @@ export class ProjectsService {
       async ({ tx, effects }) => {
       if (rest.idAsociacion != null) await assertPuedePublicarComoAsociacion(tx, rest.idAsociacion, creadoPor);
       await assertPuedePublicar(tx, creadoPor, idsOrganizacion);
-      await validarParticipantes(tx, creadoPor, idOrganizacion, participantes ?? [], roles ?? []);
+      await validarParticipantes(tx, creadoPor, idOrganizacion, participantes ?? [], roles ?? [], rest.idAsociacion);
       const proyecto = await tx.proyecto.create({
         data: {
           ...rest,
@@ -980,11 +1103,16 @@ export class ProjectsService {
     }
   }
 
-  async findPostulacionesByProject(idProyecto: number, userId: number) {
+  /**
+   * MEJ-21: cada postulación trae `coincidencia` (% de los requisitos de habilidad del rol que el
+   * postulante cumple; `null` si el rol no pide ninguna). Con `orden = 'coincidencia'` van primero
+   * las de mayor %, y a igual % la más reciente; sin él, la más reciente primero como siempre.
+   */
+  async findPostulacionesByProject(idProyecto: number, userId: number, orden?: string) {
     await this.readPolicy.assertRead(undefined, { projectId: idProyecto, actorId: userId, scope: 'equipo' });
     await this._requireOwner(idProyecto, userId);
 
-    return this.prisma.postulacion.findMany({
+    const postulaciones = await this.prisma.postulacion.findMany({
       where: {
         rolProyecto: { idProyecto },
       },
@@ -1001,11 +1129,33 @@ export class ProjectsService {
           select: {
             idRolProyecto: true,
             nombreRol: true,
+            requisitos: { select: { idHabilidad: true, nivelMinimo: true, obligatorio: true } },
           },
         },
       },
       orderBy: { fechaPostulacion: 'desc' },
     });
+
+    const habilidades = await this.prisma.usuarioHabilidad.findMany({
+      where: { idUsuario: { in: [...new Set(postulaciones.map((p) => p.idUsuarioPostulante))] } },
+      select: { idUsuario: true, idHabilidad: true, nivelHabilidad: true },
+    });
+    const porUsuario = new Map<number, Map<number, NivelHabilidad>>();
+    for (const h of habilidades) {
+      const mapa = porUsuario.get(h.idUsuario) ?? new Map<number, NivelHabilidad>();
+      mapa.set(h.idHabilidad, h.nivelHabilidad);
+      porUsuario.set(h.idUsuario, mapa);
+    }
+    const conCoincidencia = postulaciones.map(({ rolProyecto: { requisitos, ...rol }, ...p }) => ({
+      ...p,
+      rolProyecto: rol,
+      coincidencia: calcularCoincidencia(requisitos, porUsuario.get(p.idUsuarioPostulante) ?? new Map()),
+    }));
+    if (orden === 'coincidencia') {
+      // Array.sort es estable: a igual % se conserva el orden por fecha de la consulta.
+      conCoincidencia.sort((a, b) => (b.coincidencia?.porcentaje ?? -1) - (a.coincidencia?.porcentaje ?? -1));
+    }
+    return conCoincidencia;
   }
 
   /**

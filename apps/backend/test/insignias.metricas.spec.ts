@@ -9,6 +9,7 @@ function makeDb(overrides: { suma?: unknown } = {}) {
     postulacion: { count: vi.fn().mockResolvedValue(4) },
     comentario: { count: vi.fn().mockResolvedValue(5) },
     sprint: { count: vi.fn().mockResolvedValue(2) },
+    reconocimientoCompanero: { count: vi.fn().mockResolvedValue(6) },
   };
 }
 type Db = Parameters<typeof calcularMetrica>[0];
@@ -43,6 +44,12 @@ describe('métricas de insignias (HU-190)', () => {
     ['25.00', 25],
   ])('horas: %s se redondea hacia abajo a %i', async (suma, esperado) => {
     expect(await run(makeDb({ suma }), 'horas')).toBe(esperado);
+  });
+
+  it('companerismo: reconocimientos recibidos de compañeros', async () => {
+    const db = makeDb();
+    expect(await run(db, 'companerismo')).toBe(6);
+    expect(db.reconocimientoCompanero.count).toHaveBeenCalledWith({ where: { idReceptor: 9 } });
   });
 
   it('cerrados: CERRADO, participación ACTIVO o COMPLETADO, sin contar al creador', async () => {

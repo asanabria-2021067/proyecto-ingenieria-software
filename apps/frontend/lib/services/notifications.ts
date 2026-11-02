@@ -85,8 +85,18 @@ export function getConteoNoLeidas(): Promise<ConteoNoLeidas> {
   return apiFetch<ConteoNoLeidas>('/notificaciones/mias/conteo-no-leidas');
 }
 
-export function marcarLeida(id: number): Promise<Notificacion> {
-  return apiFetch<Notificacion>(`/notificaciones/${id}/leer`, { method: 'PATCH' });
+/**
+ * MEJ-30: al leer un aviso de mensaje de revisión se acusan también los mensajes del canal del
+ * proyecto (PATCH /mensajes-revision/proyectos/:id/marcar-leidos). Es un acuse accesorio: si falla
+ * (canal cerrado, sin acceso) el aviso queda leído igual.
+ */
+export async function marcarLeida(id: number): Promise<Notificacion> {
+  const leida = await apiFetch<Notificacion>(`/notificaciones/${id}/leer`, { method: 'PATCH' });
+  const idProyecto = idUsuarioSeguro(leida.datosJson?.idProyecto);
+  if (leida.tipoNotificacion === 'MENSAJE_REVISION' && idProyecto !== null) {
+    await apiFetch(`/mensajes-revision/proyectos/${idProyecto}/marcar-leidos`, { method: 'PATCH' }).catch(() => undefined);
+  }
+  return leida;
 }
 
 /** Sin filtros marca todas las propias; con ellos, exactamente lo que la lista filtrada muestra. */
@@ -164,6 +174,8 @@ export function getNotificationLink(n: {
         : null;
     case 'POSTULACION_RESUELTA':
       return '/dashboard/mis-postulaciones';
+    case 'TU_SEMANA':
+      return '/dashboard/mis-tareas';
     // ORG: la invitación se responde desde el listado (la organización puede ser privada y aún no ser visible).
     case 'INVITACION_ORGANIZACION':
       return '/dashboard/organizaciones';
@@ -172,6 +184,39 @@ export function getNotificationLink(n: {
       const id = Number(datos.organizationId);
       return Number.isInteger(id) && id > 0 ? `/dashboard/organizaciones/${id}` : '/dashboard/organizaciones';
     }
+    // MEJ-44/46: abre la conversacion y salta al mensaje; los ids se validan como enteros positivos.
+    case 'MENCION_CHAT':
+    case 'RECORDATORIO_MENSAJE': {
+      const conversacion = Number(datos.idConversacion);
+      const mensaje = Number(datos.idMensaje);
+      if (!Number.isInteger(conversacion) || conversacion <= 0) return null;
+      return `/dashboard/mensajes/${conversacion}${Number.isInteger(mensaje) && mensaje > 0 ? `?mensaje=${mensaje}` : ''}`;
+    }
+    // MEJ-16/17: abren el proyecto (el id llega validado como entero positivo; si no, Explorar).
+    case 'PROYECTO_NUEVO_PARA_TI':
+    case 'PROYECTO_GUARDADO_AVISO': {
+      const id = Number(datos.projectId);
+      return Number.isInteger(id) && id > 0 ? `/dashboard/proyectos/${id}` : '/dashboard/proyectos';
+    }
+    // MEJ-22: la invitación se responde en Mis postulaciones; el aviso al líder (aceptada o rechazada) abre su proyecto.
+    case 'INVITACION_ROL_PROYECTO': {
+      const id = Number(datos.idProyecto);
+      return Number.isInteger(id) && id > 0 ? `/dashboard/proyectos/${id}` : '/dashboard/mis-postulaciones';
+    }
+    // MEJ-54/57: el aviso abre la pestaña de hitos o el proyecto; el id se valida como entero positivo.
+    case 'HITO_ATRASADO': {
+      const id = idUsuarioSeguro(datos.projectId);
+      return id === null ? null : `/dashboard/projects/${id}/kanban?tab=hitos`;
+    }
+    case 'RECONOCIMIENTO_RECIBIDO': {
+      const id = idUsuarioSeguro(datos.projectId);
+      return id === null ? null : `/dashboard/proyectos/${id}`;
+    }
+    // MEJ-13/60: avisos de horas; ambos llevan a la vista donde se resuelven.
+    case 'HORAS_EN_RIESGO':
+      return '/dashboard/mis-horas';
+    case 'RECORDATORIO_HORAS':
+      return '/dashboard/mis-tareas';
     case 'SOLICITUD_RECUPERACION_CONTRASENA':
       return '/dashboard/admin/solicitudes-recuperacion';
     // G05 (OWASP25-C038): alerta de ráfaga de accesos fallidos/bloqueos; el

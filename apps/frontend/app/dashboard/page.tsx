@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/tooltip';
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
 import { SemestreHorasCard } from '@/components/hours/semestre-horas-card';
+import { VencenEstaSemana } from '@/components/dashboard/vencen-esta-semana';
 import { useHorasActual } from '@/hooks/use-horas-semestre';
 import ProfileCompletionCard, {
   profileCompletionPercent,
@@ -62,6 +63,7 @@ import { Skeleton, SkeletonCard, SkeletonRegion } from '@/components/ui/skeleton
 import { useFeedSocial } from '@/hooks/use-social';
 import { SocialProjectCard } from '@/components/social/social-project-card';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { ContinuarDondeQuedaste } from '@/components/dashboard/continuar-donde-quedaste';
 
 /**
  * S7 (VIEW-08): las horas llegan como string decimal del backend; se formatean
@@ -458,6 +460,7 @@ export default function DashboardPage() {
             }}
           />
         )}
+        <ContinuarDondeQuedaste idUsuario={user?.idUsuario} />
         {/* Welcome + Stats */}
         <section className="relative mb-section overflow-hidden rounded-card bg-sage-welcome p-card text-sage-ink shadow-card">
           <div className="absolute -right-10 -bottom-10 h-56 w-56 rounded-full bg-sage-accent/10 blur-3xl" />
@@ -739,6 +742,8 @@ export default function DashboardPage() {
           <aside className="layout-aside space-y-gap">
             {/* Calendario Academico */}
             <CalendarioWidget />
+
+            <VencenEstaSemana />
 
             {/* Mis Postulaciones (micro) */}
             <div className="card-base space-y-stack">

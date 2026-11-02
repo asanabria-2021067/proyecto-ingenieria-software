@@ -358,3 +358,34 @@ export function computeTaskProgress(tareas: TareaPublicaDTO[]): TaskProgressResu
   const porcentaje = total === 0 ? 0 : Math.round((conteos.HECHO / total) * 100);
   return { total, porcentaje, conteos };
 }
+
+export type TeclaFlecha = 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight';
+
+/**
+ * MEJ-79: tarjeta a enfocar al pulsar una flecha en el tablero. `columnas` son
+ * los ids de cada columna en el orden visible; arriba/abajo recorren la
+ * columna y izquierda/derecha saltan a la columna vecina con tareas, a la misma
+ * altura (o a su ultima tarjeta). Sin tarjeta actual entra por la primera.
+ */
+export function siguienteTareaEnTablero(
+  columnas: number[][],
+  actual: number | null,
+  tecla: TeclaFlecha,
+): number | null {
+  const conTareas = columnas.map((ids, col) => ({ ids, col })).filter((c) => c.ids.length > 0);
+  if (conTareas.length === 0) return null;
+  if (actual === null) return conTareas[0].ids[0];
+
+  const col = columnas.findIndex((ids) => ids.includes(actual));
+  if (col === -1) return conTareas[0].ids[0];
+  const fila = columnas[col].indexOf(actual);
+
+  if (tecla === 'ArrowUp') return columnas[col][Math.max(fila - 1, 0)];
+  if (tecla === 'ArrowDown') return columnas[col][Math.min(fila + 1, columnas[col].length - 1)];
+
+  const vecina =
+    tecla === 'ArrowLeft'
+      ? [...conTareas].reverse().find((c) => c.col < col)
+      : conTareas.find((c) => c.col > col);
+  return vecina ? vecina.ids[Math.min(fila, vecina.ids.length - 1)] : actual;
+}

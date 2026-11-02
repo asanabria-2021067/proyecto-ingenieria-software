@@ -30,6 +30,11 @@ export const PANTALLAS_A11Y = [
   { id: 'explorar-proyectos', ruta: '/dashboard/proyectos', correo: ESTUDIANTE, etiquetas: true },
   { id: 'mis-proyectos', ruta: '/dashboard/projects/mine', correo: ESTUDIANTE, etiquetas: true },
   { id: 'solicitudes-publicacion', ruta: '/dashboard/projects/admin/reviews', correo: ADMIN, etiquetas: true },
+  // MEJ-40: pantallas nuevas con estados vacios, skeletons y carga incremental.
+  { id: 'mensajes', ruta: '/dashboard/mensajes', correo: ESTUDIANTE },
+  { id: 'notificaciones', ruta: '/dashboard/notificaciones', correo: ESTUDIANTE },
+  { id: 'mis-horas', ruta: '/dashboard/mis-horas', correo: ESTUDIANTE },
+  { id: 'horas-admin', ruta: '/dashboard/admin/horas', correo: ADMIN },
 ] as const;
 
 async function sesion(browser: Browser, correo: string): Promise<Page> {

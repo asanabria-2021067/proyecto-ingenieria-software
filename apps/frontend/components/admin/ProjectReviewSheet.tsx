@@ -11,6 +11,8 @@ import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
 import type { RevisionProyectoDTO } from '@/lib/dto/project.dto';
 import { RevisionHistoryPanel } from './RevisionHistoryPanel';
 import uvgSwal, { swalCustomClass } from '@/lib/swal';
+import { Button } from '@/components/ui/button';
+import { RESPUESTAS_RAPIDAS, agregarRespuesta } from '@/lib/admin/respuestas-rapidas';
 
 export interface ProjectReviewSheetProps {
   idProyecto: number | null;
@@ -66,6 +68,19 @@ function SectionComment({
         >
           Comentarios del revisor
         </label>
+      </div>
+      <div role="group" aria-label="Respuestas rápidas" className="mb-3 flex flex-wrap gap-2">
+        {RESPUESTAS_RAPIDAS.map((r) => (
+          <Button
+            key={r.etiqueta}
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onChange(agregarRespuesta(value, r.texto))}
+          >
+            {r.etiqueta}
+          </Button>
+        ))}
       </div>
       <textarea
         id={`comment-${sectionKey}`}

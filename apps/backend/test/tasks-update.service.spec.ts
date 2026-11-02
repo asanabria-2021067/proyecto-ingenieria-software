@@ -955,6 +955,11 @@ describe('TasksService.update', () => {
           'hito',
           'etiquetas',
           'cantidadComentarios',
+          'idTareaBloqueante',
+          'bloqueadaPor',
+          'repeticion',
+          'repeticionProxima',
+          'checklist',
         ].sort(),
       );
     });

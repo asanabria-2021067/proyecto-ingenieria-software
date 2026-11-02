@@ -10,9 +10,11 @@ import {
   Clock,
   Flag,
   Loader2,
+  Lock,
   MessageSquare,
   MoreVertical,
   Pencil,
+  Repeat,
   Tag,
   Trash2,
   User,
@@ -45,7 +47,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tag as Etiqueta } from '@/components/ui/tag';
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
+import { TaskChecklist } from '@/components/projects/task-checklist';
+import { TaskEvidence } from '@/components/projects/task-evidence';
+import { TaskHistory } from '@/components/projects/task-history';
+import { REPETICION_LABEL } from '@/lib/tasks/extras';
 import { TaskCommentsPanel } from '@/components/projects/task-comments-panel';
 import { TaskHoursSection } from '@/components/hours/task-hours-section';
 import { useLectorOrganizacion } from '@/hooks/use-lector-organizacion';
@@ -443,7 +450,32 @@ function TaskDetailView({
               {tarea.hito.tituloHito}
             </span>
           )}
+          {tarea.repeticion && (
+            <Etiqueta tone="blue" size="sm" title="La tarea se repite en el sprint activo">
+              <Repeat aria-hidden="true" />
+              {REPETICION_LABEL[tarea.repeticion]}
+            </Etiqueta>
+          )}
         </div>
+
+        {tarea.bloqueadaPor && (
+          <p
+            role="status"
+            className="mt-3 flex items-start gap-2 rounded-md border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-sm text-on-surface-variant"
+          >
+            <Lock className="mt-0.5 size-4 shrink-0 text-tertiary" aria-hidden="true" />
+            <span>
+              Bloqueada por{' '}
+              <Link
+                href={`/dashboard/projects/${idProyecto}/kanban/tasks/${tarea.bloqueadaPor.idTarea}`}
+                className="font-semibold text-primary hover:underline"
+              >
+                {tarea.bloqueadaPor.tituloTarea}
+              </Link>
+              . No puede pasar de «Por hacer» hasta que esa tarea esté en «Hecho».
+            </span>
+          </p>
+        )}
       </div>
 
       {/* LAYOUT PRINCIPAL (Sección 15-16) */}
@@ -557,6 +589,14 @@ function TaskDetailView({
             </div>
           </section>
 
+          <TaskChecklist
+            idProyecto={idProyecto}
+            idTarea={tarea.idTarea}
+            items={tarea.checklist}
+            puedeEditar={puedeCambiarEstado}
+            tituloTarea={tarea.tituloTarea}
+          />
+
           {/* Horas de la tarea (HU-142 · S7 VIEW-04): el resumen del backend
               gobierna crear/editar/revocar; aquí no se infiere permiso alguno. */}
           <section className={CARD} aria-labelledby="horas-tarea-titulo">
@@ -596,6 +636,20 @@ function TaskDetailView({
               <p className="text-sm italic text-tertiary">Esta tarea no tiene etiquetas.</p>
             )}
           </section>
+
+          <TaskEvidence
+            idProyecto={idProyecto}
+            idTarea={tarea.idTarea}
+            idUsuarioActual={currentUser?.idUsuario ?? null}
+            esLider={isLeader}
+            puedeSubir={puedeCambiarEstado}
+          />
+
+          <TaskHistory
+            idProyecto={idProyecto}
+            idTarea={tarea.idTarea}
+            marca={[tarea.estadoTarea, tarea.fechaLimite, tarea.asignacionActiva?.idUsuario, tarea.actualizadaEn].join('|')}
+          />
         </div>
 
         {/* COLUMNA DERECHA: COMENTARIOS (Sección 41-51) */}
@@ -630,6 +684,7 @@ function TaskDetailView({
       {/* EDITAR (reutiliza el formulario compartido — Sección 24/67) */}
       {puedeGestionarTarea && (
         <TaskFormDialog
+          idProyecto={idProyecto}
           open={editarAbierto}
           mode="edit"
           task={tarea}

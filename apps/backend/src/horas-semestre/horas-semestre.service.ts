@@ -1,6 +1,7 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { TipoProyecto } from '@prisma/client';
-import { addDaysToDay, todayInGuatemala } from '../common/utils/guatemala-date';
+import { addDaysToDay, guatemalaDayOf, todayInGuatemala } from '../common/utils/guatemala-date';
+import type { DatosConstancia } from '../exports/constancia-horas.builder';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateRegistroHorasDto } from './dto/update-registro-horas.dto';
 import { HorasCentralListQueryDto, HorasCentralQueryDto } from './dto/horas-central-query.dto';
@@ -55,7 +56,7 @@ const LOTE_EN_RIESGO = 200;
 const LOTE_REPORTE = 100;
 
 /** Instante UTC del inicio de un dia de Guatemala (UTC-6, sin horario de verano). */
-const inicioDeDia = (dia: string) => new Date(`${dia}T06:00:00Z`);
+export const inicioDeDia = (dia: string) => new Date(`${dia}T06:00:00Z`);
 
 const ventana = (s: Semestre) => ({ gte: inicioDeDia(s.inicio), lt: inicioDeDia(addDaysToDay(s.fin, 1)) });
 
@@ -162,6 +163,63 @@ export class HorasSemestreService {
       semestre,
       beca: tramo(registro?.metaBeca ?? null, registro?.becaDeclarada ?? 0, acred.beca),
       extension: tramo(registro?.metaExtension ?? null, registro?.extensionDeclarada ?? 0, acred.extension),
+    };
+  }
+
+  /** MEJ-11: horas acreditadas (aprobadas) del propio estudiante en un semestre, por proyecto. Solo datos propios. */
+  async datosConstancia(idUsuario: number, q: { anio?: number; periodo?: 1 | 2 }): Promise<DatosConstancia> {
+    const semestre = this.semestreDeQuery(q);
+    const [usuario, aprobadas] = await Promise.all([
+      this.prisma.usuario.findUnique({
+        where: { idUsuario },
+        select: {
+          nombre: true,
+          apellido: true,
+          perfil: { select: { carne: true, carrera: { select: { nombreCarrera: true } } } },
+        },
+      }),
+      this.prisma.horasParticipacion.findMany({
+        where: { estadoHoras: 'APROBADA', fechaAprobacion: ventana(semestre), participacion: { idUsuario } },
+        orderBy: { fechaAprobacion: 'asc' },
+        select: {
+          horasAprobadas: true,
+          fechaAprobacion: true,
+          participacion: {
+            select: {
+              rolProyecto: {
+                select: { nombreRol: true, proyecto: { select: { tituloProyecto: true, tipoProyecto: true } } },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    const filas: DatosConstancia['filas'] = [];
+    for (const a of aprobadas) {
+      const { nombreRol, proyecto } = a.participacion.rolProyecto;
+      const tipo =
+        proyecto.tipoProyecto === TipoProyecto.ACADEMICO_HORAS_BECA
+          ? 'beca'
+          : proyecto.tipoProyecto === TipoProyecto.EXTRACURRICULAR_EXTENSION
+            ? 'extension'
+            : null;
+      if (!tipo) continue;
+      filas.push({
+        proyecto: proyecto.tituloProyecto,
+        rol: nombreRol,
+        tipo,
+        horas: Number(a.horasAprobadas ?? 0),
+        fecha: guatemalaDayOf(a.fechaAprobacion!),
+      });
+    }
+    return {
+      nombre: `${usuario.nombre} ${usuario.apellido}`,
+      carne: usuario.perfil?.carne ?? '',
+      carrera: usuario.perfil?.carrera?.nombreCarrera ?? null,
+      semestre: { anio: semestre.anio, periodo: semestre.periodo },
+      emitida: todayInGuatemala(),
+      filas,
     };
   }
 
@@ -364,6 +422,102 @@ export class HorasSemestreService {
       cursor = pagina.siguienteCursor ?? undefined;
     } while (cursor !== undefined);
     return { semestre, filas };
+  }
+
+  /** MEJ-72: los ultimos `cantidad` semestres (el mas reciente primero) con las horas de todos los estudiantes. */
+  async comparativo(idActor: number, cantidad = 4) {
+    await this.requireAdmin(idActor);
+    const semestres: Semestre[] = [];
+    let { anio, periodo } = semestreDe(new Date());
+    for (let i = 0; i < cantidad; i++) {
+      semestres.push(semestreDeAnioPeriodo(anio, periodo));
+      if (periodo === 1) {
+        anio -= 1;
+        periodo = 2;
+      } else periodo = 1;
+    }
+    const filas = await Promise.all(
+      semestres.map(async (semestre) => {
+        const [registros, aprobadas] = await Promise.all([
+          this.prisma.registroHorasSemestre.aggregate({
+            where: { anio: semestre.anio, periodo: semestre.periodo },
+            _count: { _all: true },
+            _sum: { metaBeca: true, becaDeclarada: true, metaExtension: true, extensionDeclarada: true },
+          }),
+          this.prisma.horasParticipacion.findMany({
+            where: { estadoHoras: 'APROBADA', fechaAprobacion: ventana(semestre) },
+            select: {
+              horasAprobadas: true,
+              participacion: { select: { rolProyecto: { select: { proyecto: { select: { tipoProyecto: true } } } } } },
+            },
+          }),
+        ]);
+        let becaAcreditada = 0;
+        let extensionAcreditada = 0;
+        for (const a of aprobadas) {
+          const horas = Number(a.horasAprobadas ?? 0);
+          const tipo = a.participacion.rolProyecto.proyecto.tipoProyecto;
+          if (tipo === TipoProyecto.ACADEMICO_HORAS_BECA) becaAcreditada += horas;
+          else if (tipo === TipoProyecto.EXTRACURRICULAR_EXTENSION) extensionAcreditada += horas;
+        }
+        const suma = registros._sum;
+        return {
+          semestre,
+          estudiantesConRegistro: registros._count._all,
+          metaBeca: suma.metaBeca ?? 0,
+          becaDeclarada: suma.becaDeclarada ?? 0,
+          becaAcreditada,
+          metaExtension: suma.metaExtension ?? 0,
+          extensionDeclarada: suma.extensionDeclarada ?? 0,
+          extensionAcreditada,
+        };
+      }),
+    );
+    return { semestres: filas };
+  }
+
+  /** MEJ-68: por asociacion, estudiantes de sus carreras con horas del semestre, en riesgo, proyectos y junta. */
+  async resumenPorAsociacion(idActor: number, q: HorasCentralQueryDto) {
+    await this.requireAdmin(idActor);
+    const [{ semestre, filas }, asociaciones] = await Promise.all([
+      this.recorrerTodas({ anio: q.anio, periodo: q.periodo }),
+      this.prisma.asociacion.findMany({
+        where: { archivada: false },
+        orderBy: { nombre: 'asc' },
+        select: {
+          idAsociacion: true,
+          nombre: true,
+          carreras: { select: { idCarrera: true, carrera: { select: { nombreCarrera: true } } } },
+          proyectos: { where: { eliminadoEn: null, estadoProyecto: { in: [...ESTADOS_ACTIVOS] } }, select: { idProyecto: true } },
+          _count: { select: { junta: true } },
+        },
+      }),
+    ]);
+    return {
+      semestre,
+      asociaciones: asociaciones.map((a) => {
+        const ids = new Set(a.carreras.map((c) => c.idCarrera));
+        const propios = filas.filter((f) => f.idCarrera !== null && ids.has(f.idCarrera));
+        const suma = (campo: (f: FilaHorasCentral) => number) => propios.reduce((t, f) => t + campo(f), 0);
+        return {
+          idAsociacion: a.idAsociacion,
+          nombre: a.nombre,
+          carreras: a.carreras.map((c) => c.carrera.nombreCarrera),
+          integrantesJunta: a._count.junta,
+          proyectosActivos: a.proyectos.length,
+          estudiantes: propios.length,
+          enRiesgo: propios.filter((f) => f.enRiesgo).length,
+          metaBeca: suma((f) => f.metaBeca ?? 0),
+          becaDeclarada: suma((f) => f.becaDeclarada),
+          becaAcreditada: suma((f) => f.becaAcreditada),
+          faltaBeca: suma((f) => f.faltaBeca ?? 0),
+          metaExtension: suma((f) => f.metaExtension ?? 0),
+          extensionDeclarada: suma((f) => f.extensionDeclarada),
+          extensionAcreditada: suma((f) => f.extensionAcreditada),
+          faltaExtension: suma((f) => f.faltaExtension ?? 0),
+        };
+      }),
+    };
   }
 
   /**

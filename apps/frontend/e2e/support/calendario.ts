@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@playwright/test';
+import type { Locator, Page, TestInfo } from '@playwright/test';
 import { expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,6 +41,17 @@ export async function abrirNuevoEvento(page: Page, proyecto = PROYECTO) {
   await dialogo.getByLabel('Proyecto', { exact: true }).click();
   await page.getByRole('option', { name: proyecto }).click();
   return dialogo;
+}
+
+/** MEJ-3: crear un evento es por pasos; el selector de pasos lleva a cualquiera sin validar. */
+export async function irAPaso(dialogo: Locator, paso: 1 | 2 | 3) {
+  await dialogo.getByRole('button', { name: new RegExp(`^Paso ${paso} de 3`) }).click();
+}
+
+/** Va al último paso, donde está «Agendar evento», y lo pulsa. Si hay errores, el diálogo vuelve al paso del primero. */
+export async function agendar(dialogo: Locator) {
+  await irAPaso(dialogo, 3);
+  await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
 }
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];

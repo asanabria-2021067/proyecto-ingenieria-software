@@ -35,6 +35,12 @@ export const DEPLOY_ENV_REGISTRY: Record<string, DeployEnvEntry> = {
   FRONTEND_URL: { kind: 'config', consumer: 'apps/backend/src/config/environment.validation.ts' },
   // Opcional: solo se escribe si no esta vacio (validador de fotoUrl y adaptadores de Cloudinary).
   CLOUDINARY_CLOUD_NAME: { kind: 'config', consumer: 'apps/backend/src/config/environment.validation.ts' },
+  // MEJ-80: SMTP opcional, solo se escribe si SMTP_HOST no esta vacio.
+  SMTP_HOST: { kind: 'config', consumer: 'apps/backend/src/config/smtp-config.ts' },
+  SMTP_PORT: { kind: 'config', consumer: 'apps/backend/src/config/smtp-config.ts' },
+  SMTP_USER: { kind: 'config', consumer: 'apps/backend/src/config/smtp-config.ts' },
+  SMTP_PASSWORD: { kind: 'secret', consumer: 'apps/backend/src/config/smtp-config.ts' },
+  SMTP_FROM: { kind: 'config', consumer: 'apps/backend/src/config/smtp-config.ts' },
   BACKEND_IMAGE: { kind: 'config', consumer: 'docker-compose.yml' },
   FRONTEND_IMAGE: { kind: 'config', consumer: 'docker-compose.yml' },
   // G04-C08 (OWASP25-C021 + D2): 1 = un proxy delante (nginx del host); el backend exige >=1 en produccion.

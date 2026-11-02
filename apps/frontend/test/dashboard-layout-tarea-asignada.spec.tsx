@@ -33,6 +33,7 @@ vi.mock('@/components/dashboard/UserMenu', () => ({ UserMenu: () => null }));
 vi.mock('@/components/projects/project-finalization-banner-host', () => ({ ProjectFinalizationBannerHost: () => null }));
 vi.mock('@/components/dashboard/OnboardingTour', () => ({ default: () => null }));
 vi.mock('@/components/theme-toggle', () => ({ ThemeToggle: () => null }));
+vi.mock('@/components/layout/dashboard-extras', () => ({ DashboardExtras: () => null }));
 vi.mock('@/components/font-scale-toggle', () => ({ FontScaleToggle: () => null }));
 
 import DashboardLayout from '../components/dashboard/DashboardLayout';

@@ -3,7 +3,7 @@ import { EstadoMembresia, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { ChatService, MENSAJE_CON_CITA_SELECT, conResumenDeCita } from '../chat/chat.service';
-import { assertActiva, assertVisible, cargarContexto } from './organization-access';
+import { ROLES_GESTION, assertActiva, assertRol, assertVisible, cargarContexto } from './organization-access';
 
 export const CANAL_GENERAL_ORGANIZACION = 'general';
 
@@ -125,6 +125,24 @@ export class OrganizationChatService {
     await this.asegurarMiembro(userId, idOrganizacion);
     const idConversacion = await this.sincronizar(idOrganizacion);
     return this.chat.mensajesDe(idConversacion, userId, cursorId);
+  }
+
+  async fijados(userId: number, idOrganizacion: number) {
+    await this.asegurarMiembro(userId, idOrganizacion);
+    return this.chat.fijadosDe(await this.sincronizar(idOrganizacion));
+  }
+
+  /** Solo Propietario y Administradores fijan o desfijan en el chat de la organización. */
+  async fijar(userId: number, idOrganizacion: number, idMensaje: number, fijar: boolean) {
+    const ctx = await cargarContexto(this.prisma, userId, idOrganizacion);
+    assertRol(ctx, ROLES_GESTION, 'Solo el propietario y los administradores pueden fijar mensajes');
+    assertActiva(ctx);
+    const idConversacion = await this.sincronizar(idOrganizacion);
+    const participantes = await this.prisma.conversacionParticipante.findMany({
+      where: { idConversacion },
+      select: { idUsuario: true },
+    });
+    return this.chat.aplicarFijado(idConversacion, idMensaje, fijar, participantes.map((p) => p.idUsuario));
   }
 
   async enviar(userId: number, idOrganizacion: number, contenido: string) {

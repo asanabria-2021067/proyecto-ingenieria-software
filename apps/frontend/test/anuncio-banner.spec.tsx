@@ -48,6 +48,12 @@ describe('AnuncioBanner (T-351)', () => {
     expect(banner).toHaveTextContent('Aviso 1');
   });
 
+  it('indica quién publica un anuncio de organización o asociación (MEJ-66)', () => {
+    state.data = [{ ...anuncio('INFO'), origen: 'Robótica UVG' }];
+    render(<AnuncioBanner />);
+    expect(screen.getByTestId('anuncio-banner')).toHaveTextContent('Robótica UVG ·');
+  });
+
   it('muestra solo el primero (el más importante) y cerrarlo avisa con su id', () => {
     state.data = [anuncio('URGENTE', 5), anuncio('INFO', 6)];
     render(<AnuncioBanner />);

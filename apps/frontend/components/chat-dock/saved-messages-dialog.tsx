@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { useSavedMessages, useToggleSavedMessage } from '@/hooks/use-chat';
+import { contenidoAEditable } from '@/lib/mentions/mention-tokens';
 import type { MensajeGuardadoItem } from '@/lib/types/chat';
 
 function tituloConversacion(c: MensajeGuardadoItem['conversacion'], currentUserId: number | null): string {
@@ -41,7 +42,7 @@ function SavedMessageRow({ item, currentUserId, onOpen }: SavedMessageRowProps) 
         <span className="block truncate text-xs font-semibold text-on-surface">
           {item.remitente.nombre} {item.remitente.apellido} <span className="font-normal text-tertiary">en {titulo}</span>
         </span>
-        <span className="mt-0.5 line-clamp-3 block whitespace-pre-wrap break-words text-sm text-on-surface">{item.contenido}</span>
+        <span className="mt-0.5 line-clamp-3 block whitespace-pre-wrap break-words text-sm text-on-surface">{contenidoAEditable(item.contenido).texto}</span>
         <span className="mt-0.5 block text-[10px] text-tertiary">{formatFecha(item.enviadoEn)}</span>
       </button>
       <button

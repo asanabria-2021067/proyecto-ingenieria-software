@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bookmark, BookmarkCheck, Check, MoreVertical, Pencil, Reply, Trash2, X } from 'lucide-react';
+import { AlarmClock, Bookmark, BookmarkCheck, Check, ClipboardPlus, MoreVertical, Pencil, Pin, PinOff, Reply, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -14,13 +14,19 @@ import {
 import { getIniciales } from '@/components/projects/available-project-card';
 import { ChatAdjuntoChip } from './chat-adjunto';
 import { ChatCitaBloque } from './chat-cita';
+import { ChatEncuestaTarjeta } from './chat-encuesta';
+import { ChatContenido } from './chat-menciones';
+import { ChatTarjetasEnlace } from './chat-tarjeta-enlace';
+import { NotaVozReproductor } from './chat-nota-voz';
 import { LinkPreviewCard } from './link-preview-card';
 import { MessageReactions } from './message-reactions';
 import { nombreReal } from '@/lib/chat-apodos';
 import { claseBurbujaPropia } from '@/lib/chat-temas';
+import { extraerEnlacesInternos } from '@/lib/chat-tarjetas';
+import { contenidoAEditable, editableAContenido, mencionesPresentes, type MencionSeleccionada } from '@/lib/mentions/mention-tokens';
 import { useDeleteMessage, useEditMessage, useToggleSavedMessage } from '@/hooks/use-chat';
 import { confirmar } from '@/lib/mensajes';
-import type { ChatMensaje, ChatTemaColor } from '@/lib/types/chat';
+import type { ChatMensaje, ChatTemaColor, ChatUsuario } from '@/lib/types/chat';
 
 function formatHora(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
@@ -60,6 +66,16 @@ interface ChatMessageItemProps {
   onReaccionar: (idMensaje: number, emoji: string) => void;
   /** Solo muestra el mensaje: sin editar, eliminar, guardar, adjuntos ni vista previa (canales que no son de proyecto). */
   simple?: boolean;
+  /** Quien puede fijar este mensaje (líder del proyecto, autor, o propietario/admin en la organización). */
+  puedeFijar?: boolean;
+  onFijar?: (mensaje: ChatMensaje, fijar: boolean) => void;
+  idUsuarioActual?: number | null;
+  /** Líder del proyecto: además del autor, puede cerrar las encuestas. */
+  esLider?: boolean;
+  /** Participantes de la conversación: dan el nombre vigente de las menciones. */
+  participantes?: ChatUsuario[];
+  onRecordar?: (mensaje: ChatMensaje) => void;
+  onCrearTarea?: (mensaje: ChatMensaje) => void;
 }
 
 export function ChatMessageItem({
@@ -74,20 +90,35 @@ export function ChatMessageItem({
   onIrAlOriginal,
   onReaccionar,
   simple = false,
+  puedeFijar = false,
+  onFijar,
+  idUsuarioActual = null,
+  esLider = false,
+  participantes,
+  onRecordar,
+  onCrearTarea,
 }: ChatMessageItemProps) {
   const editar = useEditMessage(idProyecto, idConversacion);
   const eliminar = useDeleteMessage(idProyecto, idConversacion);
   const [editando, setEditando] = useState(false);
   const [texto, setTexto] = useState('');
+  const [mencionesEdicion, setMencionesEdicion] = useState<MencionSeleccionada[]>([]);
   const eliminado = Boolean(m.eliminadoEn);
+  const fijable = puedeFijar && onFijar !== undefined;
+  const tieneEnlaceInterno =
+    typeof window !== 'undefined' && extraerEnlacesInternos(m.contenido, window.location.origin).length > 0;
+  const hayAcciones = !simple && (onRecordar !== undefined || onCrearTarea !== undefined);
 
   const empezarEdicion = () => {
-    setTexto(m.contenido);
+    // Las menciones se editan como `@Nombre`; al guardar vuelven a su token.
+    const editable = contenidoAEditable(m.contenido);
+    setMencionesEdicion(editable.menciones);
+    setTexto(editable.texto);
     setEditando(true);
   };
 
   const guardar = () => {
-    const contenido = texto.trim();
+    const contenido = editableAContenido(texto.trim(), mencionesPresentes(texto, mencionesEdicion));
     if (!contenido || contenido === m.contenido) {
       setEditando(false);
       return;
@@ -140,7 +171,21 @@ export function ChatMessageItem({
           <p className="italic">Mensaje eliminado</p>
         ) : (
           <>
-            {m.adjunto && !simple && <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />}
+            {m.adjunto && !simple &&
+              (m.adjunto.duracionSegundos ? (
+                <NotaVozReproductor adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />
+              ) : (
+                <ChatAdjuntoChip adjunto={m.adjunto} idProyecto={idProyecto} idConversacion={idConversacion} />
+              ))}
+            {m.encuesta && !simple && (
+              <ChatEncuestaTarjeta
+                mensaje={m}
+                idProyecto={idProyecto}
+                idConversacion={idConversacion}
+                idUsuarioActual={idUsuarioActual}
+                puedeCerrar={propio || esLider}
+              />
+            )}
             {editando ? (
               <div className="flex items-center gap-1">
                 <Input
@@ -169,13 +214,29 @@ export function ChatMessageItem({
                 </button>
               </div>
             ) : (
-              m.contenido && <p className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}>{m.contenido}</p>
+              m.contenido && !m.encuesta && (
+                <ChatContenido
+                  contenido={m.contenido}
+                  participantes={participantes}
+                  idUsuarioActual={idUsuarioActual}
+                  className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}
+                />
+              )
             )}
-            {!editando && !simple && <LinkPreviewCard idProyecto={idProyecto} idConversacion={idConversacion} contenido={m.contenido} />}
+            {!editando && !simple && <ChatTarjetasEnlace idProyecto={idProyecto} idConversacion={idConversacion} contenido={m.contenido} />}
+            {!editando && !simple && !tieneEnlaceInterno && (
+              <LinkPreviewCard idProyecto={idProyecto} idConversacion={idConversacion} contenido={m.contenido} />
+            )}
           </>
         )}
         <p className={`mt-0.5 text-[10px] ${propio && !eliminado ? '' : 'text-tertiary'}`}>
           {formatHora(m.enviadoEn)}
+          {m.fijadoEn && !eliminado && (
+            <span className="ml-1 inline-flex items-center gap-0.5 font-semibold">
+              <Pin className="size-2.5" aria-hidden="true" />
+              Fijado
+            </span>
+          )}
           {m.editadoEn && !eliminado && (
             <span title={`Editado a las ${formatHora(m.editadoEn)}`}> (editado)</span>
           )}
@@ -184,7 +245,7 @@ export function ChatMessageItem({
           <MessageReactions reacciones={m.reacciones ?? []} onToggle={(emoji) => onReaccionar(m.idMensaje, emoji)} />
         )}
       </div>
-      {propio && !eliminado && !editando && !simple && (
+      {(propio || fijable || hayAcciones) && !eliminado && !editando && (!simple || fijable) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -196,16 +257,36 @@ export function ChatMessageItem({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {m.contenido && (
+            {fijable && (
+              <DropdownMenuItem onClick={() => onFijar?.(m, !m.fijadoEn)}>
+                {m.fijadoEn ? <PinOff className="size-4" aria-hidden="true" /> : <Pin className="size-4" aria-hidden="true" />}
+                {m.fijadoEn ? 'Desfijar' : 'Fijar'}
+              </DropdownMenuItem>
+            )}
+            {onRecordar && !simple && (
+              <DropdownMenuItem onClick={() => onRecordar(m)}>
+                <AlarmClock className="size-4" aria-hidden="true" />
+                Recuérdamelo
+              </DropdownMenuItem>
+            )}
+            {onCrearTarea && !simple && m.contenido && !m.encuesta && (
+              <DropdownMenuItem onClick={() => onCrearTarea(m)}>
+                <ClipboardPlus className="size-4" aria-hidden="true" />
+                Crear tarea desde este mensaje
+              </DropdownMenuItem>
+            )}
+            {propio && !simple && m.contenido && !m.encuesta && (
               <DropdownMenuItem onClick={empezarEdicion}>
                 <Pencil className="size-4" aria-hidden="true" />
                 Editar
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem variant="destructive" onClick={handleEliminar}>
-              <Trash2 className="size-4" aria-hidden="true" />
-              Eliminar
-            </DropdownMenuItem>
+            {propio && !simple && (
+              <DropdownMenuItem variant="destructive" onClick={handleEliminar}>
+                <Trash2 className="size-4" aria-hidden="true" />
+                Eliminar
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       )}

@@ -7,6 +7,9 @@ import { UpdateAnuncioDto } from './dto/update-anuncio.dto';
 export const ANUNCIO_RANGO_MESSAGE = 'fechaFin debe ser posterior a fechaInicio';
 export const ANUNCIO_NOT_FOUND_MESSAGE = 'Anuncio no encontrado';
 
+/** Anuncio global de administración: ninguna organización ni asociación lo posee. */
+const GLOBAL = { idOrganizacion: null, idAsociacion: null } as const;
+
 const IMPORTANCIA: Record<NivelAnuncio, number> = { URGENTE: 3, ADVERTENCIA: 2, INFO: 1 };
 
 /** URGENTE > ADVERTENCIA > INFO; a igual nivel, el más reciente primero. */
@@ -29,8 +32,9 @@ export function validarRango(inicio: Date, fin: Date): void {
 export class AnunciosService {
   constructor(private prisma: PrismaService) {}
 
+  /** Administración gestiona solo los anuncios globales; los de organizaciones y asociaciones son de sus dueños. */
   listAdmin() {
-    return this.prisma.anuncio.findMany({ orderBy: { fechaCreacion: 'desc' } });
+    return this.prisma.anuncio.findMany({ where: GLOBAL, orderBy: { fechaCreacion: 'desc' } });
   }
 
   async create(dto: CreateAnuncioDto) {
@@ -41,7 +45,7 @@ export class AnunciosService {
   }
 
   async update(id: number, dto: UpdateAnuncioDto) {
-    const actual = await this.prisma.anuncio.findUnique({ where: { idAnuncio: id } });
+    const actual = await this.prisma.anuncio.findFirst({ where: { idAnuncio: id, ...GLOBAL } });
     if (!actual) throw new NotFoundException(ANUNCIO_NOT_FOUND_MESSAGE);
     const fechaInicio = dto.fechaInicio ? new Date(dto.fechaInicio) : actual.fechaInicio;
     const fechaFin = dto.fechaFin ? new Date(dto.fechaFin) : actual.fechaFin;
@@ -54,14 +58,9 @@ export class AnunciosService {
 
   /** Despublicar no borra: conserva el anuncio y sus cierres. */
   async despublicar(id: number) {
-    try {
-      return await this.prisma.anuncio.update({ where: { idAnuncio: id }, data: { activo: false } });
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
-        throw new NotFoundException(ANUNCIO_NOT_FOUND_MESSAGE);
-      }
-      throw e;
-    }
+    const { count } = await this.prisma.anuncio.updateMany({ where: { idAnuncio: id, ...GLOBAL }, data: { activo: false } });
+    if (count === 0) throw new NotFoundException(ANUNCIO_NOT_FOUND_MESSAGE);
+    return { idAnuncio: id };
   }
 
   /** «Estudiante» = rol de acceso `estudiante`; el resto de roles solo ve los anuncios para TODOS. */
@@ -73,12 +72,41 @@ export class AnunciosService {
     return esEstudiante ? ['TODOS', 'ESTUDIANTES'] : ['TODOS'];
   }
 
+  /** Organizaciones donde es miembro activo y asociaciones (no archivadas) de la carrera del estudiante. */
+  private async entidadesDe(idUsuario: number) {
+    const [membresias, perfil] = await Promise.all([
+      this.prisma.usuarioOrganizacion.findMany({
+        where: { idUsuario, estadoMembresia: 'ACTIVA' },
+        select: { idOrganizacion: true },
+      }),
+      this.prisma.perfilEstudiante.findUnique({ where: { idUsuario }, select: { idCarrera: true } }),
+    ]);
+    const asociaciones = perfil?.idCarrera
+      ? await this.prisma.asociacionCarrera.findMany({
+          where: { idCarrera: perfil.idCarrera, asociacion: { archivada: false } },
+          select: { idAsociacion: true },
+        })
+      : [];
+    return {
+      idsOrganizacion: membresias.map((m) => m.idOrganizacion),
+      idsAsociacion: asociaciones.map((a) => a.idAsociacion),
+    };
+  }
+
   private async whereVigente(idUsuario: number, ahora: Date, sinCerrar = true): Promise<Prisma.AnuncioWhereInput> {
+    const [audiencias, { idsOrganizacion, idsAsociacion }] = await Promise.all([
+      this.audienciasDe(idUsuario),
+      this.entidadesDe(idUsuario),
+    ]);
     return {
       activo: true,
       fechaInicio: { lte: ahora },
       fechaFin: { gt: ahora },
-      audiencia: { in: await this.audienciasDe(idUsuario) },
+      OR: [
+        { ...GLOBAL, audiencia: { in: audiencias } },
+        { idOrganizacion: { in: idsOrganizacion } },
+        { idAsociacion: { in: idsAsociacion } },
+      ],
       ...(sinCerrar ? { cierres: { none: { idUsuario } } } : {}),
     };
   }
@@ -94,9 +122,17 @@ export class AnunciosService {
         nivel: true,
         fechaInicio: true,
         fechaFin: true,
+        organizacion: { select: { nombreOrganizacion: true } },
+        asociacion: { select: { nombre: true } },
       },
     });
-    return ordenarPorImportancia(anuncios);
+    // `origen` = quién publica (null = administración); el banner lo muestra para distinguirlos.
+    return ordenarPorImportancia(
+      anuncios.map(({ organizacion, asociacion, ...a }) => ({
+        ...a,
+        origen: organizacion?.nombreOrganizacion ?? asociacion?.nombre ?? null,
+      })),
+    );
   }
 
   async cerrar(idUsuario: number, idAnuncio: number, ahora = new Date()) {

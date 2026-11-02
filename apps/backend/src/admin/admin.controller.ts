@@ -18,6 +18,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 import { MetricasQueryDto } from './dto/metricas-query.dto';
+import { AprobarCuentasLoteDto } from './dto/aprobar-cuentas-lote.dto';
+import { AdminEntidadesService } from './admin-entidades.service';
 import { UpdateAdminUserStatusDto } from './dto/update-admin-user-status.dto';
 import { securityRequestContext } from '../security-events/request-context';
 
@@ -25,7 +27,10 @@ import { securityRequestContext } from '../security-events/request-context';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('administrador')
 export class AdminController {
-  constructor(private adminService: AdminService) {}
+  constructor(
+    private adminService: AdminService,
+    private entidades: AdminEntidadesService,
+  ) {}
 
   @Get('estadisticas')
   getEstadisticas(@CurrentUser() user: { userId: number }) {
@@ -38,6 +43,16 @@ export class AdminController {
     @Query() query: MetricasQueryDto,
   ) {
     return this.adminService.getMetricas(user.userId, query.periodo);
+  }
+
+  @Get('metricas/entidades')
+  getMetricasEntidades(@CurrentUser() user: { userId: number }) {
+    return this.entidades.metricas(user.userId);
+  }
+
+  @Get('pendientes')
+  getPendientes(@CurrentUser() user: { userId: number }) {
+    return this.adminService.getPendientes(user.userId);
   }
 
   @Get('usuarios')
@@ -69,6 +84,15 @@ export class AdminController {
   @Get('cuentas-pendientes')
   getCuentasPendientes(@CurrentUser() user: { userId: number }) {
     return this.adminService.getCuentasPendientes(user.userId);
+  }
+
+  @Post('cuentas-pendientes/aprobar-lote')
+  aprobarCuentasLote(
+    @CurrentUser() user: { userId: number },
+    @Body() dto: AprobarCuentasLoteDto,
+    @Req() req: Request,
+  ) {
+    return this.adminService.aprobarCuentasLote(user.userId, dto.ids, securityRequestContext(req));
   }
 
   @Patch('cuentas-pendientes/:id/aprobar')

@@ -65,6 +65,72 @@ export interface TareaPublicaDTO {
   hito: HitoResumenTarea | null;
   etiquetas: EtiquetaTareaDTO[];
   cantidadComentarios: number;
+  /** MEJ-48: tarea que debe estar Hecha antes de empezar esta. */
+  idTareaBloqueante: number | null;
+  /** Solo viene si el bloqueante sigue pendiente (no Hecho ni eliminado). */
+  bloqueadaPor: { idTarea: number; tituloTarea: string; estadoTarea: EstadoTarea } | null;
+  /** MEJ-47 */
+  repeticion: RepeticionTarea | null;
+  repeticionProxima: string | null;
+  /** MEJ-6 */
+  checklist: ChecklistItemDTO[];
+}
+
+export type RepeticionTarea = 'DIARIA' | 'SEMANAL' | 'MENSUAL';
+
+export interface ChecklistItemDTO {
+  idItem: number;
+  texto: string;
+  completado: boolean;
+}
+
+/** MEJ-10: una línea del historial de la tarea (`GET .../tareas/:id/historial`). */
+export interface HistorialTareaEntradaDTO {
+  idAuditoria: number;
+  tipo: string;
+  descripcion: string;
+  fecha: string;
+  actor: { idUsuario: number; nombre: string; apellido: string } | null;
+}
+
+/** MEJ-49 */
+export interface EvidenciaTareaDTO {
+  idEvidencia: number;
+  idTarea: number;
+  idUsuarioCargador: number;
+  tipoEvidencia: 'ENLACE' | 'ARCHIVO' | 'REPORTE';
+  urlRecurso: string;
+  descripcion: string | null;
+  tamanoBytes: number | null;
+  fechaEnvio: string;
+  cargador: { idUsuario: number; nombre: string; apellido: string };
+}
+
+export interface CreateEvidenciaInput {
+  tipoEvidencia: 'ENLACE' | 'ARCHIVO';
+  urlRecurso: string;
+  descripcion?: string;
+}
+
+/** MEJ-52 */
+export interface PlantillaTareaDTO {
+  idPlantilla: number;
+  idProyecto: number;
+  nombre: string;
+  tituloTarea: string;
+  descripcionTarea: string | null;
+  prioridad: Prioridad;
+  tiempoEstimadoHoras: number | null;
+  checklist: string[];
+}
+
+export interface CreatePlantillaTareaInput {
+  nombre: string;
+  tituloTarea: string;
+  descripcionTarea?: string;
+  prioridad: Prioridad;
+  tiempoEstimadoHoras?: number;
+  checklist?: string[];
 }
 
 /** Body de `POST /proyectos/:projectId/tareas` — equivalente a `CreateTaskDto`. */
@@ -79,6 +145,9 @@ export interface CreateTaskInput {
   idRolProyecto?: number;
   idUsuarioAsignado?: number;
   idsEtiquetas?: number[];
+  idTareaBloqueante?: number;
+  repeticion?: RepeticionTarea;
+  checklist?: string[];
 }
 
 /** Body de `PATCH /proyectos/:projectId/tareas/:taskId` — equivalente a `UpdateTaskDto`. */
@@ -92,6 +161,8 @@ export interface UpdateTaskInput {
   idHito?: number | null;
   idRolProyecto?: number | null;
   idsEtiquetas?: number[];
+  idTareaBloqueante?: number | null;
+  repeticion?: RepeticionTarea | null;
 }
 
 /** Body de `PATCH /proyectos/:projectId/tareas/:taskId/estado` — equivalente a `UpdateTaskEstadoDto`. */

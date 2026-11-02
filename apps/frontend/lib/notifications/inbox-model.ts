@@ -1,5 +1,6 @@
 import {
   Activity,
+  AlertTriangle,
   AtSign,
   Award,
   BadgeCheck,
@@ -49,6 +50,7 @@ const GROUP_ICON: Record<NotificationGroupId, LucideIcon> = {
   horas: Clock3,
   recordatorios: CalendarClock,
   contactos: UserPlus,
+  organizaciones: Users,
   cuenta: ShieldCheck,
   otras: Bell,
 };
@@ -168,6 +170,40 @@ export function agruparPorDia<T extends { creadaEn: string }>(items: readonly T[
   return grupos;
 }
 
+export interface AvisoAgrupado<T> {
+  principal: T;
+  /** Avisos repetidos que se pliegan bajo el principal (el más reciente de su día). */
+  resto: T[];
+}
+
+/**
+ * MEJ-29: dentro de un día, los avisos del mismo tipo sobre el mismo proyecto se pliegan en uno
+ * («3 avisos: Tarea asignada en Feria de Ciencias»). Sin proyecto en el payload, o en Cuenta y
+ * seguridad, nunca se pliegan. Conserva el orden de entrada; el grupo ocupa el lugar de su primer aviso.
+ */
+export function agruparRepetidas<T extends Pick<Notificacion, 'tipoNotificacion' | 'datosJson'>>(items: readonly T[]): AvisoAgrupado<T>[] {
+  const grupos: AvisoAgrupado<T>[] = [];
+  const porClave = new Map<string, AvisoAgrupado<T>>();
+  for (const item of items) {
+    const id = categoriaDeTipo(item.tipoNotificacion) === 'cuenta' ? null : proyectoDeAviso(item)?.id;
+    const clave = id == null ? null : `${item.tipoNotificacion}|${id}`;
+    const existente = clave ? porClave.get(clave) : undefined;
+    if (existente) {
+      existente.resto.push(item);
+      continue;
+    }
+    const grupo = { principal: item, resto: [] };
+    grupos.push(grupo);
+    if (clave) porClave.set(clave, grupo);
+  }
+  return grupos;
+}
+
+/** Filas que se ven en la bandeja: avisos agrupados por día y con los repetidos plegados. */
+export function filasVisibles<T extends Notificacion>(items: readonly T[]): AvisoAgrupado<T>[] {
+  return agruparPorDia(items).flatMap((dia) => agruparRepetidas(dia.items));
+}
+
 /** Hora para avisos de hoy; día y mes corto para el resto (columna derecha de la fila). */
 export function fechaCompacta(iso: string, ahora: Date = new Date()): string {
   const fecha = new Date(iso);
@@ -233,6 +269,7 @@ const CAMPO_ACTOR: Readonly<Record<string, string>> = {
   APELACION_LIDERAZGO_RECIBIDA: 'leaderName',
   CALENDARIO_COMPARTIDO: 'ownerName',
   MENCION_COMENTARIO: 'autorNombre',
+  RECONOCIMIENTO_RECIBIDO: 'autorNombre',
 };
 
 /** Decisiones de Administración sin responsable individual en el payload. */
@@ -254,10 +291,13 @@ const ICONO_AUTOMATICO: Readonly<Record<string, LucideIcon>> = {
   RECORDATORIO_EVENTO: CalendarClock,
   TAREA_POR_VENCER: CalendarClock,
   HORAS_CONSOLIDADAS: Clock3,
+  HORAS_EN_RIESGO: Clock3,
+  RECORDATORIO_HORAS: Clock3,
   HORAS_ACREDITADAS: BadgeCheck,
   HORAS_VALIDADAS: BadgeCheck,
   CERTIFICADO_EMITIDO: Award,
   INSIGNIA_OBTENIDA: Award,
+  HITO_ATRASADO: AlertTriangle,
   PROYECTO_ADVERTENCIA_INACTIVIDAD: Activity,
   CAMBIO_ESTADO_PROYECTO: Activity,
   POSTULACION_RECHAZADA_POR_CIERRE: Activity,

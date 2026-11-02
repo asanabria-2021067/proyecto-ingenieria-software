@@ -114,6 +114,8 @@ export type PostulacionRecibida = {
   fechaPostulacion: string;
   fechaResolucion?: string;
   comentarioResolucion?: string;
+  /** MEJ-21: % de los requisitos de habilidad del rol que cumple el postulante; null si el rol no pide ninguna. */
+  coincidencia?: { porcentaje: number; cumplidos: number; total: number } | null;
   postulante: {
     idUsuario: number;
     nombre: string;

@@ -99,7 +99,11 @@ describe('Contenedor @container/project en los layouts del proyecto', () => {
     const contenido = screen.getByRole('main');
     const scroll = contenido.parentElement as HTMLElement;
     expect(scroll).toHaveClass('@container/project', 'overflow-y-auto', 'min-w-0', 'flex-1');
-    expect(scroll.firstElementChild).toBe(screen.getByTestId('project-mobile-nav'));
+    // La miga va primero (dentro del layout), luego la barra móvil, ambas dentro del contenedor.
+    const miga = screen.getByRole('navigation', { name: /breadcrumb/i });
+    expect(scroll.children[0]).toContainElement(miga);
+    expect(scroll.children[1]).toBe(screen.getByTestId('project-mobile-nav'));
+    expect(scroll.children[2]).toBe(contenido);
     // La sidebar del proyecto queda fuera del contenedor: no resta ancho a la medición.
     expect(scroll).not.toContainElement(screen.getByTestId('project-sidebar'));
   });

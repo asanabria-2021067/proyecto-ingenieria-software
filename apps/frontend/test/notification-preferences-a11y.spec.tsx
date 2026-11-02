@@ -54,7 +54,7 @@ describe('FG04-C04: nombres, roles y asociaciones', () => {
 
   it('la jerarquía de encabezados no salta niveles: h2 de la sección y h3 por grupo', async () => {
     await montar();
-    expect(within(seccion()).getAllByRole('heading').map((h) => h.tagName)).toEqual(['H2', ...Array(7).fill('H3')]);
+    expect(within(seccion()).getAllByRole('heading').map((h) => h.tagName)).toEqual(['H2', ...Array(8).fill('H3')]);
   });
 
   it('cada grupo es una lista: los lectores anuncian cuántos tipos tiene', async () => {

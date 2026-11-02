@@ -1,4 +1,4 @@
-import { EstadoTarea, Prioridad, Prisma } from '@prisma/client';
+import { EstadoTarea, Prioridad, Prisma, RepeticionTarea } from '@prisma/client';
 
 /**
  * Select único reutilizado por listado y detalle: hito, rolProyecto,
@@ -22,6 +22,16 @@ export const TASK_SELECT = {
   actualizadaEn: true,
   tiempoEstimadoHoras: true,
   puntosHistoria: true,
+  idTareaBloqueante: true,
+  repeticion: true,
+  repeticionProxima: true,
+  bloqueante: {
+    select: { idTarea: true, tituloTarea: true, estadoTarea: true, eliminadoEn: true },
+  },
+  checklist: {
+    select: { idItem: true, texto: true, completado: true },
+    orderBy: [{ orden: 'asc' }, { idItem: 'asc' }],
+  },
   hito: {
     select: { idHito: true, tituloHito: true },
   },
@@ -104,6 +114,14 @@ export interface TareaPublica {
   hito: HitoResumenPublico | null;
   etiquetas: EtiquetaPublica[];
   cantidadComentarios: number;
+  /** MEJ-48 */
+  idTareaBloqueante: number | null;
+  bloqueadaPor: { idTarea: number; tituloTarea: string; estadoTarea: EstadoTarea } | null;
+  /** MEJ-47 */
+  repeticion: RepeticionTarea | null;
+  repeticionProxima: string | null;
+  /** MEJ-6 */
+  checklist: { idItem: number; texto: string; completado: boolean }[];
 }
 
 /**
@@ -152,6 +170,19 @@ export function mapTarea(row: TareaRow): TareaPublica {
     hito: row.hito,
     etiquetas,
     cantidadComentarios: row._count.comentarios,
+    idTareaBloqueante: row.idTareaBloqueante,
+    // Un bloqueante eliminado o ya HECHO no bloquea.
+    bloqueadaPor:
+      row.bloqueante && row.bloqueante.eliminadoEn === null && row.bloqueante.estadoTarea !== EstadoTarea.HECHO
+        ? {
+            idTarea: row.bloqueante.idTarea,
+            tituloTarea: row.bloqueante.tituloTarea,
+            estadoTarea: row.bloqueante.estadoTarea,
+          }
+        : null,
+    repeticion: row.repeticion,
+    repeticionProxima: toDateOnly(row.repeticionProxima),
+    checklist: row.checklist,
   };
 }
 

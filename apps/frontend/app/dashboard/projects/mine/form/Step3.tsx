@@ -51,7 +51,7 @@ export function Step3({ form, saving, onSubmit, organizacion = null, participant
 
       {participantes.length > 0 && (
         <div className="rounded-xl border border-outline-variant p-4 space-y-1.5">
-          <h3 className="text-sm font-bold text-on-surface mb-2">Participantes de la organización ({participantes.length})</h3>
+          <h3 className="text-sm font-bold text-on-surface mb-2">Integrantes ({participantes.length})</h3>
           {participantes.map((p) => (
             <p key={`${p.nombre}-${p.rol}`} className="text-sm">{p.nombre} <span className="text-tertiary">- {p.rol}</span></p>
           ))}

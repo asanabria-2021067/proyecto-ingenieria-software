@@ -48,6 +48,7 @@ const EXPECTED_WITHOUT_API: Array<[string, string[]]> = [
   ['style-src', ["'self'", "'unsafe-inline'"]],
   ['img-src', ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com']],
   ['font-src', ["'self'"]],
+  ['media-src', ["'self'", 'blob:']],
   ['connect-src', ["'self'", 'https://api.cloudinary.com']],
   ['frame-src', ['blob:']],
   ['object-src', ["'none'"]],

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { agendar, irAPaso } from './support/calendario';
 
 // carlos.mendoza lidera "Portal de Empleo UVG" (Proyecto 5 del seed), donde
 // maria.lopez NO participa (ella solo está en el Proyecto 1). G01 (UI-01):
@@ -29,8 +30,9 @@ async function crearEvento(page: Page, titulo: string) {
   await dialogo.getByLabel('Título del evento o actividad').fill(titulo);
   await dialogo.getByRole('button', { name: 'Agregar descripción' }).click();
   await dialogo.getByLabel('Descripción (opcional)').fill(DESCRIPCION_PRIVADA);
+  await irAPaso(dialogo, 2);
   await dialogo.getByLabel('Enlace de conexión virtual').fill(LINK_PRIVADO);
-  await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+  await agendar(dialogo);
   await expect(page.getByText('Evento agendado')).toBeVisible();
 }
 

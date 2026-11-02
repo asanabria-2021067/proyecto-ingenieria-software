@@ -15,6 +15,7 @@ import {
 } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { avisarProyectoNuevo } from '../projects/new-project-notifications';
 
 /**
  * C039 (06 v2 §24/§32/§39): reclamar y resolver la revisión de publicación
@@ -269,6 +270,8 @@ export class RevisionesService {
             },
             tx,
           );
+          // MEJ-16: aviso a quien sigue a la organización/asociación o comparte carrera o intereses.
+          await avisarProyectoNuevo(tx, this.notifications, idProyecto);
         } else {
           await this.notifications.notifyFromTemplate(
             [proyecto.creadoPor],

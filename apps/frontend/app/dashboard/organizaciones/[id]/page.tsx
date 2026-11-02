@@ -5,12 +5,16 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Archive, Building2, ChevronLeft, ExternalLink, Folder, Globe, LogOut, Lock, Pencil, Plus, Users } from 'lucide-react';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { AnunciosEntidad } from '@/components/anuncios/anuncios-entidad';
+import { OrgCalendario } from '@/components/organizations/org-calendario';
 import { InvitarDialog } from '@/components/organizations/invitar-dialog';
+import { SeguirOrganizacion } from '@/components/organizations/boton-seguir';
 import { OrgAvatar } from '@/components/organizations/org-avatar';
 import { OrgChat } from '@/components/organizations/org-chat';
 import { OrgMiembros } from '@/components/organizations/org-miembros';
 import { OrgPendientes } from '@/components/organizations/org-pendientes';
 import { OrgProyectos } from '@/components/organizations/org-proyectos';
+import { PortafolioProyectos } from '@/components/projects/portafolio-proyectos';
 import { TransferirDialog } from '@/components/organizations/transferir-dialog';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -170,6 +174,7 @@ export default function OrganizacionPage() {
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2">
+          <SeguirOrganizacion id={org.idOrganizacion} nombre={org.nombreOrganizacion} />
           {puedePublicarComo(org.miRol) && org.puedePublicar && (
             <Button asChild>
               <Link href={`/dashboard/projects/mine/form?org=${org.idOrganizacion}`}>
@@ -216,8 +221,11 @@ export default function OrganizacionPage() {
       <Tabs defaultValue="proyectos">
         <TabsList className="mb-4.5 h-auto flex-wrap">
           <TabsTrigger value="proyectos">Proyectos</TabsTrigger>
+          <TabsTrigger value="portafolio">Portafolio</TabsTrigger>
           {org.miembros && <TabsTrigger value="miembros">Miembros ({org.miembros.length})</TabsTrigger>}
           {esMiembro && <TabsTrigger value="chat">Chat</TabsTrigger>}
+          {esMiembro && <TabsTrigger value="anuncios">Anuncios</TabsTrigger>}
+          {esMiembro && <TabsTrigger value="calendario">Calendario</TabsTrigger>}
           {gestiona && (
             <TabsTrigger value="pendientes">Solicitudes e invitaciones{pendientes > 0 ? ` (${pendientes})` : ''}</TabsTrigger>
           )}
@@ -225,6 +233,9 @@ export default function OrganizacionPage() {
 
         <TabsContent value="proyectos" className="card-base">
           <OrgProyectos proyectos={org.proyectos} />
+        </TabsContent>
+        <TabsContent value="portafolio">
+          <PortafolioProyectos tipo="organizacion" id={org.idOrganizacion} />
         </TabsContent>
         {org.miembros && (
           <TabsContent value="miembros" className="card-base">
@@ -239,7 +250,17 @@ export default function OrganizacionPage() {
         )}
         {esMiembro && (
           <TabsContent value="chat">
-            <OrgChat idOrganizacion={org.idOrganizacion} />
+            <OrgChat idOrganizacion={org.idOrganizacion} puedeFijar={gestiona} />
+          </TabsContent>
+        )}
+        {esMiembro && (
+          <TabsContent value="anuncios">
+            <AnunciosEntidad tipo="organizaciones" id={org.idOrganizacion} puedePublicar={gestiona && !org.archivada} />
+          </TabsContent>
+        )}
+        {esMiembro && (
+          <TabsContent value="calendario">
+            <OrgCalendario idOrganizacion={org.idOrganizacion} />
           </TabsContent>
         )}
         {gestiona && (

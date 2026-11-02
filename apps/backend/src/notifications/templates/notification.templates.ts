@@ -1,4 +1,6 @@
-export interface NotificationTemplateData {
+import { HORAS_TEMPLATES, type HorasTemplateData } from './horas.templates';
+
+export interface NotificationTemplateData extends HorasTemplateData {
   NUEVA_POSTULACION: {
     userName: string;
     roleName: string;
@@ -320,6 +322,39 @@ export interface NotificationTemplateData {
     idHito: number | null;
   };
 
+  // MEJ-44: mención con @ en un mensaje del chat del proyecto.
+  MENCION_CHAT: {
+    autorNombre: string;
+    tituloProyecto: string;
+    idProyecto: number;
+    idConversacion: number;
+    idMensaje: number;
+  };
+
+  // MEJ-46: «Recuérdamelo» sobre un mensaje del chat.
+  RECORDATORIO_MENSAJE: {
+    autorNombre: string;
+    extracto: string;
+    idProyecto: number;
+    idConversacion: number;
+    idMensaje: number;
+  };
+  // MEJ-54: hito sin completar con la fecha límite vencida (aviso al líder).
+  HITO_ATRASADO: {
+    hitoTitle: string;
+    projectTitle: string;
+    projectId: number;
+    hitoId: number;
+    diasAtraso: number;
+  };
+  // MEJ-57: reconocimiento de un compañero en un sprint.
+  RECONOCIMIENTO_RECIBIDO: {
+    autorNombre: string;
+    projectTitle: string;
+    projectId: number;
+    sprintNumero: number;
+  };
+
   SOLICITUD_CONTACTO: {
     nombre: string;
     correo: string;
@@ -357,9 +392,43 @@ export interface NotificationTemplateData {
     organizationId: number;
     detail: string;
   };
+
+  // MEJ-16: por qué le llega el proyecto nuevo (la entidad solo cuando la sigue).
+  PROYECTO_NUEVO_PARA_TI: {
+    projectTitle: string;
+    projectId: number;
+    motivo: 'SIGUE' | 'CARRERA' | 'INTERES';
+    entidad: string | null;
+  };
+
+  // MEJ-17: un proyecto guardado queda con pocos cupos o pasa a solicitud de cierre.
+  PROYECTO_GUARDADO_AVISO: {
+    projectTitle: string;
+    projectId: number;
+    motivo: 'CUPOS' | 'CIERRE';
+    cuposDisponibles: number;
+  };
+
+  // MEJ-22: el líder invita directo a un rol.
+  INVITACION_ROL_PROYECTO: {
+    projectTitle: string;
+    projectId: number;
+    roleName: string;
+    roleId: number;
+    invitationId: number;
+    invitedBy: string;
+  };
+
+  // MEJ-31: resumen de los lunes; los conteos ya vienen calculados por el job.
+  TU_SEMANA: {
+    tareasPorVencer: number;
+    horasSemanaPasada: number;
+    postulacionesPendientes: number;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
+  ...HORAS_TEMPLATES,
   NUEVA_POSTULACION: {
     title: 'Nueva postulación recibida',
     message: (data: NotificationTemplateData['NUEVA_POSTULACION']) =>
@@ -631,6 +700,30 @@ export const NOTIFICATION_TEMPLATES = {
     },
   },
 
+  MENCION_CHAT: {
+    title: 'Te mencionaron en el chat',
+    message: (data: NotificationTemplateData['MENCION_CHAT']) =>
+      `${data.autorNombre} te mencionó en el chat del proyecto "${data.tituloProyecto}".`,
+  },
+
+  RECORDATORIO_MENSAJE: {
+    title: 'Recordatorio de un mensaje',
+    message: (data: NotificationTemplateData['RECORDATORIO_MENSAJE']) =>
+      `Pediste que te recordáramos este mensaje de ${data.autorNombre}: "${data.extracto}".`,
+  },
+
+  HITO_ATRASADO: {
+    title: 'Un hito está atrasado',
+    message: (data: NotificationTemplateData['HITO_ATRASADO']) =>
+      `El hito "${data.hitoTitle}" del proyecto "${data.projectTitle}" lleva ${data.diasAtraso} ${data.diasAtraso === 1 ? 'día' : 'días'} de atraso.`,
+  },
+
+  RECONOCIMIENTO_RECIBIDO: {
+    title: 'Te reconocieron en el sprint',
+    message: (data: NotificationTemplateData['RECONOCIMIENTO_RECIBIDO']) =>
+      `${data.autorNombre} te reconoció en el sprint ${data.sprintNumero} del proyecto "${data.projectTitle}".`,
+  },
+
   SOLICITUD_CONTACTO: {
     title: 'Nueva solicitud de contacto',
     message: (data: NotificationTemplateData['SOLICITUD_CONTACTO']) =>
@@ -662,6 +755,44 @@ export const NOTIFICATION_TEMPLATES = {
   ORGANIZACION_ACTUALIZADA: {
     title: (data: NotificationTemplateData['ORGANIZACION_ACTUALIZADA']) => data.organizationName,
     message: (data: NotificationTemplateData['ORGANIZACION_ACTUALIZADA']) => data.detail,
+  },
+
+  PROYECTO_NUEVO_PARA_TI: {
+    title: 'Hay un proyecto nuevo para ti',
+    message: (data: NotificationTemplateData['PROYECTO_NUEVO_PARA_TI']) => {
+      if (data.motivo === 'SIGUE') return `"${data.entidad}", que sigues, publicó el proyecto "${data.projectTitle}".`;
+      if (data.motivo === 'CARRERA') return `Se publicó "${data.projectTitle}", que busca estudiantes de tu carrera.`;
+      return `Se publicó "${data.projectTitle}", que coincide con tus intereses.`;
+    },
+  },
+
+  PROYECTO_GUARDADO_AVISO: {
+    title: (data: NotificationTemplateData['PROYECTO_GUARDADO_AVISO']) =>
+      data.motivo === 'CIERRE' ? 'Un proyecto guardado va a cerrar' : 'Quedan pocos cupos en un proyecto guardado',
+    message: (data: NotificationTemplateData['PROYECTO_GUARDADO_AVISO']) =>
+      data.motivo === 'CIERRE'
+        ? `"${data.projectTitle}" pasó a solicitud de cierre: ya no acepta postulaciones.`
+        : `A "${data.projectTitle}" ${data.cuposDisponibles === 1 ? 'le queda 1 cupo' : `le quedan ${data.cuposDisponibles} cupos`}. Postúlate antes de que se llene.`,
+  },
+
+  INVITACION_ROL_PROYECTO: {
+    title: 'Te invitaron a un rol de proyecto',
+    message: (data: NotificationTemplateData['INVITACION_ROL_PROYECTO']) =>
+      `${data.invitedBy} te invitó al rol "${data.roleName}" del proyecto "${data.projectTitle}".`,
+  },
+
+  TU_SEMANA: {
+    title: 'Tu semana',
+    message: (data: NotificationTemplateData['TU_SEMANA']) =>
+      [
+        data.tareasPorVencer > 0 ? `${data.tareasPorVencer} ${data.tareasPorVencer === 1 ? 'tarea vence' : 'tareas vencen'} esta semana` : null,
+        `${data.horasSemanaPasada} h registradas la semana pasada`,
+        data.postulacionesPendientes > 0
+          ? `${data.postulacionesPendientes} ${data.postulacionesPendientes === 1 ? 'postulación pendiente' : 'postulaciones pendientes'}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' · ') + '.',
   },
 } as const;
 

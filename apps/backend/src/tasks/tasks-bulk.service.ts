@@ -12,7 +12,7 @@ import { TasksRelationsService } from './tasks-relations.service';
 import { TasksNotificationsService } from './tasks-notifications.service';
 import type { AccionMasivaTarea, BulkTaskActionDto } from './dto/bulk-task-action.dto';
 import { TASK_SELECT, compareTareas, mapTarea, type TareaPublica } from './tasks.mapper';
-import { createActiveAssignment, lockedProject, syncHitoEstado } from './tasks-writes.helpers';
+import { assertNoBloqueada, createActiveAssignment, lockedProject, syncHitoEstado } from './tasks-writes.helpers';
 
 /**
  * HU-202/T-383: columnas mínimas que la acción masiva necesita de cada tarea
@@ -26,6 +26,7 @@ interface TareaAccionMasiva {
   idRolProyecto: number | null;
   tituloTarea: string;
   estadoTarea: EstadoTarea;
+  idTareaBloqueante: number | null;
 }
 
 export interface ResultadoAccionMasiva {
@@ -89,6 +90,7 @@ export class TasksBulkService {
           idRolProyecto: true,
           tituloTarea: true,
           estadoTarea: true,
+          idTareaBloqueante: true,
         },
       });
       const encontradas = new Set(tareas.map((tarea) => tarea.idTarea));
@@ -177,6 +179,8 @@ export class TasksBulkService {
     if (aMover.length === 0) {
       return [];
     }
+
+    await assertNoBloqueada(tx, aMover, estadoTarea);
 
     await tx.tarea.updateMany({
       where: { idTarea: { in: aMover.map((tarea) => tarea.idTarea) }, idProyecto: projectId },

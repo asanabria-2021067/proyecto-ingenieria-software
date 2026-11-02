@@ -6,12 +6,14 @@ import { login } from './support/auth';
 import {
   CORREO_LIDER,
   abrirNuevoEvento,
+  agendar,
   borrarEventosConTitulo,
   capturar,
   crearEventoPorApi,
   enDias,
   fijarRelojMananaTemprano,
   idDelProyecto,
+  irAPaso,
   mananaTemprano,
   overflowHorizontal,
   retirarDeudaCspDelMapa,
@@ -188,11 +190,14 @@ test.describe('Calendario: accesibilidad y viewport (HU-184, G05-C13)', () => {
 
         // Crear: con fecha de fin y modalidad híbrida (enlace + ubicación), el formulario más largo.
         const crear = await abrirNuevoEvento(page);
+        await irAPaso(crear, 2);
         await crear.getByRole('checkbox', { name: 'Termina otro día' }).click();
         await crear.getByRole('radio', { name: 'Híbrida' }).click();
         await expect(crear.getByLabel('Ubicación presencial')).toBeVisible();
-        await crear.getByRole('button', { name: 'Agendar evento' }).click();
+        await agendar(crear);
         await expect(crear.getByText('El título no puede estar vacío.')).toBeVisible();
+        // Se mide el paso largo (fechas, modalidad, enlace y ubicación) con sus errores a la vista.
+        await irAPaso(crear, 2);
         filas.push(await medir(page, tema, ancho, alto, 'crear (híbrida, varios días, con errores)', DIALOGO, TEXTO_DEL_DIALOGO));
         expect(await scrollLateral(crear), `scroll lateral del formulario a ${ancho}`).toBe(0);
         if (process.env.G05_EVIDENCIAS) await capturar(page, testInfo, `c13-${tema}-${ancho}-dialogo-crear`);
@@ -268,25 +273,32 @@ test.describe('Calendario: accesibilidad y viewport (HU-184, G05-C13)', () => {
       // Formulario: la alerta de error del servidor para cada código que el diálogo distingue.
       const formulario = await abrirNuevoEvento(page);
       await formulario.getByLabel('Título del evento o actividad').fill('Demo');
+      await irAPaso(formulario, 2);
       await formulario.getByLabel('Enlace de conexión virtual').fill('https://meet.google.com/abc-defg-hij');
       const alerta = formulario.locator('[role="alert"][aria-live="assertive"]');
       for (const estado of [400, 403, 404, 409, 500]) {
         estadoAlCrear = estado;
         // Editar un campo retira la alerta anterior; así cada código pinta la suya.
+        await irAPaso(formulario, 1);
         await formulario.getByLabel('Título del evento o actividad').fill(`Demo ${estado}`);
         await expect(alerta).toHaveCount(0);
-        await formulario.getByRole('button', { name: 'Agendar evento' }).click();
+        await agendar(formulario);
         await expect(alerta).toBeVisible();
         // La alerta sigue dentro del diálogo y a la vista.
         expect(await alerta.evaluate((el) => { const a = el.getBoundingClientRect(); const d = (el.closest('[role="dialog"]') as HTMLElement).getBoundingClientRect(); return a.top >= d.top && a.bottom <= d.bottom && a.width > 0; })).toBe(true);
         await medir(`formulario: HTTP ${estado}`, '[role="dialog"] [role="alert"][aria-live="assertive"]');
       }
       // Mensajes de validación junto a los campos, con la alerta del servidor ya retirada.
+      await irAPaso(formulario, 1);
       await formulario.getByLabel('Título del evento o actividad').fill('');
+      await irAPaso(formulario, 2);
       await formulario.getByLabel('Enlace de conexión virtual').fill('http://localhost:3000/sala');
-      await formulario.getByRole('button', { name: 'Agendar evento' }).click();
+      await agendar(formulario);
       await expect(formulario.getByText('El título no puede estar vacío.')).toBeVisible();
-      await medir('formulario: validación por campo', '[role="dialog"] [data-slot="form-message"]', 2);
+      await medir('formulario: validación del paso 1', '[role="dialog"] [data-slot="form-message"]');
+      await irAPaso(formulario, 2);
+      await expect(formulario.getByText(/El link no parece válido/)).toBeVisible();
+      await medir('formulario: validación del paso 2', '[role="dialog"] [data-slot="form-message"]');
       await page.keyboard.press('Escape');
 
       // Botón "Eliminar evento" en el detalle y en la edición.

@@ -116,6 +116,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`conversation:${idConversacion}`).emit('reactionUpdated', { idConversacion, idMensaje, reacciones });
   }
 
+  /** Resultados en vivo de una encuesta: opciones con los ids de quienes votaron (cada cliente deriva su voto). */
+  broadcastPollUpdated(idConversacion: number, idMensaje: number, encuesta: unknown) {
+    this.server.to(`conversation:${idConversacion}`).emit('pollUpdated', { idConversacion, idMensaje, encuesta });
+  }
+
   /** Saca a los usuarios de la room (sockets ya unidos) y les refresca la lista de chats. */
   removeFromConversation(idConversacion: number, usuarios: number[]) {
     for (const idUsuario of usuarios) {
