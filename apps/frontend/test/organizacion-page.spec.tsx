@@ -16,7 +16,10 @@ vi.mock('@/hooks/use-current-user', () => ({
   useCurrentUser: () => ({ data: { idUsuario: 1, nombre: 'Ana', apellido: 'Paz', roles: [] } }),
 }));
 // MEJ-18: el botón «Seguir» usa TanStack Query; aquí solo importa la página.
-vi.mock('@/components/organizations/boton-seguir', () => ({ SeguirOrganizacion: () => null }));
+vi.mock('@/components/organizations/boton-seguir', () => ({
+  SeguirOrganizacion: () => null,
+  SeguirOrganizacionItem: () => null,
+}));
 vi.mock('@/lib/mensajes', () => ({
   aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() },
   confirmar: vi.fn().mockResolvedValue(true),
@@ -94,46 +97,97 @@ function orgCon(miRol: RolOrganizacion | null, extra: Partial<OrganizacionDetall
 }
 
 const boton = (nombre: string | RegExp) => screen.queryByRole('button', { name: nombre });
+const masAcciones = () => screen.queryByRole('button', { name: 'Más acciones de la organización' });
+const abrirMas = () => {
+  fireEvent.keyDown(masAcciones()!, { key: 'Enter' });
+  return screen.getByRole('menu');
+};
+const opcion = (nombre: string) => screen.queryByRole('menuitem', { name: nombre });
 
 describe('pagina de la organizacion', () => {
   beforeEach(() => estado.mutate.mockReset());
   afterEach(() => cleanup());
 
-  it('el Propietario gestiona: invita, transfiere y archiva, pero no sale', () => {
+  it('el Propietario: Nuevo proyecto visible; Editar, Invitar, Transferir y Archivar dentro de «Más»', () => {
     estado.org = orgCon('PROPIETARIO');
     render(<OrganizacionPage />);
 
-    expect(screen.getByRole('link', { name: 'Editar' })).toHaveAttribute('href', '/dashboard/organizaciones/7/editar');
-    expect(boton('Invitar')).toBeInTheDocument();
-    expect(boton('Transferir propiedad')).toBeInTheDocument();
-    expect(boton('Archivar')).toBeInTheDocument();
-    expect(boton('Salir')).toBeNull();
-    expect(screen.getByRole('tab', { name: 'Solicitudes e invitaciones (3)' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Nuevo proyecto/ })).toHaveAttribute(
       'href',
       '/dashboard/projects/mine/form?org=7',
     );
+    for (const n of ['Invitar', 'Transferir propiedad', 'Archivar', 'Salir']) expect(boton(n)).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Editar' })).toBeNull();
+
+    abrirMas();
+    expect(opcion('Editar')).toHaveAttribute('href', '/dashboard/organizaciones/7/editar');
+    for (const n of ['Invitar', 'Transferir propiedad', 'Archivar']) expect(opcion(n)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Solicitudes e invitaciones (3)' })).toBeInTheDocument();
   });
 
-  it('el Administrador invita y sale, pero no transfiere ni archiva', () => {
+  it('el nombre queda en su propia línea y las acciones en un bloque aparte', () => {
+    estado.org = orgCon('PROPIETARIO');
+    render(<OrganizacionPage />);
+
+    const titulo = screen.getByRole('heading', { name: 'Grupo Robotica' });
+    const acciones = screen.getByRole('link', { name: /Nuevo proyecto/ }).parentElement!;
+    expect(acciones.contains(titulo)).toBe(false);
+    expect(titulo.parentElement!.contains(acciones)).toBe(false);
+    expect(acciones.parentElement).toBe(titulo.closest('section'));
+  });
+
+  it('Archivar desde «Más» conserva su confirmación', async () => {
+    estado.org = orgCon('PROPIETARIO');
+    render(<OrganizacionPage />);
+
+    abrirMas();
+    fireEvent.click(opcion('Archivar')!);
+    await vi.waitFor(() => expect(estado.mutate).toHaveBeenCalled());
+  });
+
+  it('Transferir propiedad desde «Más» abre su diálogo de confirmación', async () => {
+    estado.org = orgCon('PROPIETARIO');
+    render(<OrganizacionPage />);
+
+    abrirMas();
+    fireEvent.click(opcion('Transferir propiedad')!);
+    expect(await screen.findByRole('dialog', { name: 'Transferir la propiedad' })).toBeInTheDocument();
+    expect(estado.mutate).not.toHaveBeenCalled();
+  });
+
+  it('el Administrador: Invitar y Editar en «Más», sin Transferir ni Archivar; puede salir', () => {
     estado.org = orgCon('ADMINISTRADOR');
     render(<OrganizacionPage />);
 
-    expect(boton('Invitar')).toBeInTheDocument();
     expect(boton('Salir')).toBeInTheDocument();
-    expect(boton('Transferir propiedad')).toBeNull();
-    expect(boton('Archivar')).toBeNull();
+    abrirMas();
+    expect(opcion('Invitar')).toBeInTheDocument();
+    expect(opcion('Editar')).toBeInTheDocument();
+    expect(opcion('Transferir propiedad')).toBeNull();
+    expect(opcion('Archivar')).toBeNull();
   });
 
-  it('el Editor publica proyectos pero no gestiona miembros', () => {
+  it('el Editor publica proyectos pero no gestiona miembros ni ve «Más»', () => {
     estado.org = orgCon('EDITOR');
     render(<OrganizacionPage />);
 
     expect(screen.getByRole('link', { name: /Nuevo proyecto/ })).toBeInTheDocument();
+    expect(masAcciones()).toBeNull();
     expect(boton('Invitar')).toBeNull();
     expect(screen.queryByRole('link', { name: 'Editar' })).toBeNull();
     expect(screen.queryByRole('tab', { name: /Solicitudes e invitaciones/ })).toBeNull();
     expect(screen.getByRole('tab', { name: 'Chat' })).toBeInTheDocument();
+  });
+
+  it('sin permiso de publicar, Invitar pasa a ser la acción principal visible', () => {
+    estado.org = orgCon('ADMINISTRADOR', { puedePublicar: false });
+    render(<OrganizacionPage />);
+
+    expect(screen.queryByRole('link', { name: /Nuevo proyecto/ })).toBeNull();
+    expect(boton('Invitar')).toBeInTheDocument();
+    abrirMas();
+    expect(opcion('Invitar')).toBeNull();
+    expect(opcion('Editar')).toBeInTheDocument();
   });
 
   it('Lectura ve miembros y chat sin acciones de edicion; puede salir', () => {
@@ -142,6 +196,7 @@ describe('pagina de la organizacion', () => {
 
     expect(screen.queryByRole('link', { name: /Nuevo proyecto/ })).toBeNull();
     expect(boton('Invitar')).toBeNull();
+    expect(masAcciones()).toBeNull();
     expect(boton('Salir')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Miembros/ })).toBeInTheDocument();
   });
@@ -182,8 +237,7 @@ describe('pagina de la organizacion', () => {
 
     expect(screen.getByText('Organización archivada.')).toBeInTheDocument();
     expect(boton('Invitar')).toBeNull();
-    expect(boton('Archivar')).toBeNull();
-    expect(boton('Transferir propiedad')).toBeNull();
+    expect(masAcciones()).toBeNull();
   });
 
   it('salir confirma y llama al servicio', async () => {

@@ -1,14 +1,15 @@
 'use client';
 
 import { PageTitle } from '@/components/ui/page-title';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Archive, Building2, ChevronLeft, ExternalLink, Folder, Globe, LogOut, Lock, Pencil, Plus, Users } from 'lucide-react';
+import { Archive, ArrowRightLeft, Building2, ChevronLeft, ExternalLink, Folder, Globe, LogOut, Lock, MoreVertical, Pencil, Plus, UserPlus, Users } from 'lucide-react';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { AnunciosEntidad } from '@/components/anuncios/anuncios-entidad';
 import { OrgCalendario } from '@/components/organizations/org-calendario';
 import { InvitarDialog } from '@/components/organizations/invitar-dialog';
-import { SeguirOrganizacion } from '@/components/organizations/boton-seguir';
+import { SeguirOrganizacion, SeguirOrganizacionItem } from '@/components/organizations/boton-seguir';
 import { OrgAvatar } from '@/components/organizations/org-avatar';
 import { OrgChat } from '@/components/organizations/org-chat';
 import { OrgMiembros } from '@/components/organizations/org-miembros';
@@ -17,6 +18,7 @@ import { OrgProyectos } from '@/components/organizations/org-proyectos';
 import { PortafolioProyectos } from '@/components/projects/portafolio-proyectos';
 import { TransferirDialog } from '@/components/organizations/transferir-dialog';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { SkeletonDetail } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -43,6 +45,8 @@ export default function OrganizacionPage() {
   const salir = useSalirDeOrganizacion(id);
   const archivar = useArchivarOrganizacion(id);
   const solicitar = useSolicitarUnirse();
+  const [invitando, setInvitando] = useState(false);
+  const [transfiriendo, setTransfiriendo] = useState(false);
 
   if (isLoading) {
     return <SkeletonDetail label="Cargando organización" sections={2} className={dashboardPage('pt-7 pb-10')} />;
@@ -78,6 +82,15 @@ export default function OrganizacionPage() {
   const sitio = safeExternalHref(org.sitioWeb);
   const idUsuario = usuario?.idUsuario ?? null;
   const pendientes = (org.invitacionesPendientes ?? 0) + (org.solicitudesPendientes ?? 0);
+
+  // Una sola acción principal visible; el resto vive en el menú «Más».
+  const puedeNuevoProyecto = puedePublicarComo(org.miRol) && org.puedePublicar;
+  const puedeEditar = gestiona && !org.archivada;
+  const invitaEnMenu = puedeEditar && puedeNuevoProyecto;
+  const invitaVisible = puedeEditar && !puedeNuevoProyecto;
+  const puedeTransferir = esPropietario && !org.archivada && !!org.miembros;
+  const hayTransferencia = puedeTransferir && org.miembros!.some((m) => m.idUsuario !== idUsuario);
+  const hayMas = puedeEditar;
 
   const salirDeLaOrg = async () => {
     const ok = await confirmar({
@@ -136,7 +149,7 @@ export default function OrganizacionPage() {
         </div>
       )}
 
-      <section className="card-base mb-6 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+      <section className="card-base mb-6 flex flex-col gap-5">
         <div className="flex min-w-0 gap-4">
           <OrgAvatar nombre={org.nombreOrganizacion} logoUrl={org.logoUrl} className="size-16 sm:size-20" />
           <div className="min-w-0">
@@ -173,9 +186,8 @@ export default function OrganizacionPage() {
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <SeguirOrganizacion id={org.idOrganizacion} nombre={org.nombreOrganizacion} />
-          {puedePublicarComo(org.miRol) && org.puedePublicar && (
+        <div className="flex flex-wrap items-center gap-2">
+          {puedeNuevoProyecto && (
             <Button asChild>
               <Link href={`/dashboard/projects/mine/form?org=${org.idOrganizacion}`}>
                 <Plus aria-hidden="true" />
@@ -183,23 +195,56 @@ export default function OrganizacionPage() {
               </Link>
             </Button>
           )}
-          {gestiona && !org.archivada && (
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/organizaciones/${org.idOrganizacion}/editar`}>
-                <Pencil aria-hidden="true" />
-                Editar
-              </Link>
+          {invitaVisible && (
+            <Button type="button" onClick={() => setInvitando(true)}>
+              <UserPlus aria-hidden="true" />
+              Invitar
             </Button>
           )}
-          {gestiona && !org.archivada && <InvitarDialog idOrganizacion={org.idOrganizacion} miRol={org.miRol} />}
-          {esPropietario && !org.archivada && org.miembros && (
-            <TransferirDialog idOrganizacion={org.idOrganizacion} miembros={org.miembros} idUsuarioActual={idUsuario} />
-          )}
-          {esPropietario && !org.archivada && (
-            <Button type="button" variant="outline" disabled={archivar.isPending} onClick={archivarOrg}>
-              <Archive aria-hidden="true" />
-              Archivar
-            </Button>
+          {hayMas ? (
+            // modal={false}: los diálogos se abren al cerrarse el menú y no deben competir por el puntero del body.
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" aria-label="Más acciones de la organización">
+                  <MoreVertical aria-hidden="true" />
+                  Más
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-52">
+                <SeguirOrganizacionItem id={org.idOrganizacion} nombre={org.nombreOrganizacion} />
+                {puedeEditar && (
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/organizaciones/${org.idOrganizacion}/editar`}>
+                      <Pencil className="size-4" aria-hidden="true" />
+                      Editar
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {invitaEnMenu && (
+                  <DropdownMenuItem onSelect={() => setInvitando(true)}>
+                    <UserPlus className="size-4" aria-hidden="true" />
+                    Invitar
+                  </DropdownMenuItem>
+                )}
+                {puedeTransferir && (
+                  <DropdownMenuItem disabled={!hayTransferencia} onSelect={() => setTransfiriendo(true)}>
+                    <ArrowRightLeft className="size-4" aria-hidden="true" />
+                    Transferir propiedad
+                  </DropdownMenuItem>
+                )}
+                {esPropietario && !org.archivada && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem variant="destructive" disabled={archivar.isPending} onSelect={() => void archivarOrg()}>
+                      <Archive className="size-4" aria-hidden="true" />
+                      Archivar
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <SeguirOrganizacion id={org.idOrganizacion} nombre={org.nombreOrganizacion} />
           )}
           {esMiembro && !esPropietario && (
             <Button type="button" variant="outline" disabled={salir.isPending} onClick={salirDeLaOrg}>
@@ -216,6 +261,18 @@ export default function OrganizacionPage() {
               </Button>
             ))}
         </div>
+        {puedeEditar && (
+          <InvitarDialog idOrganizacion={org.idOrganizacion} miRol={org.miRol} abierto={invitando} onAbiertoChange={setInvitando} />
+        )}
+        {puedeTransferir && (
+          <TransferirDialog
+            idOrganizacion={org.idOrganizacion}
+            miembros={org.miembros!}
+            idUsuarioActual={idUsuario}
+            abierto={transfiriendo}
+            onAbiertoChange={setTransfiriendo}
+          />
+        )}
       </section>
 
       <Tabs defaultValue="proyectos">
