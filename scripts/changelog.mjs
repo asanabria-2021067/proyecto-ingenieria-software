@@ -141,7 +141,8 @@ export function render(commits, prs) {
 // MEJ-75: «Que hay de nuevo». Las funcionalidades del ultimo sprint con commits; `id` cambia por
 // release (sprint) y el frontend lo usa para mostrar el aviso una sola vez.
 // Commits que el usuario final no ve: backend, datos de demo, pruebas, calidad, base de datos.
-const INTERNO = /^\w+\((?:backend|seed|demo|db|schema|calidad|docker|ci)\)|\b(?:backend|seed|k6|axe|DEMO-\d+)\b/i;
+// novedades.json se puede editar a mano tras generarlo (--novedades): el filtro no atrapa todo el texto interno.
+const INTERNO = /^\w+\((?:backend|seed|demo|db|schema|calidad|docker|ci)\)|\b(?:backend|seed|k6|axe|DEMO-\d+|UI-\d+|convencion|PageTitle|Rubik)\b/i;
 
 export function novedades(commits, max = 8) {
   const g = agrupar(commits);
