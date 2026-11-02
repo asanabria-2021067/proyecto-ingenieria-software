@@ -33,6 +33,7 @@ const SCENARIOS = {
   'kanban-operations': 'scenarios/kanban-operations.js',
   'socket-io': 'scenarios/socket-io.js',
   'baseline-endpoints': 'scenarios/baseline-endpoints.js',
+  'horas-vistas': 'scenarios/horas-vistas.js',
 };
 
 const DEFAULT_LOCAL_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5433/uvg_collab?schema=public';
@@ -98,14 +99,19 @@ function main() {
   if (!env.DIRECT_URL) env.DIRECT_URL = env.DATABASE_URL;
   const baseUrl = env.K6_BASE_URL || DEFAULT_BASE_URL;
 
-  console.log('[run-k6] Preparando fixture (usuarios, proyecto, Sprint ACTIVO)...');
-  const fixture = runFixture(env);
+  // horas-vistas es solo lectura con cuentas existentes: no usa el fixture, reenvia sus credenciales.
+  const soloLectura = scenarioArg === 'horas-vistas';
+  const fixture = soloLectura ? null : (console.log('[run-k6] Preparando fixture (usuarios, proyecto, Sprint ACTIVO)...'), runFixture(env));
 
-  const k6Env = {
-    K6_BASE_URL: baseUrl,
-    K6_USER_EMAIL: fixture.email,
-    K6_USER_PASSWORD: fixture.password,
-  };
+  const k6Env = { K6_BASE_URL: baseUrl };
+  if (soloLectura) {
+    for (const k of ['K6_ADMIN_EMAIL', 'K6_ADMIN_PASSWORD', 'K6_ASOC_ID', 'K6_JUNTA_EMAIL', 'K6_JUNTA_PASSWORD']) {
+      if (env[k]) k6Env[k] = env[k];
+    }
+  } else {
+    k6Env.K6_USER_EMAIL = fixture.email;
+    k6Env.K6_USER_PASSWORD = fixture.password;
+  }
 
   if (scenarioArg === 'kanban-operations' || scenarioArg === 'baseline-endpoints') {
     k6Env.K6_PROJECT_ID = String(fixture.projectId);

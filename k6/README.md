@@ -10,6 +10,12 @@ Tres escenarios contra el backend real (`apps/backend`), nunca contra mocks:
   opcionalmente (`--trigger`), verificación de `SPRINT_FINALIZATION_STARTED`
   con dos actores.
 
+- `scenarios/horas-vistas.js` — READ-ONLY (MEJ-39): recorre con cursor la vista
+  central de horas del admin y los estudiantes de una asociación. Usa cuentas
+  existentes, sin fixture: `K6_ADMIN_EMAIL`, `K6_ADMIN_PASSWORD` y, para la
+  segunda vista, `K6_ASOC_ID`, `K6_JUNTA_EMAIL`, `K6_JUNTA_PASSWORD`
+  (`npm run k6:horas`).
+
 ## Cómo correrlas
 
 Backend y Postgres arriba (`docker compose up -d postgres redis` o
