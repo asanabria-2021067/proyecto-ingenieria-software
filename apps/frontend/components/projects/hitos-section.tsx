@@ -115,7 +115,9 @@ function estadoHitoConfig(estado: HitoStats['estado']) {
 
 /** MEJ-54: hito sin completar cuya fecha límite (AAAA-MM-DD) ya pasó. */
 export function hitoEstaAtrasado(fechaLimite: string | null, estado: HitoStats['estado'], hoy = new Date()): boolean {
-  return !!fechaLimite && estado !== 'COMPLETADO' && fechaLimite < hoy.toISOString().slice(0, 10);
+  // Día calendario de Guatemala (UTC-6, sin horario de verano), igual que el backend (hoyGuatemala).
+  const hoyGt = new Date(hoy.getTime() - 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return !!fechaLimite && estado !== 'COMPLETADO' && fechaLimite < hoyGt;
 }
 
 function fechaHitoClass(hito: Hito, stats: HitoStats): string {

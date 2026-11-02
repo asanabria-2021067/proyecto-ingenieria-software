@@ -84,7 +84,7 @@ export function ResultadosContenido({ resultados, idProyecto }: { resultados: Re
           label="Hitos completados"
           value={`${metricas.hitosCompletados} de ${metricas.hitosTotales}`}
         />
-        <HoursKpiCard variante="en-linea" destacado icon={Clock} label="Horas acreditadas" value={formatearHoras(metricas.horasAcreditadas)} />
+        <HoursKpiCard variante="en-linea" destacado icon={Clock} label="Horas acreditadas" value={metricas.horasAcreditadas === null ? '-' : formatearHoras(metricas.horasAcreditadas)} />
         <HoursKpiCard variante="en-linea" icon={Repeat} label="Sprints cerrados" value={String(metricas.sprintsCerrados)} />
         <HoursKpiCard variante="en-linea" icon={Sparkles} label="Reconocimientos" value={String(metricas.reconocimientos)} />
       </div>

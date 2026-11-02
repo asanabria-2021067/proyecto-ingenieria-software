@@ -61,7 +61,7 @@ export function PortafolioLista({ proyectos }: { proyectos: ProyectoCerradoResum
                 <Clock className="size-3.5" aria-hidden="true" />
                 Horas
               </dt>
-              <dd className="font-semibold tabular-nums text-text-primary">{formatearHoras(p.horasAcreditadas)}</dd>
+              <dd className="font-semibold tabular-nums text-text-primary">{p.horasAcreditadas === null ? '-' : formatearHoras(p.horasAcreditadas)}</dd>
             </div>
           </dl>
           <Button asChild variant="outline" size="sm" className="mt-tight w-fit">

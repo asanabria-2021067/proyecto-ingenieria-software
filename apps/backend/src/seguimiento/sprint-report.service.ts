@@ -14,7 +14,8 @@ const redondear = (n: number) => Math.round(n * 100) / 100;
  * MEJ-23: reporte del Sprint en CSV y PDF. Mismo permiso que la exportación
  * del proyecto (scope `exportacion` de ProjectReadPolicyService: líder y
  * administración). Un Sprint CERRADO usa la instantánea congelada al cierre
- * para el resumen; el detalle sale de las tareas que siguen en el Sprint.
+ * para el resumen; el detalle sale de las tareas que siguen en el Sprint y, si no
+ * cubre lo planificado, el modelo lo avisa en `notaDetalle`.
  */
 @Injectable()
 export class SprintReportService {
@@ -101,6 +102,10 @@ export class SprintReportService {
         puntosPlanificados: congelado ? (sprint.puntosHistoriaPlanificadosCierre ?? 0) : filas.reduce((s, f) => s + (f.puntos ?? 0), 0),
         puntosCompletados: congelado ? (sprint.puntosHistoriaCompletadosCierre ?? 0) : hechas.reduce((s, f) => s + (f.puntos ?? 0), 0),
       },
+      notaDetalle:
+        congelado && filas.length !== planificadas
+          ? `El detalle lista solo las ${filas.length} tareas que siguen en este Sprint; el resumen cuenta ${planificadas} planificadas al cierre (las arrastradas a otro Sprint o al backlog no aparecen).`
+          : null,
       tareas: filas,
       integrantes: [...integrantes.values()],
       retrospectiva: retro,

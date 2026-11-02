@@ -13,6 +13,8 @@ export interface ModeloReporteSprint {
     puntosPlanificados: number;
     puntosCompletados: number;
   };
+  /** Aviso cuando el detalle no cubre todo lo planificado (Sprint CERRADO cuyas tareas se arrastraron). */
+  notaDetalle: string | null;
   tareas: Array<{
     titulo: string;
     estado: string;
@@ -58,6 +60,7 @@ export function buildSprintReportCsv(m: ModeloReporteSprint): string {
     ['Cumplimiento (%)', r.porcentajeCumplimiento],
     ['Puntos planificados', r.puntosPlanificados],
     ['Puntos completados', r.puntosCompletados],
+    ...(m.notaDetalle ? [['Nota', m.notaDetalle]] : []),
     [],
     TAREAS_HEADER,
     ...m.tareas.map((t) => filaTarea({ ...t, fechaLimite: t.fechaLimite ? dmy(t.fechaLimite) : null })),
@@ -110,7 +113,8 @@ export function renderSprintReportPdf(m: ModeloReporteSprint): Buffer {
     76,
   );
 
-  let y = tabla(90, TAREAS_HEADER, m.tareas.map(filaTarea));
+  if (m.notaDetalle) doc.text(m.notaDetalle, 40, 90);
+  let y = tabla(m.notaDetalle ? 104 : 90, TAREAS_HEADER, m.tareas.map(filaTarea));
   y = tabla(y, INTEGRANTES_HEADER, m.integrantes.map((i) => [i.nombre, i.tareasHechas, i.horas]));
   if (m.retrospectiva) {
     tabla(y, ['Retrospectiva', ''], [

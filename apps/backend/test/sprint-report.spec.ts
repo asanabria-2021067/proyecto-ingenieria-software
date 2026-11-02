@@ -12,6 +12,7 @@ const MODELO: ModeloReporteSprint = {
   proyecto: 'Feria de Ciencias',
   sprint: { numero: 2, estado: 'CERRADO', fechaInicio: '2026-10-01', fechaFinPlaneada: '2026-10-15', fechaCierre: '2026-10-16' },
   resumen: { tareasPlanificadas: 4, tareasCompletadas: 3, porcentajeCumplimiento: 75, puntosPlanificados: 13, puntosCompletados: 8 },
+  notaDetalle: null,
   tareas: [
     { titulo: 'Diseñar afiche', estado: 'HECHO', prioridad: 'ALTA', puntos: 5, responsable: 'Ana Paz', horas: 3.5, fechaLimite: '2026-10-10', hito: 'Difusión' },
     { titulo: '=HYPERLINK("http://x")', estado: 'POR_HACER', prioridad: 'BAJA', puntos: null, responsable: 'Sin asignar', horas: 0, fechaLimite: null, hito: '' },
@@ -142,13 +143,16 @@ describe('SprintReportService (MEJ-23)', () => {
       puntosHistoriaPlanificadosCierre: 40,
       puntosHistoriaCompletadosCierre: 35,
     });
-    expect((await service.modelo(5, 8, 1)).resumen).toEqual({
+    const modelo = await service.modelo(5, 8, 1);
+    expect(modelo.resumen).toEqual({
       tareasPlanificadas: 10,
       tareasCompletadas: 9,
       porcentajeCumplimiento: 90,
       puntosPlanificados: 40,
       puntosCompletados: 35,
     });
+    // El detalle solo ve las tareas que siguen en el Sprint: el modelo lo avisa para que no parezca un error.
+    expect(modelo.notaDetalle).toMatch(/10 planificadas al cierre/);
   });
 
   it('deja el rastro en la bitácora después de generar CSV y PDF', async () => {

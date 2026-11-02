@@ -105,6 +105,38 @@ describe('SeguimientoService.resultados (MEJ-56)', () => {
     readPolicy.assertRead.mockRejectedValue(new ForbiddenException('No tienes acceso'));
     await expect(service.resultados(5, 9)).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it.each([
+    ['LIDER', 12],
+    ['MIEMBRO_ORGANIZACION', null],
+    ['EXTERNO', null],
+  ])('%s ve horas acreditadas: %s', async (perfil, horas) => {
+    const { prisma, service } = build(perfil, 'CERRADO');
+    Object.assign(prisma, {
+      proyecto: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          idProyecto: 5,
+          tituloProyecto: 'Feria',
+          descripcionProyecto: '',
+          tipoProyecto: 'ACADEMICO_HORAS_BECA',
+          fechaInicio: null,
+          fechaFinEstimada: null,
+          creador: { idUsuario: 1, nombre: 'A', apellido: 'B' },
+          asociacion: null,
+          organizaciones: [],
+        }),
+      },
+      participacionProyecto: {
+        findMany: vi.fn().mockResolvedValue([{ idUsuario: 2, usuario: { nombre: 'C', apellido: 'D' }, rolProyecto: { nombreRol: 'Dev' } }]),
+      },
+      horasParticipacion: { findMany: vi.fn().mockResolvedValue([{ horasAprobadas: '12', participacion: { idUsuario: 2 } }]) },
+      reconocimientoCompanero: { count: vi.fn().mockResolvedValue(0) },
+      revisionCierreProyecto: { findMany: vi.fn().mockResolvedValue([]) },
+    });
+    const r = await service.resultados(5, 9);
+    expect(r.metricas.horasAcreditadas).toBe(horas);
+    expect(r.equipo).toHaveLength(horas === null ? 0 : 1);
+  });
 });
 
 describe('SeguimientoService portafolios (MEJ-56)', () => {
@@ -130,12 +162,19 @@ describe('SeguimientoService portafolios (MEJ-56)', () => {
     expect(prisma.proyecto.findMany).not.toHaveBeenCalled();
   });
 
-  it('suma tareas hechas, equipo y horas acreditadas por proyecto cerrado', async () => {
+  // Las horas acreditadas solo las ve quien gestiona la organización (ORG-8); público y miembros ven el resto.
+  it.each([
+    [null, null],
+    ['LECTURA', null],
+    ['ADMINISTRADOR', 14.5],
+  ])('suma tareas hechas y equipo por proyecto cerrado (rol %s, horas %s)', async (rol, horas) => {
     const prisma = {
       organizacion: {
         findUnique: vi.fn().mockResolvedValue({ idOrganizacion: 4, nombreOrganizacion: 'Org', estadoOrganizacion: 'ACTIVA', visibilidad: 'PUBLICA' }),
       },
-      usuarioOrganizacion: { findUnique: vi.fn().mockResolvedValue(null) },
+      usuarioOrganizacion: {
+        findUnique: vi.fn().mockResolvedValue(rol ? { rolOrganizacion: rol, estadoMembresia: 'ACTIVA' } : null),
+      },
       proyecto: {
         findMany: vi.fn().mockResolvedValue([
           { idProyecto: 10, tituloProyecto: 'Feria', tipoProyecto: 'ACADEMICO_HORAS_BECA', fechaInicio: d('2026-02-01'), creadoPor: 1 },
@@ -169,7 +208,7 @@ describe('SeguimientoService portafolios (MEJ-56)', () => {
         fechaCierre: '2026-06-15',
         integrantes: 3,
         tareasHechas: 6,
-        horasAcreditadas: 14.5,
+        horasAcreditadas: horas,
       },
     ]);
   });

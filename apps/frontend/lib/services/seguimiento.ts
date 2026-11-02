@@ -46,7 +46,7 @@ export interface ResultadosProyectoDTO {
     hitosTotales: number;
     hitosCompletados: number;
     sprintsCerrados: number;
-    horasAcreditadas: number;
+    horasAcreditadas: number | null;
     reconocimientos: number;
   };
   hitos: { idHito: number; tituloHito: string; fechaLimite: string | null; completado: boolean }[];
@@ -68,7 +68,7 @@ export interface ProyectoCerradoResumenDTO {
   fechaCierre: string | null;
   integrantes: number;
   tareasHechas: number;
-  horasAcreditadas: number;
+  horasAcreditadas: number | null;
 }
 
 export interface ReconocimientoDTO {

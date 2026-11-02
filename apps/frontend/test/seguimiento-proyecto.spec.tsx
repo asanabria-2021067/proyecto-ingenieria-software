@@ -133,6 +133,12 @@ describe('hitoEstaAtrasado (MEJ-54)', () => {
     expect(hitoEstaAtrasado('2026-11-01', 'COMPLETADO', hoy)).toBe(false);
     expect(hitoEstaAtrasado(null, 'PENDIENTE', hoy)).toBe(false);
   });
+
+  it('usa el día de Guatemala: a las 19:00 locales del día límite aún no está atrasado', () => {
+    const tarde = new Date('2026-11-11T01:00:00.000Z');
+    expect(hitoEstaAtrasado('2026-11-10', 'PENDIENTE', tarde)).toBe(false);
+    expect(hitoEstaAtrasado('2026-11-09', 'PENDIENTE', tarde)).toBe(true);
+  });
 });
 
 describe('PortafolioProyectos (MEJ-56)', () => {

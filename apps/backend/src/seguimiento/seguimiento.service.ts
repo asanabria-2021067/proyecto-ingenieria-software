@@ -3,7 +3,7 @@ import { EstadoHoras, EstadoParticipacion, EstadoProyecto, EstadoRevisionCierre,
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { calcularProgresoHito } from '../common/hito-progreso';
-import { cargarContexto, assertVisible } from '../organizations/organization-access';
+import { ROLES_GESTION, cargarContexto, assertVisible } from '../organizations/organization-access';
 import { AYUDA_SEMAFORO, DIAS_HITO_PROXIMO, calcularSemaforo, type ResultadoSemaforo } from './semaforo';
 import { UN_DIA_MS, diasEntre, hoyGuatemala } from './seguimiento.util';
 
@@ -27,9 +27,10 @@ export interface ResumenProyectoCerrado {
   fechaCierre: string | null;
   integrantes: number;
   tareasHechas: number;
-  horasAcreditadas: number;
+  horasAcreditadas: number | null;
 }
 
+const PERFILES_EQUIPO: string[] = ['LIDER', 'ADMIN', 'PARTICIPANTE_ACTIVO'];
 const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 const aNumero = (v: unknown) => Math.round(Number(v ?? 0) * 100) / 100;
 
@@ -48,7 +49,7 @@ export class SeguimientoService {
   /** Líder, admin o participante activo; el resto del equipo extendido no ve el semáforo. */
   private async assertEquipo(projectId: number, actorId: number) {
     const decision = await this.readPolicy.assertRead(undefined, { projectId, actorId, scope: 'resumen' });
-    if (!['LIDER', 'ADMIN', 'PARTICIPANTE_ACTIVO'].includes(decision.profile)) {
+    if (!PERFILES_EQUIPO.includes(decision.profile)) {
       throw new ForbiddenException('No tienes acceso al seguimiento de este proyecto');
     }
     return decision;
@@ -122,7 +123,8 @@ export class SeguimientoService {
     if (decision.project.estadoProyecto !== EstadoProyecto.CERRADO) {
       throw new BadRequestException('Los resultados se publican cuando el proyecto está cerrado');
     }
-    const verEquipo = decision.profile !== 'MIEMBRO_ORGANIZACION';
+    // Horas e integrantes con nombre: solo el equipo (ORG-8: el miembro de la organización y el externo no ven horas).
+    const verEquipo = PERFILES_EQUIPO.includes(decision.profile);
 
     const [proyecto, tareas, hitos, sprints, participaciones, horas, reconocimientos, [cierre]] = await Promise.all([
       this.prisma.proyecto.findUniqueOrThrow({
@@ -221,7 +223,7 @@ export class SeguimientoService {
         hitosTotales: hitos.length,
         hitosCompletados: hitosCompletados.length,
         sprintsCerrados: sprints.length,
-        horasAcreditadas: aNumero([...horasPorUsuario.values()].reduce((a, b) => a + b, 0)),
+        horasAcreditadas: verEquipo ? aNumero([...horasPorUsuario.values()].reduce((a, b) => a + b, 0)) : null,
         reconocimientos,
       },
       hitos: hitos.map((h) => ({
@@ -237,8 +239,11 @@ export class SeguimientoService {
 
   /** Portafolio de una organización: sus proyectos cerrados (una privada solo la ven sus miembros). */
   async portafolioOrganizacion(idOrganizacion: number, actorId: number): Promise<ResumenProyectoCerrado[]> {
-    assertVisible(await cargarContexto(this.prisma, actorId, idOrganizacion));
-    return this.resumenesCerrados({ organizaciones: { some: { idOrganizacion } } });
+    const ctx = await cargarContexto(this.prisma, actorId, idOrganizacion);
+    assertVisible(ctx);
+    // Las horas acreditadas solo las ve quien gestiona la organización; el resto (miembros o público) ve el resto de cifras.
+    const filas = await this.resumenesCerrados({ organizaciones: { some: { idOrganizacion } } });
+    return ctx.rol && ROLES_GESTION.includes(ctx.rol) ? filas : filas.map((f) => ({ ...f, horasAcreditadas: null }));
   }
 
   /** Portafolio de una asociación. La ruta exige JuntaGuard: solo llega aquí la junta de `idAsociacion`. */
