@@ -267,7 +267,7 @@ async function armarProyecto(d: ProyectoDef) {
 
 async function main() {
   const password = process.env.DEMO_PASSWORD;
-  if (!password) throw new Error('Falta la variable de entorno DEMO_PASSWORD (contrasena de las cuentas demo nuevas).');
+  if (!password) throw new Error('Falta la variable de entorno DEMO_PASSWORD (contraseña de las cuentas demo nuevas).');
 
   const semestre = semestreDe(new Date());
   const hoy = todayInGuatemala();
@@ -489,12 +489,15 @@ async function main() {
   console.log('Demo final seed completed successfully');
 }
 
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e instanceof Error ? e.message : e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+// Solo corre como entrypoint; importarlo desde la app Nest no ejecuta nada.
+if (require.main === module) {
+  main()
+    .then(async () => {
+      await prisma.$disconnect();
+    })
+    .catch(async (e) => {
+      console.error(e instanceof Error ? e.message : e);
+      await prisma.$disconnect();
+      process.exit(1);
+    });
+}
