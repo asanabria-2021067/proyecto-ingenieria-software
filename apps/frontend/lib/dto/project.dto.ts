@@ -196,7 +196,17 @@ export interface MiProyectoListItemDTO extends ProyectoListItemDTO {
     RevisionProyectoDTO,
     'idRevisionProyecto' | 'estadoRevision' | 'comentarioRevision' | 'numeroEnvio' | 'enviadaEn' | 'revisadaEn'
   >[];
-  avanceProyecto: AvanceProyectoDTO;
+  /** Solo llega al líder y a participantes activos (en «donde participo» puede faltar). */
+  avanceProyecto?: AvanceProyectoDTO;
+  /** MEJ-25: avance del sprint activo; null sin sprint activo. */
+  sprintActual?: AvanceSprintActualDTO | null;
+}
+
+export interface AvanceSprintActualDTO {
+  numero: number;
+  porcentaje: number;
+  total: number;
+  hecho: number;
 }
 
 /** Payload para crear un proyecto completo */

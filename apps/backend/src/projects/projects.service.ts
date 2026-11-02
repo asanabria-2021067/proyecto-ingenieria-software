@@ -36,8 +36,10 @@ import {
   ESTADOS_EDITABLES,
   ESTADOS_EDITABLE_PARCIAL,
   ESTADOS_VISIBLES,
+  avanceParaTarjeta,
   calcularAvanceProyecto,
   conCuposDisponibles,
+  sprintActivoSelect,
   proyectoDetalleAnonimoSelect,
   proyectoDetallePublicoSelect,
   proyectoDetalleSelect,
@@ -462,6 +464,7 @@ export class ProjectsService {
         // soft delete no debe contarse en avanceProyecto.
         tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true, idHito: true } },
         hitos: { select: { idHito: true } },
+        sprints: sprintActivoSelect,
         revisiones: {
           select: {
             idRevisionProyecto: true,
@@ -493,10 +496,15 @@ export class ProjectsService {
         roles: proyecto.roles.map((rol) => ({ idRolProyecto: rol.idRolProyecto })),
         tareas: undefined,
         hitos: undefined,
+        sprints: undefined,
         cantidadPostulaciones,
         rolesCubiertos,
         rolesTotales: proyecto.roles.length,
-        avanceProyecto: calcularAvanceProyecto(proyecto.tareas ?? [], proyecto.hitos ?? []),
+        ...avanceParaTarjeta({
+          tareas: proyecto.tareas ?? [],
+          hitos: proyecto.hitos ?? [],
+          sprints: proyecto.sprints ?? [],
+        }),
       };
     });
   }
@@ -522,7 +530,22 @@ export class ProjectsService {
       },
       orderBy: { fechaCreacion: 'desc' },
     });
-    return proyectos.map(conCuposDisponibles);
+
+    // MEJ-25: el avance solo se expone donde ya se podia ver (getAvance): a participantes ACTIVOS.
+    const activos = await this.prisma.proyecto.findMany({
+      where: {
+        idProyecto: { in: proyectos.map((p) => p.idProyecto) },
+        roles: { some: { participaciones: { some: { idUsuario: userId, estadoParticipacion: 'ACTIVO' } } } },
+      },
+      select: {
+        idProyecto: true,
+        tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true, idHito: true } },
+        hitos: { select: { idHito: true } },
+        sprints: sprintActivoSelect,
+      },
+    });
+    const avances = new Map(activos.map((p) => [p.idProyecto, avanceParaTarjeta(p)]));
+    return proyectos.map((p) => ({ ...conCuposDisponibles(p), ...(avances.get(p.idProyecto) ?? {}) }));
   }
 
   async findFeatured() {

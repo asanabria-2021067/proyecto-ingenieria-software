@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/tooltip';
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
 import { SemestreHorasCard } from '@/components/hours/semestre-horas-card';
+import { VencenEstaSemana } from '@/components/dashboard/vencen-esta-semana';
 import { useHorasActual } from '@/hooks/use-horas-semestre';
 import ProfileCompletionCard, {
   profileCompletionPercent,
@@ -739,6 +740,8 @@ export default function DashboardPage() {
           <aside className="layout-aside space-y-gap">
             {/* Calendario Academico */}
             <CalendarioWidget />
+
+            <VencenEstaSemana />
 
             {/* Mis Postulaciones (micro) */}
             <div className="card-base space-y-stack">
