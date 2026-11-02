@@ -320,6 +320,24 @@ export interface NotificationTemplateData {
     idHito: number | null;
   };
 
+  // MEJ-44: mención con @ en un mensaje del chat del proyecto.
+  MENCION_CHAT: {
+    autorNombre: string;
+    tituloProyecto: string;
+    idProyecto: number;
+    idConversacion: number;
+    idMensaje: number;
+  };
+
+  // MEJ-46: «Recuérdamelo» sobre un mensaje del chat.
+  RECORDATORIO_MENSAJE: {
+    autorNombre: string;
+    extracto: string;
+    idProyecto: number;
+    idConversacion: number;
+    idMensaje: number;
+  };
+
   SOLICITUD_CONTACTO: {
     nombre: string;
     correo: string;
@@ -629,6 +647,18 @@ export const NOTIFICATION_TEMPLATES = {
       const donde = { TAREA: 'la tarea', PROYECTO: 'el proyecto', HITO: 'el hito' }[data.contexto];
       return `${data.autorNombre} te mencionó en un comentario de ${donde} "${data.tituloContexto}".`;
     },
+  },
+
+  MENCION_CHAT: {
+    title: 'Te mencionaron en el chat',
+    message: (data: NotificationTemplateData['MENCION_CHAT']) =>
+      `${data.autorNombre} te mencionó en el chat del proyecto "${data.tituloProyecto}".`,
+  },
+
+  RECORDATORIO_MENSAJE: {
+    title: 'Recordatorio de un mensaje',
+    message: (data: NotificationTemplateData['RECORDATORIO_MENSAJE']) =>
+      `Pediste que te recordáramos este mensaje de ${data.autorNombre}: "${data.extracto}".`,
   },
 
   SOLICITUD_CONTACTO: {

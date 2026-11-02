@@ -137,11 +137,14 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   // HU-195: reuniones que Administración convoca con el equipo de tus proyectos.
   REUNION_PROGRAMADA: { grupo: 'recordatorios', etiqueta: 'Reunión programada', descripcion: 'Administración convoca a tu equipo a una reunión.' },
   REUNION_ACTUALIZADA: { grupo: 'recordatorios', etiqueta: 'Reunión actualizada', descripcion: 'Cambia la fecha, el lugar o el enlace de una reunión de tu equipo.' },
+  RECORDATORIO_MENSAJE: { grupo: 'recordatorios', etiqueta: 'Recordatorio de un mensaje', descripcion: 'Un mensaje que pediste que te recordáramos.' },
   REUNION_CANCELADA: { grupo: 'recordatorios', etiqueta: 'Reunión cancelada', descripcion: 'Administración cancela una reunión de tu equipo.' },
 
   SOLICITUD_AMISTAD: { grupo: 'contactos', etiqueta: 'Solicitud de amistad', descripcion: 'Recibes una solicitud de amistad.' },
   AMISTAD_ACEPTADA: { grupo: 'contactos', etiqueta: 'Amistad aceptada', descripcion: 'Aceptan tu solicitud de amistad.' },
   NUEVO_SEGUIDOR: { grupo: 'contactos', etiqueta: 'Nuevo seguidor', descripcion: 'Alguien empieza a seguirte.' },
+  // MEJ-44: llega aunque la conversacion este silenciada; solo esta preferencia la apaga.
+  MENCION_CHAT: { grupo: 'contactos', etiqueta: 'Menciones en conversaciones', descripcion: 'Alguien te menciona con @ en una conversación de proyecto, aunque esté silenciada.' },
 
   SOLICITUD_RECUPERACION_CONTRASENA: {
     grupo: 'cuenta',

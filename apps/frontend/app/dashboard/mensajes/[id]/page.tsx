@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { RUTA_MENSAJES } from '@/components/chat-dock/chat-dock-context';
 import { useChatSocket } from '@/components/chat-dock/chat-dock';
 import { ChatWindow } from '@/components/chat-dock/chat-window';
@@ -11,6 +11,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 export default function MensajesConversacionPage() {
   const router = useRouter();
   const idConversacion = Number(useParams<{ id: string }>().id);
+  const mensaje = Number(useSearchParams().get('mensaje'));
   const { conversations, isLoading, isFetching } = useAllConversations();
   const { typingByConversation, emitTyping } = useChatSocket();
   const conversacion = conversations.find((c) => c.idConversacion === idConversacion);
@@ -34,6 +35,7 @@ export default function MensajesConversacionPage() {
       variante="pagina"
       idProyecto={conversacion.idProyecto}
       idConversacion={idConversacion}
+      mensajeInicial={Number.isInteger(mensaje) && mensaje > 0 ? mensaje : null}
       minimized={false}
       onMinimize={() => {}}
       onClose={() => router.push(RUTA_MENSAJES)}

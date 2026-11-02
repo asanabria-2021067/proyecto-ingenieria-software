@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Archive,
@@ -52,6 +52,9 @@ import { AdjuntoIcono } from './chat-adjunto';
 import { ChatMessageItem } from './chat-message-item';
 import { ChatSearchPanel } from './chat-search';
 import { ChatFijadosBarra } from './chat-fijados';
+import { MencionSugerencias, useMencionesChat } from './chat-menciones';
+import { RecordatorioDialog } from './chat-recordatorio';
+import { CrearTareaDesdeMensajeDialog } from './crear-tarea-desde-mensaje';
 import { NuevaEncuestaDialog } from './chat-encuesta';
 import { NotaVozGrabador } from './chat-nota-voz';
 import { useFijados, usePinMessage, useSendVoiceNote } from '@/hooks/use-chat-extras';
@@ -79,6 +82,7 @@ import { estaSilenciada } from '@/lib/chat-silencio';
 import { CHAT_ADJUNTO_ACCEPT, formatearTamano, validarArchivoChat } from '@/lib/chat-adjuntos';
 import { ChatThemeDialog } from '@/components/chat-dock/chat-theme-dialog';
 import { claseAcentoCabecera } from '@/lib/chat-temas';
+import { esComandoRecordarme } from '@/lib/chat-recordatorio';
 import { ScheduleMessageButton, ScheduledMessagesList } from '@/components/chat-dock/scheduled-messages';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useIrAlMensaje } from '@/hooks/use-ir-al-mensaje';
@@ -108,9 +112,11 @@ interface ChatWindowProps {
   onTyping?: () => void;
   /** `pagina`: ocupa todo el espacio de /dashboard/mensajes en vez de ser una ventana flotante. */
   variante?: 'ventana' | 'pagina';
+  /** Mensaje al que saltar al abrir (enlace de una mención o un recordatorio). */
+  mensajeInicial?: number | null;
 }
 
-export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, onClose, typingUserIds = [], onTyping, variante = 'ventana' }: ChatWindowProps) {
+export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, onClose, typingUserIds = [], onTyping, variante = 'ventana', mensajeInicial = null }: ChatWindowProps) {
   const pagina = variante === 'pagina';
   const { data: user } = useCurrentUser();
   const currentUserId = user?.idUsuario ?? null;
@@ -144,6 +150,8 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   // El líder del proyecto fija cualquier mensaje; el resto, solo los suyos.
   const esLider = currentUserId !== null && conversacion?.proyecto.creadoPor === currentUserId;
   const [citando, setCitando] = useState<ChatMensaje | null>(null);
+  const [recordarMensaje, setRecordarMensaje] = useState<ChatMensaje | null>(null);
+  const [tareaMensaje, setTareaMensaje] = useState<ChatMensaje | null>(null);
   const [apodosAbierto, setApodosAbierto] = useState(false);
   const [temaAbierto, setTemaAbierto] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -155,7 +163,21 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
     cargarAnteriores,
     onNoDisponible: () => toast.info('El mensaje original ya no está disponible'),
   });
+  const mencionesListId = useId();
+  const menciones = useMencionesChat({
+    texto,
+    setTexto,
+    inputRef,
+    participantes: conversacion?.participantes ?? [],
+    idUsuarioActual: currentUserId,
+  });
   const [buscarAbierto, setBuscarAbierto] = useState(false);
+  const saltoInicialHecho = useRef(false);
+  useEffect(() => {
+    if (mensajeInicial === null || saltoInicialHecho.current || isLoading || minimized) return;
+    saltoInicialHecho.current = true;
+    void irAlMensaje(mensajeInicial);
+  }, [mensajeInicial, isLoading, minimized, irAlMensaje]);
   const [saltarA, setSaltarA] = useState<number | null>(null);
   const saltarARef = useRef<number | null>(null);
 
@@ -197,7 +219,15 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const contenido = texto.trim();
+    // MEJ-46: `/recuérdamelo` abre el recordatorio del mensaje citado o, si no hay, del último.
+    if (esComandoRecordarme(texto)) {
+      const objetivo = citando ?? [...messages].reverse().find((m) => !m.eliminadoEn) ?? null;
+      if (!objetivo) return toast.info('Aún no hay mensajes para recordar');
+      setTexto('');
+      setRecordarMensaje(objetivo);
+      return;
+    }
+    const contenido = menciones.contenidoFinal();
     if (archivo) {
       setErrorArchivo(null);
       enviarArchivo.mutate(
@@ -206,6 +236,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
           onSuccess: () => {
             setArchivo(null);
             setTexto('');
+            menciones.reiniciar();
           },
           onError: (error) => setErrorArchivo(error.message || 'No se pudo enviar el archivo.'),
         },
@@ -214,6 +245,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
     }
     if (!contenido) return;
     setTexto('');
+    menciones.reiniciar();
     setCitando(null);
     enviar.mutate({ contenido, idMensajeCitado: citando?.idMensaje });
   };
@@ -439,6 +471,9 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                   resaltado={saltarA === m.idMensaje}
                   idUsuarioActual={currentUserId}
                   esLider={esLider}
+                  participantes={conversacion?.participantes}
+                  onRecordar={setRecordarMensaje}
+                  onCrearTarea={setTareaMensaje}
                   puedeFijar={esLider || m.remitente.idUsuario === currentUserId}
                   onFijar={handleFijar}
                   onResponder={responder}
@@ -543,23 +578,48 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             )}
             {!grabando && (
               <>
-            <Input
-              ref={inputRef}
-              value={texto}
-              onChange={(event) => {
-                setTexto(event.target.value);
-                if (event.target.value.trim()) onTyping?.();
-              }}
-              placeholder="Escribe un mensaje…"
-              maxLength={4000}
-              disabled={enviando}
-              className="h-9 flex-1 rounded-full border-outline-variant text-sm"
-            />
+            <div className="relative min-w-0 flex-1">
+              {menciones.abierto && (
+                <MencionSugerencias
+                  id={mencionesListId}
+                  sugerencias={menciones.sugerencias}
+                  activo={menciones.indiceActivo}
+                  onElegir={menciones.seleccionar}
+                />
+              )}
+              <Input
+                ref={inputRef}
+                value={texto}
+                onChange={(event) => {
+                  menciones.onChange(event.target.value, event.target.selectionStart);
+                  if (event.target.value.trim()) onTyping?.();
+                }}
+                onKeyDown={(event) => {
+                  menciones.onKeyDown(event);
+                }}
+                onClick={(event) => menciones.onChange(event.currentTarget.value, event.currentTarget.selectionStart)}
+                onBlur={menciones.cerrar}
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={menciones.abierto}
+                aria-controls={menciones.abierto ? mencionesListId : undefined}
+                aria-activedescendant={menciones.abierto ? `${mencionesListId}-${menciones.indiceActivo}` : undefined}
+                aria-label="Escribe un mensaje"
+                placeholder="Escribe un mensaje…"
+                title="Escribe @ para mencionar a alguien"
+                maxLength={4000}
+                disabled={enviando}
+                className="h-9 w-full rounded-full border-outline-variant text-sm"
+              />
+            </div>
             <ScheduleMessageButton
               idProyecto={idProyecto}
               idConversacion={idConversacion}
-              texto={texto}
-              onScheduled={() => setTexto('')}
+              texto={menciones.contenidoFinal()}
+              onScheduled={() => {
+                setTexto('');
+                menciones.reiniciar();
+              }}
             />
             <Button
               type="submit"
@@ -576,6 +636,19 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
         </>
       )}
 
+      <RecordatorioDialog
+        open={recordarMensaje !== null}
+        onOpenChange={(abierto) => !abierto && setRecordarMensaje(null)}
+        idProyecto={idProyecto}
+        idConversacion={idConversacion}
+        mensaje={recordarMensaje}
+      />
+      <CrearTareaDesdeMensajeDialog
+        open={tareaMensaje !== null}
+        onOpenChange={(abierto) => !abierto && setTareaMensaje(null)}
+        idProyecto={idProyecto}
+        mensaje={tareaMensaje}
+      />
       <NuevaEncuestaDialog open={encuestaAbierta} onOpenChange={setEncuestaAbierta} idProyecto={idProyecto} idConversacion={idConversacion} />
 
       <ChatLinksDialog open={enlacesAbierto} onOpenChange={setEnlacesAbierto} idProyecto={idProyecto} idConversacion={idConversacion} />

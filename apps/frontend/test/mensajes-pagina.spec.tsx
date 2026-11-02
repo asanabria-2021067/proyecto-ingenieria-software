@@ -9,6 +9,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => ruta.pathname,
   useParams: () => ({ id: ruta.id }),
   useRouter: () => ({ push }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 const conversaciones = vi.hoisted(() => ({ lista: [] as unknown[], cargando: false }));

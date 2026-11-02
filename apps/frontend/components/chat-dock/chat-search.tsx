@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLoadMessagesUntil, useSearchMessages } from '@/hooks/use-chat';
 import { resaltarTexto } from '@/lib/chat-highlight';
+import { contenidoAEditable } from '@/lib/mentions/mention-tokens';
 import type { ChatUsuario } from '@/lib/types/chat';
 
 export function TextoResaltado({ texto, termino }: { texto: string; termino?: string | null }) {
@@ -176,7 +177,7 @@ export function ChatSearchPanel({ idProyecto, idConversacion, participantes, onJ
                         <time dateTime={m.enviadoEn}>{new Date(m.enviadoEn).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' })}</time>
                       </span>
                       <span className="line-clamp-2 whitespace-pre-wrap break-words">
-                        <TextoResaltado texto={m.contenido} termino={aplicados.q} />
+                        <TextoResaltado texto={contenidoAEditable(m.contenido).texto} termino={aplicados.q} />
                       </span>
                       <span className="sr-only">Ir al mensaje</span>
                     </button>

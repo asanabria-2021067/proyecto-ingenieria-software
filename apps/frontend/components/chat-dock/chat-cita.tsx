@@ -1,11 +1,12 @@
 import { X } from 'lucide-react';
+import { contenidoAEditable } from '@/lib/mentions/mention-tokens';
 import type { ChatCita } from '@/lib/types/chat';
 
 const EXTRACTO_MAX = 120;
 
 /** Mismo recorte que aplica el backend al resumen del citado. */
 export function extractoDe(contenido: string): string {
-  const texto = contenido.replace(/\s+/g, ' ').trim();
+  const texto = contenidoAEditable(contenido).texto.replace(/\s+/g, ' ').trim();
   return texto.length > EXTRACTO_MAX ? `${texto.slice(0, EXTRACTO_MAX)}…` : texto;
 }
 

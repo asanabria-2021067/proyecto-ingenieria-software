@@ -90,6 +90,15 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     expect(deChat.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
   });
 
+  // MEJ-45/46: tarjetas de enlaces internos y «Recuérdamelo» (permisos en los servicios).
+  it('las rutas de tarjetas de enlaces y recordatorios del chat existen y exigen JwtAuthGuard', () => {
+    const base = 'proyectos/:projectId/conversaciones/:conversationId';
+    const esperadas = [`POST /api/${base}/tarjetas`, `POST /api/${base}/mensajes/:messageId/recordatorio`];
+    const deChat = rutas.filter((r) => esperadas.includes(r.id));
+    expect(deChat.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(deChat.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+  });
+
   it('toda ruta de administracion exige RolesGuard y @Roles("administrador")', () => {
     const admin = rutas.filter((r) => r.adminPath);
     expect(admin.length).toBeGreaterThan(20);

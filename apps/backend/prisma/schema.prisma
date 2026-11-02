@@ -314,6 +314,10 @@ enum TipoNotificacion {
   INVITACION_ORGANIZACION
   SOLICITUD_UNIRSE_ORGANIZACION
   ORGANIZACION_ACTUALIZADA
+  // MEJ-44: alguien mencionó al usuario con @ en un mensaje del chat.
+  MENCION_CHAT
+  // MEJ-46: recordatorio programado de un mensaje del chat.
+  RECORDATORIO_MENSAJE
 }
 
 enum EstadoAmistad {
@@ -430,6 +434,7 @@ model Usuario {
   apodosDefinidos                  ApodoConversacion[]          @relation("ApodosDefinidos")
   apodosRecibidos                  ApodoConversacion[]          @relation("ApodosRecibidos")
   mensajesProgramadosChat          MensajeProgramado[]          @relation("MensajesProgramadosChat")
+  recordatorios                    RecordatorioMensaje[]
   tokensRefresco                   TokenRefresco[]
   proyectosGuardados               ProyectoGuardado[]
   estadoChat                       EstadoChatUsuario?
@@ -1978,6 +1983,7 @@ model MensajeChat {
   reacciones   ReaccionMensajeChat[]
   guardadoPor  MensajeGuardado[]
   encuesta     EncuestaChat?
+  recordatorios RecordatorioMensaje[]
 
   @@index([idConversacion, enviadoEn])
   @@index([idConversacion, fijadoEn])
@@ -2140,6 +2146,24 @@ model MensajeProgramado {
   @@index([estado, enviarEn])
   @@index([idConversacion, idRemitente])
   @@map("mensaje_programado")
+}
+
+/// MEJ-46: «Recuérdamelo» sobre un mensaje del chat. El job reclama la fila
+/// con un UPDATE condicional PENDIENTE -> ENVIADO antes de notificar.
+model RecordatorioMensaje {
+  idRecordatorio Int                     @id @default(autoincrement()) @map("id_recordatorio")
+  idUsuario      Int                     @map("id_usuario")
+  idMensaje      Int                     @map("id_mensaje")
+  recordarEn     DateTime                @map("recordar_en")
+  estado         EstadoMensajeProgramado @default(PENDIENTE)
+  creadoEn       DateTime                @default(now()) @map("creado_en")
+
+  usuario Usuario     @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  mensaje MensajeChat @relation(fields: [idMensaje], references: [idMensaje], onDelete: Restrict)
+
+  @@index([estado, recordarEn])
+  @@index([idUsuario, estado])
+  @@map("recordatorio_mensaje")
 }
 
 // HU-190 (T-346): niveles de una insignia. Sin nivel (null) = aún sin umbral alcanzado.
