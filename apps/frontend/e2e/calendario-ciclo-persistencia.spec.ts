@@ -7,6 +7,7 @@ import {
   LINK,
   PROYECTO,
   abrirNuevoEvento,
+  agendar,
   borrarEventosConTitulo,
   capturar,
   crearEventoPorApi,
@@ -14,6 +15,7 @@ import {
   eventosConTitulo,
   fijarRelojMananaTemprano,
   idDelProyecto,
+  irAPaso,
   marca,
 } from './support/calendario';
 
@@ -84,8 +86,9 @@ test.describe('GPI01-C13: persistencia del evento en las tres vistas', () => {
     // ── Crear ──────────────────────────────────────────────────────────
     const dialogo = await abrirNuevoEvento(page);
     await dialogo.getByLabel('Título del evento o actividad').fill(titulo);
+    await irAPaso(dialogo, 2);
     await dialogo.getByLabel('Enlace de conexión virtual').fill(LINK);
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(page.getByText('Evento agendado')).toBeVisible();
 
     const creados = await eventosConTitulo(page, titulo);
@@ -242,8 +245,9 @@ test.describe('GPI01-C13: contrato real de errores de eventos', () => {
     try {
       const dialogo = await abrirNuevoEvento(page, PROYECTO_DE_MARIA);
       await dialogo.getByLabel('Título del evento o actividad').fill(titulo);
+      await irAPaso(dialogo, 2);
       await dialogo.getByLabel('Enlace de conexión virtual').fill(LINK);
-      await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+      await agendar(dialogo);
       await expect(page.getByText('Evento agendado')).toBeVisible();
 
       const persistidos = await eventosConTitulo(page, titulo);

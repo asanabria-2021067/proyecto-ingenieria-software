@@ -6,6 +6,7 @@ import {
   LINK,
   PROYECTO,
   abrirNuevoEvento,
+  agendar,
   borrarEventosConTitulo,
   capturar,
   diaDelSelector,
@@ -13,6 +14,7 @@ import {
   eventosConTitulo,
   fijarRelojMananaTemprano,
   idDelProyecto,
+  irAPaso,
   marca,
   mananaTemprano,
   overflowHorizontal,
@@ -40,20 +42,22 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
 
   test('no envía con campos vacíos ni con el fin antes del inicio', async ({ page }) => {
     const dialogo = await abrirNuevoEvento(page);
-    const agendar = dialogo.getByRole('button', { name: 'Agendar evento' });
 
-    // Campos vacíos: título y enlace (la modalidad por defecto es virtual).
-    await agendar.click();
+    // Campos vacíos: título y enlace (la modalidad por defecto es virtual). Al fallar, el diálogo vuelve al paso del primer error.
+    await agendar(dialogo);
     await expect(dialogo.getByText('El título no puede estar vacío.')).toBeVisible();
+    await irAPaso(dialogo, 2);
     await expect(dialogo.getByText('Ingresa el link de la sesión.')).toBeVisible();
     await expect(dialogo).toBeVisible();
 
     // Hora de fin antes de la de inicio, mismo día.
+    await irAPaso(dialogo, 1);
     await dialogo.getByLabel('Título del evento o actividad').fill('Evento que no debe crearse');
+    await irAPaso(dialogo, 2);
     await dialogo.getByLabel('Enlace de conexión virtual').fill(LINK);
     await dialogo.getByLabel('Hora de inicio').fill('10:00');
     await dialogo.getByLabel('Hora de fin').fill('09:00');
-    await agendar.click();
+    await agendar(dialogo);
     await expect(dialogo.getByText('El fin debe ser posterior al inicio.')).toBeVisible();
     await expect(dialogo.getByText('El título no puede estar vacío.')).toHaveCount(0);
     await expect(dialogo).toBeVisible();
@@ -72,9 +76,10 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     await dialogo.getByLabel('Título del evento o actividad').fill(titulo);
     await dialogo.getByLabel('Tipo de actividad').click();
     await page.getByRole('option', { name: 'Tutoría' }).click();
+    await irAPaso(dialogo, 2);
     await dialogo.getByLabel('Enlace de conexión virtual').fill(LINK);
     await expect(dialogo.getByText('Google Meet')).toBeVisible();
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(page.getByText('Evento agendado')).toBeVisible();
     await expect(dialogo).toBeHidden();
 
@@ -117,11 +122,12 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     const titulo = `E2E nocturno ${Date.now()}`;
     const dialogo = await abrirNuevoEvento(page);
     await dialogo.getByLabel('Título del evento o actividad').fill(titulo);
+    await irAPaso(dialogo, 2);
     await dialogo.getByLabel('Enlace de conexión virtual').fill(LINK);
     await dialogo.getByLabel('Hora de inicio').fill('22:00');
     await dialogo.getByLabel('Hora de fin').fill('01:00');
     // Sin fecha de fin el fin cae "antes" del inicio.
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(dialogo.getByText('El fin debe ser posterior al inicio.')).toBeVisible();
 
     await dialogo.getByRole('checkbox', { name: 'Termina otro día' }).click();
@@ -130,7 +136,7 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     const fin = mananaTemprano();
     fin.setDate(fin.getDate() + 1);
     await elegirDiaDelSelector(page, fin, mananaTemprano());
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(page.getByText('Evento agendado')).toBeVisible();
 
     try {
@@ -163,6 +169,7 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     const titulo = `E2E medianoche ${Date.now()}`;
     const dialogo = await abrirNuevoEvento(page);
     await dialogo.getByLabel('Título del evento o actividad').fill(titulo);
+    await irAPaso(dialogo, 2);
     await dialogo.getByLabel('Enlace de conexión virtual').fill(LINK);
     await dialogo.getByLabel('Hora de inicio').fill('23:00');
     await dialogo.getByLabel('Hora de fin').fill('00:00');
@@ -171,7 +178,7 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     const fin = mananaTemprano();
     fin.setDate(fin.getDate() + 1);
     await elegirDiaDelSelector(page, fin, mananaTemprano());
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(page.getByText('Evento agendado')).toBeVisible();
 
     try {
@@ -198,12 +205,13 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
     );
     const dialogo = await abrirNuevoEvento(page);
     await dialogo.getByLabel('Título del evento o actividad').fill('Visita presencial que no se crea');
+    await irAPaso(dialogo, 2);
     await dialogo.getByRole('radio', { name: 'Presencial' }).click();
     // El selector de lugar se carga aparte (next/dynamic). Se espera a que exista antes de enviar: si se envía
     // antes, el error aparece igual pero el foco se queda en el botón (carrera registrada en la auditoría de G05).
     const input = dialogo.getByLabel('Ubicación presencial');
     await expect(input).toBeVisible();
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     const error = dialogo.getByText('Marca la ubicación de la sesión en el mapa.');
     await expect(error).toBeVisible();
     await expect(input).toHaveAttribute('aria-invalid', 'true');
@@ -229,6 +237,7 @@ test.describe('Calendario: diálogo de evento (HU-184, T-325)', () => {
  */
 async function rellenarVirtual(dialogo: Locator, titulo: string) {
   await dialogo.getByLabel('Título del evento o actividad').fill(titulo);
+  await irAPaso(dialogo, 2);
   await dialogo.getByLabel('Enlace de conexión virtual').fill(LINK);
 }
 
@@ -288,7 +297,7 @@ test.describe('Calendario: ciclo de vida completo del evento (HU-184, G05-C10)',
     // Hoy, pero a una hora que ya pasó para el reloj del navegador (08:00).
     await dialogo.getByLabel('Hora de inicio').fill('06:00');
     await dialogo.getByLabel('Hora de fin').fill('07:00');
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(dialogo.getByText('El inicio no puede ser anterior al momento actual.')).toBeVisible();
     await expect(dialogo.getByLabel('Hora de inicio')).toHaveAttribute('aria-invalid', 'true');
     await expect(dialogo).toBeVisible();
@@ -327,6 +336,7 @@ test.describe('Calendario: ciclo de vida completo del evento (HU-184, G05-C10)',
     const creaciones = contarCreaciones(page);
     const dialogo = await abrirNuevoEvento(page);
     await rellenarVirtual(dialogo, etiqueta);
+    await irAPaso(dialogo, 3);
     await dialogo.getByRole('button', { name: 'Agendar evento' }).dblclick();
     await expect(page.getByText('Evento agendado')).toBeVisible();
     await expect(dialogo).toBeHidden();
@@ -337,7 +347,7 @@ test.describe('Calendario: ciclo de vida completo del evento (HU-184, G05-C10)',
   test('cancelar la confirmación de eliminar conserva el evento; confirmarla lo quita del calendario y de la API', async ({ page }) => {
     const dialogo = await abrirNuevoEvento(page);
     await rellenarVirtual(dialogo, etiqueta);
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(page.getByText('Evento agendado')).toBeVisible();
     await verDia(page);
     const bloque = bloqueEvento(page, etiqueta);
@@ -370,10 +380,11 @@ test.describe('Calendario: ciclo de vida completo del evento (HU-184, G05-C10)',
     await simularBuscadorDeLugares(page, lugar);
     const dialogo = await abrirNuevoEvento(page);
     await dialogo.getByLabel('Título del evento o actividad').fill(etiqueta);
+    await irAPaso(dialogo, 2);
     await dialogo.getByRole('radio', { name: 'Presencial' }).click();
     await expect(dialogo.getByLabel('Enlace de conexión virtual')).toHaveCount(0);
     await elegirLugar(page, dialogo, lugar);
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(page.getByText('Evento agendado')).toBeVisible();
 
     const [guardado] = await eventosConTitulo(page, etiqueta);
@@ -397,14 +408,15 @@ test.describe('Calendario: ciclo de vida completo del evento (HU-184, G05-C10)',
     await simularBuscadorDeLugares(page, lugar);
     const dialogo = await abrirNuevoEvento(page);
     await dialogo.getByLabel('Título del evento o actividad').fill(etiqueta);
+    await irAPaso(dialogo, 2);
     await dialogo.getByRole('radio', { name: 'Híbrida' }).click();
     // Sin enlace ni punto: los dos errores a la vez, junto a su campo.
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(dialogo.getByText('Ingresa el link de la sesión.')).toBeVisible();
     await expect(dialogo.getByText('Marca la ubicación de la sesión en el mapa.')).toBeVisible();
     await dialogo.getByLabel('Enlace de conexión virtual').fill(LINK);
     await elegirLugar(page, dialogo, lugar);
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(page.getByText('Evento agendado')).toBeVisible();
     expect((await eventosConTitulo(page, etiqueta))[0]).toMatchObject({ modalidad: 'MIXTA', ubicacionNombre: lugar, linkSesion: LINK });
 
@@ -433,6 +445,7 @@ test.describe('Calendario: ciclo de vida completo del evento (HU-184, G05-C10)',
     const creaciones = contarCreaciones(page);
     const dialogo = await abrirNuevoEvento(page);
     await dialogo.getByLabel('Título del evento o actividad').fill(etiqueta);
+    await irAPaso(dialogo, 2);
     const enlace = dialogo.getByLabel('Enlace de conexión virtual');
     for (const [valor, mensaje] of [
       ['http://localhost:3000/sala', /El link no parece válido/],
@@ -441,13 +454,13 @@ test.describe('Calendario: ciclo de vida completo del evento (HU-184, G05-C10)',
       ['javascript:alert(1)', 'El link debe empezar con http:// o https://.'],
     ] as const) {
       await enlace.fill(valor);
-      await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+      await agendar(dialogo);
       await expect(dialogo.getByText(mensaje)).toBeVisible();
       await expect(enlace).toHaveAttribute('aria-invalid', 'true');
     }
     expect(creaciones).toEqual([]);
     await enlace.fill(LINK);
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(page.getByText('Evento agendado')).toBeVisible();
     expect(creaciones).toEqual([201]);
   });
@@ -467,7 +480,7 @@ test.describe('Calendario: ciclo de vida completo del evento (HU-184, G05-C10)',
     await elegir('Fecha', inicio, mananaTemprano());
     await dialogo.getByRole('checkbox', { name: 'Termina otro día' }).click();
     await elegir('Fecha de fin', fin, inicio);
-    await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+    await agendar(dialogo);
     await expect(page.getByText('Evento agendado')).toBeVisible();
 
     const [creado] = await eventosConTitulo(page, etiqueta);
@@ -531,7 +544,7 @@ test.describe('Calendario: ciclo de vida completo del evento (HU-184, G05-C10)',
       await capturar(page, testInfo, `c10-dialogo-crear-${ancho}-${tema}`);
 
       await dialogo.getByRole('checkbox', { name: 'Termina otro día' }).click();
-      await dialogo.getByRole('button', { name: 'Agendar evento' }).click();
+      await agendar(dialogo);
       await expect(page.getByText('Evento agendado')).toBeVisible();
       await expect(dialogo).toBeHidden();
       expect(await eventosConTitulo(page, etiqueta)).toHaveLength(1);

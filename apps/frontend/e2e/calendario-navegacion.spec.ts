@@ -12,6 +12,7 @@ import {
   flecha,
   focoActual,
   idDelProyecto,
+  irAPaso,
   mananaTemprano,
   retirarDeudaCspDelMapa,
 } from './support/calendario';
@@ -323,6 +324,7 @@ test.describe('Calendario: navegación, eventos cortos y teclado (HU-184, G05-C1
     // Modalidad del formulario: flechas con aria-checked real.
     await agendar.click();
     const nuevo = page.getByRole('dialog', { name: 'Nuevo evento o sesión' });
+    await irAPaso(nuevo, 2);
     const modalidad = (nombre: string) => nuevo.getByRole('radio', { name: nombre });
     await modalidad('Virtual').focus();
     await flecha(page, 'ArrowRight');
@@ -374,6 +376,7 @@ test.describe('Calendario: navegación, eventos cortos y teclado (HU-184, G05-C1
       expect(fuera).toEqual([]);
 
       const dialogo = await abrirNuevoEvento(page);
+      await irAPaso(dialogo, 2);
       await dialogo.getByRole('checkbox', { name: 'Termina otro día' }).click();
       const medidas = await dialogo.evaluate((raiz) => {
         const cuerpo = raiz.querySelector('.overflow-y-auto') as HTMLElement;
