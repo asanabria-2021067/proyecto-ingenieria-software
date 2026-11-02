@@ -270,7 +270,7 @@ export default function DashboardLayout({
             {/* Mobile-only logo */}
             <div className="flex items-center gap-tight md:hidden">
               <Image src={logo} alt="UVGENIUS" className="h-8 w-auto" />
-              <span className="type-subtitle text-text-primary">UVGenius</span>
+              <span className="type-subtitle text-text-primary max-[359px]:hidden">UVGenius</span>
             </div>
             <button
               type="button"

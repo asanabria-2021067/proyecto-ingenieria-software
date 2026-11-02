@@ -47,6 +47,8 @@ test('administracion crea el anuncio, el estudiante lo cierra y no reaparece, y 
   await expect(banner).toBeVisible();
   await expect(banner).toHaveAttribute('role', 'alert');
   await expect(banner).toContainText(TITULO);
+  // El asistente de horas del semestre (HRS) se abre solo sin registro y deja el resto de la pantalla inerte: se pospone.
+  await estudiante.getByRole('button', { name: 'Hacerlo después' }).click();
   await banner.getByRole('button', { name: /Cerrar anuncio/ }).click();
   await expect(estudiante.getByText(TITULO)).toHaveCount(0);
 
