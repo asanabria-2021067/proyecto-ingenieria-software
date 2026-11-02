@@ -729,6 +729,7 @@ model Organizacion {
   solicitudes    SolicitudUnirseOrganizacion[]
   conversaciones Conversacion[]
   seguidores     SeguimientoEntidad[]
+  anuncios       Anuncio[]
 
   @@map("organizacion")
 }
@@ -853,6 +854,7 @@ model Asociacion {
   junta     JuntaAsociacion[]
   proyectos Proyecto[]
   seguidores SeguimientoEntidad[]
+  anuncios   Anuncio[]
 
   @@map("asociacion")
 }
@@ -2292,9 +2294,17 @@ model Anuncio {
   fechaFin      DateTime         @map("fecha_fin")
   activo        Boolean          @default(true)
   fechaCreacion DateTime         @default(now()) @map("fecha_creacion")
+  /// MEJ-66: ambos null = anuncio global de administracion. A lo mucho uno con valor (CHECK en la migracion).
+  idOrganizacion Int?            @map("id_organizacion")
+  idAsociacion   Int?            @map("id_asociacion")
+  creadoPor      Int?            @map("creado_por")
 
-  cierres AnuncioCierre[]
+  organizacion Organizacion? @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Cascade)
+  asociacion   Asociacion?   @relation(fields: [idAsociacion], references: [idAsociacion], onDelete: Cascade)
+  cierres      AnuncioCierre[]
 
+  @@index([idOrganizacion])
+  @@index([idAsociacion])
   @@index([activo, fechaInicio, fechaFin])
   @@map("anuncio")
 }
