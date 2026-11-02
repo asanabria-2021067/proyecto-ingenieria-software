@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Blend, Bookmark, Building2, Check, Clock, Eye, Lock, MapPin, Monitor, Pencil, Pin, Trash2, Users } from 'lucide-react';
+import { Blend, Bookmark, Building2, Check, Clock, Copy, Eye, Lock, MapPin, Monitor, Pencil, Pin, Sparkles, Trash2, Users } from 'lucide-react';
+import { Tag } from '@/components/ui/tag';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
@@ -26,6 +27,8 @@ export type ProyectoDisponibleResumen = Omit<ProyectoResumen, 'roles'> & {
   roles?: { cupos: number; cuposDisponibles?: number }[];
   /** Llega con sesión y sin q: algún rol pide la carrera del usuario. */
   mismaCarrera?: boolean;
+  /** Solo en «Para ti» (MEJ-15): cuánto coincide el proyecto con las habilidades e intereses de quien lo ve. */
+  coincidencia?: { porcentaje: number; interesesCompartidos: number; coincideHabilidades: boolean };
 };
 
 // Los badges se pintan por clase, nunca por `style` inline: cada tono
@@ -276,7 +279,7 @@ export const PROJECT_CARD_GRID = 'grid grid-cols-1 gap-grid lg:grid-cols-2';
 
 export type AvailableProjectCardProps =
   | { context?: 'explore'; proyecto: ProyectoDisponibleResumen }
-  | { context: 'mine'; proyecto: MiProyectoListItemDTO; onDelete?: () => void };
+  | { context: 'mine'; proyecto: MiProyectoListItemDTO; onDelete?: () => void; onDuplicate?: () => void };
 
 /**
  * Tarjeta compartida entre "Explorar Proyectos" y "Mis Proyectos". La
@@ -341,8 +344,22 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
     const Icon = cfg.buttonIcon;
     const SecondaryIcon = cfg.secondaryIcon;
     const onDelete = props.onDelete;
+    const onDuplicate = props.onDuplicate;
     footerAction = (
       <>
+        {onDuplicate && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={onDuplicate}
+            aria-label={`Duplicar proyecto ${tituloProyecto}`}
+            title="Duplicar como borrador"
+            className="h-9.5 w-9.5"
+          >
+            <Copy aria-hidden="true" />
+          </Button>
+        )}
         <Button
           asChild
           className={`h-9.5 w-56 min-w-0 shrink gap-1.5 rounded-md px-4.5 text-[13px] font-semibold shadow-none ${
@@ -491,6 +508,15 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
       <p className="mt-inline text-[13px] leading-4.5 font-normal text-on-surface-variant line-clamp-3">
         {descripcionProyecto || 'Sin descripción disponible.'}
       </p>
+
+      {esExplorar && (proyecto as ProyectoDisponibleResumen).coincidencia?.coincideHabilidades && (
+        <p className="mt-inline">
+          <Tag tone="lime" size="sm">
+            <Sparkles aria-hidden="true" />
+            Coincide con tus habilidades ({(proyecto as ProyectoDisponibleResumen).coincidencia?.porcentaje}%)
+          </Tag>
+        </p>
+      )}
 
       {publicadoPor && (
         <p className="mt-inline flex items-center gap-1.5 text-[12px] text-on-surface-variant">

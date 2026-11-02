@@ -180,6 +180,17 @@ export function getNotificationLink(n: {
       if (!Number.isInteger(conversacion) || conversacion <= 0) return null;
       return `/dashboard/mensajes/${conversacion}${Number.isInteger(mensaje) && mensaje > 0 ? `?mensaje=${mensaje}` : ''}`;
     }
+    // MEJ-16/17: abren el proyecto (el id llega validado como entero positivo; si no, Explorar).
+    case 'PROYECTO_NUEVO_PARA_TI':
+    case 'PROYECTO_GUARDADO_AVISO': {
+      const id = Number(datos.projectId);
+      return Number.isInteger(id) && id > 0 ? `/dashboard/proyectos/${id}` : '/dashboard/proyectos';
+    }
+    // MEJ-22: la invitación se responde en Mis postulaciones; el aviso al líder (aceptada o rechazada) abre su proyecto.
+    case 'INVITACION_ROL_PROYECTO': {
+      const id = Number(datos.idProyecto);
+      return Number.isInteger(id) && id > 0 ? `/dashboard/proyectos/${id}` : '/dashboard/mis-postulaciones';
+    }
     case 'SOLICITUD_RECUPERACION_CONTRASENA':
       return '/dashboard/admin/solicitudes-recuperacion';
     // G05 (OWASP25-C038): alerta de ráfaga de accesos fallidos/bloqueos; el

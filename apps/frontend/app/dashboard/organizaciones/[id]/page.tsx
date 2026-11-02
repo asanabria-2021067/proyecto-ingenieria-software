@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Archive, Building2, ChevronLeft, ExternalLink, Folder, Globe, LogOut, Lock, Pencil, Plus, Users } from 'lucide-react';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { InvitarDialog } from '@/components/organizations/invitar-dialog';
+import { SeguirOrganizacion } from '@/components/organizations/boton-seguir';
 import { OrgAvatar } from '@/components/organizations/org-avatar';
 import { OrgChat } from '@/components/organizations/org-chat';
 import { OrgMiembros } from '@/components/organizations/org-miembros';
@@ -170,6 +171,7 @@ export default function OrganizacionPage() {
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2">
+          <SeguirOrganizacion id={org.idOrganizacion} nombre={org.nombreOrganizacion} />
           {puedePublicarComo(org.miRol) && org.puedePublicar && (
             <Button asChild>
               <Link href={`/dashboard/projects/mine/form?org=${org.idOrganizacion}`}>

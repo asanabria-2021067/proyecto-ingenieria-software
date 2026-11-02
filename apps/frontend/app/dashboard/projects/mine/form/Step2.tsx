@@ -6,6 +6,7 @@ import type { Carrera, Habilidad } from '@/lib/services/catalogs';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { SugerenciasInvitado } from '@/components/projects/sugerencias-invitado';
 import { inputClass, labelClass, type RolFormItem, type RequisitoFormItem, type FieldErrors } from './types';
 
 type Props = {
@@ -13,6 +14,8 @@ type Props = {
   carreras: Carrera[];
   habilidades: Habilidad[];
   errors: Record<string, FieldErrors>;
+  /** Proyecto que se edita (excluye a quienes ya participan de las sugerencias); ausente al crear. */
+  idProyecto?: number;
   onAddRol: () => void;
   onRemoveRol: (id: string) => void;
   onUpdateRol: (id: string, field: keyof Omit<RolFormItem, 'id' | 'requisitos'>, value: unknown) => void;
@@ -25,7 +28,7 @@ const ErrMsg = ({ msg }: { msg?: string }) =>
   msg ? <p className="text-xs text-error mt-1">{msg}</p> : null;
 
 export function Step2({
-  roles, carreras, habilidades, errors,
+  roles, carreras, habilidades, errors, idProyecto,
   onAddRol, onRemoveRol, onUpdateRol,
   onAddRequisito, onRemoveRequisito, onUpdateRequisito,
 }: Props) {
@@ -166,6 +169,12 @@ export function Step2({
               ))}
             </div>
           </div>
+
+          <SugerenciasInvitado
+            habilidades={rol.requisitos.flatMap((r) => (r.idHabilidad ? [r.idHabilidad] : []))}
+            idCarrera={rol.idCarreraRequerida}
+            idProyecto={idProyecto}
+          />
         </div>
         );
       })}

@@ -96,6 +96,22 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
     descripcion: 'Cambia tu pertenencia o rol en una organización, o responden a tu invitación.',
   },
 
+  PROYECTO_NUEVO_PARA_TI: {
+    grupo: 'proyectos',
+    etiqueta: 'Proyecto nuevo para ti',
+    descripcion: 'Se publica un proyecto de tu carrera, de tus intereses o de una organización o asociación que sigues.',
+  },
+  PROYECTO_GUARDADO_AVISO: {
+    grupo: 'proyectos',
+    etiqueta: 'Aviso de un proyecto guardado',
+    descripcion: 'A un proyecto que guardaste le quedan pocos cupos o pasa a solicitud de cierre.',
+  },
+  INVITACION_ROL_PROYECTO: {
+    grupo: 'postulaciones',
+    etiqueta: 'Invitación a un rol',
+    descripcion: 'Un líder te invita a un rol, o responde a tu invitación.',
+  },
+
   PROYECTO_PUBLICADO: { grupo: 'proyectos', etiqueta: 'Proyecto publicado', descripcion: 'Se publica un proyecto.' },
   PROYECTO_EN_REVISION: { grupo: 'proyectos', etiqueta: 'Proyecto en revisión', descripcion: 'Un proyecto entra a revisión de publicación.' },
   PROYECTO_OBSERVADO: { grupo: 'proyectos', etiqueta: 'Proyecto con observaciones', descripcion: 'La revisión devuelve observaciones.' },

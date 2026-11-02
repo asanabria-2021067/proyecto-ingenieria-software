@@ -7,6 +7,7 @@ import { Tag } from '@/components/ui/tag';
 import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
 import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
 import { OrgAvatar } from '@/components/organizations/org-avatar';
+import { SeguirOrganizacion } from '@/components/organizations/boton-seguir';
 import { ROL_LABEL } from '@/lib/organizations/roles';
 import type { MiOrganizacion, OrganizacionPublica } from '@/lib/types/organizations';
 
@@ -79,6 +80,7 @@ export function OrgCard({ org, onSolicitar, solicitando = false }: OrgCardProps)
 
       <div className="mt-auto pt-card">
         <div className="flex flex-wrap items-center justify-end gap-x-inline gap-y-tight border-t border-outline-variant/40 pt-stack">
+          <SeguirOrganizacion id={org.idOrganizacion} nombre={org.nombreOrganizacion} />
           {esMiembro || !onSolicitar ? (
             <Button asChild className={`shrink-0 ${PROJECT_ACTION_BUTTON_CLASS}`}>
               <Link href={`/dashboard/organizaciones/${org.idOrganizacion}`}>Ver organización</Link>

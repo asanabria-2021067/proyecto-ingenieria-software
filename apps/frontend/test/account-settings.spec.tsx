@@ -41,8 +41,10 @@ const FAMILIAS = [
   // HU-200: + MENCION_COMENTARIO.
   ['Tareas e hitos', 8],
   // ORG-1: + INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA.
-  ['Postulaciones y equipo', 10],
-  ['Proyectos', 17],
+  // MEJ-22: + INVITACION_ROL_PROYECTO.
+  ['Postulaciones y equipo', 11],
+  // MEJ-16/17: + PROYECTO_NUEVO_PARA_TI, PROYECTO_GUARDADO_AVISO.
+  ['Proyectos', 19],
   ['Horas y reconocimiento', 5],
   // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA. MEJ-46: + RECORDATORIO_MENSAJE.
   ['Recordatorios y calendario', 6],

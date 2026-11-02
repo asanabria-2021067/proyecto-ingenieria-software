@@ -481,7 +481,7 @@ function NewProjectFormContent() {
             {pasoActual === 'roles' && (
               <Step2
                 roles={form.roles} carreras={carreras} habilidades={habilidades}
-                errors={step2Errors}
+                errors={step2Errors} idProyecto={editId ?? undefined}
                 onAddRol={addRol} onRemoveRol={removeRol} onUpdateRol={updateRol}
                 onAddRequisito={addRequisito} onRemoveRequisito={removeRequisito} onUpdateRequisito={updateRequisito}
               />
