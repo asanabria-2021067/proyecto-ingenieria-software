@@ -177,6 +177,13 @@ enum EstadoTarea {
   HECHO
 }
 
+/// MEJ-47: frecuencia de las tareas repetitivas; el cron crea una copia por ocurrencia.
+enum RepeticionTarea {
+  DIARIA
+  SEMANAL
+  MENSUAL
+}
+
 enum Prioridad {
   BAJA
   MEDIA
@@ -708,19 +715,19 @@ model ExperienciaPrevia {
 }
 
 model Organizacion {
-  idOrganizacion          Int                @id @default(autoincrement()) @map("id_organizacion")
-  nombreOrganizacion      String             @map("nombre_organizacion") @db.VarChar(255)
-  tipoOrganizacion        TipoOrganizacion   @default(OTRO) @map("tipo_organizacion")
-  descripcionOrganizacion String?            @map("descripcion_organizacion") @db.Text
-  correoContacto          String?            @map("correo_contacto") @db.VarChar(255)
-  telefonoContacto        String?            @map("telefono_contacto") @db.VarChar(255)
-  sitioWeb                String?            @map("sitio_web") @db.VarChar(255)
-  logoUrl                 String?            @map("logo_url") @db.VarChar(255)
+  idOrganizacion          Int                     @id @default(autoincrement()) @map("id_organizacion")
+  nombreOrganizacion      String                  @map("nombre_organizacion") @db.VarChar(255)
+  tipoOrganizacion        TipoOrganizacion        @default(OTRO) @map("tipo_organizacion")
+  descripcionOrganizacion String?                 @map("descripcion_organizacion") @db.Text
+  correoContacto          String?                 @map("correo_contacto") @db.VarChar(255)
+  telefonoContacto        String?                 @map("telefono_contacto") @db.VarChar(255)
+  sitioWeb                String?                 @map("sitio_web") @db.VarChar(255)
+  logoUrl                 String?                 @map("logo_url") @db.VarChar(255)
   /// INACTIVA = archivada (solo lectura).
-  estadoOrganizacion      EstadoOrganizacion @default(ACTIVA) @map("estado_organizacion")
+  estadoOrganizacion      EstadoOrganizacion      @default(ACTIVA) @map("estado_organizacion")
   visibilidad             VisibilidadOrganizacion @default(PRIVADA) @map("visibilidad")
-  creadaPor               Int                @map("creada_por")
-  fechaCreacion           DateTime           @default(now()) @map("fecha_creacion")
+  creadaPor               Int                     @map("creada_por")
+  fechaCreacion           DateTime                @default(now()) @map("fecha_creacion")
 
   creador        Usuario                       @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
   miembros       UsuarioOrganizacion[]
@@ -818,6 +825,7 @@ model Proyecto {
   roles             RolProyecto[]
   hitos             Hito[]
   tareas            Tarea[]
+  plantillasTarea   PlantillaTarea[]
   revisiones        RevisionProyecto[]
   comentarios       Comentario[]
   mensajesRevision  MensajeRevisionProyecto[]
@@ -1265,12 +1273,23 @@ model Tarea {
   actualizadaEn       DateTime?        @map("actualizada_en")
   eliminadoEn         DateTime?        @map("eliminado_en")
   destinoArrastre     DestinoArrastre? @map("destino_arrastre")
+  /// MEJ-48: tarea que debe estar HECHO antes de iniciar esta (sin ciclos, validado en el servicio).
+  idTareaBloqueante   Int?             @map("id_tarea_bloqueante")
+  /// MEJ-47: la tarea maestra repite; `repeticionProxima` es el dia de la siguiente copia.
+  repeticion          RepeticionTarea?
+  repeticionProxima   DateTime?        @map("repeticion_proxima") @db.Date
+  idTareaOrigen       Int?             @map("id_tarea_origen")
 
-  proyecto      Proyecto            @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
-  hito          Hito?               @relation(fields: [idHito], references: [idHito], onDelete: SetNull)
-  rolProyecto   RolProyecto?        @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
-  sprint        Sprint?             @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
-  creador       Usuario             @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
+  proyecto      Proyecto             @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  bloqueante    Tarea?               @relation("TareaBloqueo", fields: [idTareaBloqueante], references: [idTarea], onDelete: SetNull)
+  bloqueadas    Tarea[]              @relation("TareaBloqueo")
+  origen        Tarea?               @relation("TareaRepetida", fields: [idTareaOrigen], references: [idTarea], onDelete: SetNull)
+  copias        Tarea[]              @relation("TareaRepetida")
+  checklist     TareaChecklistItem[]
+  hito          Hito?                @relation(fields: [idHito], references: [idHito], onDelete: SetNull)
+  rolProyecto   RolProyecto?         @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
+  sprint        Sprint?              @relation(fields: [idSprint], references: [idSprint], onDelete: SetNull)
+  creador       Usuario              @relation(fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
   asignaciones  AsignacionTarea[]
   evidencias    Evidencia[]
   comentarios   Comentario[]
@@ -1282,7 +1301,42 @@ model Tarea {
   @@index([idProyecto, idRolProyecto])
   @@index([idHito])
   @@index([idSprint])
+  @@index([idTareaBloqueante])
+  @@index([repeticionProxima])
   @@map("tarea")
+}
+
+/// MEJ-6: items de checklist de una tarea.
+model TareaChecklistItem {
+  idItem     Int     @id @default(autoincrement()) @map("id_item")
+  idTarea    Int     @map("id_tarea")
+  texto      String  @db.VarChar(200)
+  completado Boolean @default(false)
+  orden      Int     @default(0)
+
+  tarea Tarea @relation(fields: [idTarea], references: [idTarea], onDelete: Cascade)
+
+  @@index([idTarea])
+  @@map("tarea_checklist_item")
+}
+
+/// MEJ-52: plantillas de tarea del proyecto (el checklist es un arreglo JSON de textos).
+model PlantillaTarea {
+  idPlantilla         Int       @id @default(autoincrement()) @map("id_plantilla")
+  idProyecto          Int       @map("id_proyecto")
+  nombre              String    @db.VarChar(100)
+  tituloTarea         String    @map("titulo_tarea") @db.VarChar(150)
+  descripcionTarea    String?   @map("descripcion_tarea") @db.Text
+  prioridad           Prioridad @default(MEDIA)
+  tiempoEstimadoHoras Int?      @map("tiempo_estimado_horas")
+  checklist           Json      @default("[]")
+  creadaPor           Int       @map("creada_por")
+  creadaEn            DateTime  @default(now()) @map("creada_en")
+
+  proyecto Proyecto @relation(fields: [idProyecto], references: [idProyecto], onDelete: Cascade)
+
+  @@index([idProyecto])
+  @@map("plantilla_tarea")
 }
 
 /// HU-186 (T-329): registro de los avisos de vencimiento ya enviados. Una fila
@@ -1944,14 +1998,14 @@ model MensajeRevisionProyecto {
 /// por par de usuarios dentro del proyecto) se garantiza en ChatService
 /// buscando antes de crear, no con una constraint de base de datos.
 model Conversacion {
-  idConversacion Int              @id @default(autoincrement()) @map("id_conversacion")
+  idConversacion      Int              @id @default(autoincrement()) @map("id_conversacion")
   // Exactamente uno de idProyecto / idOrganizacion (CHECK en la migracion).
-  idProyecto     Int?             @map("id_proyecto")
-  idOrganizacion Int?             @map("id_organizacion")
-  tipo           TipoConversacion
-  nombre         String?          @db.VarChar(255)
-  creadaPor      Int              @map("creada_por")
-  creadaEn       DateTime         @default(now()) @map("creada_en")
+  idProyecto          Int?             @map("id_proyecto")
+  idOrganizacion      Int?             @map("id_organizacion")
+  tipo                TipoConversacion
+  nombre              String?          @db.VarChar(255)
+  creadaPor           Int              @map("creada_por")
+  creadaEn            DateTime         @default(now()) @map("creada_en")
   // T-xxx: menú de 3 puntos del chat — renombrar/archivar/favorito. Aditivas,
   // nullable/default para no tocar filas existentes.
   nombrePersonalizado String?          @map("nombre_personalizado") @db.VarChar(120)
@@ -1970,13 +2024,13 @@ model Conversacion {
   esCanal             Boolean          @default(false) @map("es_canal")
   nombreCanal         String?          @map("nombre_canal") @db.VarChar(40)
 
-  proyecto      Proyecto?                  @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
-  organizacion  Organizacion?              @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Restrict)
-  creador       Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
-  participantes ConversacionParticipante[]
-  mensajes      MensajeChat[]
-  adjuntos      AdjuntoMensajeChat[]
-  apodos        ApodoConversacion[]
+  proyecto            Proyecto?                  @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
+  organizacion        Organizacion?              @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Restrict)
+  creador             Usuario                    @relation("ConversacionesCreadas", fields: [creadaPor], references: [idUsuario], onDelete: Restrict)
+  participantes       ConversacionParticipante[]
+  mensajes            MensajeChat[]
+  adjuntos            AdjuntoMensajeChat[]
+  apodos              ApodoConversacion[]
   mensajesProgramados MensajeProgramado[]
 
   @@unique([idProyecto, nombreCanal])

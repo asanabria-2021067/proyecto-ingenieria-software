@@ -1,5 +1,5 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
-import { AsignacionTarea, Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { AsignacionTarea, EstadoTarea, Prisma, RepeticionTarea } from '@prisma/client';
 import type { ProjectLockRow, ProjectTransactionContext } from '../common/project-policy/project-transaction.service';
 import { calcularProgresoHito } from '../common/hito-progreso';
 
@@ -94,4 +94,78 @@ function isActiveAssignmentCollision(error: unknown): boolean {
     target.length === 1 &&
     target[0] === 'id_tarea'
   );
+}
+
+/** MEJ-47: siguiente ocurrencia (fecha UTC de calendario); en mensual el dia se ajusta al ultimo del mes. */
+export function sumarRepeticion(fecha: Date, repeticion: RepeticionTarea): Date {
+	const d = new Date(fecha);
+	if (repeticion === RepeticionTarea.DIARIA) {
+		d.setUTCDate(d.getUTCDate() + 1);
+	} else if (repeticion === RepeticionTarea.SEMANAL) {
+		d.setUTCDate(d.getUTCDate() + 7);
+	} else {
+		const dia = d.getUTCDate();
+		d.setUTCDate(1);
+		d.setUTCMonth(d.getUTCMonth() + 1);
+		const ultimo = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+		d.setUTCDate(Math.min(dia, ultimo));
+	}
+	return d;
+}
+
+/**
+ * MEJ-48: valida la tarea bloqueante: del mismo proyecto, vigente, distinta de
+ * la propia y sin ciclos (se recorre la cadena de bloqueantes; una cadena que
+ * regrese a `idTarea` es un ciclo). `idTarea` es null al crear.
+ */
+export async function assertBloqueanteValido(
+	tx: Prisma.TransactionClient,
+	projectId: number,
+	idTarea: number | null,
+	idBloqueante: number,
+): Promise<void> {
+	if (idTarea !== null && idBloqueante === idTarea) {
+		throw new BadRequestException('Una tarea no puede estar bloqueada por sí misma');
+	}
+	const vistos = new Set<number>();
+	let actual: number | null = idBloqueante;
+	while (actual !== null && !vistos.has(actual)) {
+		vistos.add(actual);
+		if (idTarea !== null && actual === idTarea) {
+			throw new BadRequestException('La dependencia crearía un ciclo entre tareas');
+		}
+		const fila: { idProyecto: number; idTareaBloqueante: number | null } | null = await tx.tarea.findFirst({
+			where: { idTarea: actual, eliminadoEn: null },
+			select: { idProyecto: true, idTareaBloqueante: true },
+		});
+		if (!fila || fila.idProyecto !== projectId) {
+			throw new BadRequestException('La tarea bloqueante no existe en este proyecto');
+		}
+		actual = fila.idTareaBloqueante;
+	}
+}
+
+/**
+ * MEJ-48: una tarea bloqueada solo puede volver/permanecer en POR_HACER hasta
+ * que su bloqueante esté HECHO. Un bloqueante eliminado ya no bloquea. Recibe
+ * las filas ya leídas por la autorización: sin bloqueante no hay consulta extra.
+ */
+export async function assertNoBloqueada(
+	tx: Prisma.TransactionClient,
+	tareas: { tituloTarea?: string; idTareaBloqueante?: number | null }[],
+	estado: EstadoTarea,
+): Promise<void> {
+	if (estado === EstadoTarea.POR_HACER) return;
+	for (const tarea of tareas) {
+		if (tarea.idTareaBloqueante == null) continue;
+		const bloqueante = await tx.tarea.findFirst({
+			where: { idTarea: tarea.idTareaBloqueante, eliminadoEn: null, estadoTarea: { not: EstadoTarea.HECHO } },
+			select: { tituloTarea: true },
+		});
+		if (bloqueante) {
+			throw new ConflictException(
+				`La tarea "${tarea.tituloTarea ?? ''}" está bloqueada por "${bloqueante.tituloTarea}" hasta que esa tarea esté en Hecho.`,
+			);
+		}
+	}
 }

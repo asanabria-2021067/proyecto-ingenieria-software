@@ -28,7 +28,14 @@ import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { TASK_SELECT, compareTareas, mapTarea, toDateOnly, type TareaPublica } from './tasks.mapper';
 import { TasksNotificationsService } from './tasks-notifications.service';
 import { TasksBulkService, type ResultadoAccionMasiva } from './tasks-bulk.service';
-import { createActiveAssignment, lockedProject, syncHitoEstado } from './tasks-writes.helpers';
+import {
+  assertBloqueanteValido,
+  assertNoBloqueada,
+  createActiveAssignment,
+  lockedProject,
+  sumarRepeticion,
+  syncHitoEstado,
+} from './tasks-writes.helpers';
 
 export type { TareaPublica } from './tasks.mapper';
 export type { ResultadoAccionMasiva } from './tasks-bulk.service';
@@ -49,6 +56,8 @@ const UPDATE_TASK_FIELDS = [
   'idHito',
   'idRolProyecto',
   'idsEtiquetas',
+  'idTareaBloqueante',
+  'repeticion',
 ] as const;
 
 const MIN_PROGRESS_CONTENT_LENGTH = 200;
@@ -223,9 +232,17 @@ export class TasksService {
         tx,
       );
 
+      if (dto.idTareaBloqueante !== undefined) {
+        await assertBloqueanteValido(tx, projectId, null, dto.idTareaBloqueante);
+      }
+      const fechaLimiteCreada = new Date(`${dto.fechaLimite}T00:00:00.000Z`);
+
       const tarea = await tx.tarea.create({
         data: {
           idProyecto: projectId,
+          idTareaBloqueante: dto.idTareaBloqueante ?? null,
+          repeticion: dto.repeticion ?? null,
+          repeticionProxima: dto.repeticion ? sumarRepeticion(fechaLimiteCreada, dto.repeticion) : null,
           idSprint: sprintActivo.idSprint,
           creadaPor: userId,
           tituloTarea: dto.tituloTarea,
@@ -236,7 +253,7 @@ export class TasksService {
           // fechaLimite es @db.Date: se ancla a medianoche UTC del mismo
           // día calendario validado por el DTO, sin usar getters locales,
           // igual que la lectura ya verificada en TasksService (Tarea 15).
-          fechaLimite: new Date(`${dto.fechaLimite}T00:00:00.000Z`),
+          fechaLimite: fechaLimiteCreada,
           prioridad: dto.prioridad,
           // Estado inicial fijo: no existe todavía un contrato de API que
           // permita elegirlo desde el cliente (Tarea 11), y el schema no
@@ -265,6 +282,12 @@ export class TasksService {
             asignadoPor: userId,
             desasignadaEn: null,
           },
+        });
+      }
+
+      if (dto.checklist && dto.checklist.length > 0) {
+        await tx.tareaChecklistItem.createMany({
+          data: dto.checklist.map((texto, orden) => ({ idTarea: tarea.idTarea, texto, orden })),
         });
       }
 
@@ -451,6 +474,18 @@ export class TasksService {
         data.idRolProyecto = recursos.rolProyecto?.idRolProyecto ?? null;
       }
 
+      if (Object.prototype.hasOwnProperty.call(dto, 'idTareaBloqueante')) {
+        if (dto.idTareaBloqueante != null) {
+          await assertBloqueanteValido(tx, projectId, taskId, dto.idTareaBloqueante);
+        }
+        data.idTareaBloqueante = dto.idTareaBloqueante ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(dto, 'repeticion')) {
+        data.repeticion = dto.repeticion ?? null;
+        const base = (data.fechaLimite as Date | undefined) ?? tareaAntes.fechaLimite;
+        data.repeticionProxima = dto.repeticion && base ? sumarRepeticion(base, dto.repeticion) : null;
+      }
+
       await tx.tarea.update({ where: { idTarea: taskId }, data });
 
       // HU-186: los avisos de vencimiento ya registrados eran de la fecha
@@ -575,6 +610,7 @@ export class TasksService {
       await this.policy.assertWriteTx(tx, lockedProject(ctx), 'TAREA_WRITE', userId, {
         sprintId: tareaAntes?.idSprint ?? null,
       });
+      await assertNoBloqueada(tx, tareaAntes ? [tareaAntes] : [], dto.estadoTarea);
 
       await tx.tarea.update({
         where: { idTarea: taskId },
@@ -1036,6 +1072,7 @@ export class TasksService {
       });
 
       if (dto.marcarComoHecha === true) {
+        await assertNoBloqueada(tx, tareaBase ? [tareaBase] : [], EstadoTarea.HECHO);
         await tx.tarea.update({
           where: { idTarea: taskId },
           data: { estadoTarea: EstadoTarea.HECHO },
