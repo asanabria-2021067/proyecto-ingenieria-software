@@ -27,6 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskBoard } from '@/components/projects/task-board';
 import { StartSprintButton } from '@/components/projects/start-sprint-button';
+import { SprintReconocimientos, candidatosAReconocer } from '@/components/projects/sprint-extras';
 import { HitosSection } from '@/components/projects/hitos-section';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
 import { CreateMilestoneDialog } from '@/components/projects/create-milestone-dialog';
@@ -713,6 +714,18 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           />
         )}
       </div>
+      {/* MEJ-57: cada integrante reconoce a un compañero por Sprint; el Sprint cerrado ya no aparece aquí. */}
+      {haySprintDeTrabajo && sprintActual && (isLeader || esParticipante) && (
+        <div className="mt-section">
+          <SprintReconocimientos
+            idProyecto={idProyecto}
+            idSprint={sprintActual.idSprint}
+            estado={sprintActual.estado}
+            idUsuarioActual={currentUser?.idUsuario ?? null}
+            candidatos={candidatosAReconocer(proyecto.creador, members, currentUser?.idUsuario ?? null)}
+          />
+        </div>
+      )}
     </ProjectPageShell>
   );
 }

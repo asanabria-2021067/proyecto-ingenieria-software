@@ -68,6 +68,7 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   },
   EVIDENCIA_REVISADA: { grupo: 'tareas', etiqueta: 'Evidencia revisada', descripcion: 'Revisan una evidencia que entregaste.' },
   TAREA_POR_VENCER: { grupo: 'tareas', etiqueta: 'Tarea por vencer', descripcion: 'Una tarea tuya está cerca de su fecha límite.' },
+  HITO_ATRASADO: { grupo: 'tareas', etiqueta: 'Hito atrasado', descripcion: 'Un hito de un proyecto que lideras pasó su fecha límite sin completarse.' },
 
   NUEVA_POSTULACION: { grupo: 'postulaciones', etiqueta: 'Nueva postulación', descripcion: 'Alguien se postula a un rol de tu proyecto.' },
   POSTULACION_RESUELTA: { grupo: 'postulaciones', etiqueta: 'Postulación resuelta', descripcion: 'Aceptan o rechazan tu postulación.' },
@@ -147,6 +148,7 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   HORAS_ACREDITADAS: { grupo: 'horas', etiqueta: 'Horas acreditadas', descripcion: 'Se acreditan tus horas al cerrar un proyecto.' },
   CERTIFICADO_EMITIDO: { grupo: 'horas', etiqueta: 'Certificado emitido', descripcion: 'Se emite un certificado a tu nombre.' },
   INSIGNIA_OBTENIDA: { grupo: 'horas', etiqueta: 'Insignia obtenida', descripcion: 'Subes de nivel en una insignia.' },
+  RECONOCIMIENTO_RECIBIDO: { grupo: 'horas', etiqueta: 'Reconocimiento de un compañero', descripcion: 'Un compañero te reconoce al cierre de un sprint.' },
 
   RECORDATORIO_EVENTO: { grupo: 'recordatorios', etiqueta: 'Recordatorio de evento', descripcion: 'Un evento de tu calendario está por empezar.' },
   CALENDARIO_COMPARTIDO: { grupo: 'recordatorios', etiqueta: 'Calendario compartido', descripcion: 'Alguien comparte su calendario contigo.' },

@@ -191,6 +191,15 @@ export function getNotificationLink(n: {
       const id = Number(datos.idProyecto);
       return Number.isInteger(id) && id > 0 ? `/dashboard/proyectos/${id}` : '/dashboard/mis-postulaciones';
     }
+    // MEJ-54/57: el aviso abre la pestaña de hitos o el proyecto; el id se valida como entero positivo.
+    case 'HITO_ATRASADO': {
+      const id = idUsuarioSeguro(datos.projectId);
+      return id === null ? null : `/dashboard/projects/${id}/kanban?tab=hitos`;
+    }
+    case 'RECONOCIMIENTO_RECIBIDO': {
+      const id = idUsuarioSeguro(datos.projectId);
+      return id === null ? null : `/dashboard/proyectos/${id}`;
+    }
     case 'SOLICITUD_RECUPERACION_CONTRASENA':
       return '/dashboard/admin/solicitudes-recuperacion';
     // G05 (OWASP25-C038): alerta de ráfaga de accesos fallidos/bloqueos; el

@@ -16,6 +16,8 @@ vi.mock('../components/dashboard/DashboardLayout', () => ({
 }));
 
 vi.mock('../hooks/use-project-detail', () => ({ useProjectDetail: vi.fn() }));
+// MEJ-57: el panel de reconocimientos tiene su propia prueba (seguimiento-proyecto.spec.tsx).
+vi.mock('../components/projects/sprint-extras', () => ({ SprintReconocimientos: () => null, candidatosAReconocer: () => [] }));
 vi.mock('../hooks/use-project-avance', () => ({
   useProjectAvance: () => ({ data: undefined, isSuccess: false }),
 }));

@@ -53,6 +53,7 @@ import type {
   SprintHistoryUsuarioDto,
 } from '@/lib/types/sprints';
 import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+import { SprintReconocimientosEquipo, SprintReportButtons, SprintRetrospectiva } from '@/components/projects/sprint-extras';
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -338,6 +339,7 @@ function SprintDetailContent({
   // S7 (VIEW-11): un Sprint CERRADO es histórico para todos los roles. Las
   // horas acreditadas viven en el resumen de cierre (read-only en ese estado).
   const cerrado = detail.estado === 'CERRADO';
+  const { data: usuarioActual } = useCurrentUser();
 
   return (
     <div className="space-y-6">
@@ -350,18 +352,21 @@ function SprintDetailContent({
             : 'Resumen histórico del trabajo, las contribuciones y los hitos de este Sprint.'
         }
         actions={
-          cerrado && (
-            <Button
-              asChild
-              variant="outline"
-              className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
-            >
-              <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/finalizar`}>
-                <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                Horas acreditadas
-              </Link>
-            </Button>
-          )
+          <>
+            <SprintReportButtons idProyecto={detail.idProyecto} idSprint={detail.idSprint} />
+            {cerrado && (
+              <Button
+                asChild
+                variant="outline"
+                className="gap-1.5 rounded-lg border-outline-variant text-xs font-bold"
+              >
+                <Link href={`/dashboard/proyectos/${detail.idProyecto}/sprints/${detail.idSprint}/finalizar`}>
+                  <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                  Horas acreditadas
+                </Link>
+              </Button>
+            )}
+          </>
         }
       >
         <div className="mt-tight flex flex-wrap items-center gap-x-inline gap-y-micro">
@@ -500,6 +505,14 @@ function SprintDetailContent({
           </div>
         )}
       </div>
+
+      <SprintReconocimientosEquipo
+        idProyecto={detail.idProyecto}
+        idSprint={detail.idSprint}
+        estado={detail.estado}
+        idUsuarioActual={usuarioActual?.idUsuario ?? null}
+      />
+      <SprintRetrospectiva idProyecto={detail.idProyecto} idSprint={detail.idSprint} estado={detail.estado} esLider />
     </div>
   );
 }

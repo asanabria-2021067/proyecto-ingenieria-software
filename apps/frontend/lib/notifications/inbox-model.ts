@@ -1,5 +1,6 @@
 import {
   Activity,
+  AlertTriangle,
   AtSign,
   Award,
   BadgeCheck,
@@ -233,6 +234,7 @@ const CAMPO_ACTOR: Readonly<Record<string, string>> = {
   APELACION_LIDERAZGO_RECIBIDA: 'leaderName',
   CALENDARIO_COMPARTIDO: 'ownerName',
   MENCION_COMENTARIO: 'autorNombre',
+  RECONOCIMIENTO_RECIBIDO: 'autorNombre',
 };
 
 /** Decisiones de Administración sin responsable individual en el payload. */
@@ -258,6 +260,7 @@ const ICONO_AUTOMATICO: Readonly<Record<string, LucideIcon>> = {
   HORAS_VALIDADAS: BadgeCheck,
   CERTIFICADO_EMITIDO: Award,
   INSIGNIA_OBTENIDA: Award,
+  HITO_ATRASADO: AlertTriangle,
   PROYECTO_ADVERTENCIA_INACTIVIDAD: Activity,
   CAMBIO_ESTADO_PROYECTO: Activity,
   POSTULACION_RECHAZADA_POR_CIERRE: Activity,

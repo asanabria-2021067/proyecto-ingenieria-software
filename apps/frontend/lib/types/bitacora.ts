@@ -58,6 +58,9 @@ export class TipoEventoBitacora {
   static readonly ACTIVITY_CREATED = 'ACTIVITY_CREATED' as const;
   static readonly ATTENDANCE_MARKED = 'ATTENDANCE_MARKED' as const;
 
+  // ---- MEJ-24: retrospectiva opcional del Sprint. ----
+  static readonly SPRINT_RETROSPECTIVE_SAVED = 'SPRINT_RETROSPECTIVE_SAVED' as const;
+
   static readonly VALORES = [
     'TASK_CREATED',
     'TASK_UPDATED',
@@ -98,6 +101,7 @@ export class TipoEventoBitacora {
     'PROJECT_EXPORT_PDF_GENERATED',
     'ACTIVITY_CREATED',
     'ATTENDANCE_MARKED',
+    'SPRINT_RETROSPECTIVE_SAVED',
   ] as const;
 }
 
