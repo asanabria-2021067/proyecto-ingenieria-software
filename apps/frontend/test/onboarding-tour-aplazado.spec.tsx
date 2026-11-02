@@ -50,6 +50,15 @@ describe('OnboardingTour y paso de horas', () => {
   });
 });
 
+describe('OnboardingTour pasos', () => {
+  it('incluye el paso de Mensajes', () => {
+    perfil.incompleto = false;
+    render(<OnboardingTour />);
+    const opts = useJoyrideMock.mock.calls.at(-1)![0] as unknown as { steps: { target: string }[] };
+    expect(opts.steps.map((s) => s.target)).toContain('#nav-item-mensajes');
+  });
+});
+
 describe('OnboardingTour y asistente de perfil', () => {
   it('con perfil incompleto y sin aplazar, no arranca', () => {
     render(<OnboardingTour />);

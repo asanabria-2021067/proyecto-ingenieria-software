@@ -211,6 +211,14 @@ export default function OnboardingTour() {
       disableBeacon: true,
     },
     {
+      target: '#nav-item-mensajes',
+      title: 'Mensajes',
+      content:
+        'Conversa con tus equipos y organizaciones en una sola pantalla: busca, revisa lo no leído, adjunta archivos, graba notas de voz y crea encuestas.',
+      placement: 'right',
+      disableBeacon: true,
+    },
+    {
       target: '#dashboard-theme-toggle',
       title: 'Tema Claro / Oscuro',
       content:
