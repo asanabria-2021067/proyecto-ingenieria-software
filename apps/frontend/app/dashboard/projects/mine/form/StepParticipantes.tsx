@@ -12,13 +12,13 @@ import type { MiembroOrganizacion } from '@/lib/types/organizations';
 import type { RolFormItem } from './types';
 
 /** De una asociación no hay rol de organización: la etiqueta es el cargo en la junta o «Estudiante». */
-export type CandidatoParticipante = Pick<MiembroOrganizacion, 'idUsuario' | 'nombre' | 'apellido' | 'fotoUrl'> & {
+export type CandidatoVista = Pick<MiembroOrganizacion, 'idUsuario' | 'nombre' | 'apellido' | 'fotoUrl'> & {
   rolOrganizacion?: MiembroOrganizacion['rolOrganizacion'];
   etiqueta?: string;
 };
 
 type Props = {
-  miembros: CandidatoParticipante[];
+  miembros: CandidatoVista[];
   roles: RolFormItem[];
   participantes: ParticipanteForm[];
   error: string | null;

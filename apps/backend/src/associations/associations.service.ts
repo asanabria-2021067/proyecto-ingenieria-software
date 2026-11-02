@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService, type PostCommitEffect } from '../notifications/notifications.service';
 import { CARGO_ETIQUETA, NIVEL_POR_CARGO } from './associations.rules';
 import { assertPuedePublicarComoAsociacion } from './junta-access';
+import { whereCandidatoAsociacion } from '../organizations/organization-projects';
 import { CreateAsociacionDto } from './dto/create-asociacion.dto';
 import { UpdateAsociacionDto } from './dto/update-asociacion.dto';
 import { ActualizarJuntaDto, AsignarJuntaDto } from './dto/junta.dto';
@@ -186,12 +187,8 @@ export class AssociationsService {
     const termino = q?.trim();
     const usuarios = await this.prisma.usuario.findMany({
       where: {
-        estado: 'ACTIVO',
+        ...whereCandidatoAsociacion(idAsociacion),
         idUsuario: { not: idUsuario },
-        OR: [
-          { juntasAsociacion: { some: { idAsociacion } } },
-          { perfil: { is: { carrera: { asociaciones: { some: { idAsociacion } } } } } },
-        ],
         ...(termino
           ? {
               AND: termino.split(/\s+/).map((t) => ({

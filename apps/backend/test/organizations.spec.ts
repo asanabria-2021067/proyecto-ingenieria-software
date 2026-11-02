@@ -159,6 +159,13 @@ describe('organization-projects', () => {
     await expect(validarParticipantes(cliente, 1, undefined, [{ idUsuario: 1, indiceRol: 0 }], roles, 5)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('idAsociacion null cuenta como ausente: 400 sin consultar la base', async () => {
+    const count = vi.fn();
+    const cliente = { usuario: { count } } as unknown as Prisma.TransactionClient;
+    await expect(validarParticipantes(cliente, 1, undefined, [{ idUsuario: 2, indiceRol: 0 }], roles, null)).rejects.toBeInstanceOf(BadRequestException);
+    expect(count).not.toHaveBeenCalled();
+  });
+
   it('crea las participaciones activas en el rol que corresponde a cada posición', async () => {
     const createMany = vi.fn();
     const cliente = { participacionProyecto: { createMany } } as unknown as Prisma.TransactionClient;

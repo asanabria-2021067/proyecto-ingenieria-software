@@ -26,7 +26,7 @@ import { Step1 } from './Step1';
 import { Step2 } from './Step2';
 import { Step3 } from './Step3';
 import { StepPropietario } from './StepPropietario';
-import { StepParticipantes, type CandidatoParticipante } from './StepParticipantes';
+import { StepParticipantes, type CandidatoVista } from './StepParticipantes';
 import {
   newRol, newRequisito, safeId, step1Schema, rolSchema, formSchema, partialProjectSchema, zodToFieldErrors,
   type FormData, type RolFormItem, type RequisitoFormItem, type FieldErrors,
@@ -111,8 +111,8 @@ function NewProjectFormContent() {
     busquedaAplicada,
   );
   // Quienes ya se eligieron siguen con nombre en el resumen aunque la búsqueda cambie.
-  const candidatosVistos = useRef(new Map<number, CandidatoParticipante>());
-  const candidatos: CandidatoParticipante[] = candidatosAsociacion.map((c) => ({
+  const candidatosVistos = useRef(new Map<number, CandidatoVista>());
+  const candidatos: CandidatoVista[] = candidatosAsociacion.map((c) => ({
     idUsuario: c.idUsuario,
     nombre: c.nombre,
     apellido: c.apellido,

@@ -8,6 +8,15 @@ export interface ParticipanteOrganizacion {
   indiceRol: number;
 }
 
+/** Quién puede participar en un proyecto de asociación: junta o estudiantes de sus carreras, usuarios activos. */
+export const whereCandidatoAsociacion = (idAsociacion: number): Prisma.UsuarioWhereInput => ({
+  estado: EstadoUsuario.ACTIVO,
+  OR: [
+    { juntasAsociacion: { some: { idAsociacion } } },
+    { perfil: { is: { carrera: { asociaciones: { some: { idAsociacion } } } } } },
+  ],
+});
+
 /**
  * Participantes elegidos entre los miembros de la organización: deben ser
  * miembros activos con rol Propietario, Administrador o Editor (Lectura solo
@@ -21,9 +30,10 @@ export async function validarParticipantes(
   idOrganizacion: number | undefined,
   participantes: ParticipanteOrganizacion[],
   roles: { cupos: number }[],
-  idAsociacion?: number,
+  idAsociacionDto?: number | null,
 ): Promise<void> {
   if (participantes.length === 0) return;
+  const idAsociacion = idAsociacionDto ?? undefined; // el DTO acepta null
   if (idOrganizacion === undefined && idAsociacion === undefined) {
     throw new BadRequestException('Los participantes solo se eligen cuando el proyecto es de una organización o una asociación');
   }
@@ -42,14 +52,7 @@ export async function validarParticipantes(
 
   if (idOrganizacion === undefined) {
     const validos = await tx.usuario.count({
-      where: {
-        idUsuario: { in: ids },
-        estado: EstadoUsuario.ACTIVO,
-        OR: [
-          { juntasAsociacion: { some: { idAsociacion } } },
-          { perfil: { is: { carrera: { asociaciones: { some: { idAsociacion } } } } } },
-        ],
-      },
+      where: { idUsuario: { in: ids }, ...whereCandidatoAsociacion(idAsociacion as number) },
     });
     if (validos !== ids.length) {
       throw new BadRequestException('Solo pueden participar integrantes de la junta o estudiantes activos de las carreras de la asociación');
