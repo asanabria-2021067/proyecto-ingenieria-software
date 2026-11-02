@@ -13,6 +13,7 @@ import { dashboardPage } from '@/components/layout/dashboard-page';
 import { ADMIN_TAB_LIST, ADMIN_TAB_TRIGGER } from '@/components/admin/admin-tabs';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { PageTitle } from '@/components/ui/page-title';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useEstudiantesAsociacion, useMisJuntas } from '@/hooks/use-asociaciones';
@@ -77,7 +78,7 @@ export default function AsociacionDashboardPage() {
   return (
     <div className={dashboardPage('flex flex-col gap-section py-section')}>
       <header>
-        <h1 className="type-display">Asociación {junta.nombre}</h1>
+        <PageTitle>Asociación {junta.nombre}</PageTitle>
         <p className="type-body mt-micro text-text-secondary">
           Tu cargo: {CARGO_LABEL[junta.cargo]}. Aquí ves el avance de horas de los estudiantes de las carreras de la asociación. Es solo
           consulta: la junta no aprueba ni acredita horas.

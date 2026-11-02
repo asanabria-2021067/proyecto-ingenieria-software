@@ -18,6 +18,7 @@ import {
 } from '@/components/dashboard/data-table';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { PageTitle } from '@/components/ui/page-title';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tag } from '@/components/ui/tag';
@@ -60,7 +61,7 @@ export default function AdminAsociacionesPage() {
       <AdminBreadcrumb seccion="Usuarios" pagina="Asociaciones y juntas" />
       <section className="mb-8 flex flex-wrap items-end justify-between gap-stack">
         <div>
-          <h1 className={ADMIN_PAGE_TITLE}>Asociaciones y juntas</h1>
+          <PageTitle className={ADMIN_PAGE_TITLE}>Asociaciones y juntas</PageTitle>
           <p className={ADMIN_PAGE_LEAD}>
             Las asociaciones oficiales representan una o varias carreras. Solo tú nombras a su junta directiva; cada cambio queda en la bitácora y
             avisa a la persona.
