@@ -53,7 +53,8 @@ describe('calendario — tokens de tipografía y radios (G04-C10, UI-33)', () =>
     const radiosDeBotones = [...pie.matchAll(/<Button[\s\S]*?className=(?:"([^"]*)"|\{(EVENT_DIALOG_[A-Z_]+)\})/g)].map(
       (m) => (m[1] ?? clase(m[2])).match(/rounded-[a-z]+/)?.[0],
     );
-    expect(radiosDeBotones).toEqual(['rounded-pill', 'rounded-pill', 'rounded-pill']);
+    // Eliminar, Cancelar, Anterior, Siguiente y el botón de envío (Anterior/Siguiente son del formulario por pasos).
+    expect(radiosDeBotones).toEqual(['rounded-pill', 'rounded-pill', 'rounded-pill', 'rounded-pill', 'rounded-pill']);
 
     const pagina = leer(join('app', 'dashboard', 'calendario', 'page.tsx'));
     const barra = pagina.slice(pagina.indexOf('<CalendarFilterMenu'), pagina.indexOf("{vista === 'mes' && ("));
