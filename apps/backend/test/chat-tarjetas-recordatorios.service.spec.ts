@@ -77,6 +77,7 @@ describe('RecordatoriosMensajeService (MEJ-46)', () => {
         findMany: vi.fn(),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
+      participacionProyecto: { count: vi.fn().mockResolvedValue(0) },
     };
     chat = { assertConversationParticipant: vi.fn().mockResolvedValue(undefined) };
     notifications = { notifyFromTemplate: vi.fn().mockResolvedValue(undefined) };
@@ -159,6 +160,17 @@ describe('RecordatoriosMensajeService (MEJ-46)', () => {
       expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
       expect(prisma.recordatorioMensaje.update).toHaveBeenCalledTimes(2);
       expect(prisma.recordatorioMensaje.update.mock.calls[0][0].data).toEqual({ estado: 'FALLIDO' });
+    });
+
+    it('canal: quien salio del proyecto no recibe el recordatorio aunque conserve la fila de participante', async () => {
+      prisma.recordatorioMensaje.findMany.mockResolvedValue([fila({}, { esCanal: true, proyecto: { creadoPor: 50 } })]);
+      await service.procesarVencidos(AHORA);
+      expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
+      expect(prisma.recordatorioMensaje.update.mock.calls[0][0].data).toEqual({ estado: 'FALLIDO' });
+      prisma.recordatorioMensaje.findMany.mockResolvedValue([fila({}, { esCanal: true, proyecto: { creadoPor: 50 } })]);
+      prisma.participacionProyecto.count.mockResolvedValue(1);
+      await service.procesarVencidos(AHORA);
+      expect(notifications.notifyFromTemplate).toHaveBeenCalledTimes(1);
     });
 
     it('un fallo al notificar no detiene el resto del lote', async () => {

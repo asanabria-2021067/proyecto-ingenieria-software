@@ -201,6 +201,20 @@ export class ChatService {
     return proyecto;
   }
 
+  /** Ids mencionables: en canales las filas de participante pueden ser de ex miembros, asi que se exige membresia vigente. */
+  private async idsMencionables(
+    conversacion: { esCanal: boolean; idProyecto: number | null; participantes: { idUsuario: number }[]; proyecto: { creadoPor: number } | null },
+  ) {
+    const ids = conversacion.participantes.map((p) => p.idUsuario);
+    if (!conversacion.esCanal || conversacion.idProyecto === null) return ids;
+    const activos = await this.prisma.participacionProyecto.findMany({
+      where: { idUsuario: { in: ids }, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: conversacion.idProyecto } },
+      select: { idUsuario: true },
+    });
+    const vigentes = new Set(activos.map((a) => a.idUsuario));
+    return ids.filter((id) => vigentes.has(id) || id === conversacion.proyecto?.creadoPor);
+  }
+
   private async getConversacionOrThrow(idProyecto: number, idConversacion: number, userId: number) {
     const conversacion = await this.prisma.conversacion.findFirst({
       where: { idConversacion, idProyecto, eliminadaEn: null },
@@ -638,11 +652,7 @@ export class ChatService {
     }
 
     // MEJ-44: las menciones validas conservan su token; el resto queda como texto.
-    const menciones = prepararMencionesChat(
-      contenido,
-      conversacion.participantes.map((p) => p.idUsuario),
-      userId,
-    );
+    const menciones = prepararMencionesChat(contenido, await this.idsMencionables(conversacion), userId);
     contenido = menciones.contenido;
 
     const { encuesta } = extra;
@@ -909,7 +919,7 @@ export class ChatService {
     contenido: string,
   ) {
     const conversacion = await this.getOwnMessageOrThrow(idProyecto, idConversacion, idMensaje, userId);
-    const participantes = conversacion.participantes.map((p) => p.idUsuario);
+    const participantes = await this.idsMencionables(conversacion);
     const menciones = prepararMencionesChat(contenido.trim(), participantes, userId);
     const mensaje = conResumenDeCita(
       await this.prisma.mensajeChat.update({

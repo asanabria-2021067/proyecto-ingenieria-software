@@ -97,7 +97,13 @@ export class RecordatoriosMensajeService {
             eliminadoEn: true,
             remitente: { select: { nombre: true, apellido: true } },
             conversacion: {
-              select: { idProyecto: true, eliminadaEn: true, participantes: { select: { idUsuario: true } } },
+              select: {
+                idProyecto: true,
+                eliminadaEn: true,
+                esCanal: true,
+                participantes: { select: { idUsuario: true } },
+                proyecto: { select: { creadoPor: true } },
+              },
             },
           },
         },
@@ -113,9 +119,22 @@ export class RecordatoriosMensajeService {
         if (count === 0) continue; // otra ejecucion lo tomo primero
 
         const m = r.mensaje;
-        const { idProyecto, eliminadaEn, participantes } = m.conversacion;
+        const { idProyecto, eliminadaEn, participantes, esCanal, proyecto } = m.conversacion;
         // Mensaje borrado, conversacion eliminada o el usuario ya no participa: no se avisa ni se filtra contenido.
-        if (m.eliminadoEn || eliminadaEn || idProyecto === null || !participantes.some((p) => p.idUsuario === r.idUsuario)) {
+        // En canales las filas de participante pueden ser de ex miembros: se exige ademas membresia vigente del proyecto.
+        const vigente =
+          !esCanal ||
+          proyecto?.creadoPor === r.idUsuario ||
+          (await this.prisma.participacionProyecto.count({
+            where: { idUsuario: r.idUsuario, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: idProyecto ?? -1 } },
+          })) > 0;
+        if (
+          m.eliminadoEn ||
+          eliminadaEn ||
+          idProyecto === null ||
+          !vigente ||
+          !participantes.some((p) => p.idUsuario === r.idUsuario)
+        ) {
           await this.prisma.recordatorioMensaje.update({
             where: { idRecordatorio: r.idRecordatorio },
             data: { estado: EstadoMensajeProgramado.FALLIDO },
