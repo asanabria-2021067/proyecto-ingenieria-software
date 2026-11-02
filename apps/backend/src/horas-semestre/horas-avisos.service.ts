@@ -89,8 +89,8 @@ export class HorasAvisosService {
         tarea: {
           estadoTarea: 'EN_PROGRESO',
           eliminadoEn: null,
-          proyecto: { eliminadoEn: null, estadoProyecto: { in: ['PUBLICADO', 'EN_PROGRESO'] } },
-          // Sin sprint, time-records solo exige un sprint operable en el proyecto (assertWriteTx).
+          proyecto: { eliminadoEn: null, estadoProyecto: { in: ['PUBLICADO', 'EN_PROGRESO'] }, sprints: { some: { estado: 'ACTIVO' } } },
+          // assertWriteTx exige siempre un sprint ACTIVO en el proyecto; ademas, si la tarea tiene sprint, debe ser ese.
           OR: [{ idSprint: null }, { sprint: { estado: 'ACTIVO' } }],
         },
       },

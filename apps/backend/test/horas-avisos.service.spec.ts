@@ -103,7 +103,7 @@ describe('HorasAvisosService.recordarRegistroDeHoras (MEJ-60)', () => {
       OR: [{ participacion: { estadoParticipacion: 'ACTIVO' } }, { idParticipacion: null }],
       tarea: {
         OR: [{ idSprint: null }, { sprint: { estado: 'ACTIVO' } }],
-        proyecto: { estadoProyecto: { in: ['PUBLICADO', 'EN_PROGRESO'] } },
+        proyecto: { estadoProyecto: { in: ['PUBLICADO', 'EN_PROGRESO'] }, sprints: { some: { estado: 'ACTIVO' } } },
       },
     });
   });
