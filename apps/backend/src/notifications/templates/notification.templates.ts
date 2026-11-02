@@ -1,4 +1,6 @@
-export interface NotificationTemplateData {
+import { HORAS_TEMPLATES, type HorasTemplateData } from './horas.templates';
+
+export interface NotificationTemplateData extends HorasTemplateData {
   NUEVA_POSTULACION: {
     userName: string;
     roleName: string;
@@ -353,12 +355,6 @@ export interface NotificationTemplateData {
     sprintNumero: number;
   };
 
-  // MEJ-13: el avance de horas beca o extension del semestre va en riesgo.
-  HORAS_EN_RIESGO: { tipos: ('beca' | 'extension')[] };
-
-  // MEJ-60: tareas en progreso sin horas registradas en los ultimos 3 dias.
-  RECORDATORIO_HORAS: { cantidad: number; taskTitle: string; taskId: number; projectId: number };
-
   SOLICITUD_CONTACTO: {
     nombre: string;
     correo: string;
@@ -432,6 +428,7 @@ export interface NotificationTemplateData {
 }
 
 export const NOTIFICATION_TEMPLATES = {
+  ...HORAS_TEMPLATES,
   NUEVA_POSTULACION: {
     title: 'Nueva postulación recibida',
     message: (data: NotificationTemplateData['NUEVA_POSTULACION']) =>
@@ -725,20 +722,6 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Te reconocieron en el sprint',
     message: (data: NotificationTemplateData['RECONOCIMIENTO_RECIBIDO']) =>
       `${data.autorNombre} te reconoció en el sprint ${data.sprintNumero} del proyecto "${data.projectTitle}".`,
-  },
-
-  HORAS_EN_RIESGO: {
-    title: 'Tus horas del semestre van atrasadas',
-    message: (data: NotificationTemplateData['HORAS_EN_RIESGO']) =>
-      `Tu avance de ${data.tipos.map((t) => (t === 'beca' ? 'horas beca' : 'horas de extensión')).join(' y ')} está por debajo de lo esperado para esta altura del semestre. Revisa «Mis horas».`,
-  },
-
-  RECORDATORIO_HORAS: {
-    title: 'Recuerda registrar tus horas',
-    message: (data: NotificationTemplateData['RECORDATORIO_HORAS']) =>
-      data.cantidad === 1
-        ? `Tu tarea "${data.taskTitle}" está en progreso y no has registrado horas en los últimos 3 días.`
-        : `Tienes ${data.cantidad} tareas en progreso sin horas registradas en los últimos 3 días, entre ellas "${data.taskTitle}".`,
   },
 
   SOLICITUD_CONTACTO: {
