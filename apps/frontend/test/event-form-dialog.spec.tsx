@@ -117,6 +117,16 @@ function evento(overrides: Partial<EventoProyectoDTO> = {}): EventoProyectoDTO {
   };
 }
 
+/** La creación es por pasos: el selector de pasos lleva al último, donde está «Agendar evento». */
+function irAlUltimoPaso() {
+  fireEvent.click(screen.getByRole('button', { name: /^Paso 3 de 3/ }));
+}
+
+function agendar() {
+  irAlUltimoPaso();
+  fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+}
+
 function renderCrear(onOpenChange = vi.fn()) {
   render(<EventFormDialog open onOpenChange={onOpenChange} ledProjects={LED} defaultProjectId={1} />, { wrapper });
   return { onOpenChange };
@@ -166,7 +176,7 @@ describe('EventFormDialog (HU-184 T-323, rediseño)', () => {
   it('con el título vacío no envía y marca el campo', async () => {
     renderCrear();
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     expect(await screen.findByText('El título no puede estar vacío.')).toBeInTheDocument();
     expect(eventsMock.createEvent).not.toHaveBeenCalled();
@@ -179,7 +189,7 @@ describe('EventFormDialog (HU-184 T-323, rediseño)', () => {
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
     fireEvent.change(screen.getByLabelText('Hora de inicio'), { target: { value: '15:00' } });
     fireEvent.change(screen.getByLabelText('Hora de fin'), { target: { value: '14:00' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     expect(await screen.findByText('El fin debe ser posterior al inicio.')).toBeInTheDocument();
     expect(eventsMock.createEvent).not.toHaveBeenCalled();
@@ -197,7 +207,7 @@ describe('EventFormDialog (HU-184 T-323, rediseño)', () => {
     fireEvent.click(screen.getByText('Luis Hernández'));
     expect(await screen.findByText('1 invitado')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
     const [projectId, payload] = eventsMock.createEvent.mock.calls[0];
@@ -223,7 +233,7 @@ describe('EventFormDialog (HU-184 T-323, rediseño)', () => {
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Enviar recordatorio' }));
     expect(screen.queryByRole('combobox', { name: 'Cuándo enviar el recordatorio' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
     expect(eventsMock.createEvent.mock.calls[0][1].antelacionMinutos).toBe(0);
@@ -234,7 +244,7 @@ describe('EventFormDialog (HU-184 T-323, rediseño)', () => {
     const { onOpenChange } = renderCrear();
     fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     await waitFor(() => expect(mensajesMock.aviso.error).toHaveBeenCalled());
     expect(mensajesMock.aviso.error.mock.calls[0][0]).toBe('No se pudo agendar el evento');
@@ -348,7 +358,7 @@ describe('EventFormDialog — validación visible de la ubicación (G02-C02, UI-
 
   it('presencial sin punto en el mapa: el error aparece junto al campo, el input queda inválido y recibe el foco', async () => {
     renderPresencial();
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     const mensaje = await screen.findByText('Marca la ubicación de la sesión en el mapa.');
     const input = screen.getByLabelText('Ubicación presencial');
@@ -361,7 +371,7 @@ describe('EventFormDialog — validación visible de la ubicación (G02-C02, UI-
   it('un nombre de lugar de más de 255 caracteres muestra su mensaje junto al campo (no solo el aviso genérico)', async () => {
     renderPresencial();
     fireEvent.change(screen.getByLabelText('Ubicación presencial'), { target: { value: 'x'.repeat(300) } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     expect(await screen.findByText('El nombre del lugar no puede exceder 255 caracteres.')).toHaveAttribute('role', 'alert');
     expect(eventsMock.createEvent).not.toHaveBeenCalled();
@@ -370,14 +380,14 @@ describe('EventFormDialog — validación visible de la ubicación (G02-C02, UI-
   it('al marcar el punto el error desaparece y el evento se agenda con sus coordenadas', async () => {
     eventsMock.createEvent.mockResolvedValueOnce(evento());
     renderPresencial();
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     await screen.findByText('Marca la ubicación de la sesión en el mapa.');
 
     leafletMock.handlers.click({ latlng: { lat: 14.6, lng: -90.5 } });
     await waitFor(() => expect(screen.queryByText('Marca la ubicación de la sesión en el mapa.')).not.toBeInTheDocument());
     expect(screen.getByLabelText('Ubicación presencial')).toHaveAttribute('aria-invalid', 'false');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
     expect(eventsMock.createEvent.mock.calls[0][1]).toMatchObject({ modalidad: 'PRESENCIAL', ubicacionLat: 14.6, ubicacionLng: -90.5 });
   });
@@ -385,7 +395,7 @@ describe('EventFormDialog — validación visible de la ubicación (G02-C02, UI-
   it('si además falta el título, el foco va al título (campo nativo) y no a la ubicación', async () => {
     renderPresencial();
     fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     await screen.findByText('El título no puede estar vacío.');
     await waitFor(() => expect(screen.getByLabelText('Título del evento o actividad')).toHaveFocus());
@@ -408,7 +418,7 @@ describe('EventFormDialog — límites de ubicación de extremo a extremo (G02-C
     fireEvent.click(await screen.findByRole('button', { name: nombreLargo }));
 
     expect((screen.getByLabelText('Ubicación presencial') as HTMLInputElement).value).toHaveLength(255);
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
     expect(eventsMock.createEvent.mock.calls[0][1].ubicacionNombre).toHaveLength(255);
     expect(screen.queryByText('El nombre del lugar no puede exceder 255 caracteres.')).not.toBeInTheDocument();
@@ -420,7 +430,7 @@ describe('EventFormDialog — límites de ubicación de extremo a extremo (G02-C
     fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Visita' } });
     fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).getByRole('radio', { name: 'Híbrida' }));
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     const mensaje = await screen.findByText('Marca la ubicación de la sesión en el mapa.');
     const input = screen.getByLabelText('Ubicación presencial');
@@ -469,7 +479,7 @@ describe('EventFormDialog — "Termina otro día" y fecha de fin (G02-C08, UI-06
     renderCrear();
     rellenarVirtual();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     expect(await screen.findByText('Selecciona la fecha de fin.')).toBeInTheDocument();
     expect(eventsMock.createEvent).not.toHaveBeenCalled();
@@ -489,7 +499,7 @@ describe('EventFormDialog — "Termina otro día" y fecha de fin (G02-C08, UI-06
     await waitFor(() => expect(screen.getByLabelText('Fecha de fin')).toHaveTextContent(/6 oct 2026/i));
     expect(screen.getByText('3h')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
     expect(eventsMock.createEvent.mock.calls[0][1]).toMatchObject({
       fechaInicio: new Date(2026, 9, 5, 22, 0).toISOString(),
@@ -581,7 +591,7 @@ describe('EventFormDialog — comportamiento del formulario con dos fechas (G02-
     fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
     fireEvent.click(screen.getByLabelText('Fecha de fin'));
     fireEvent.click(await screen.findByRole('button', { name: /, 5 de octubre/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     expect(await screen.findByText('El fin debe ser posterior al inicio.')).toBeInTheDocument();
     expect(screen.queryByText('La fecha de fin no puede ser anterior a la de inicio.')).not.toBeInTheDocument();
@@ -592,7 +602,7 @@ describe('EventFormDialog — comportamiento del formulario con dos fechas (G02-
     renderCrear();
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     expect(await screen.findByText('El título no puede estar vacío.')).toBeInTheDocument();
     expect(screen.getByText('Selecciona la fecha de fin.')).toBeInTheDocument();
@@ -622,7 +632,7 @@ describe('EventFormDialog — errores del servidor dentro del diálogo (G03-C01,
   async function enviarEventoValido() {
     fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
   }
 
   it.each([
@@ -672,7 +682,7 @@ describe('EventFormDialog — errores del servidor dentro del diálogo (G03-C01,
     await waitFor(() => expect(alertaDelDialogo()).toBeUndefined());
 
     fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     expect(await screen.findByText('El título no puede estar vacío.')).toBeInTheDocument();
     expect(alertaDelDialogo()).toBeUndefined();
   });
@@ -683,7 +693,7 @@ describe('EventFormDialog — errores del servidor dentro del diálogo (G03-C01,
     await enviarEventoValido();
     await waitFor(() => expect(alertaDelDialogo()).toBeDefined());
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Evento agendado');
   });
@@ -734,7 +744,7 @@ describe('EventFormDialog — modalidad accesible por teclado (G03-C12, UI-08)',
     fireEvent.click(radio('Híbrida'));
     expect(screen.getByText('Punto marcado')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalled());
     expect(eventsMock.createEvent.mock.calls[0][1]).toMatchObject({ modalidad: 'MIXTA', ubicacionLat: 14.6, ubicacionLng: -90.5, linkSesion: 'https://meet.google.com/x' });
@@ -745,7 +755,7 @@ describe('EventFormDialog — modalidad accesible por teclado (G03-C12, UI-08)',
     renderCrear();
     fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     await waitFor(() => expect(radio('Presencial')).toBeDisabled());
   });
 });
@@ -755,7 +765,7 @@ describe('EventFormDialog — etiquetas, foco en campos no nativos y obligatorie
     render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} />, { wrapper });
     fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     const mensaje = await screen.findByText('Selecciona un proyecto.');
     const trigger = screen.getByRole('combobox', { name: 'Proyecto' });
@@ -813,7 +823,7 @@ describe('EventFormDialog — etiquetas, foco en campos no nativos y obligatorie
     renderCrear();
     fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'meet.google.com/x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     const mensaje = await screen.findByText('El link debe empezar con http:// o https://.');
     const input = screen.getByLabelText('Enlace de conexión virtual');
@@ -826,7 +836,7 @@ describe('EventFormDialog — etiquetas, foco en campos no nativos y obligatorie
     render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} />, { wrapper });
     fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
     fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).getByRole('radio', { name: 'Presencial' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
 
     await screen.findByText('Marca la ubicación de la sesión en el mapa.');
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Proyecto' })).toHaveFocus());
@@ -892,7 +902,7 @@ describe('EventFormDialog — ARIA válido en los disparadores de fecha (G04-C07
     fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
     fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Termina otro día' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     await screen.findByText('Selecciona la fecha de fin.');
     expect(screen.getByLabelText('Fecha de fin')).toHaveAccessibleDescription('Campo obligatorio Selecciona la fecha de fin.');
     await waitFor(() => expect(screen.getByLabelText('Fecha de fin')).toHaveFocus());
@@ -1028,8 +1038,8 @@ describe('EventFormDialog — cierre y envío en curso (G05-C09, T-323)', () => 
     eventsMock.createEvent.mockReturnValueOnce(new Promise<EventoProyectoDTO>((resolve) => (resolver = resolve)));
     const { onOpenChange } = renderCrear();
     rellenar();
-    const agendar = screen.getByRole('button', { name: 'Agendar evento' });
-    fireEvent.click(agendar);
+    irAlUltimoPaso();
+    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
     await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalledTimes(1));
 
     const dialogo = screen.getByRole('dialog');
@@ -1145,7 +1155,7 @@ describe('EventFormDialog — fecha inicial y fechas pasadas (G05-C09, T-323/T-3
     // El reloj de la prueba marca las 10:00 del 5 de octubre.
     fireEvent.change(screen.getByLabelText('Hora de inicio'), { target: { value: '08:00' } });
     fireEvent.change(screen.getByLabelText('Hora de fin'), { target: { value: '09:00' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     const mensaje = await screen.findByText('El inicio no puede ser anterior al momento actual.');
     expect(screen.getByLabelText('Hora de inicio').getAttribute('aria-describedby')).toContain(mensaje.id);
     expect(screen.getByLabelText('Hora de inicio')).toHaveAttribute('aria-invalid', 'true');
@@ -1181,7 +1191,7 @@ describe('EventFormDialog — proyecto, invitados y modalidad (G05-C09, T-323)',
     expect(await screen.findByText('2 invitados')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Quitar a Ana García' }));
     expect(await screen.findByText('1 invitado')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalledTimes(1));
     expect(eventsMock.createEvent.mock.calls[0][1].invitados).toEqual([5]);
   });
@@ -1217,7 +1227,7 @@ describe('EventFormDialog — proyecto, invitados y modalidad (G05-C09, T-323)',
     await waitFor(() => expect(screen.queryByText('1 invitado')).not.toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Quitar a Luis Hernández' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     await waitFor(() => expect(eventsMock.createEvent).toHaveBeenCalledTimes(1));
     const [projectId, payload] = eventsMock.createEvent.mock.calls[0];
     expect(projectId).toBe(2);
@@ -1262,7 +1272,7 @@ describe('EventFormDialog — proyecto, invitados y modalidad (G05-C09, T-323)',
     fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
     const enlace = screen.getByLabelText('Enlace de conexión virtual');
     fireEvent.change(enlace, { target: { value: 'http://localhost:3000/sala' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     const mensaje = await screen.findByText(/El link no parece válido/);
     expect(enlace).toHaveAttribute('aria-invalid', 'true');
     expect(enlace.getAttribute('aria-describedby')).toContain(mensaje.id);
@@ -1285,7 +1295,7 @@ describe('EventFormDialog — texto de error y acción destructiva legibles (G05
   it('los mensajes de validación junto a cada campo no usan el color de superficie de error', async () => {
     renderCrear();
     fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Modalidad de la sesión' })).getByRole('radio', { name: 'Híbrida' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Agendar evento' }));
+    agendar();
     await screen.findByText('El título no puede estar vacío.');
     await screen.findByText('Marca la ubicación de la sesión en el mapa.');
     expect(screen.getByRole('dialog').querySelectorAll('.text-status-error')).toHaveLength(0);
@@ -1305,5 +1315,49 @@ describe('EventFormDialog — texto de error y acción destructiva legibles (G05
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('EventFormDialog — agendar por pasos (MEJ-3)', () => {
+  it('arranca en «Qué es»: sin Anterior ni Agendar, con Siguiente', () => {
+    renderCrear();
+    expect(screen.getByRole('button', { name: /^Paso 1 de 3: Qué es/ })).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Agendar evento' })).not.toBeInTheDocument();
+  });
+
+  it('Siguiente no avanza con el título vacío y lo marca', async () => {
+    renderCrear();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    await waitFor(() => expect(screen.getByLabelText('Título del evento o actividad')).toHaveAttribute('aria-invalid', 'true'));
+    expect(screen.getByRole('button', { name: /^Paso 1 de 3/ })).toHaveAttribute('aria-current', 'step');
+  });
+
+  it('recorre los tres pasos, el recordatorio solo se ve al final y Anterior regresa', async () => {
+    renderCrear();
+    fireEvent.change(screen.getByLabelText('Título del evento o actividad'), { target: { value: 'Demo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Paso 2 de 3/ })).toHaveAttribute('aria-current', 'step'));
+
+    fireEvent.change(screen.getByLabelText('Enlace de conexión virtual'), { target: { value: 'https://meet.google.com/x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    expect(await screen.findByRole('button', { name: 'Agendar evento' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Anterior' }));
+    expect(screen.getByRole('button', { name: /^Paso 2 de 3/ })).toHaveAttribute('aria-current', 'step');
+  });
+
+  it('un error de otro paso al enviar lleva a ese paso', async () => {
+    renderCrear();
+    agendar();
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Paso 1 de 3/ })).toHaveAttribute('aria-current', 'step'));
+    expect(eventsMock.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('al editar no hay pasos: el formulario es uno solo', () => {
+    render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={LED} editingEvent={evento()} />, { wrapper });
+    expect(screen.queryByRole('list', { name: 'Progreso del formulario' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeInTheDocument();
   });
 });

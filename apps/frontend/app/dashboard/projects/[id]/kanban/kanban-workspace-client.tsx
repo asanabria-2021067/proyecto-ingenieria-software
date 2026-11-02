@@ -612,6 +612,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           open={crearAbierto}
           mode="create"
           task={null}
+          idProyecto={idProyecto}
           roles={proyecto.roles}
           milestones={proyecto.hitos}
           members={members}

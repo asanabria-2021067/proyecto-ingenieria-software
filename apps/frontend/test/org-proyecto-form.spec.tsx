@@ -185,7 +185,7 @@ describe('resumen del proyecto', () => {
       />,
     );
     expect(screen.getByText('Publicado por:').parentElement).toHaveTextContent('Grupo Robotica');
-    expect(screen.getByText('Participantes de la organización (1)')).toBeInTheDocument();
+    expect(screen.getByText('Integrantes (1)')).toBeInTheDocument();
     expect(screen.getByText(/Ana Perez/)).toBeInTheDocument();
   });
 });

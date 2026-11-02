@@ -114,3 +114,14 @@ export const actualizarJunta = (id: number, idUsuario: number, input: { cargo?: 
 
 export const quitarJunta = (id: number, idUsuario: number) =>
   apiFetch<{ idAsociacion: number; idUsuario: number }>(`${ADMIN}/${id}/junta/${idUsuario}`, { method: 'DELETE' });
+
+export interface CandidatoParticipante {
+  idUsuario: number;
+  nombre: string;
+  apellido: string;
+  carne: string | null;
+  cargo: CargoJunta | null;
+}
+
+export const getCandidatosParticipantes = (id: number, q?: string) =>
+  apiFetch<CandidatoParticipante[]>(`${base(id)}/candidatos-participantes${q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`);

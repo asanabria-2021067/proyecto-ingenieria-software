@@ -133,6 +133,7 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
       'POST /api/admin/asociaciones/:idAsociacion/junta',
     ]);
     expect(ids((r) => r.path.startsWith('asociaciones'))).toEqual([
+      'GET /api/asociaciones/:idAsociacion/candidatos-participantes',
       'GET /api/asociaciones/:idAsociacion/estudiantes',
       'GET /api/asociaciones/:idAsociacion/estudiantes/csv',
       'GET /api/asociaciones/:idAsociacion/estudiantes/pdf',

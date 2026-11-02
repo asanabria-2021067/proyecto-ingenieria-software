@@ -20,6 +20,9 @@ beforeAll(() => {
   }
 });
 
+// TaskFormDialog usa useFormDraft, que lee la cuenta con useCurrentUser (necesita QueryClient).
+vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 } }) }));
+
 // TaskCommentsDialog no es el objeto principal de esta prueba (TaskBoard lo
 // es): se stubea, igual que en hitos-section.spec.ts, para no arrastrar
 // QueryClient/useCurrentUser/red.

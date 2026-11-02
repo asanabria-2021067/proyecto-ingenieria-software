@@ -773,6 +773,7 @@ export function TaskBoard({
           open={crearAbierto || tareaEditar !== null}
           mode={tareaEditar !== null ? 'edit' : 'create'}
           task={tareaEditar}
+          idProyecto={idProyecto}
           roles={roles}
           milestones={milestones}
           members={members}
