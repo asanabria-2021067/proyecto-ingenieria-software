@@ -1,3 +1,4 @@
+import { PageTitle } from '@/components/ui/page-title';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ClipboardCheck, Lock, Tag } from 'lucide-react';
@@ -111,9 +112,9 @@ export function ProjectSummarySection({
                 </div>
 
                 {/* Título + descripción (Sección 11) */}
-                <h1 className="font-headline text-2xl font-black leading-tight text-on-surface md:text-[28px]">
+                <PageTitle className="text-2xl font-black leading-tight text-on-surface md:text-[28px]">
                   {proyecto.tituloProyecto}
-                </h1>
+                </PageTitle>
                 <p className="max-w-2xl text-sm leading-relaxed text-on-surface-variant">
                   {proyecto.descripcionProyecto || 'Sin descripción disponible.'}
                 </p>

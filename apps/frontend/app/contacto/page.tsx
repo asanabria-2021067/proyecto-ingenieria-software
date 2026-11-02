@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import Link from 'next/link';
 import { useRef } from 'react';
 import { AlertCircle, ArrowLeft, BellRing, CheckCircle, Clock, LifeBuoy, type LucideIcon } from 'lucide-react';
@@ -66,9 +67,9 @@ export default function ContactoPage() {
         <section className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4 sm:px-6 lg:px-8 lg:pt-8">
           <div data-contacto-encabezado className="mx-auto flex max-w-2xl flex-col items-center text-center">
             <span className="pill pill-success">Contacto</span>
-            <h1 className="mt-4 font-headline text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl lg:text-5xl">
+            <PageTitle className="mt-4 text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl lg:text-5xl">
               Contacto y soporte
-            </h1>
+            </PageTitle>
             <p className="mt-4 text-base text-text-secondary sm:text-lg">
               ¿Tienes un problema o una duda? Cuéntanos y administración te ayudará.
             </p>

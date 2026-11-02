@@ -120,7 +120,7 @@ describe('FG07-C01: inventario de las vistas administrativas', () => {
     // La revisión de una apelación es una vista de lectura: usa a propósito un ancho menor (1100 px).
     const ancho = ruta === '/dashboard/admin/apelaciones/[apelacionId]' ? /max-w-\[1100px\]|ADMIN_PAGE_NARROW/ : /max-w-\[1400px\]|ADMIN_PAGE/;
     expect(fuente).toMatch(ancho);
-    expect(fuente.match(/<h1\b/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
+    expect(fuente.match(/<(?:h1|PageTitle)\b/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
   });
 
   it.each(Object.entries(VISTAS_ADMIN))('%s: la medición actual es la registrada y ninguna cifra empeora respecto a la línea base', (ruta, archivo) => {

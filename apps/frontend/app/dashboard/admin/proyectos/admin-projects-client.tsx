@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, FolderKanban } from 'lucide-react';
@@ -74,7 +75,7 @@ export default function AdminProjectsClient() {
       <section className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           {/* Título limpio: el total del grupo va justo antes de la tabla, no como badge aquí. */}
-          <h1 className={ADMIN_PAGE_TITLE}>{ADMIN_PROJECT_GROUP_LABEL[grupo]}</h1>
+          <PageTitle className={ADMIN_PAGE_TITLE}>{ADMIN_PROJECT_GROUP_LABEL[grupo]}</PageTitle>
           <p className={ADMIN_PAGE_LEAD}>{DESCRIPCION_GRUPO[grupo]}</p>
         </div>
       </section>

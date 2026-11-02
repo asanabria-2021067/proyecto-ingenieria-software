@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -100,9 +101,9 @@ export default function PostulacionesProyectoPage() {
         </Link>
 
         <div className="mb-8">
-          <h1 className="type-display mb-1">
+          <PageTitle className="type-display mb-1">
             Postulaciones recibidas
-          </h1>
+          </PageTitle>
           <p className="text-tertiary text-sm">
             Revisa y gestiona las postulaciones a los roles de tu proyecto.
           </p>

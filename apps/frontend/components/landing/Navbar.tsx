@@ -99,7 +99,7 @@ export default function Navbar() {
             <ThemeToggle />
             <button
               type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-on-surface"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-outline-variant bg-surface-container text-on-surface"
               onClick={() => setMenuOpen((prev) => !prev)}
               aria-label="Abrir menú"
             >

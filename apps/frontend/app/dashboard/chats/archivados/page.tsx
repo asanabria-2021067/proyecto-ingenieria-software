@@ -15,6 +15,7 @@
    se conecta acá sin cambiar esta pantalla).
    =========================================================================== */
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState } from 'react';
 import { Archive, Lock, Users as UsersIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -66,7 +67,7 @@ export default function ChatsArchivadosPage() {
   return (
     <div className={dashboardPage('py-section lg:py-page')}>
       <header className="mb-section">
-        <h1 className="type-display text-text-primary">Chats archivados</h1>
+        <PageTitle className="type-display text-text-primary">Chats archivados</PageTitle>
         <p className="type-body mt-tight text-text-secondary">
           Conversaciones de proyectos que ya cerraron, en solo lectura.
         </p>

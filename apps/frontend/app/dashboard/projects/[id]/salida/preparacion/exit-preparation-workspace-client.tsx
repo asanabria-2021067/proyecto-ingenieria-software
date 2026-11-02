@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ArrowRight, CheckCircle2, Info, Loader2 } from 'lucide-react';
@@ -452,9 +453,9 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
       <div className="mb-4 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm md:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
-            <h1 className="type-display line-clamp-2">
+            <PageTitle className="type-display line-clamp-2">
               {proyecto.tituloProyecto}
-            </h1>
+            </PageTitle>
             <p className="text-sm text-tertiary">Workspace del proyecto</p>
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               <span

@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -125,9 +126,9 @@ export default function MyProjectsPage() {
       <div className={dashboardPage('pt-7 pb-10')}>
         <div className="mb-4.5 flex items-start justify-between gap-4">
           <div>
-            <h1 className="type-display">
+            <PageTitle className="type-display">
               Mis Proyectos
-            </h1>
+            </PageTitle>
             <p className="mt-1 text-[14px] font-normal text-tertiary">
               Gestiona tus proyectos, revisa su estado y sigue desarrollando tus ideas.
             </p>

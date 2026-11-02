@@ -39,7 +39,7 @@ describe('FG10-C04: ningún hallazgo corregido reaparece', () => {
   });
 
   it('A11Y-06: «Editar perfil» no salta niveles de encabezado', () => {
-    const niveles = [...leer('app/dashboard/perfil/editar/page.tsx').matchAll(/<h([1-6])\b/g)].map((m) => Number(m[1]));
+    const niveles = [...leer('app/dashboard/perfil/editar/page.tsx').matchAll(/<(?:h([1-6])|(PageTitle))\b/g)].map((m) => (m[2] ? 1 : Number(m[1])));
     expect(niveles[0]).toBe(1);
     for (let i = 1; i < niveles.length; i += 1) expect(niveles[i] - niveles[i - 1]).toBeLessThanOrEqual(1);
   });

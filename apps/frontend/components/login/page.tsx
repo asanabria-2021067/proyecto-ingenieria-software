@@ -33,7 +33,7 @@ export default function LoginComponent() {
 
         <button
           type="submit"
-          className="rounded-lg bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700"
+          className="rounded-lg bg-primary py-3 font-medium text-on-primary transition hover:bg-primary/90"
         >
           Entrar
         </button>

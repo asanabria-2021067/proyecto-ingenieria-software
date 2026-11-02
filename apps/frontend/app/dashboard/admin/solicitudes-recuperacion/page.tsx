@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useRef, useState } from 'react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -217,9 +218,9 @@ export default function AdminSolicitudesRecuperacionPage() {
         {/* Header */}
         <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className={ADMIN_PAGE_TITLE}>
+            <PageTitle className={ADMIN_PAGE_TITLE}>
               Recuperación de contraseña
-            </h1>
+            </PageTitle>
             <p className={ADMIN_PAGE_LEAD}>
               Solicitudes de recuperación pendientes. Genera un enlace y envíalo manualmente
               al correo institucional del usuario.

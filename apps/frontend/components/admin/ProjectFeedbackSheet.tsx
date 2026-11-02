@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, MessageSquare, Eye } from 'lucide-react';
@@ -145,9 +146,9 @@ export function ProjectFeedbackSheet({ idProyecto, open, onOpenChange }: Project
           <p className="type-micro font-black uppercase tracking-widest text-review-ink dark:text-review-soft">
             Administración · Retroalimentación enviada
           </p>
-          <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
+          <PageTitle className="text-lg font-black text-on-surface leading-tight truncate">
             {proyecto?.tituloProyecto ?? 'Retroalimentación'}
-          </h1>
+          </PageTitle>
           {revisionesRevisadas.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {revisionesRevisadas.map((r) => (

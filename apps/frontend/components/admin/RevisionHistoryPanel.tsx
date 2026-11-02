@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { ArrowLeft, MessageSquare } from 'lucide-react';
 import { TIPO_LABEL, MODALIDAD_LABEL, NIVEL_LABEL } from '@/types';
 import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
@@ -85,9 +86,9 @@ export function RevisionHistoryPanel({ revision, projectTitle, onClose }: Props)
           <p className="type-micro font-black uppercase tracking-widest text-primary">
             Historial · Solo lectura · Revisión {revision.numeroEnvio}
           </p>
-          <h1 className="font-headline text-lg font-black text-on-surface leading-tight truncate">
+          <PageTitle className="text-lg font-black text-on-surface leading-tight truncate">
             {snap?.tituloProyecto ?? projectTitle}
-          </h1>
+          </PageTitle>
         </div>
         {revision.revisadaEn && (
           <span className="shrink-0 text-xs text-tertiary">

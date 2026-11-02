@@ -268,7 +268,7 @@ function TaskFormDialogContent({
                 disabled={isRunning}
                 aria-label="Desasignar tarea"
                 onClick={() => form.setValue('idUsuarioAsignado', SIN_ASIGNAR, { shouldDirty: true, shouldValidate: true })}
-                className="h-10 gap-1.5 border-red-500/40 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                className="h-10 gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10"
               >
                 <UserMinus className="size-4" aria-hidden="true" />
                 Desasignar
@@ -284,7 +284,7 @@ function TaskFormDialogContent({
                   onRequestDelete(task);
                   onOpenChange(false);
                 }}
-                className="h-10 gap-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                className="h-10 gap-1.5 text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="size-4" aria-hidden="true" />
                 Eliminar tarea

@@ -1,9 +1,10 @@
 import './global.css';
-import { Inter, Manrope } from 'next/font/google';
+import { Inter, Manrope, Rubik } from 'next/font/google';
 import Providers from './providers';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
+const rubik = Rubik({ subsets: ['latin'], variable: '--font-rubik' });
 
 export const metadata = {
   title: 'UVGENIUS | Excelencia Académica',
@@ -38,7 +39,7 @@ export default function RootLayout({
     <html lang="es" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${inter.variable} ${manrope.variable} font-body`}
+        className={`${inter.variable} ${manrope.variable} ${rubik.variable} font-body`}
       >
         <script dangerouslySetInnerHTML={{ __html: RANDOM_UUID_POLYFILL }} />
         <Providers>{children}</Providers>

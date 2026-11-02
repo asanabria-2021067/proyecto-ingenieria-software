@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -129,9 +130,9 @@ export default function LoginPage() {
             {/* Branding */}
             <div className="mb-10 text-left">
               <Image src={logo} alt="UVGENIUS" className="mx-auto mb-4 h-28 w-auto" />
-              <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
+              <PageTitle className="text-4xl font-extrabold tracking-tight text-on-surface">
                 Bienvenido de nuevo
-              </h1>
+              </PageTitle>
               <p className="mt-2 text-base text-tertiary">
                 Inicia sesión con tu correo institucional
               </p>

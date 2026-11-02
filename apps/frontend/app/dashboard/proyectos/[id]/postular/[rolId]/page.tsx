@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -123,9 +124,9 @@ export default function PostularPage() {
         {proyecto && rol && (
           <>
             <div className="mb-8">
-              <h1 className="type-display mb-1">
+              <PageTitle className="type-display mb-1">
                 Postularme como {rol.nombreRol}
-              </h1>
+              </PageTitle>
               <p className="text-tertiary text-sm">
                 Proyecto:{' '}
                 <span className="font-semibold text-on-surface">{proyecto.tituloProyecto}</span>

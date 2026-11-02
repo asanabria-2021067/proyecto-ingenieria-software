@@ -86,7 +86,7 @@ export function ProjectSearchInput() {
                     role="option"
                     aria-selected="false"
                     onClick={() => handleSelect(proyecto.idProyecto)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors group focus-visible:bg-gray-50"
+                    className="w-full text-left px-4 py-2.5 hover:bg-surface-container-low transition-colors group focus-visible:bg-surface-container-low"
                   >
                     <p className="text-sm font-medium text-gray-900 group-hover:text-[#006735] truncate">
                       {proyecto.tituloProyecto}

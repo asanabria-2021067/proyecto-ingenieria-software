@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import Image from 'next/image';
 import { useRef, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -43,13 +44,13 @@ export function PaginaError({ codigo, titulo, descripcion, referencia, variante 
             {codigo}
           </p>
         </div>
-        <h1
+        <PageTitle
           id="pagina-error-titulo"
           data-error-entrada
-          className="mt-8 font-headline text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl"
+          className="mt-8 text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl"
         >
           {titulo}
-        </h1>
+        </PageTitle>
         <p data-error-entrada className="mt-3 max-w-md text-base text-text-secondary">
           {descripcion}
         </p>

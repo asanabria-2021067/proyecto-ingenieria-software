@@ -73,7 +73,7 @@ describe('FG10-C02 · A11Y-06: jerarquía de encabezados de «Editar perfil»', 
   const pagina = leer('app/dashboard/perfil/editar/page.tsx');
 
   it('hay un único h1 y los títulos de cada paso son h2: ningún nivel se salta', () => {
-    expect(pagina.match(/<h1\b/g)).toHaveLength(1);
+    expect(pagina.match(/<(?:h1|PageTitle)\b/g)).toHaveLength(1);
     expect(pagina.match(/<h2\b/g)).toHaveLength(6);
     expect(pagina).not.toMatch(/<h3\b|<\/h3>/);
     expect(pagina.match(/<\/h2>/g)).toHaveLength(6);

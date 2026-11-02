@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -163,7 +164,7 @@ export default function AppealReviewClient() {
 
       <header className="mb-6">
         <div className="flex flex-wrap items-center gap-inline">
-          <h1 className="type-display min-w-0 text-balance">{apelacion.asunto}</h1>
+          <PageTitle className="type-display min-w-0 text-balance">{apelacion.asunto}</PageTitle>
           <span className={`pill ${estado.className}`}>{estado.label}</span>
         </div>
         <p className="mt-tight text-base text-tertiary">

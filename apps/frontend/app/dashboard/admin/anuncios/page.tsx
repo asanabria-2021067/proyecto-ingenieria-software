@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState } from 'react';
 import { Megaphone, Pencil, Plus, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
@@ -61,7 +62,7 @@ export default function AdminAnunciosPage() {
       <AdminBreadcrumb seccion="Comunicación" pagina="Anuncios" />
       <section className="mb-8 flex flex-wrap items-end justify-between gap-stack">
         <div>
-          <h1 className={ADMIN_PAGE_TITLE}>Anuncios</h1>
+          <PageTitle className={ADMIN_PAGE_TITLE}>Anuncios</PageTitle>
           <p className={ADMIN_PAGE_LEAD}>
             Avisos que aparecen como banner en el dashboard. Cada persona puede cerrarlos y no vuelven a mostrársele.
           </p>

@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { ESTADO_REVISION_LABEL } from '@/components/projects/closure-review-status.utils';
 import type { EstadoRevisionCierre } from '@/lib/types/closure';
 
@@ -689,7 +690,7 @@ function HistoricalProjectPage({
               </span>
             )}
           </div>
-          <h1 className="type-display mt-3.5 line-clamp-2">{resumen.tituloProyecto}</h1>
+          <PageTitle className="type-display mt-3.5 line-clamp-2">{resumen.tituloProyecto}</PageTitle>
           <p className="mt-2 text-[14px] leading-5.25 text-on-surface-variant">
             {resumen.descripcionProyecto || 'Sin descripción disponible.'}
           </p>

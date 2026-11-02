@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
@@ -361,9 +362,9 @@ export default function EditarPerfilPage() {
             <ChevronLeft className="w-4 h-4" />
             Volver al perfil
           </button>
-          <h1 className="type-display">
+          <PageTitle className="type-display">
             Editar Perfil Profesional
-          </h1>
+          </PageTitle>
           <p className="mt-1 text-sm text-on-surface-variant">
             Completa y personaliza tu portafolio en la UVG para destacar ante los proyectos.
           </p>
@@ -716,7 +717,7 @@ export default function EditarPerfilPage() {
                         onClick={() => toggleCualidad(Number(q.id))}
                         className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-secondary border-secondary text-white shadow-sm scale-102'
+                            ? 'bg-secondary border-secondary text-on-secondary shadow-sm scale-102'
                             : 'bg-surface-container-low border-outline-variant/30 text-on-surface hover:bg-surface-container-high'
                         }`}
                       >

@@ -1,5 +1,6 @@
 'use client';
 
+import { PageTitle } from '@/components/ui/page-title';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, ChevronLeft, ChevronRight, Eye, Globe, Lock, Save, Upload } from 'lucide-react';
@@ -138,7 +139,7 @@ export function OrgForm({ org }: { org?: OrganizacionDetalle }) {
           <ChevronLeft aria-hidden="true" className="h-4 w-4" />
           {org ? 'Volver a la organización' : 'Volver a mis organizaciones'}
         </button>
-        <h1 className="type-display">{org ? 'Editar organización' : 'Nueva organización'}</h1>
+        <PageTitle className="type-display">{org ? 'Editar organización' : 'Nueva organización'}</PageTitle>
         <p className="mt-1 text-sm text-on-surface-variant">
           {org
             ? 'Actualiza los datos de la organización.'
