@@ -5,6 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CHAT_STORAGE_PORT, type ChatStoragePort } from '../storage/chat-storage.port';
 import { ChatGateway } from './chat.gateway';
 import { ADJUNTO_MAX_BYTES, validarAdjunto, type ArchivoSubido } from './chat-adjuntos';
+import { validarNotaVoz } from './chat-nota-voz';
+import { CreatePollDto } from './dto/create-poll.dto';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
 import { DuracionSilencio } from './dto/silenciar-conversation.dto';
@@ -49,6 +51,20 @@ function conEstado<T extends { estadoChat: Parameters<typeof estadoVigente>[0] }
   return { ...usuario, estado: estadoVigente(estadoChat) };
 }
 
+const ENCUESTA_SELECT = {
+  select: {
+    idEncuesta: true,
+    pregunta: true,
+    multiple: true,
+    cierraEn: true,
+    cerradaEn: true,
+    opciones: {
+      orderBy: { orden: 'asc' },
+      select: { idOpcion: true, texto: true, votos: { select: { idUsuario: true } } },
+    },
+  },
+} as const;
+
 const MENSAJE_SELECT = {
   idMensaje: true,
   idConversacion: true,
@@ -56,10 +72,14 @@ const MENSAJE_SELECT = {
   enviadoEn: true,
   editadoEn: true,
   eliminadoEn: true,
+  fijadoEn: true,
   remitente: USUARIO_SELECT,
   // Solo metadatos: la clave de almacenamiento y las URL nunca salen en el listado.
-  adjunto: { select: { idAdjunto: true, nombreOriginal: true, mime: true, tamanoBytes: true } },
+  adjunto: { select: { idAdjunto: true, nombreOriginal: true, mime: true, tamanoBytes: true, duracionSegundos: true } },
+  encuesta: ENCUESTA_SELECT,
 } as const;
+
+const MAX_FIJADOS = 3;
 
 const URL_ADJUNTO_TTL_SEGUNDOS = 60;
 
@@ -115,7 +135,12 @@ function reaccionesParaUsuario(grupos: ReturnType<typeof agruparReacciones>, use
 /** El contenido de un mensaje eliminado nunca sale del servidor. */
 export function ocultarEliminado<T extends { contenido: string; eliminadoEn: Date | null }>(mensaje: T): T {
   if (!mensaje.eliminadoEn) return mensaje;
-  return { ...mensaje, contenido: '', ...('adjunto' in mensaje ? { adjunto: null } : {}) };
+  return {
+    ...mensaje,
+    contenido: '',
+    ...('adjunto' in mensaje ? { adjunto: null } : {}),
+    ...('encuesta' in mensaje ? { encuesta: null } : {}),
+  };
 }
 
 const ARCHIVADOS_PAGE_SIZE = 20;
@@ -174,7 +199,7 @@ export class ChatService {
       where: { idConversacion, idProyecto, eliminadaEn: null },
       include: {
         participantes: { select: { idUsuario: true } },
-        proyecto: { select: { estadoProyecto: true } },
+        proyecto: { select: { estadoProyecto: true, creadoPor: true } },
       },
     });
     if (!conversacion) {
@@ -458,7 +483,8 @@ export class ChatService {
     await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     const limite = query.limite ?? 20;
     const filas = await this.prisma.adjuntoMensajeChat.findMany({
-      where: { idConversacion, mensaje: { eliminadoEn: null }, ...(query.cursor ? { idAdjunto: { lt: query.cursor } } : {}) },
+      // Las notas de voz tienen su reproductor en el mensaje: no van a la galeria de archivos.
+      where: { idConversacion, duracionSegundos: null, mensaje: { eliminadoEn: null }, ...(query.cursor ? { idAdjunto: { lt: query.cursor } } : {}) },
       orderBy: { idAdjunto: 'desc' },
       take: limite,
       select: {
@@ -555,6 +581,7 @@ export class ChatService {
     contenido: string,
     archivo?: ArchivoSubido,
     idMensajeCitado?: number,
+    extra: { duracionSegundos?: number; encuesta?: CreatePollDto } = {},
   ) {
     const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     // T-234: único punto real de creación de mensajes (REST) — el gateway de
@@ -580,9 +607,21 @@ export class ChatService {
       }
     }
 
+    const { encuesta } = extra;
+    if (encuesta) {
+      const cierra = encuesta.cierraEn ? new Date(encuesta.cierraEn) : null;
+      if (cierra && cierra.getTime() <= Date.now()) {
+        throw new BadRequestException('El cierre de la encuesta debe ser una fecha futura');
+      }
+      if (new Set(encuesta.opciones.map((o) => o.toLowerCase())).size !== encuesta.opciones.length) {
+        throw new BadRequestException('Las opciones de la encuesta no se pueden repetir');
+      }
+    }
+
     let adjunto: Prisma.AdjuntoMensajeChatCreateWithoutMensajeInput | undefined;
     if (archivo) {
-      const { mime, nombre } = validarAdjunto(archivo);
+      const esVoz = extra.duracionSegundos !== undefined;
+      const { mime, nombre } = esVoz ? validarNotaVoz(archivo) : validarAdjunto(archivo);
       const clave = `chat/${idConversacion}/${randomUUID()}.${nombre.split('.').pop()!.toLowerCase()}`;
       await this.storage.upload(clave, archivo.buffer);
       adjunto = {
@@ -591,6 +630,7 @@ export class ChatService {
         mime,
         tamanoBytes: archivo.buffer.length,
         claveAlmacenamiento: clave,
+        duracionSegundos: extra.duracionSegundos,
       };
     }
 
@@ -604,9 +644,21 @@ export class ChatService {
             data: {
               idConversacion,
               idRemitente: userId,
-              contenido: contenido.trim(),
+              contenido: encuesta ? encuesta.pregunta : contenido.trim(),
               idMensajeCitado,
               ...(adjunto ? { adjunto: { create: adjunto } } : {}),
+              ...(encuesta
+                ? {
+                    encuesta: {
+                      create: {
+                        pregunta: encuesta.pregunta,
+                        multiple: encuesta.multiple ?? false,
+                        cierraEn: encuesta.cierraEn ? new Date(encuesta.cierraEn) : null,
+                        opciones: { create: encuesta.opciones.map((texto, orden) => ({ texto, orden })) },
+                      },
+                    },
+                  }
+                : {}),
             },
             select: MENSAJE_CON_CITA_SELECT,
           });
@@ -625,6 +677,124 @@ export class ChatService {
     const destinatarios = conversacion.participantes.map((p) => p.idUsuario).filter((id) => id !== userId);
     this.gateway.broadcastMessage(idConversacion, destinatarios, mensaje);
 
+    return mensaje;
+  }
+
+  /** Encuesta de un mensaje vivo de la conversacion, con sus opciones y votos. */
+  private async getEncuestaOrThrow(idConversacion: number, idMensaje: number) {
+    const mensaje = await this.prisma.mensajeChat.findFirst({
+      where: { idMensaje, idConversacion, eliminadoEn: null, encuesta: { isNot: null } },
+      select: { idRemitente: true, encuesta: ENCUESTA_SELECT },
+    });
+    if (!mensaje?.encuesta) throw new NotFoundException('Encuesta no encontrada');
+    return { idRemitente: mensaje.idRemitente, encuesta: mensaje.encuesta };
+  }
+
+  /** Reemplaza los votos del usuario en la encuesta (arreglo vacio = retirar voto) y avisa en vivo. */
+  async votarEncuesta(idProyecto: number, idConversacion: number, idMensaje: number, userId: number, idsOpciones: number[]) {
+    const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    if (chatArchivado(conversacion.proyecto?.estadoProyecto)) {
+      throw new ForbiddenException('Esta conversación está archivada: no se puede votar.');
+    }
+    const { encuesta } = await this.getEncuestaOrThrow(idConversacion, idMensaje);
+    if (encuesta.cerradaEn || (encuesta.cierraEn && encuesta.cierraEn.getTime() <= Date.now())) {
+      throw new BadRequestException('La encuesta está cerrada');
+    }
+    const validas = new Set(encuesta.opciones.map((o) => o.idOpcion));
+    if (idsOpciones.some((id) => !validas.has(id))) throw new BadRequestException('Opción inválida para esta encuesta');
+    if (!encuesta.multiple && idsOpciones.length > 1) {
+      throw new BadRequestException('Esta encuesta admite un solo voto');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.votoEncuestaChat.deleteMany({ where: { idUsuario: userId, opcion: { idEncuesta: encuesta.idEncuesta } } }),
+      this.prisma.votoEncuestaChat.createMany({ data: idsOpciones.map((idOpcion) => ({ idOpcion, idUsuario: userId })) }),
+    ]);
+    return this.publicarEncuesta(idConversacion, idMensaje);
+  }
+
+  /** Cierre manual: solo quien la creo o el lider del proyecto. */
+  async cerrarEncuesta(idProyecto: number, idConversacion: number, idMensaje: number, userId: number) {
+    const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    if (chatArchivado(conversacion.proyecto?.estadoProyecto)) {
+      throw new ForbiddenException('Esta conversación está archivada: no se puede cerrar la encuesta.');
+    }
+    const { idRemitente, encuesta } = await this.getEncuestaOrThrow(idConversacion, idMensaje);
+    if (idRemitente !== userId && conversacion.proyecto?.creadoPor !== userId) {
+      throw new ForbiddenException('Solo quien creó la encuesta o el líder del proyecto puede cerrarla');
+    }
+    if (encuesta.cerradaEn) return this.publicarEncuesta(idConversacion, idMensaje);
+    await this.prisma.encuestaChat.update({ where: { idEncuesta: encuesta.idEncuesta }, data: { cerradaEn: new Date() } });
+    return this.publicarEncuesta(idConversacion, idMensaje);
+  }
+
+  private async publicarEncuesta(idConversacion: number, idMensaje: number) {
+    const { encuesta } = await this.getEncuestaOrThrow(idConversacion, idMensaje);
+    this.gateway.broadcastPollUpdated(idConversacion, idMensaje, encuesta);
+    return encuesta;
+  }
+
+  /** Fijados vigentes de la conversacion, en el orden en que se fijaron. Sin chequeo de acceso: lo hace el llamador. */
+  async fijadosDe(idConversacion: number) {
+    const mensajes = await this.prisma.mensajeChat.findMany({
+      where: { idConversacion, eliminadoEn: null, fijadoEn: { not: null } },
+      orderBy: { fijadoEn: 'asc' },
+      take: MAX_FIJADOS,
+      select: MENSAJE_CON_CITA_SELECT,
+    });
+    return mensajes.map((m) => conResumenDeCita(m));
+  }
+
+  async getFijados(idProyecto: number, idConversacion: number, userId: number) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    return this.fijadosDe(idConversacion);
+  }
+
+  /** Proyecto: puede fijar/desfijar el lider del proyecto o el autor del mensaje. */
+  async fijarMensaje(idProyecto: number, idConversacion: number, idMensaje: number, userId: number, fijar: boolean) {
+    const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    if (chatArchivado(conversacion.proyecto?.estadoProyecto)) {
+      throw new ForbiddenException('Esta conversación está archivada: no se pueden fijar mensajes.');
+    }
+    const autor = await this.prisma.mensajeChat.findFirst({
+      where: { idMensaje, idConversacion, eliminadoEn: null },
+      select: { idRemitente: true },
+    });
+    if (!autor) throw new NotFoundException(`Mensaje con id ${idMensaje} no encontrado`);
+    if (autor.idRemitente !== userId && conversacion.proyecto?.creadoPor !== userId) {
+      throw new ForbiddenException('Solo el líder del proyecto o el autor del mensaje puede fijarlo');
+    }
+    return this.aplicarFijado(idConversacion, idMensaje, fijar, conversacion.participantes.map((p) => p.idUsuario));
+  }
+
+  /**
+   * Fija o desfija sin chequear permisos (los verifica cada tipo de chat).
+   * El tope de MAX_FIJADOS se cuenta bajo bloqueo de la conversacion para que
+   * dos fijados simultaneos no lo superen.
+   */
+  async aplicarFijado(idConversacion: number, idMensaje: number, fijar: boolean, participantes: number[]) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM "conversacion" WHERE "id_conversacion" = ${idConversacion} FOR UPDATE`;
+      const mensaje = await tx.mensajeChat.findFirst({
+        where: { idMensaje, idConversacion, eliminadoEn: null },
+        select: { fijadoEn: true },
+      });
+      if (!mensaje) throw new NotFoundException(`Mensaje con id ${idMensaje} no encontrado`);
+      if (!fijar) {
+        if (mensaje.fijadoEn) await tx.mensajeChat.update({ where: { idMensaje }, data: { fijadoEn: null } });
+        return;
+      }
+      if (mensaje.fijadoEn) return;
+      const fijados = await tx.mensajeChat.count({ where: { idConversacion, eliminadoEn: null, fijadoEn: { not: null } } });
+      if (fijados >= MAX_FIJADOS) {
+        throw new BadRequestException(`Solo se pueden fijar hasta ${MAX_FIJADOS} mensajes: desfija uno primero`);
+      }
+      await tx.mensajeChat.update({ where: { idMensaje }, data: { fijadoEn: new Date() } });
+    });
+    const mensaje = conResumenDeCita(
+      await this.prisma.mensajeChat.findUniqueOrThrow({ where: { idMensaje }, select: MENSAJE_CON_CITA_SELECT }),
+    );
+    this.gateway.broadcastMessageChange('messageUpdated', idConversacion, participantes, mensaje);
     return mensaje;
   }
 

@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -196,5 +197,28 @@ export class OrganizationsController {
   @Post(':id/chat/mensajes')
   sendChatMessage(@Param('id', ParseIntPipe) id: number, @Body() dto: SendOrgMessageDto, @CurrentUser() user: Usuario) {
     return this.chat.enviar(user.userId, id, dto.contenido);
+  }
+
+  @Get(':id/chat/fijados')
+  getChatPinned(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: Usuario) {
+    return this.chat.fijados(user.userId, id);
+  }
+
+  @Put(':id/chat/mensajes/:idMensaje/fijado')
+  pinChatMessage(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('idMensaje', ParseIntPipe) idMensaje: number,
+    @CurrentUser() user: Usuario,
+  ) {
+    return this.chat.fijar(user.userId, id, idMensaje, true);
+  }
+
+  @Delete(':id/chat/mensajes/:idMensaje/fijado')
+  unpinChatMessage(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('idMensaje', ParseIntPipe) idMensaje: number,
+    @CurrentUser() user: Usuario,
+  ) {
+    return this.chat.fijar(user.userId, id, idMensaje, false);
   }
 }
