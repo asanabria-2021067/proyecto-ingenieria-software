@@ -170,7 +170,7 @@ test('A · filtrar: la búsqueda, la lectura y la categoría acotan la lista a l
     await lectura.getByRole('radio', { name: 'Todas' }).click();
     await expect.poll(() => unaFilaDe(page, pendiente, revisada)).toBe(true);
 
-    // Categoría que abarca TAREA_ASIGNADA: siguen las dos, cada una con su categoría.
+    // Categoría que abarca TAREA_ASIGNADA: sigue la fila plegada de las dos, con su categoría.
     const categoria = bandeja(page).getByRole('combobox', { name: 'Filtrar por categoría' });
     await categoria.click();
     await page.getByRole('option', { name: 'Tareas e hitos' }).click();
@@ -275,7 +275,8 @@ test('C · marcar todas: sin filtros lee todos los avisos propios, persiste y no
     await expect(bandeja(page).getByText(new RegExp(`· ${pendientes} sin leer$`))).toBeVisible();
     await expect(bandeja(page).getByText(`${pendientes} nuevas`, { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: `Notificaciones, ${pendientes} sin leer` }).first()).toBeVisible();
-    for (const aviso of propios) await expect(fila(page, aviso.idNotificacion)).toHaveAttribute('data-leida', 'false');
+    // MEJ-29: los avisos propios (y los de otras pruebas del día) se pliegan, así que no hay fila por aviso.
+    await expect(bandeja(page).locator('li[data-leida="false"]').first()).toBeVisible();
 
     // Sin filtros, el botón abarca todas las propias.
     const marcar = page.getByRole('button', { name: 'Marcar todas como leídas' });
@@ -289,7 +290,6 @@ test('C · marcar todas: sin filtros lee todos los avisos propios, persiste y no
 
     await expect(page.getByText(`${pendientes} avisos marcados como leídos`)).toBeVisible();
     await expect(bandeja(page).locator('li[data-leida="false"]')).toHaveCount(0);
-    for (const aviso of propios) await expect(fila(page, aviso.idNotificacion)).toHaveAttribute('data-leida', 'true');
     await expect(bandeja(page).getByText(/· 0 sin leer$/)).toBeVisible();
     await expect(bandeja(page).getByText(/^\d+ nuevas?$/)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Notificaciones, no hay pendientes' }).first()).toBeVisible();

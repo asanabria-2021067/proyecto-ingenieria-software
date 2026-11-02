@@ -109,6 +109,7 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
         'Horas y reconocimiento',
         'Recordatorios y calendario',
         'Red de contactos',
+        'Organizaciones y asociaciones',
         'Cuenta y seguridad',
       ]);
       await expect(seccion.getByRole('switch')).toHaveCount(0);

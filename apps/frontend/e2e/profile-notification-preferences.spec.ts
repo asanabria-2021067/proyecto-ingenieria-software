@@ -143,6 +143,7 @@ test.describe('FG05-C03: preferencias de notificación por tipo en el perfil', (
       'Horas y reconocimiento',
       'Recordatorios y calendario',
       'Red de contactos',
+      'Organizaciones y asociaciones',
       'Cuenta y seguridad',
     ]);
     // El perfil sigue ahí, ya sin las preferencias.
