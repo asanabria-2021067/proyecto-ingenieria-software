@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Archive, Building2, ChevronLeft, ExternalLink, Folder, Globe, LogOut, Lock, Pencil, Plus, Users } from 'lucide-react';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { AnunciosEntidad } from '@/components/anuncios/anuncios-entidad';
+import { OrgCalendario } from '@/components/organizations/org-calendario';
 import { InvitarDialog } from '@/components/organizations/invitar-dialog';
 import { SeguirOrganizacion } from '@/components/organizations/boton-seguir';
 import { OrgAvatar } from '@/components/organizations/org-avatar';
@@ -220,6 +222,8 @@ export default function OrganizacionPage() {
           <TabsTrigger value="proyectos">Proyectos</TabsTrigger>
           {org.miembros && <TabsTrigger value="miembros">Miembros ({org.miembros.length})</TabsTrigger>}
           {esMiembro && <TabsTrigger value="chat">Chat</TabsTrigger>}
+          {esMiembro && <TabsTrigger value="anuncios">Anuncios</TabsTrigger>}
+          {esMiembro && <TabsTrigger value="calendario">Calendario</TabsTrigger>}
           {gestiona && (
             <TabsTrigger value="pendientes">Solicitudes e invitaciones{pendientes > 0 ? ` (${pendientes})` : ''}</TabsTrigger>
           )}
@@ -242,6 +246,16 @@ export default function OrganizacionPage() {
         {esMiembro && (
           <TabsContent value="chat">
             <OrgChat idOrganizacion={org.idOrganizacion} puedeFijar={gestiona} />
+          </TabsContent>
+        )}
+        {esMiembro && (
+          <TabsContent value="anuncios">
+            <AnunciosEntidad tipo="organizaciones" id={org.idOrganizacion} puedePublicar={gestiona && !org.archivada} />
+          </TabsContent>
+        )}
+        {esMiembro && (
+          <TabsContent value="calendario">
+            <OrgCalendario idOrganizacion={org.idOrganizacion} />
           </TabsContent>
         )}
         {gestiona && (

@@ -1,14 +1,19 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { adminAnunciosQueryKey, anunciosVigentesQueryKey } from '@/lib/query-keys/anuncios';
+import { adminAnunciosQueryKey, anunciosEntidadQueryKey, anunciosVigentesQueryKey } from '@/lib/query-keys/anuncios';
 import {
   cerrarAnuncio,
   createAnuncio,
+  createAnuncioEntidad,
   despublicarAnuncio,
+  despublicarAnuncioEntidad,
   getAnunciosAdmin,
+  getAnunciosEntidad,
   getAnunciosVigentes,
   updateAnuncio,
+  type AnuncioEntidadInput,
+  type TipoEntidadAnuncio,
   type UpdateAnuncioInput,
 } from '@/lib/services/anuncios';
 
@@ -50,5 +55,23 @@ export function useAnunciosAdminMutations() {
       onSuccess: refrescar,
     }),
     despublicar: useMutation({ mutationFn: despublicarAnuncio, onSuccess: refrescar }),
+  };
+}
+
+export function useAnunciosEntidad(tipo: TipoEntidadAnuncio, id: number, enabled = true) {
+  return useQuery({ queryKey: anunciosEntidadQueryKey(tipo, id), queryFn: () => getAnunciosEntidad(tipo, id), enabled });
+}
+
+/** Publicar y despublicar refrescan la lista de la entidad y el banner. */
+export function useAnunciosEntidadMutations(tipo: TipoEntidadAnuncio, id: number) {
+  const queryClient = useQueryClient();
+  const refrescar = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: anunciosEntidadQueryKey(tipo, id) }),
+      queryClient.invalidateQueries({ queryKey: anunciosVigentesQueryKey }),
+    ]);
+  return {
+    crear: useMutation({ mutationFn: (input: AnuncioEntidadInput) => createAnuncioEntidad(tipo, id, input), onSuccess: refrescar }),
+    despublicar: useMutation({ mutationFn: (idAnuncio: number) => despublicarAnuncioEntidad(tipo, id, idAnuncio), onSuccess: refrescar }),
   };
 }

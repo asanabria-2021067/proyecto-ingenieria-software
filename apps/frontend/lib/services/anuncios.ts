@@ -14,6 +14,8 @@ export interface AnuncioVigente {
   nivel: NivelAnuncio;
   fechaInicio: string;
   fechaFin: string;
+  /** Organización o asociación que lo publica; null = administración. */
+  origen?: string | null;
 }
 
 /** Anuncio completo de administración (`GET /admin/anuncios`). */
@@ -50,3 +52,21 @@ export const updateAnuncio = (idAnuncio: number, input: UpdateAnuncioInput) =>
 
 export const despublicarAnuncio = (idAnuncio: number) =>
   apiFetch<AnuncioAdmin>(`/admin/anuncios/${idAnuncio}/despublicar`, { method: 'PATCH' });
+
+/** MEJ-66: anuncios de una organización (miembros) o de una asociación (estudiantes de sus carreras). */
+export type TipoEntidadAnuncio = 'organizaciones' | 'asociaciones';
+
+export type AnuncioEntidad = Omit<AnuncioAdmin, 'audiencia'>;
+
+export type AnuncioEntidadInput = Omit<AnuncioInput, 'audiencia'>;
+
+const baseEntidad = (tipo: TipoEntidadAnuncio, id: number) => `/${tipo}/${id}/anuncios`;
+
+export const getAnunciosEntidad = (tipo: TipoEntidadAnuncio, id: number) =>
+  apiFetch<AnuncioEntidad[]>(baseEntidad(tipo, id));
+
+export const createAnuncioEntidad = (tipo: TipoEntidadAnuncio, id: number, input: AnuncioEntidadInput) =>
+  apiFetch<AnuncioEntidad>(baseEntidad(tipo, id), { method: 'POST', body: JSON.stringify(input) });
+
+export const despublicarAnuncioEntidad = (tipo: TipoEntidadAnuncio, id: number, idAnuncio: number) =>
+  apiFetch<{ idAnuncio: number }>(`${baseEntidad(tipo, id)}/${idAnuncio}/despublicar`, { method: 'PATCH' });

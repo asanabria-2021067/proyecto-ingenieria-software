@@ -46,6 +46,7 @@ export function AnuncioBanner() {
       <Icono className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
       <p className="min-w-0 flex-1 type-body">
         <span className="font-semibold">{etiqueta}: </span>
+        {anuncio.origen && <span className="font-semibold">{anuncio.origen} · </span>}
         <span className="font-semibold">{anuncio.titulo}.</span> {anuncio.mensaje}
       </p>
       <button
