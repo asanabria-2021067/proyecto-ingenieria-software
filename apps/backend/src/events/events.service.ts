@@ -5,8 +5,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EstadoProyecto, Prisma, type ModalidadEvento, type TipoEvento } from '@prisma/client';
+import { EstadoProyecto, Prisma, RolOrganizacion, type ModalidadEvento, type TipoEvento } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertRol, cargarContexto } from '../organizations/organization-access';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 
@@ -165,6 +166,39 @@ export class EventsService {
     return unaPorReunion([...ordinarios, ...historicos])
       .sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
       .map(conOrigen);
+  }
+
+  /**
+   * MEJ-34: eventos de los proyectos de la organización para sus miembros activos (cualquier rol).
+   * Solo los abiertos a todo el proyecto (sin invitados): un evento con invitados es privado de ellos.
+   */
+  async findForOrganizationInRange(idOrganizacion: number, userId: number, desde: string, hasta: string) {
+    const ctx = await cargarContexto(this.prisma, userId, idOrganizacion);
+    assertRol(ctx, Object.values(RolOrganizacion), 'Solo los miembros ven el calendario de la organización');
+    return this.prisma.eventoProyecto.findMany({
+      where: {
+        eliminadoEn: null,
+        invitados: { isEmpty: true },
+        fechaInicio: { lte: new Date(hasta) },
+        fechaFin: { gte: new Date(desde) },
+        proyecto: { eliminadoEn: null, organizaciones: { some: { idOrganizacion } } },
+      },
+      select: {
+        idEvento: true,
+        idProyecto: true,
+        tituloEvento: true,
+        descripcionEvento: true,
+        fechaInicio: true,
+        fechaFin: true,
+        antelacionMinutos: true,
+        modalidad: true,
+        ubicacionNombre: true,
+        linkSesion: true,
+        tipoEvento: true,
+        proyecto: { select: { idProyecto: true, tituloProyecto: true } },
+      },
+      orderBy: { fechaInicio: 'asc' },
+    });
   }
 
   /**
