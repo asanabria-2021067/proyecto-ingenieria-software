@@ -59,6 +59,7 @@ export class ProjectsController {
     @Query('modalidad') modalidad?: string,
     @Query('organizacionId') organizacionId?: string,
     @Query('habilidad') habilidad?: string,
+    @Query('duenio') duenio?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @CurrentUser() user?: { userId: number },
@@ -69,6 +70,7 @@ export class ProjectsController {
       modalidad,
       organizacionId: organizacionId ? parseInt(organizacionId, 10) : undefined,
       habilidadId: habilidad ? parseInt(habilidad, 10) : undefined,
+      duenio,
     };
 
     if (page !== undefined) {
@@ -81,6 +83,13 @@ export class ProjectsController {
     // dashboard ("Proyectos Disponibles"); ahí sí se pondera por amistad y
     // carrera (la ruta exige sesión).
     return this.projectsService.findAll(filters, user?.userId);
+  }
+
+  /** MEJ-15: proyectos abiertos ordenados por coincidencia con tus habilidades e intereses. */
+  @Get('para-ti')
+  @UseGuards(JwtAuthGuard)
+  paraTi(@Query('duenio') duenio: string | undefined, @CurrentUser() user: { userId: number }) {
+    return this.projectsService.paraTi(user.userId, duenio);
   }
 
   @Get('mine')
@@ -235,6 +244,17 @@ export class ProjectsController {
     return this.projectsService.assignHitoTasks(id, idHito, user.userId, data.idsTareas);
   }
 
+  /** MEJ-20: copia del proyecto propio como borrador (roles con sus requisitos, hitos, descripción). */
+  @Post(':id/duplicar')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  duplicar(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.projectsService.duplicar(id, user.userId);
+  }
+
   // ---------- GUARDAR (bookmark personal, distinto de postularse) ----------
 
   @Post(':id/guardar')
@@ -264,8 +284,9 @@ export class ProjectsController {
   findPostulaciones(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { userId: number },
+    @Query('orden') orden?: string,
   ) {
-    return this.projectsService.findPostulacionesByProject(id, user.userId);
+    return this.projectsService.findPostulacionesByProject(id, user.userId, orden);
   }
 
   // -------------------------------------------------

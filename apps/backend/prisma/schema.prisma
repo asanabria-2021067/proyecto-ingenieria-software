@@ -67,6 +67,12 @@ enum VisibilidadOrganizacion {
   PRIVADA
 }
 
+enum EstadoInvitacionRol {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
+}
+
 enum EstadoInvitacionOrganizacion {
   PENDIENTE
   ACEPTADA
@@ -318,6 +324,12 @@ enum TipoNotificacion {
   MENCION_CHAT
   // MEJ-46: recordatorio programado de un mensaje del chat.
   RECORDATORIO_MENSAJE
+  // MEJ-16: proyecto nuevo de mi carrera, mis intereses o una organización/asociación que sigo.
+  PROYECTO_NUEVO_PARA_TI
+  // MEJ-17: un proyecto guardado queda con 1-2 cupos o pasa a solicitud de cierre.
+  PROYECTO_GUARDADO_AVISO
+  // MEJ-22: el líder invita directo a un rol.
+  INVITACION_ROL_PROYECTO
 }
 
 enum EstadoAmistad {
@@ -378,6 +390,9 @@ model Usuario {
   experiencias                     ExperienciaPrevia[]
   organizacionesCreadas            Organizacion[]
   membresiasOrganizacion           UsuarioOrganizacion[]
+  seguimientosEntidad              SeguimientoEntidad[]
+  invitacionesRolRecibidas         InvitacionRolProyecto[]      @relation("InvitacionesRolRecibidas")
+  invitacionesRolEnviadas          InvitacionRolProyecto[]      @relation("InvitacionesRolEnviadas")
   juntasAsociacion                 JuntaAsociacion[]
   invitacionesOrganizacionRecibidas      InvitacionOrganizacion[]      @relation("InvitacionesOrganizacionRecibidas")
   invitacionesOrganizacionEnviadas       InvitacionOrganizacion[]      @relation("InvitacionesOrganizacionEnviadas")
@@ -494,6 +509,45 @@ model Seguimiento {
 
   @@unique([idSeguidor, idSeguido])
   @@map("seguimiento")
+}
+
+/// MEJ-18: un usuario sigue a UNA organización o a UNA asociación (exactamente una de las dos; CHECK en la migración).
+model SeguimientoEntidad {
+  idSeguimientoEntidad Int      @id @default(autoincrement()) @map("id_seguimiento_entidad")
+  idUsuario            Int      @map("id_usuario")
+  idOrganizacion       Int?     @map("id_organizacion")
+  idAsociacion         Int?     @map("id_asociacion")
+  fechaCreacion        DateTime @default(now()) @map("fecha_creacion")
+
+  usuario      Usuario       @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  organizacion Organizacion? @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Cascade)
+  asociacion   Asociacion?   @relation(fields: [idAsociacion], references: [idAsociacion], onDelete: Cascade)
+
+  @@unique([idUsuario, idOrganizacion])
+  @@unique([idUsuario, idAsociacion])
+  @@index([idOrganizacion])
+  @@index([idAsociacion])
+  @@map("seguimiento_entidad")
+}
+
+/// MEJ-22: invitación directa del líder a un estudiante para un rol. Aceptarla crea la participación (sin postulación). Una sola PENDIENTE por (rol, invitado), garantizada por el lock del proyecto.
+model InvitacionRolProyecto {
+  idInvitacionRol Int                     @id @default(autoincrement()) @map("id_invitacion_rol")
+  idRolProyecto   Int                     @map("id_rol_proyecto")
+  idInvitado      Int                     @map("id_invitado")
+  idInvitadoPor   Int                     @map("id_invitado_por")
+  mensaje         String?                 @db.VarChar(500)
+  estado          EstadoInvitacionRol     @default(PENDIENTE)
+  creadaEn        DateTime                @default(now()) @map("creada_en")
+  resueltaEn      DateTime?               @map("resuelta_en")
+
+  rolProyecto RolProyecto @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: Cascade)
+  invitado    Usuario     @relation("InvitacionesRolRecibidas", fields: [idInvitado], references: [idUsuario], onDelete: Restrict)
+  invitadoPor Usuario     @relation("InvitacionesRolEnviadas", fields: [idInvitadoPor], references: [idUsuario], onDelete: Restrict)
+
+  @@index([idInvitado, estado])
+  @@index([idRolProyecto, estado])
+  @@map("invitacion_rol_proyecto")
 }
 
 model UsuarioTelefono {
@@ -674,6 +728,7 @@ model Organizacion {
   invitaciones   InvitacionOrganizacion[]
   solicitudes    SolicitudUnirseOrganizacion[]
   conversaciones Conversacion[]
+  seguidores     SeguimientoEntidad[]
 
   @@map("organizacion")
 }
@@ -797,6 +852,7 @@ model Asociacion {
   carreras  AsociacionCarrera[]
   junta     JuntaAsociacion[]
   proyectos Proyecto[]
+  seguidores SeguimientoEntidad[]
 
   @@map("asociacion")
 }
@@ -1018,6 +1074,7 @@ model RolProyecto {
   postulaciones    Postulacion[]
   participaciones  ParticipacionProyecto[]
   tareas           Tarea[]
+  invitaciones     InvitacionRolProyecto[]
 
   @@index([idProyecto])
   @@map("rol_proyecto")

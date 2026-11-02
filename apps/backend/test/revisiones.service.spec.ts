@@ -20,7 +20,8 @@ function makePrisma() {
     revisionProyecto: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     revisionCierreProyecto: { findMany: vi.fn().mockResolvedValue([{ idRevisionCierre: 2 }]) },
     proyecto: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
-    usuario: { findUnique: vi.fn() },
+    usuario: { findUnique: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    seguimientoEntidad: { findMany: vi.fn().mockResolvedValue([]) },
     notificacion: { create: vi.fn() },
   };
 }
@@ -93,7 +94,17 @@ describe('RevisionesService', () => {
     const prisma = makePrisma();
     prisma.revisionProyecto.findFirst.mockResolvedValue({ idRevisionProyecto: 4, idRevisor: 7 });
     prisma.revisionProyecto.update.mockResolvedValue({ idRevisionProyecto: 4, estadoRevision: 'APROBADA' });
-    prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: 2, tituloProyecto: 'Proyecto' });
+    prisma.proyecto.findUnique.mockResolvedValue({
+      creadoPor: 2,
+      tituloProyecto: 'Proyecto',
+      idAsociacion: null,
+      asociacion: null,
+      organizaciones: [],
+      intereses: [{ idInteres: 4 }],
+      roles: [{ idCarreraRequerida: 3 }],
+    });
+    // MEJ-16: la aprobación también avisa a quien coincide por carrera (31) o por interés (32).
+    prisma.usuario.findMany.mockResolvedValueOnce([{ idUsuario: 31 }]).mockResolvedValueOnce([{ idUsuario: 32 }]);
     const notifications = {
       isAdmin: vi.fn().mockResolvedValue(true),
       notifyFromTemplate: vi.fn(),
@@ -111,6 +122,32 @@ describe('RevisionesService', () => {
       expect.objectContaining({ projectId: 1, revisionId: 4 }),
       prisma,
     );
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith(
+      [31],
+      'PROYECTO_NUEVO_PARA_TI',
+      expect.objectContaining({ projectId: 1, motivo: 'CARRERA' }),
+      prisma,
+    );
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith(
+      [32],
+      'PROYECTO_NUEVO_PARA_TI',
+      expect.objectContaining({ projectId: 1, motivo: 'INTERES' }),
+      prisma,
+    );
+  });
+
+  it('observar un proyecto no dispara el aviso de proyecto nuevo', async () => {
+    const prisma = makePrisma();
+    prisma.revisionProyecto.findFirst.mockResolvedValue({ idRevisionProyecto: 4, idRevisor: 7 });
+    prisma.revisionProyecto.update.mockResolvedValue({ idRevisionProyecto: 4, estadoRevision: 'OBSERVADA' });
+    prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: 2, tituloProyecto: 'Proyecto' });
+    const notifications = { isAdmin: vi.fn().mockResolvedValue(true), notifyFromTemplate: vi.fn() };
+    const service = makeService(prisma, notifications);
+
+    await service.resolver(1, 7, { resultado: 'OBSERVADA', comentario: 'Falta detalle' });
+
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledTimes(1);
+    expect(notifications.notifyFromTemplate.mock.calls[0][1]).toBe('PROYECTO_OBSERVADO');
   });
 
   it('reclamar falla con estado inválido', async () => {

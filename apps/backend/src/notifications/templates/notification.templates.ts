@@ -375,6 +375,32 @@ export interface NotificationTemplateData {
     organizationId: number;
     detail: string;
   };
+
+  // MEJ-16: por qué le llega el proyecto nuevo (la entidad solo cuando la sigue).
+  PROYECTO_NUEVO_PARA_TI: {
+    projectTitle: string;
+    projectId: number;
+    motivo: 'SIGUE' | 'CARRERA' | 'INTERES';
+    entidad: string | null;
+  };
+
+  // MEJ-17: un proyecto guardado queda con pocos cupos o pasa a solicitud de cierre.
+  PROYECTO_GUARDADO_AVISO: {
+    projectTitle: string;
+    projectId: number;
+    motivo: 'CUPOS' | 'CIERRE';
+    cuposDisponibles: number;
+  };
+
+  // MEJ-22: el líder invita directo a un rol.
+  INVITACION_ROL_PROYECTO: {
+    projectTitle: string;
+    projectId: number;
+    roleName: string;
+    roleId: number;
+    invitationId: number;
+    invitedBy: string;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -692,6 +718,30 @@ export const NOTIFICATION_TEMPLATES = {
   ORGANIZACION_ACTUALIZADA: {
     title: (data: NotificationTemplateData['ORGANIZACION_ACTUALIZADA']) => data.organizationName,
     message: (data: NotificationTemplateData['ORGANIZACION_ACTUALIZADA']) => data.detail,
+  },
+
+  PROYECTO_NUEVO_PARA_TI: {
+    title: 'Hay un proyecto nuevo para ti',
+    message: (data: NotificationTemplateData['PROYECTO_NUEVO_PARA_TI']) => {
+      if (data.motivo === 'SIGUE') return `"${data.entidad}", que sigues, publicó el proyecto "${data.projectTitle}".`;
+      if (data.motivo === 'CARRERA') return `Se publicó "${data.projectTitle}", que busca estudiantes de tu carrera.`;
+      return `Se publicó "${data.projectTitle}", que coincide con tus intereses.`;
+    },
+  },
+
+  PROYECTO_GUARDADO_AVISO: {
+    title: (data: NotificationTemplateData['PROYECTO_GUARDADO_AVISO']) =>
+      data.motivo === 'CIERRE' ? 'Un proyecto guardado va a cerrar' : 'Quedan pocos cupos en un proyecto guardado',
+    message: (data: NotificationTemplateData['PROYECTO_GUARDADO_AVISO']) =>
+      data.motivo === 'CIERRE'
+        ? `"${data.projectTitle}" pasó a solicitud de cierre: ya no acepta postulaciones.`
+        : `A "${data.projectTitle}" ${data.cuposDisponibles === 1 ? 'le queda 1 cupo' : `le quedan ${data.cuposDisponibles} cupos`}. Postúlate antes de que se llene.`,
+  },
+
+  INVITACION_ROL_PROYECTO: {
+    title: 'Te invitaron a un rol de proyecto',
+    message: (data: NotificationTemplateData['INVITACION_ROL_PROYECTO']) =>
+      `${data.invitedBy} te invitó al rol "${data.roleName}" del proyecto "${data.projectTitle}".`,
   },
 } as const;
 

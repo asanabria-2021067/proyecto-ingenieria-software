@@ -2,7 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SocialService } from '../social/social.service';
-import { PESOS_ORDEN_DISPONIBLES } from './projects.read-model';
+import { calcularCoincidencia, mejorCoincidencia, UMBRAL_COINCIDE } from '../common/coincidencia-habilidades';
+import { PESOS_ORDEN_DISPONIBLES, conCuposDisponibles, proyectoListSelect } from './projects.read-model';
+
+/** Cuántos proyectos abiertos recientes se comparan en «Para ti» (una sola consulta, sin N+1). */
+const PARA_TI_VENTANA = 100;
+/** Máximo de proyectos que devuelve «Para ti». */
+const PARA_TI_MAXIMO = 20;
+/** Cada interés compartido suma esto al orden, por debajo de un requisito de habilidad cumplido al 100 %. */
+const PESO_INTERES = 10;
 
 /** Marca de guardado y orden por afinidad del listado de proyectos (extraído de ProjectsService). */
 @Injectable()
@@ -118,6 +126,68 @@ export class ProjectsAffinityService {
     // `proyectos` ya viene ordenado por recencia; Array.sort es estable, así
     // que a igual score se conserva ese orden (la recencia como base, T-251).
     return enriquecidos.sort((a, b) => this.scoreAfinidad(b) - this.scoreAfinidad(a));
+  }
+
+  /**
+   * MEJ-15: «Para ti». Proyectos abiertos con cupo, ordenados por la coincidencia entre tus
+   * habilidades y los requisitos de su mejor rol, más los intereses que compartes con el
+   * proyecto. Solo entran los que coinciden en algo; no incluye los propios ni aquellos donde
+   * ya participas. `condiciones` son los mismos filtros del catálogo (estado visible, dueño…).
+   */
+  async paraTi(userId: number, condiciones: Prisma.ProyectoWhereInput[]) {
+    const [habilidadesUsuario, interesesUsuario, proyectos] = await Promise.all([
+      this.prisma.usuarioHabilidad.findMany({ where: { idUsuario: userId }, select: { idHabilidad: true, nivelHabilidad: true } }),
+      this.prisma.usuarioInteres.findMany({ where: { idUsuario: userId }, select: { idInteres: true } }),
+      this.prisma.proyecto.findMany({
+        where: {
+          AND: [
+            ...condiciones,
+            { creadoPor: { not: userId } },
+            { roles: { none: { participaciones: { some: { idUsuario: userId, estadoParticipacion: 'ACTIVO' } } } } },
+          ],
+        },
+        select: {
+          ...proyectoListSelect,
+          intereses: { select: { idInteres: true, interes: { select: { nombreInteres: true } } } },
+          roles: {
+            select: {
+              cupos: true,
+              requisitos: { select: { idHabilidad: true, nivelMinimo: true, obligatorio: true } },
+              _count: { select: { participaciones: { where: { estadoParticipacion: 'ACTIVO' } } } },
+            },
+          },
+        },
+        orderBy: { fechaCreacion: 'desc' },
+        take: PARA_TI_VENTANA,
+      }),
+    ]);
+    const habilidades = new Map(habilidadesUsuario.map((h) => [h.idHabilidad, h.nivelHabilidad]));
+    const intereses = new Set(interesesUsuario.map((i) => i.idInteres));
+
+    const puntuados = proyectos
+      .map((p) => {
+        const abiertos = p.roles.filter((r) => r.cupos - r._count.participaciones > 0);
+        if (abiertos.length === 0) return null;
+        const mejor = mejorCoincidencia(abiertos.map((r) => calcularCoincidencia(r.requisitos, habilidades)));
+        const interesesCompartidos = p.intereses.filter((i) => intereses.has(i.idInteres)).length;
+        const porcentaje = mejor?.porcentaje ?? 0;
+        if (porcentaje === 0 && interesesCompartidos === 0) return null;
+        return {
+          proyecto: p,
+          puntaje: porcentaje + interesesCompartidos * PESO_INTERES,
+          coincidencia: { porcentaje, interesesCompartidos, coincideHabilidades: porcentaje >= UMBRAL_COINCIDE },
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+      // Estable: a igual puntaje se conserva la recencia de la consulta.
+      .sort((a, b) => b.puntaje - a.puntaje)
+      .slice(0, PARA_TI_MAXIMO);
+
+    const conCupos = puntuados.map((x) => ({
+      ...conCuposDisponibles({ ...x.proyecto, intereses: x.proyecto.intereses.map(({ interes }) => ({ interes })) }),
+      coincidencia: x.coincidencia,
+    }));
+    return this.conGuardado(conCupos, userId);
   }
 
   private scoreAfinidad(p: { amigosParticipantes: number; mismaCarrera: boolean }): number {

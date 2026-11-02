@@ -51,6 +51,8 @@ import { AnunciosModule } from './anuncios/anuncios.module';
 import { ContactoModule } from './contacto/contacto.module';
 import { AssociationsModule } from './associations/associations.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { FollowsModule } from './follows/follows.module';
+import { RoleInvitationsModule } from './role-invitations/role-invitations.module';
 
 const skipThrottling = () => isThrottlerDisabled();
 
@@ -138,6 +140,8 @@ const skipThrottling = () => isThrottlerDisabled();
     ContactoModule,
     AssociationsModule,
     OrganizationsModule,
+    FollowsModule,
+    RoleInvitationsModule,
   ],
   controllers: [AppController],
   providers: [

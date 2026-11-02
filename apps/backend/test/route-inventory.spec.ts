@@ -145,4 +145,34 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     const conJunta = rutas.filter((r) => r.path.startsWith('asociaciones/:idAsociacion'));
     expect(conJunta.every((r) => r.guards.includes(JuntaGuard))).toBe(true);
   });
+
+  // MEJ-15/18/20/21/22/62: cada ruta nueva se declara aqui con su guard; una de mas o de menos hace fallar la prueba.
+  it('descubrimiento: seguimientos, invitaciones a rol, «Para ti» y duplicar exigen JwtAuthGuard', () => {
+    const ids = (f: (r: Ruta) => boolean) => rutas.filter(f).map((r) => r.id).sort();
+    const deSeguimientos = rutas.filter((r) => r.controller.startsWith('FollowsController.'));
+    expect(deSeguimientos.map((r) => r.id).sort()).toEqual([
+      'DELETE /api/seguimientos/asociaciones/:id',
+      'DELETE /api/seguimientos/organizaciones/:id',
+      'GET /api/seguimientos/asociaciones',
+      'GET /api/seguimientos/mios',
+      'POST /api/seguimientos/asociaciones/:id',
+      'POST /api/seguimientos/organizaciones/:id',
+    ]);
+    const deInvitaciones = rutas.filter((r) => r.controller.startsWith('RoleInvitationsController.'));
+    expect(deInvitaciones.map((r) => r.id).sort()).toEqual([
+      'GET /api/invitaciones-rol/mias',
+      'GET /api/invitaciones-rol/proyecto/:idProyecto',
+      'GET /api/invitaciones-rol/sugerencias',
+      'POST /api/invitaciones-rol',
+      'POST /api/invitaciones-rol/:id/aceptar',
+      'POST /api/invitaciones-rol/:id/rechazar',
+    ]);
+    const deProyectos = ids((r) => ['GET /api/proyectos/para-ti', 'POST /api/proyectos/:id/duplicar', 'GET /api/proyectos/:id/postulaciones'].includes(r.id));
+    expect(deProyectos).toHaveLength(3);
+    const nuevas = rutas.filter(
+      (r) => deSeguimientos.includes(r) || deInvitaciones.includes(r) || ['GET /api/proyectos/para-ti', 'POST /api/proyectos/:id/duplicar'].includes(r.id),
+    );
+    expect(nuevas.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+    expect(nuevas.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+  });
 });
