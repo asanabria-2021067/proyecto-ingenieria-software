@@ -7,6 +7,9 @@ vi.mock('next/navigation', () => ({
   useParams: () => ({ id: '10' }),
 }));
 
+// MEJ-22: el diálogo de invitar a un rol usa TanStack Query; aquí solo importa el perfil.
+vi.mock('@/components/projects/invitar-a-rol-dialog', () => ({ InvitarARolDialog: () => null }));
+
 const usePerfilUsuarioMock = vi.fn();
 const useAccionesAmistadMock = vi.fn();
 vi.mock('@/hooks/use-social', () => ({

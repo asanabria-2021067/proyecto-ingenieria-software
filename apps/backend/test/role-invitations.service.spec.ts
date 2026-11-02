@@ -167,15 +167,6 @@ describe('RoleInvitationsService listados', () => {
     await service.mias(20);
     expect(prisma.invitacionRolProyecto.findMany.mock.calls[0][0].where).toMatchObject({ idInvitado: 20, estado: 'PENDIENTE' });
   });
-
-  it('las pendientes de un proyecto solo las ve su líder', async () => {
-    const { prisma, service } = crear();
-    prisma.proyecto.findFirst.mockResolvedValue({ creadoPor: 1 });
-    await expect(service.delProyecto(2, 9)).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(service.delProyecto(1, 9)).resolves.toEqual([]);
-    prisma.proyecto.findFirst.mockResolvedValue(null);
-    await expect(service.delProyecto(1, 9)).rejects.toBeInstanceOf(NotFoundException);
-  });
 });
 
 describe('RoleInvitationsService.sugerencias (MEJ-62)', () => {

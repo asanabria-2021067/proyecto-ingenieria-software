@@ -161,7 +161,6 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     const deInvitaciones = rutas.filter((r) => r.controller.startsWith('RoleInvitationsController.'));
     expect(deInvitaciones.map((r) => r.id).sort()).toEqual([
       'GET /api/invitaciones-rol/mias',
-      'GET /api/invitaciones-rol/proyecto/:idProyecto',
       'GET /api/invitaciones-rol/sugerencias',
       'POST /api/invitaciones-rol',
       'POST /api/invitaciones-rol/:id/aceptar',

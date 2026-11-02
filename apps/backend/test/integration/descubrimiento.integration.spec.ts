@@ -237,8 +237,6 @@ describeIntegration('Descubrimiento — seguir, invitar a un rol, duplicar y Par
 
       expect((await pedir('GET', '/invitaciones-rol/mias', invitado.token)).body).toHaveLength(1);
       expect((await pedir('GET', '/invitaciones-rol/mias', otro.token)).body).toHaveLength(0);
-      expect((await pedir('GET', `/invitaciones-rol/proyecto/${p.idProyecto}`, lider.token)).body).toHaveLength(1);
-      expect((await pedir('GET', `/invitaciones-rol/proyecto/${p.idProyecto}`, otro.token)).status).toBe(403);
 
       // Nadie acepta una invitación ajena; ni el propio líder.
       expect((await pedir('POST', `/invitaciones-rol/${id}/aceptar`, otro.token)).status).toBe(404);

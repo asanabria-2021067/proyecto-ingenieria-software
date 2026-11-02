@@ -123,18 +123,6 @@ export class RoleInvitationsService {
     });
   }
 
-  /** Invitaciones pendientes de un proyecto: solo las ve su líder (para marcar «Invitado» en la UI). */
-  async delProyecto(userId: number, idProyecto: number) {
-    const proyecto = await this.prisma.proyecto.findFirst({ where: { idProyecto, eliminadoEn: null }, select: { creadoPor: true } });
-    if (!proyecto) throw new NotFoundException('Proyecto no encontrado');
-    if (proyecto.creadoPor !== userId) throw new ForbiddenException('No eres el líder de este proyecto');
-    return this.prisma.invitacionRolProyecto.findMany({
-      where: { estado: EstadoInvitacionRol.PENDIENTE, rolProyecto: { idProyecto } },
-      orderBy: { creadaEn: 'desc' },
-      select: { idInvitacionRol: true, idRolProyecto: true, idInvitado: true, creadaEn: true },
-    });
-  }
-
   async responder(userId: number, idInvitacionRol: number, aceptar: boolean) {
     const inv = await this.prisma.invitacionRolProyecto.findUnique({
       where: { idInvitacionRol },

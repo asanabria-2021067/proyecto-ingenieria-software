@@ -44,11 +44,6 @@ export class RoleInvitationsController {
     });
   }
 
-  @Get('proyecto/:idProyecto')
-  delProyecto(@Param('idProyecto', ParseIntPipe) idProyecto: number, @CurrentUser() user: { userId: number }) {
-    return this.service.delProyecto(user.userId, idProyecto);
-  }
-
   @Post(':id/aceptar')
   @HttpCode(HttpStatus.OK)
   aceptar(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number }) {

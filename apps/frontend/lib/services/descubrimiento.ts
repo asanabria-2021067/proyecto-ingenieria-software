@@ -84,8 +84,6 @@ export interface SugerenciaInvitado {
 }
 
 export const getMisInvitacionesRol = () => apiFetch<InvitacionRol[]>('/invitaciones-rol/mias');
-export const getInvitacionesRolProyecto = (idProyecto: number) =>
-  apiFetch<InvitacionRolEnviada[]>(`/invitaciones-rol/proyecto/${idProyecto}`);
 export const invitarARol = (input: { idRolProyecto: number; idUsuario: number; mensaje?: string }) =>
   apiFetch<InvitacionRolEnviada>('/invitaciones-rol', { method: 'POST', body: JSON.stringify(input) });
 export const responderInvitacionRol = (idInvitacionRol: number, aceptar: boolean) =>

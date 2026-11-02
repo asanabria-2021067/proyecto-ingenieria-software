@@ -19,8 +19,8 @@ const MAX_MENSAJE = 500;
 
 /**
  * MEJ-22: el líder invita directo a una persona a un rol de uno de sus proyectos abiertos (desde
- * su perfil o desde Personas). Solo muestra proyectos propios publicados o en progreso y roles
- * con cupo; las reglas finales (cupo, duplicados, cuenta activa) las valida el servidor.
+ * su perfil o desde Personas). Solo muestra proyectos propios publicados o en progreso; las reglas
+ * finales (cupo, duplicados, cuenta activa) las valida el servidor.
  */
 export function InvitarARolDialog({ idUsuario, nombre }: { idUsuario: number; nombre: string }) {
   const [abierto, setAbierto] = useState(false);

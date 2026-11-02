@@ -6,7 +6,6 @@ import {
   dejarOrganizacion,
   duplicarProyecto,
   getAsociacionesSeguibles,
-  getInvitacionesRolProyecto,
   getMisInvitacionesRol,
   getMisSeguimientos,
   getProyectosParaTi,
@@ -60,14 +59,6 @@ export function useAlternarSeguimiento() {
 
 export function useMisInvitacionesRol() {
   return useQuery({ queryKey: [...invitacionesRolKey, 'mias'], queryFn: getMisInvitacionesRol });
-}
-
-export function useInvitacionesRolProyecto(idProyecto: number | null) {
-  return useQuery({
-    queryKey: [...invitacionesRolKey, 'proyecto', idProyecto],
-    queryFn: () => getInvitacionesRolProyecto(idProyecto as number),
-    enabled: idProyecto !== null,
-  });
 }
 
 export function useInvitarARol() {
