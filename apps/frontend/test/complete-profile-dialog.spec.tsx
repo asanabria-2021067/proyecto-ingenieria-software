@@ -145,6 +145,16 @@ async function avanzarHasta(pasoSinHoras: number) {
 }
 
 describe('CompleteProfileDialog (T-203)', () => {
+  // jsdom no calcula layout: se comprueban las clases que evitan el recorte a 390 px.
+  it('movil 390 px: el dialogo no ensancha su columna y la botonera se parte en lineas', () => {
+    renderDialog();
+    const dialogo = screen.getByRole('dialog');
+    expect(dialogo.className).toContain('grid-cols-[minmax(0,1fr)]');
+    const botonera = screen.getByRole('button', { name: /Siguiente/i }).parentElement as HTMLElement;
+    expect(botonera.className).toContain('flex-wrap');
+    expect(botonera.parentElement?.className).toContain('flex-wrap');
+  });
+
   it('precarga los campos desde currentUser, incluidas habilidades/intereses/cualidades anidadas', async () => {
     const user = baseUser({
       perfil: {
