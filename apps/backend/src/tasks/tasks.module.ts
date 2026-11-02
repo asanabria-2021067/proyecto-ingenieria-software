@@ -15,6 +15,7 @@ import { TasksExtrasService } from './tasks-extras.service';
 import { PlantillasTareaController } from './plantillas-tarea.controller';
 import { PlantillasTareaService } from './plantillas-tarea.service';
 import { TasksRecurrenceService } from './tasks-recurrence.service';
+import { WeeklySummaryService } from './weekly-summary.service';
 import { ComentariosModule } from '../comentarios/comentarios.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SprintsModule } from '../sprints/sprints.module';
@@ -37,6 +38,8 @@ import { BitacoraModule } from '../bitacora/bitacora.module';
     PlantillasTareaService,
     // MEJ-47: job diario de tareas repetitivas.
     TasksRecurrenceService,
+    // MEJ-31: resumen "Tu semana" de los lunes.
+    WeeklySummaryService,
   ],
   exports: [TasksService, TasksAuthorizationService, TasksContextService],
 })

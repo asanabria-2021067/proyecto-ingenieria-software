@@ -416,6 +416,13 @@ export interface NotificationTemplateData {
     invitationId: number;
     invitedBy: string;
   };
+
+  // MEJ-31: resumen de los lunes; los conteos ya vienen calculados por el job.
+  TU_SEMANA: {
+    tareasPorVencer: number;
+    horasSemanaPasada: number;
+    postulacionesPendientes: number;
+  };
 }
 
 export const NOTIFICATION_TEMPLATES = {
@@ -769,6 +776,20 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Te invitaron a un rol de proyecto',
     message: (data: NotificationTemplateData['INVITACION_ROL_PROYECTO']) =>
       `${data.invitedBy} te invitó al rol "${data.roleName}" del proyecto "${data.projectTitle}".`,
+  },
+
+  TU_SEMANA: {
+    title: 'Tu semana',
+    message: (data: NotificationTemplateData['TU_SEMANA']) =>
+      [
+        data.tareasPorVencer > 0 ? `${data.tareasPorVencer} ${data.tareasPorVencer === 1 ? 'tarea vence' : 'tareas vencen'} esta semana` : null,
+        `${data.horasSemanaPasada} h registradas la semana pasada`,
+        data.postulacionesPendientes > 0
+          ? `${data.postulacionesPendientes} ${data.postulacionesPendientes === 1 ? 'postulación pendiente' : 'postulaciones pendientes'}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' · ') + '.',
   },
 } as const;
 
