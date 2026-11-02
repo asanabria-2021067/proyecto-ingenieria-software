@@ -95,7 +95,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
 
     fireEvent.click(familia('Red de contactos'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getAllByRole('switch')).toHaveLength(6);
+    expect(screen.getAllByRole('switch')).toHaveLength(7);
   });
 
   it('el disparador es un botón dentro de un encabezado: se alcanza y se acciona con teclado', async () => {
