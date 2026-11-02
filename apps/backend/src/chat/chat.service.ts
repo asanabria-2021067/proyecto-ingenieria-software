@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CHAT_STORAGE_PORT, type ChatStoragePort } from '../storage/chat-storage.port';
 import { ChatGateway } from './chat.gateway';
 import { ADJUNTO_MAX_BYTES, validarAdjunto, type ArchivoSubido } from './chat-adjuntos';
-import { validarNotaVoz } from './chat-nota-voz';
+import { NOTA_VOZ_MAX_BYTES, validarNotaVoz } from './chat-nota-voz';
 import { CreatePollDto } from './dto/create-poll.dto';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
@@ -537,6 +537,29 @@ export class ChatService {
     return { datos, mime: adjunto.mime };
   }
 
+  /**
+   * Bytes de una nota de voz para el reproductor: mismo criterio que la miniatura
+   * (descarga en el servidor para que el navegador solo hable con el mismo origen),
+   * solo participantes, solo audio y con el tope de NOTA_VOZ_MAX_BYTES.
+   */
+  async getAdjuntoAudio(idProyecto: number, idConversacion: number, idAdjunto: number, userId: number) {
+    await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
+    const adjunto = await this.prisma.adjuntoMensajeChat.findFirst({
+      where: { idAdjunto, idConversacion, mensaje: { eliminadoEn: null } },
+      select: { claveAlmacenamiento: true, mime: true, tamanoBytes: true },
+    });
+    if (!adjunto) throw new NotFoundException('Archivo no encontrado');
+    if (!adjunto.mime.startsWith('audio/') || adjunto.tamanoBytes > NOTA_VOZ_MAX_BYTES) {
+      throw new BadRequestException('El archivo no es una nota de voz');
+    }
+    const url = await this.storage.signedUrl(adjunto.claveAlmacenamiento, URL_ADJUNTO_TTL_SEGUNDOS);
+    const respuesta = await fetch(url);
+    if (!respuesta.ok) throw new NotFoundException('Archivo no disponible');
+    const datos = Buffer.from(await respuesta.arrayBuffer());
+    if (datos.length > NOTA_VOZ_MAX_BYTES) throw new BadRequestException('El archivo no es una nota de voz');
+    return { datos, mime: adjunto.mime };
+  }
+
   /** Busca en una conversación por texto (parcial, sin acentos ni mayúsculas), autor y rango de fechas. */
   async searchMessages(idProyecto: number, idConversacion: number, userId: number, filtros: SearchMessagesQueryDto) {
     await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
@@ -962,7 +985,8 @@ export class ChatService {
           : {}),
       },
       include: {
-        proyecto: { select: { idProyecto: true, tituloProyecto: true } },
+        // creadoPor: el cliente sabe si es el lider (puede fijar mensajes ajenos).
+        proyecto: { select: { idProyecto: true, tituloProyecto: true, creadoPor: true } },
         apodos: apodosPropios(userId),
         participantes: {
           select: {

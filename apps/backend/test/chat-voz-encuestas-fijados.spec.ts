@@ -248,6 +248,38 @@ describe('ChatService - notas de voz (MEJ-41)', () => {
     expect(adjunto).toMatchObject({ nombreOriginal: 'nota-de-voz.webm', mime: 'audio/webm', duracionSegundos: 42 });
   });
 
+  describe('getAdjuntoAudio', () => {
+    function build(adjunto: unknown) {
+      const prisma = makePrisma();
+      (prisma as any).adjuntoMensajeChat = { findFirst: vi.fn().mockResolvedValue(adjunto) };
+      prisma.conversacion.findFirst.mockResolvedValue(conversacionRow());
+      const storage = { signedUrl: vi.fn().mockResolvedValue('https://firmada.example/a') };
+      return { service: new ChatService(prisma as any, {} as any, storage as any), prisma, storage };
+    }
+
+    it('devuelve los bytes del audio a un participante', async () => {
+      const { service } = build({ claveAlmacenamiento: 'chat/5/a.webm', mime: 'audio/webm', tamanoBytes: 64 });
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new Uint8Array(webm()).buffer }));
+      const r = await service.getAdjuntoAudio(10, 5, 3, AUTOR);
+      expect(r.mime).toBe('audio/webm');
+      expect(r.datos.length).toBe(64);
+      vi.unstubAllGlobals();
+    });
+
+    it('rechaza adjuntos que no son audio, mas grandes que 5 MB o inexistentes, y a quien no participa', async () => {
+      await expect(build({ claveAlmacenamiento: 'k', mime: 'application/pdf', tamanoBytes: 10 }).service.getAdjuntoAudio(10, 5, 3, AUTOR)).rejects.toThrow(
+        'no es una nota de voz',
+      );
+      await expect(
+        build({ claveAlmacenamiento: 'k', mime: 'audio/webm', tamanoBytes: NOTA_VOZ_MAX_BYTES + 1 }).service.getAdjuntoAudio(10, 5, 3, AUTOR),
+      ).rejects.toThrow('no es una nota de voz');
+      await expect(build(null).service.getAdjuntoAudio(10, 5, 3, AUTOR)).rejects.toThrow('no encontrado');
+      await expect(build({ claveAlmacenamiento: 'k', mime: 'audio/webm', tamanoBytes: 1 }).service.getAdjuntoAudio(10, 5, 3, 999)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+  });
+
   it('no sube nada si el contenido no es audio', async () => {
     const prisma = makePrisma();
     const storage = { upload: vi.fn(), destroy: vi.fn() };

@@ -144,6 +144,17 @@ export class ChatController {
     return new StreamableFile(datos, { type: mime, disposition: 'inline' });
   }
 
+  @Get(':conversationId/archivos/:attachmentId/audio')
+  async voiceNoteAudio(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    const { datos, mime } = await this.chatService.getAdjuntoAudio(projectId, conversationId, attachmentId, user.userId);
+    return new StreamableFile(datos, { type: mime, disposition: 'inline' });
+  }
+
   /** Un archivo por mensaje, con o sin texto. El tamano se corta en multer. */
   @Post(':conversationId/mensajes/archivo')
   @HttpCode(HttpStatus.CREATED)

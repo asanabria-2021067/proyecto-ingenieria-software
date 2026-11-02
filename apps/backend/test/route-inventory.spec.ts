@@ -77,6 +77,7 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     const base = 'proyectos/:projectId/conversaciones/:conversationId';
     const esperadas = [
       `POST /api/${base}/mensajes/voz`,
+      `GET /api/${base}/archivos/:attachmentId/audio`,
       `POST /api/${base}/encuestas`,
       `PUT /api/${base}/mensajes/:messageId/voto`,
       `POST /api/${base}/mensajes/:messageId/encuesta/cierre`,
