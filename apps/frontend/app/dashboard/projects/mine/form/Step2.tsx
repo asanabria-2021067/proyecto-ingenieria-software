@@ -130,7 +130,7 @@ export function Step2({
                 <div key={req.id} className="grid grid-cols-[1fr_8rem_auto_auto] items-start gap-2">
                   <div>
                     <Select value={req.idHabilidad ? String(req.idHabilidad) : '__NONE__'} onValueChange={(v) => onUpdateRequisito(rol.id, req.id, 'idHabilidad', v === '__NONE__' ? null : Number(v))}>
-                      <SelectTrigger className="h-auto py-2 rounded-lg border-outline-variant/30 bg-surface-container-low text-sm">
+                      <SelectTrigger className="w-full h-auto py-2 rounded-lg border-outline-variant/30 bg-surface-container-low text-sm">
                         <SelectValue placeholder="Seleccionar habilidad" />
                       </SelectTrigger>
                       <SelectContent>
@@ -145,7 +145,7 @@ export function Step2({
 
                   <div>
                     <Select value={req.nivelMinimo || '__NONE__'} onValueChange={(v) => onUpdateRequisito(rol.id, req.id, 'nivelMinimo', v === '__NONE__' ? '' : v)}>
-                      <SelectTrigger className="h-auto py-2 rounded-lg border-outline-variant/30 bg-surface-container-low text-sm">
+                      <SelectTrigger className="w-full h-auto py-2 rounded-lg border-outline-variant/30 bg-surface-container-low text-sm">
                         <SelectValue placeholder="Nivel" />
                       </SelectTrigger>
                       <SelectContent>
