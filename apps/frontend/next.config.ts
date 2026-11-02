@@ -12,13 +12,14 @@ const FRONTEND_ROUTES = '/((?!api(?:/|$)).*)';
  * Cabeceras base de seguridad del HTML. `frame-ancestors` va en la CSP
  * aplicada (ver CSP_HEADERS); X-Frame-Options DENY cubre navegadores
  * antiguos. Permissions-Policy apaga capacidades que la app no usa (el
- * portapapeles, que sí usa, queda intacto).
+ * portapapeles y el micrófono de las notas de voz, que sí usa, quedan
+ * intactos; el micrófono solo para el propio origen).
  */
 const BASELINE_SECURITY_HEADERS = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), payment=(), usb=()' },
 ];
 
 /**

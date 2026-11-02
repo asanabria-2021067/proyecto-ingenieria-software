@@ -441,6 +441,7 @@ model Usuario {
   insignias                        InsigniaUsuario[]
   reaccionesChat                   ReaccionMensajeChat[]
   mensajesGuardados                MensajeGuardado[]
+  votosEncuestaChat                VotoEncuestaChat[]
   reunionesAdministracionCreadas   ReunionAdministracion[]      @relation("ReunionesAdministracionCreadas")
   reunionesAdministracionEditables ReunionAdministradorEditor[] @relation("ReunionesAdministracionEditables")
 
@@ -1966,6 +1967,8 @@ model MensajeChat {
   editadoEn       DateTime? @map("editado_en")
   eliminadoEn     DateTime? @map("eliminado_en")
   idMensajeCitado Int?      @map("id_mensaje_citado")
+  // MEJ-43: mensaje fijado (hasta 3 por conversacion, validado en ChatService).
+  fijadoEn        DateTime? @map("fijado_en")
 
   conversacion Conversacion          @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
   remitente    Usuario               @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario], onDelete: Restrict)
@@ -1974,8 +1977,10 @@ model MensajeChat {
   respuestas   MensajeChat[]         @relation("MensajeCitado")
   reacciones   ReaccionMensajeChat[]
   guardadoPor  MensajeGuardado[]
+  encuesta     EncuestaChat?
 
   @@index([idConversacion, enviadoEn])
+  @@index([idConversacion, fijadoEn])
   @@map("mensaje_chat")
 }
 
@@ -1990,12 +1995,56 @@ model AdjuntoMensajeChat {
   tamanoBytes         Int      @map("tamano_bytes")
   claveAlmacenamiento String   @map("clave_almacenamiento") @db.VarChar(255)
   creadoEn            DateTime @default(now()) @map("creado_en")
+  // MEJ-41: solo en notas de voz (audio), duracion declarada por el cliente (max 120 s).
+  duracionSegundos    Int?     @map("duracion_segundos")
 
   mensaje      MensajeChat  @relation(fields: [idMensaje], references: [idMensaje], onDelete: Restrict)
   conversacion Conversacion @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
 
   @@index([idConversacion, idMensaje])
   @@map("adjunto_mensaje_chat")
+}
+
+/// MEJ-42: encuesta de un mensaje del chat (2 a 6 opciones, voto unico o multiple).
+model EncuestaChat {
+  idEncuesta Int       @id @default(autoincrement()) @map("id_encuesta")
+  idMensaje  Int       @unique @map("id_mensaje")
+  pregunta   String    @db.VarChar(300)
+  multiple   Boolean   @default(false)
+  // Cierre opcional: programado (cierraEn) o manual (cerradaEn).
+  cierraEn   DateTime? @map("cierra_en")
+  cerradaEn  DateTime? @map("cerrada_en")
+
+  mensaje  MensajeChat          @relation(fields: [idMensaje], references: [idMensaje], onDelete: Restrict)
+  opciones OpcionEncuestaChat[]
+
+  @@map("encuesta_chat")
+}
+
+model OpcionEncuestaChat {
+  idOpcion   Int    @id @default(autoincrement()) @map("id_opcion")
+  idEncuesta Int    @map("id_encuesta")
+  texto      String @db.VarChar(120)
+  orden      Int
+
+  encuesta EncuestaChat       @relation(fields: [idEncuesta], references: [idEncuesta], onDelete: Cascade)
+  votos    VotoEncuestaChat[]
+
+  @@index([idEncuesta])
+  @@map("opcion_encuesta_chat")
+}
+
+model VotoEncuestaChat {
+  idOpcion  Int      @map("id_opcion")
+  idUsuario Int      @map("id_usuario")
+  votadoEn  DateTime @default(now()) @map("votado_en")
+
+  opcion  OpcionEncuestaChat @relation(fields: [idOpcion], references: [idOpcion], onDelete: Cascade)
+  usuario Usuario            @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@id([idOpcion, idUsuario])
+  @@index([idUsuario])
+  @@map("voto_encuesta_chat")
 }
 
 /// Reacción con emoji de un usuario a un mensaje del chat (una por mensaje+usuario+emoji).

@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Bell,
   BellOff,
+  BarChart3,
   ChevronDown,
   ChevronUp,
   Link2,
@@ -50,6 +51,10 @@ import { ChatLinksDialog } from './chat-links-dialog';
 import { AdjuntoIcono } from './chat-adjunto';
 import { ChatMessageItem } from './chat-message-item';
 import { ChatSearchPanel } from './chat-search';
+import { ChatFijadosBarra } from './chat-fijados';
+import { NuevaEncuestaDialog } from './chat-encuesta';
+import { NotaVozGrabador } from './chat-nota-voz';
+import { useFijados, usePinMessage, useSendVoiceNote } from '@/hooks/use-chat-extras';
 import { ApodosDialog } from '@/components/chat-dock/apodos-dialog';
 import { nombreMostrado, nombreReal } from '@/lib/chat-apodos';
 import { EstadoIndicador } from '@/components/chat-dock/estado-chat';
@@ -130,7 +135,14 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
   const archivoInputRef = useRef<HTMLInputElement>(null);
   const enviarArchivo = useSendFileMessage(idProyecto, idConversacion);
-  const enviando = enviar.isPending || enviarArchivo.isPending;
+  const enviarVoz = useSendVoiceNote(idProyecto, idConversacion);
+  const { fijados } = useFijados(idProyecto, idConversacion);
+  const fijar = usePinMessage(idProyecto, idConversacion);
+  const enviando = enviar.isPending || enviarArchivo.isPending || enviarVoz.isPending;
+  const [grabando, setGrabando] = useState(false);
+  const [encuestaAbierta, setEncuestaAbierta] = useState(false);
+  // El líder del proyecto fija cualquier mensaje; el resto, solo los suyos.
+  const esLider = currentUserId !== null && conversacion?.proyecto.creadoPor === currentUserId;
   const [citando, setCitando] = useState<ChatMensaje | null>(null);
   const [apodosAbierto, setApodosAbierto] = useState(false);
   const [temaAbierto, setTemaAbierto] = useState(false);
@@ -214,6 +226,15 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
     setErrorArchivo(error);
     setArchivo(error ? null : elegido);
   };
+
+  const handleFijar = (mensaje: ChatMensaje, fijarMensaje: boolean) =>
+    fijar.mutate(
+      { idMensaje: mensaje.idMensaje, fijar: fijarMensaje },
+      {
+        onSuccess: () => toast.success(fijarMensaje ? 'Mensaje fijado' : 'Mensaje desfijado'),
+        onError: (error) => toast.error(error.message || 'No se pudo actualizar el mensaje fijado'),
+      },
+    );
 
   const handleBorrar = async () => {
     const ok = await confirmar({
@@ -395,6 +416,12 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               onClose={() => setBuscarAbierto(false)}
             />
           )}
+          <ChatFijadosBarra
+            fijados={fijados}
+            onIrA={irAlMensaje}
+            puedeDesfijar={(m) => esLider || m.remitente.idUsuario === currentUserId}
+            onDesfijar={(m) => handleFijar(m, false)}
+          />
           <div ref={listRef} className={`${pagina ? 'flex-1' : 'h-[40rem] max-h-[60dvh]'} min-h-0 space-y-3 overflow-y-auto px-3 py-3`}>
             {isLoading && <SkeletonList label="Cargando historial" count={3} lines={1} avatar="circle" layout="plain" />}
             {!isLoading && messages.length === 0 && (
@@ -410,6 +437,10 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                   apodo={m.apodoRemitente ?? conversacion?.participantes.find((p) => p.idUsuario === m.remitente.idUsuario)?.apodo}
                   temaColor={conversacion?.temaColor}
                   resaltado={saltarA === m.idMensaje}
+                  idUsuarioActual={currentUserId}
+                  esLider={esLider}
+                  puedeFijar={esLider || m.remitente.idUsuario === currentUserId}
+                  onFijar={handleFijar}
                   onResponder={responder}
                   onIrAlOriginal={irAlMensaje}
                   onReaccionar={(idMensaje, emoji) =>
@@ -473,17 +504,45 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               className="hidden"
               data-testid="adjunto-input"
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => archivoInputRef.current?.click()}
+            {!grabando && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => archivoInputRef.current?.click()}
+                disabled={enviando}
+                className="size-9 shrink-0 rounded-full"
+                aria-label="Adjuntar archivo"
+              >
+                <Paperclip className="size-4" aria-hidden="true" />
+              </Button>
+            )}
+            <NotaVozGrabador
               disabled={enviando}
-              className="size-9 shrink-0 rounded-full"
-              aria-label="Adjuntar archivo"
-            >
-              <Paperclip className="size-4" aria-hidden="true" />
-            </Button>
+              onGrabandoChange={setGrabando}
+              onEnviar={(audio, duracionSegundos) =>
+                enviarVoz.mutate(
+                  { audio, duracionSegundos },
+                  { onError: (error) => toast.error(error.message || 'No se pudo enviar la nota de voz') },
+                )
+              }
+            />
+            {!grabando && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setEncuestaAbierta(true)}
+                disabled={enviando}
+                className="size-9 shrink-0 rounded-full"
+                aria-label="Crear encuesta"
+                title="Crear encuesta"
+              >
+                <BarChart3 className="size-4" aria-hidden="true" />
+              </Button>
+            )}
+            {!grabando && (
+              <>
             <Input
               ref={inputRef}
               value={texto}
@@ -511,9 +570,13 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
             >
               <Send className="size-4" aria-hidden="true" />
             </Button>
+              </>
+            )}
           </form>
         </>
       )}
+
+      <NuevaEncuestaDialog open={encuestaAbierta} onOpenChange={setEncuestaAbierta} idProyecto={idProyecto} idConversacion={idConversacion} />
 
       <ChatLinksDialog open={enlacesAbierto} onOpenChange={setEnlacesAbierto} idProyecto={idProyecto} idConversacion={idConversacion} />
       {apodosAbierto && conversacion && (

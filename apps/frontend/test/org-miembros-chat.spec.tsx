@@ -21,6 +21,17 @@ vi.mock('@/hooks/use-organizations', () => ({
   useMensajesOrganizacion: () => ({ data: estado.mensajes }),
   useEnviarMensajeOrganizacion: () => ({ mutate: estado.enviar, isPending: false }),
 }));
+// MEJ-41/42/43: notas de voz, encuestas y fijados viven en use-chat-extras; aqui no hay nada fijado ni se graba.
+vi.mock('@/hooks/use-chat-extras', () => ({
+  useFijados: () => ({ fijados: [], isLoading: false }),
+  usePinMessage: () => ({ mutate: vi.fn(), isPending: false }),
+  useFijadosOrganizacion: () => ({ fijados: [], isLoading: false }),
+  usePinMessageOrganizacion: () => ({ mutate: vi.fn(), isPending: false }),
+  useSendVoiceNote: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreatePoll: () => ({ mutate: vi.fn(), isPending: false }),
+  useVotePoll: () => ({ mutate: vi.fn(), isPending: false }),
+  useClosePoll: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 vi.mock('@/hooks/use-chat', () => ({
   useDeleteMessage: () => ({ mutate: vi.fn() }),
   useEditMessage: () => ({ mutate: vi.fn() }),

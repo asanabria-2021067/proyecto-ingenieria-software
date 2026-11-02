@@ -62,11 +62,32 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
       'GET /api/organizaciones/:id/chat',
       'GET /api/organizaciones/:id/chat/mensajes',
       'POST /api/organizaciones/:id/chat/mensajes',
+      'GET /api/organizaciones/:id/chat/fijados',
+      'PUT /api/organizaciones/:id/chat/mensajes/:idMensaje/fijado',
+      'DELETE /api/organizaciones/:id/chat/mensajes/:idMensaje/fijado',
     ];
     const deOrganizaciones = rutas.filter((r) => r.controller.startsWith('OrganizationsController.'));
     expect(deOrganizaciones.map((r) => r.id).sort()).toEqual([...esperadas].sort());
     expect(deOrganizaciones.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
     expect(deOrganizaciones.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+  });
+
+  // MEJ-41/42/43: notas de voz, encuestas y fijados del chat de proyecto (permisos en ChatService).
+  it('las rutas de notas de voz, encuestas y fijados del chat existen y exigen JwtAuthGuard', () => {
+    const base = 'proyectos/:projectId/conversaciones/:conversationId';
+    const esperadas = [
+      `POST /api/${base}/mensajes/voz`,
+      `GET /api/${base}/archivos/:attachmentId/audio`,
+      `POST /api/${base}/encuestas`,
+      `PUT /api/${base}/mensajes/:messageId/voto`,
+      `POST /api/${base}/mensajes/:messageId/encuesta/cierre`,
+      `GET /api/${base}/fijados`,
+      `PUT /api/${base}/mensajes/:messageId/fijado`,
+      `DELETE /api/${base}/mensajes/:messageId/fijado`,
+    ];
+    const deChat = rutas.filter((r) => esperadas.includes(r.id));
+    expect(deChat.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(deChat.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
   });
 
   it('toda ruta de administracion exige RolesGuard y @Roles("administrador")', () => {

@@ -247,7 +247,7 @@ export const EXPECTED_FRONTEND_HEADERS = {
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
   'referrer-policy': 'strict-origin-when-cross-origin',
-  'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  'permissions-policy': 'camera=(), microphone=(self), geolocation=(), payment=(), usb=()',
   'content-security-policy': "frame-ancestors 'none'",
   'strict-transport-security': EXPECTED_HSTS,
 };

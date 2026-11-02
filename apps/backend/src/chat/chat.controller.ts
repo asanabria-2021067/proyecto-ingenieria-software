@@ -21,6 +21,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
 import { ADJUNTO_MAX_BYTES, type ArchivoSubido } from './chat-adjuntos';
+import { NOTA_VOZ_MAX_BYTES } from './chat-nota-voz';
+import { CreatePollDto } from './dto/create-poll.dto';
+import { SendVoiceNoteDto } from './dto/send-voice-note.dto';
+import { VotePollDto } from './dto/vote-poll.dto';
 import { LinkPreviewDto } from './dto/link-preview.dto';
 import { LinkPreviewService } from './link-preview/link-preview.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
@@ -39,6 +43,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 // parts: busboy corta al ALCANZAR el limite, asi que file + contenido = 2 -> 3.
 export const CHAT_UPLOAD_LIMITS = { files: 1, fields: 1, parts: 3, fileSize: ADJUNTO_MAX_BYTES };
+export const CHAT_VOICE_LIMITS = { files: 1, fields: 1, parts: 3, fileSize: NOTA_VOZ_MAX_BYTES };
 
 @Controller('proyectos/:projectId/conversaciones')
 @UseGuards(JwtAuthGuard)
@@ -139,6 +144,17 @@ export class ChatController {
     return new StreamableFile(datos, { type: mime, disposition: 'inline' });
   }
 
+  @Get(':conversationId/archivos/:attachmentId/audio')
+  async voiceNoteAudio(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    const { datos, mime } = await this.chatService.getAdjuntoAudio(projectId, conversationId, attachmentId, user.userId);
+    return new StreamableFile(datos, { type: mime, disposition: 'inline' });
+  }
+
   /** Un archivo por mensaje, con o sin texto. El tamano se corta en multer. */
   @Post(':conversationId/mensajes/archivo')
   @HttpCode(HttpStatus.CREATED)
@@ -152,6 +168,87 @@ export class ChatController {
   ) {
     if (!file) throw new BadRequestException('No se recibió el archivo');
     return this.chatService.createMessage(projectId, conversationId, user.userId, dto.contenido ?? '', file);
+  }
+
+  /** Nota de voz: audio de hasta 5 MB y 120 s; el tipo se valida por contenido en el servicio. */
+  @Post(':conversationId/mensajes/voz')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor('file', { limits: CHAT_VOICE_LIMITS }))
+  sendVoiceNote(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: SendVoiceNoteDto,
+    @UploadedFile() file?: ArchivoSubido,
+  ) {
+    if (!file) throw new BadRequestException('No se recibió la nota de voz');
+    return this.chatService.createMessage(projectId, conversationId, user.userId, '', file, undefined, {
+      duracionSegundos: dto.duracionSegundos,
+    });
+  }
+
+  @Post(':conversationId/encuestas')
+  @HttpCode(HttpStatus.CREATED)
+  createPoll(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: CreatePollDto,
+  ) {
+    return this.chatService.createMessage(projectId, conversationId, user.userId, '', undefined, undefined, { encuesta: dto });
+  }
+
+  @Put(':conversationId/mensajes/:messageId/voto')
+  @HttpCode(HttpStatus.OK)
+  votePoll(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: VotePollDto,
+  ) {
+    return this.chatService.votarEncuesta(projectId, conversationId, messageId, user.userId, dto.idsOpciones);
+  }
+
+  @Post(':conversationId/mensajes/:messageId/encuesta/cierre')
+  @HttpCode(HttpStatus.OK)
+  closePoll(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.cerrarEncuesta(projectId, conversationId, messageId, user.userId);
+  }
+
+  @Get(':conversationId/fijados')
+  findPinned(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.getFijados(projectId, conversationId, user.userId);
+  }
+
+  @Put(':conversationId/mensajes/:messageId/fijado')
+  @HttpCode(HttpStatus.OK)
+  pin(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.fijarMensaje(projectId, conversationId, messageId, user.userId, true);
+  }
+
+  @Delete(':conversationId/mensajes/:messageId/fijado')
+  unpin(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('conversationId', ParseIntPipe) conversationId: number,
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.chatService.fijarMensaje(projectId, conversationId, messageId, user.userId, false);
   }
 
   @Post(':conversationId/mensajes/:messageId/reacciones')

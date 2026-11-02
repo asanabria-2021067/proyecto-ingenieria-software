@@ -58,8 +58,9 @@ import {
   scheduledMessagesQueryKey,
   searchMessagesQueryKey,
 } from '@/lib/query-keys/chat';
-import type { BuscarMensajesFiltros, ChatLectura, ChatMensaje, ChatReaccion, ChatTemaColor, CreateChannelPayload, SetEstadoChatPayload, ChatReaccionSocket, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
+import type { BuscarMensajesFiltros, ChatEncuesta, ChatLectura, ChatMensaje, ChatReaccion, ChatTemaColor, CreateChannelPayload, SetEstadoChatPayload, ChatReaccionSocket, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
 import { alternarReaccionLocal, reaccionesDesdeSocket } from '@/lib/chat-reacciones';
+import { actualizarEncuestaEnCache, refrescarFijados } from '@/lib/chat-extras';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -692,7 +693,14 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       );
     };
 
-    const handleMessageChanged = ({ mensaje }: { mensaje: ChatMensaje }) => reemplazarMensaje(queryClient, mensaje);
+    const handleMessageChanged = ({ mensaje }: { mensaje: ChatMensaje }) => {
+      reemplazarMensaje(queryClient, mensaje);
+      refrescarFijados(queryClient, mensaje.idConversacion);
+    };
+
+    // Resultados en vivo de una encuesta: cada voto de cualquier participante llega a todas las ventanas abiertas.
+    const handlePollUpdated = ({ idConversacion, idMensaje, encuesta }: { idConversacion: number; idMensaje: number; encuesta: ChatEncuesta }) =>
+      actualizarEncuestaEnCache(queryClient, idConversacion, idMensaje, encuesta);
 
     const handleConversationUpdated = () => {
       queryClient.invalidateQueries({ queryKey: ['chats-global'] });
@@ -742,6 +750,7 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
     socket.on('reactionUpdated', handleReactionUpdated);
     socket.on('messageUpdated', handleMessageChanged);
     socket.on('messageDeleted', handleMessageChanged);
+    socket.on('pollUpdated', handlePollUpdated);
     socket.on('conversationUpdated', handleConversationUpdated);
     socket.on('typing', handleTyping);
     socket.on('messagesRead', handleMessagesRead);
@@ -755,6 +764,7 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       socket.off('reactionUpdated', handleReactionUpdated);
       socket.off('messageUpdated', handleMessageChanged);
       socket.off('messageDeleted', handleMessageChanged);
+      socket.off('pollUpdated', handlePollUpdated);
       socket.off('conversationUpdated', handleConversationUpdated);
       socket.off('typing', handleTyping);
       socket.off('messagesRead', handleMessagesRead);
