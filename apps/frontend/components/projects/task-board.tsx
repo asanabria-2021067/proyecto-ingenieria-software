@@ -16,8 +16,10 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { Filter, Plus, Tags } from 'lucide-react';
+import { Filter, Keyboard, Plus, Tags } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Kbd } from '@/components/ui/kbd';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -54,12 +56,15 @@ import {
 } from '@/components/projects/task-board-dnd';
 import {
   COLUMNAS_TABLERO,
+  ESTADO_LABEL,
   ESTADO_COLUMNA_STYLE,
   FILTRO_TODOS,
   derivarOpcionesHito,
   derivarOpcionesRol,
   filtrarTareas,
   ordenarTareas,
+  siguienteTareaEnTablero,
+  type TeclaFlecha,
 } from '@/components/projects/task-board.utils';
 import type { EstadoTarea, TareaPublicaDTO } from '@/lib/types/tasks';
 import type { useProjectTasks } from '@/hooks/use-project-tasks';
@@ -282,6 +287,7 @@ export function TaskBoard({
   const [tareaEditar, setTareaEditar] = useState<TareaPublicaDTO | null>(null);
   const [etiquetasAbierto, setEtiquetasAbierto] = useState(false);
   const [filtrosMovilAbiertos, setFiltrosMovilAbiertos] = useState(false);
+  const [atajosAbierto, setAtajosAbierto] = useState(false);
   const [mobileSelectedState, setMobileSelectedState] = useState<EstadoTarea>('POR_HACER');
   const [activeDrag, setActiveDrag] = useState<TaskDragData | null>(null);
   const [dndAnnouncement, setDndAnnouncement] = useState<string | null>(null);
@@ -337,6 +343,39 @@ export function TaskBoard({
     const base = `/dashboard/projects/${idProyecto}/kanban/tasks/${tarea.idTarea}`;
     router.push(tab === 'comentarios' ? `${base}?section=comments` : base);
   };
+
+  // MEJ-79: atajos del tablero (N nueva tarea, flechas para moverse, Enter abre, ? ayuda). Se ignoran
+  // al escribir, con un dialogo abierto o mientras se arrastra, y solo cambian el foco entre tarjetas.
+  const atajosBloqueados =
+    activeDrag !== null || crearAbierto || tareaEditar !== null || etiquetasAbierto || atajosAbierto || filtrosMovilAbiertos;
+  useEffect(() => {
+    if (atajosBloqueados || esMovil) return;
+    const columnas = COLUMNAS_TABLERO.map((c) => ordenPorEstado[c.estado]);
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const destino = e.target instanceof HTMLElement ? e.target : null;
+      if (destino?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="listbox"], [role="menu"]')) return;
+
+      const enfocada = [...cardRefs.current].find(([, el]) => el.contains(document.activeElement))?.[0] ?? null;
+      if (e.key === '?') {
+        e.preventDefault();
+        setAtajosAbierto(true);
+      } else if (e.key.toLowerCase() === 'n' && isLeader && !e.shiftKey) {
+        e.preventDefault();
+        setCrearAbierto(true);
+      } else if (e.key === 'Enter' && enfocada !== null && document.activeElement === cardRefs.current.get(enfocada)) {
+        e.preventDefault();
+        router.push(`/dashboard/projects/${idProyecto}/kanban/tasks/${enfocada}`);
+      } else if (e.key.startsWith('Arrow') && (enfocada !== null || destino === document.body)) {
+        const siguiente = siguienteTareaEnTablero(columnas, enfocada, e.key as TeclaFlecha);
+        if (siguiente === null) return;
+        e.preventDefault();
+        cardRefs.current.get(siguiente)?.focus();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [atajosBloqueados, esMovil, ordenPorEstado, isLeader, idProyecto, router]);
 
   const solicitarEliminar = async (tarea: TareaPublicaDTO) => {
     const confirmado = await confirmar({
@@ -448,6 +487,12 @@ export function TaskBoard({
         onSuccess: () => {
           setMobileSelectedState((actual) =>
             actual === accion.estadoOrigen ? accion.estadoDestino : actual,
+          );
+          aviso.deshacer(`"${accion.titulo}" pasó a ${ESTADO_LABEL[accion.estadoDestino]}`, () =>
+            cambiarEstadoTarea.mutate(
+              { taskId: accion.taskId, input: { estadoTarea: accion.estadoOrigen } },
+              { onError: (error) => aviso.error('No se pudo deshacer', getApiErrorMessage(error, 'task')) },
+            ),
           );
         },
         onError: (error) => {
@@ -644,6 +689,17 @@ export function TaskBoard({
               </Sheet>
             </div>
 
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setAtajosAbierto(true)}
+              className={`${CONTROL_CLASS} hidden gap-1.5 md:inline-flex`}
+            >
+              <Keyboard className="size-3.5" aria-hidden="true" />
+              Atajos
+            </Button>
+
             {isLeader && (
               <>
                 <Button
@@ -767,6 +823,30 @@ export function TaskBoard({
         <div aria-live="assertive" role="status" className="sr-only">
           {dndAnnouncement ?? ''}
         </div>
+
+        <Dialog open={atajosAbierto} onOpenChange={setAtajosAbierto}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Atajos del tablero</DialogTitle>
+              <DialogDescription>Funcionan fuera de los campos de texto y de los cuadros de diálogo.</DialogDescription>
+            </DialogHeader>
+            <dl className="grid grid-cols-[auto_1fr] items-center gap-x-stack gap-y-tight text-sm">
+              {[
+                ...(isLeader ? [['N', 'Nueva tarea']] : []),
+                ['Flechas', 'Moverse entre tarjetas y columnas'],
+                ['Enter', 'Abrir la tarea enfocada'],
+                ['?', 'Mostrar esta ayuda'],
+              ].map(([tecla, texto]) => (
+                <div key={tecla} className="contents">
+                  <dt>
+                    <Kbd>{tecla}</Kbd>
+                  </dt>
+                  <dd className="text-text-primary">{texto}</dd>
+                </div>
+              ))}
+            </dl>
+          </DialogContent>
+        </Dialog>
 
         {/* CREAR / EDITAR: única instancia reutilizada en ambos modos */}
         <TaskFormDialog

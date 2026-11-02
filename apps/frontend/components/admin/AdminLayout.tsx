@@ -47,6 +47,8 @@ import { useAdminSidebarCollapsed } from '@/components/dashboard/use-dashboard-s
 import { ThemeToggle } from '@/components/theme-toggle';
 import logo from '@/public/logo.png';
 import { ShellSkeleton } from '@/components/layout/shell-skeleton';
+import { DashboardBreadcrumbs } from '@/components/layout/dashboard-breadcrumbs';
+import { DashboardExtras } from '@/components/layout/dashboard-extras';
 
 export const ADMIN_CUENTAS_PENDIENTES_HREF = '/dashboard/admin/cuentas-pendientes';
 
@@ -294,6 +296,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Scrollable page body */}
         <div className="flex-1 overflow-auto pb-20 md:pb-0">
+          <DashboardBreadcrumbs />
           {children}
         </div>
       </main>
@@ -322,6 +325,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         })}
         <UserMenu user={user} onLogout={handleLogout} variant="compact" theme="admin" />
       </nav>
+      <DashboardExtras recordarVista={false} destinos={navEntries.flatMap((e) => (e.type === 'group' ? e.items : [e]))} />
     </div>
   );
 }

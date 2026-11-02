@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mensajesMock = vi.hoisted(() => ({
   confirmar: vi.fn(),
-  aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() },
+  aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn(), deshacer: vi.fn() },
 }));
 vi.mock('../lib/mensajes', () => mensajesMock);
 
@@ -46,7 +46,10 @@ describe('ShareCalendarDialog (HU-184)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Dejar de compartir con Luis Hernández' }));
     await waitFor(() => expect(sharesMock.dejarDeCompartirCalendario).toHaveBeenCalledWith(5));
-    await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Dejaste de compartir tu agenda', expect.any(String)));
+    await waitFor(() => expect(mensajesMock.aviso.deshacer).toHaveBeenCalledWith('Dejaste de compartir tu agenda con Luis Hernández', expect.any(Function)));
+    sharesMock.compartirCalendario.mockResolvedValue(LUIS);
+    mensajesMock.aviso.deshacer.mock.calls[0][1]();
+    await waitFor(() => expect(sharesMock.compartirCalendario).toHaveBeenCalledWith(5));
     // Reversible: no pide confirmación.
     expect(mensajesMock.confirmar).not.toHaveBeenCalled();
   });
@@ -65,7 +68,10 @@ describe('ShareCalendarDialog (HU-184)', () => {
     fireEvent.click(boton);
 
     await waitFor(() => expect(sharesMock.compartirCalendario).toHaveBeenCalledWith(4));
-    await waitFor(() => expect(mensajesMock.aviso.exito).toHaveBeenCalledWith('Agenda compartida', expect.stringContaining('Ana')));
+    await waitFor(() => expect(mensajesMock.aviso.deshacer).toHaveBeenCalledWith('Agenda compartida con Ana García', expect.any(Function)));
+    sharesMock.dejarDeCompartirCalendario.mockResolvedValue({ eliminado: true });
+    mensajesMock.aviso.deshacer.mock.calls.at(-1)![1]();
+    await waitFor(() => expect(sharesMock.dejarDeCompartirCalendario).toHaveBeenCalledWith(4));
   });
 
   it('una persona con la que ya se compartió aparece como "Compartida" y no se puede volver a compartir', async () => {

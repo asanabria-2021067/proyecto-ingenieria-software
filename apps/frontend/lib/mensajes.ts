@@ -17,6 +17,9 @@ export const aviso = {
   error: (titulo: string, texto?: string) => toast.error(titulo, { description: texto, duration: DURACION_MS.error }),
   advertencia: (titulo: string, texto?: string) =>
     toast.warning(titulo, { description: texto, duration: DURACION_MS.advertencia }),
+  // MEJ-77: accion reversible; el aviso dura lo suficiente para arrepentirse.
+  deshacer: (titulo: string, alDeshacer: () => void) =>
+    toast.success(titulo, { duration: DURACION_MS.advertencia, action: { label: 'Deshacer', onClick: alDeshacer } }),
 };
 
 export interface OpcionesConfirmar {
