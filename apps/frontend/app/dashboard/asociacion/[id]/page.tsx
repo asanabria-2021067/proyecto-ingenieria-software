@@ -80,7 +80,7 @@ export default function AsociacionDashboardPage() {
   return (
     <div className={dashboardPage('flex flex-col gap-section py-section')}>
       <header>
-        <PageTitle>Asociación {junta.nombre}</PageTitle>
+        <PageTitle>{junta.nombre}</PageTitle>
         <p className="type-body mt-micro text-text-secondary">
           Tu cargo: {CARGO_LABEL[junta.cargo]}. Aquí ves el avance de horas de los estudiantes de las carreras de la asociación. Es solo
           consulta: la junta no aprueba ni acredita horas.

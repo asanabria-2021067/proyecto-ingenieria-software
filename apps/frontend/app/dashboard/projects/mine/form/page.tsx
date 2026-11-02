@@ -574,7 +574,7 @@ function NewProjectFormContent() {
                   editId
                     ? null
                     : idAsociacion !== null
-                      ? `Asociación ${asociacionesPublicables.find((j) => j.idAsociacion === idAsociacion)?.nombre ?? ''}`
+                      ? (asociacionesPublicables.find((j) => j.idAsociacion === idAsociacion)?.nombre ?? '')
                       : idOrganizacion !== null
                         ? (orgElegida?.nombreOrganizacion ?? null)
                         : null

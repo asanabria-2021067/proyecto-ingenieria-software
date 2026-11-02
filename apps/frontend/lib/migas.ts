@@ -90,7 +90,7 @@ const ETIQUETA_ID: Record<string, string> = {
   organizaciones: 'Organización',
   personas: 'Perfil',
   mensajes: 'Conversación',
-  asociacion: 'Asociación',
+  asociacion: 'Mi asociación',
   sprints: 'Sprint',
   equipo: 'Integrante',
   postular: 'Rol',
