@@ -19,6 +19,8 @@ import { FormStepper } from '@/components/ui/form-stepper';
 import { DraftNotice } from '@/components/ui/draft-notice';
 import { useFormDraft } from '@/hooks/use-form-draft';
 import { TaskFormFields } from '@/components/projects/task-form-fields';
+import { TaskFormExtras } from '@/components/projects/task-form-extras';
+import { extrasIniciales, extrasParaCrear, extrasParaEditar, type TaskExtrasValue } from '@/lib/tasks/extras';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { toast } from 'sonner';
 import type { FieldErrors } from 'react-hook-form';
@@ -61,7 +63,10 @@ export interface TaskFormDialogProps {
   open: boolean;
   mode: 'create' | 'edit';
   task: TareaPublicaDTO | null;
-  /** Proyecto donde se crea la tarea: con él, el borrador de «Nueva tarea» es por proyecto. */
+  /**
+   * Proyecto de la tarea: el borrador de «Nueva tarea» es por proyecto y habilita plantilla,
+   * «Bloqueada por» y «Repetir» (MEJ-48/47/52). Sin él el formulario queda como antes.
+   */
   idProyecto?: number;
   roles: RolOpcion[];
   milestones: HitoOpcion[];
@@ -197,6 +202,7 @@ function TaskFormDialogContent({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [progreso, setProgreso] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [extras, setExtras] = useState<TaskExtrasValue>(() => extrasIniciales(task));
 
   const asignadoActual = form.watch('idUsuarioAsignado');
   // "Desasignar" (Sección 42): solo cuando la tarea tiene una asignación activa
@@ -216,7 +222,7 @@ function TaskFormDialogContent({
 
     try {
       if (mode === 'create') {
-        await crearTarea.mutateAsync(buildCreatePayload(values));
+        await crearTarea.mutateAsync({ ...buildCreatePayload(values), ...extrasParaCrear(extras) });
         borrador.limpiar();
         mostrarAvisoTareaGuardada('create');
         onOpenChange(false);
@@ -226,7 +232,8 @@ function TaskFormDialogContent({
       if (!task) return;
 
       const steps = planTaskEditSteps(task, values);
-      if (steps.length === 0) {
+      const cambiosExtras = idProyecto !== undefined ? extrasParaEditar(task, extras) : null;
+      if (steps.length === 0 && !cambiosExtras) {
         borrador.limpiar();
         onOpenChange(false);
         return;
@@ -249,6 +256,17 @@ function TaskFormDialogContent({
           setSubmitError(
             `${prefijo}No se pudo completar: "${stepLabel(step)}". ${getApiErrorMessage(error, scope)}`,
           );
+          return;
+        }
+      }
+
+      if (cambiosExtras) {
+        setProgreso('Guardar dependencia y repetición');
+        try {
+          await editarTarea.mutateAsync({ taskId: task.idTarea, input: cambiosExtras });
+        } catch (error) {
+          const prefijo = steps.length > 0 ? 'Los cambios anteriores se guardaron correctamente. ' : '';
+          setSubmitError(`${prefijo}No se pudo guardar la dependencia o la repetición. ${getApiErrorMessage(error, 'task')}`);
           return;
         }
       }
@@ -308,6 +326,16 @@ function TaskFormDialogContent({
             mode={mode}
             hitoOriginal={task?.idHito ?? null}
           />
+
+          {idProyecto !== undefined && (
+            <TaskFormExtras
+              idProyecto={idProyecto}
+              mode={mode}
+              idTareaActual={task?.idTarea ?? null}
+              value={extras}
+              onChange={setExtras}
+            />
+          )}
 
           {progreso && (
             <p role="status" className="mt-4 text-xs text-tertiary">

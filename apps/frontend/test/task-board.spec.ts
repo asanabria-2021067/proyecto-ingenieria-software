@@ -30,6 +30,13 @@ vi.mock('../components/projects/task-comments-dialog', () => ({
   TaskCommentsDialog: () => null,
 }));
 
+// Plantilla/bloqueo/repetición (MEJ-47/48/52) piden datos al servidor con
+// QueryClient; aquí se stubea, igual que los comentarios. Se prueba en
+// tasks-mej-f.spec.tsx.
+vi.mock('../components/projects/task-form-extras', () => ({
+  TaskFormExtras: () => null,
+}));
+
 // El detalle de tarea es ahora una ruta dedicada: el tablero navega hacia ella
 // con `router.push` en vez de abrir un Sheet. Se expone el spy para verificarlo.
 const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }));
@@ -61,6 +68,11 @@ function tarea(overrides: Partial<TareaPublicaDTO> = {}): TareaPublicaDTO {
     hito: null,
     etiquetas: [],
     cantidadComentarios: 0,
+    idTareaBloqueante: null,
+    bloqueadaPor: null,
+    repeticion: null,
+    repeticionProxima: null,
+    checklist: [],
     ...overrides,
   };
 }

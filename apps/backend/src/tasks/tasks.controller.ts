@@ -32,7 +32,7 @@ import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/projec
  * ACTIVO, y el servicio exige además, tras el lock, que la tarea afectada
  * pertenezca a un Sprint ACTIVO (todas las operaciones menos crear).
  */
-const TASK_WRITE: ProjectWriteMetadata = {
+export const TASK_WRITE: ProjectWriteMetadata = {
   source: { kind: 'param', name: 'projectId' },
   states: ['P', 'E'],
   sprint: 'ACTIVO',

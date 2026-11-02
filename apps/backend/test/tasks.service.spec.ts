@@ -234,6 +234,11 @@ describe('TasksService', () => {
           'hito',
           'etiquetas',
           'cantidadComentarios',
+          'idTareaBloqueante',
+          'bloqueadaPor',
+          'repeticion',
+          'repeticionProxima',
+          'checklist',
         ].sort(),
       );
     });
@@ -541,6 +546,11 @@ describe('TasksService', () => {
         fechaLimite: new Date('2026-08-15T00:00:00.000Z'),
         actualizadaEn: new Date('2026-07-01T00:00:00.000Z'),
         tiempoEstimadoHoras: 8,
+        idTareaBloqueante: 99,
+        bloqueante: { idTarea: 99, tituloTarea: 'Diseñar esquema', estadoTarea: 'EN_PROGRESO', eliminadoEn: null },
+        repeticion: 'SEMANAL',
+        repeticionProxima: new Date('2026-08-22T00:00:00.000Z'),
+        checklist: [{ idItem: 1, texto: 'Medir', completado: true }],
         hito: { idHito: 4, tituloHito: 'MVP funcional' },
         rolProyecto: { idRolProyecto: 6, nombreRol: 'Fullstack' },
         asignaciones: [
@@ -589,6 +599,11 @@ describe('TasksService', () => {
           { idEtiqueta: 2, nombreEtiqueta: 'urgente', nombreNormalizado: 'urgente', color: '#EF4444' },
         ],
         cantidadComentarios: 4,
+        idTareaBloqueante: 99,
+        bloqueadaPor: { idTarea: 99, tituloTarea: 'Diseñar esquema', estadoTarea: 'EN_PROGRESO' },
+        repeticion: 'SEMANAL',
+        repeticionProxima: '2026-08-22',
+        checklist: [{ idItem: 1, texto: 'Medir', completado: true }],
       });
 
       // Campos internos que nunca deben aparecer, ni en este ni en ningún caso.
