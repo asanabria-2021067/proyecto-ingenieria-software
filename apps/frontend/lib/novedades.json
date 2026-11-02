@@ -1,13 +1,13 @@
 {
   "id": "Sprint 10",
   "items": [
-    "prueba k6 de las vistas de horas, paso de Mensajes en el tour, axe en pantallas nuevas y accion en el vacio de mensajes (MEJ-38, MEJ-39, MEJ-40)",
-    "grabador y reproductor de notas de voz, encuestas en vivo y mensajes fijados en el dock y la pagina de mensajes (MEJ-41, MEJ-42, MEJ-43)",
-    "reproduccion de notas de voz por el backend y lider en la lista de conversaciones (MEJ-41, MEJ-43)",
-    "notas de voz, encuestas en vivo y mensajes fijados en el backend (MEJ-41, MEJ-42, MEJ-43)",
+    "buscador Ctrl+K, migas de pan, novedades, deshacer, continuar donde te quedaste y atajos del tablero",
+    "grabador y reproductor de notas de voz, encuestas en vivo y mensajes fijados en el dock y la pagina de mensajes",
     "bandeja unica, aprobacion en lote, respuestas rapidas, comparativo de semestres y metricas de asociaciones y organizaciones",
     "quita el boton Continua con Microsoft del login",
     "pendientes, aprobacion en lote, metricas de entidades, comparativo de semestres y resumen por asociacion",
-    "DEMO-1 seed-demo-final idempotente con asociacion, orgs, proyectos y horas del semestre"
+    "convencion de botones, Rubik y PageTitle unico",
+    "transicion de pagina y aparicion de tarjetas con framer-motion",
+    "aviso de privacidad sobre la junta directiva en registro y perfil"
   ]
 }

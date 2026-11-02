@@ -97,14 +97,20 @@ export function ShareCalendarDialog({
 
   const handleCompartir = (persona: UsuarioResumenDto) => {
     compartir.mutate(persona.idUsuario, {
-      onSuccess: () => aviso.exito('Agenda compartida', `${persona.nombre} ${persona.apellido} ya puede ver tu agenda.`),
+      onSuccess: () =>
+        aviso.deshacer(`Agenda compartida con ${persona.nombre} ${persona.apellido}`, () =>
+          dejar.mutate(persona.idUsuario, { onError: (err) => aviso.error('No se pudo deshacer', getApiErrorMessage(err, 'calendar')) }),
+        ),
       onError: (err) => aviso.error('No se pudo compartir tu agenda', getApiErrorMessage(err, 'calendar')),
     });
   };
 
   const handleDejar = (persona: UsuarioResumenDto) => {
     dejar.mutate(persona.idUsuario, {
-      onSuccess: () => aviso.exito('Dejaste de compartir tu agenda', `${persona.nombre} ${persona.apellido} ya no la verá.`),
+      onSuccess: () =>
+        aviso.deshacer(`Dejaste de compartir tu agenda con ${persona.nombre} ${persona.apellido}`, () =>
+          compartir.mutate(persona.idUsuario, { onError: (err) => aviso.error('No se pudo deshacer', getApiErrorMessage(err, 'calendar')) }),
+        ),
       onError: (err) => aviso.error('No se pudo dejar de compartir', getApiErrorMessage(err, 'calendar')),
     });
   };

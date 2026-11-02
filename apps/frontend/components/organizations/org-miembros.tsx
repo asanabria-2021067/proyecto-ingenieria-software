@@ -33,7 +33,13 @@ export function OrgMiembros({ idOrganizacion, miembros, miRol, idUsuarioActual, 
     cambiarRol.mutate(
       { idUsuario: m.idUsuario, rol },
       {
-        onSuccess: () => aviso.exito('Rol actualizado'),
+        onSuccess: () =>
+          aviso.deshacer('Rol actualizado', () =>
+            cambiarRol.mutate(
+              { idUsuario: m.idUsuario, rol: m.rolOrganizacion },
+              { onError: (err) => aviso.error('No se pudo deshacer', mensajeErrorOrganizacion(err)) },
+            ),
+          ),
         onError: (err) => aviso.error('No se pudo cambiar el rol', mensajeErrorOrganizacion(err)),
       },
     );

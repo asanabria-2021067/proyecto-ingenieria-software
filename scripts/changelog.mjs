@@ -140,6 +140,9 @@ export function render(commits, prs) {
 
 // MEJ-75: «Que hay de nuevo». Las funcionalidades del ultimo sprint con commits; `id` cambia por
 // release (sprint) y el frontend lo usa para mostrar el aviso una sola vez.
+// Commits que el usuario final no ve: backend, datos de demo, pruebas, calidad, base de datos.
+const INTERNO = /^\w+\((?:backend|seed|demo|db|schema|calidad|docker|ci)\)|\b(?:backend|seed|k6|axe|DEMO-\d+)\b/i;
+
 export function novedades(commits, max = 8) {
   const g = agrupar(commits);
   const [id] = [...g].find(([, secs]) => secs.has('Funcionalidades')) ?? [];
@@ -147,7 +150,8 @@ export function novedades(commits, max = 8) {
   const items = g
     .get(id)
     .get('Funcionalidades')
-    .map((c) => c.subject.replace(/^\w+(\([^)]*\))?!?:\s*/, ''))
+    .filter((c) => !INTERNO.test(c.subject))
+    .map((c) => c.subject.replace(/^\w+(\([^)]*\))?!?:\s*/, '').replace(/\s*\([A-Z]+-\d+[^)]*\)/g, '').replace(/^(?:[A-Z]+-\d+(?:,| y)?\s+)+/, ''))
     .filter((t, i, a) => a.indexOf(t) === i)
     .slice(0, max);
   return { id, items };

@@ -99,6 +99,7 @@ const ETIQUETA_ID: Record<string, string> = {
 // Pantallas que ya dibujan su propia miga de pan.
 const CON_MIGA_PROPIA = [
   /^\/dashboard\/admin(\/|$)/,
+  /^\/dashboard\/projects\/admin(\/|$)/,
   /^\/dashboard\/mensajes(\/|$)/, // pantalla completa del chat
   /^\/dashboard\/projects\/[^/]+\/kanban\/tasks\//,
   /^\/dashboard\/projects\/[^/]+\/(cierre|salida)(\/|$)/,
@@ -132,6 +133,6 @@ export function migasDe(pathname: string): Miga[] | null {
 /** Nombre legible de una ruta del estudiante («Proyecto / Sprints»); `null` si no es retomable. */
 export function etiquetaDeRuta(pathname: string): string | null {
   const limpia = limpiar(pathname);
-  if (!limpia.startsWith('/dashboard/') || /^\/dashboard\/admin(\/|$)/.test(limpia)) return null;
+  if (!limpia.startsWith('/dashboard/') || /^\/dashboard\/(projects\/)?admin(\/|$)/.test(limpia)) return null;
   return construir(limpia).slice(1).map((m) => m.label).join(' / ');
 }

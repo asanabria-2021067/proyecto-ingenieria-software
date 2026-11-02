@@ -38,6 +38,7 @@ describe('migasDe (MEJ-74)', () => {
     for (const ruta of [
       '/dashboard',
       '/dashboard/admin/usuarios',
+      '/dashboard/projects/admin/reviews',
       '/dashboard/mensajes/9',
       '/dashboard/proyectos/12',
       '/dashboard/projects/3/kanban/tasks/8',
@@ -54,6 +55,7 @@ describe('etiquetaDeRuta (MEJ-78)', () => {
   it('une las migas sin Inicio y excluye el panel de administracion', () => {
     expect(etiquetaDeRuta('/dashboard/proyectos/12/bitacora')).toBe('Proyectos / Proyecto / Bitácora');
     expect(etiquetaDeRuta('/dashboard/admin/horas')).toBeNull();
+    expect(etiquetaDeRuta('/dashboard/projects/admin/reviews')).toBeNull();
     expect(etiquetaDeRuta('/dashboard')).toBeNull();
   });
 });
