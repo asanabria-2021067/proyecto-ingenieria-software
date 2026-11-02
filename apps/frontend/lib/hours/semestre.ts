@@ -168,3 +168,7 @@ export function filtrosServidor(ui: FiltrosUI): HorasCentralFiltros {
   if (ui.idAsociacion) filtros.idAsociacion = Number(ui.idAsociacion);
   return filtros;
 }
+
+/** Regla de «en riesgo» en lenguaje llano (la calcula el servidor). */
+export const AYUDA_EN_RIESGO =
+  'En riesgo: el avance del semestre está más de 20 puntos por debajo de lo esperado según el tiempo transcurrido (a la mitad del semestre debe llevar 50 %; se marca si lleva menos de 30 %).';

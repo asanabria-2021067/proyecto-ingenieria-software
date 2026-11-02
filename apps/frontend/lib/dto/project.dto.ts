@@ -214,6 +214,8 @@ export interface CreateProjectPayload {
   organizacionesIds?: number[];
   /** «¿A nombre de quién?»: ausente = proyecto personal. */
   idOrganizacion?: number;
+  /** A nombre de una asociación (Presidente y Editores de su junta); excluye a `idOrganizacion`. */
+  idAsociacion?: number;
   /** Miembros de la organización que entran directo; `indiceRol` es la posición dentro de `roles`. */
   participantes?: { idUsuario: number; indiceRol: number }[];
   roles?: {

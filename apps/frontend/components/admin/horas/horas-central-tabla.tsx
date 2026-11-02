@@ -14,7 +14,7 @@ const TD = 'whitespace-normal px-stack py-inline align-top';
 
 const horas = (n: number | null) => (n === null ? '—' : `${n} h`);
 
-function Horas({ meta, declaradas, acreditadas, falta }: { meta: number | null; declaradas: number; acreditadas: number; falta: number | null }) {
+export function Horas({ meta, declaradas, acreditadas, falta }: { meta: number | null; declaradas: number; acreditadas: number; falta: number | null }) {
   return (
     <dl className="grid grid-cols-2 gap-x-inline gap-y-micro type-meta tabular-nums">
       <div>

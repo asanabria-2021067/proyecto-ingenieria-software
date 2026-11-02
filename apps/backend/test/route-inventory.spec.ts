@@ -90,7 +90,13 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
       'POST /api/admin/asociaciones/:idAsociacion/junta',
     ]);
     expect(ids((r) => r.path.startsWith('asociaciones'))).toEqual([
+      'GET /api/asociaciones/:idAsociacion/estudiantes',
+      'GET /api/asociaciones/:idAsociacion/estudiantes/csv',
+      'GET /api/asociaciones/:idAsociacion/estudiantes/pdf',
       'GET /api/asociaciones/:idAsociacion/membresia',
+      'GET /api/asociaciones/:idAsociacion/proyectos',
+      'GET /api/asociaciones/:idAsociacion/proyectos/csv',
+      'GET /api/asociaciones/:idAsociacion/proyectos/pdf',
       'GET /api/asociaciones/mis-juntas',
     ]);
     const conJunta = rutas.filter((r) => r.path.startsWith('asociaciones/:idAsociacion'));

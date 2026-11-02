@@ -40,6 +40,13 @@ function crearServicio(opts: {
           }));
       }),
     },
+    participacionProyecto: {
+      findMany: vi.fn(async () => [
+        { idUsuario: 1, rolProyecto: { idProyecto: 10 } },
+        { idUsuario: 1, rolProyecto: { idProyecto: 10 } },
+        { idUsuario: 1, rolProyecto: { idProyecto: 11 } },
+      ]),
+    },
     registroHorasSemestre: {
       findUnique: vi.fn(async () => null),
       findMany: vi.fn(async () => []),
@@ -99,6 +106,40 @@ describe('HorasSemestreService', () => {
     const p2 = await service.listarCentral(1, { enRiesgo: true, limit: 1, cursor: 2 });
     expect(p2.filas.map((f) => f.idUsuario)).toEqual([4]);
     expect(p2.siguienteCursor).toBeNull();
+  });
+
+  it('tipo limita la evaluacion de riesgo a ese tipo de horas', async () => {
+    const { service } = crearServicio({
+      usuarios: [{ id: 2, registro: { metaBeca: 100, becaDeclarada: 90, metaExtension: 100, extensionDeclarada: 5 } }],
+    });
+    const ids = async (tipo?: 'BECA' | 'EXTENSION') =>
+      (await service.paginaCentral({ enRiesgo: true, tipo })).filas.map((f) => f.idUsuario);
+    expect(await ids()).toEqual([2]);
+    expect(await ids('EXTENSION')).toEqual([2]);
+    expect(await ids('BECA')).toEqual([]);
+  });
+
+  it('busqueda exige cada termino en nombre, apellido o carne', async () => {
+    const { service, prisma } = crearServicio({ usuarios: [{ id: 1 }] });
+    await service.paginaCentral({ busqueda: '  ana  2021 ' });
+    const and = prisma.usuario.findMany.mock.calls[0][0].where.AND as unknown as { OR: unknown[] }[];
+    expect(and).toHaveLength(2);
+    expect(and[0].OR).toEqual([
+      { nombre: { contains: 'ana', mode: 'insensitive' } },
+      { apellido: { contains: 'ana', mode: 'insensitive' } },
+      { perfil: { is: { carne: { contains: 'ana', mode: 'insensitive' } } } },
+    ]);
+  });
+
+  it('conProyectos cuenta proyectos activos distintos y no se pide por defecto', async () => {
+    const { service, prisma } = crearServicio({ usuarios: [{ id: 1 }, { id: 2 }] });
+    const con = await service.paginaCentral({ conProyectos: true });
+    expect(con.filas.map((f) => f.proyectosActivos)).toEqual([2, 0]);
+    expect(prisma.participacionProyecto.findMany.mock.calls[0][0].where.rolProyecto).toEqual({
+      proyecto: { estadoProyecto: { in: ['PUBLICADO', 'EN_PROGRESO', 'EN_SOLICITUD_CIERRE'] }, eliminadoEn: null },
+    });
+    const sin = await service.paginaCentral({});
+    expect(sin.filas[0]).not.toHaveProperty('proyectosActivos');
   });
 
   it('solo cuenta horas aprobadas dentro del semestre consultado', async () => {

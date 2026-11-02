@@ -37,10 +37,10 @@ describe('FG07-C02: primitivas de página', () => {
     const conTitular = Object.values(VISTAS_ADMIN).filter((archivo) => leer(archivo).includes('className={ADMIN_PAGE_TITLE}'));
     const conEntrada = Object.values(VISTAS_ADMIN).filter((archivo) => leer(archivo).includes('className={ADMIN_PAGE_LEAD}'));
     // Incluye la vista de cuentas pendientes (HU-179, PR #270), migrada a las primitivas al integrarla,
-    // y la página propia de «Tendencias de uso» y la vista central de horas. El catálogo temporal de etiquetas, que también usaba
+    // y la página propia de «Tendencias de uso» la vista central de horas y la gestión de asociaciones y juntas. El catálogo temporal de etiquetas, que también usaba
     // el titular, se retiró del proyecto; el de botones, que también lo usaba, después.
-    expect(conTitular).toHaveLength(12);
-    expect(conEntrada).toHaveLength(11);
+    expect(conTitular).toHaveLength(13);
+    expect(conEntrada).toHaveLength(12);
     for (const archivo of Object.values(VISTAS_ADMIN)) {
       expect(leer(archivo), archivo).not.toContain('className="type-display text-balance"');
       expect(leer(archivo), archivo).not.toMatch(/className="mt-(2|tight) max-w-2xl text-base text-tertiary"/);

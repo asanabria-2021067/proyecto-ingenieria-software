@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { etiquetaSemestre, ultimosSemestres, type FiltrosUI } from '@/lib/hours/semestre';
+import { AYUDA_EN_RIESGO, etiquetaSemestre, ultimosSemestres, type FiltrosUI } from '@/lib/hours/semestre';
 import type { Carrera } from '@/lib/services/catalogs';
 import type { AsociacionResumen, Semestre } from '@/lib/services/horas-semestre';
 
@@ -116,8 +116,7 @@ export function HorasCentralFiltros({ value, onChange, carreras, asociaciones, s
         </Button>
       </div>
       <p id="horas-filtro-riesgo-ayuda" className="type-meta sm:col-span-2 xl:col-span-4">
-        En riesgo: el avance del semestre está más de 20 puntos por debajo de lo esperado según el tiempo transcurrido
-        (a la mitad del semestre debe llevar 50 %; se marca si lleva menos de 30 %).
+        {AYUDA_EN_RIESGO}
       </p>
     </form>
   );
