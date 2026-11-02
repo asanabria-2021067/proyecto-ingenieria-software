@@ -254,6 +254,7 @@ async function armarProyecto(d: ProyectoDef) {
         'checklist_items',
         () => prisma.tareaChecklistItem.findFirst({ where: { idTarea: tarea.idTarea, texto } }),
         () => prisma.tareaChecklistItem.create({ data: { idTarea: tarea.idTarea, texto, completado, orden } }),
+        (c) => (c.completado !== completado || c.orden !== orden ? prisma.tareaChecklistItem.update({ where: { idItem: c.idItem }, data: { completado, orden } }) : undefined),
       );
     }
     if (t.horas === undefined) continue;
@@ -287,11 +288,10 @@ async function main() {
   const semestre = semestreDe(new Date());
   const hoy = todayInGuatemala();
   const plan = planDeHoras(semestre, hoy);
-  const { metaBeca: pMetaBeca, becaDeclarada: pBeca, metaExtension: pMetaExt, extensionDeclarada: pExt } = REGISTRO_PRESIDENTE;
   verificarRiesgo(
     [
       ...plan.map((p) => ({ metaBeca: p.metaBeca, avanceBeca: p.avanceBeca, metaExtension: p.metaExtension, avanceExtension: p.avanceExtension })),
-      { metaBeca: pMetaBeca, avanceBeca: pBeca, metaExtension: pMetaExt, avanceExtension: pExt },
+      { metaBeca: REGISTRO_PRESIDENTE.metaBeca, avanceBeca: REGISTRO_PRESIDENTE.becaDeclarada, metaExtension: REGISTRO_PRESIDENTE.metaExtension, avanceExtension: REGISTRO_PRESIDENTE.extensionDeclarada },
     ],
     semestre,
     hoy,

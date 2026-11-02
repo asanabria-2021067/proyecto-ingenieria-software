@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
+import { semestreDe } from '../../src/horas-semestre/semestre';
 import { describeIntegration } from './setup/database';
 
 /**
@@ -69,9 +70,7 @@ describeIntegration('DEMO seed-demo-final', () => {
     const carrera = await db.carrera.create({ data: { nombreCarrera: 'Ingeniería en Ciencias de la Computación y TI' } });
     const carlos = await db.usuario.create({ data: { correo: 'carlos.mendoza@uvg.edu.gt', contrasena: 'hash-previo', nombre: 'Carlos', apellido: 'Mendoza' } });
     await db.perfilEstudiante.create({ data: { idUsuario: carlos.idUsuario, carne: 'REAL-CARLOS', idCarrera: carrera.idCarrera } });
-    const ahora = new Date();
-    const anio = ahora.getUTCFullYear();
-    const periodo = ahora.getUTCMonth() < 6 ? 1 : 2;
+    const { anio, periodo } = semestreDe(new Date());
     // Registro previo con otras cifras: el script solo debe corregir esos cuatro campos.
     await db.registroHorasSemestre.create({ data: { idUsuario: carlos.idUsuario, anio, periodo, metaBeca: 80, becaDeclarada: 3 } });
     for (const [i, carne] of PROHIBIDAS.entries()) {
