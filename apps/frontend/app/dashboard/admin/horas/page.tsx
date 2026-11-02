@@ -11,6 +11,7 @@ import {
   HorasCentralFiltros,
 } from '@/components/admin/horas/horas-central-filtros';
 import { HorasCentralTabla } from '@/components/admin/horas/horas-central-tabla';
+import { HorasComparativo } from '@/components/admin/horas/horas-comparativo';
 import { HorasTotalesAsociacion } from '@/components/admin/horas/horas-totales-asociacion';
 import { DATA_TABLE_CARD } from '@/components/dashboard/data-table';
 import { Button } from '@/components/ui/button';
@@ -99,6 +100,8 @@ export default function AdminHorasPage() {
         </div>
 
         <HorasTotalesAsociacion totales={totalesAsociacion} />
+
+        <HorasComparativo />
 
         {central.isError ? (
           <Empty tone="danger" role="alert">

@@ -19,6 +19,8 @@ vi.mock('../lib/services/horas-semestre', () => ({
   getHorasActual: vi.fn(),
   getHorasCentral: vi.fn(),
   getHorasTotales: vi.fn(),
+  getHorasComparativo: vi.fn(),
+  getResumenAsociaciones: vi.fn(),
   getAsociacionesAdmin: vi.fn(),
   descargarHorasCentral: vi.fn(),
 }));
@@ -33,6 +35,7 @@ import {
   getAsociacionesAdmin,
   getHorasActual,
   getHorasCentral,
+  getHorasComparativo,
   getHorasTotales,
   type FilaHorasCentral,
 } from '../lib/services/horas-semestre';
@@ -64,6 +67,7 @@ function montar() {
   vi.mocked(getAsociacionesAdmin).mockResolvedValue([
     { idAsociacion: 7, nombre: 'Asociación CC', archivada: false, carreras: [{ carrera: { idCarrera: 1, nombreCarrera: 'CC' } }] },
   ]);
+  vi.mocked(getHorasComparativo).mockResolvedValue({ semestres: [] });
   vi.mocked(getHorasTotales).mockResolvedValue({
     semestre: SEMESTRE,
     porCarrera: [

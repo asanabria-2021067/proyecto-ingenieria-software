@@ -8,4 +8,6 @@ export const horasSemestreKeys = {
   central: (filtros: HorasCentralFiltros) => ['horas-semestre', 'central', filtros] as const,
   totales: (filtros: HorasCentralFiltros) => ['horas-semestre', 'totales', filtros] as const,
   asociaciones: ['horas-semestre', 'asociaciones'] as const,
+  comparativo: ['horas-semestre', 'comparativo'] as const,
+  resumenAsociaciones: ['horas-semestre', 'resumen-asociaciones'] as const,
 };

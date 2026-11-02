@@ -39,12 +39,14 @@ vi.mock('@/lib/swal', () => ({
 vi.mock('@/lib/services/admin', () => ({
   getCuentasPendientes: vi.fn(),
   aprobarCuentaPendiente: vi.fn(),
+  aprobarCuentasLote: vi.fn(),
   rechazarCuentaPendiente: vi.fn(),
 }));
 
 import uvgSwal from '@/lib/swal';
 import {
   aprobarCuentaPendiente,
+  aprobarCuentasLote,
   getCuentasPendientes,
   rechazarCuentaPendiente,
 } from '@/lib/services/admin';
@@ -326,5 +328,39 @@ describe('Notificación de cuenta pendiente', () => {
     expect(
       getNotificationLink({ tipoNotificacion: 'CUENTA_PENDIENTE_VERIFICACION', datosJson: { userId: 7 } }),
     ).toBe('/dashboard/admin/cuentas-pendientes');
+  });
+});
+
+describe('MEJ-70: aprobar cuentas en lote', () => {
+  const OTRA = { ...CUENTA, idUsuario: 8, nombre: 'Luis', apellido: 'Li', correo: 'li24013@uvg.edu.gt' };
+
+  it('sin selección el botón de lote está deshabilitado; seleccionar todas y confirmar aprueba en una sola llamada', async () => {
+    vi.mocked(getCuentasPendientes).mockResolvedValue({ total: 2, cuentas: [CUENTA, OTRA] });
+    vi.mocked(aprobarCuentasLote).mockResolvedValue({ aprobadas: [7, 8], omitidas: [] });
+    renderPage();
+
+    const lote = await screen.findByRole('button', { name: /Aprobar seleccionadas \(0\)/ });
+    expect(lote).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar todas las cuentas' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Aprobar seleccionadas \(2\)/ }));
+    const dialogo = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Aprobar' }));
+
+    await waitFor(() => expect(aprobarCuentasLote).toHaveBeenCalledWith([7, 8]));
+    expect(aprobarCuentaPendiente).not.toHaveBeenCalled();
+  });
+
+  it('solo se envían las cuentas marcadas', async () => {
+    vi.mocked(getCuentasPendientes).mockResolvedValue({ total: 2, cuentas: [CUENTA, OTRA] });
+    vi.mocked(aprobarCuentasLote).mockResolvedValue({ aprobadas: [8], omitidas: [] });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Seleccionar la cuenta de Luis Li' }));
+    fireEvent.click(screen.getByRole('button', { name: /Aprobar seleccionadas \(1\)/ }));
+    const dialogo = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Aprobar' }));
+
+    await waitFor(() => expect(aprobarCuentasLote).toHaveBeenCalledWith([8]));
   });
 });
