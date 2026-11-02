@@ -29,6 +29,31 @@ export interface ChatAdjunto {
   nombreOriginal: string;
   mime: string;
   tamanoBytes: number;
+  /** Solo en notas de voz (audio): duración en segundos. */
+  duracionSegundos?: number | null;
+}
+
+export interface ChatEncuestaOpcion {
+  idOpcion: number;
+  texto: string;
+  /** Quienes votaron la opción: cada cliente deriva su propio voto. */
+  votos: { idUsuario: number }[];
+}
+
+export interface ChatEncuesta {
+  idEncuesta: number;
+  pregunta: string;
+  multiple: boolean;
+  cierraEn: string | null;
+  cerradaEn: string | null;
+  opciones: ChatEncuestaOpcion[];
+}
+
+export interface CrearEncuestaPayload {
+  pregunta: string;
+  opciones: string[];
+  multiple?: boolean;
+  cierraEn?: string;
 }
 
 /** Resumen del mensaje citado; `null` si el original ya no existe. */
@@ -61,8 +86,11 @@ export interface ChatMensaje {
   editadoEn?: string | null;
   /** Mensaje eliminado: el backend manda `contenido` vacío. */
   eliminadoEn?: string | null;
+  /** Mensaje fijado (hasta 3 por conversación). */
+  fijadoEn?: string | null;
   remitente: ChatUsuario;
   adjunto?: ChatAdjunto | null;
+  encuesta?: ChatEncuesta | null;
   citado?: ChatCita | null;
   /** Ausente en mensajes recien creados o en `ultimoMensaje`. */
   reacciones?: ChatReaccion[];
@@ -154,7 +182,8 @@ export interface ChatConversacion {
 export interface ChatConversacionGlobal {
   idConversacion: number;
   idProyecto: number;
-  proyecto: { idProyecto: number; tituloProyecto: string };
+  /** `creadoPor`: id del líder del proyecto. */
+  proyecto: { idProyecto: number; tituloProyecto: string; creadoPor?: number };
   tipo: 'GRUPAL' | 'INDIVIDUAL';
   nombre: string | null;
   nombrePersonalizado: string | null;

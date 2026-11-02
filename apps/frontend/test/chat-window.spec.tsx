@@ -39,6 +39,17 @@ let temaActual: string | null = null;
 const silenciarMutate = vi.fn();
 const toggleSavedMutate = vi.fn();
 const silencio = vi.hoisted(() => ({ siempre: false }));
+// MEJ-41/42/43: notas de voz, encuestas y fijados viven en use-chat-extras; aqui no hay nada fijado ni se graba.
+vi.mock('@/hooks/use-chat-extras', () => ({
+  useFijados: () => ({ fijados: [], isLoading: false }),
+  usePinMessage: () => ({ mutate: vi.fn(), isPending: false }),
+  useFijadosOrganizacion: () => ({ fijados: [], isLoading: false }),
+  usePinMessageOrganizacion: () => ({ mutate: vi.fn(), isPending: false }),
+  useSendVoiceNote: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreatePoll: () => ({ mutate: vi.fn(), isPending: false }),
+  useVotePoll: () => ({ mutate: vi.fn(), isPending: false }),
+  useClosePoll: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 vi.mock('@/hooks/use-chat', () => ({
   useMessages: () => ({ messages: mensajesMock, isLoading: false }),
   useReadReceipts: () => ({ lecturas: lecturasMock }),

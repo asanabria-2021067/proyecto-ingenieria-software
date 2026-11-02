@@ -239,7 +239,7 @@ export default function OrganizacionPage() {
         )}
         {esMiembro && (
           <TabsContent value="chat">
-            <OrgChat idOrganizacion={org.idOrganizacion} />
+            <OrgChat idOrganizacion={org.idOrganizacion} puedeFijar={gestiona} />
           </TabsContent>
         )}
         {gestiona && (
