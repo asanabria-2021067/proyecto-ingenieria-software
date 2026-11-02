@@ -1,7 +1,7 @@
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { EstadoUsuario, type Prisma } from '@prisma/client';
 import { readSmtpConfig } from './smtp-config';
-import { assertJwtSecret,JWT_SECRET_MIN_LENGTH, JWT_SECRET_VARIABLE } from './jwt-secret';
+import { assertJwtSecret, JWT_SECRET_MIN_LENGTH, JWT_SECRET_VARIABLE } from './jwt-secret';
 
 /**
  * Validador único y puro de environment (06 v2 §51.1 y §51.2). Conserva las
