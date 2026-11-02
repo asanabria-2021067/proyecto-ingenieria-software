@@ -354,17 +354,10 @@ export interface NotificationTemplateData {
   };
 
   // MEJ-13: el avance de horas beca o extension del semestre va en riesgo.
-  HORAS_EN_RIESGO: {
-    tipos: ('beca' | 'extension')[];
-  };
+  HORAS_EN_RIESGO: { tipos: ('beca' | 'extension')[] };
 
   // MEJ-60: tareas en progreso sin horas registradas en los ultimos 3 dias.
-  RECORDATORIO_HORAS: {
-    cantidad: number;
-    taskTitle: string;
-    taskId: number;
-    projectId: number;
-  };
+  RECORDATORIO_HORAS: { cantidad: number; taskTitle: string; taskId: number; projectId: number };
 
   SOLICITUD_CONTACTO: {
     nombre: string;
