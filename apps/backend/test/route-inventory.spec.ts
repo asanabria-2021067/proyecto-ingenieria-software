@@ -78,6 +78,19 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     expect(sinRol).toEqual([]);
   });
 
+  it('panel admin (MEJ-69 a 72, 36, 68): las rutas nuevas existen y son solo de administrador', () => {
+    const esperadas = [
+      'GET /api/admin/pendientes',
+      'POST /api/admin/cuentas-pendientes/aprobar-lote',
+      'GET /api/admin/metricas/entidades',
+      'GET /api/admin/horas-semestre/comparativo',
+      'GET /api/admin/horas-semestre/resumen-asociaciones',
+    ];
+    const nuevas = rutas.filter((r) => esperadas.includes(r.id));
+    expect(nuevas.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(nuevas.every((r) => r.guards.includes(JwtAuthGuard) && r.guards.includes(RolesGuard) && r.roles.includes('administrador'))).toBe(true);
+  });
+
   it('asociaciones: la gestion es solo de admin y las rutas de junta exigen JuntaGuard', () => {
     const ids = (f: (r: Ruta) => boolean) => rutas.filter(f).map((r) => r.id).sort();
     expect(ids((r) => r.path.startsWith('admin/asociaciones'))).toEqual([

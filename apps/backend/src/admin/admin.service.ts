@@ -781,6 +781,43 @@ export class AdminService {
     return cuenta;
   }
 
+  /** Aprueba varias cuentas; las que ya no estan pendientes se informan como omitidas sin frenar el resto. */
+  async aprobarCuentasLote(callerId: number, ids: number[], origen?: SecurityRequestContext) {
+    await this.requireAdmin(callerId);
+    const aprobadas: number[] = [];
+    const omitidas: { idUsuario: number; motivo: string }[] = [];
+    for (const id of ids) {
+      try {
+        await this.aprobarCuentaPendiente(callerId, id, origen);
+        aprobadas.push(id);
+      } catch (error) {
+        if (!(error instanceof ConflictException || error instanceof NotFoundException)) throw error;
+        omitidas.push({ idUsuario: id, motivo: error.message });
+      }
+    }
+    return { aprobadas, omitidas };
+  }
+
+  /** MEJ-69: todo lo que espera una decision del administrador, con su contador. */
+  async getPendientes(callerId: number) {
+    await this.requireAdmin(callerId);
+    const [cuentas, revisiones, cierres, recuperaciones, apelaciones] = await Promise.all([
+      this.prisma.usuario.count({ where: { estado: EstadoUsuario.PENDIENTE_VERIFICACION } }),
+      this.prisma.proyecto.count({ where: { estadoProyecto: EstadoProyecto.EN_REVISION, eliminadoEn: null } }),
+      this.prisma.proyecto.count({ where: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE, eliminadoEn: null } }),
+      this.prisma.solicitudRecuperacion.count({ where: { estado: EstadoSolicitudRecuperacion.PENDIENTE } }),
+      this.prisma.apelacionLiderazgo.count({ where: { estadoApelacion: 'PENDIENTE' } }),
+    ]);
+    const items = [
+      { clave: 'cuentas', total: cuentas },
+      { clave: 'revisiones', total: revisiones },
+      { clave: 'cierres', total: cierres },
+      { clave: 'recuperaciones', total: recuperaciones },
+      { clave: 'apelaciones', total: apelaciones },
+    ];
+    return { total: items.reduce((suma, i) => suma + i.total, 0), items };
+  }
+
   async rechazarCuentaPendiente(callerId: number, targetId: number, origen?: SecurityRequestContext) {
     return this.resolverCuentaPendiente(callerId, targetId, EstadoUsuario.INACTIVO, origen);
   }
