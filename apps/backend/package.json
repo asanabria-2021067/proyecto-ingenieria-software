@@ -19,6 +19,7 @@
     "prisma:push": "prisma db push",
     "prisma:seed": "prisma db seed",
     "prisma:seed-demo-extra": "tsx prisma/seed-demo-extra.ts",
+    "prisma:seed-demo-final": "tsx prisma/seed-demo-final.ts",
     "insignias:backfill": "node dist/scripts/insignias-backfill.js",
     "insignias:backfill:dev": "tsx src/scripts/insignias-backfill.ts",
     "legacy:s7": "tsx scripts/sprint7-legacy.ts",
