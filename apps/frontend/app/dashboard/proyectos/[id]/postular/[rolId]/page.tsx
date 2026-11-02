@@ -275,43 +275,44 @@ export default function PostularPage() {
 
                 <div className="flex gap-3 pt-2">
                   {vistaPrevia ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setVistaPrevia(false)}
-                      disabled={mutation.isPending}
-                      className="h-auto flex-1 rounded-xl px-5 py-3 text-sm font-semibold"
-                    >
-                      Seguir editando
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setVistaPrevia(false)}
+                        disabled={mutation.isPending}
+                        className="h-auto flex-1 rounded-xl px-5 py-3 text-sm font-semibold"
+                      >
+                        Seguir editando
+                      </Button>
+                      <Button
+                        key="enviar"
+                        type="submit"
+                        disabled={mutation.isPending}
+                        aria-busy={mutation.isPending}
+                        className="h-auto flex-1 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary hover:bg-primary disabled:opacity-60 motion-glow-primary"
+                      >
+                        {mutation.isPending && <Spinner aria-label="Cargando" />}
+                        {mutation.isPending ? 'Enviando...' : 'Enviar Postulación'}
+                      </Button>
+                    </>
                   ) : (
-                    <Link
-                      href={`/dashboard/proyectos/${id}`}
-                      className="flex-1 text-center px-5 py-3 rounded-xl border border-outline-variant text-on-surface text-sm font-semibold hover:bg-surface-container transition-colors"
-                    >
-                      Cancelar
-                    </Link>
-                  )}
-                  {vistaPrevia ? (
-                    <Button
-                      key="enviar"
-                      type="submit"
-                      disabled={mutation.isPending}
-                      aria-busy={mutation.isPending}
-                      className="h-auto flex-1 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary hover:bg-primary disabled:opacity-60 motion-glow-primary"
-                    >
-                      {mutation.isPending && <Spinner aria-label="Cargando" />}
-                      {mutation.isPending ? 'Enviando...' : 'Enviar Postulación'}
-                    </Button>
-                  ) : (
-                    <Button
-                      key="vista-previa"
-                      type="button"
-                      onClick={() => void verVistaPrevia()}
-                      className="h-auto flex-1 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary hover:bg-primary motion-glow-primary"
-                    >
-                      Vista previa
-                    </Button>
+                    <>
+                      <Link
+                        href={`/dashboard/proyectos/${id}`}
+                        className="flex-1 text-center px-5 py-3 rounded-xl border border-outline-variant text-on-surface text-sm font-semibold hover:bg-surface-container transition-colors"
+                      >
+                        Cancelar
+                      </Link>
+                      <Button
+                        key="vista-previa"
+                        type="button"
+                        onClick={() => void verVistaPrevia()}
+                        className="h-auto flex-1 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary hover:bg-primary motion-glow-primary"
+                      >
+                        Vista previa
+                      </Button>
+                    </>
                   )}
                 </div>
               </form>

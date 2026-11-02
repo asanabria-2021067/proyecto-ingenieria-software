@@ -152,9 +152,11 @@ function TaskFormDialogContent({
     [task, members, mode],
   );
 
+  const valoresBase = useMemo(() => defaultTaskFormValues(task), [task]);
+
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: defaultTaskFormValues(task),
+    defaultValues: valoresBase,
   });
 
   const porPasos = mode === 'create';
@@ -168,12 +170,12 @@ function TaskFormDialogContent({
     // Solo lo que cambió el usuario: lo que otro miembro cambie en el servidor no se pisa al restaurar.
     valor: Object.fromEntries(
       Object.entries(form.watch()).filter(
-        ([k, v]) => JSON.stringify(v) !== JSON.stringify(defaultTaskFormValues(task)[k as keyof TaskFormValues]),
+        ([k, v]) => JSON.stringify(v) !== JSON.stringify(valoresBase[k as keyof TaskFormValues]),
       ),
     ) as Partial<TaskFormValues>,
-    alRestaurar: (cambios) => form.reset({ ...defaultTaskFormValues(task), ...cambios }),
+    alRestaurar: (cambios) => form.reset({ ...valoresBase, ...cambios }),
     alDescartar: () => {
-      form.reset(defaultTaskFormValues(task));
+      form.reset(valoresBase);
       setPaso(0);
     },
   });
