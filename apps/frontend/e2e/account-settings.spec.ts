@@ -87,7 +87,7 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
     }
   });
 
-  test('Configuración: siete familias cerradas con contador, se abren sin guardar nada', async ({ browser }) => {
+  test('Configuración: ocho familias cerradas con contador, se abren sin guardar nada', async ({ browser }) => {
     const page = await sesion(browser, ESTUDIANTE);
     try {
       await page.setViewportSize({ width: 1440, height: 900 });
@@ -101,7 +101,7 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       await expect(seccion.getByText('Los cambios se guardan automáticamente.')).toBeVisible();
 
       const familias = seccion.locator('[data-slot="accordion-trigger"]');
-      await expect(familias).toHaveCount(7);
+      await expect(familias).toHaveCount(8);
       await expect(seccion.locator('h3 [id^="preferencias-grupo-"]')).toHaveText([
         'Tareas e hitos',
         'Postulaciones y equipo',
@@ -109,6 +109,7 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
         'Horas y reconocimiento',
         'Recordatorios y calendario',
         'Red de contactos',
+        'Organizaciones y asociaciones',
         'Cuenta y seguridad',
       ]);
       await expect(seccion.getByRole('switch')).toHaveCount(0);
@@ -221,7 +222,7 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
         await page.setViewportSize({ width: ancho, height: alto });
         await page.goto('/dashboard/configuracion');
         await expect(page.getByRole('heading', { level: 1, name: 'Configuración' })).toBeVisible();
-        await expect(page.locator('[data-slot="accordion-trigger"]')).toHaveCount(7);
+        await expect(page.locator('[data-slot="accordion-trigger"]')).toHaveCount(8);
         await expect(cuentas(page)).toHaveCount(1);
         await sinDesborde(page);
 
@@ -254,7 +255,7 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       // Sigue en el armazón de administración: no lo redirige a su panel ni al del estudiante.
       await expect(page.locator('.admin-sidebar')).toBeVisible();
       await expect(page.getByRole('heading', { level: 1, name: 'Configuración' })).toBeVisible();
-      await expect(page.locator('[data-slot="accordion-trigger"]')).toHaveCount(7);
+      await expect(page.locator('[data-slot="accordion-trigger"]')).toHaveCount(8);
       await sinDesborde(page);
       await captura(page, 'configuracion-admin-1440');
     } finally {
