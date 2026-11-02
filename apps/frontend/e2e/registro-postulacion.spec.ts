@@ -127,6 +127,8 @@ test('un usuario nuevo se registra, administración lo aprueba, entra a proyecto
   await page
     .locator('textarea[name="justificacion"]')
     .fill('Tengo experiencia relevante en desarrollo frontend y quiero aportar al proyecto de tutorías.');
+  // MEJ-5: antes de enviar hay una vista previa de la postulación.
+  await page.getByRole('button', { name: 'Vista previa' }).click();
   await page.getByRole('button', { name: 'Enviar Postulación' }).click();
 
   await expect(page.getByText('¡Postulación enviada!')).toBeVisible();
