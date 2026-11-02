@@ -232,7 +232,7 @@ export function AssignMilestoneDialog({
                   <Select value={idHito} onValueChange={setIdHito} disabled={isPending}>
                     <SelectTrigger
                       id="hito-existente"
-                      className="mt-1 h-10 border-outline-variant"
+                      className="mt-1 h-10 w-full border-outline-variant"
                     >
                       <SelectValue placeholder="Selecciona un hito" />
                     </SelectTrigger>

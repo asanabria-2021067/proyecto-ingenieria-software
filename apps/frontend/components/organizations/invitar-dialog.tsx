@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { useCandidatosOrg, useInvitarMiembro } from '@/hooks/use-organizations';
@@ -15,10 +14,19 @@ import type { RolOrganizacion, UsuarioOrganizacion } from '@/lib/types/organizat
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Invita por nombre (candidatos activos) o por correo, con el rol elegido. */
-export function InvitarDialog({ idOrganizacion, miRol }: { idOrganizacion: number; miRol: RolOrganizacion | null }) {
+/** Invita por nombre (candidatos activos) o por correo, con el rol elegido. Lo abre un botón o el menú «Más» de la página. */
+export function InvitarDialog({
+  idOrganizacion,
+  miRol,
+  abierto,
+  onAbiertoChange,
+}: {
+  idOrganizacion: number;
+  miRol: RolOrganizacion | null;
+  abierto: boolean;
+  onAbiertoChange: (abierto: boolean) => void;
+}) {
   const asignables = rolesQueSePuedenAsignar(miRol);
-  const [abierto, setAbierto] = useState(false);
   const [consulta, setConsulta] = useState('');
   const [elegido, setElegido] = useState<UsuarioOrganizacion | null>(null);
   const [rol, setRol] = useState<RolOrganizacion>('LECTURA');
@@ -30,7 +38,7 @@ export function InvitarDialog({ idOrganizacion, miRol }: { idOrganizacion: numbe
   const puedeEnviar = (elegido !== null || porCorreo) && !invitar.isPending;
 
   const cerrar = (valor: boolean) => {
-    setAbierto(valor);
+    onAbiertoChange(valor);
     if (!valor) {
       setConsulta('');
       setElegido(null);
@@ -52,12 +60,6 @@ export function InvitarDialog({ idOrganizacion, miRol }: { idOrganizacion: numbe
 
   return (
     <Dialog open={abierto} onOpenChange={cerrar}>
-      <DialogTrigger asChild>
-        <Button type="button">
-          <UserPlus aria-hidden="true" />
-          Invitar
-        </Button>
-      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Invitar a la organización</DialogTitle>

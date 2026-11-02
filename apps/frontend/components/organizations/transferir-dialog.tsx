@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTransferirOrganizacion } from '@/hooks/use-organizations';
 import { mensajeErrorOrganizacion } from '@/lib/organizations/errors';
@@ -16,12 +15,16 @@ export function TransferirDialog({
   idOrganizacion,
   miembros,
   idUsuarioActual,
+  abierto,
+  onAbiertoChange: setAbierto,
 }: {
   idOrganizacion: number;
   miembros: MiembroOrganizacion[];
   idUsuarioActual: number | null;
+  /** Lo abre un ítem del menú «Más» de la página. */
+  abierto: boolean;
+  onAbiertoChange: (abierto: boolean) => void;
 }) {
-  const [abierto, setAbierto] = useState(false);
   const [elegido, setElegido] = useState('');
   const transferir = useTransferirOrganizacion(idOrganizacion);
   const destinos = miembros.filter((m) => m.idUsuario !== idUsuarioActual);
@@ -41,12 +44,6 @@ export function TransferirDialog({
 
   return (
     <Dialog open={abierto} onOpenChange={setAbierto}>
-      <DialogTrigger asChild>
-        <Button type="button" variant="outline" disabled={destinos.length === 0}>
-          <ArrowRightLeft aria-hidden="true" />
-          Transferir propiedad
-        </Button>
-      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Transferir la propiedad</DialogTitle>
