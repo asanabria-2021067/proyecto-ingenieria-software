@@ -108,6 +108,12 @@ async function idsVisibles(page: Page): Promise<number[]> {
   return ids.sort((a, b) => a - b);
 }
 
+/** Verdadero si la lista tiene una sola fila y es de uno de los avisos dados (los repetidos se pliegan en el primero). */
+async function unaFilaDe(page: Page, ...avisos: Aviso[]): Promise<boolean> {
+  const ids = await idsVisibles(page);
+  return ids.length === 1 && avisos.some((a) => a.idNotificacion === ids[0]);
+}
+
 const ordenados = (...avisos: Aviso[]) => avisos.map((a) => a.idNotificacion).sort((a, b) => a - b);
 
 async function abrirCentro(page: Page): Promise<void> {
@@ -143,10 +149,12 @@ test('A · filtrar: la búsqueda, la lectura y la categoría acotan la lista a l
     const page = maria.page;
     await abrirCentro(page);
     await buscar(page, etiqueta);
-    await expect.poll(() => idsVisibles(page)).toEqual(ordenados(pendiente, revisada));
+    // MEJ-29: dos avisos del mismo tipo y proyecto en el mismo día se pliegan en una sola fila,
+    // que cuenta como sin leer mientras alguno lo esté; el conteo del encabezado sigue siendo de avisos.
+    await expect.poll(() => unaFilaDe(page, pendiente, revisada)).toBe(true);
     await expect(bandeja(page).getByText('2 avisos · 1 sin leer')).toBeVisible();
-    await expect(fila(page, pendiente.idNotificacion)).toHaveAttribute('data-leida', 'false');
-    await expect(fila(page, revisada.idNotificacion)).toHaveAttribute('data-leida', 'true');
+    await expect(bandeja(page).locator('li[data-notificacion]')).toHaveText(/2 avisos: /);
+    await expect(bandeja(page).locator('li[data-notificacion]')).toHaveAttribute('data-leida', 'false');
 
     // «No leídas»: queda solo la pendiente y ninguna fila visible está leída.
     const lectura = bandeja(page);
@@ -160,17 +168,15 @@ test('A · filtrar: la búsqueda, la lectura y la categoría acotan la lista a l
     await expect(bandeja(page).locator('li[data-leida="false"]')).toHaveCount(0);
 
     await lectura.getByRole('radio', { name: 'Todas' }).click();
-    await expect.poll(() => idsVisibles(page)).toEqual(ordenados(pendiente, revisada));
+    await expect.poll(() => unaFilaDe(page, pendiente, revisada)).toBe(true);
 
     // Categoría que abarca TAREA_ASIGNADA: siguen las dos, cada una con su categoría.
     const categoria = bandeja(page).getByRole('combobox', { name: 'Filtrar por categoría' });
     await categoria.click();
     await page.getByRole('option', { name: 'Tareas e hitos' }).click();
     await expect(categoria).toHaveText('Tareas e hitos');
-    await expect.poll(() => idsVisibles(page)).toEqual(ordenados(pendiente, revisada));
-    for (const aviso of [pendiente, revisada]) {
-      await expect(fila(page, aviso.idNotificacion).getByText('Tareas e hitos', { exact: true })).toBeVisible();
-    }
+    await expect.poll(() => unaFilaDe(page, pendiente, revisada)).toBe(true);
+    await expect(bandeja(page).locator('li[data-notificacion]').getByText('Tareas e hitos', { exact: true })).toBeVisible();
 
     // Otra categoría: los avisos de tarea no cumplen el criterio y no aparecen.
     await categoria.click();
