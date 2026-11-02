@@ -26,10 +26,6 @@ export class MailService {
       : null;
   }
 
-  get habilitado(): boolean {
-    return this.transport !== null;
-  }
-
   async enviar(para: string, asunto: string, texto: string): Promise<void> {
     if (!this.transport || !this.from) return;
     try {

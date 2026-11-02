@@ -45,7 +45,6 @@ describe('MEJ-80: MailService', () => {
     delete process.env.SMTP_HOST;
     const mail = new MailService();
     await mail.enviar('a@example.test', 'Asunto', 'Texto');
-    expect(mail.habilitado).toBe(false);
     expect(createTransport).not.toHaveBeenCalled();
   });
 
