@@ -522,7 +522,8 @@ describeIntegration('S7 seguridad del almacenamiento de cierre', () => {
     );
     const ttl = (lectura.expiraEn.getTime() - antes) / 1000;
     expect(ttl).toBeGreaterThan(290);
-    expect(ttl).toBeLessThanOrEqual(300);
+    // exp se trunca a segundos: si el segundo cambia entre `antes` y la emision, ttl puede pasar de 300 por ms.
+    expect(ttl).toBeLessThanOrEqual(301);
     expect(lectura.url.startsWith(`/proyectos/${f.project.idProyecto}/cierre/documentos/`)).toBe(true);
     expect(lectura.url).toContain('/contenido?ticket=');
     // Ni una URL del proveedor, ni una firma, ni un secreto.
