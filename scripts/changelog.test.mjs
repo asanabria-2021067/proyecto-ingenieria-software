@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sprintOf, tipoOf, OTROS } from './changelog.mjs';
+import { sprintOf, tipoOf, novedades, OTROS } from './changelog.mjs';
 
 test('limites de sprint', () => {
   assert.equal(sprintOf('2026-03-29'), 'Sprint 1');
@@ -19,4 +19,15 @@ test('tipo de commit', () => {
   assert.equal(tipoOf('feat(x): algo'), 'feat');
   assert.equal(tipoOf('Fix!: algo'), 'fix');
   assert.equal(tipoOf('Add files via upload'), 'Otros');
+});
+
+test('novedades: funcionalidades del ultimo sprint, sin prefijo ni repetidas', () => {
+  const commits = [
+    { date: '2026-10-20', subject: 'feat(chat): notas de voz' },
+    { date: '2026-10-21', subject: 'feat: notas de voz' },
+    { date: '2026-10-22', subject: 'fix: arreglo' },
+    { date: '2026-10-05', subject: 'feat: viejo' },
+  ];
+  assert.deepEqual(novedades(commits), { id: 'Sprint 10', items: ['notas de voz'] });
+  assert.deepEqual(novedades([{ date: '2026-10-22', subject: 'fix: x' }]), { id: 'sin-novedades', items: [] });
 });

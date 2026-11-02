@@ -87,7 +87,7 @@ import { ScheduleMessageButton, ScheduledMessagesList } from '@/components/chat-
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useIrAlMensaje } from '@/hooks/use-ir-al-mensaje';
 import { ChatCitaVistaPrevia, extractoDe } from '@/components/chat-dock/chat-cita';
-import { confirmar } from '@/lib/mensajes';
+import { aviso, confirmar } from '@/lib/mensajes';
 import { toast } from 'sonner';
 import type { ChatConversacionGlobal, ChatMensaje } from '@/lib/types/chat';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -263,7 +263,13 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
     fijar.mutate(
       { idMensaje: mensaje.idMensaje, fijar: fijarMensaje },
       {
-        onSuccess: () => toast.success(fijarMensaje ? 'Mensaje fijado' : 'Mensaje desfijado'),
+        onSuccess: () =>
+          aviso.deshacer(fijarMensaje ? 'Mensaje fijado' : 'Mensaje desfijado', () =>
+            fijar.mutate(
+              { idMensaje: mensaje.idMensaje, fijar: !fijarMensaje },
+              { onError: (error) => toast.error(error.message || 'No se pudo deshacer') },
+            ),
+          ),
         onError: (error) => toast.error(error.message || 'No se pudo actualizar el mensaje fijado'),
       },
     );

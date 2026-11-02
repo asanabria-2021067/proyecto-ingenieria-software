@@ -123,6 +123,7 @@ export function TaskCard({
       }}
       style={dragStyle}
       data-prioridad={tarea.prioridad}
+      tabIndex={-1}
       data-seleccionada={seleccionable ? seleccionada : undefined}
       aria-busy={estadoPending}
       aria-describedby={resaltada ? `tarea-resaltada-${tarea.idTarea}` : undefined}
@@ -147,7 +148,7 @@ export function TaskCard({
             }
           : undefined
       }
-      className={`group relative space-y-2 overflow-hidden rounded-lg border bg-surface-container-lowest p-3 pl-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-outline-variant/60 hover:shadow-md ${
+      className={`group relative space-y-2 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg border bg-surface-container-lowest p-3 pl-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-outline-variant/60 hover:shadow-md ${
         seleccionada
           ? 'border-primary bg-primary/5 ring-2 ring-primary/40'
           : resaltada
