@@ -34,6 +34,7 @@ import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
 import { PerfilActividad, PerfilCvAcciones, PerfilOrganizaciones } from '@/components/profile/perfil-social-secciones';
 import { SemestreHorasCard } from '@/components/hours/semestre-horas-card';
 import { SemestreHorasHistorial } from '@/components/hours/semestre-horas-historial';
+import { HorasPorProyecto } from '@/components/hours/horas-por-proyecto';
 import { useMisInsignias } from '@/hooks/use-insignias';
 import { SkeletonCard, SkeletonDetail } from '@/components/ui/skeleton';
 
@@ -412,6 +413,7 @@ export default function PerfilPage() {
               <>
                 <SemestreHorasCard editable />
                 <SemestreHorasHistorial />
+                <HorasPorProyecto />
               </>
             )}
 

@@ -1,5 +1,6 @@
 import type {
   AsociacionResumen,
+  HorasSemestreHistorial,
   HorasCentralFiltros,
   RegistroHorasSemestre,
   Semestre,
@@ -146,6 +147,29 @@ export function ultimosSemestres(actual: Pick<Semestre, 'anio' | 'periodo'>, can
     } else periodo = 1;
   }
   return lista;
+}
+
+export interface FilaComparacion {
+  etiqueta: string;
+  a: number;
+  b: number;
+  /** b - a: positivo = el segundo semestre tiene mas horas. */
+  diferencia: number;
+}
+
+/** MEJ-61: declaradas, acreditadas y avance (su suma) de beca y extension en dos semestres. */
+export function compararSemestres(a: HorasSemestreHistorial, b: HorasSemestreHistorial): FilaComparacion[] {
+  const fila = (etiqueta: string, x: number, y: number): FilaComparacion => ({ etiqueta, a: x, b: y, diferencia: y - x });
+  return (['beca', 'extension'] as const).flatMap((tipo) => {
+    const nombre = tipo === 'beca' ? 'Beca' : 'Extensión';
+    const [da, aa] = tipo === 'beca' ? [a.becaDeclarada, a.becaAcreditada] : [a.extensionDeclarada, a.extensionAcreditada];
+    const [db, ab] = tipo === 'beca' ? [b.becaDeclarada, b.becaAcreditada] : [b.extensionDeclarada, b.extensionAcreditada];
+    return [
+      fila(`${nombre}: declaradas`, da, db),
+      fila(`${nombre}: acreditadas`, aa, ab),
+      fila(`${nombre}: avance`, da + aa, db + ab),
+    ];
+  });
 }
 
 export interface FiltrosUI {

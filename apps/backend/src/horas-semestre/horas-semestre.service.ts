@@ -1,6 +1,7 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { TipoProyecto } from '@prisma/client';
-import { addDaysToDay, todayInGuatemala } from '../common/utils/guatemala-date';
+import { addDaysToDay, guatemalaDayOf, todayInGuatemala } from '../common/utils/guatemala-date';
+import type { DatosConstancia } from '../exports/constancia-horas.builder';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateRegistroHorasDto } from './dto/update-registro-horas.dto';
 import { HorasCentralListQueryDto, HorasCentralQueryDto } from './dto/horas-central-query.dto';
@@ -162,6 +163,63 @@ export class HorasSemestreService {
       semestre,
       beca: tramo(registro?.metaBeca ?? null, registro?.becaDeclarada ?? 0, acred.beca),
       extension: tramo(registro?.metaExtension ?? null, registro?.extensionDeclarada ?? 0, acred.extension),
+    };
+  }
+
+  /** MEJ-11: horas acreditadas (aprobadas) del propio estudiante en un semestre, por proyecto. Solo datos propios. */
+  async datosConstancia(idUsuario: number, q: { anio?: number; periodo?: 1 | 2 }): Promise<DatosConstancia> {
+    const semestre = this.semestreDeQuery(q);
+    const [usuario, aprobadas] = await Promise.all([
+      this.prisma.usuario.findUnique({
+        where: { idUsuario },
+        select: {
+          nombre: true,
+          apellido: true,
+          perfil: { select: { carne: true, carrera: { select: { nombreCarrera: true } } } },
+        },
+      }),
+      this.prisma.horasParticipacion.findMany({
+        where: { estadoHoras: 'APROBADA', fechaAprobacion: ventana(semestre), participacion: { idUsuario } },
+        orderBy: { fechaAprobacion: 'asc' },
+        select: {
+          horasAprobadas: true,
+          fechaAprobacion: true,
+          participacion: {
+            select: {
+              rolProyecto: {
+                select: { nombreRol: true, proyecto: { select: { tituloProyecto: true, tipoProyecto: true } } },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    const filas: DatosConstancia['filas'] = [];
+    for (const a of aprobadas) {
+      const { nombreRol, proyecto } = a.participacion.rolProyecto;
+      const tipo =
+        proyecto.tipoProyecto === TipoProyecto.ACADEMICO_HORAS_BECA
+          ? 'beca'
+          : proyecto.tipoProyecto === TipoProyecto.EXTRACURRICULAR_EXTENSION
+            ? 'extension'
+            : null;
+      if (!tipo) continue;
+      filas.push({
+        proyecto: proyecto.tituloProyecto,
+        rol: nombreRol,
+        tipo,
+        horas: Number(a.horasAprobadas ?? 0),
+        fecha: guatemalaDayOf(a.fechaAprobacion!),
+      });
+    }
+    return {
+      nombre: `${usuario.nombre} ${usuario.apellido}`,
+      carne: usuario.perfil?.carne ?? '',
+      carrera: usuario.perfil?.carrera?.nombreCarrera ?? null,
+      semestre: { anio: semestre.anio, periodo: semestre.periodo },
+      emitida: todayInGuatemala(),
+      filas,
     };
   }
 

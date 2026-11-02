@@ -91,6 +91,14 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     expect(deChat.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
   });
 
+  // MEJ-11: constancia PDF de las horas propias (el servicio solo lee las del usuario de la sesion).
+  it('GET /api/horas-semestre/constancia existe, exige JwtAuthGuard y no es publica', () => {
+    const constancia = rutas.filter((r) => r.id === 'GET /api/horas-semestre/constancia');
+    expect(constancia).toHaveLength(1);
+    expect(constancia[0].guards).toContain(JwtAuthGuard);
+    expect(PUBLICAS.has(constancia[0].id)).toBe(false);
+  });
+
   // MEJ-45/46: tarjetas de enlaces internos y «Recuérdamelo» (permisos en los servicios).
   it('las rutas de tarjetas de enlaces y recordatorios del chat existen y exigen JwtAuthGuard', () => {
     const base = 'proyectos/:projectId/conversaciones/:conversationId';
