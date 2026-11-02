@@ -13,8 +13,8 @@ import {
 import type { PuntoHorasProyecto } from './horas-por-proyecto';
 
 const CONFIG = {
-  registradas: { label: 'Registradas', color: 'var(--color-primary)' },
-  acreditadas: { label: 'Acreditadas', color: 'var(--color-tertiary)' },
+  registradas: { label: 'Registradas' },
+  acreditadas: { label: 'Acreditadas' },
 };
 
 /** Solo el dibujo de recharts; HorasPorProyecto lo carga con next/dynamic. */
@@ -27,8 +27,8 @@ export default function HorasPorProyectoPlot({ serie }: { serie: PuntoHorasProye
         <YAxis type="category" dataKey="nombre" width={120} {...CHART_AXIS_PROPS} />
         <ChartTooltip content={<ChartTooltipContent valueFormatter={(valor) => `${String(valor)} h`} />} />
         <ChartLegend content={<ChartLegendContent />} />
-        <Bar dataKey="registradas" fill="var(--color-registradas)" radius={[0, 6, 6, 0]} isAnimationActive={false} />
-        <Bar dataKey="acreditadas" fill="var(--color-acreditadas)" radius={[0, 6, 6, 0]} isAnimationActive={false} />
+        <Bar dataKey="registradas" name="Registradas" fill="var(--color-primary)" radius={[0, 6, 6, 0]} isAnimationActive={false} />
+        <Bar dataKey="acreditadas" name="Acreditadas" fill="var(--color-tertiary)" radius={[0, 6, 6, 0]} isAnimationActive={false} />
       </BarChart>
     </ChartContainer>
   );

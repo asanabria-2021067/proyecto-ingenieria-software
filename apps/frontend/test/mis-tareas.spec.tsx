@@ -90,7 +90,8 @@ describe('MisTareasPage — vista global de tareas del usuario', () => {
     const fila = screen.getByText('Tarea vencida').closest('li')!;
     expect(within(fila).getByText('UVG Collab')).toBeInTheDocument();
     expect(within(fila).getByText('Alta')).toBeInTheDocument();
-    expect(within(fila).getByText('En progreso')).toBeInTheDocument();
+    // Chip de estado y selector de acciones rapidas muestran el mismo estado.
+    expect(within(fila).getAllByText('En progreso')).toHaveLength(2);
   });
 
   it('ordena por fecha límite ascendente por defecto (lo que vence primero, arriba)', async () => {
