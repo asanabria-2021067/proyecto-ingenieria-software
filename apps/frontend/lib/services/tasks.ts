@@ -3,8 +3,14 @@ import type {
   AssignTaskInput,
   BulkTaskActionInput,
   BulkTaskActionResultDTO,
+  ChecklistItemDTO,
   CloseAssignmentInput,
+  CreateEvidenciaInput,
+  CreatePlantillaTareaInput,
   CreateTaskInput,
+  EvidenciaTareaDTO,
+  HistorialTareaEntradaDTO,
+  PlantillaTareaDTO,
   TareaPublicaDTO,
   UpdateTaskInput,
   UpdateTaskStateInput,
@@ -95,4 +101,73 @@ export function closeAssignment(
       body: JSON.stringify(input),
     },
   );
+}
+
+/** MEJ-6 — checklist: cada operación devuelve la lista completa actualizada. */
+export function addChecklistItem(idProyecto: number, idTarea: number, texto: string): Promise<ChecklistItemDTO[]> {
+  return apiFetch<ChecklistItemDTO[]>(`/proyectos/${idProyecto}/tareas/${idTarea}/checklist`, {
+    method: 'POST',
+    body: JSON.stringify({ texto }),
+  });
+}
+
+export function updateChecklistItem(
+  idProyecto: number,
+  idTarea: number,
+  idItem: number,
+  input: { texto?: string; completado?: boolean },
+): Promise<ChecklistItemDTO[]> {
+  return apiFetch<ChecklistItemDTO[]>(`/proyectos/${idProyecto}/tareas/${idTarea}/checklist/${idItem}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function removeChecklistItem(idProyecto: number, idTarea: number, idItem: number): Promise<ChecklistItemDTO[]> {
+  return apiFetch<ChecklistItemDTO[]>(`/proyectos/${idProyecto}/tareas/${idTarea}/checklist/${idItem}`, {
+    method: 'DELETE',
+  });
+}
+
+/** MEJ-10 */
+export function getTaskHistory(idProyecto: number, idTarea: number): Promise<HistorialTareaEntradaDTO[]> {
+  return apiFetch<HistorialTareaEntradaDTO[]>(`/proyectos/${idProyecto}/tareas/${idTarea}/historial`);
+}
+
+/** MEJ-49 */
+export function getTaskEvidence(idProyecto: number, idTarea: number): Promise<EvidenciaTareaDTO[]> {
+  return apiFetch<EvidenciaTareaDTO[]>(`/proyectos/${idProyecto}/tareas/${idTarea}/evidencias`);
+}
+
+export function addTaskEvidence(
+  idProyecto: number,
+  idTarea: number,
+  input: CreateEvidenciaInput,
+): Promise<EvidenciaTareaDTO> {
+  return apiFetch<EvidenciaTareaDTO>(`/proyectos/${idProyecto}/tareas/${idTarea}/evidencias`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function removeTaskEvidence(idProyecto: number, idTarea: number, idEvidencia: number): Promise<void> {
+  return apiFetch<void>(`/proyectos/${idProyecto}/tareas/${idTarea}/evidencias/${idEvidencia}`, {
+    method: 'DELETE',
+  });
+}
+
+/** MEJ-52 */
+export function getTaskTemplates(idProyecto: number): Promise<PlantillaTareaDTO[]> {
+  return apiFetch<PlantillaTareaDTO[]>(`/proyectos/${idProyecto}/plantillas-tarea`);
+}
+
+export function createTaskTemplate(idProyecto: number, input: CreatePlantillaTareaInput): Promise<PlantillaTareaDTO> {
+  return apiFetch<PlantillaTareaDTO>(`/proyectos/${idProyecto}/plantillas-tarea`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteTaskTemplate(idProyecto: number, idPlantilla: number): Promise<void> {
+  return apiFetch<void>(`/proyectos/${idProyecto}/plantillas-tarea/${idPlantilla}`, { method: 'DELETE' });
 }

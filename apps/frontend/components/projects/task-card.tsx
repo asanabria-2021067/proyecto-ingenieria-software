@@ -6,13 +6,20 @@ import {
   Calendar,
   Flag,
   GripVertical,
+  ListChecks,
+  Lock,
   MessageCircle,
+  Repeat,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
+import { Tag } from '@/components/ui/tag';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
 import { taskDragId, type TaskDragData } from '@/components/projects/task-board-dnd';
+import { resumenChecklist } from '@/components/projects/task-checklist';
+import { REPETICION_LABEL } from '@/lib/tasks/extras';
 import {
   PRIORIDAD_COLOR,
   PRIORIDAD_FRANJA,
@@ -81,6 +88,7 @@ export function TaskCard({
   const PrioridadIcon = PRIORIDAD_ICON[tarea.prioridad];
   const vencida = estaVencida(tarea);
   const asignado = tarea.asignacionActiva?.usuario ?? null;
+  const checklist = resumenChecklist(tarea.checklist);
 
   const etiquetasVisibles = tarea.etiquetas.slice(0, MAX_ETIQUETAS_VISIBLES);
   const etiquetasRestantes = tarea.etiquetas.slice(MAX_ETIQUETAS_VISIBLES);
@@ -235,7 +243,33 @@ export function TaskCard({
             {tarea.rolProyecto.nombreRol}
           </span>
         )}
+        {tarea.bloqueadaPor && (
+          <Tag tone="amber" size="sm" title={`Bloqueada por «${tarea.bloqueadaPor.tituloTarea}»`}>
+            <Lock aria-hidden="true" />
+            Bloqueada
+            <span className="sr-only"> por {tarea.bloqueadaPor.tituloTarea}</span>
+          </Tag>
+        )}
+        {tarea.repeticion && (
+          <Tag tone="blue" size="sm" title={REPETICION_LABEL[tarea.repeticion]}>
+            <Repeat aria-hidden="true" />
+            {REPETICION_LABEL[tarea.repeticion]}
+          </Tag>
+        )}
       </div>
+
+      {/* Avance del checklist (MEJ-6): 2/3 y barra */}
+      {checklist.total > 0 && (
+        <div className="space-y-1" data-slot="checklist-avance">
+          <p className="flex items-center gap-1 text-xs font-medium text-on-surface-variant">
+            <ListChecks className="size-3.5 text-tertiary" aria-hidden="true" />
+            <span aria-label={`Checklist: ${checklist.hechos} de ${checklist.total} completados`}>
+              {checklist.hechos}/{checklist.total} · {checklist.porcentaje}%
+            </span>
+          </p>
+          <Progress value={checklist.porcentaje} aria-hidden="true" className="h-1" />
+        </div>
+      )}
 
       {/* Tercera fila: hasta dos etiquetas + "+N" (Sección 41) */}
       {tarea.etiquetas.length > 0 && (

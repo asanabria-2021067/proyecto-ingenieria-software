@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Kanban, MousePointerClick, Plus, Tags } from 'lucide-react';
+import { FileText, Kanban, MousePointerClick, Plus, Tags, UserCheck } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { useProjectLabels } from '@/hooks/use-project-labels';
@@ -31,6 +31,8 @@ import { HitosSection } from '@/components/projects/hitos-section';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
 import { CreateMilestoneDialog } from '@/components/projects/create-milestone-dialog';
 import { TaskFormDialog } from '@/components/projects/task-form-dialog';
+import { TaskTemplatesDialog } from '@/components/projects/task-templates-dialog';
+import { soloMisTareas } from '@/lib/tasks/extras';
 import { TaskBulkActionsBar } from '@/components/projects/task-bulk-actions-bar';
 import {
   Select,
@@ -197,6 +199,9 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const [activeTab, setActiveTab] = useState(tabParam === 'hitos' ? 'hitos' : 'tablero');
   const [filtroRol, setFiltroRol] = useState(FILTRO_TODOS);
   const [filtroHito, setFiltroHito] = useState(FILTRO_TODOS);
+  // MEJ-51: «Solo mis tareas» (asignación activa del usuario actual).
+  const [soloMias, setSoloMias] = useState(false);
+  const [plantillasAbierto, setPlantillasAbierto] = useState(false);
   const [crearAbierto, setCrearAbierto] = useState(false);
   const [etiquetasAbierto, setEtiquetasAbierto] = useState(false);
   const [crearHitoAbierto, setCrearHitoAbierto] = useState(false);
@@ -257,19 +262,25 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const { crearHito, asignarHitoTareas } = useProjectMilestones(idProyecto);
   const opcionesRol = useMemo(() => derivarOpcionesRol(tasks), [tasks]);
   const opcionesHito = useMemo(() => derivarOpcionesHito(tasks), [tasks]);
-  const hayFiltrosActivos = filtroRol !== FILTRO_TODOS || filtroHito !== FILTRO_TODOS;
+  const hayFiltrosActivos = filtroRol !== FILTRO_TODOS || filtroHito !== FILTRO_TODOS || soloMias;
   const limpiarFiltros = () => {
     setFiltroRol(FILTRO_TODOS);
     setFiltroHito(FILTRO_TODOS);
+    setSoloMias(false);
   };
+  const idUsuarioActual = currentUser?.idUsuario ?? null;
+  const tareasVisibles = useMemo(
+    () => (soloMias ? soloMisTareas(tasks, idUsuarioActual) : tasks),
+    [soloMias, tasks, idUsuarioActual],
+  );
 
   // Selección múltiple (HU-202/T-382): solo el líder, solo en la pestaña
   // Tablero y sobre las tareas que los filtros dejan ver. Fuera de eso la
   // lista de visibles queda vacía y la selección se limpia sola.
   const puedeSeleccionar = isLeader && activeTab === 'tablero' && haySprintDeTrabajo;
   const idsVisibles = useMemo(
-    () => (puedeSeleccionar ? filtrarTareas(tasks, filtroRol, filtroHito).map((t) => t.idTarea) : []),
-    [puedeSeleccionar, tasks, filtroRol, filtroHito],
+    () => (puedeSeleccionar ? filtrarTareas(tareasVisibles, filtroRol, filtroHito).map((t) => t.idTarea) : []),
+    [puedeSeleccionar, tareasVisibles, filtroRol, filtroHito],
   );
   const seleccion = useTaskSelection(idsVisibles);
   const tareasSeleccionadas = useMemo(
@@ -367,7 +378,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 {activeTab === 'hitos' ? 'Hitos' : 'Tablero de tareas'}
               </h2>
               <span className="pill pill-sm pill-green">
-                {tasks.length} {tasks.length === 1 ? 'tarea' : 'tareas'}
+                {tareasVisibles.length} {tareasVisibles.length === 1 ? 'tarea' : 'tareas'}
               </span>
               {isFetchingTasks && (
                 <span aria-live="polite" className="flex items-center gap-1 text-[11px] text-tertiary">
@@ -414,6 +425,18 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 </SelectContent>
               </Select>
 
+              <Button
+                type="button"
+                variant={soloMias ? 'default' : 'outline'}
+                size="sm"
+                aria-pressed={soloMias}
+                onClick={() => setSoloMias((v) => !v)}
+                className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 sm:w-auto`}
+              >
+                <UserCheck className="size-3.5" aria-hidden="true" />
+                Solo mis tareas
+              </Button>
+
               {hayFiltrosActivos && (
                 <Button
                   type="button"
@@ -423,6 +446,19 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                   className={`${WORKSPACE_CONTROL_CLASS} border border-transparent text-tertiary hover:text-on-surface`}
                 >
                   Limpiar filtros
+                </Button>
+              )}
+
+              {isLeader && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPlantillasAbierto(true)}
+                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 bg-surface-container-lowest sm:w-auto`}
+                >
+                  <FileText className="size-3.5" aria-hidden="true" />
+                  Plantillas
                 </Button>
               )}
 
@@ -504,9 +540,26 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 </Button>
               </div>
             ) : haySprintDeTrabajo ? (
+              <>
+              {soloMias && !isLoadingTasks && !isErrorTasks && tasks.length > 0 && tareasVisibles.length === 0 && (
+                <Empty tone="muted" size="compact" role="status" className="mb-4">
+                  <EmptyMedia variant="compact" className="size-10 rounded-control border-transparent text-text-secondary">
+                    <UserCheck aria-hidden="true" className="size-5" />
+                  </EmptyMedia>
+                  <EmptyHeader>
+                    <EmptyTitle>No tienes tareas asignadas en este proyecto</EmptyTitle>
+                    <EmptyDescription>Cuando te asignen una, aparecerá aquí.</EmptyDescription>
+                  </EmptyHeader>
+                  <EmptyContent>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setSoloMias(false)}>
+                      Ver todas las tareas
+                    </Button>
+                  </EmptyContent>
+                </Empty>
+              )}
               <TaskBoard
                 idProyecto={idProyecto}
-                tasks={tasks}
+                tasks={tareasVisibles}
                 isLoading={isLoadingTasks}
                 isFetching={isFetchingTasks}
                 isError={isErrorTasks}
@@ -536,6 +589,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 mostrarToolbar={false}
                 seleccion={puedeSeleccionar ? seleccion.control : undefined}
               />
+              </>
             ) : proyectoEnCierre ? (
               /* S7: en cierre no se abre trabajo nuevo. Ofrecer «Iniciar
                  Sprint» aquí prometía una acción que el backend rechaza. */
@@ -579,7 +633,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           <TabsContent value="hitos" className="mt-5">
             <HitosSection
               hitos={proyecto.hitos}
-              tareas={tasks}
+              tareas={tareasVisibles}
               idProyecto={idProyecto}
               filtroRol={filtroRol}
               filtroHito={filtroHito}
@@ -608,7 +662,11 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             />
           </TabsContent>
         </Tabs>
+        {isLeader && (
+          <TaskTemplatesDialog idProyecto={idProyecto} open={plantillasAbierto} onOpenChange={setPlantillasAbierto} />
+        )}
         <TaskFormDialog
+          idProyecto={idProyecto}
           open={crearAbierto}
           mode="create"
           task={null}
