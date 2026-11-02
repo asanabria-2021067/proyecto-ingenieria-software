@@ -89,7 +89,7 @@ describe('PerfilCvAcciones (MEJ-27, MEJ-63)', () => {
     Object.assign(navigator, { clipboard: { writeText } });
     state.descargarCvPdf.mockResolvedValue(new Blob(['%PDF']));
     render(<PerfilCvAcciones idUsuario={9} />);
-    expect(screen.getByRole('link', { name: /Ver CV de proyectos/ })).toHaveAttribute('href', '/dashboard/personas/9/cv');
+    expect(screen.getByRole('link', { name: /Ver currículum de proyectos/ })).toHaveAttribute('href', '/dashboard/personas/9/cv');
 
     fireEvent.click(screen.getByRole('button', { name: /CV en PDF/ }));
     await waitFor(() => expect(state.descargar).toHaveBeenCalledWith(expect.any(Blob), 'cv-proyectos.pdf'));

@@ -205,7 +205,7 @@ export function PerfilCvAcciones({ idUsuario, nombre }: { idUsuario: number; nom
     <div className="flex flex-wrap gap-tight" role="group" aria-label={`CV de proyectos${nombre ? ` de ${nombre}` : ''}`}>
       <Button asChild variant="outline" size="sm">
         <Link href={ruta}>
-          <FileText aria-hidden="true" /> Ver CV de proyectos
+          <FileText aria-hidden="true" /> Ver currículum de proyectos
         </Link>
       </Button>
       <Button type="button" variant="outline" size="sm" disabled={descargando} onClick={() => void descargar()}>

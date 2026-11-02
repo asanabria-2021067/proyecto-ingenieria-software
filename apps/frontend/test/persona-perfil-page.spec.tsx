@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { UsuarioPerfilDto } from '@/lib/types/social';
 
 vi.mock('next/navigation', () => ({
@@ -15,6 +15,14 @@ const useAccionesAmistadMock = vi.fn();
 vi.mock('@/hooks/use-social', () => ({
   usePerfilUsuario: (id: number) => usePerfilUsuarioMock(id),
   useAccionesAmistad: (usuario: unknown) => useAccionesAmistadMock(usuario),
+}));
+
+// MEJ-26/28/64: las secciones nuevas tienen su propio spec; aquí solo importa que el perfil no dependa de ellas.
+const enviarMensajeMock = vi.fn();
+vi.mock('@/hooks/use-perfil-social', () => ({
+  useEnviarMensaje: () => ({ mutate: enviarMensajeMock, isPending: false }),
+  usePerfilResumen: () => ({ data: undefined, isLoading: false, isError: false }),
+  useActividadReciente: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
 import PerfilPersonaPage from '@/app/dashboard/personas/[id]/page';
@@ -110,6 +118,20 @@ describe('PerfilPersonaPage', () => {
     expect(screen.getByText('Semestre 5')).toBeInTheDocument();
     expect(screen.getByText('De tu carrera')).toBeInTheDocument();
     expect(screen.getByText('React')).toBeInTheDocument();
+  });
+
+  it('«Enviar mensaje» aparece solo entre amigos y abre la conversación (MEJ-28)', () => {
+    usePerfilUsuarioMock.mockReturnValue({ perfil: perfil(), isLoading: false, isError: false });
+    useAccionesAmistadMock.mockReturnValue(accionesDefault);
+    const { unmount } = render(<PerfilPersonaPage />);
+    expect(screen.queryByRole('button', { name: /Enviar mensaje/ })).not.toBeInTheDocument();
+    unmount();
+
+    usePerfilUsuarioMock.mockReturnValue({ perfil: perfil({ esAmigo: true }), isLoading: false, isError: false });
+    render(<PerfilPersonaPage />);
+    fireEvent.click(screen.getByRole('button', { name: /Enviar mensaje/ }));
+    expect(enviarMensajeMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('link', { name: /Ver currículum de proyectos/ })).toHaveAttribute('href', '/dashboard/personas/10/cv');
   });
 
   it('con amigos en común muestra el conteo y la lista en vez de "De tu carrera"', () => {
