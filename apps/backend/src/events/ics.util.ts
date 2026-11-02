@@ -30,12 +30,16 @@ function plegar(linea: string): string[] {
   return partes.map((p, i) => (i === 0 ? p : ` ${p}`));
 }
 
-export function enviarIcs(res: import('express').Response, ics: string, nombre: string): void {
-  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+export function enviarAdjunto(res: import('express').Response, cuerpo: string | Buffer, nombre: string, tipo: string): void {
+  res.setHeader('Content-Type', tipo);
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Content-Disposition', `attachment; filename="${nombre}"`);
-  res.status(200).send(ics);
+  res.status(200).send(cuerpo);
+}
+
+export function enviarIcs(res: import('express').Response, ics: string, nombre: string): void {
+  enviarAdjunto(res, ics, nombre, 'text/calendar; charset=utf-8');
 }
 
 /** MEJ-33: calendario iCalendar (.ics) con los eventos dados; cada uno lleva su recordatorio. */

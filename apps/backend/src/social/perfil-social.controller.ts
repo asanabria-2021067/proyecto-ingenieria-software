@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { renderTablaPdf } from '../exports/horas-central-report.builder';
+import { enviarAdjunto } from '../events/ics.util';
 import { PerfilSocialService } from './perfil-social.service';
 
 type Actor = { userId: number };
@@ -38,12 +39,7 @@ export class PerfilSocialController {
       ['Proyecto', 'Rol', 'Inicio', 'Fin', 'Horas acreditadas'],
       filas,
     );
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Cache-Control', 'private, no-store');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Disposition', 'attachment; filename="cv-proyectos.pdf"');
-    res.setHeader('Content-Length', String(bytes.length));
-    res.status(200).end(bytes);
+    enviarAdjunto(res, bytes, 'cv-proyectos.pdf', 'application/pdf');
   }
 
   @Post('amistades/:idAmigo/mensaje')
