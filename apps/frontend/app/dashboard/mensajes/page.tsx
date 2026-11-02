@@ -17,7 +17,7 @@ export default function MensajesPage() {
       <PageTitle className="text-lg font-bold text-on-surface">Tus mensajes</PageTitle>
       <p className="max-w-xs text-sm text-text-secondary">Elige una conversación de la lista o inicia un chat nuevo.</p>
       <Button type="button" className="mt-2" onClick={() => setNuevoChatAbierto(true)}>
-        Nuevo chat
+        Iniciar conversación
       </Button>
       <NewChatDialog open={nuevoChatAbierto} onOpenChange={setNuevoChatAbierto} currentUserId={user?.idUsuario ?? null} />
     </div>
