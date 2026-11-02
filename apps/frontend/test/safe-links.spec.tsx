@@ -37,7 +37,10 @@ vi.mock('../hooks/use-current-user', () => ({
   useCurrentUser: () => ({ data: perfilUsuario, isLoading: false }),
   isAdminUser: () => false,
 }));
-vi.mock('../lib/services/users', () => ({ getDashboardStats: () => new Promise(() => undefined) }));
+vi.mock('../lib/services/users', () => ({
+  getDashboardStats: () => new Promise(() => undefined),
+  getMisHoras: () => new Promise(() => undefined),
+}));
 vi.mock('../lib/services/admin', () => ({ getAdminUserDetail: () => new Promise(() => undefined) }));
 // MEJ-26/64: organizaciones y actividad del perfil consultan sus propios endpoints.
 vi.mock('../lib/services/perfil-social', () => ({

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, ClipboardList, SearchX } from 'lucide-react';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
+import { AccionesRapidasTarea } from '@/components/dashboard/acciones-rapidas-tarea';
 import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
 import { Button } from '@/components/ui/button';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
@@ -183,6 +184,9 @@ function FilaTarea({ tarea }: { tarea: MiTareaDTO }) {
         >
           {tarea.tituloTarea}
         </Link>
+        <div className="mt-tight">
+          <AccionesRapidasTarea tarea={tarea} />
+        </div>
       </div>
       <p className={`type-meta min-w-0 line-clamp-2 ${CELDA_ANCHA}`}>{tarea.proyecto.tituloProyecto}</p>
       {/* Sin fecha la celda queda vacía (el grupo ya lo dice) pero conserva su columna. */}

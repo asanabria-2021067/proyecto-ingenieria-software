@@ -1,4 +1,6 @@
-export interface NotificationTemplateData {
+import { HORAS_TEMPLATES, type HorasTemplateData } from './horas.templates';
+
+export interface NotificationTemplateData extends HorasTemplateData {
   NUEVA_POSTULACION: {
     userName: string;
     roleName: string;
@@ -426,6 +428,7 @@ export interface NotificationTemplateData {
 }
 
 export const NOTIFICATION_TEMPLATES = {
+  ...HORAS_TEMPLATES,
   NUEVA_POSTULACION: {
     title: 'Nueva postulación recibida',
     message: (data: NotificationTemplateData['NUEVA_POSTULACION']) =>

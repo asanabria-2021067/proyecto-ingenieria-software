@@ -44,10 +44,10 @@ const FAMILIAS = [
   ['Postulaciones y equipo', 8],
   // MEJ-16/17: + PROYECTO_NUEVO_PARA_TI, PROYECTO_GUARDADO_AVISO.
   ['Proyectos', 19],
-  // MEJ-57: + RECONOCIMIENTO_RECIBIDO.
-  ['Horas y reconocimiento', 6],
-  // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA. MEJ-46: + RECORDATORIO_MENSAJE.
-  ['Recordatorios y calendario', 6],
+  // MEJ-57: + RECONOCIMIENTO_RECIBIDO. MEJ-13: + HORAS_EN_RIESGO.
+  ['Horas y reconocimiento', 7],
+  // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA. MEJ-46: + RECORDATORIO_MENSAJE. MEJ-60: + RECORDATORIO_HORAS.
+  ['Recordatorios y calendario', 7],
   // MEJ-44: + MENCION_CHAT.
   ['Red de contactos', 4],
   // ORG-1 y ASO-1: INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA, JUNTA_ASOCIACION.
@@ -95,7 +95,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
 
     fireEvent.click(familia('Red de contactos'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getAllByRole('switch')).toHaveLength(6);
+    expect(screen.getAllByRole('switch')).toHaveLength(7);
   });
 
   it('el disparador es un botón dentro de un encabezado: se alcanza y se acciona con teclado', async () => {

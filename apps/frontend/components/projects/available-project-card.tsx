@@ -6,6 +6,7 @@ import { Tag } from '@/components/ui/tag';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PROJECT_ACTION_BUTTON_CLASS } from '@/components/projects/project-action-button';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { usePinnedProjects } from '@/hooks/use-pinned-projects';
@@ -277,6 +278,32 @@ const PROJECT_CARD_SHELL = 'card-base flex min-h-56 flex-col';
  */
 export const PROJECT_CARD_GRID = 'grid grid-cols-1 gap-grid lg:grid-cols-2';
 
+/** MEJ-25: % de tareas del proyecto y del sprint actual, solo en «Mis proyectos» y si hay tareas. */
+function AvanceTarjeta({ proyecto }: { proyecto: MiProyectoListItemDTO }) {
+  const tareas = proyecto.avanceProyecto?.tareas;
+  if (!tareas || tareas.total === 0) return null;
+  const sprint = proyecto.sprintActual;
+  return (
+    <div className="mt-stack flex flex-col gap-tight text-[12px] text-on-surface-variant">
+      <div className="flex items-center justify-between gap-inline">
+        <span>
+          Tareas: {tareas.hecho}/{tareas.total}
+        </span>
+        <span className="font-semibold text-on-surface tabular-nums">{tareas.porcentaje} %</span>
+      </div>
+      <Progress value={tareas.porcentaje} aria-label={`Avance de tareas de ${proyecto.tituloProyecto}`} className="h-1.5 bg-primary/10" />
+      {sprint && sprint.total > 0 && (
+        <div className="flex items-center justify-between gap-inline">
+          <span>
+            Sprint {sprint.numero}: {sprint.hecho}/{sprint.total}
+          </span>
+          <span className="font-semibold text-on-surface tabular-nums">{sprint.porcentaje} %</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export type AvailableProjectCardProps =
   | { context?: 'explore'; proyecto: ProyectoDisponibleResumen }
   | { context: 'mine'; proyecto: MiProyectoListItemDTO; onDelete?: () => void; onDuplicate?: () => void };
@@ -537,6 +564,8 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
         </span>
         {metadataExtra}
       </div>
+
+      {props.context === 'mine' && <AvanceTarjeta proyecto={props.proyecto} />}
 
       {/* Footer: línea divisoria + acciones, anclados al borde inferior. */}
       <div className="mt-auto pt-card">

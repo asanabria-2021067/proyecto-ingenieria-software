@@ -13,6 +13,7 @@ const DIRS = ['app', 'components', 'lib', 'hooks'];
 export const HEAVY: Record<string, string[]> = {
   recharts: [
     'components/admin/metric-trend-plot.tsx',
+    'components/hours/horas-por-proyecto-plot.tsx',
     'components/projects/burndown-chart-plot.tsx',
     'components/projects/velocity-chart-plot.tsx',
     'components/ui/chart.tsx',
@@ -21,6 +22,7 @@ export const HEAVY: Record<string, string[]> = {
   './metric-trend-plot': [],
   './burndown-chart-plot': [],
   './velocity-chart-plot': [],
+  './horas-por-proyecto-plot': [],
   leaflet: ['components/calendar/event-location-picker.tsx'],
   '@tsparticles/': ['components/ui/sparkles.tsx'],
   // Envoltorios de las librerías de arriba: importarlos de forma estática las arrastra igual.

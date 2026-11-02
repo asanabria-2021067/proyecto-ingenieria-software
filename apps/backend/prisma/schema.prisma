@@ -343,6 +343,10 @@ enum TipoNotificacion {
   RECONOCIMIENTO_RECIBIDO
   // MEJ-31: resumen semanal de los lunes.
   TU_SEMANA
+  // MEJ-13: aviso al estudiante cuyo avance de horas del semestre va en riesgo (max uno por semana).
+  HORAS_EN_RIESGO
+  // MEJ-60: recordatorio de registrar horas en tareas en progreso (max uno cada 3 dias).
+  RECORDATORIO_HORAS
 }
 
 enum EstadoAmistad {

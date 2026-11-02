@@ -291,6 +291,8 @@ const ICONO_AUTOMATICO: Readonly<Record<string, LucideIcon>> = {
   RECORDATORIO_EVENTO: CalendarClock,
   TAREA_POR_VENCER: CalendarClock,
   HORAS_CONSOLIDADAS: Clock3,
+  HORAS_EN_RIESGO: Clock3,
+  RECORDATORIO_HORAS: Clock3,
   HORAS_ACREDITADAS: BadgeCheck,
   HORAS_VALIDADAS: BadgeCheck,
   CERTIFICADO_EMITIDO: Award,

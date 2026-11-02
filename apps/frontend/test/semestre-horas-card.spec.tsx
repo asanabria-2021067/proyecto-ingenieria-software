@@ -124,7 +124,7 @@ describe('HRS: desglose por semestre', () => {
       { semestre: { ...SEMESTRE, periodo: 1, inicio: '2026-01-01', fin: '2026-06-30' }, metaBeca: null, becaDeclarada: 0, becaAcreditada: 0, metaExtension: 40, extensionDeclarada: 8, extensionAcreditada: 0 },
     ]);
     montar(<SemestreHorasHistorial />);
-    const tabla = await screen.findByRole('table');
+    const tabla = (await screen.findAllByRole('table'))[0];
     const filas = within(tabla).getAllByRole('row');
     expect(filas).toHaveLength(3);
     expect(within(filas[1]).getByText('2.º semestre 2026')).toBeInTheDocument();

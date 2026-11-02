@@ -136,6 +136,28 @@ export function calcularAvanceProyecto(
   };
 }
 
+/** MEJ-25: select del sprint activo con sus tareas, para el avance de las tarjetas de «Mis proyectos». */
+export const sprintActivoSelect = {
+  where: { estado: 'ACTIVO' as const },
+  orderBy: { numero: 'desc' as const },
+  take: 1,
+  select: { numero: true, tareas: { where: { eliminadoEn: null }, select: { estadoTarea: true } } },
+} as const;
+
+/** MEJ-25: avance de las tareas del proyecto y del sprint actual (null si no hay sprint activo). */
+export function avanceParaTarjeta(proyecto: {
+  tareas: { estadoTarea: string; idHito: number | null }[];
+  hitos: { idHito: number }[];
+  sprints: { numero: number; tareas: { estadoTarea: string }[] }[];
+}) {
+  const sprint = proyecto.sprints[0];
+  const delSprint = sprint ? calcularAvanceTareas(sprint.tareas) : null;
+  const sprintActual = delSprint
+    ? { numero: sprint.numero, porcentaje: delSprint.porcentaje, total: delSprint.total, hecho: delSprint.hecho }
+    : null;
+  return { avanceProyecto: calcularAvanceProyecto(proyecto.tareas, proyecto.hitos), sprintActual };
+}
+
 /**
  * Los participantes activos ocupan cupos (incluidos los miembros de una
  * organización que entran directo): el listado expone `cuposDisponibles`
