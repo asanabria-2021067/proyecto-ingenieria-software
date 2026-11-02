@@ -285,7 +285,9 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Apelaciones',
     'Tendencias de uso',
     'Horas por semestre',
+    'Asociaciones y organizaciones',
     'Anuncios',
+    'Bandeja única',
     'Cuentas pendientes',
     'Eventos de seguridad',
   ];
@@ -384,7 +386,7 @@ describe('AdminLayout — acceso al visor de eventos de seguridad (T-310, FG02-C
   it('«Eventos de seguridad» vive en «Verificación y seguridad» junto a «Cuentas pendientes», enlazado una sola vez', () => {
     const grupo = adminNavEntries.find((e) => 'type' in e && e.type === 'group' && e.label === 'Verificación y seguridad');
     const items = grupo && 'items' in grupo ? grupo.items : [];
-    expect(items.map((i) => i.label)).toEqual(['Cuentas pendientes', 'Eventos de seguridad']);
+    expect(items.map((i) => i.label)).toEqual(['Bandeja única', 'Cuentas pendientes', 'Eventos de seguridad']);
 
     const destinos = flattenNavEntries(adminNavEntries);
     expect(destinos.filter((d) => d.href === HREF)).toHaveLength(1);
@@ -519,9 +521,9 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
         items: ['Activos', 'Solicitudes de publicación', 'Solicitudes de cierre', 'Cerrados', 'Calendario de Sprints'],
       },
       { grupo: 'Gobernanza', items: ['Apelaciones'] },
-      { grupo: 'Métricas', items: ['Tendencias de uso', 'Horas por semestre'] },
+      { grupo: 'Métricas', items: ['Tendencias de uso', 'Horas por semestre', 'Asociaciones y organizaciones'] },
       { grupo: 'Comunicación', items: ['Anuncios'] },
-      { grupo: 'Verificación y seguridad', items: ['Cuentas pendientes', 'Eventos de seguridad'] },
+      { grupo: 'Verificación y seguridad', items: ['Bandeja única', 'Cuentas pendientes', 'Eventos de seguridad'] },
     ]);
   });
 
@@ -695,6 +697,7 @@ describe('Métricas de uso en la estructura (T-321 · HU-178, FG08-C01)', () => 
     expect(grupo && 'items' in grupo ? grupo.items.map((i) => [i.label, i.href]) : []).toEqual([
       ['Tendencias de uso', HREF],
       ['Horas por semestre', '/dashboard/admin/horas'],
+      ['Asociaciones y organizaciones', '/dashboard/admin/entidades'],
     ]);
     expect(flattenNavEntries(adminNavEntries).filter((d) => /m[eé]trica|tendencia/i.test(d.label))).toHaveLength(1);
   });

@@ -15,6 +15,7 @@ import {
   DATA_TABLE_ROW_HOVER,
 } from '@/components/dashboard/data-table';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
@@ -28,9 +29,10 @@ import {
 import uvgSwal from '@/lib/swal';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { useCuentasPendientes } from '@/hooks/use-cuentas-pendientes';
-import { adminCuentasPendientesQueryKey } from '@/lib/query-keys/admin-accounts';
+import { adminCuentasPendientesQueryKey, adminPendientesQueryKey } from '@/lib/query-keys/admin-accounts';
 import {
   aprobarCuentaPendiente,
+  aprobarCuentasLote,
   rechazarCuentaPendiente,
   type AdminCuentaPendiente,
 } from '@/lib/services/admin';
@@ -85,6 +87,8 @@ function TablaSkeleton() {
 export default function AdminCuentasPendientesPage() {
   const queryClient = useQueryClient();
   const [accion, setAccion] = useState<AccionPendiente | null>(null);
+  const [seleccion, setSeleccion] = useState<number[]>([]);
+  const [confirmarLote, setConfirmarLote] = useState(false);
 
   const { data, isLoading, isError, refetch } = useCuentasPendientes();
 
@@ -127,11 +131,46 @@ export default function AdminCuentasPendientesPage() {
     onSettled: () => {
       setAccion(null);
       queryClient.invalidateQueries({ queryKey: adminCuentasPendientesQueryKey });
+      queryClient.invalidateQueries({ queryKey: adminPendientesQueryKey });
+    },
+  });
+
+  const loteMutation = useMutation({
+    mutationFn: (ids: number[]) => aprobarCuentasLote(ids),
+    onSuccess: ({ aprobadas, omitidas }) => {
+      uvgSwal.fire({
+        icon: omitidas.length > 0 ? 'info' : 'success',
+        title: aprobadas.length === 1 ? '1 cuenta aprobada' : `${aprobadas.length} cuentas aprobadas`,
+        text:
+          omitidas.length > 0
+            ? `${omitidas.length} ya no estaban pendientes y se omitieron. La lista se actualizó.`
+            : 'Ya pueden usar la plataforma.',
+        timer: 2500,
+        showConfirmButton: false,
+      });
+    },
+    onError: (error: Error) => {
+      uvgSwal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: getApiErrorMessage(error, 'admin', 'No se pudieron aprobar las cuentas.'),
+      });
+    },
+    onSettled: () => {
+      setConfirmarLote(false);
+      setSeleccion([]);
+      queryClient.invalidateQueries({ queryKey: adminCuentasPendientesQueryKey });
+      queryClient.invalidateQueries({ queryKey: adminPendientesQueryKey });
     },
   });
 
   const cuentas = data?.cuentas ?? [];
-  const procesando = resolverMutation.isPending;
+  const procesando = resolverMutation.isPending || loteMutation.isPending;
+  // Solo cuentas que siguen en la lista: una aprobada por otro admin sale de la selección.
+  const elegidas = seleccion.filter((id) => cuentas.some((c) => c.idUsuario === id));
+  const todasElegidas = cuentas.length > 0 && elegidas.length === cuentas.length;
+  const alternar = (id: number, marcada: boolean) =>
+    setSeleccion(marcada ? [...elegidas, id] : elegidas.filter((x) => x !== id));
 
   return (
     <div className={ADMIN_PAGE}>
@@ -176,11 +215,30 @@ export default function AdminCuentasPendientesPage() {
             <p className="type-body text-text-secondary" role="status" aria-live="polite">
               Cuentas pendientes: <span className="font-semibold tabular-nums text-text-primary">{cuentas.length}</span>
             </p>
+            <div className="flex flex-wrap items-center gap-inline">
+              <Button
+                type="button"
+                size="sm"
+                disabled={procesando || elegidas.length === 0}
+                onClick={() => setConfirmarLote(true)}
+              >
+                <Check aria-hidden="true" />
+                Aprobar seleccionadas ({elegidas.length})
+              </Button>
+            </div>
             <div className={DATA_TABLE_CARD}>
               <Table>
                 <caption className="sr-only">Cuentas que esperan verificación</caption>
                 <TableHeader>
                   <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
+                    <TableHead scope="col" className={`${TH} w-10`}>
+                      <Checkbox
+                        aria-label="Seleccionar todas las cuentas"
+                        checked={todasElegidas ? true : elegidas.length > 0 ? 'indeterminate' : false}
+                        disabled={procesando}
+                        onCheckedChange={(marcada) => setSeleccion(marcada === true ? cuentas.map((c) => c.idUsuario) : [])}
+                      />
+                    </TableHead>
                     <TableHead scope="col" className={TH}>Nombre completo</TableHead>
                     <TableHead scope="col" className={TH}>Correo</TableHead>
                     <TableHead scope="col" className={TH}>Carné</TableHead>
@@ -194,6 +252,14 @@ export default function AdminCuentasPendientesPage() {
                     const nombreCompleto = `${cuenta.nombre} ${cuenta.apellido}`;
                     return (
                       <TableRow key={cuenta.idUsuario} className={`${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER}`}>
+                        <TableCell className={TD}>
+                          <Checkbox
+                            aria-label={`Seleccionar la cuenta de ${nombreCompleto}`}
+                            checked={elegidas.includes(cuenta.idUsuario)}
+                            disabled={procesando}
+                            onCheckedChange={(marcada) => alternar(cuenta.idUsuario, marcada === true)}
+                          />
+                        </TableCell>
                         <TableCell className={TD}>
                           <span className="type-body break-words font-semibold text-text-primary">{nombreCompleto}</span>
                         </TableCell>
@@ -247,6 +313,19 @@ export default function AdminCuentasPendientesPage() {
           </>
         )}
       </div>
+
+      {confirmarLote && (
+        <ConfirmActionDialog
+          open
+          title="Aprobar cuentas seleccionadas"
+          description={`¿Aprobar ${elegidas.length} ${elegidas.length === 1 ? 'cuenta' : 'cuentas'}? Podrán iniciar sesión y usar la plataforma.`}
+          actionLabel="Aprobar"
+          variant="default"
+          isPending={loteMutation.isPending}
+          onConfirm={() => loteMutation.mutate(elegidas)}
+          onCancel={() => setConfirmarLote(false)}
+        />
+      )}
 
       {accion && (
         <ConfirmActionDialog

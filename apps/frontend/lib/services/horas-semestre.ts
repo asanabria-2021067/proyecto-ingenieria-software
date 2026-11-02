@@ -128,6 +128,31 @@ export const getHorasCentral = (filtros: HorasCentralFiltros, cursor?: number) =
 export const getHorasTotales = (filtros: HorasCentralFiltros) =>
   apiFetch<HorasTotales>(`/admin/horas-semestre/totales${query(filtros)}`);
 
+export interface HorasComparativoSemestre {
+  semestre: Semestre;
+  estudiantesConRegistro: number;
+  metaBeca: number;
+  becaDeclarada: number;
+  becaAcreditada: number;
+  metaExtension: number;
+  extensionDeclarada: number;
+  extensionAcreditada: number;
+}
+
+export const getHorasComparativo = () =>
+  apiFetch<{ semestres: HorasComparativoSemestre[] }>('/admin/horas-semestre/comparativo');
+
+export interface ResumenAsociacion extends Omit<TotalesCarrera, 'idCarrera' | 'carrera'> {
+  idAsociacion: number;
+  nombre: string;
+  carreras: string[];
+  integrantesJunta: number;
+  proyectosActivos: number;
+}
+
+export const getResumenAsociaciones = () =>
+  apiFetch<{ semestre: Semestre; asociaciones: ResumenAsociacion[] }>('/admin/horas-semestre/resumen-asociaciones');
+
 export const getAsociacionesAdmin = () => apiFetch<AsociacionResumen[]>('/admin/asociaciones');
 
 export const descargarHorasCentral = (formato: 'csv' | 'pdf', filtros: HorasCentralFiltros) =>

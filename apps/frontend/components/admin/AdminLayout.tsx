@@ -8,11 +8,13 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Archive,
   BarChart3,
+  Building2,
   CalendarRange,
   Clock,
   FileSearch,
   FolderKanban,
   FolderOpen,
+  Inbox,
   Landmark,
   BellRing,
   Megaphone,
@@ -104,6 +106,7 @@ export const adminNavEntries: NavEntry[] = [
       // HU-178: las métricas de uso tienen página propia; el Panel Admin solo conserva un resumen.
       { href: ADMIN_METRICS_ROUTE, label: 'Tendencias de uso', icon: TrendingUp },
       { href: '/dashboard/admin/horas', label: 'Horas por semestre', icon: Clock },
+      { href: '/dashboard/admin/entidades', label: 'Asociaciones y organizaciones', icon: Building2 },
     ],
   },
   {
@@ -117,6 +120,8 @@ export const adminNavEntries: NavEntry[] = [
     label: 'Verificación y seguridad',
     icon: ShieldAlert,
     items: [
+      // MEJ-69: una sola lista con los contadores de todo lo que espera una decisión.
+      { href: '/dashboard/admin/bandeja', label: 'Bandeja única', icon: Inbox },
       // HU-179 (PR #270): bandeja de cuentas que esperan verificación; lleva el contador.
       { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
       // T-310: visor de solo lectura de los eventos de seguridad que ya se registran.

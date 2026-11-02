@@ -33,6 +33,16 @@ export class AdminHorasSemestreController {
     return this.service.totales(user.userId, query);
   }
 
+  @Get('comparativo')
+  comparativo(@CurrentUser() user: { userId: number }) {
+    return this.service.comparativo(user.userId);
+  }
+
+  @Get('resumen-asociaciones')
+  resumenAsociaciones(@CurrentUser() user: { userId: number }, @Query() query: HorasCentralQueryDto) {
+    return this.service.resumenPorAsociacion(user.userId, query);
+  }
+
   @Get('csv')
   async csv(@CurrentUser() user: { userId: number }, @Query() query: HorasCentralQueryDto, @Res() res: Response) {
     const { semestre, filas } = await this.service.todasLasFilas(user.userId, query);
