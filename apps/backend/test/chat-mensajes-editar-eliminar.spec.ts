@@ -43,7 +43,7 @@ describe('ChatService - editar y eliminar mensajes propios', () => {
     prisma = {
       conversacion: { findFirst: vi.fn().mockResolvedValue(conversacionRow()) },
       mensajeChat: {
-        findFirst: vi.fn().mockResolvedValue({ idRemitente: 1, eliminadoEn: null }),
+        findFirst: vi.fn().mockResolvedValue({ idRemitente: 1, eliminadoEn: null, contenido: 'hola' }),
         findMany: vi.fn(),
         update: vi.fn(),
       },

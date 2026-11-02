@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { EstadoProyecto, Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,6 +19,8 @@ import { estaEnNoMolestar, estaSilenciada } from './chat-silencio.util';
 import { UpdateNoMolestarDto } from './dto/update-no-molestar.dto';
 import { UpdateChatThemeDto } from './dto/update-chat-theme.dto';
 import { ESTADO_CHAT_SELECT, estadoVigente } from './chat-estado.service';
+import { prepararMencionesChat } from './chat-menciones';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /**
  * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
@@ -171,6 +173,7 @@ export class ChatService {
     private prisma: PrismaService,
     private gateway: ChatGateway,
     @Inject(CHAT_STORAGE_PORT) private storage: ChatStoragePort,
+    @Optional() private notifications?: NotificationsService,
   ) {}
 
   /** Líder o participante con participación ACTIVO en algún rol del proyecto. */
@@ -630,6 +633,14 @@ export class ChatService {
       }
     }
 
+    // MEJ-44: las menciones validas conservan su token; el resto queda como texto.
+    const menciones = prepararMencionesChat(
+      contenido,
+      conversacion.participantes.map((p) => p.idUsuario),
+      userId,
+    );
+    contenido = menciones.contenido;
+
     const { encuesta } = extra;
     if (encuesta) {
       const cierra = encuesta.cierraEn ? new Date(encuesta.cierraEn) : null;
@@ -699,8 +710,39 @@ export class ChatService {
 
     const destinatarios = conversacion.participantes.map((p) => p.idUsuario).filter((id) => id !== userId);
     this.gateway.broadcastMessage(idConversacion, destinatarios, mensaje);
+    await this.notificarMenciones(idProyecto, idConversacion, mensaje.idMensaje, userId, menciones.mencionados);
 
     return mensaje;
+  }
+
+  /**
+   * MEJ-44: aviso a los mencionados. Es una `Notificacion` propia del usuario, asi que
+   * llega aunque la conversacion este silenciada; solo la preferencia del tipo la apaga.
+   * Un fallo aqui nunca debe tumbar un mensaje ya persistido.
+   */
+  private async notificarMenciones(
+    idProyecto: number,
+    idConversacion: number,
+    idMensaje: number,
+    autorId: number,
+    mencionados: number[],
+  ): Promise<void> {
+    if (!this.notifications || mencionados.length === 0) return;
+    try {
+      const [autor, proyecto] = await Promise.all([
+        this.prisma.usuario.findUnique({ where: { idUsuario: autorId }, select: { nombre: true, apellido: true } }),
+        this.prisma.proyecto.findUnique({ where: { idProyecto }, select: { tituloProyecto: true } }),
+      ]);
+      await this.notifications.notifyFromTemplate(mencionados, 'MENCION_CHAT', {
+        autorNombre: autor ? `${autor.nombre} ${autor.apellido}` : 'Un integrante',
+        tituloProyecto: proyecto?.tituloProyecto ?? '',
+        idProyecto,
+        idConversacion,
+        idMensaje,
+      });
+    } catch {
+      // best effort: el mensaje ya se guardo y difundio
+    }
   }
 
   /** Encuesta de un mensaje vivo de la conversacion, con sus opciones y votos. */
@@ -845,14 +887,14 @@ export class ChatService {
     }
     const mensaje = await this.prisma.mensajeChat.findFirst({
       where: { idMensaje, idConversacion },
-      select: { idRemitente: true, eliminadoEn: true },
+      select: { idRemitente: true, eliminadoEn: true, contenido: true },
     });
     if (!mensaje) throw new NotFoundException(`Mensaje con id ${idMensaje} no encontrado`);
     if (mensaje.idRemitente !== userId) {
       throw new ForbiddenException('Solo puedes modificar tus propios mensajes');
     }
     if (mensaje.eliminadoEn) throw new BadRequestException('El mensaje ya fue eliminado');
-    return conversacion;
+    return { ...conversacion, contenidoActual: mensaje.contenido };
   }
 
   async editMessage(
@@ -863,15 +905,26 @@ export class ChatService {
     contenido: string,
   ) {
     const conversacion = await this.getOwnMessageOrThrow(idProyecto, idConversacion, idMensaje, userId);
+    const participantes = conversacion.participantes.map((p) => p.idUsuario);
+    const menciones = prepararMencionesChat(contenido.trim(), participantes, userId);
     const mensaje = conResumenDeCita(
       await this.prisma.mensajeChat.update({
         where: { idMensaje },
-        data: { contenido: contenido.trim(), editadoEn: new Date() },
+        data: { contenido: menciones.contenido, editadoEn: new Date() },
         select: MENSAJE_CON_CITA_SELECT,
       }),
     );
     const destinatarios = conversacion.participantes.map((p) => p.idUsuario).filter((id) => id !== userId);
     this.gateway.broadcastMessageChange('messageUpdated', idConversacion, destinatarios, mensaje);
+    // Al editar solo se avisa a quien no estaba ya mencionado.
+    const previos = prepararMencionesChat(conversacion.contenidoActual, participantes, userId).mencionados;
+    await this.notificarMenciones(
+      idProyecto,
+      idConversacion,
+      idMensaje,
+      userId,
+      menciones.mencionados.filter((id) => !previos.includes(id)),
+    );
     return mensaje;
   }
 
