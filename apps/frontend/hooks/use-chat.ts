@@ -258,7 +258,7 @@ export function useSendFileMessage(idProyecto: number, idConversacion: number | 
     onSuccess: (mensaje) => {
       queryClient.setQueryData<ChatMensaje[]>(
         conversationMessagesQueryKey(idProyecto, idConversacion as number),
-        (current) => (current ? [...current, mensaje] : [mensaje]),
+        (current) => (!current ? [mensaje] : current.some((m) => m.idMensaje === mensaje.idMensaje) ? current : [...current, mensaje]),
       );
       queryClient.invalidateQueries({ queryKey: conversationFilesQueryKey(idProyecto, idConversacion as number) });
       invalidateChatLists(queryClient, idProyecto);
@@ -300,7 +300,7 @@ export function useSendMessage(idProyecto: number, idConversacion: number | null
     onSuccess: (mensaje) => {
       queryClient.setQueryData<ChatMensaje[]>(
         conversationMessagesQueryKey(idProyecto, idConversacion as number),
-        (current) => (current ? [...current, mensaje] : [mensaje]),
+        (current) => (!current ? [mensaje] : current.some((m) => m.idMensaje === mensaje.idMensaje) ? current : [...current, mensaje]),
       );
       invalidateChatLists(queryClient, idProyecto);
     },
