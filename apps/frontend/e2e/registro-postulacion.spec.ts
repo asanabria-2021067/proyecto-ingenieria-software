@@ -52,7 +52,7 @@ async function expectSinSesion(page: Page): Promise<void> {
 async function expectLoginRechazado(page: Page, mensaje: string, correo: string): Promise<void> {
   // NL-T1: el rechazo se muestra como alerta en el formulario, ya no en un popup.
   // POST /auth/login admite 5/min por IP y otros specs del shard también inician sesión: si el límite
-  // responde primero, se espera a que se libere la ventana y se reenvía en vez de dar por fallido el rechazo.
+  // responde primero, se reenvía (esperando 20 s entre intentos hasta que se libere la ventana) en vez de dar por fallido el rechazo.
   await expect(async () => {
     if (await page.getByRole('alert').filter({ hasText: 'Demasiados intentos' }).isVisible()) await enviarLogin(page, correo);
     await expect(page.getByRole('alert').filter({ hasText: mensaje })).toBeVisible({ timeout: 5_000 });
@@ -80,6 +80,7 @@ async function resolverCuenta(adminPage: Page, correo: string, accion: 'Aprobar'
 
 // smoke: registro y postulación (T-125, flujo 1)
 test('un usuario nuevo se registra, administración lo aprueba, entra a proyectos y se postula', async ({ page, browser }) => {
+  test.setTimeout(180_000);
   const correo = await registrar(page);
 
   // Mientras la cuenta está pendiente no hay sesión ni login posible.
