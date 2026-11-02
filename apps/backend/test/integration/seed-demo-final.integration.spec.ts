@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import { describeIntegration } from './setup/database';
 
 /**
- * DEMO (Fase 4): src/scripts/seed-demo-final.ts contra PostgreSQL real. Corre en una
+ * DEMO (Fase 4): prisma/seed-demo-final.ts contra PostgreSQL real. Corre en una
  * base propia y desechable (CREATE DATABASE + migrate deploy + DROP DATABASE al
  * final; un schema aparte no sirve porque las migraciones instalan extensiones)
  * para no dejar datos de demo en la base compartida de las demas suites.
@@ -15,7 +15,7 @@ const PROHIBIDAS = ['pru26200', 'pru26201', 'pru26202', 'pru26203', 'pru26204', 
 const TABLAS = [
   'usuario', 'perfil_estudiante', 'registro_horas_semestre', 'asociacion', 'junta_asociacion', 'organizacion', 'usuario_organizacion',
   'invitacion_organizacion', 'conversacion', 'conversacion_participante', 'mensaje_chat', 'proyecto', 'participacion_proyecto', 'sprint',
-  'tarea', 'asignacion_tarea', 'registro_tiempo_tarea', 'horas_participacion',
+  'tarea', 'asignacion_tarea', 'registro_tiempo_tarea', 'horas_participacion', 'tarea_checklist_item',
 ];
 
 describeIntegration('DEMO seed-demo-final', () => {
@@ -30,8 +30,8 @@ describeIntegration('DEMO seed-demo-final', () => {
 
   const node = (script: string[], env: NodeJS.ProcessEnv) =>
     execFileSync(process.execPath, [...script], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  const correrSeed = (password: string | null = 'Contrasena-Demo-1') =>
-    node([join(process.cwd(), 'node_modules/tsx/dist/cli.mjs'), 'src/scripts/seed-demo-final.ts'], { ...envBase, ...(password && { DEMO_PASSWORD: password }) });
+  const correrSeed = (password: string | null = 'Contrasena-Demo-1', extra: NodeJS.ProcessEnv = {}) =>
+    node([join(process.cwd(), 'node_modules/tsx/dist/cli.mjs'), 'prisma/seed-demo-final.ts'], { ...envBase, ...extra, ...(password && { DEMO_PASSWORD: password }) });
   const conteos = async () => {
     const filas: Record<string, number> = {};
     for (const t of TABLAS) filas[t] = Number((await db.$queryRawUnsafe<{ n: bigint }[]>(`SELECT COUNT(*) AS n FROM "${t}"`))[0].n);
@@ -67,13 +67,26 @@ describeIntegration('DEMO seed-demo-final', () => {
 
   it('corre dos veces con conteos estables, sin tocar cuentas prohibidas y sin exponer la contrasena', async () => {
     const carrera = await db.carrera.create({ data: { nombreCarrera: 'Ingeniería en Ciencias de la Computación y TI' } });
-    await db.usuario.create({ data: { correo: 'carlos.mendoza@uvg.edu.gt', contrasena: 'hash-previo', nombre: 'Carlos', apellido: 'Mendoza' } });
+    const carlos = await db.usuario.create({ data: { correo: 'carlos.mendoza@uvg.edu.gt', contrasena: 'hash-previo', nombre: 'Carlos', apellido: 'Mendoza' } });
+    await db.perfilEstudiante.create({ data: { idUsuario: carlos.idUsuario, carne: 'REAL-CARLOS', idCarrera: carrera.idCarrera } });
+    const ahora = new Date();
+    const anio = ahora.getUTCFullYear();
+    const periodo = ahora.getUTCMonth() < 6 ? 1 : 2;
+    // Registro previo con otras cifras: el script solo debe corregir esos cuatro campos.
+    await db.registroHorasSemestre.create({ data: { idUsuario: carlos.idUsuario, anio, periodo, metaBeca: 80, becaDeclarada: 3 } });
     for (const [i, carne] of PROHIBIDAS.entries()) {
       const u = await db.usuario.create({ data: { correo: `${carne}@uvg.edu.gt`, contrasena: 'hash-previo', nombre: 'Prohibida', apellido: String(i) } });
       await db.perfilEstudiante.create({ data: { idUsuario: u.idUsuario, carne, idCarrera: carrera.idCarrera } });
-      await db.registroHorasSemestre.create({ data: { idUsuario: u.idUsuario, anio: 2026, periodo: 2, metaBeca: 80, becaDeclarada: 1 } });
+      await db.registroHorasSemestre.create({ data: { idUsuario: u.idUsuario, anio: 2026, periodo: 2, metaBeca: 80, becaDeclarada: 80 } }); // meta cumplida: no cuentan como en riesgo de la asociacion
     }
     const antesProhibidas = await snapshotProhibidas();
+
+    const antesDry = await conteos();
+    const dry = correrSeed('Contrasena-Demo-1', { DRY_RUN: '1' });
+    expect(dry).toContain('usuarios: creados 15');
+    expect(dry).toContain('transaccion revertida');
+    expect(await conteos()).toEqual(antesDry);
+    expect((await db.registroHorasSemestre.findFirstOrThrow({ where: { usuario: { correo: 'carlos.mendoza@uvg.edu.gt' } } })).metaBeca).toBe(80);
 
     const password = 'Contrasena-Demo-1';
     const primera = correrSeed(password);
@@ -97,6 +110,22 @@ describeIntegration('DEMO seed-demo-final', () => {
     const junta = await db.juntaAsociacion.findMany({ orderBy: { cargo: 'asc' }, include: { usuario: true } });
     expect(junta.map((j) => j.cargo)).toEqual(['PRESIDENTE', 'VICEPRESIDENTE', 'VOCAL']);
     expect(junta.find((j) => j.cargo === 'PRESIDENTE')?.usuario.correo).toBe('carlos.mendoza@uvg.edu.gt');
+    const reg = await db.registroHorasSemestre.findMany({ where: { usuario: { correo: 'carlos.mendoza@uvg.edu.gt' } } });
+    expect(reg).toHaveLength(1);
+    expect(reg[0]).toMatchObject({ metaBeca: 50, becaDeclarada: 20, metaExtension: 40, extensionDeclarada: 10 });
+    expect(await db.perfilEstudiante.findFirstOrThrow({ where: { usuario: { correo: 'carlos.mendoza@uvg.edu.gt' } } })).toMatchObject({ carne: 'REAL-CARLOS' });
+
+    const conMetas = await db.registroHorasSemestre.count({ where: { usuario: { correo: { startsWith: 'demo.cs' } }, OR: [{ metaBeca: { not: null } }, { metaExtension: { not: null } }] } });
+    const sinMetas = await db.registroHorasSemestre.count({ where: { usuario: { correo: { startsWith: 'demo.cs' } }, metaBeca: null, metaExtension: null } });
+    expect(conMetas).toBeGreaterThanOrEqual(10);
+    expect(sinMetas).toBeGreaterThanOrEqual(1);
+    expect(new Set((await db.registroHorasSemestre.findMany({ where: { usuario: { correo: { startsWith: 'demo.cs' } }, metaBeca: { not: null } } })).map((r) => r.metaBeca)).size).toBeGreaterThan(1);
+
+    const tareaCarlos = await db.tarea.findFirstOrThrow({
+      where: { estadoTarea: 'EN_PROGRESO', asignaciones: { some: { desasignadaEn: null, usuario: { correo: 'carlos.mendoza@uvg.edu.gt' } } }, sprint: { estado: 'ACTIVO' }, proyecto: { estadoProyecto: 'EN_PROGRESO' } },
+      include: { checklist: { orderBy: { orden: 'asc' } } },
+    });
+    expect(tareaCarlos.checklist.map((i) => i.completado)).toEqual([true, false, false]);
     expect(await db.tarea.groupBy({ by: ['estadoTarea'] }).then((g) => g.map((x) => x.estadoTarea).sort())).toEqual(['EN_PROGRESO', 'EN_REVISION', 'HECHO', 'POR_HACER']);
   }, 120_000);
 });

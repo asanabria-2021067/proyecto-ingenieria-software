@@ -10,22 +10,29 @@
  *
  * Requiere DEMO_PASSWORD (contrasena de las cuentas demo NUEVAS; nunca se
  * imprime ni se guarda) y que carlos.mendoza@uvg.edu.gt ya exista.
+ * DRY_RUN=1 corre todo dentro de una transaccion y la revierte al final.
  *
- * Uso:
- *   Produccion (imagen compilada): DEMO_PASSWORD="..." npm run prisma:seed-demo-final
- *   Desarrollo: DEMO_PASSWORD="..." npm run prisma:seed-demo-final:dev
+ * Uso: DEMO_PASSWORD="..." npm run prisma:seed-demo-final (en la imagen de
+ * produccion no hay tsx; ver README, seccion Demo).
  */
-import { PrismaClient, type EstadoProyecto, type EstadoTarea, type RolOrganizacion, type TipoProyecto } from '@prisma/client';
+import { Prisma, PrismaClient, type EstadoProyecto, type EstadoTarea, type RolOrganizacion, type TipoProyecto } from '@prisma/client';
 import { hashSync } from 'bcryptjs';
-import { addDaysToDay, todayInGuatemala } from '../common/utils/guatemala-date';
-import { esEnRiesgo, semestreDe, type Semestre } from '../horas-semestre/semestre';
+import { addDaysToDay, todayInGuatemala } from '../src/common/utils/guatemala-date';
+import { esEnRiesgo, semestreDe, type Semestre } from '../src/horas-semestre/semestre';
 
-const prisma = new PrismaClient();
+const cliente = new PrismaClient();
+// En DRY_RUN pasa a ser el cliente de la transaccion que se revierte.
+let prisma: Prisma.TransactionClient = cliente;
 
 const NOMBRE_ASOCIACION = 'Asociación de Estudiantes de Ciencias de la Computación y TI';
 const CORREO_PRESIDENTE = 'carlos.mendoza@uvg.edu.gt';
-const META_BECA = 80;
-const META_EXTENSION = 40;
+// Metas variadas por estudiante (indice % 3).
+const METAS_BECA = [80, 60, 100];
+const METAS_EXTENSION = [40, 30, 50];
+// Carlos (presidente): cuenta real, solo se fija su registro del semestre.
+const REGISTRO_PRESIDENTE = { metaBeca: 50, becaDeclarada: 20, metaExtension: 40, extensionDeclarada: 10 };
+const RIESGO_MIN = 4;
+const RIESGO_MAX = 8;
 
 const stats: Record<string, { creado: number; actualizado: number }> = {};
 const contar = (entidad: string, tipo: 'creado' | 'actualizado') => stats[entidad][tipo]++;
@@ -68,12 +75,12 @@ const NOMBRES: [string, string][] = [
   ['Mónica', 'Ruiz'], ['Esteban', 'Palencia'], ['Natalia', 'Solís'], ['Kevin', 'Arriaza'], ['Alejandra', 'Duarte'],
 ];
 
-/** Desviacion (puntos porcentuales) del avance respecto al esperado a hoy; null = sin meta de ese tipo. Menor a -20 = en riesgo. */
+/** Desviacion (puntos porcentuales) del avance respecto al esperado a hoy; null = sin meta de ese tipo (3 estudiantes sin ninguna). Menor a -20 = en riesgo. */
 const PLAN_HORAS: { beca: number | null; extension: number | null }[] = [
   { beca: 15, extension: null }, { beca: 5, extension: 10 }, { beca: -35, extension: null }, { beca: -10, extension: -5 },
   { beca: 30, extension: null }, { beca: -40, extension: -35 }, { beca: 0, extension: 20 }, { beca: -35, extension: null },
-  { beca: 10, extension: null }, { beca: -38, extension: -10 }, { beca: null, extension: -33 }, { beca: 20, extension: null },
-  { beca: -5, extension: null }, { beca: 40, extension: 5 }, { beca: null, extension: 0 },
+  { beca: 10, extension: null }, { beca: -38, extension: -10 }, { beca: null, extension: -33 }, { beca: null, extension: null },
+  { beca: null, extension: null }, { beca: 40, extension: 5 }, { beca: null, extension: null },
 ];
 
 const nn = (i: number) => String(i + 1).padStart(2, '0');
@@ -95,14 +102,13 @@ function porcentajeEsperado(s: Semestre, hoy: string) {
 
 interface FilaHoras { metaBeca: number | null; avanceBeca: number; metaExtension: number | null; avanceExtension: number }
 
-/** Cuenta riesgo con la funcion real esEnRiesgo y falla si no hay 3-4 en beca y 2 en extension. */
+/** Cuenta estudiantes en riesgo (beca o extension) con la funcion real esEnRiesgo y falla si quedan fuera de 4-8. */
 function verificarRiesgo(filas: FilaHoras[], s: Semestre, hoy: string, origen: string) {
   const riesgo = (meta: number | null, avance: number) => meta !== null && meta > 0 && esEnRiesgo((avance / meta) * 100, s.inicio, s.fin, hoy);
-  const beca = filas.filter((f) => riesgo(f.metaBeca, f.avanceBeca)).length;
-  const extension = filas.filter((f) => riesgo(f.metaExtension, f.avanceExtension)).length;
-  if (beca < 3 || beca > 4 || extension !== 2) {
+  const enRiesgo = filas.filter((f) => riesgo(f.metaBeca, f.avanceBeca) || riesgo(f.metaExtension, f.avanceExtension)).length;
+  if (enRiesgo < RIESGO_MIN || enRiesgo > RIESGO_MAX) {
     throw new Error(
-      `Riesgo inesperado (${origen}): beca=${beca} (se esperaba 3-4), extension=${extension} (se esperaba 2) al ${hoy}. ` +
+      `Riesgo inesperado (${origen}): ${enRiesgo} estudiantes en riesgo al ${hoy} (se esperaban ${RIESGO_MIN}-${RIESGO_MAX}). ` +
         'Las desviaciones del plan solo producen riesgo cuando ha transcurrido mas del 20% del semestre.',
     );
   }
@@ -114,12 +120,14 @@ function planDeHoras(s: Semestre, hoy: string) {
   const horas = (meta: number, desviacion: number) => Math.round((meta * avancePct(desviacion, esperado)) / 100);
   return PLAN_HORAS.map((p, i) => {
     const acreditada = ACREDITADAS_BECA[i] ?? 0;
-    const avanceBeca = p.beca === null ? 0 : horas(META_BECA, p.beca);
-    const avanceExtension = p.extension === null ? 0 : horas(META_EXTENSION, p.extension);
+    const metaB = METAS_BECA[i % 3];
+    const metaE = METAS_EXTENSION[i % 3];
+    const avanceBeca = p.beca === null ? 0 : horas(metaB, p.beca);
+    const avanceExtension = p.extension === null ? 0 : horas(metaE, p.extension);
     return {
-      metaBeca: p.beca === null ? null : META_BECA,
+      metaBeca: p.beca === null ? null : metaB,
       becaDeclarada: Math.max(avanceBeca - acreditada, 0),
-      metaExtension: p.extension === null ? null : META_EXTENSION,
+      metaExtension: p.extension === null ? null : metaE,
       extensionDeclarada: avanceExtension,
       // El avance real incluye las acreditadas aunque la declarada se haya recortado a 0.
       avanceBeca: Math.max(avanceBeca, acreditada),
@@ -130,7 +138,7 @@ function planDeHoras(s: Semestre, hoy: string) {
 
 // ─── Proyectos ──────────────────────────────────────────────────────────────
 
-interface TareaDef { titulo: string; estado: EstadoTarea; prioridad: 'BAJA' | 'MEDIA' | 'ALTA'; asignadoA: number; horas?: number }
+interface TareaDef { titulo: string; estado: EstadoTarea; prioridad: 'BAJA' | 'MEDIA' | 'ALTA'; asignadoA: number; horas?: number; checklist?: [string, boolean][] }
 
 interface ProyectoDef {
   titulo: string;
@@ -241,6 +249,13 @@ async function armarProyecto(d: ProyectoDef) {
       () => prisma.asignacionTarea.create({ data: { idTarea: tarea.idTarea, idUsuario: t.asignadoA, idParticipacion: participaciones.get(t.asignadoA), asignadoPor: d.creadoPor, horasReales: t.horas } }),
       (a) => (t.horas !== undefined && Number(a.horasReales) !== t.horas ? prisma.asignacionTarea.update({ where: { idAsignacion: a.idAsignacion }, data: { horasReales: t.horas } }) : undefined),
     );
+    for (const [orden, [texto, completado]] of (t.checklist ?? []).entries()) {
+      await asegurar(
+        'checklist_items',
+        () => prisma.tareaChecklistItem.findFirst({ where: { idTarea: tarea.idTarea, texto } }),
+        () => prisma.tareaChecklistItem.create({ data: { idTarea: tarea.idTarea, texto, completado, orden } }),
+      );
+    }
     if (t.horas === undefined) continue;
     await asegurar(
       'registros_tiempo',
@@ -272,7 +287,16 @@ async function main() {
   const semestre = semestreDe(new Date());
   const hoy = todayInGuatemala();
   const plan = planDeHoras(semestre, hoy);
-  verificarRiesgo(plan.map((p) => ({ metaBeca: p.metaBeca, avanceBeca: p.avanceBeca, metaExtension: p.metaExtension, avanceExtension: p.avanceExtension })), semestre, hoy, 'plan');
+  const { metaBeca: pMetaBeca, becaDeclarada: pBeca, metaExtension: pMetaExt, extensionDeclarada: pExt } = REGISTRO_PRESIDENTE;
+  verificarRiesgo(
+    [
+      ...plan.map((p) => ({ metaBeca: p.metaBeca, avanceBeca: p.avanceBeca, metaExtension: p.metaExtension, avanceExtension: p.avanceExtension })),
+      { metaBeca: pMetaBeca, avanceBeca: pBeca, metaExtension: pMetaExt, avanceExtension: pExt },
+    ],
+    semestre,
+    hoy,
+    'plan',
+  );
 
   const presidente = await prisma.usuario.findUnique({ where: { correo: CORREO_PRESIDENTE } });
   if (!presidente) throw new Error(`No existe ${CORREO_PRESIDENTE}: debe existir antes de correr este script (corre seed.ts o crea la cuenta).`);
@@ -319,6 +343,16 @@ async function main() {
           : undefined,
     );
   }
+  // Solo el registro del semestre de Carlos; su cuenta y perfil reales no se tocan.
+  await asegurar(
+    'registro_horas_presidente',
+    () => prisma.registroHorasSemestre.findUnique({ where: { idUsuario_anio_periodo: { idUsuario: presidente.idUsuario, anio: semestre.anio, periodo: semestre.periodo } } }),
+    () => prisma.registroHorasSemestre.create({ data: { idUsuario: presidente.idUsuario, anio: semestre.anio, periodo: semestre.periodo, ...REGISTRO_PRESIDENTE } }),
+    (r) =>
+      (Object.keys(REGISTRO_PRESIDENTE) as (keyof typeof REGISTRO_PRESIDENTE)[]).some((k) => r[k] !== REGISTRO_PRESIDENTE[k])
+        ? prisma.registroHorasSemestre.update({ where: { idRegistro: r.idRegistro }, data: REGISTRO_PRESIDENTE })
+        : undefined,
+  );
   // est[0] = VP, est[1] = vocal; el resto son estudiantes y miembros de las orgs.
   const [vp, vocal] = est;
 
@@ -450,7 +484,15 @@ async function main() {
     },
     {
       titulo: 'Demo - Hackathon de Computación', descripcion: 'Proyecto de la asociación en progreso con sprint activo.', tipo: 'ACADEMICO_HORAS_BECA', estado: 'EN_PROGRESO',
-      creadoPor: presidente.idUsuario, idAsociacion: asociacion.idAsociacion, participantes: [vp, est[2], est[3]], sprint: 'activo', tareas: tablero('Hackathon', vp, est[2], est[3], vp),
+      creadoPor: presidente.idUsuario, idAsociacion: asociacion.idAsociacion, participantes: [presidente.idUsuario, vp, est[2], est[3]], sprint: 'activo',
+      tareas: [
+        ...tablero('Hackathon', vp, est[2], est[3], vp),
+        // Tarea de Carlos: «Mis tareas en este proyecto», checklist y registro de horas.
+        {
+          titulo: 'Hackathon: coordinar la logística del evento', estado: 'EN_PROGRESO', prioridad: 'ALTA', asignadoA: presidente.idUsuario,
+          checklist: [['Reservar el auditorio', true], ['Confirmar a los jurados', false], ['Preparar el material de registro', false]],
+        },
+      ],
     },
     {
       titulo: 'Demo - Semana de la Computación (cerrado)', descripcion: 'Proyecto de la asociación ya cerrado, con horas acreditadas.', tipo: 'ACADEMICO_HORAS_BECA', estado: 'CERRADO',
@@ -461,18 +503,27 @@ async function main() {
   for (const p of proyectos) await armarProyecto(p);
 
   // ─── Verificacion final contra la base ────────────────────────────────────
-  const registros = await prisma.registroHorasSemestre.findMany({ where: { idUsuario: { in: est }, anio: semestre.anio, periodo: semestre.periodo } });
+  // Mismo universo que la asociacion: estudiantes activos de sus carreras.
+  const registros = await prisma.registroHorasSemestre.findMany({
+    where: {
+      anio: semestre.anio,
+      periodo: semestre.periodo,
+      usuario: { estado: 'ACTIVO', perfil: { is: { carrera: { asociaciones: { some: { idAsociacion: asociacion.idAsociacion } } } } } },
+    },
+  });
+  const idsRegistros = registros.map((r) => r.idUsuario);
   const acreditadas = await prisma.horasParticipacion.findMany({
     where: {
       estadoHoras: 'APROBADA',
       fechaAprobacion: { gte: inicioDeDia(semestre.inicio), lt: inicioDeDia(addDaysToDay(semestre.fin, 1)) },
-      participacion: { idUsuario: { in: est } },
+      participacion: { idUsuario: { in: idsRegistros } },
     },
     select: { horasAprobadas: true, participacion: { select: { idUsuario: true, rolProyecto: { select: { proyecto: { select: { tipoProyecto: true } } } } } } },
   });
   const acred = (idUsuario: number, tipo: TipoProyecto) =>
     acreditadas.filter((h) => h.participacion.idUsuario === idUsuario && h.participacion.rolProyecto.proyecto.tipoProyecto === tipo).reduce((s, h) => s + Number(h.horasAprobadas ?? 0), 0);
-  if (registros.length !== est.length) throw new Error(`Se esperaban ${est.length} registros de horas del semestre y hay ${registros.length}.`);
+  const demoConRegistro = registros.filter((r) => est.includes(r.idUsuario)).length;
+  if (demoConRegistro !== est.length) throw new Error(`Se esperaban ${est.length} registros de horas del semestre y hay ${demoConRegistro}.`);
   verificarRiesgo(
     registros.map((r) => ({
       metaBeca: r.metaBeca,
@@ -489,15 +540,33 @@ async function main() {
   console.log('Demo final seed completed successfully');
 }
 
-// Solo corre como entrypoint; importarlo desde la app Nest no ejecuta nada.
+class Rollback extends Error {}
+
+// Solo corre como entrypoint.
 if (require.main === module) {
-  main()
+  const ejecutar = async () => {
+    if (process.env.DRY_RUN !== '1') return main();
+    try {
+      await cliente.$transaction(
+        async (tx) => {
+          prisma = tx;
+          await main();
+          throw new Rollback();
+        },
+        { timeout: 300_000, maxWait: 30_000 },
+      );
+    } catch (e) {
+      if (!(e instanceof Rollback)) throw e;
+      console.log('DRY_RUN=1: transaccion revertida, no se guardo nada.');
+    }
+  };
+  ejecutar()
     .then(async () => {
-      await prisma.$disconnect();
+      await cliente.$disconnect();
     })
     .catch(async (e) => {
       console.error(e instanceof Error ? e.message : e);
-      await prisma.$disconnect();
+      await cliente.$disconnect();
       process.exit(1);
     });
 }
