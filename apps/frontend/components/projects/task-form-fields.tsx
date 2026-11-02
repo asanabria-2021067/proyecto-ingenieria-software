@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Tags } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,12 @@ export interface TaskFormFieldsProps {
   mode?: 'create' | 'edit';
   /** Hito ya persistido de la tarea (null si nunca tuvo uno). Solo importa en modo 'edit'. */
   hitoOriginal?: number | null;
+  /**
+   * Creación por pasos: 0 básico, 1 planificación, 2 asignación y etiquetas.
+   * Los otros pasos siguen montados (conservan sus valores y errores) pero
+   * ocultos. Sin `paso`, se muestran las tres secciones (edición).
+   */
+  paso?: 0 | 1 | 2;
 }
 
 /**
@@ -158,7 +165,10 @@ export function TaskFormFields({
   onManageLabels,
   mode = 'edit',
   hitoOriginal = null,
+  paso,
 }: TaskFormFieldsProps) {
+  const porPasos = paso !== undefined;
+  const panel = (n: number) => (porPasos && paso !== n ? 'hidden' : undefined);
   const { control, watch, getValues, setValue } = useFormContext<TaskFormValues>();
   // HU-147/T-185: "Sin hito" solo se ofrece cuando retirarlo/omitirlo sigue
   // siendo una operación válida — creación siempre lo exige, y edición solo
@@ -199,15 +209,15 @@ export function TaskFormFields({
 
   return (
     <div className="space-y-6">
-      {/* ── SECCIÓN 1: INFORMACIÓN BÁSICA (Sección 13) ── */}
-      <section>
+      {/* ── SECCIÓN 1: INFORMACIÓN BÁSICA ── */}
+      <section className={panel(0)}>
         <SectionTitle numero={1}>Información básica</SectionTitle>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4">
           <FormField
             control={control}
             name="tituloTarea"
             render={({ field }) => (
-              <FormItem className="md:col-span-2">
+              <FormItem>
                 <FormLabel>
                   Título de la tarea <span className="text-red-600">*</span>
                 </FormLabel>
@@ -228,9 +238,39 @@ export function TaskFormFields({
 
           <FormField
             control={control}
+            name="descripcionTarea"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Descripción</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    maxLength={5000}
+                    placeholder="Describe el objetivo, alcance y detalles relevantes de la tarea."
+                    className="min-h-26 resize-y"
+                  />
+                </FormControl>
+                <FormDescription className="text-xs">
+                  Descripción opcional. Incluye la información necesaria para quien la realice.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </section>
+
+      <div className={cn('border-t border-outline-variant/40', porPasos && 'hidden')} />
+
+      {/* ── SECCIÓN 2: PLANIFICACIÓN ── */}
+      <section className={panel(1)}>
+        <SectionTitle numero={2}>Planificación</SectionTitle>
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField
+            control={control}
             name="prioridad"
             render={({ field }) => (
-              <FormItem className="md:col-span-1">
+              <FormItem>
                 <FormLabel>
                   Prioridad <span className="text-red-600">*</span>
                 </FormLabel>
@@ -261,107 +301,120 @@ export function TaskFormFields({
 
           <FormField
             control={control}
-            name="descripcionTarea"
+            name="fechaLimite"
             render={({ field }) => (
-              <FormItem className="md:col-span-2 md:flex md:flex-col">
-                <FormLabel>Descripción</FormLabel>
+              <FormItem>
+                <FormLabel>
+                  Fecha límite <span className="text-red-600">*</span>
+                </FormLabel>
                 <FormControl>
-                  {/* En md+ el textarea crece para llenar la columna, de modo que
-                      su borde inferior quede a la misma altura que el bloque
-                      Fecha/Tiempo de al lado (sin escalón). */}
-                  <Textarea
+                  <Input {...field} type="date" className="h-10" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name="tiempoEstimadoHoras"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tiempo estimado (horas)</FormLabel>
+                <FormControl>
+                  <Input
                     {...field}
-                    maxLength={5000}
-                    placeholder="Describe el objetivo, alcance y detalles relevantes de la tarea."
-                    className="min-h-26 resize-y md:min-h-0 md:flex-1"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={1000}
+                    step={1}
+                    placeholder="Opcional"
+                    className="h-10"
                   />
                 </FormControl>
                 <FormDescription className="text-xs">
-                  Descripción opcional. Incluye la información necesaria para quien la realice.
+                  Horas de dedicación estimadas para la tarea.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          <div className="flex flex-col gap-4 md:col-span-1">
-            <FormField
-              control={control}
-              name="fechaLimite"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Fecha límite <span className="text-red-600">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input {...field} type="date" className="h-10" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <FormField
+            control={control}
+            name="puntosHistoria"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Puntos de historia</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={100}
+                    step={1}
+                    placeholder="Opcional"
+                    className="h-10"
+                  />
+                </FormControl>
+                <FormDescription className="text-xs">
+                  Tamaño relativo del esfuerzo, usado en el burndown y la velocidad del sprint.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-            <FormField
-              control={control}
-              name="tiempoEstimadoHoras"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tiempo estimado (horas)</FormLabel>
+          <FormField
+            control={control}
+            name="idHito"
+            render={({ field }) => (
+              <FormItem className="min-w-0">
+                <FormLabel>
+                  Hito {mode === 'create' && <span className="text-red-600">*</span>}
+                </FormLabel>
+                <Select value={field.value} onValueChange={field.onChange} disabled={sinHitosEnProyecto}>
                   <FormControl>
-                    <Input
-                      {...field}
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={1000}
-                      step={1}
-                      placeholder="Opcional"
-                      className="h-10"
-                    />
+                    <SelectTrigger aria-label="Seleccionar hito" className={SELECT_TRIGGER_CLASS}>
+                      <SelectValue />
+                    </SelectTrigger>
                   </FormControl>
-                  <FormDescription className="text-xs">
-                    Horas de dedicación estimadas para la tarea.
+                  <SelectContent>
+                    {permiteSinHito && <SelectItem value={SIN_HITO}>Sin hito</SelectItem>}
+                    {milestones.map((hito) => (
+                      <SelectItem key={hito.idHito} value={String(hito.idHito)}>
+                        {hito.tituloHito}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {sinHitosEnProyecto ? (
+                  <FormDescription className="text-xs text-red-600 dark:text-red-400">
+                    Este proyecto todavía no tiene hitos. Crea uno primero desde la pestaña «Hitos» para
+                    poder registrar tareas nuevas.
                   </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={control}
-              name="puntosHistoria"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Puntos de historia</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={100}
-                      step={1}
-                      placeholder="Opcional"
-                      className="h-10"
-                    />
-                  </FormControl>
+                ) : (
                   <FormDescription className="text-xs">
-                    Tamaño relativo del esfuerzo, usado en el burndown y la velocidad del sprint.
+                    {mode === 'create'
+                      ? 'Toda tarea nueva necesita un hito para poder entrar al tablero.'
+                      : 'Asocia la tarea a una etapa del proyecto.'}
                   </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+                )}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
       </section>
 
-      <div className="border-t border-outline-variant/40" />
+      <div className={cn('border-t border-outline-variant/40', porPasos && 'hidden')} />
 
-      {/* ── SECCIÓN 2: ORGANIZACIÓN (Sección 20) ── */}
-      <section>
-        <SectionTitle numero={2}>Organización</SectionTitle>
-        <div className="grid gap-3 md:grid-cols-3">
+      {/* ── SECCIÓN 3: ASIGNACIÓN Y ETIQUETAS ── */}
+      <section className={panel(2)}>
+        <SectionTitle numero={3}>Asignación y etiquetas</SectionTitle>
+        <div className="grid gap-3 md:grid-cols-2">
           <FormField
             control={control}
             name="idRolProyecto"
@@ -479,84 +532,39 @@ export function TaskFormFields({
               </FormItem>
             )}
           />
-
+        </div>
+        <div className="mt-4">
           <FormField
             control={control}
-            name="idHito"
+            name="idsEtiquetas"
             render={({ field }) => (
-              <FormItem className="min-w-0">
-                <FormLabel>
-                  Hito {mode === 'create' && <span className="text-red-600">*</span>}
-                </FormLabel>
-                <Select value={field.value} onValueChange={field.onChange} disabled={sinHitosEnProyecto}>
-                  <FormControl>
-                    <SelectTrigger aria-label="Seleccionar hito" className={SELECT_TRIGGER_CLASS}>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {permiteSinHito && <SelectItem value={SIN_HITO}>Sin hito</SelectItem>}
-                    {milestones.map((hito) => (
-                      <SelectItem key={hito.idHito} value={String(hito.idHito)}>
-                        {hito.tituloHito}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {sinHitosEnProyecto ? (
-                  <FormDescription className="text-xs text-red-600 dark:text-red-400">
-                    Este proyecto todavía no tiene hitos. Crea uno primero desde la pestaña «Hitos» para
-                    poder registrar tareas nuevas.
-                  </FormDescription>
-                ) : (
-                  <FormDescription className="text-xs">
-                    {mode === 'create'
-                      ? 'Toda tarea nueva necesita un hito para poder entrar al tablero.'
-                      : 'Asocia la tarea a una etapa del proyecto.'}
-                  </FormDescription>
-                )}
+              <FormItem>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                  <div className="min-w-0 sm:flex-1">
+                    <LabelsControl
+                      labels={labels}
+                      value={field.value as number[]}
+                      onChange={field.onChange}
+                    />
+                  </div>
+                  {onManageLabels && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={onManageLabels}
+                      aria-label="Gestionar etiquetas del proyecto"
+                      className="h-10 shrink-0 gap-1.5 border-outline-variant bg-surface-container-lowest text-sm font-semibold text-on-surface hover:bg-primary/10 max-sm:w-full sm:w-auto"
+                    >
+                      <Tags className="size-4" aria-hidden="true" />
+                      Gestionar etiquetas
+                    </Button>
+                  )}
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-      </section>
-
-      <div className="border-t border-outline-variant/40" />
-
-      {/* ── SECCIÓN 3: ETIQUETAS (Sección 27) ── */}
-      <section>
-        <SectionTitle numero={3}>Etiquetas</SectionTitle>
-        <FormField
-          control={control}
-          name="idsEtiquetas"
-          render={({ field }) => (
-            <FormItem>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                <div className="min-w-0 sm:flex-1">
-                  <LabelsControl
-                    labels={labels}
-                    value={field.value as number[]}
-                    onChange={field.onChange}
-                  />
-                </div>
-                {onManageLabels && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onManageLabels}
-                    aria-label="Gestionar etiquetas del proyecto"
-                    className="h-10 shrink-0 gap-1.5 border-outline-variant bg-surface-container-lowest text-sm font-semibold text-on-surface hover:bg-primary/10 max-sm:w-full sm:w-auto"
-                  >
-                    <Tags className="size-4" aria-hidden="true" />
-                    Gestionar etiquetas
-                  </Button>
-                )}
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
       </section>
     </div>
   );

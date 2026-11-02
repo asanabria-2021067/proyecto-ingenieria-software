@@ -84,6 +84,7 @@ describe('GPI01-C08: selector de proyecto de «Agendar actividad»', () => {
 
   it('con un proyecto elegible el formulario se puede enviar', () => {
     render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={[proyecto(1, 'EN_PROGRESO')]} defaultProjectId={1} />, { wrapper });
+    fireEvent.click(screen.getByRole('button', { name: /^Paso 3 de 3/ }));
     expect(screen.getByRole('button', { name: 'Agendar evento' })).toBeEnabled();
   });
 
@@ -93,6 +94,7 @@ describe('GPI01-C08: selector de proyecto de «Agendar actividad»', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'Ninguno de tus proyectos admite actividades nuevas: los proyectos cerrados son de solo lectura.',
     );
+    fireEvent.click(screen.getByRole('button', { name: /^Paso 3 de 3/ }));
     expect(screen.getByRole('button', { name: 'Agendar evento' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeEnabled();
   });
@@ -100,6 +102,7 @@ describe('GPI01-C08: selector de proyecto de «Agendar actividad»', () => {
   it('sin proyectos tampoco deja enviar', () => {
     render(<EventFormDialog open onOpenChange={vi.fn()} ledProjects={[]} />, { wrapper });
     expect(screen.getByRole('status')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Paso 3 de 3/ }));
     expect(screen.getByRole('button', { name: 'Agendar evento' })).toBeDisabled();
   });
 

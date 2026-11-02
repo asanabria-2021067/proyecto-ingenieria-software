@@ -34,6 +34,9 @@ import {
 import { normalizeUrlInput } from '@/lib/security/safe-url';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { FormStepper } from '@/components/ui/form-stepper';
+import { DraftNotice } from '@/components/ui/draft-notice';
+import { useFormDraft } from '@/hooks/use-form-draft';
 
 // Estados con edición completa (asistente de 3 pasos) vs. edición PARCIAL
 // (subconjunto seguro: proyecto ya publicado / en progreso). El resto no es
@@ -44,12 +47,26 @@ const ALLOWED_EDIT_STATES = [...FULL_EDIT_STATES, ...PARTIAL_EDIT_STATES];
 
 type PasoKey = 'propietario' | 'datos' | 'roles' | 'participantes' | 'resumen';
 const TITULO_PASO: Record<PasoKey, string> = {
-  propietario: '¿A nombre de quién?',
   datos: 'Datos generales',
+  propietario: '¿A nombre de quién?',
   roles: 'Roles y habilidades',
   participantes: 'Participantes de la organización',
-  resumen: 'Resumen',
+  resumen: 'Revisar y enviar',
 };
+
+const FORM_VACIO: FormData = {
+  tituloProyecto: '', descripcionProyecto: '', tipoProyecto: '',
+  modalidadProyecto: '', objetivosProyecto: '', ubicacionProyecto: '',
+  contextoAcademico: '', urlRecursoExterno: '', fechaInicio: '',
+  fechaFinEstimada: '', roles: [],
+};
+
+interface BorradorProyecto {
+  form: FormData;
+  idOrganizacion: number | null;
+  idAsociacion: number | null;
+  participantes: ParticipanteForm[];
+}
 
 function NewProjectFormContent() {
   const router = useRouter();
@@ -69,12 +86,7 @@ function NewProjectFormContent() {
   const [participantes, setParticipantes] = useState<ParticipanteForm[]>([]);
   const orgPreseleccionada = useRef(false);
 
-  const [form, setForm] = useState<FormData>({
-    tituloProyecto: '', descripcionProyecto: '', tipoProyecto: '',
-    modalidadProyecto: '', objetivosProyecto: '', ubicacionProyecto: '',
-    contextoAcademico: '', urlRecursoExterno: '', fechaInicio: '',
-    fechaFinEstimada: '', roles: [],
-  });
+  const [form, setForm] = useState<FormData>(FORM_VACIO);
 
   const { data: carreras = [] } = useQuery<Carrera[]>({ queryKey: ['carreras'], queryFn: getCarreras });
   const { data: habilidades = [] } = useQuery<Habilidad[]>({ queryKey: ['habilidades'], queryFn: getHabilidades });
@@ -86,6 +98,31 @@ function NewProjectFormContent() {
   const asociacionesPublicables = misJuntas.filter(puedePublicarComoAsociacion);
   const { data: orgElegida, isLoading: cargandoOrg } = useOrganizacion(idOrganizacion ?? 0);
   const orgParam = Number(searchParams.get('org')) || null;
+
+  // Borrador automático solo al crear: sobrevive a recargas y se descarta al enviar.
+  const borrador = useFormDraft<BorradorProyecto>({
+    clave: editId === null ? 'proyecto-nuevo' : null,
+    valor: { form, idOrganizacion, idAsociacion, participantes },
+    alRestaurar: (b) => {
+      setForm(b.form);
+      // `?org=` manda sobre el borrador: sus participantes no calzarían con otra organización.
+      if (orgParam === null) {
+        setIdOrganizacion(b.idOrganizacion);
+        setIdAsociacion(b.idAsociacion);
+        setParticipantes(b.participantes);
+      }
+    },
+    alDescartar: () => {
+      setForm(FORM_VACIO);
+      setIdOrganizacion(null);
+      setIdAsociacion(null);
+      setParticipantes([]);
+      setStep(0);
+      setTriedStep1(false);
+      setTriedStep2(false);
+      setTriedParticipantes(false);
+    },
+  });
 
   // `?org=<id>` (desde la página de la organización) llega con la organización ya elegida.
   useEffect(() => {
@@ -153,7 +190,7 @@ function NewProjectFormContent() {
 
   const pasos: PasoKey[] = editId
     ? ['datos', 'roles', 'resumen']
-    : ['propietario', 'datos', 'roles', ...(idOrganizacion !== null ? (['participantes'] as const) : []), 'resumen'];
+    : ['datos', 'propietario', 'roles', ...(idOrganizacion !== null ? (['participantes'] as const) : []), 'resumen'];
   const pasoActual = pasos[Math.min(step, pasos.length - 1)];
   const errorDeParticipantes = idOrganizacion === null ? null : errorParticipantes(form.roles, participantes);
 
@@ -314,6 +351,7 @@ function NewProjectFormContent() {
         router.push('/dashboard/projects/mine');
       } else {
         await createProject({ ...buildDataPayload(), accion });
+        borrador.limpiar();
         await queryClient.invalidateQueries({ queryKey: ['mis-proyectos'] });
         await uvgSwal.fire({
           icon: 'success',
@@ -458,11 +496,18 @@ function NewProjectFormContent() {
           </div>
 
           {/* Barra de progreso */}
-          <div className="flex gap-2 px-8 pb-6">
-            {pasos.map((_, i) => (
-              <button key={i} onClick={() => goTo(i)} className={`h-1.5 flex-1 rounded-full cursor-pointer transition-colors duration-200 ${i <= step ? 'bg-primary' : 'bg-surface-container-highest'}`} />
-            ))}
-          </div>
+          <FormStepper
+            pasos={pasos.map((k) => TITULO_PASO[k])}
+            actual={step}
+            onSeleccionar={goTo}
+            className="px-8 pb-6"
+          />
+
+          {borrador.restaurado && (
+            <div className="px-8 pb-4">
+              <DraftNotice onDescartar={borrador.descartar} />
+            </div>
+          )}
 
           {/* Contenido animado */}
           <div key={step} className={`px-8 pb-6 ${animClass}`}>

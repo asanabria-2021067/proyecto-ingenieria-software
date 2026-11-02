@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { CalendarCheck2, Loader2, Trash2 } from 'lucide-react';
+import { CalendarCheck2, ChevronLeft, ChevronRight, Loader2, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { FormStepper } from '@/components/ui/form-stepper';
+import { cn } from '@/lib/utils';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getApiErrorMessage } from '@/components/projects/api-error';
@@ -45,6 +47,15 @@ export interface LedProjectOption {
   /** GPI01-C08: un proyecto CERRADO se lista deshabilitado; el backend rechaza eventos nuevos en él. */
   estadoProyecto?: string;
 }
+
+const PASOS_CREACION = ['Qué es', 'Cuándo y modalidad', 'Invitados y recordatorio'];
+
+// Campos de cada paso, en el orden en que aparecen: sirven para validar al avanzar y para enfocar el primer error.
+const CAMPOS_POR_PASO: (keyof EventFormValues)[][] = [
+  ['tituloEvento', 'descripcionEvento', 'tipoEvento', 'idProyecto'],
+  ['fecha', 'horaInicio', 'horaFin', 'terminaOtroDia', 'fechaFin', 'modalidad', 'linkSesion', 'ubicacionNombre', 'ubicacionLat', 'ubicacionLng'],
+  ['invitados', 'recordatorioActivo', 'antelacionMinutos'],
+];
 
 function hoyInicioDelDia(): Date {
   const hoy = new Date();
@@ -86,6 +97,9 @@ export function EventFormDialog({
   restaurarFocoEn?: RefObject<HTMLElement | null>;
 }) {
   const isEditing = Boolean(editingEvent);
+  const porPasos = !isEditing;
+  const [paso, setPaso] = useState<0 | 1 | 2>(0);
+  const panel = (n: number) => cn('space-y-4', porPasos && paso !== n && 'hidden');
   const [mostrarDescripcion, setMostrarDescripcion] = useState(false);
   const ubicacionInputRef = useRef<HTMLInputElement>(null);
   const errorServidorRef = useRef<HTMLParagraphElement>(null);
@@ -113,6 +127,7 @@ export function EventFormDialog({
     if (!open) return;
     form.reset(editingEvent ? eventFormFromEvento(editingEvent) : emptyEventForm(defaultProjectId, initialDate));
     setMostrarDescripcion(Boolean(editingEvent?.descripcionEvento));
+    setPaso(0);
     // Solo al abrir: no queremos pisar lo que el usuario está escribiendo en cada render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingEvent?.idEvento]);
@@ -185,6 +200,17 @@ export function EventFormDialog({
     const claves = Object.keys(errores).filter((k) => k !== 'root');
     const soloUbicacion = claves.length > 0 && claves.every((k) => k === 'ubicacionLat' || k === 'ubicacionNombre');
     if (soloUbicacion) ubicacionInputRef.current?.focus();
+    if (!porPasos) return;
+    // Un error en otro paso: se muestra ese paso y se enfoca allí (en un panel oculto no se puede enfocar).
+    const destino = CAMPOS_POR_PASO.findIndex((campos) => campos.some((c) => c in errores));
+    if (destino < 0) return;
+    setPaso(destino as 0 | 1 | 2);
+    const campo = CAMPOS_POR_PASO[destino].find((c) => c in errores);
+    if (campo && !soloUbicacion) setTimeout(() => form.setFocus(campo), 0);
+  };
+
+  const siguiente = async () => {
+    if (await form.trigger(CAMPOS_POR_PASO[paso])) setPaso((p) => (p < 2 ? ((p + 1) as 1 | 2) : p));
   };
 
   const onSubmit = (values: EventFormValues) => {
@@ -216,7 +242,17 @@ export function EventFormDialog({
               descripcion="Programa tutorías, reuniones, revisiones o entregas de tus proyectos."
             />
 
+            {porPasos && (
+              <FormStepper
+                pasos={PASOS_CREACION}
+                actual={paso}
+                onSeleccionar={(i) => setPaso(i as 0 | 1 | 2)}
+                className="shrink-0 px-4 pb-1 sm:px-6"
+              />
+            )}
+
             <div className={EVENT_DIALOG_BODY_CLASS}>
+              <div className={panel(0)}>
               <TituloDescripcionFields
                 isPending={isPending}
                 tituloLabel="Título del evento o actividad"
@@ -304,10 +340,15 @@ export function EventFormDialog({
                 />
               </div>
 
+              </div>
+
+              <div className={panel(1)}>
               <FechaHorarioFields isPending={isPending} disabledBefore={isEditing ? undefined : hoyInicioDelDia()} />
 
               <ModalidadFields isPending={isPending} ubicacionInputRef={ubicacionInputRef} />
+              </div>
 
+              <div className={panel(2)}>
               <FormField
                 control={form.control}
                 name="invitados"
@@ -324,6 +365,7 @@ export function EventFormDialog({
                   </FormItem>
                 )}
               />
+              </div>
 
               {errorServidor && (
                 <p
@@ -338,9 +380,11 @@ export function EventFormDialog({
             </div>
 
             <DialogFooter className={EVENT_DIALOG_FOOTER_CLASS}>
-              <RecordatorioFields isPending={isPending} />
+              <div className={cn(porPasos && paso !== 2 && 'hidden')}>
+                <RecordatorioFields isPending={isPending} />
+              </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2 sm:ml-auto">
                 {isEditing && (
                   <Button
                     type="button"
@@ -366,7 +410,31 @@ export function EventFormDialog({
                 >
                   Cancelar
                 </Button>
+                {porPasos && paso > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={isPending}
+                    onClick={() => setPaso((p) => (p - 1) as 0 | 1)}
+                    className={EVENT_DIALOG_SECONDARY_BUTTON_CLASS}
+                  >
+                    <ChevronLeft className="size-4" aria-hidden="true" />
+                    Anterior
+                  </Button>
+                )}
+                {porPasos && paso < 2 ? (
                 <Button
+                  key="siguiente"
+                  type="button"
+                  onClick={() => void siguiente()}
+                  className={EVENT_DIALOG_PRIMARY_BUTTON_CLASS}
+                >
+                  Siguiente
+                  <ChevronRight className="size-4" aria-hidden="true" />
+                </Button>
+                ) : (
+                <Button
+                  key="enviar"
                   type="submit"
                   disabled={isPending || sinProyectoAgendable}
                   className={EVENT_DIALOG_PRIMARY_BUTTON_CLASS}
@@ -378,6 +446,7 @@ export function EventFormDialog({
                   )}
                   {isEditing ? 'Guardar cambios' : 'Agendar evento'}
                 </Button>
+                )}
               </div>
             </DialogFooter>
           </form>
