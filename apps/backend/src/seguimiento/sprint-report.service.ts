@@ -5,9 +5,9 @@ import { ProjectReadPolicyService } from '../common/project-policy/project-read-
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { SprintsContextService } from '../sprints/sprints-context.service';
+import { iso } from './seguimiento.util';
 import { buildSprintReportCsv, renderSprintReportPdf, type ModeloReporteSprint } from './sprint-report.builder';
 
-const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 const redondear = (n: number) => Math.round(n * 100) / 100;
 
 /**

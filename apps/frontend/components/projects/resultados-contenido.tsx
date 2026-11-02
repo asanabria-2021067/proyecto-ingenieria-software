@@ -13,15 +13,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tag } from '@/components/ui/tag';
+import { fecha } from '@/lib/utils';
 import { TIPO_LABEL } from '@/types';
 import type { TipoProyecto } from '@/types';
 import type { ResultadosProyectoDTO } from '@/lib/services/seguimiento';
-
-function fecha(iso: string | null): string {
-  if (!iso) return 'Sin fecha';
-  const [anio, mes, dia] = iso.split('-');
-  return `${dia}/${mes}/${anio}`;
-}
 
 function Seccion({ icon: Icon, titulo, children }: { icon: typeof Users; titulo: string; children: React.ReactNode }) {
   return (

@@ -6,6 +6,7 @@ import { useSeguimientoProyecto } from '@/hooks/use-seguimiento';
 import { Button } from '@/components/ui/button';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Tag, type TagTone } from '@/components/ui/tag';
+import { fecha } from '@/lib/utils';
 import type { ColorSemaforo, SeguimientoProyectoDTO } from '@/lib/services/seguimiento';
 
 const SEMAFORO: Record<ColorSemaforo, { tone: TagTone; etiqueta: string; dot: string }> = {
@@ -13,11 +14,6 @@ const SEMAFORO: Record<ColorSemaforo, { tone: TagTone; etiqueta: string; dot: st
   AMARILLO: { tone: 'amber', etiqueta: 'Requiere atención', dot: 'bg-amber-500 dark:bg-amber-400' },
   ROJO: { tone: 'red', etiqueta: 'En riesgo', dot: 'bg-red-600 dark:bg-red-400' },
 };
-
-function fechaCorta(iso: string): string {
-  const [anio, mes, dia] = iso.split('-');
-  return `${dia}/${mes}/${anio}`;
-}
 
 /** Contenido de la tarjeta, separado del hook para poder probarlo sin red. */
 export function ProjectHealthContent({ seguimiento, idProyecto, esLider }: { seguimiento: SeguimientoProyectoDTO; idProyecto: number; esLider: boolean }) {
@@ -62,7 +58,7 @@ export function ProjectHealthContent({ seguimiento, idProyecto, esLider }: { seg
               <li key={hito.idHito} className="flex flex-wrap items-center justify-between gap-tight type-body">
                 <span className="min-w-0 font-medium text-text-primary">{hito.tituloHito}</span>
                 <span className="text-text-secondary">
-                  Venció el {fechaCorta(hito.fechaLimite)} ({hito.diasAtraso} {hito.diasAtraso === 1 ? 'día' : 'días'} de atraso)
+                  Venció el {fecha(hito.fechaLimite)} ({hito.diasAtraso} {hito.diasAtraso === 1 ? 'día' : 'días'} de atraso)
                 </span>
               </li>
             ))}

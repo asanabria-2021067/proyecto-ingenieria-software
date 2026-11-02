@@ -12,3 +12,6 @@ export function hoyGuatemala(ahora: Date = new Date()): Date {
 export function diasEntre(desde: Date, hasta: Date): number {
   return Math.round((hasta.getTime() - desde.getTime()) / UN_DIA_MS);
 }
+
+/** Fecha como `YYYY-MM-DD` (UTC). */
+export const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);

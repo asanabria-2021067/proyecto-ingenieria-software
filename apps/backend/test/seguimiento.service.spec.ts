@@ -94,6 +94,30 @@ describe('SeguimientoService.obtener (MEJ-54/55)', () => {
   });
 });
 
+function datosResultados(prisma: object) {
+  Object.assign(prisma, {
+    proyecto: {
+      findUniqueOrThrow: vi.fn().mockResolvedValue({
+        idProyecto: 5,
+        tituloProyecto: 'Feria',
+        descripcionProyecto: '',
+        tipoProyecto: 'ACADEMICO_HORAS_BECA',
+        fechaInicio: null,
+        fechaFinEstimada: null,
+        creador: { idUsuario: 1, nombre: 'A', apellido: 'B' },
+        asociacion: null,
+        organizaciones: [],
+      }),
+    },
+    participacionProyecto: {
+      findMany: vi.fn().mockResolvedValue([{ idUsuario: 2, usuario: { nombre: 'C', apellido: 'D' }, rolProyecto: { nombreRol: 'Dev' } }]),
+    },
+    horasParticipacion: { findMany: vi.fn().mockResolvedValue([{ horasAprobadas: '12', participacion: { idUsuario: 2 } }]) },
+    reconocimientoCompanero: { count: vi.fn().mockResolvedValue(0) },
+    revisionCierreProyecto: { findMany: vi.fn().mockResolvedValue([]) },
+  });
+}
+
 describe('SeguimientoService.resultados (MEJ-56)', () => {
   it('solo existe para proyectos cerrados', async () => {
     const { service } = build('LIDER', 'EN_PROGRESO');
@@ -101,7 +125,8 @@ describe('SeguimientoService.resultados (MEJ-56)', () => {
   });
 
   it('propaga el 403 de la política de lectura', async () => {
-    const { readPolicy, service } = build();
+    const { prisma, readPolicy, service } = build();
+    Object.assign(prisma, { proyecto: { findFirst: vi.fn().mockResolvedValue(null) } });
     readPolicy.assertRead.mockRejectedValue(new ForbiddenException('No tienes acceso'));
     await expect(service.resultados(5, 9)).rejects.toBeInstanceOf(ForbiddenException);
   });
@@ -112,30 +137,56 @@ describe('SeguimientoService.resultados (MEJ-56)', () => {
     ['EXTERNO', null],
   ])('%s ve horas acreditadas: %s', async (perfil, horas) => {
     const { prisma, service } = build(perfil, 'CERRADO');
-    Object.assign(prisma, {
-      proyecto: {
-        findUniqueOrThrow: vi.fn().mockResolvedValue({
-          idProyecto: 5,
-          tituloProyecto: 'Feria',
-          descripcionProyecto: '',
-          tipoProyecto: 'ACADEMICO_HORAS_BECA',
-          fechaInicio: null,
-          fechaFinEstimada: null,
-          creador: { idUsuario: 1, nombre: 'A', apellido: 'B' },
-          asociacion: null,
-          organizaciones: [],
-        }),
-      },
-      participacionProyecto: {
-        findMany: vi.fn().mockResolvedValue([{ idUsuario: 2, usuario: { nombre: 'C', apellido: 'D' }, rolProyecto: { nombreRol: 'Dev' } }]),
-      },
-      horasParticipacion: { findMany: vi.fn().mockResolvedValue([{ horasAprobadas: '12', participacion: { idUsuario: 2 } }]) },
-      reconocimientoCompanero: { count: vi.fn().mockResolvedValue(0) },
-      revisionCierreProyecto: { findMany: vi.fn().mockResolvedValue([]) },
-    });
+    datosResultados(prisma);
     const r = await service.resultados(5, 9);
     expect(r.metricas.horasAcreditadas).toBe(horas);
     expect(r.equipo).toHaveLength(horas === null ? 0 : 1);
+  });
+
+  it.each(['PARTICIPANTE_HISTORICO', 'MIEMBRO_ORGANIZACION'])(
+    'quien participó ve horas y equipo en un proyecto cerrado aunque su perfil sea %s',
+    async (perfil) => {
+      const { prisma, service } = build(perfil, 'CERRADO');
+      datosResultados(prisma);
+      const r = await service.resultados(5, 2); // idUsuario 2 consta con participación COMPLETADO
+      expect(r.metricas.horasAcreditadas).toBe(12);
+      expect(r.equipo).toHaveLength(1);
+    },
+  );
+
+  describe('lectores del portafolio que la política de lectura niega', () => {
+    function conPolitica403(junta: object | null, org: object | null = null) {
+      const { prisma, readPolicy, service } = build('EXTERNO', 'CERRADO');
+      datosResultados(prisma);
+      readPolicy.assertRead.mockRejectedValue(new ForbiddenException('No tienes acceso'));
+      Object.assign(prisma, {
+        proyecto: {
+          ...(prisma as unknown as { proyecto: object }).proyecto,
+          findFirst: vi.fn().mockResolvedValue({ estadoProyecto: 'CERRADO', idAsociacion: 3, organizaciones: [{ idOrganizacion: 4 }] }),
+        },
+        juntaAsociacion: { findUnique: vi.fn().mockResolvedValue(junta) },
+        organizacion: { findUnique: vi.fn().mockResolvedValue(org) },
+        usuarioOrganizacion: { findUnique: vi.fn().mockResolvedValue(null) },
+      });
+      return service;
+    }
+
+    it('la junta de la asociación dueña abre los resultados sin horas ni equipo', async () => {
+      const service = conPolitica403({ asociacion: { archivada: false } });
+      const r = await service.resultados(5, 9);
+      expect(r.metricas.horasAcreditadas).toBeNull();
+      expect(r.equipo).toEqual([]);
+    });
+
+    it('quien ve la organización dueña (pública) abre los resultados', async () => {
+      const service = conPolitica403(null, { idOrganizacion: 4, nombreOrganizacion: 'O', estadoOrganizacion: 'ACTIVA', visibilidad: 'PUBLICA' });
+      await expect(service.resultados(5, 9)).resolves.toMatchObject({ equipo: [] });
+    });
+
+    it('quien no es de la junta ni ve la organización sigue con 403', async () => {
+      const service = conPolitica403(null, { idOrganizacion: 4, nombreOrganizacion: 'O', estadoOrganizacion: 'ACTIVA', visibilidad: 'PRIVADA' });
+      await expect(service.resultados(5, 9)).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 });
 

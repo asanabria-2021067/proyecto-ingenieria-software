@@ -7,15 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Tag } from '@/components/ui/tag';
+import { fecha } from '@/lib/utils';
 import { TIPO_LABEL } from '@/types';
 import type { TipoProyecto } from '@/types';
 import type { ProyectoCerradoResumenDTO } from '@/lib/services/seguimiento';
-
-function fecha(iso: string | null): string {
-  if (!iso) return 'Sin fecha';
-  const [anio, mes, dia] = iso.split('-');
-  return `${dia}/${mes}/${anio}`;
-}
 
 export function formatearHoras(horas: number): string {
   return `${horas.toLocaleString('es-GT', { maximumFractionDigits: 2 })} h`;

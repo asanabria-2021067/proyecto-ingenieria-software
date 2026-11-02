@@ -5,7 +5,8 @@ import { ProjectReadPolicyService } from '../common/project-policy/project-read-
 import { calcularProgresoHito } from '../common/hito-progreso';
 import { ROLES_GESTION, cargarContexto, assertVisible } from '../organizations/organization-access';
 import { AYUDA_SEMAFORO, DIAS_HITO_PROXIMO, calcularSemaforo, type ResultadoSemaforo } from './semaforo';
-import { UN_DIA_MS, diasEntre, hoyGuatemala } from './seguimiento.util';
+import { UN_DIA_MS, diasEntre, hoyGuatemala, iso } from './seguimiento.util';
+import { membresiaJunta } from '../associations/junta-access';
 
 export interface HitoAtrasado {
   idHito: number;
@@ -31,7 +32,6 @@ export interface ResumenProyectoCerrado {
 }
 
 const PERFILES_EQUIPO: string[] = ['LIDER', 'ADMIN', 'PARTICIPANTE_ACTIVO'];
-const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 const aNumero = (v: unknown) => Math.round(Number(v ?? 0) * 100) / 100;
 
 /**
@@ -117,14 +117,40 @@ export class SeguimientoService {
     return { semaforo: { ...semaforo, ayuda: AYUDA_SEMAFORO }, hitosAtrasados };
   }
 
+  /**
+   * Lectura de resultados: la política de lectura y, si la niega, los mismos visores del portafolio que enlaza
+   * a esta página (junta de la asociación dueña y quien ve una organización dueña).
+   */
+  private async leerResultados(projectId: number, actorId: number) {
+    try {
+      return await this.readPolicy.assertRead(undefined, { projectId, actorId, scope: 'resumen' });
+    } catch (e) {
+      if (!(e instanceof ForbiddenException)) throw e;
+      const p = await this.prisma.proyecto.findFirst({
+        where: { idProyecto: projectId, eliminadoEn: null },
+        select: { estadoProyecto: true, idAsociacion: true, organizaciones: { select: { idOrganizacion: true } } },
+      });
+      if (!p) throw e;
+      const junta = p.idAsociacion ? await membresiaJunta(this.prisma, p.idAsociacion, actorId) : null;
+      if (junta && !junta.asociacion.archivada) return { profile: 'EXTERNO', project: p };
+      for (const { idOrganizacion } of p.organizaciones) {
+        try {
+          assertVisible(await cargarContexto(this.prisma, actorId, idOrganizacion));
+          return { profile: 'EXTERNO', project: p };
+        } catch {
+          // esta organización no es visible para el actor; prueba la siguiente
+        }
+      }
+      throw e;
+    }
+  }
+
   /** MEJ-56: página de resultados de un proyecto CERRADO. */
   async resultados(projectId: number, actorId: number) {
-    const decision = await this.readPolicy.assertRead(undefined, { projectId, actorId, scope: 'resumen' });
+    const decision = await this.leerResultados(projectId, actorId);
     if (decision.project.estadoProyecto !== EstadoProyecto.CERRADO) {
       throw new BadRequestException('Los resultados se publican cuando el proyecto está cerrado');
     }
-    // Horas e integrantes con nombre: solo el equipo (ORG-8: el miembro de la organización y el externo no ven horas).
-    const verEquipo = PERFILES_EQUIPO.includes(decision.profile);
 
     const [proyecto, tareas, hitos, sprints, participaciones, horas, reconocimientos, [cierre]] = await Promise.all([
       this.prisma.proyecto.findUniqueOrThrow({
@@ -180,6 +206,10 @@ export class SeguimientoService {
         select: { resueltaEn: true },
       }),
     ]);
+
+    // Horas e integrantes con nombre: solo quien trabajó en el proyecto. Al cerrar, la participación pasa a COMPLETADO
+    // y el perfil queda como histórico o de organización, así que se decide por la participación propia.
+    const verEquipo = PERFILES_EQUIPO.includes(decision.profile) || participaciones.some((p) => p.idUsuario === actorId);
 
     const horasPorUsuario = new Map<number, number>();
     for (const h of horas) {
