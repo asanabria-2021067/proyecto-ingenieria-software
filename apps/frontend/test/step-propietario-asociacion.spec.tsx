@@ -13,7 +13,7 @@ afterEach(cleanup);
 describe('ASO: «¿A nombre de quién?» con asociación', () => {
   it('ofrece «a nombre de la asociación» a quien puede publicar', () => {
     render(<StepPropietario organizaciones={[]} cargando={false} idOrganizacion={null} onChange={vi.fn()} asociaciones={juntas} />);
-    expect(screen.getByRole('radio', { name: /A nombre de la asociación AEC/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /A nombre de AEC/ })).toBeInTheDocument();
     expect(screen.getByText(/Tu cargo: Presidente/)).toBeInTheDocument();
   });
 
@@ -36,7 +36,7 @@ describe('ASO: «¿A nombre de quién?» con asociación', () => {
         onChangeAsociacion={onChangeAsociacion}
       />,
     );
-    fireEvent.click(screen.getByRole('radio', { name: /A nombre de la asociación AEC/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /A nombre de AEC/ }));
     expect(onChangeAsociacion).toHaveBeenCalledWith(7);
 
     cleanup();
@@ -51,7 +51,7 @@ describe('ASO: «¿A nombre de quién?» con asociación', () => {
         onChangeAsociacion={onChangeAsociacion}
       />,
     );
-    expect(screen.getByRole('radio', { name: /A nombre de la asociación AEC/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /A nombre de AEC/ })).toBeChecked();
     fireEvent.click(screen.getByRole('radio', { name: /Personal/ }));
     expect(onChange).toHaveBeenCalledWith(null);
   });

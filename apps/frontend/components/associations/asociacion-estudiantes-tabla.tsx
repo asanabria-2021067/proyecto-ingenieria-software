@@ -62,7 +62,14 @@ export function AsociacionEstudiantesTabla({ filas, tipo }: { filas: FilaEstudia
               </TableCell>
               {tipo !== 'EXTENSION' && (
                 <TableCell className={TD}>
-                  <Horas meta={f.metaBeca} declaradas={f.becaDeclarada} acreditadas={f.becaAcreditada} falta={f.faltaBeca} />
+                  <Horas
+                    meta={f.metaBeca}
+                    declaradas={f.becaDeclarada}
+                    acreditadas={f.becaAcreditada}
+                    falta={f.faltaBeca}
+                    tipo="beca"
+                    sinMetas={f.metaBeca === null && f.metaExtension === null}
+                  />
                 </TableCell>
               )}
               {tipo !== 'BECA' && (
@@ -72,6 +79,8 @@ export function AsociacionEstudiantesTabla({ filas, tipo }: { filas: FilaEstudia
                     declaradas={f.extensionDeclarada}
                     acreditadas={f.extensionAcreditada}
                     falta={f.faltaExtension}
+                    tipo="extensión"
+                    sinMetas={f.metaBeca === null && f.metaExtension === null}
                   />
                 </TableCell>
               )}

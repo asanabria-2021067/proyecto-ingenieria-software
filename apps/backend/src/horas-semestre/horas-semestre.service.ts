@@ -13,6 +13,7 @@ import {
   semestreDeAnioPeriodo,
   type Semestre,
 } from './semestre';
+import { compararEstudiantes } from './orden-estudiantes';
 
 interface Acreditadas {
   beca: number;
@@ -52,8 +53,7 @@ export interface FiltroCentral extends HorasCentralListQueryDto {
 
 const ESTADOS_ACTIVOS = ['PUBLICADO', 'EN_PROGRESO', 'EN_SOLICITUD_CIERRE'] as const;
 
-const LOTE_EN_RIESGO = 200;
-const LOTE_REPORTE = 100;
+const LOTE = 200;
 
 /** Instante UTC del inicio de un dia de Guatemala (UTC-6, sin horario de verano). */
 export const inicioDeDia = (dia: string) => new Date(`${dia}T06:00:00Z`);
@@ -286,8 +286,7 @@ export class HorasSemestreService {
   }
 
   /**
-   * Pagina con cursor (idUsuario) de los estudiantes activos con sus horas del semestre.
-   * `enRiesgo` se evalua despues de calcular, asi que recorre lotes hasta llenar la pagina.
+   * Pagina con cursor de los estudiantes activos con sus horas del semestre (ver `paginaCentral`).
    */
   async listarCentral(idActor: number, q: HorasCentralListQueryDto) {
     await this.requireAdmin(idActor);
@@ -320,16 +319,15 @@ export class HorasSemestreService {
     return mapa;
   }
 
-  async paginaCentral(q: FiltroCentral) {
+  /** Todos los estudiantes que cumplen el filtro, ya ordenados (riesgo, avance, sin metas) y sin proyectos. */
+  private async filasOrdenadas(q: FiltroCentral) {
     const semestre = this.semestreDeQuery(q);
     const hoy = todayInGuatemala();
-    const limit = q.limit ?? 50;
-    const lote = q.enRiesgo ? LOTE_EN_RIESGO : limit + 1;
     const filas: FilaHorasCentral[] = [];
-    let cursor = q.cursor ?? 0;
+    let cursor = 0;
     const terminos = (q.busqueda ?? '').trim().split(/\s+/).filter(Boolean);
 
-    while (filas.length <= limit) {
+    for (;;) {
       const usuarios = await this.prisma.usuario.findMany({
         where: {
           idUsuario: { gt: cursor },
@@ -353,7 +351,7 @@ export class HorasSemestreService {
           },
         },
         orderBy: { idUsuario: 'asc' },
-        take: lote,
+        take: LOTE,
         select: {
           idUsuario: true,
           nombre: true,
@@ -363,7 +361,6 @@ export class HorasSemestreService {
         },
       });
       const acreditadas = await this.acreditadasPorUsuario(semestre, usuarios.map((u) => u.idUsuario));
-      const proyectos = q.conProyectos ? await this.proyectosActivosPorUsuario(usuarios.map((u) => u.idUsuario)) : null;
       for (const u of usuarios) {
         cursor = u.idUsuario;
         const r = u.registrosHorasSemestre[0];
@@ -391,17 +388,34 @@ export class HorasSemestreService {
           extensionAcreditada: acred.extension,
           faltaExtension: falta(r?.metaExtension ?? null, avanceExt),
           enRiesgo,
-          ...(proyectos && { proyectosActivos: proyectos.get(u.idUsuario)?.size ?? 0 }),
         });
-        if (filas.length > limit) break;
       }
-      if (usuarios.length < lote) break;
+      if (usuarios.length < LOTE) break;
     }
 
-    // La fila limit+1 solo confirma que hay pagina siguiente; no se entrega.
-    const hayMas = filas.length > limit;
-    const pagina = filas.slice(0, limit);
-    return { semestre, filas: pagina, siguienteCursor: hayMas ? pagina[pagina.length - 1].idUsuario : null };
+    // ponytail: el orden por avance exige ordenar todo el conjunto en memoria; barato con miles de
+    // estudiantes activos, si crece se materializa el avance en una columna ordenable.
+    return { semestre, filas: filas.sort(compararEstudiantes(q.tipo)) };
+  }
+
+  private async conProyectos(filas: FilaHorasCentral[], q: FiltroCentral) {
+    if (!q.conProyectos) return filas;
+    const proyectos = await this.proyectosActivosPorUsuario(filas.map((f) => f.idUsuario));
+    return filas.map((f) => ({ ...f, proyectosActivos: proyectos.get(f.idUsuario)?.size ?? 0 }));
+  }
+
+  /**
+   * Pagina con cursor (idUsuario de la ultima fila entregada) sobre el orden compuesto: en riesgo,
+   * menor a mayor avance, sin metas. El orden es total (desempata por idUsuario), asi el cursor es estable.
+   */
+  async paginaCentral(q: FiltroCentral) {
+    const limit = q.limit ?? 50;
+    const { semestre, filas } = await this.filasOrdenadas(q);
+    const inicio = q.cursor ? filas.findIndex((f) => f.idUsuario === q.cursor) + 1 : 0;
+    // cursor desconocido (la fila ya no cumple el filtro): fin de lista en vez de reiniciar
+    const resto = q.cursor && inicio === 0 ? [] : filas.slice(inicio);
+    const pagina = await this.conProyectos(resto.slice(0, limit), q);
+    return { semestre, filas: pagina, siguienteCursor: resto.length > limit ? pagina[pagina.length - 1].idUsuario : null };
   }
 
   /** Todas las filas que cumplen el filtro (totales y reportes). */
@@ -412,16 +426,8 @@ export class HorasSemestreService {
 
   /** Igual que `todasLasFilas` sin verificar al actor: el llamador ya autorizo (junta de la asociacion). */
   async recorrerTodas(q: FiltroCentral) {
-    const filas: FilaHorasCentral[] = [];
-    let cursor: number | undefined;
-    let semestre!: Semestre;
-    do {
-      const pagina = await this.paginaCentral({ ...q, cursor, limit: LOTE_REPORTE });
-      semestre = pagina.semestre;
-      filas.push(...pagina.filas);
-      cursor = pagina.siguienteCursor ?? undefined;
-    } while (cursor !== undefined);
-    return { semestre, filas };
+    const { semestre, filas } = await this.filasOrdenadas(q);
+    return { semestre, filas: await this.conProyectos(filas, q) };
   }
 
   /** MEJ-72: los ultimos `cantidad` semestres (el mas reciente primero) con las horas de todos los estudiantes. */
