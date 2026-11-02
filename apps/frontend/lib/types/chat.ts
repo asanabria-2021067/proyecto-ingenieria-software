@@ -108,7 +108,6 @@ export interface ChatTarjetaEnlace {
   titulo?: string;
   estado?: string;
   proyecto?: string;
-  fechaLimite?: string | null;
 }
 
 export interface ChatArchivo extends ChatAdjunto {

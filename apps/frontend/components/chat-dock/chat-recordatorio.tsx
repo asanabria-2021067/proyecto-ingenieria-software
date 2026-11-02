@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useCreateReminder } from '@/hooks/use-chat-extras';
+import { contenidoAEditable } from '@/lib/mentions/mention-tokens';
 import {
   aInputLocal,
   errorFechaRecordatorio,
@@ -86,7 +87,7 @@ export function RecordatorioDialog({ open, onOpenChange, idProyecto, idConversac
           {mensaje && (
             <p className="line-clamp-2 rounded-md bg-surface-container px-2 py-1.5 text-xs text-on-surface-variant">
               <span className="font-semibold">{mensaje.remitente.nombre}: </span>
-              {mensaje.contenido || 'Mensaje con adjunto'}
+              {contenidoAEditable(mensaje.contenido).texto || 'Mensaje con adjunto'}
             </p>
           )}
           {opciones.map((o) => (

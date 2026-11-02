@@ -35,13 +35,12 @@ describe('ChatTarjetasService (MEJ-45)', () => {
     prisma.tarea.findFirst.mockResolvedValue({
       tituloTarea: 'Diseñar logo',
       estadoTarea: 'EN_PROGRESO',
-      fechaLimite: new Date('2026-12-01T00:00:00Z'),
       proyecto: { tituloProyecto: 'Feria', creadoPor: 9, eliminadoEn: null },
     });
     prisma.participacionProyecto.findFirst.mockResolvedValueOnce({ idParticipacion: 1 });
     const ruta = '/dashboard/projects/4/kanban/tasks/8';
     const [visible] = await service.resolver(1, 2, 3, [ruta]);
-    expect(visible).toMatchObject({ accesible: true, titulo: 'Diseñar logo', proyecto: 'Feria', fechaLimite: '2026-12-01' });
+    expect(visible).toMatchObject({ accesible: true, titulo: 'Diseñar logo', proyecto: 'Feria' });
 
     const [oculta] = await service.resolver(1, 2, 3, [ruta]);
     expect(oculta).toEqual({ ruta, tipo: 'TAREA', accesible: false });

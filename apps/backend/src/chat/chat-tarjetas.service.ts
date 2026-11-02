@@ -13,7 +13,6 @@ export interface TarjetaEnlace {
   estado?: string;
   /** Tarea: titulo del proyecto. Proyecto: tipo de horas/modalidad no se expone. */
   proyecto?: string;
-  fechaLimite?: string | null;
 }
 
 /**
@@ -72,7 +71,6 @@ export class ChatTarjetasService {
       select: {
         tituloTarea: true,
         estadoTarea: true,
-        fechaLimite: true,
         proyecto: { select: { tituloProyecto: true, creadoPor: true, eliminadoEn: true } },
       },
     });
@@ -86,7 +84,6 @@ export class ChatTarjetasService {
       titulo: tarea.tituloTarea,
       estado: tarea.estadoTarea,
       proyecto: tarea.proyecto.tituloProyecto,
-      fechaLimite: tarea.fechaLimite ? tarea.fechaLimite.toISOString().slice(0, 10) : null,
     };
   }
 }

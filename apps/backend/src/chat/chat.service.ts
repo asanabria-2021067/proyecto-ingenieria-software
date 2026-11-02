@@ -20,6 +20,7 @@ import { UpdateNoMolestarDto } from './dto/update-no-molestar.dto';
 import { UpdateChatThemeDto } from './dto/update-chat-theme.dto';
 import { ESTADO_CHAT_SELECT, estadoVigente } from './chat-estado.service';
 import { prepararMencionesChat } from './chat-menciones';
+import { normalizarMenciones } from '../comentarios/menciones/menciones.parser';
 import { NotificationsService } from '../notifications/notifications.service';
 
 /**
@@ -102,8 +103,7 @@ export function conResumenDeCita<
   const { citado, ...resto } = mensaje;
   if (!citado) return { ...resto, citado: null };
   // MEJ-44: el token `@[Nombre](id)` se muestra como `@Nombre`.
-  const texto = ocultarEliminado(citado)
-    .contenido.replace(/@\[([^[\]()\n]{1,120})\]\([1-9]\d{0,8}\)/g, '@$1')
+  const texto = normalizarMenciones(ocultarEliminado(citado).contenido, new Set())
     .replace(/\s+/g, ' ')
     .trim();
   const extracto = texto.length > EXTRACTO_CITA_MAX ? `${texto.slice(0, EXTRACTO_CITA_MAX)}…` : texto;

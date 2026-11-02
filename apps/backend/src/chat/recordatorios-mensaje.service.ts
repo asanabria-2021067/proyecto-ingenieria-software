@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EstadoMensajeProgramado } from '@prisma/client';
+import { normalizarMenciones } from '../comentarios/menciones/menciones.parser';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatService } from './chat.service';
@@ -121,7 +122,7 @@ export class RecordatoriosMensajeService {
           });
           continue;
         }
-        const texto = m.contenido.replace(/@\[([^[\]()\n]{1,120})\]\([1-9]\d{0,8}\)/g, '@$1').trim() || 'Mensaje con adjunto';
+        const texto = normalizarMenciones(m.contenido, new Set()).trim() || 'Mensaje con adjunto';
         await this.notifications.notifyFromTemplate([r.idUsuario], 'RECORDATORIO_MENSAJE', {
           autorNombre: `${m.remitente.nombre} ${m.remitente.apellido}`,
           extracto: texto.length > MAX_EXTRACTO ? `${texto.slice(0, MAX_EXTRACTO - 1)}…` : texto,
