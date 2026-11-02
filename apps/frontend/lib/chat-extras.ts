@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { contenidoAEditable } from '@/lib/mentions/mention-tokens';
 import type { ChatEncuesta, ChatMensaje } from '@/lib/types/chat';
 
 /** Misma raíz que las claves de mensajes: el socket global actualiza por `idConversacion` (idProyecto 0 = organización). */
@@ -70,5 +71,5 @@ export function resumenMensaje(m: Pick<ChatMensaje, 'contenido' | 'adjunto' | 'e
   if (m.encuesta) return `Encuesta: ${m.encuesta.pregunta}`;
   if (m.adjunto?.duracionSegundos) return `Nota de voz (${formatearDuracion(m.adjunto.duracionSegundos)})`;
   if (m.adjunto) return m.contenido.trim() || m.adjunto.nombreOriginal;
-  return m.contenido.replace(/\s+/g, ' ').trim();
+  return contenidoAEditable(m.contenido).texto.replace(/\s+/g, ' ').trim();
 }

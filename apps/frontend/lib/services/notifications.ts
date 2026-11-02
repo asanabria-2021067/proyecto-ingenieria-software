@@ -172,6 +172,14 @@ export function getNotificationLink(n: {
       const id = Number(datos.organizationId);
       return Number.isInteger(id) && id > 0 ? `/dashboard/organizaciones/${id}` : '/dashboard/organizaciones';
     }
+    // MEJ-44/46: abre la conversacion y salta al mensaje; los ids se validan como enteros positivos.
+    case 'MENCION_CHAT':
+    case 'RECORDATORIO_MENSAJE': {
+      const conversacion = Number(datos.idConversacion);
+      const mensaje = Number(datos.idMensaje);
+      if (!Number.isInteger(conversacion) || conversacion <= 0) return null;
+      return `/dashboard/mensajes/${conversacion}${Number.isInteger(mensaje) && mensaje > 0 ? `?mensaje=${mensaje}` : ''}`;
+    }
     case 'SOLICITUD_RECUPERACION_CONTRASENA':
       return '/dashboard/admin/solicitudes-recuperacion';
     // G05 (OWASP25-C038): alerta de ráfaga de accesos fallidos/bloqueos; el

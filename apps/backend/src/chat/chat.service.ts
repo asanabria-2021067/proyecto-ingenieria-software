@@ -101,7 +101,11 @@ export function conResumenDeCita<
 ) {
   const { citado, ...resto } = mensaje;
   if (!citado) return { ...resto, citado: null };
-  const texto = ocultarEliminado(citado).contenido.replace(/\s+/g, ' ').trim();
+  // MEJ-44: el token `@[Nombre](id)` se muestra como `@Nombre`.
+  const texto = ocultarEliminado(citado)
+    .contenido.replace(/@\[([^[\]()\n]{1,120})\]\([1-9]\d{0,8}\)/g, '@$1')
+    .replace(/\s+/g, ' ')
+    .trim();
   const extracto = texto.length > EXTRACTO_CITA_MAX ? `${texto.slice(0, EXTRACTO_CITA_MAX)}…` : texto;
   return {
     ...resto,

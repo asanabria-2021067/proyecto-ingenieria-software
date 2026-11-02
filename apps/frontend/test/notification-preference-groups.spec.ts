@@ -18,7 +18,7 @@ const backend = (ruta: string) => readFileSync(join(__dirname, '../../backend', 
 
 /** Valores de `enum TipoNotificacion`, en el orden del schema. */
 const TIPOS_BACKEND = (() => {
-  const schema = backend('prisma/schema.prisma');
+  const schema = backend('prisma/schema.prisma').replace(/\r\n/g, '\n');
   const cuerpo = schema.slice(schema.indexOf('enum TipoNotificacion {'));
   return cuerpo
     .slice(cuerpo.indexOf('{') + 1, cuerpo.indexOf('}'))
@@ -68,11 +68,13 @@ describe('FG03-C01: contrato existente de preferencias (backend sin cambios)', (
     }
   });
 
-  it('no existe un tipo de notificación de chat', () => {
-    expect(TIPOS_BACKEND.filter((tipo) => /CHAT|MENSAJE_DIRECTO|MENSAJE_CHAT/.test(tipo))).toEqual([]);
-    // El chat no crea notificaciones: no usa el servicio ni el enum.
-    const chat = backend('src/chat/chat.service.ts') + backend('src/chat/chat.gateway.ts');
-    expect(chat).not.toMatch(/TipoNotificacion|createNotification|notificationsService/i);
+  it('el único tipo de notificación de chat es la mención (MEJ-44)', () => {
+    expect(TIPOS_BACKEND.filter((tipo) => /CHAT|MENSAJE_DIRECTO|MENSAJE_CHAT/.test(tipo))).toEqual(['MENCION_CHAT']);
+    // El gateway no crea notificaciones; el servicio solo emite la plantilla de mención.
+    expect(backend('src/chat/chat.gateway.ts')).not.toMatch(/TipoNotificacion|createNotification|notificationsService/i);
+    const servicioChat = backend('src/chat/chat.service.ts');
+    expect(servicioChat.match(/notifyFromTemplate\(/g)).toHaveLength(1);
+    expect(servicioChat).toContain("'MENCION_CHAT'");
   });
 });
 

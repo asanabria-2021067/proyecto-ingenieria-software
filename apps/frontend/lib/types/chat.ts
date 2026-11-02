@@ -100,6 +100,17 @@ export interface ChatMensaje {
   guardado?: boolean;
 }
 
+/** MEJ-45: tarjeta de un enlace interno; `accesible: false` = sin permiso o inexistente (sin datos). */
+export interface ChatTarjetaEnlace {
+  ruta: string;
+  tipo: 'PROYECTO' | 'TAREA';
+  accesible: boolean;
+  titulo?: string;
+  estado?: string;
+  proyecto?: string;
+  fechaLimite?: string | null;
+}
+
 export interface ChatArchivo extends ChatAdjunto {
   idMensaje: number;
   creadoEn: string;

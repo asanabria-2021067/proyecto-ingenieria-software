@@ -1,5 +1,5 @@
 import { apiFetch, apiFetchBlob } from '@/lib/api/client';
-import type { ChatEncuesta, ChatMensaje, CrearEncuestaPayload } from '@/lib/types/chat';
+import type { ChatEncuesta, ChatMensaje, ChatTarjetaEnlace, CrearEncuestaPayload } from '@/lib/types/chat';
 
 const base = (idProyecto: number, idConversacion: number) => `/proyectos/${idProyecto}/conversaciones/${idConversacion}`;
 
@@ -30,6 +30,16 @@ export function votePoll(idProyecto: number, idConversacion: number, idMensaje: 
 
 export function closePoll(idProyecto: number, idConversacion: number, idMensaje: number): Promise<ChatEncuesta> {
   return apiFetch(`${base(idProyecto, idConversacion)}/mensajes/${idMensaje}/encuesta/cierre`, { method: 'POST' });
+}
+
+/** MEJ-45: resuelve rutas internas a tarjetas con los permisos de quien lee. */
+export function resolveCards(idProyecto: number, idConversacion: number, rutas: string[]): Promise<ChatTarjetaEnlace[]> {
+  return apiFetch(`${base(idProyecto, idConversacion)}/tarjetas`, { method: 'POST', body: JSON.stringify({ rutas }) });
+}
+
+/** MEJ-46: «Recuérdamelo»; volver a pedirlo cambia la hora del recordatorio pendiente. */
+export function createReminder(idProyecto: number, idConversacion: number, idMensaje: number, recordarEn: string): Promise<{ idRecordatorio: number; recordarEn: string }> {
+  return apiFetch(`${base(idProyecto, idConversacion)}/mensajes/${idMensaje}/recordatorio`, { method: 'POST', body: JSON.stringify({ recordarEn }) });
 }
 
 /** Mensajes fijados (MEJ-43). */

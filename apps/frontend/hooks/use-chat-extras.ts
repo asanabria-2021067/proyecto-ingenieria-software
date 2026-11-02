@@ -4,8 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   closePoll,
   createPoll,
+  createReminder,
   getPinned,
   getPinnedOrganizacion,
+  resolveCards,
   sendVoiceNote,
   setPinned,
   setPinnedOrganizacion,
@@ -58,6 +60,24 @@ export function useClosePoll(idProyecto: number, idConversacion: number) {
   return useMutation({
     mutationFn: (idMensaje: number) => closePoll(idProyecto, idConversacion, idMensaje),
     onSuccess: (encuesta, idMensaje) => actualizarEncuestaEnCache(queryClient, idConversacion, idMensaje, encuesta),
+  });
+}
+
+/** MEJ-45: tarjetas de los enlaces internos de un mensaje; cada ruta se resuelve una sola vez por sesion. */
+export function useTarjetasEnlace(idProyecto: number, idConversacion: number, rutas: string[]) {
+  const query = useQuery({
+    queryKey: ['chat-tarjetas', idProyecto, idConversacion, rutas],
+    queryFn: () => resolveCards(idProyecto, idConversacion, rutas),
+    enabled: rutas.length > 0,
+    staleTime: 60_000,
+  });
+  return { tarjetas: query.data ?? [], isLoading: query.isLoading };
+}
+
+export function useCreateReminder(idProyecto: number, idConversacion: number) {
+  return useMutation({
+    mutationFn: ({ idMensaje, recordarEn }: { idMensaje: number; recordarEn: string }) =>
+      createReminder(idProyecto, idConversacion, idMensaje, recordarEn),
   });
 }
 

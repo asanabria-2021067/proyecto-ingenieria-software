@@ -41,6 +41,8 @@ const toggleSavedMutate = vi.fn();
 const silencio = vi.hoisted(() => ({ siempre: false }));
 // MEJ-41/42/43: notas de voz, encuestas y fijados viven en use-chat-extras; aqui no hay nada fijado ni se graba.
 vi.mock('@/hooks/use-chat-extras', () => ({
+  useCreateReminder: () => ({ mutate: vi.fn(), isPending: false }),
+  useTarjetasEnlace: () => ({ tarjetas: [], isLoading: false }),
   useFijados: () => ({ fijados: [], isLoading: false }),
   usePinMessage: () => ({ mutate: vi.fn(), isPending: false }),
   useFijadosOrganizacion: () => ({ fijados: [], isLoading: false }),

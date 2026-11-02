@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bookmark, BookmarkCheck, Check, MoreVertical, Pencil, Pin, PinOff, Reply, Trash2, X } from 'lucide-react';
+import { AlarmClock, Bookmark, BookmarkCheck, Check, ClipboardPlus, MoreVertical, Pencil, Pin, PinOff, Reply, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -15,14 +15,18 @@ import { getIniciales } from '@/components/projects/available-project-card';
 import { ChatAdjuntoChip } from './chat-adjunto';
 import { ChatCitaBloque } from './chat-cita';
 import { ChatEncuestaTarjeta } from './chat-encuesta';
+import { ChatContenido } from './chat-menciones';
+import { ChatTarjetasEnlace } from './chat-tarjeta-enlace';
 import { NotaVozReproductor } from './chat-nota-voz';
 import { LinkPreviewCard } from './link-preview-card';
 import { MessageReactions } from './message-reactions';
 import { nombreReal } from '@/lib/chat-apodos';
 import { claseBurbujaPropia } from '@/lib/chat-temas';
+import { extraerEnlacesInternos } from '@/lib/chat-tarjetas';
+import { contenidoAEditable, editableAContenido, mencionesPresentes, type MencionSeleccionada } from '@/lib/mentions/mention-tokens';
 import { useDeleteMessage, useEditMessage, useToggleSavedMessage } from '@/hooks/use-chat';
 import { confirmar } from '@/lib/mensajes';
-import type { ChatMensaje, ChatTemaColor } from '@/lib/types/chat';
+import type { ChatMensaje, ChatTemaColor, ChatUsuario } from '@/lib/types/chat';
 
 function formatHora(iso: string): string {
   return new Date(iso).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
@@ -68,6 +72,10 @@ interface ChatMessageItemProps {
   idUsuarioActual?: number | null;
   /** Líder del proyecto: además del autor, puede cerrar las encuestas. */
   esLider?: boolean;
+  /** Participantes de la conversación: dan el nombre vigente de las menciones. */
+  participantes?: ChatUsuario[];
+  onRecordar?: (mensaje: ChatMensaje) => void;
+  onCrearTarea?: (mensaje: ChatMensaje) => void;
 }
 
 export function ChatMessageItem({
@@ -86,21 +94,31 @@ export function ChatMessageItem({
   onFijar,
   idUsuarioActual = null,
   esLider = false,
+  participantes,
+  onRecordar,
+  onCrearTarea,
 }: ChatMessageItemProps) {
   const editar = useEditMessage(idProyecto, idConversacion);
   const eliminar = useDeleteMessage(idProyecto, idConversacion);
   const [editando, setEditando] = useState(false);
   const [texto, setTexto] = useState('');
+  const [mencionesEdicion, setMencionesEdicion] = useState<MencionSeleccionada[]>([]);
   const eliminado = Boolean(m.eliminadoEn);
   const fijable = puedeFijar && onFijar !== undefined;
+  const tieneEnlaceInterno =
+    typeof window !== 'undefined' && extraerEnlacesInternos(m.contenido, window.location.origin).length > 0;
+  const hayAcciones = !simple && (onRecordar !== undefined || onCrearTarea !== undefined);
 
   const empezarEdicion = () => {
-    setTexto(m.contenido);
+    // Las menciones se editan como `@Nombre`; al guardar vuelven a su token.
+    const editable = contenidoAEditable(m.contenido);
+    setMencionesEdicion(editable.menciones);
+    setTexto(editable.texto);
     setEditando(true);
   };
 
   const guardar = () => {
-    const contenido = texto.trim();
+    const contenido = editableAContenido(texto.trim(), mencionesPresentes(texto, mencionesEdicion));
     if (!contenido || contenido === m.contenido) {
       setEditando(false);
       return;
@@ -196,9 +214,19 @@ export function ChatMessageItem({
                 </button>
               </div>
             ) : (
-              m.contenido && !m.encuesta && <p className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}>{m.contenido}</p>
+              m.contenido && !m.encuesta && (
+                <ChatContenido
+                  contenido={m.contenido}
+                  participantes={participantes}
+                  idUsuarioActual={idUsuarioActual}
+                  className={`whitespace-pre-wrap break-words ${m.adjunto ? 'mt-1' : ''}`}
+                />
+              )
             )}
-            {!editando && !simple && <LinkPreviewCard idProyecto={idProyecto} idConversacion={idConversacion} contenido={m.contenido} />}
+            {!editando && !simple && <ChatTarjetasEnlace idProyecto={idProyecto} idConversacion={idConversacion} contenido={m.contenido} />}
+            {!editando && !simple && !tieneEnlaceInterno && (
+              <LinkPreviewCard idProyecto={idProyecto} idConversacion={idConversacion} contenido={m.contenido} />
+            )}
           </>
         )}
         <p className={`mt-0.5 text-[10px] ${propio && !eliminado ? '' : 'text-tertiary'}`}>
@@ -217,7 +245,7 @@ export function ChatMessageItem({
           <MessageReactions reacciones={m.reacciones ?? []} onToggle={(emoji) => onReaccionar(m.idMensaje, emoji)} />
         )}
       </div>
-      {(propio || fijable) && !eliminado && !editando && (!simple || fijable) && (
+      {(propio || fijable || hayAcciones) && !eliminado && !editando && (!simple || fijable) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -233,6 +261,18 @@ export function ChatMessageItem({
               <DropdownMenuItem onClick={() => onFijar?.(m, !m.fijadoEn)}>
                 {m.fijadoEn ? <PinOff className="size-4" aria-hidden="true" /> : <Pin className="size-4" aria-hidden="true" />}
                 {m.fijadoEn ? 'Desfijar' : 'Fijar'}
+              </DropdownMenuItem>
+            )}
+            {onRecordar && !simple && (
+              <DropdownMenuItem onClick={() => onRecordar(m)}>
+                <AlarmClock className="size-4" aria-hidden="true" />
+                Recuérdamelo
+              </DropdownMenuItem>
+            )}
+            {onCrearTarea && !simple && m.contenido && !m.encuesta && (
+              <DropdownMenuItem onClick={() => onCrearTarea(m)}>
+                <ClipboardPlus className="size-4" aria-hidden="true" />
+                Crear tarea desde este mensaje
               </DropdownMenuItem>
             )}
             {propio && !simple && m.contenido && !m.encuesta && (
