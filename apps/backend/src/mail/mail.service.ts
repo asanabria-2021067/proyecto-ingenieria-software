@@ -21,6 +21,10 @@ export class MailService {
           host: config.host,
           port: config.port,
           secure: config.port === 465,
+          // Sin timeouts nodemailer espera hasta 2 min: un SMTP caido colgaria la peticion que envia.
+          connectionTimeout: 10_000,
+          greetingTimeout: 10_000,
+          socketTimeout: 15_000,
           auth: config.user ? { user: config.user, pass: config.password } : undefined,
         })
       : null;

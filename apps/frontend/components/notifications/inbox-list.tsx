@@ -11,6 +11,7 @@ import type { Notificacion } from '@/lib/services/notifications';
 import {
   agruparPorDia,
   agruparRepetidas,
+  filasVisibles,
   etiquetaDeTipo,
   categoriaDeTipo,
   fechaCompacta,
@@ -185,7 +186,7 @@ export function InboxList({
       if (notificaciones.length === 0) return;
       event.preventDefault();
       // Solo las filas visibles: los avisos plegados (MEJ-29) no tienen fila propia.
-      const visibles = agruparPorDia(notificaciones).flatMap((dia) => agruparRepetidas(dia.items));
+      const visibles = filasVisibles(notificaciones);
       const indice = visibles.findIndex((g) => g.principal.idNotificacion === seleccionadaId);
       const siguiente = event.key === 'ArrowDown' ? Math.min(indice + 1, visibles.length - 1) : Math.max(indice - 1, 0);
       const destino = visibles[siguiente];

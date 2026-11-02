@@ -16,7 +16,7 @@ import {
   type Notificacion,
   type NotificacionesPagina,
 } from '@/lib/services/notifications';
-import { INBOX_CATEGORIES, agruparPorDia, agruparRepetidas } from '@/lib/notifications/inbox-model';
+import { INBOX_CATEGORIES, filasVisibles } from '@/lib/notifications/inbox-model';
 import type { NotificationGroupId } from '@/lib/notifications/preference-groups';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { InboxList } from './inbox-list';
@@ -181,7 +181,7 @@ export function NotificationInbox() {
   const indice = seleccionada ? notificaciones.findIndex((n) => n.idNotificacion === seleccionada.idNotificacion) : -1;
   const mostrada = indice >= 0 ? notificaciones[indice] : seleccion && (seleccion.clave === claveFiltros || lista.isPending) ? seleccionada : null;
   // MEJ-29: anterior/siguiente recorren las filas visibles (principal + resto), igual que la lista.
-  const visibles = useMemo(() => agruparPorDia(notificaciones).flatMap((dia) => agruparRepetidas(dia.items)), [notificaciones]);
+  const visibles = useMemo(() => filasVisibles(notificaciones), [notificaciones]);
   const indiceGrupo = seleccionada
     ? visibles.findIndex((g) => g.principal.idNotificacion === seleccionada.idNotificacion || g.resto.some((n) => n.idNotificacion === seleccionada.idNotificacion))
     : -1;

@@ -199,6 +199,11 @@ export function agruparRepetidas<T extends Pick<Notificacion, 'tipoNotificacion'
   return grupos;
 }
 
+/** Filas que se ven en la bandeja: avisos agrupados por día y con los repetidos plegados. */
+export function filasVisibles<T extends Notificacion>(items: readonly T[]): AvisoAgrupado<T>[] {
+  return agruparPorDia(items).flatMap((dia) => agruparRepetidas(dia.items));
+}
+
 /** Hora para avisos de hoy; día y mes corto para el resto (columna derecha de la fila). */
 export function fechaCompacta(iso: string, ahora: Date = new Date()): string {
   const fecha = new Date(iso);
