@@ -133,7 +133,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     guardado.resolver(preferencias(['NUEVO_SEGUIDOR']));
     await waitFor(() => expect(familia('Red de contactos')).toHaveTextContent('3 de 4 activas'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'true');
-    expect(familia('Tareas e hitos')).toHaveTextContent('9 de 9 activas');
+    expect(familia('Tareas e hitos')).toHaveTextContent('10 de 10 activas');
   });
 
   it('si el guardado falla, el contador no se mueve', async () => {
