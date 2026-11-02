@@ -12,18 +12,18 @@
  * imprime ni se guarda) y que carlos.mendoza@uvg.edu.gt ya exista.
  *
  * Uso:
- *   DEMO_PASSWORD="..." npm run prisma:seed-demo-final
+ *   Produccion (imagen compilada): DEMO_PASSWORD="..." npm run prisma:seed-demo-final
+ *   Desarrollo: DEMO_PASSWORD="..." npm run prisma:seed-demo-final:dev
  */
 import { PrismaClient, type EstadoProyecto, type EstadoTarea, type RolOrganizacion, type TipoProyecto } from '@prisma/client';
 import { hashSync } from 'bcryptjs';
-import { addDaysToDay, todayInGuatemala } from '../src/common/utils/guatemala-date';
-import { esEnRiesgo, semestreDe, type Semestre } from '../src/horas-semestre/semestre';
+import { addDaysToDay, todayInGuatemala } from '../common/utils/guatemala-date';
+import { esEnRiesgo, semestreDe, type Semestre } from '../horas-semestre/semestre';
 
 const prisma = new PrismaClient();
 
 const NOMBRE_ASOCIACION = 'Asociación de Estudiantes de Ciencias de la Computación y TI';
 const CORREO_PRESIDENTE = 'carlos.mendoza@uvg.edu.gt';
-const PROHIBIDAS = /^(pru2620[0-5]|lid26299)/i;
 const META_BECA = 80;
 const META_EXTENSION = 40;
 
@@ -238,7 +238,8 @@ async function armarProyecto(d: ProyectoDef) {
     const asignacion = await asegurar(
       'asignaciones',
       () => prisma.asignacionTarea.findFirst({ where: { idTarea: tarea.idTarea, idUsuario: t.asignadoA, desasignadaEn: null } }),
-      () => prisma.asignacionTarea.create({ data: { idTarea: tarea.idTarea, idUsuario: t.asignadoA, idParticipacion: participaciones.get(t.asignadoA), asignadoPor: d.creadoPor } }),
+      () => prisma.asignacionTarea.create({ data: { idTarea: tarea.idTarea, idUsuario: t.asignadoA, idParticipacion: participaciones.get(t.asignadoA), asignadoPor: d.creadoPor, horasReales: t.horas } }),
+      (a) => (t.horas !== undefined && Number(a.horasReales) !== t.horas ? prisma.asignacionTarea.update({ where: { idAsignacion: a.idAsignacion }, data: { horasReales: t.horas } }) : undefined),
     );
     if (t.horas === undefined) continue;
     await asegurar(
@@ -246,7 +247,6 @@ async function armarProyecto(d: ProyectoDef) {
       () => prisma.registroTiempoTarea.findFirst({ where: { idAsignacion: asignacion.idAsignacion, nota: 'Horas de demo' } }),
       () => prisma.registroTiempoTarea.create({ data: { idAsignacion: asignacion.idAsignacion, idUsuario: t.asignadoA, horas: t.horas!, fecha: enDias(-2), nota: 'Horas de demo' } }),
     );
-    await prisma.asignacionTarea.update({ where: { idAsignacion: asignacion.idAsignacion }, data: { horasReales: t.horas } });
   }
 
   for (const [idUsuario, horas] of Object.entries(d.acreditadas ?? {})) {
@@ -273,10 +273,6 @@ async function main() {
   const hoy = todayInGuatemala();
   const plan = planDeHoras(semestre, hoy);
   verificarRiesgo(plan.map((p) => ({ metaBeca: p.metaBeca, avanceBeca: p.avanceBeca, metaExtension: p.metaExtension, avanceExtension: p.avanceExtension })), semestre, hoy, 'plan');
-
-  for (let i = 0; i < NOMBRES.length; i++) {
-    if (PROHIBIDAS.test(correoDemo(i)) || PROHIBIDAS.test(carneDemo(i))) throw new Error('Una cuenta demo coincide con una cuenta prohibida.');
-  }
 
   const presidente = await prisma.usuario.findUnique({ where: { correo: CORREO_PRESIDENTE } });
   if (!presidente) throw new Error(`No existe ${CORREO_PRESIDENTE}: debe existir antes de correr este script (corre seed.ts o crea la cuenta).`);

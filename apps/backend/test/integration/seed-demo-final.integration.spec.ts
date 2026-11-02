@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import { describeIntegration } from './setup/database';
 
 /**
- * DEMO (Fase 4): prisma/seed-demo-final.ts contra PostgreSQL real. Corre en una
+ * DEMO (Fase 4): src/scripts/seed-demo-final.ts contra PostgreSQL real. Corre en una
  * base propia y desechable (CREATE DATABASE + migrate deploy + DROP DATABASE al
  * final; un schema aparte no sirve porque las migraciones instalan extensiones)
  * para no dejar datos de demo en la base compartida de las demas suites.
@@ -31,7 +31,7 @@ describeIntegration('DEMO seed-demo-final', () => {
   const node = (script: string[], env: NodeJS.ProcessEnv) =>
     execFileSync(process.execPath, [...script], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const correrSeed = (password: string | null = 'Contrasena-Demo-1') =>
-    node([join(process.cwd(), 'node_modules/tsx/dist/cli.mjs'), 'prisma/seed-demo-final.ts'], { ...envBase, ...(password && { DEMO_PASSWORD: password }) });
+    node([join(process.cwd(), 'node_modules/tsx/dist/cli.mjs'), 'src/scripts/seed-demo-final.ts'], { ...envBase, ...(password && { DEMO_PASSWORD: password }) });
   const conteos = async () => {
     const filas: Record<string, number> = {};
     for (const t of TABLAS) filas[t] = Number((await db.$queryRawUnsafe<{ n: bigint }[]>(`SELECT COUNT(*) AS n FROM "${t}"`))[0].n);
