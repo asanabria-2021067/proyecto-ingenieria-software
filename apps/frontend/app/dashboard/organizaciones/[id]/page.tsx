@@ -39,7 +39,7 @@ import { getApiErrorStatus } from '@/components/projects/api-error';
 export default function OrganizacionPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const tabInicial = useSearchParams().get('tab') === 'chat' ? 'chat' : 'proyectos';
+  const tabUrl = useSearchParams().get('tab');
   const id = Number(params.id);
   const { data: usuario } = useCurrentUser();
   const { data: org, isLoading, isError, error } = useOrganizacion(id);
@@ -79,6 +79,8 @@ export default function OrganizacionPage() {
   }
 
   const esMiembro = org.miRol !== null;
+  // Las pestañas solo de miembros caen en Proyectos si quien llega por un enlace ya no lo es.
+  const tab = !tabUrl || (!esMiembro && ['chat', 'anuncios', 'calendario'].includes(tabUrl)) ? 'proyectos' : tabUrl;
   const gestiona = puedeGestionar(org.miRol);
   const esPropietario = org.miRol === 'PROPIETARIO';
   const sitio = safeExternalHref(org.sitioWeb);
@@ -274,7 +276,7 @@ export default function OrganizacionPage() {
         )}
       </section>
 
-      <Tabs key={tabInicial} defaultValue={tabInicial}>
+      <Tabs value={tab} onValueChange={(v) => router.replace(`?tab=${v}`, { scroll: false })}>
         <TabsList className="mb-4.5 h-auto flex-wrap">
           <TabsTrigger value="proyectos">Proyectos</TabsTrigger>
           <TabsTrigger value="portafolio">Portafolio</TabsTrigger>

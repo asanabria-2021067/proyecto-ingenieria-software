@@ -5,13 +5,13 @@ import type { OrganizacionDetalle, RolOrganizacion } from '@/lib/types/organizat
 
 const estado = vi.hoisted(() => {
   const mutate = vi.fn();
-  return { org: null as unknown, mutate, push: vi.fn(), mutacion: () => ({ mutate, isPending: false }) };
+  return { org: null as unknown, query: '', replace: vi.fn(), mutate, push: vi.fn(), mutacion: () => ({ mutate, isPending: false }) };
 });
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: '7' }),
-  useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ push: estado.push, replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(estado.query),
+  useRouter: () => ({ push: estado.push, replace: estado.replace }),
 }));
 vi.mock('@/hooks/use-current-user', () => ({
   useCurrentUser: () => ({ data: { idUsuario: 1, nombre: 'Ana', apellido: 'Paz', roles: [] } }),
@@ -22,6 +22,7 @@ vi.mock('@/components/organizations/boton-seguir', () => ({
   SeguirOrganizacionItem: () => null,
   useSeguirOrganizacion: () => ({ siguiendo: false, pendiente: false, alternar: () => {} }),
 }));
+vi.mock('@/components/organizations/org-chat', () => ({ OrgChat: () => null }));
 vi.mock('@/lib/mensajes', () => ({
   aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() },
   confirmar: vi.fn().mockResolvedValue(true),
@@ -107,7 +108,11 @@ const abrirMas = () => {
 const opcion = (nombre: string) => screen.queryByRole('menuitem', { name: nombre });
 
 describe('pagina de la organizacion', () => {
-  beforeEach(() => estado.mutate.mockReset());
+  beforeEach(() => {
+    estado.mutate.mockReset();
+    estado.replace.mockReset();
+    estado.query = '';
+  });
   afterEach(() => cleanup());
 
   it('el Propietario: Nuevo proyecto visible; Editar, Invitar, Transferir y Archivar dentro de «Más»', () => {
@@ -201,6 +206,30 @@ describe('pagina de la organizacion', () => {
     expect(masAcciones()).toBeNull();
     expect(boton('Salir')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Miembros/ })).toBeInTheDocument();
+  });
+
+  it('?tab=chat abre la pestaña Chat de un miembro', () => {
+    estado.org = orgCon('LECTURA');
+    estado.query = 'tab=chat';
+    render(<OrganizacionPage />);
+
+    expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('cambiar de pestaña actualiza ?tab para que un enlace a ?tab=chat vuelva a abrir el chat', () => {
+    estado.org = orgCon('LECTURA');
+    render(<OrganizacionPage />);
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Anuncios' }));
+    expect(estado.replace).toHaveBeenCalledWith('?tab=anuncios', { scroll: false });
+  });
+
+  it('?tab=chat sin ser miembro cae en Proyectos en vez de dejar la pestaña vacía', () => {
+    estado.org = orgCon(null);
+    estado.query = 'tab=chat';
+    render(<OrganizacionPage />);
+
+    expect(screen.getByRole('tab', { name: /Proyectos/ })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('un visitante de una organizacion publica solo ve proyectos y puede solicitar unirse', () => {
