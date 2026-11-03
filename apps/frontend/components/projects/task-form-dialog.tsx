@@ -327,8 +327,9 @@ function TaskFormDialogContent({
             hitoOriginal={task?.idHito ?? null}
           />
 
-          {idProyecto !== undefined && (!porPasos || paso === 1) && (
+          {idProyecto !== undefined && (!porPasos || paso < 2) && (
             <TaskFormExtras
+              parte={porPasos ? (paso === 0 ? 'plantilla' : 'planificacion') : undefined}
               idProyecto={idProyecto}
               mode={mode}
               idTareaActual={task?.idTarea ?? null}

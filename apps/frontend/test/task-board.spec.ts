@@ -162,9 +162,11 @@ describe('TaskBoard', () => {
   });
 
   it('MEJ-79: las flechas no se capturan con el foco en un input', () => {
-    renderBoard({ tasks: [tarea({ idTarea: 7 })] });
+    const { container } = renderBoard({ tasks: [tarea({ idTarea: 7 }), tarea({ idTarea: 8 })] });
+    // El input vive dentro de una tarjeta: sin el guard, la flecha moveria el foco a otra tarjeta.
+    const tarjeta = container.querySelector<HTMLElement>('[data-prioridad]') as HTMLElement;
     const input = document.createElement('input');
-    document.body.appendChild(input);
+    tarjeta.appendChild(input);
     input.focus();
     const ev = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
     input.dispatchEvent(ev);

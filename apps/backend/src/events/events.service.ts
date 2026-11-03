@@ -168,10 +168,6 @@ export class EventsService {
       .map(conOrigen);
   }
 
-  /**
-   * MEJ-34: eventos de los proyectos de la organización para sus miembros activos (cualquier rol).
-   * Solo los abiertos a todo el proyecto (sin invitados): un evento con invitados es privado de ellos.
-   */
   /** Nombre para el X-WR-CALNAME del .ics; llamar solo tras verificar la membresía. */
   async nombreOrganizacion(idOrganizacion: number) {
     const org = await this.prisma.organizacion.findUnique({
@@ -181,6 +177,10 @@ export class EventsService {
     return org?.nombreOrganizacion;
   }
 
+  /**
+   * MEJ-34: eventos de los proyectos de la organización para sus miembros activos (cualquier rol).
+   * Solo los abiertos a todo el proyecto (sin invitados): un evento con invitados es privado de ellos.
+   */
   async findForOrganizationInRange(idOrganizacion: number, userId: number, desde: string, hasta: string) {
     const ctx = await cargarContexto(this.prisma, userId, idOrganizacion);
     assertRol(ctx, Object.values(RolOrganizacion), 'Solo los miembros ven el calendario de la organización');
