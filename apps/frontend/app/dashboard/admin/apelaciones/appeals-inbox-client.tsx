@@ -300,7 +300,7 @@ export default function AppealsInboxClient() {
         ) : (
           <>
             <div className={DATA_TABLE_CARD}>
-              <Table>
+              <Table containerLabel="Apelaciones">
                 <TableHeader>
                   <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
                     <TableHead scope="col" className={TH}>

@@ -400,7 +400,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
               <p className="border-t border-outline-variant/40 px-5 py-6 text-sm italic text-tertiary">Sin integrantes registrados.</p>
             ) : (
               <div className="overflow-x-auto border-t border-outline-variant/40">
-                <Table>
+                <Table containerLabel="Integrantes del proyecto">
                   <TableHeader>
                     <TableRow className="border-outline-variant/40 bg-surface-container-low hover:bg-surface-container-low">
                       <TableHead className={TH_MIEMBROS}>Integrante</TableHead>

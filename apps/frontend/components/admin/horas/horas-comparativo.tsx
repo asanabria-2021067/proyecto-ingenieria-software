@@ -56,7 +56,7 @@ export function HorasComparativo() {
         </Empty>
       ) : (
         <div className={DATA_TABLE_CARD}>
-          <Table>
+          <Table containerLabel="Horas de todos los estudiantes por semestre">
             <caption className="sr-only">Horas de todos los estudiantes por semestre</caption>
             <TableHeader>
               <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>

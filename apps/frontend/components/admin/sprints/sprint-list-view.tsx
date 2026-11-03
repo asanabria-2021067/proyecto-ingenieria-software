@@ -38,7 +38,7 @@ const TD = `${TD_BASE} px-inline @lg/sprints:px-stack`;
 export function SprintListView({ items }: { items: readonly AdminSprintCalendarItem[] }) {
   return (
     <div className="card-base overflow-hidden p-0">
-      <Table className="table-fixed">
+      <Table containerLabel="Sprints" className="table-fixed">
         <TableHeader>
           <TableRow className="border-outline-variant/50 bg-surface-container-low hover:bg-surface-container-low">
             <TableHead scope="col" className={TH}>

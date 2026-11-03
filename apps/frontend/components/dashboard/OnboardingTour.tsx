@@ -25,7 +25,7 @@ const CustomTooltip = ({
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4 select-none">
-        <span className="text-[10px] font-black uppercase tracking-widest text-[#006735] bg-[#006735]/10 px-3 py-1 rounded-full font-headline">
+        <span className="text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 px-3 py-1 rounded-full font-headline">
           Guía UVGenius
         </span>
         <span className="text-[10px] font-black uppercase tracking-widest text-tertiary bg-surface-container-high px-2.5 py-1 rounded-full font-headline">

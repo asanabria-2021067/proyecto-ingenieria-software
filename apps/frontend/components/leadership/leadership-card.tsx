@@ -72,7 +72,7 @@ const CELDA = 'px-stack py-inline';
  */
 export function LeadershipHistoryTable({ items }: { items: LeadershipHistoryItemDto[] }) {
   return (
-    <Table aria-label="Historial de liderazgo">
+    <Table containerLabel="Tabla del historial de liderazgo">
       <TableHeader>
         <TableRow className={FILA_GUIA}>
           <TableHead scope="col" className={CELDA_GUIA}>Fecha</TableHead>

@@ -90,7 +90,7 @@ export default function CvProyectosPage() {
             </Empty>
           ) : (
             <div className={DATA_TABLE_CARD}>
-              <Table>
+              <Table containerLabel="Proyectos de la persona">
                 <caption className="sr-only">Proyectos cerrados con rol, fechas y horas acreditadas</caption>
                 <TableHeader>
                   <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>

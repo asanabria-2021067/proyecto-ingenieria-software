@@ -101,7 +101,7 @@ export default function AdminAnunciosPage() {
         </Empty>
       ) : (
         <div className={DATA_TABLE_CARD}>
-          <Table>
+          <Table containerLabel="Anuncios">
             <caption className="sr-only">Anuncios, del más reciente al más antiguo</caption>
             <TableHeader>
               <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
