@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
+import { calcularCoincidencia } from '../../src/common/coincidencia-habilidades';
 import { semestreDe } from '../../src/horas-semestre/semestre';
 import { describeIntegration } from './setup/database';
 
@@ -17,6 +18,7 @@ const TABLAS = [
   'usuario', 'perfil_estudiante', 'registro_horas_semestre', 'asociacion', 'junta_asociacion', 'organizacion', 'usuario_organizacion',
   'invitacion_organizacion', 'conversacion', 'conversacion_participante', 'mensaje_chat', 'proyecto', 'participacion_proyecto', 'sprint',
   'tarea', 'asignacion_tarea', 'registro_tiempo_tarea', 'horas_participacion', 'tarea_checklist_item',
+  'rol_proyecto', 'postulacion', 'requisito_habilidad_rol', 'habilidad', 'usuario_habilidad',
 ];
 
 describeIntegration('DEMO seed-demo-final', () => {
@@ -119,6 +121,27 @@ describeIntegration('DEMO seed-demo-final', () => {
     expect(conMetas).toBeGreaterThanOrEqual(10);
     expect(sinMetas).toBeGreaterThanOrEqual(1);
     expect(new Set((await db.registroHorasSemestre.findMany({ where: { usuario: { correo: { startsWith: 'demo.cs' } }, metaBeca: { not: null } } })).map((r) => r.metaBeca)).size).toBeGreaterThan(1);
+
+    // Semestre anterior: al menos 5 cuentas demo con horas para el comparativo.
+    const previo = periodo === 2 ? { anio, periodo: 1 } : { anio: anio - 1, periodo: 2 };
+    const conHistorial = await db.registroHorasSemestre.findMany({ where: { ...previo, usuario: { correo: { startsWith: 'demo.cs' } } } });
+    expect(conHistorial.length).toBeGreaterThanOrEqual(5);
+    for (const r of conHistorial) expect(r.becaDeclarada + r.extensionDeclarada).toBeGreaterThan(0);
+
+    // Rol con requisitos en un proyecto en progreso de una cuenta demo y 2 postulantes pendientes con coincidencia parcial.
+    const rol = await db.rolProyecto.findFirstOrThrow({
+      where: { requisitos: { some: {} }, proyecto: { estadoProyecto: 'EN_PROGRESO', creador: { correo: { startsWith: 'demo.cs' } } } },
+      include: { requisitos: true, postulaciones: { include: { postulante: { include: { habilidades: true } } } } },
+    });
+    const pendientes = rol.postulaciones.filter((p) => p.estadoPostulacion === 'PENDIENTE');
+    expect(pendientes).toHaveLength(2);
+    const porcentajes = pendientes
+      .map((p) => {
+        const niveles = new Map(p.postulante.habilidades.map((h) => [h.idHabilidad, h.nivelHabilidad]));
+        return calcularCoincidencia(rol.requisitos, niveles)!.porcentaje;
+      })
+      .sort();
+    expect(porcentajes).toEqual([33, 67]);
 
     const tareaCarlos = await db.tarea.findFirstOrThrow({
       where: { estadoTarea: 'EN_PROGRESO', asignaciones: { some: { desasignadaEn: null, usuario: { correo: 'carlos.mendoza@uvg.edu.gt' } } }, sprint: { estado: 'ACTIVO' }, proyecto: { estadoProyecto: 'EN_PROGRESO' } },

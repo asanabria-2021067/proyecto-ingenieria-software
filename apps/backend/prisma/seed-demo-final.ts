@@ -2,7 +2,9 @@
  * Dataset de demo final (Fase 4): asociacion oficial con su junta, dos
  * organizaciones con chat #general, proyectos de los tres tipos de duenio
  * (personal, organizacion, asociacion) en distintos estados y horas del
- * semestre actual para 15 estudiantes de Computacion.
+ * semestre actual para 15 estudiantes de Computacion, registros del semestre
+ * anterior para 8 de ellos (comparativo) y un rol con requisitos de habilidad
+ * y postulaciones pendientes (ordenar por coincidencia).
  *
  * Idempotente: todo se localiza por clave natural (correo, nombre, titulo) y
  * una segunda corrida no duplica nada. Solo crea o actualiza entidades de
@@ -31,6 +33,8 @@ const METAS_BECA = [80, 60, 100];
 const METAS_EXTENSION = [40, 30, 50];
 // Carlos (presidente): cuenta real, solo se fija su registro del semestre.
 const REGISTRO_PRESIDENTE = { metaBeca: 50, becaDeclarada: 20, metaExtension: 40, extensionDeclarada: 10 };
+// Cuantas cuentas demo reciben horas del semestre anterior (>= 5 para el comparativo).
+const CON_SEMESTRE_ANTERIOR = 8;
 const RIESGO_MIN = 4;
 const RIESGO_MAX = 8;
 
@@ -64,6 +68,9 @@ function enDias(n: number): Date {
   fecha.setHours(0, 0, 0, 0);
   return fecha;
 }
+
+/** Semestre inmediatamente anterior: del 2.º es el 1.º del mismo año; del 1.º, el 2.º del año previo. */
+const semestreAnterior = (s: Pick<Semestre, 'anio' | 'periodo'>) => (s.periodo === 2 ? { anio: s.anio, periodo: 1 } : { anio: s.anio - 1, periodo: 2 });
 
 const inicioDeDia = (dia: string) => new Date(`${dia}T06:00:00Z`);
 
@@ -343,6 +350,23 @@ async function main() {
           : undefined,
     );
   }
+  // Historial: el semestre anterior ya cerrado, con metas cumplidas a distintos ritmos.
+  const anterior = semestreAnterior(semestre);
+  for (const [i, idUsuario] of est.slice(0, CON_SEMESTRE_ANTERIOR).entries()) {
+    const metaBeca = METAS_BECA[i % 3];
+    const metaExtension = METAS_EXTENSION[i % 3];
+    const becaDeclarada = Math.round((metaBeca * (60 + 10 * (i % 4))) / 100);
+    const extensionDeclarada = Math.round((metaExtension * (50 + 10 * (i % 5))) / 100);
+    await asegurar(
+      'registros_semestre_anterior',
+      () => prisma.registroHorasSemestre.findUnique({ where: { idUsuario_anio_periodo: { idUsuario, anio: anterior.anio, periodo: anterior.periodo } } }),
+      () => prisma.registroHorasSemestre.create({ data: { idUsuario, anio: anterior.anio, periodo: anterior.periodo, metaBeca, becaDeclarada, metaExtension, extensionDeclarada } }),
+      (r) =>
+        r.metaBeca !== metaBeca || r.becaDeclarada !== becaDeclarada || r.metaExtension !== metaExtension || r.extensionDeclarada !== extensionDeclarada
+          ? prisma.registroHorasSemestre.update({ where: { idRegistro: r.idRegistro }, data: { metaBeca, becaDeclarada, metaExtension, extensionDeclarada } })
+          : undefined,
+    );
+  }
   // Solo el registro del semestre de Carlos; su cuenta y perfil reales no se tocan.
   await asegurar(
     'registro_horas_presidente',
@@ -500,7 +524,50 @@ async function main() {
       acreditadas: { [est[4]]: ACREDITADAS_BECA[4], [est[8]]: ACREDITADAS_BECA[8] },
     },
   ];
-  for (const p of proyectos) await armarProyecto(p);
+  const armados: Awaited<ReturnType<typeof armarProyecto>>[] = [];
+  for (const p of proyectos) armados.push(await armarProyecto(p));
+
+  // ─── Postulaciones pendientes con requisitos de habilidad (MEJ-21) ────────
+  // «Tutorías» lo lidera demo.cs05 (est[4]). Cumplimiento: est[10] 2 de 3 (67 %), est[11] 1 de 3 (33 %).
+  const habilidad = (nombreHabilidad: string) =>
+    asegurar(
+      'habilidades',
+      () => prisma.habilidad.findFirst({ where: { nombreHabilidad } }),
+      () => prisma.habilidad.create({ data: { nombreHabilidad } }),
+    );
+  const [react, typescript, figma] = [await habilidad('React'), await habilidad('TypeScript'), await habilidad('Figma')];
+  const rolFrontend = await asegurar(
+    'roles_proyecto',
+    () => prisma.rolProyecto.findFirst({ where: { idProyecto: armados[0].idProyecto, nombreRol: 'Desarrollador/a front-end' } }),
+    () => prisma.rolProyecto.create({ data: { idProyecto: armados[0].idProyecto, nombreRol: 'Desarrollador/a front-end', descripcionRolProyecto: 'Interfaz de la app de tutorías.', cupos: 2 } }),
+  );
+  for (const [h, nivelMinimo] of [[react, 'INTERMEDIO'], [typescript, 'BASICO'], [figma, 'BASICO']] as const) {
+    await asegurar(
+      'requisitos_habilidad_rol',
+      () => prisma.requisitoHabilidadRol.findUnique({ where: { idRolProyecto_idHabilidad: { idRolProyecto: rolFrontend.idRolProyecto, idHabilidad: h.idHabilidad } } }),
+      () => prisma.requisitoHabilidadRol.create({ data: { idRolProyecto: rolFrontend.idRolProyecto, idHabilidad: h.idHabilidad, nivelMinimo } }),
+      (r) => (r.nivelMinimo !== nivelMinimo ? prisma.requisitoHabilidadRol.update({ where: { idRequisitoHabilidad: r.idRequisitoHabilidad }, data: { nivelMinimo } }) : undefined),
+    );
+  }
+  const postulantes = [
+    { idUsuario: est[10], habilidades: [[react, 'AVANZADO'], [typescript, 'INTERMEDIO']] },
+    { idUsuario: est[11], habilidades: [[react, 'BASICO'], [figma, 'BASICO']] },
+  ] as const;
+  for (const { idUsuario, habilidades } of postulantes) {
+    for (const [h, nivelHabilidad] of habilidades) {
+      await asegurar(
+        'habilidades_usuario',
+        () => prisma.usuarioHabilidad.findUnique({ where: { idUsuario_idHabilidad: { idUsuario, idHabilidad: h.idHabilidad } } }),
+        () => prisma.usuarioHabilidad.create({ data: { idUsuario, idHabilidad: h.idHabilidad, nivelHabilidad } }),
+        (u) => (u.nivelHabilidad !== nivelHabilidad ? prisma.usuarioHabilidad.update({ where: { idUsuarioHabilidad: u.idUsuarioHabilidad }, data: { nivelHabilidad } }) : undefined),
+      );
+    }
+    await asegurar(
+      'postulaciones_pendientes',
+      () => prisma.postulacion.findFirst({ where: { idUsuarioPostulante: idUsuario, idRolProyecto: rolFrontend.idRolProyecto } }),
+      () => prisma.postulacion.create({ data: { idUsuarioPostulante: idUsuario, idRolProyecto: rolFrontend.idRolProyecto, justificacion: 'Me interesa sumarme al equipo de la app de tutorías.' } }),
+    );
+  }
 
   // ─── Verificacion final contra la base ────────────────────────────────────
   // Mismo universo que la asociacion: estudiantes activos de sus carreras.
