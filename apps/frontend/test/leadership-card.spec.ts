@@ -202,7 +202,8 @@ describe('VIEW-06 — rediseño: resumen, módulos y historial como sección', (
 
     const historial = await screen.findByRole('region', { name: 'Historial de liderazgo' });
     expect(screen.queryByRole('button', { name: /historial de liderazgo/i })).not.toBeInTheDocument();
-    const tabla = await within(historial).findByRole('table');
+    const tablaRegion = await within(historial).findByRole('region', { name: 'Tabla del historial de liderazgo' });
+    const tabla = within(tablaRegion).getByRole('table');
     expect(within(tabla).getByText('Reasignación administrativa')).toBeInTheDocument();
     expect(within(historial).getByText('1 cambio registrado')).toBeInTheDocument();
   });
