@@ -289,7 +289,7 @@ test.describe('HU-204: estados de carga del estudiante', () => {
   });
 
   test.describe('perfil', () => {
-    const estadisticas = /\/api\/usuarios\/me\/dashboard/;
+    const estadisticas = /\/api\/horas-semestre\/progreso/;
 
     test('las horas se muestran en skeleton hasta que llegan, nunca como «0 / N/A»', async ({ page }) => {
       const horas = await retener(page, estadisticas);
