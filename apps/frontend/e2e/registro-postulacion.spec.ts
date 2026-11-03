@@ -49,9 +49,14 @@ async function expectSinSesion(page: Page): Promise<void> {
   expect((await page.request.get('/api/usuarios/me')).status()).toBe(401);
 }
 
-async function expectLoginRechazado(page: Page, mensaje: string): Promise<void> {
+async function expectLoginRechazado(page: Page, mensaje: string, correo: string): Promise<void> {
   // NL-T1: el rechazo se muestra como alerta en el formulario, ya no en un popup.
-  await expect(page.getByRole('alert').filter({ hasText: mensaje })).toBeVisible();
+  // POST /auth/login admite 5/min por IP y otros specs del shard también inician sesión: si el límite
+  // responde primero, se reenvía (esperando 20 s entre intentos hasta que se libere la ventana) en vez de dar por fallido el rechazo.
+  await expect(async () => {
+    if (await page.getByRole('alert').filter({ hasText: 'Demasiados intentos' }).isVisible()) await enviarLogin(page, correo);
+    await expect(page.getByRole('alert').filter({ hasText: mensaje })).toBeVisible({ timeout: 5_000 });
+  }).toPass({ intervals: [20_000], timeout: 100_000 });
   await expect(page).toHaveURL(/\/login/);
   await expectSinSesion(page);
 }
@@ -75,12 +80,13 @@ async function resolverCuenta(adminPage: Page, correo: string, accion: 'Aprobar'
 
 // smoke: registro y postulación (T-125, flujo 1)
 test('un usuario nuevo se registra, administración lo aprueba, entra a proyectos y se postula', async ({ page, browser }) => {
+  test.setTimeout(180_000);
   const correo = await registrar(page);
 
   // Mientras la cuenta está pendiente no hay sesión ni login posible.
   await expectSinSesion(page);
   await enviarLogin(page, correo);
-  await expectLoginRechazado(page, 'Tu cuenta está pendiente de verificación por administración.');
+  await expectLoginRechazado(page, 'Tu cuenta está pendiente de verificación por administración.', correo);
 
   // Administración aterriza en su panel y llega a la bandeja desde la navegación.
   const adminContext = await browser.newContext();
@@ -135,6 +141,7 @@ test('un usuario nuevo se registra, administración lo aprueba, entra a proyecto
 });
 
 test('administración rechaza una cuenta nueva y esta no puede iniciar sesión', async ({ page, browser }) => {
+  test.setTimeout(180_000);
   const correo = await registrar(page);
 
   // Sin sesión, la bandeja de administración no responde.
@@ -157,5 +164,5 @@ test('administración rechaza una cuenta nueva y esta no puede iniciar sesión',
 
   // La cuenta rechazada recibe el error genérico de credenciales, no el de «pendiente».
   await enviarLogin(page, correo);
-  await expectLoginRechazado(page, 'Correo o contraseña incorrectos');
+  await expectLoginRechazado(page, 'Correo o contraseña incorrectos', correo);
 });

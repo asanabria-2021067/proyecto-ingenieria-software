@@ -13,6 +13,7 @@ import {
 } from './setup/fixtures';
 import { cleanupIntegrationFixtures } from './setup/cleanup';
 import { SeguimientoService } from '../../src/seguimiento/seguimiento.service';
+import { hoyGuatemala } from '../../src/seguimiento/seguimiento.util';
 import { HitosAtrasadosService } from '../../src/seguimiento/hitos-atrasados.service';
 import { ReconocimientosService } from '../../src/seguimiento/reconocimientos.service';
 import { RetrospectivaService } from '../../src/seguimiento/retrospectiva.service';
@@ -26,8 +27,7 @@ import type { PrismaService } from '../../src/prisma/prisma.service';
 import type { NotificationsGateway } from '../../src/notifications/notifications.gateway';
 
 const dia = (delta: number) => {
-  const d = new Date();
-  d.setUTCHours(0, 0, 0, 0);
+  const d = hoyGuatemala();
   d.setUTCDate(d.getUTCDate() + delta);
   return d;
 };
