@@ -12,7 +12,7 @@ vi.mock('@/hooks/use-current-user', () => ({
 }));
 
 // react-joyride real: tras terminar, saltar o recargar no debe quedar nada de la guía en el documento.
-const restos = () => document.querySelectorAll('.react-joyride__loader, .react-joyride__overlay, .react-joyride__spotlight');
+const restos = () => document.querySelectorAll('.react-joyride__loader, .react-joyride__overlay, .react-joyride__spotlight, .react-joyride__beacon, [data-test-id="beacon"]');
 const avanzar = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
 
 beforeEach(() => {
@@ -25,6 +25,16 @@ afterEach(() => {
 });
 
 describe('OnboardingTour desmontaje', () => {
+  it('un usuario que no ha visto la guía no ve ningún beacon: arranca directo en el primer paso', () => {
+    render(<OnboardingTour />);
+    avanzar(1000);
+    expect(screen.getByText('Siguiente')).toBeInTheDocument();
+    expect(document.querySelectorAll('.react-joyride__beacon, [data-test-id="beacon"]')).toHaveLength(0);
+    fireEvent.click(screen.getByText('Siguiente'));
+    avanzar(500);
+    expect(document.querySelectorAll('.react-joyride__beacon, [data-test-id="beacon"]')).toHaveLength(0);
+  });
+
   it('un paso cuyo objetivo no está visible no pinta el spinner de carga de joyride', () => {
     render(<OnboardingTour />);
     avanzar(1000);

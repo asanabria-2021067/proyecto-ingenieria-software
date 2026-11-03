@@ -51,7 +51,10 @@ vi.mock('@/hooks/use-current-user', () => {
     }),
   };
 });
-vi.mock('@/hooks/use-horas-semestre', () => ({ useHorasActual: () => ({ data: undefined }) }));
+vi.mock('@/hooks/use-horas-semestre', () => ({
+  useHorasActual: () => ({ data: undefined }),
+  useHorasProgreso: () => ({ data: undefined }),
+}));
 vi.mock('@/components/hours/semestre-horas-card', () => ({ SemestreHorasCard: () => null }));
 vi.mock('@/hooks/use-social', () => ({
   useFeedSocial: () => ({ proyectosDeAmigos: [], proyectosDeSeguidos: [] }),

@@ -16,9 +16,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
-  getDashboardStats,
   getMisTareas,
-  type DashboardStats,
   type MiTareaDTO,
 } from '@/lib/services/users';
 import { getMyProjects } from '@/lib/services/projects';
@@ -53,6 +51,7 @@ import {
   useDejarDeRecibirCalendario,
 } from '@/hooks/use-calendar-shares';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useHorasProgreso } from '@/hooks/use-horas-semestre';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { aviso } from '@/lib/mensajes';
 import { getCalendariosCompartidos, type EventoCompartidoDTO } from '@/lib/services/calendar-shares';
@@ -202,11 +201,6 @@ export default function CalendarioPage() {
   } = useQuery<MiTareaDTO[]>({
     queryKey: ['mis-tareas'],
     queryFn: () => getMisTareas(),
-  });
-
-  const { data: stats } = useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats'],
-    queryFn: getDashboardStats,
   });
 
   const { data: misProyectos = SIN_PROYECTOS } = useQuery<MiProyectoListItemDTO[]>({
@@ -528,18 +522,16 @@ export default function CalendarioPage() {
     if (vista === 'mes') setSelectedKey(key);
   };
 
-  // Meta de horas: misma fuente y misma regla que el dashboard (VIEW-08) —
+  // Meta de horas: misma fuente que «Horas de este semestre» (avance y meta del semestre).
   // Beca y Extensión nunca se suman. Se muestra la primera que aplique.
+  const { data: horasProgreso } = useHorasProgreso();
   const metaHoras = useMemo<MetaHoras | null>(() => {
-    if (!stats) return null;
-    if (stats.horasBecaRequeridas !== null && stats.horasBecaRequeridas > 0) {
-      return { etiqueta: 'Horas Beca', actual: stats.horasBeca, requeridas: stats.horasBecaRequeridas };
-    }
-    if (stats.horasExtensionRequeridas !== null && stats.horasExtensionRequeridas > 0) {
-      return { etiqueta: 'Horas de Extensión', actual: stats.horasExtension, requeridas: stats.horasExtensionRequeridas };
-    }
+    if (!horasProgreso) return null;
+    const { beca, extension } = horasProgreso;
+    if (beca.meta !== null && beca.meta > 0) return { etiqueta: 'Horas beca del semestre', actual: beca.avance, requeridas: beca.meta };
+    if (extension.meta !== null && extension.meta > 0) return { etiqueta: 'Horas de extensión del semestre', actual: extension.avance, requeridas: extension.meta };
     return null;
-  }, [stats]);
+  }, [horasProgreso]);
 
   // Nuevo evento: en Día, ese día a las 09:00; en Mes con un día elegido, ese día; si no, la siguiente hora.
   const initialDateParaNuevoEvento =

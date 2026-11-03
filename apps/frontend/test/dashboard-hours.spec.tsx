@@ -60,7 +60,11 @@ vi.mock('@/hooks/use-current-user', () => ({
   perfilPospuesto: () => false,
   PERFIL_POSPUESTO_KEY: 'perfil_asistente_pospuesto',
 }));
-vi.mock('@/hooks/use-horas-semestre', () => ({ useHorasActual: () => ({ data: undefined }) }));
+const progresoMock = vi.hoisted(() => ({ data: undefined as unknown }));
+vi.mock('@/hooks/use-horas-semestre', () => ({
+  useHorasActual: () => ({ data: undefined }),
+  useHorasProgreso: () => progresoMock,
+}));
 vi.mock('@/components/hours/semestre-horas-card', () => ({ SemestreHorasCard: () => null }));
 vi.mock('@/hooks/use-social', () => ({
   useFeedSocial: () => ({ proyectosDeAmigos: [], proyectosDeSeguidos: [] }),
@@ -106,6 +110,7 @@ async function renderDashboard() {
 }
 
 beforeEach(() => {
+  progresoMock.data = undefined;
   getDashboardStatsMock.mockResolvedValue(stats());
 });
 
@@ -122,7 +127,7 @@ describe('Dashboard — horas abiertas y acreditadas (VIEW-08 / F018)', () => {
       name: 'Horas Registradas',
     });
     const acreditadas = screen.getByRole('group', {
-      name: 'Horas acreditadas',
+      name: 'Horas acreditadas en total',
     });
     expect(within(abiertas).getByText('12.5')).toBeInTheDocument();
     expect(within(acreditadas).getByText('40')).toBeInTheDocument();
@@ -131,7 +136,7 @@ describe('Dashboard — horas abiertas y acreditadas (VIEW-08 / F018)', () => {
 
   it('no existe un KPI que sume abiertas y acreditadas', async () => {
     await renderDashboard();
-    await screen.findByRole('group', { name: 'Horas acreditadas' });
+    await screen.findByRole('group', { name: 'Horas acreditadas en total' });
 
     expect(screen.queryByText('52.5')).not.toBeInTheDocument();
     expect(screen.queryByText('52.50')).not.toBeInTheDocument();
@@ -140,13 +145,13 @@ describe('Dashboard — horas abiertas y acreditadas (VIEW-08 / F018)', () => {
 
   it('cada métrica tiene un tooltip accesible y un estado corto siempre visible', async () => {
     await renderDashboard();
-    await screen.findByRole('group', { name: 'Horas acreditadas' });
+    await screen.findByRole('group', { name: 'Horas acreditadas en total' });
 
     expect(
       screen.getByRole('button', { name: 'Qué significa: Horas Registradas' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Qué significa: Horas acreditadas' }),
+      screen.getByRole('button', { name: 'Qué significa: Horas acreditadas en total' }),
     ).toBeInTheDocument();
     // el detalle completo vive en el tooltip (bajo demanda); el estado corto
     // siempre visible es lo que reemplaza al párrafo permanente de antes.
@@ -175,5 +180,26 @@ describe('Dashboard — horas abiertas y acreditadas (VIEW-08 / F018)', () => {
       within(abiertas).getByText('No disponible por ahora'),
     ).toBeInTheDocument();
     expect(within(abiertas).queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it('las tarjetas beca y extensión usan el avance y la meta del semestre (Carlos: 20 de 50 y 10 de 40), no el total histórico', async () => {
+    const tramo = (meta: number, declaradas: number) => ({ meta, declaradas, acreditadas: 0, avance: declaradas, falta: meta - declaradas, fechaProyectada: null, enRiesgo: false });
+    progresoMock.data = {
+      semestre: { anio: 2026, periodo: 2, inicio: '2026-07-01', fin: '2026-12-31' },
+      beca: tramo(50, 20),
+      extension: tramo(40, 10),
+    };
+    getDashboardStatsMock.mockResolvedValue(
+      stats({ horasBeca: 10, horasBecaRequeridas: 50, horasExtension: 0, horasExtensionRequeridas: 40 }),
+    );
+    await renderDashboard();
+
+    const beca = (await screen.findByText('Horas beca del semestre')).parentElement!.parentElement!;
+    expect(within(beca).getByText('20')).toBeInTheDocument();
+    expect(within(beca).getByText('/ 50')).toBeInTheDocument();
+    const extension = screen.getByText('Horas de extensión del semestre').parentElement!.parentElement!;
+    expect(within(extension).getByText('10')).toBeInTheDocument();
+    expect(within(extension).getByText('/ 40')).toBeInTheDocument();
+    expect(screen.queryByText('Horas Beca Acumuladas')).not.toBeInTheDocument();
   });
 });
