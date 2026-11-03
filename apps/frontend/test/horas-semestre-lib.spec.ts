@@ -56,9 +56,16 @@ describe('textos de semestre', () => {
     expect(formatearDiaMes('2026-11-05')).toBe('05/11');
   });
 
-  it('proyecta con la fecha del backend', () => {
+  it('proyecta con la fecha del backend, con año', () => {
     expect(textoProyeccion('beca', tramo())).toBe('A este ritmo completas tus horas beca el 05/11');
     expect(textoProyeccion('extension', tramo())).toBe('A este ritmo completas tus horas de extensión el 05/11');
+  });
+
+  it('no promete una fecha posterior al fin del semestre', () => {
+    const aviso = 'A este ritmo no alcanzas la meta este semestre';
+    expect(textoProyeccion('beca', tramo({ fechaProyectada: '2027-01-31' }), '2026-12-31')).toBe(aviso);
+    expect(textoProyeccion('beca', tramo({ fechaProyectada: '2026-12-31' }), '2026-12-31')).toMatch(/31\/12/);
+    expect(textoProyeccion('beca', tramo({ fechaProyectada: '2026-11-05' }), '2026-12-31')).toMatch(/05\/11/);
   });
 
   it('avisa si ya cumplio, si no hay ritmo o si no hay meta', () => {

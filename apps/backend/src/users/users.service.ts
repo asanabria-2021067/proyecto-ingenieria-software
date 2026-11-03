@@ -2,6 +2,8 @@ import { Injectable, InternalServerErrorException, NotFoundException } from '@ne
 import { Prisma, TipoExperiencia } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectHoursSummaryService } from '../sprints/project-hours-summary.service';
+import { resolverMetas, selectRegistroActual } from '../horas-semestre/metas-vigentes';
+import { semestreDe } from '../horas-semestre/semestre';
 import {
   UpdateProfileDto,
   CreateExperienciaDto,
@@ -95,6 +97,7 @@ export class UsersService {
     const user = await this.prisma.usuario.findUnique({
       where: { idUsuario: userId },
       include: {
+        ...selectRegistroActual(),
         perfil: {
           include: { carrera: true },
         },
@@ -133,6 +136,7 @@ export class UsersService {
         }),
       ]);
 
+    const metas = resolverMetas(user.registrosHorasSemestre, user.perfil);
     const profile = {
       nombreCompleto: `${user.nombre ?? ''} ${user.apellido ?? ''}`.trim(),
       correoInstitucional: user.correo ?? '',
@@ -151,8 +155,8 @@ export class UsersService {
       linkedinUrl: user.perfil?.linkedinUrl ?? '',
       urlCv: user.perfil?.urlCv ?? '',
       disponibilidadHorasSemana: user.perfil?.disponibilidadHorasSemana ?? 0,
-      horasBecaRequeridas: user.perfil?.horasBecaRequeridas ?? null,
-      horasExtensionRequeridas: user.perfil?.horasExtensionRequeridas ?? null,
+      horasBecaRequeridas: metas.beca,
+      horasExtensionRequeridas: metas.extension,
 
       habilidades: user.habilidades.map((item) => ({
         idHabilidad: item.idHabilidad,
@@ -262,6 +266,18 @@ export class UsersService {
         });
       }
 
+      // La meta que ve el estudiante es la del semestre: si ya tiene registro, se edita tambien ahi.
+      if (dto.horasBecaRequeridas !== undefined || dto.horasExtensionRequeridas !== undefined) {
+        const { anio, periodo } = semestreDe(new Date());
+        await tx.registroHorasSemestre.updateMany({
+          where: { idUsuario: userId, anio, periodo },
+          data: {
+            ...(dto.horasBecaRequeridas !== undefined && { metaBeca: dto.horasBecaRequeridas }),
+            ...(dto.horasExtensionRequeridas !== undefined && { metaExtension: dto.horasExtensionRequeridas }),
+          },
+        });
+      }
+
       // Devolvemos el perfil actualizado
       return this.getProfile(userId);
     });
@@ -364,8 +380,10 @@ export class UsersService {
       select: {
         horasBecaRequeridas: true,
         horasExtensionRequeridas: true,
+        usuario: { select: selectRegistroActual() },
       },
     });
+    const metas = resolverMetas(perfil?.usuario?.registrosHorasSemestre, perfil);
 
     const [horasData, proyectosActivos, postulacionesRecientes, horasBecaResult, horasExtensionResult] =
       await Promise.all([
@@ -426,9 +444,9 @@ export class UsersService {
 
     return {
       horasBeca: Number(horasBecaResult._sum.horasAprobadas ?? 0),
-      horasBecaRequeridas: perfil?.horasBecaRequeridas ?? null,
+      horasBecaRequeridas: metas.beca,
       horasExtension: Number(horasExtensionResult._sum.horasAprobadas ?? 0),
-      horasExtensionRequeridas: perfil?.horasExtensionRequeridas ?? null,
+      horasExtensionRequeridas: metas.extension,
       horasTotal: Number(horasData._sum.horasAprobadas ?? 0),
       proyectosActivos,
       postulacionesRecientes,

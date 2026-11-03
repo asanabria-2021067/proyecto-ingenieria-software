@@ -258,6 +258,23 @@ describe('MyHoursProjectList', () => {
     expect(within(seccion('Proyectos cerrados')).getByRole('heading', { name: 'Archivo' })).toBeInTheDocument();
   });
 
+  it('un borrador o proyecto en revisión sin horas no se lista como cerrado', () => {
+    render(
+      <MyHoursProjectList
+        proyectos={[
+          proyecto({ idProyecto: 5, tituloProyecto: 'Borrador org', estadoProyecto: 'BORRADOR', abierto: false, tareas: [] }),
+          proyecto({ idProyecto: 6, tituloProyecto: 'En revision', estadoProyecto: 'EN_REVISION', abierto: false, tareas: [] }),
+          proyecto({ idProyecto: 7, tituloProyecto: 'Archivo', estadoProyecto: 'CERRADO', abierto: false, tareas: [] }),
+        ]}
+      />,
+    );
+
+    const cerrados = seccion('Proyectos cerrados');
+    expect(within(cerrados).getByRole('heading', { name: 'Archivo' })).toBeInTheDocument();
+    expect(screen.queryByText('Borrador org')).not.toBeInTheDocument();
+    expect(screen.queryByText('En revision')).not.toBeInTheDocument();
+  });
+
   it('sin proyectos cerrados no pinta su sección', () => {
     render(<MyHoursProjectList proyectos={[proyecto()]} />);
 

@@ -10,6 +10,7 @@ import {
   TipoProyecto,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolverMetas, selectRegistroActual } from '../horas-semestre/metas-vigentes';
 
 /**
  * C069 (06 v2 §40/§46 ProjectHoursSummary): proveedor de LECTURA de las horas
@@ -409,7 +410,7 @@ export class ProjectHoursSummaryService {
     const [perfil, tramos, agregados, participacionesActivas] = await Promise.all([
       this.prisma.perfilEstudiante.findUnique({
         where: { idUsuario: userId },
-        select: { horasBecaRequeridas: true, horasExtensionRequeridas: true },
+        select: { horasBecaRequeridas: true, horasExtensionRequeridas: true, usuario: { select: selectRegistroActual() } },
       }),
       // Todos los tramos del usuario, también los de participaciones retiradas
       // y los de tareas eliminadas; los de proyectos eliminados no se leen.
@@ -559,11 +560,12 @@ export class ProjectHoursSummaryService {
         a.idProyecto - b.idProyecto,
     );
 
+    const metas = resolverMetas(perfil?.usuario?.registrosHorasSemestre, perfil);
     return {
       idUsuario: userId,
       requisitos: {
-        horasBecaRequeridas: perfil?.horasBecaRequeridas ?? null,
-        horasExtensionRequeridas: perfil?.horasExtensionRequeridas ?? null,
+        horasBecaRequeridas: metas.beca,
+        horasExtensionRequeridas: metas.extension,
       },
       totales: {
         registradasEnProyectosAbiertos: dec2(totales.registradas),

@@ -11,10 +11,10 @@ import { useHorasProgreso } from '@/hooks/use-horas-semestre';
 import { ETIQUETA_TIPO, etiquetaSemestre, porcentajeAvance, textoProyeccion, type TipoHorasSemestre } from '@/lib/hours/semestre';
 import type { TramoProgreso } from '@/lib/services/horas-semestre';
 
-function Tramo({ tipo, tramo }: { tipo: TipoHorasSemestre; tramo: TramoProgreso }) {
+function Tramo({ tipo, tramo, finSemestre }: { tipo: TipoHorasSemestre; tramo: TramoProgreso; finSemestre: string }) {
   const etiqueta = ETIQUETA_TIPO[tipo];
   const porcentaje = porcentajeAvance(tramo.avance, tramo.meta);
-  const proyeccion = textoProyeccion(tipo, tramo);
+  const proyeccion = textoProyeccion(tipo, tramo, finSemestre);
   const id = `semestre-${tipo}`;
   return (
     <li aria-labelledby={id} className="flex flex-col gap-tight">
@@ -94,8 +94,8 @@ export function SemestreHorasCard({ editable = false }: { editable?: boolean }) 
         </p>
       ) : (
         <ul className="flex flex-col gap-card">
-          {visible(data.beca) && <Tramo tipo="beca" tramo={data.beca} />}
-          {visible(data.extension) && <Tramo tipo="extension" tramo={data.extension} />}
+          {visible(data.beca) && <Tramo tipo="beca" tramo={data.beca} finSemestre={data.semestre.fin} />}
+          {visible(data.extension) && <Tramo tipo="extension" tramo={data.extension} finSemestre={data.semestre.fin} />}
         </ul>
       )}
 
