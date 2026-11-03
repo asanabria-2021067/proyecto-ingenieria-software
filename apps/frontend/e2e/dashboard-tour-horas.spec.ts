@@ -1,5 +1,6 @@
 import { test, expect } from './support/test';
 import { login } from './support/auth';
+import { API_URL } from './support/realtime';
 
 /**
  * FIX: sin beacon fuera del paso activo del tour, y las tarjetas de horas del
@@ -23,6 +24,13 @@ test('un usuario que no ha visto el tour no tiene ningún beacon', async ({ page
 
 test('las tarjetas de horas del semestre coinciden con «Horas de este semestre»', async ({ page }) => {
   await login(page, CARLOS);
+  // La siembra del E2E registra el semestre sin metas, y sin metas no hay tarjetas que comparar.
+  const progreso = await (await page.request.get(`${API_URL}/api/horas-semestre/progreso`)).json();
+  if (!progreso.beca.meta || !progreso.extension.meta) {
+    const res = await page.request.put(`${API_URL}/api/horas-semestre/actual`, { data: { metaBeca: 50, metaExtension: 40 } });
+    expect(res.ok()).toBe(true);
+    await page.reload();
+  }
   const bloque = page.getByRole('region', { name: 'Horas de este semestre' });
   await expect(bloque).toBeVisible();
   for (const [tarjeta, tramo] of [
