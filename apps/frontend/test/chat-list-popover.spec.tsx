@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+const orgsMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/services/organizations', () => ({ getMisOrganizaciones: () => orgsMock() }));
 vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 } }) }));
 
 const abrirChat = vi.fn();
@@ -54,6 +56,7 @@ function renderPopover() {
 }
 
 afterEach(() => {
+  orgsMock.mockReset();
   cleanup();
   vi.clearAllMocks();
 });
@@ -179,5 +182,22 @@ describe('ChatListPopover', () => {
     const activa = (await screen.findByText('Luis Perez')).closest('button');
     expect(activa).toHaveAttribute('aria-current', 'true');
     expect(screen.getByText('Rosa Fuentes').closest('button')).not.toHaveAttribute('aria-current');
+  });
+
+  it('lista el #general de mis organizaciones con su nombre y lo encuentra al buscar', async () => {
+    listAllConversationsMock.mockResolvedValue([]);
+    orgsMock.mockResolvedValue([
+      { idOrganizacion: 8, nombreOrganizacion: 'Verificacion QA', logoUrl: null, miRol: 'LECTURA' },
+      { idOrganizacion: 9, nombreOrganizacion: 'Otra Org', logoUrl: null, miRol: 'EDITOR' },
+    ]);
+    renderPopover();
+
+    const enlace = (await screen.findByText('Verificacion QA')).closest('a');
+    expect(enlace).toHaveAttribute('href', '/dashboard/organizaciones/8?tab=chat');
+    expect(screen.getByText('Otra Org')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Buscar por nombre de chat o por mensajes enviados'), { target: { value: 'verifi' } });
+    await waitFor(() => expect(screen.queryByText('Otra Org')).not.toBeInTheDocument());
+    expect(screen.getByText('Verificacion QA')).toBeInTheDocument();
   });
 });

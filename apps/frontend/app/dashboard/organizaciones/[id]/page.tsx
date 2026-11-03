@@ -2,7 +2,7 @@
 
 import { PageTitle } from '@/components/ui/page-title';
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Archive, ArrowRightLeft, Building2, ChevronLeft, ExternalLink, Folder, Globe, LogOut, Lock, MoreVertical, Pencil, Plus, UserPlus, Users } from 'lucide-react';
 import { dashboardPage } from '@/components/layout/dashboard-page';
@@ -39,6 +39,7 @@ import { getApiErrorStatus } from '@/components/projects/api-error';
 export default function OrganizacionPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
+  const tabInicial = useSearchParams().get('tab') === 'chat' ? 'chat' : 'proyectos';
   const id = Number(params.id);
   const { data: usuario } = useCurrentUser();
   const { data: org, isLoading, isError, error } = useOrganizacion(id);
@@ -150,7 +151,7 @@ export default function OrganizacionPage() {
       )}
 
       <section className="card-base mb-6 flex flex-col gap-5">
-        <div className="flex min-w-0 gap-4">
+        <div className="flex min-w-0 flex-col gap-4 sm:flex-row">
           <OrgAvatar nombre={org.nombreOrganizacion} logoUrl={org.logoUrl} className="size-16 sm:size-20" />
           <div className="min-w-0">
             <PageTitle className="type-display break-words">{org.nombreOrganizacion}</PageTitle>
@@ -273,7 +274,7 @@ export default function OrganizacionPage() {
         )}
       </section>
 
-      <Tabs defaultValue="proyectos">
+      <Tabs defaultValue={tabInicial}>
         <TabsList className="mb-4.5 h-auto flex-wrap">
           <TabsTrigger value="proyectos">Proyectos</TabsTrigger>
           <TabsTrigger value="portafolio">Portafolio</TabsTrigger>

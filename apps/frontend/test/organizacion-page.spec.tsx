@@ -10,6 +10,7 @@ const estado = vi.hoisted(() => {
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: '7' }),
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: estado.push, replace: vi.fn() }),
 }));
 vi.mock('@/hooks/use-current-user', () => ({
