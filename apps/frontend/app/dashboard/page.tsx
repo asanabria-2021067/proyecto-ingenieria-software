@@ -28,7 +28,7 @@ import {
 import CompleteProfileDialog from '@/components/profile/CompleteProfileDialog';
 import { SemestreHorasCard } from '@/components/hours/semestre-horas-card';
 import { VencenEstaSemana } from '@/components/dashboard/vencen-esta-semana';
-import { useHorasActual } from '@/hooks/use-horas-semestre';
+import { useHorasActual, useHorasProgreso } from '@/hooks/use-horas-semestre';
 import ProfileCompletionCard, {
   profileCompletionPercent,
 } from '@/components/profile/ProfileCompletionCard';
@@ -345,6 +345,8 @@ export default function DashboardPage() {
     'destacados',
   );
   const { data: horasActual } = useHorasActual();
+  // Misma fuente que «Horas de este semestre»: declaradas + acreditadas del semestre contra la meta del semestre.
+  const { data: horasProgreso } = useHorasProgreso();
   // Perfil completo pero sin registro de horas del semestre: el asistente reaparece solo con ese paso.
   const soloHorasAhora = !!user && !isProfileIncomplete(user) && !wizardReopened;
   const showWizard = useMemo(
@@ -394,10 +396,10 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const horasBeca = stats?.horasBeca ?? 0;
-  const horasBecaRequeridas = stats?.horasBecaRequeridas ?? null;
-  const horasExtension = stats?.horasExtension ?? 0;
-  const horasExtensionRequeridas = stats?.horasExtensionRequeridas ?? null;
+  const horasBeca = horasProgreso?.beca.avance ?? 0;
+  const horasBecaRequeridas = horasProgreso?.beca.meta ?? null;
+  const horasExtension = horasProgreso?.extension.avance ?? 0;
+  const horasExtensionRequeridas = horasProgreso?.extension.meta ?? null;
   const proyectosActivos = stats?.proyectosActivos ?? 0;
   // VIEW-08: dos métricas SEPARADAS (nunca se suman): significan cosas distintas.
   const horasAbiertas = formatearHorasDashboard(
@@ -490,7 +492,7 @@ export default function DashboardPage() {
               <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-sage-kpi-border bg-sage-kpi p-stack">
                 <div className="flex items-start justify-between gap-tight">
                   <span className="type-meta uppercase tracking-wider text-sage-ink-muted">
-                    Horas Beca Acumuladas
+                    Horas beca del semestre
                   </span>
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-sage-open text-sage-accent">
                     <GraduationCap className="h-4 w-4" />
@@ -518,7 +520,7 @@ export default function DashboardPage() {
               <div className="relative flex min-h-36 flex-col justify-between overflow-hidden rounded-2xl border border-sage-kpi-border bg-sage-kpi p-stack">
                 <div className="flex items-start justify-between gap-tight">
                   <span className="type-meta uppercase tracking-wider text-sage-ink-muted">
-                    Horas de Extensión
+                    Horas de extensión del semestre
                   </span>
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-sage-open text-sage-accent">
                     <HeartHandshake className="h-4 w-4" />
@@ -574,7 +576,7 @@ export default function DashboardPage() {
             />
             <HorasKpiCard
               id="stats-horas-acreditadas"
-              titulo="Horas acreditadas"
+              titulo="Horas acreditadas en total"
               valor={horasAcreditadas}
               ayuda="Horas aprobadas por administración al cerrar tus proyectos. Ya no cambian."
               estadoLabel="Validado oficial"

@@ -186,7 +186,7 @@ export default function OnboardingTour() {
       content:
         'Tu portal inteligente para gestionar proyectos, horas beca y extensión en la UVG. Permítenos darte un recorrido rápido de 1 minuto por tus herramientas principales.',
       placement: 'center',
-      disableBeacon: true,
+      skipBeacon: true,
     },
     {
       target: '#stats-container',
@@ -194,7 +194,7 @@ export default function OnboardingTour() {
       content:
         'Mantén el control en tiempo real de tus Horas Beca y de Extensión acumuladas. Aquí verás tu avance respecto a la meta y tus proyectos activos.',
       placement: 'bottom',
-      disableBeacon: true,
+      skipBeacon: true,
     },
     {
       target: '#nav-item-explorar-proyectos',
@@ -202,7 +202,7 @@ export default function OnboardingTour() {
       content:
         'Explora la lista completa de proyectos disponibles en la universidad, fíltralos por tus intereses y postúlate fácilmente.',
       placement: 'right',
-      disableBeacon: true,
+      skipBeacon: true,
     },
     {
       target: '#nav-item-mis-postulaciones',
@@ -210,7 +210,7 @@ export default function OnboardingTour() {
       content:
         'Lleva el control del estado de tus aplicaciones. Descubre de inmediato si has sido aceptado, si estás en revisión o si hay feedback de los directores.',
       placement: 'right',
-      disableBeacon: true,
+      skipBeacon: true,
     },
     {
       target: '#nav-item-mensajes',
@@ -218,7 +218,7 @@ export default function OnboardingTour() {
       content:
         'Conversa con tus equipos y organizaciones en una sola pantalla: busca, revisa lo no leído, adjunta archivos, graba notas de voz y crea encuestas.',
       placement: 'right',
-      disableBeacon: true,
+      skipBeacon: true,
     },
     {
       target: '#dashboard-theme-toggle',
@@ -226,7 +226,7 @@ export default function OnboardingTour() {
       content:
         'Cambia el aspecto visual de la aplicación según tu preferencia con un solo clic.',
       placement: 'bottom',
-      disableBeacon: true,
+      skipBeacon: true,
     },
     {
       target: '#dashboard-account-menu',
@@ -234,7 +234,7 @@ export default function OnboardingTour() {
       content:
         'Mantén al día tus habilidades e intereses desde tu cuenta, aquí abajo, para que los directores de proyectos puedan invitarte a colaborar.',
       placement: 'top',
-      disableBeacon: true,
+      skipBeacon: true,
     },
   ];
 

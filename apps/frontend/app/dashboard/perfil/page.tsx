@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
 import { SafeExternalLink } from '@/components/profile/safe-external-link';
-import { getDashboardStats, type DashboardStats } from '@/lib/services/users';
+import { useHorasProgreso } from '@/hooks/use-horas-semestre';
 import { getAdminUserDetail, type AdminUserDetail } from '@/lib/services/admin';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
@@ -84,21 +84,12 @@ function rolLabel(rol: string) {
 export default function PerfilPage() {
   const router = useRouter();
   const { data: user, isLoading } = useCurrentUser();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [statsCargando, setStatsCargando] = useState(true);
+  // Misma fuente que «Horas de este semestre»: avance del semestre contra la meta del semestre.
+  const { data: horas, isLoading: statsCargando } = useHorasProgreso();
   const [adminDetail, setAdminDetail] = useState<AdminUserDetail | null>(null);
 
   const isAdmin = !isLoading && isAdminUser(user);
   const insignias = useMisInsignias(!isLoading && !isAdmin);
-
-  useEffect(() => {
-    if (!isLoading && !isAdmin) {
-      getDashboardStats()
-        .then(setStats)
-        .catch(() => {})
-        .finally(() => setStatsCargando(false));
-    }
-  }, [isLoading, isAdmin]);
 
   useEffect(() => {
     if (!isLoading && isAdmin && user?.idUsuario) {
@@ -211,23 +202,23 @@ export default function PerfilPage() {
                 <article className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-outline">
-                      Horas beca
+                      Horas beca del semestre
                     </p>
                     <GraduationCap className="h-5 w-5 text-primary" />
                   </div>
                   <div className="mt-3 flex items-end gap-3">
                     <span className="text-5xl font-black tracking-tighter text-primary">
-                      {stats?.horasBeca ?? 0}
+                      {horas?.beca.avance ?? 0}
                     </span>
                     <span className="mb-1 text-outline">
-                      / {stats?.horasBecaRequeridas ?? 'N/A'} hrs
+                      / {horas?.beca.meta ?? 'N/A'} hrs
                     </span>
                   </div>
                   <div className="mt-4 h-3 rounded-full bg-surface-container-high">
                     <div
                       className="h-full rounded-full bg-primary"
                       style={{
-                        width: `${progreso(stats?.horasBeca ?? 0, stats?.horasBecaRequeridas ?? null)}%`,
+                        width: `${progreso(horas?.beca.avance ?? 0, horas?.beca.meta ?? null)}%`,
                       }}
                     />
                   </div>
@@ -236,16 +227,16 @@ export default function PerfilPage() {
                 <article className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-outline">
-                      Horas extensión
+                      Horas de extensión del semestre
                     </p>
                     <HeartHandshake className="h-5 w-5 text-secondary" />
                   </div>
                   <div className="mt-3 flex items-end gap-3">
                     <span className="text-5xl font-black tracking-tighter text-secondary">
-                      {stats?.horasExtension ?? 0}
+                      {horas?.extension.avance ?? 0}
                     </span>
                     <span className="mb-1 text-outline">
-                      / {stats?.horasExtensionRequeridas ?? 'N/A'} hrs
+                      / {horas?.extension.meta ?? 'N/A'} hrs
                     </span>
                   </div>
                   <div className="mt-4 h-3 rounded-full bg-surface-container-high">
@@ -253,8 +244,8 @@ export default function PerfilPage() {
                       className="h-full rounded-full bg-secondary"
                       style={{
                         width: `${progreso(
-                          stats?.horasExtension ?? 0,
-                          stats?.horasExtensionRequeridas ?? null,
+                          horas?.extension.avance ?? 0,
+                          horas?.extension.meta ?? null,
                         )}%`,
                       }}
                     />

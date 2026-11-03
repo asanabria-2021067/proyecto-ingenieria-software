@@ -54,6 +54,8 @@ const sesionMock = vi.hoisted(() => ({ usuario: { idUsuario: 1, nombre: 'Carlos'
 vi.mock('../hooks/use-current-user', () => ({
   useCurrentUser: () => ({ data: sesionMock.usuario }),
 }));
+const horasProgresoMock = vi.hoisted(() => ({ data: undefined as unknown }));
+vi.mock('../hooks/use-horas-semestre', () => ({ useHorasProgreso: () => horasProgresoMock }));
 vi.mock('../hooks/use-project-members', () => ({ useProjectMembers: () => ({ members: [], isLoading: false }) }));
 // El mapa (leaflet) no se necesita en la página: el diálogo monta un hueco.
 vi.mock('next/dynamic', () => ({ default: () => () => null }));
@@ -82,6 +84,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(HOY);
   usersMock.getMisTareas.mockResolvedValue([]);
+  horasProgresoMock.data = undefined;
   usersMock.getDashboardStats.mockResolvedValue({ horasBeca: 0, horasBecaRequeridas: null, horasExtension: 0, horasExtensionRequeridas: null });
   projectsMock.getMyProjects.mockResolvedValue([]);
   eventsMock.getMisEventos.mockResolvedValue([]);
@@ -965,7 +968,7 @@ describe('CalendarioPage — una sola representación de Semana montada (G04-C03
 
 describe('CalendarioPage — jerarquía de encabezados y grupos con nombre (G04-C07, UI-32)', () => {
   it('los encabezados no saltan niveles: h1 de la página, h2 del periodo y de la columna, h3 de sus secciones', async () => {
-    usersMock.getDashboardStats.mockResolvedValue({ horasBeca: 10, horasBecaRequeridas: 40, horasExtension: 0, horasExtensionRequeridas: null });
+    horasProgresoMock.data = { beca: { meta: 40, avance: 10 }, extension: { meta: null, avance: 0 } };
     await renderPage();
     await screen.findByRole('heading', { name: 'Meta de horas' });
     const niveles = screen.getAllByRole('heading').map((h) => Number(h.tagName.slice(1)));
