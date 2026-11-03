@@ -116,10 +116,6 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
     if (!open || !currentUser) return;
     setBiografia(currentUser.perfil?.biografia ?? '');
     setDisponibilidad(currentUser.perfil?.disponibilidadHorasSemana ?? 10);
-    setRequiereHorasBeca((currentUser.perfil?.horasBecaRequeridas ?? 0) > 0);
-    setHorasBecaRequeridas(currentUser.perfil?.horasBecaRequeridas ?? 150);
-    setRequiereHorasExtension((currentUser.perfil?.horasExtensionRequeridas ?? 0) > 0);
-    setHorasExtensionRequeridas(currentUser.perfil?.horasExtensionRequeridas ?? 40);
     setEnlacePortafolio(currentUser.perfil?.enlacePortafolio ?? '');
     setGithubUrl(currentUser.perfil?.githubUrl ?? '');
     setLinkedinUrl(currentUser.perfil?.linkedinUrl ?? '');
@@ -141,12 +137,16 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
   // La meta vigente es la del registro del semestre; la del perfil (legacy) solo es respaldo.
   const registroActual = horasActual?.registro;
   useEffect(() => {
-    if (!open || !registroActual) return;
-    setRequiereHorasBeca((registroActual.metaBeca ?? 0) > 0);
-    setHorasBecaRequeridas(registroActual.metaBeca ?? 150);
-    setRequiereHorasExtension((registroActual.metaExtension ?? 0) > 0);
-    setHorasExtensionRequeridas(registroActual.metaExtension ?? 40);
-  }, [open, registroActual]);
+    if (!open || !currentUser) return;
+    const beca = registroActual ? registroActual.metaBeca : currentUser.perfil?.horasBecaRequeridas;
+    const ext = registroActual
+      ? registroActual.metaExtension
+      : currentUser.perfil?.horasExtensionRequeridas;
+    setRequiereHorasBeca((beca ?? 0) > 0);
+    setHorasBecaRequeridas(beca ?? 150);
+    setRequiereHorasExtension((ext ?? 0) > 0);
+    setHorasExtensionRequeridas(ext ?? 40);
+  }, [open, currentUser, registroActual]);
 
   const normalizeText = (text: string) =>
     text
@@ -362,14 +362,12 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
             : null,
           ...(fotoUrl && { fotoUrl }),
         });
-        // Sin registro del semestre, la meta que acaba de indicar es el valor inicial del paso de horas.
-        if (!horasActual?.registro) {
-          setHorasForm((f) => ({
-            ...f,
-            metaBeca: requiereHorasBeca ? String(horasBecaRequeridas) : '',
-            metaExtension: requiereHorasExtension ? String(horasExtensionRequeridas) : '',
-          }));
-        }
+        // La meta que acaba de indicar es la que debe mostrar y guardar el paso de horas.
+        setHorasForm((f) => ({
+          ...f,
+          metaBeca: requiereHorasBeca ? String(horasBecaRequeridas) : '',
+          metaExtension: requiereHorasExtension ? String(horasExtensionRequeridas) : '',
+        }));
       } else if (key === 'habilidades') {
         await replaceHabilidades(selectedHabilidades);
       } else if (key === 'intereses') {
