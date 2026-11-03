@@ -296,17 +296,17 @@ test.describe('HU-204: estados de carga del estudiante', () => {
       await page.goto('/dashboard/perfil');
       await horas.pedida;
       await esperarSkeleton(page, 'Cargando tus horas');
-      await expect(page.getByText('Horas beca', { exact: true })).toHaveCount(0);
+      await expect(page.getByText('Horas beca del semestre', { exact: true })).toHaveCount(0);
 
       horas.soltar();
       await sinSkeleton(page, 'Cargando tus horas');
-      await expect(page.getByText('Horas beca', { exact: true })).toBeVisible();
+      await expect(page.getByText('Horas beca del semestre', { exact: true })).toBeVisible();
     });
 
     test('si las horas fallan, el skeleton no se queda', async ({ page }) => {
       await responder(page, estadisticas, 500, { message: 'fallo inducido' });
       await page.goto('/dashboard/perfil');
-      await expect(page.getByText('Horas beca', { exact: true })).toBeVisible(TRAS_REINTENTOS);
+      await expect(page.getByText('Horas beca del semestre', { exact: true })).toBeVisible(TRAS_REINTENTOS);
       await sinSkeleton(page, 'Cargando tus horas');
     });
   });
