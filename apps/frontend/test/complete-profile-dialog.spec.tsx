@@ -465,4 +465,27 @@ describe('CompleteProfileDialog (T-203)', () => {
     });
     expect(updateProfileMock).not.toHaveBeenCalled();
   });
+
+  it('todos los campos de cada paso tienen nombre accesible (axe: label)', async () => {
+    renderDialog();
+    await screen.findByDisplayValue('10');
+    const sinNombre = () =>
+      Array.from(
+        screen.getByRole('dialog').querySelectorAll<HTMLInputElement>('input, select, textarea'),
+      )
+        .filter((el) => !(el.labels?.length || el.getAttribute('aria-label')?.trim()))
+        .map((el) => el.outerHTML);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Horas beca/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Horas de extensión/i }));
+    expect(sinNombre()).toEqual([]);
+
+    for (let paso = 1; paso <= 5; paso++) {
+      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+      await screen.findByText(new RegExp(`Paso ${paso + 1} de 6`));
+      if (paso === 2) fireEvent.click(await screen.findByRole('button', { name: 'React' }));
+      if (paso === 5) fireEvent.click(screen.getByRole('button', { name: /Agregar otra/i }));
+      expect(sinNombre()).toEqual([]);
+    }
+  });
 });

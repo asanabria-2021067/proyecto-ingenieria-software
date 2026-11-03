@@ -470,6 +470,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                 <input
                   type="file"
                   accept="image/*"
+                  aria-label="Foto de perfil"
                   onChange={handleFotoChange}
                   className="absolute inset-0 cursor-pointer opacity-0"
                 />
@@ -486,6 +487,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
               </label>
               <textarea
                 value={biografia}
+                aria-label="Biografía"
                 onChange={(e) => setBiografia(e.target.value)}
                 placeholder="Cuéntanos sobre ti, tus intereses académicos..."
                 rows={3}
@@ -502,6 +504,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                 min={1}
                 max={40}
                 value={disponibilidad}
+                aria-label="Disponibilidad (horas/semana)"
                 onChange={(e) => setDisponibilidad(Number(e.target.value))}
                 className={inputClass}
               />
@@ -535,6 +538,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                       min={1}
                       max={500}
                       value={horasBecaRequeridas}
+                      aria-label="Total de horas beca"
                       onChange={(e) => setHorasBecaRequeridas(Number(e.target.value))}
                       placeholder="Total de horas beca"
                       className={inputClass}
@@ -563,6 +567,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                       min={1}
                       max={500}
                       value={horasExtensionRequeridas}
+                      aria-label="Total de horas de extensión"
                       onChange={(e) =>
                         setHorasExtensionRequeridas(Number(e.target.value))
                       }
@@ -591,6 +596,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                 <input
                   type="text"
                   value={habilidadesInput}
+                  aria-label="Habilidades"
                   onChange={(e) => setHabilidadesInput(e.target.value)}
                   onKeyDown={async (e) => {
                     if (e.key === 'Enter') {
@@ -624,6 +630,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                       {sel && (
                         <select
                           value={sel.nivelHabilidad}
+                          aria-label={`Nivel de ${h.nombreHabilidad}`}
                           onChange={(e) =>
                             setNivelHabilidad(h.idHabilidad, e.target.value as NivelHabilidad)
                           }
@@ -656,6 +663,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                 <input
                   type="text"
                   value={interesesInput}
+                  aria-label="Intereses"
                   onChange={(e) => setInteresesInput(e.target.value)}
                   onKeyDown={async (e) => {
                     if (e.key === 'Enter') {
@@ -704,6 +712,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                 <input
                   type="text"
                   value={cualidadesInput}
+                  aria-label="Cualidades"
                   onChange={(e) => setCualidadesInput(e.target.value)}
                   onKeyDown={async (e) => {
                     if (e.key === 'Enter') {
@@ -748,6 +757,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
               <input
                 type="url"
                 value={githubUrl}
+                aria-label="GitHub URL"
                 onChange={(e) => setGithubUrl(e.target.value)}
                 placeholder="https://github.com/usuario"
                 className={inputClass}
@@ -761,6 +771,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
               <input
                 type="url"
                 value={linkedinUrl}
+                aria-label="LinkedIn URL"
                 onChange={(e) => setLinkedinUrl(e.target.value)}
                 placeholder="https://linkedin.com/in/usuario"
                 className={inputClass}
@@ -774,6 +785,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
               <input
                 type="url"
                 value={enlacePortafolio}
+                aria-label="Enlace Portafolio"
                 onChange={(e) => setEnlacePortafolio(e.target.value)}
                 placeholder="https://miportafolio.com"
                 className={inputClass}
@@ -788,6 +800,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                 <input
                   type="file"
                   accept=".pdf,.doc,.docx"
+                  aria-label="Curriculum (CV)"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
@@ -834,6 +847,7 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                     type="text"
                     placeholder="Título del proyecto"
                     value={exp.tituloProyectoExperiencia}
+                    aria-label="Título del proyecto"
                     onChange={(e) => updateExp(idx, 'tituloProyectoExperiencia', e.target.value)}
                     className={inputClass}
                   />
@@ -841,11 +855,13 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
                     type="text"
                     placeholder="Rol desempeñado"
                     value={exp.rolDesempenado}
+                    aria-label="Rol desempeñado"
                     onChange={(e) => updateExp(idx, 'rolDesempenado', e.target.value)}
                     className={inputClass}
                   />
                   <select
                     value={exp.tipoExperiencia}
+                    aria-label="Tipo de experiencia"
                     onChange={(e) => updateExp(idx, 'tipoExperiencia', e.target.value)}
                     className={inputClass}
                   >
