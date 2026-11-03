@@ -197,6 +197,14 @@ Luego completá en `.env` las variables marcadas `[obligatoria]`: `DB_PASSWORD`,
 el backend se niegan a arrancar. pgAdmin no tiene contraseña por defecto:
 definí `PGADMIN_PASSWORD` antes de usar el perfil `tools`.
 
+Secretos de GitHub Actions para el deploy: además de los de base de datos y JWT,
+las notas de voz, los adjuntos y las fotos exigen en el backend
+`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET`
+(`apps/backend/src/config/environment.validation.ts`). Créalos en
+Settings > Secrets and variables > Actions con los valores de tu cuenta de
+Cloudinary; `deploy.yml` solo los escribe al `.env` si no están vacíos. Sin
+`CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET` esas subidas responden 503.
+
 ### 2) Levantar entorno con Docker
 
 Todo el entorno (DB + Backend + Frontend):
