@@ -148,6 +148,49 @@ describeIntegration('DEMO seed-demo-final', () => {
       include: { checklist: { orderBy: { orden: 'asc' } } },
     });
     expect(tareaCarlos.checklist.map((i) => i.completado)).toEqual([true, false, false]);
+    // Chat #general de «Tutorías» y «Hackathon»: 5 a 8 mensajes escalonados, con mencion, respuesta y reaccion; Carlos escribe en el del Hackathon.
+    for (const titulo of ['Demo - App de tutorías entre pares', 'Demo - Hackathon de Computación']) {
+      const mensajes = await db.mensajeChat.findMany({
+        where: { conversacion: { esCanal: true, nombreCanal: 'general', proyecto: { tituloProyecto: titulo } } },
+        include: { reacciones: true },
+        orderBy: { enviadoEn: 'asc' },
+      });
+      expect(mensajes.length, titulo).toBeGreaterThanOrEqual(5);
+      expect(mensajes.length, titulo).toBeLessThanOrEqual(8);
+      expect(mensajes.some((m) => /@\[[^\]]+\]\(\d+\)/.test(m.contenido)), titulo).toBe(true);
+      expect(mensajes.some((m) => m.idMensajeCitado !== null), titulo).toBe(true);
+      expect(mensajes.some((m) => m.reacciones.length > 0), titulo).toBe(true);
+      expect(new Set(mensajes.map((m) => m.enviadoEn.getTime())).size, titulo).toBe(mensajes.length);
+      const ahora = Date.now();
+      for (const m of mensajes) expect(ahora - m.enviadoEn.getTime()).toBeLessThan(7 * 86_400_000);
+    }
+    expect(await db.mensajeChat.count({ where: { remitente: { correo: 'carlos.mendoza@uvg.edu.gt' }, conversacion: { proyecto: { tituloProyecto: 'Demo - Hackathon de Computación' } } } })).toBeGreaterThan(0);
+
+    // Calendario del Laboratorio: 3 eventos futuros (reunion, taller, entrega) dentro de 60 dias y sin invitados.
+    const ahora = new Date();
+    const eventos = await db.eventoProyecto.findMany({
+      where: { eliminadoEn: null, invitados: { isEmpty: true }, proyecto: { organizaciones: { some: { organizacion: { nombreOrganizacion: 'Laboratorio de Innovación Abierta (Demo)' } } } } },
+    });
+    expect(eventos.map((e) => e.tipoEvento).sort()).toEqual(['ENTREGA', 'REUNION', 'TALLER']);
+    for (const e of eventos) {
+      expect(e.tituloEvento).toMatch(/^Demo - /);
+      expect(e.fechaInicio.getTime()).toBeGreaterThan(ahora.getTime());
+      expect(e.fechaInicio.getTime()).toBeLessThan(ahora.getTime() + 60 * 86_400_000);
+    }
+
+    // Hitos de «Tutorías»: uno atrasado y sin terminar (alerta roja) y uno proximo.
+    const hoy = new Date();
+    hoy.setUTCHours(0, 0, 0, 0);
+    const hitos = await db.hito.findMany({ where: { proyecto: { tituloProyecto: 'Demo - App de tutorías entre pares' } } });
+    expect(hitos.filter((h) => h.estadoHito !== 'COMPLETADO' && h.fechaLimite! < hoy)).toHaveLength(1);
+    expect(hitos.filter((h) => h.estadoHito !== 'COMPLETADO' && h.fechaLimite! > hoy)).toHaveLength(1);
+
+    // demo.cs05 es miembro de las dos organizaciones.
+    const orgsCs05 = await db.usuarioOrganizacion.findMany({ where: { usuario: { correo: 'demo.cs05@uvg.edu.gt' }, estadoMembresia: 'ACTIVA' }, include: { organizacion: true } });
+    expect(orgsCs05.map((m) => m.organizacion.nombreOrganizacion).sort()).toEqual(['Comunidad de Ciencia de Datos (Demo)', 'Laboratorio de Innovación Abierta (Demo)']);
+    expect(await db.usuarioOrganizacion.findFirstOrThrow({ where: { usuario: { correo: 'demo.cs05@uvg.edu.gt' }, organizacion: { nombreOrganizacion: 'Comunidad de Ciencia de Datos (Demo)' } } })).toMatchObject({ rolOrganizacion: 'LECTURA' });
+    expect(await db.usuarioOrganizacion.count({ where: { organizacion: { nombreOrganizacion: 'Comunidad de Ciencia de Datos (Demo)' } } })).toBeLessThanOrEqual(8);
+
     expect(await db.tarea.groupBy({ by: ['estadoTarea'] }).then((g) => g.map((x) => x.estadoTarea).sort())).toEqual(['EN_PROGRESO', 'EN_REVISION', 'HECHO', 'POR_HACER']);
   }, 120_000);
 });
