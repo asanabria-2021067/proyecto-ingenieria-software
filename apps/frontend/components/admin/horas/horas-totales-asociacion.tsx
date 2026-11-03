@@ -19,7 +19,7 @@ export function HorasTotalesAsociacion({ totales }: { totales: TotalesAsociacion
         Totales por asociación
       </h2>
       <div className={DATA_TABLE_CARD}>
-        <Table>
+        <Table containerLabel="Totales de horas por asociación">
           <caption className="sr-only">Totales de horas del semestre por asociación</caption>
           <TableHeader>
             <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>

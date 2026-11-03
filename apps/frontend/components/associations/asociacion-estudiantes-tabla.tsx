@@ -20,7 +20,7 @@ const TD = 'whitespace-normal px-stack py-inline align-top';
 export function AsociacionEstudiantesTabla({ filas, tipo }: { filas: FilaEstudianteAsociacion[]; tipo?: TipoHorasFiltro }) {
   return (
     <div className={DATA_TABLE_CARD}>
-      <Table>
+      <Table containerLabel="Horas por estudiante de la asociación">
         <caption className="sr-only">Horas beca y de extensión por estudiante de la asociación en el semestre</caption>
         <TableHeader>
           <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>

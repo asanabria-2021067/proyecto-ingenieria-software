@@ -42,7 +42,7 @@ export function SemestreHorasHistorial() {
         Horas por semestre
       </h2>
       <div className={DATA_TABLE_CARD}>
-        <Table>
+        <Table containerLabel="Historial de horas por semestre">
           <caption className="sr-only">Horas beca y de extensión por semestre, declaradas y acreditadas</caption>
           <TableHeader>
             <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>

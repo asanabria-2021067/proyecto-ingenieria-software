@@ -89,7 +89,7 @@ export function AsociacionProyectos({ idAsociacion }: { idAsociacion: number }) 
 
   return (
     <div className={DATA_TABLE_CARD}>
-      <Table>
+      <Table containerLabel="Proyectos de la asociación">
         <caption className="sr-only">Proyectos publicados a nombre de la asociación</caption>
         <TableHeader>
           <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>

@@ -57,7 +57,7 @@ function TablaTareas({ proyecto }: { proyecto: MisHorasProyecto }) {
     return <p className="type-meta">Aún no registras horas en este proyecto.</p>;
   }
   return (
-    <Table aria-label={`Horas por tarea en ${proyecto.tituloProyecto}`}>
+    <Table aria-label={`Horas por tarea en ${proyecto.tituloProyecto}`} containerLabel={`Horas por tarea en ${proyecto.tituloProyecto}`}>
       <TableHeader>
         <TableRow className={FILA_TABLA}>
           <TableHead>Tarea</TableHead>
