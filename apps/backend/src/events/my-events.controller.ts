@@ -24,7 +24,7 @@ export class MyEventsController {
     @Res() res: Response,
   ) {
     const eventos = await this.eventsService.findForUserInRange(user.userId, query.desde, query.hasta);
-    enviarIcs(res, construirIcs(eventos), 'uvgenius-calendario.ics');
+    enviarIcs(res, construirIcs(eventos, 'Mi calendario'), 'uvgenius-calendario.ics');
   }
 
   @Get()

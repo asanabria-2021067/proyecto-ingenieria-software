@@ -327,7 +327,7 @@ function TaskFormDialogContent({
             hitoOriginal={task?.idHito ?? null}
           />
 
-          {idProyecto !== undefined && (
+          {idProyecto !== undefined && (!porPasos || paso === 1) && (
             <TaskFormExtras
               idProyecto={idProyecto}
               mode={mode}
