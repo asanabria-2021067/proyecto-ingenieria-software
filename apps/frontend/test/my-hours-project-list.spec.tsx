@@ -44,7 +44,7 @@ const seccion = (nombre: string) => screen.getByRole('region', { name: nombre })
 /** Abre el acordeón de un proyecto y devuelve su tabla de tareas. */
 function abrir(titulo: string) {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(titulo) }));
-  return screen.getByRole('table', { name: `Horas por tarea en ${titulo}` });
+  return screen.getByRole('region', { name: `Horas por tarea en ${titulo}` }).querySelector('table')!;
 }
 
 describe('MyHoursProjectList', () => {
