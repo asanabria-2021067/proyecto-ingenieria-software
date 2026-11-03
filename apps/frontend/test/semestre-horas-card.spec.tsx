@@ -54,7 +54,7 @@ afterEach(() => {
 });
 
 describe('HRS: tarjeta del semestre actual', () => {
-  it('separa declaradas de acreditadas y muestra la proyeccion dd/mm/aaaa', async () => {
+  it('separa declaradas de acreditadas y muestra la proyeccion dd/mm', async () => {
     vi.mocked(getHorasProgreso).mockResolvedValue(progreso());
     montar(<SemestreHorasCard />);
 
@@ -63,7 +63,7 @@ describe('HRS: tarjeta del semestre actual', () => {
     expect(within(seccion).getByText('Declaradas por ti').nextSibling).toHaveTextContent('10 h');
     expect(within(seccion).getByText('Acreditadas en UVGenius').nextSibling).toHaveTextContent('20 h');
     expect(within(seccion).getByText('30 h')).toBeInTheDocument();
-    expect(within(seccion).getByText('A este ritmo completas tus horas beca el 25/11/2026')).toBeInTheDocument();
+    expect(within(seccion).getByText('A este ritmo completas tus horas beca el 25/11')).toBeInTheDocument();
     expect(within(seccion).queryByText(/extensión/i)).toBeNull();
     expect(within(seccion).queryByRole('button', { name: /Editar horas/ })).toBeNull();
   });

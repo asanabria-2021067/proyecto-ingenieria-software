@@ -19,10 +19,10 @@ export function etiquetaSemestre(s: Pick<Semestre, 'anio' | 'periodo'>): string 
   return `${s.periodo === 1 ? '1.er' : '2.º'} semestre ${s.anio}`;
 }
 
-/** YYYY-MM-DD -> dd/mm/aaaa */
+/** YYYY-MM-DD -> dd/mm */
 export function formatearDiaMes(dia: string): string {
-  const [anio, mes, d] = dia.split('-');
-  return `${d}/${mes}/${anio}`;
+  const [, mes, d] = dia.split('-');
+  return `${d}/${mes}`;
 }
 
 /** Frase de proyección de un tramo; null si no hay meta ni ritmo para proyectar. `finSemestre` (YYYY-MM-DD): una fecha posterior no se promete. */

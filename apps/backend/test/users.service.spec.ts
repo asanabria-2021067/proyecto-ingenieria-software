@@ -77,7 +77,7 @@ describe('UsersService', () => {
       usuario: { update: vi.fn() },
       perfilEstudiante: { update: vi.fn() },
     };
-    prisma.$transaction = vi.fn(async (cb: (arg: typeof tx) => unknown) => cb(tx)) as typeof prisma.$transaction;
+    prisma.$transaction = vi.fn(async (cb: (arg: typeof tx) => unknown) => cb(tx)) as unknown as typeof prisma.$transaction;
     prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 1 });
     const service = new UsersService(prisma);
     const getProfileSpy = vi
@@ -99,7 +99,7 @@ describe('UsersService', () => {
       perfilEstudiante: { update: vi.fn() },
       registroHorasSemestre: { updateMany: vi.fn() },
     };
-    prisma.$transaction = vi.fn(async (cb: (arg: typeof tx) => unknown) => cb(tx)) as typeof prisma.$transaction;
+    prisma.$transaction = vi.fn(async (cb: (arg: typeof tx) => unknown) => cb(tx)) as unknown as typeof prisma.$transaction;
     const service = new UsersService(prisma);
     vi.spyOn(service, 'getProfile').mockResolvedValue({} as unknown as Awaited<ReturnType<typeof service.getProfile>>);
 
@@ -113,7 +113,7 @@ describe('UsersService', () => {
   it('replaceIntereses reemplaza y retorna count', async () => {
     const prisma = prismaMock();
     const tx = { usuarioInteres: { deleteMany: vi.fn(), createMany: vi.fn() } };
-    prisma.$transaction = vi.fn(async (cb: (arg: typeof tx) => unknown) => cb(tx)) as typeof prisma.$transaction;
+    prisma.$transaction = vi.fn(async (cb: (arg: typeof tx) => unknown) => cb(tx)) as unknown as typeof prisma.$transaction;
     const service = new UsersService(prisma);
 
     const result = await service.replaceIntereses(1, [2, 3]);

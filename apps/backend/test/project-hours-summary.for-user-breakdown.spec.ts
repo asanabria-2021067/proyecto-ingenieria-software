@@ -453,7 +453,7 @@ describe('ProjectHoursSummaryService.forUserBreakdown', () => {
   it('las metas salen del registro del semestre actual, con el perfil solo de respaldo', async () => {
     const { prisma, llamadas } = prismaDe(mundoBase());
     const original = prisma.perfilEstudiante.findUnique.bind(prisma.perfilEstudiante);
-    (prisma.perfilEstudiante as { findUnique: unknown }).findUnique = async (args: Record<string, unknown>) => ({
+    (prisma.perfilEstudiante as { findUnique: unknown }).findUnique = async (args: Parameters<typeof original>[0]) => ({
       ...(await original(args)),
       usuario: { registrosHorasSemestre: [{ metaBeca: 80, metaExtension: null }] },
     });
