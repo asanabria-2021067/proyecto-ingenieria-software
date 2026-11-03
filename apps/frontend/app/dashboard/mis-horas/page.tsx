@@ -129,13 +129,13 @@ function Contenido({ vista }: { vista: MisHorasView }) {
         <HoursKpiCard
           variante="en-linea"
           icon={CheckCircle2}
-          label="Acreditadas"
+          label="Acreditadas en total"
           value={formatearHoras(totales.acreditadas)}
           destacado
         />
       </section>
 
-      <MyHoursRequirements requisitos={vista.requisitos} porTipo={vista.porTipo} />
+      <MyHoursRequirements porTipo={vista.porTipo} />
 
       {vista.proyectos.length === 0 ? <SinHoras /> : <MyHoursProjectList proyectos={vista.proyectos} />}
 

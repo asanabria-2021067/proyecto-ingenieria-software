@@ -68,6 +68,26 @@ describe('HRS: tarjeta del semestre actual', () => {
     expect(within(seccion).queryByRole('button', { name: /Editar horas/ })).toBeNull();
   });
 
+  it('Carlos: beca 20 declaradas + 0 acreditadas del semestre = 20 de 50; extension 10 de 40', async () => {
+    vi.mocked(getHorasProgreso).mockResolvedValue(
+      progreso({
+        beca: tramo({ meta: 50, declaradas: 20, acreditadas: 0, avance: 20, falta: 30 }),
+        extension: tramo({ meta: 40, declaradas: 10, acreditadas: 0, avance: 10, falta: 30 }),
+      }),
+    );
+    montar(<SemestreHorasCard />);
+
+    const seccion = await screen.findByRole('region', { name: 'Horas de este semestre' });
+    const [beca, extension] = within(seccion).getAllByRole('listitem');
+    expect(beca).toHaveTextContent('20 h de 50 h');
+    expect(within(beca).getByText('Acreditadas en UVGenius').nextSibling).toHaveTextContent('0 h');
+    expect(extension).toHaveTextContent('10 h de 40 h');
+    // la barra es la institucional (primary) sobre su pista clara
+    const barra = within(beca).getByRole('progressbar');
+    expect(barra).toHaveClass('h-1.5', 'bg-primary/10');
+    expect(barra.querySelector('[data-slot="progress-indicator"]')).toHaveClass('bg-primary');
+  });
+
   it('marca En riesgo', async () => {
     vi.mocked(getHorasProgreso).mockResolvedValue(progreso({ beca: tramo({ meta: 100, avance: 5, falta: 95, enRiesgo: true }) }));
     montar(<SemestreHorasCard />);
