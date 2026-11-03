@@ -274,7 +274,7 @@ export default function OrganizacionPage() {
         )}
       </section>
 
-      <Tabs defaultValue={tabInicial}>
+      <Tabs key={tabInicial} defaultValue={tabInicial}>
         <TabsList className="mb-4.5 h-auto flex-wrap">
           <TabsTrigger value="proyectos">Proyectos</TabsTrigger>
           <TabsTrigger value="portafolio">Portafolio</TabsTrigger>
