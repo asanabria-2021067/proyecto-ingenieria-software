@@ -89,7 +89,7 @@ describe('HorasSemestreService', () => {
     });
   });
 
-  it('el filtro enRiesgo salta a los que no lo estan y mantiene el cursor', async () => {
+  it('el filtro enRiesgo salta a los que no lo estan y pagina por cursor de menor a mayor avance', async () => {
     // 1-abr: 50 % del semestre; en riesgo si avance < 30 %
     const { service } = crearServicio({
       usuarios: [
@@ -101,11 +101,37 @@ describe('HorasSemestreService', () => {
       ],
     });
     const p1 = await service.listarCentral(1, { enRiesgo: true, limit: 1 });
-    expect(p1.filas.map((f) => f.idUsuario)).toEqual([2]);
-    expect(p1.siguienteCursor).toBe(2);
-    const p2 = await service.listarCentral(1, { enRiesgo: true, limit: 1, cursor: 2 });
-    expect(p2.filas.map((f) => f.idUsuario)).toEqual([4]);
+    expect(p1.filas.map((f) => f.idUsuario)).toEqual([4]);
+    expect(p1.siguienteCursor).toBe(4);
+    const p2 = await service.listarCentral(1, { enRiesgo: true, limit: 1, cursor: 4 });
+    expect(p2.filas.map((f) => f.idUsuario)).toEqual([2]);
     expect(p2.siguienteCursor).toBeNull();
+  });
+
+  it('ordena en riesgo, avance creciente y sin metas; el cursor recorre todo sin perder ni repetir filas', async () => {
+    // 1-abr: en riesgo si avance < 30 %
+    const { service } = crearServicio({
+      usuarios: [
+        { id: 1 },
+        { id: 2, registro: { metaBeca: 100, becaDeclarada: 90 } },
+        { id: 3, registro: { metaBeca: 100, becaDeclarada: 10 } },
+        { id: 4, registro: { metaBeca: 100, becaDeclarada: 50 } },
+        { id: 5 },
+        { id: 6, registro: { metaBeca: 100, becaDeclarada: 5 } },
+      ],
+    });
+    const esperado = [6, 3, 4, 2, 1, 5];
+    const vistas: number[] = [];
+    let cursor: number | undefined;
+    do {
+      const p = await service.paginaCentral({ limit: 2, cursor });
+      vistas.push(...p.filas.map((f) => f.idUsuario));
+      cursor = p.siguienteCursor ?? undefined;
+    } while (cursor !== undefined);
+    expect(vistas).toEqual(esperado);
+    expect((await service.recorrerTodas({})).filas.map((f) => f.idUsuario)).toEqual(esperado);
+    // cursor de una fila que ya no cumple el filtro: fin de lista, no reinicio
+    expect((await service.paginaCentral({ enRiesgo: true, cursor: 2 })).filas).toEqual([]);
   });
 
   it('tipo limita la evaluacion de riesgo a ese tipo de horas', async () => {
@@ -231,6 +257,11 @@ describe('reportes de horas', () => {
     const lineas = buildHorasCsv([fila]).split('\r\n');
     expect(lineas[0]).toContain('Falta beca');
     expect(lineas[1]).toBe("'=Ana Perez;123;Computacion;100;10;20;70;;0;0;;Sí");
+  });
+
+  it('CSV rotula con texto claro al estudiante sin metas registradas', () => {
+    const sinMetas = { ...fila, metaBeca: null, metaExtension: null, faltaBeca: null, faltaExtension: null, enRiesgo: false };
+    expect(buildHorasCsv([sinMetas]).split('\r\n')[1]).toContain(';Aún no registra sus metas del semestre;');
   });
 
   it('PDF genera un documento valido', () => {

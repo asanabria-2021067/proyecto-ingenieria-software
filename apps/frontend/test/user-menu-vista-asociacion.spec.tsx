@@ -41,22 +41,22 @@ describe('ASO: cambio de vista en el menú de cuenta', () => {
     expect(screen.queryByRole('menuitem', { name: 'Estudiante' })).toBeNull();
   });
 
-  it('ofrece Estudiante y Asociación <nombre>, con Estudiante activa en el dashboard', async () => {
+  it('ofrece Estudiante y el nombre de la asociación (sin repetir «Asociación»), con Estudiante activa en el dashboard', async () => {
     abrir();
     expect(await screen.findByRole('menuitem', { name: 'Estudiante' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('menuitem', { name: 'Asociación AEC' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('menuitem', { name: 'AEC' })).not.toHaveAttribute('aria-current');
   });
 
   it('cada opción lleva a su vista: Asociación al dashboard de la asociación, Estudiante al dashboard', async () => {
     abrir();
-    expect(await screen.findByRole('menuitem', { name: 'Asociación AEC' })).toHaveAttribute('href', '/dashboard/asociacion/7');
+    expect(await screen.findByRole('menuitem', { name: 'AEC' })).toHaveAttribute('href', '/dashboard/asociacion/7');
     expect(screen.getByRole('menuitem', { name: 'Estudiante' })).toHaveAttribute('href', '/dashboard');
   });
 
   it('en la vista de asociación esa opción queda activa', async () => {
     nav.pathname = '/dashboard/asociacion/7';
     abrir();
-    expect(await screen.findByRole('menuitem', { name: 'Asociación AEC' })).toHaveAttribute('aria-current', 'page');
+    expect(await screen.findByRole('menuitem', { name: 'AEC' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('menuitem', { name: 'Estudiante' })).not.toHaveAttribute('aria-current');
   });
 });

@@ -12,19 +12,43 @@ import type { FilaHorasCentral } from '@/lib/services/horas-semestre';
 const TH = `h-auto whitespace-normal px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
 const TD = 'whitespace-normal px-stack py-inline align-top';
 
-const horas = (n: number | null) => (n === null ? '—' : `${n} h`);
+const horas = (n: number | null) => `${n ?? 0} h`;
 
-export function Horas({ meta, declaradas, acreditadas, falta }: { meta: number | null; declaradas: number; acreditadas: number; falta: number | null }) {
+/** `sinMetas`: el estudiante no registró ninguna de las dos metas; si solo falta esta, el texto nombra el tipo. */
+export function Horas({
+  meta,
+  declaradas,
+  acreditadas,
+  falta,
+  tipo,
+  sinMetas,
+}: {
+  meta: number | null;
+  declaradas: number;
+  acreditadas: number;
+  falta: number | null;
+  tipo: 'beca' | 'extensión';
+  sinMetas: boolean;
+}) {
   return (
     <dl className="grid grid-cols-2 gap-x-inline gap-y-micro type-meta tabular-nums">
-      <div>
-        <dt>Meta</dt>
-        <dd className="type-body font-semibold text-text-primary">{horas(meta)}</dd>
-      </div>
-      <div>
-        <dt>Falta</dt>
-        <dd className="type-body font-semibold text-text-primary">{horas(falta)}</dd>
-      </div>
+      {meta === null ? (
+        <div className="col-span-2">
+          <dt>Meta</dt>
+          <dd>{sinMetas ? 'Aún no registra sus metas del semestre' : `Sin meta de ${tipo} registrada`}</dd>
+        </div>
+      ) : (
+        <>
+          <div>
+            <dt>Meta</dt>
+            <dd className="type-body font-semibold text-text-primary">{horas(meta)}</dd>
+          </div>
+          <div>
+            <dt>Falta</dt>
+            <dd className="type-body font-semibold text-text-primary">{horas(falta)}</dd>
+          </div>
+        </>
+      )}
       <div>
         <dt>Declaradas</dt>
         <dd className="type-body text-text-primary">{declaradas} h</dd>
@@ -72,7 +96,14 @@ export function HorasCentralTabla({ filas }: { filas: FilaHorasCentral[] }) {
                 )}
               </TableCell>
               <TableCell className={TD}>
-                <Horas meta={f.metaBeca} declaradas={f.becaDeclarada} acreditadas={f.becaAcreditada} falta={f.faltaBeca} />
+                <Horas
+                  meta={f.metaBeca}
+                  declaradas={f.becaDeclarada}
+                  acreditadas={f.becaAcreditada}
+                  falta={f.faltaBeca}
+                  tipo="beca"
+                  sinMetas={f.metaBeca === null && f.metaExtension === null}
+                />
               </TableCell>
               <TableCell className={TD}>
                 <Horas
@@ -80,6 +111,8 @@ export function HorasCentralTabla({ filas }: { filas: FilaHorasCentral[] }) {
                   declaradas={f.extensionDeclarada}
                   acreditadas={f.extensionAcreditada}
                   falta={f.faltaExtension}
+                  tipo="extensión"
+                  sinMetas={f.metaBeca === null && f.metaExtension === null}
                 />
               </TableCell>
             </TableRow>

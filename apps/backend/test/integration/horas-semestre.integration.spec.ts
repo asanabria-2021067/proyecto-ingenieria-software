@@ -74,4 +74,36 @@ describeIntegration('HRS registro de horas por semestre', () => {
     const fila = filas.find((f) => f.idUsuario === u.idUsuario);
     expect(fila).toMatchObject({ metaBeca: 100, becaDeclarada: 30, becaAcreditada: 0, faltaBeca: 70 });
   });
+
+  it('ordena en riesgo, luego menor a mayor avance, luego sin metas, y la paginacion por cursor no pierde ni repite filas', async () => {
+    const marca = `ord${randomUUID().slice(0, 8)}`;
+    const crear = async (declaradas?: number) => {
+      const u = await createIntegrationUser(db);
+      userIds.push(u.idUsuario);
+      await db.perfilEstudiante.create({ data: { idUsuario: u.idUsuario, carne: `${marca}-${userIds.length}` } });
+      if (declaradas !== undefined) {
+        await db.registroHorasSemestre.create({ data: { idUsuario: u.idUsuario, anio: 2024, periodo: 1, metaBeca: 100, becaDeclarada: declaradas } });
+      }
+      return u.idUsuario;
+    };
+    // semestre 2024-1 ya terminado: se espera 100 %, en riesgo si lleva menos de 80 %
+    const [a, b, c, d, e, f] = [await crear(10), await crear(5), await crear(90), await crear(85), await crear(), await crear()];
+    const esperado = [b, a, d, c, e, f];
+    const q = { anio: 2024, periodo: 1 as const, busqueda: marca };
+
+    const todas = await service.recorrerTodas(q);
+    expect(todas.filas.map((x) => x.idUsuario)).toEqual(esperado);
+
+    const vistas: number[] = [];
+    let cursor: number | undefined;
+    do {
+      const pagina = await service.paginaCentral({ ...q, limit: 2, cursor });
+      vistas.push(...pagina.filas.map((x) => x.idUsuario));
+      cursor = pagina.siguienteCursor ?? undefined;
+    } while (cursor !== undefined);
+    expect(vistas).toEqual(esperado);
+
+    const enRiesgo = await service.recorrerTodas({ ...q, enRiesgo: true });
+    expect(enRiesgo.filas.map((x) => x.idUsuario)).toEqual([b, a]);
+  });
 });

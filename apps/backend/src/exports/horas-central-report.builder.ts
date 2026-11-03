@@ -37,11 +37,13 @@ const HEADER = [
 
 const celda = (n: number | null) => (n === null ? '' : n);
 
+const SIN_METAS = 'Aún no registra sus metas del semestre';
+
 const filaTabla = (f: FilaReporteHoras) => [
   `${f.nombre} ${f.apellido}`,
   f.carne,
   f.carrera ?? '',
-  celda(f.metaBeca),
+  f.metaBeca === null && f.metaExtension === null ? SIN_METAS : celda(f.metaBeca),
   f.becaDeclarada,
   f.becaAcreditada,
   celda(f.faltaBeca),

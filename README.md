@@ -347,6 +347,33 @@ Todos usan la misma contrasena: `Test1234!`
 
 ---
 
+## Demo final (`apps/backend/prisma/seed-demo-final.ts`)
+
+Dataset idempotente de demo: 15 estudiantes `demo.cs01..15`, asociacion con junta, 2 organizaciones con chat, proyectos en distintos estados, metas de horas (Carlos: beca 50/20, extension 40/10; 12 de los 15 con metas) y una tarea de Carlos con checklist en el Hackathon. Falla si los estudiantes en riesgo de la asociacion quedan fuera de 4-8. No entra a `dist` ni depende de la compilacion de Nest.
+
+Requiere `DEMO_PASSWORD` (solo se hashea para cuentas nuevas) y que `carlos.mendoza@uvg.edu.gt` exista. `DRY_RUN=1` ejecuta todo en una transaccion y la revierte.
+
+Desarrollo (con `tsx`): `DEMO_PASSWORD=... npm run prisma:seed-demo-final -w apps/backend` (agregar `DRY_RUN=1` para probar).
+
+Produccion: la imagen no trae `tsx`, pero si `typescript`. Se copia el script con los dos modulos de `src/` que importa, se transpila dentro del contenedor y se ejecuta con `node` (probado en la VM con `DRY_RUN=1`):
+
+```bash
+cd apps/backend
+tar cf - prisma/seed-demo-final.ts src/common/utils/guatemala-date.ts src/horas-semestre/semestre.ts \
+  | docker exec -i -u root uvg-collab-backend sh -c 'rm -rf /app/.demo && mkdir -p /app/.demo && tar x -C /app/.demo'
+docker exec -u root -w /app/.demo uvg-collab-backend node ../node_modules/typescript/bin/tsc --noCheck \
+  --outDir out --rootDir . --module commonjs --target es2021 --esModuleInterop --skipLibCheck prisma/seed-demo-final.ts
+# Ensayo sin guardar nada:
+docker exec -u root -e DRY_RUN=1 -e DEMO_PASSWORD=ensayo -w /app/.demo uvg-collab-backend node out/prisma/seed-demo-final.js
+# Real (respaldo con pg_dump antes; DEMO_PASSWORD desde ~/.demo_password):
+docker exec -u root -e DEMO_PASSWORD="$(cat ~/.demo_password)" -w /app/.demo uvg-collab-backend node out/prisma/seed-demo-final.js
+docker exec -u root uvg-collab-backend rm -rf /app/.demo
+```
+
+Contenido sugerido para `~/recargar-demo.sh` en la VM (desde un checkout de `apps/backend`): `pg_dump -Fc` a `~/backups/pre_demo2_$(date +%F).dump`, verificar que pese mas de 0 bytes y luego los comandos anteriores.
+
+---
+
 ## Recursos y Entregables
 
 | Recurso | Enlace |

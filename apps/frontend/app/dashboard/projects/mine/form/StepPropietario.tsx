@@ -92,7 +92,7 @@ export function StepPropietario({
                 <Landmark aria-hidden="true" className="size-5" />
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-bold text-on-surface">A nombre de la asociación {j.nombre}</span>
+                <span className="block truncate text-sm font-bold text-on-surface">A nombre de {j.nombre}</span>
                 <span className="block text-xs text-on-surface-variant">Tu cargo: {CARGO_LABEL[j.cargo]}</span>
               </span>
             </span>

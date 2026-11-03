@@ -237,7 +237,11 @@ describeIntegration('dashboard de asociacion - permisos y regla en riesgo (Postg
     expect(p1.filas).toHaveLength(2);
     expect(p1.siguienteCursor).not.toBeNull();
     const p2 = await (await pedir(`/asociaciones/${ids.asociacionA}/estudiantes?${SEMESTRE}&limit=100&cursor=${p1.siguienteCursor}`, 'presA')).json();
-    expect(p2.filas.every((f: { idUsuario: number }) => f.idUsuario > p1.siguienteCursor)).toBe(true);
+    // el cursor sigue el orden compuesto (riesgo, avance, sin metas), no el idUsuario: la union de las paginas es la lista completa
+    const todos = await (await pedir(`/asociaciones/${ids.asociacionA}/estudiantes?${SEMESTRE}&limit=100`, 'presA')).json();
+    const idsDe = (filas: { idUsuario: number }[]) => filas.map((f) => f.idUsuario);
+    expect([...idsDe(p1.filas), ...idsDe(p2.filas)]).toEqual(idsDe(todos.filas));
+    expect(idsDe(todos.filas)[0]).toBe(ids.riesgoA1);
   });
 
   it('reportes CSV y PDF respetan los filtros activos', async () => {

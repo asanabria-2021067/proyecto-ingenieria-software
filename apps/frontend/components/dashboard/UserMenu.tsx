@@ -86,7 +86,7 @@ function UserMenuContent({
   const vista = String(asociacionDeRuta(pathname) ?? 'estudiante');
   const vistas = [
     { clave: 'estudiante', href: '/dashboard', etiqueta: 'Estudiante' },
-    ...juntas.map((j) => ({ clave: String(j.idAsociacion), href: rutaAsociacion(j.idAsociacion), etiqueta: `Asociación ${j.nombre}` })),
+    ...juntas.map((j) => ({ clave: String(j.idAsociacion), href: rutaAsociacion(j.idAsociacion), etiqueta: j.nombre })),
   ];
   return (
     // `admin-account-menu` solo cambia colores (paleta Forest Graphite); el

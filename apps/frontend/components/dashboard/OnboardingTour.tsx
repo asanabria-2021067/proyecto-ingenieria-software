@@ -169,6 +169,8 @@ export default function OnboardingTour() {
     const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
 
     if (finishedStatuses.includes(status)) {
+      // Un arranque pendiente (retardo de 800 ms) no debe reabrir la guía tras terminarla o saltarla.
+      cancelTimer();
       setRun(false);
       if (user) {
         const tourKey = `onboarding_seen_${user.idUsuario}`;
@@ -241,6 +243,9 @@ export default function OnboardingTour() {
     steps,
     continuous: true,
     onEvent: handleJoyrideCallback,
+    // Sin spinner: si el objetivo de un paso no está visible (menú lateral oculto en móvil) joyride
+    // pintaba un aro oscuro fijo en el centro de la pantalla, encima de las tarjetas de horas.
+    loaderComponent: null,
     tooltipComponent: (props: any) => (
       <CustomTooltip {...props} size={steps.length} />
     ),
