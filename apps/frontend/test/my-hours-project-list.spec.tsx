@@ -44,7 +44,7 @@ const seccion = (nombre: string) => screen.getByRole('region', { name: nombre })
 /** Abre el acordeón de un proyecto y devuelve su tabla de tareas. */
 function abrir(titulo: string) {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(titulo) }));
-  return screen.getByRole('table', { name: `Horas por tarea en ${titulo}` });
+  return screen.getByRole('region', { name: `Horas por tarea en ${titulo}` }).querySelector('table')!;
 }
 
 describe('MyHoursProjectList', () => {
@@ -256,6 +256,23 @@ describe('MyHoursProjectList', () => {
     expect(within(seccion('Proyectos abiertos')).getByText('No tienes proyectos abiertos')).toBeInTheDocument();
     expect(within(seccion('Proyectos abiertos')).queryByRole('button')).not.toBeInTheDocument();
     expect(within(seccion('Proyectos cerrados')).getByRole('heading', { name: 'Archivo' })).toBeInTheDocument();
+  });
+
+  it('un borrador o proyecto en revisión sin horas no se lista como cerrado', () => {
+    render(
+      <MyHoursProjectList
+        proyectos={[
+          proyecto({ idProyecto: 5, tituloProyecto: 'Borrador org', estadoProyecto: 'BORRADOR', abierto: false, tareas: [] }),
+          proyecto({ idProyecto: 6, tituloProyecto: 'En revision', estadoProyecto: 'EN_REVISION', abierto: false, tareas: [] }),
+          proyecto({ idProyecto: 7, tituloProyecto: 'Archivo', estadoProyecto: 'CERRADO', abierto: false, tareas: [] }),
+        ]}
+      />,
+    );
+
+    const cerrados = seccion('Proyectos cerrados');
+    expect(within(cerrados).getByRole('heading', { name: 'Archivo' })).toBeInTheDocument();
+    expect(screen.queryByText('Borrador org')).not.toBeInTheDocument();
+    expect(screen.queryByText('En revision')).not.toBeInTheDocument();
   });
 
   it('sin proyectos cerrados no pinta su sección', () => {

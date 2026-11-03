@@ -35,6 +35,8 @@ export const DEPLOY_ENV_REGISTRY: Record<string, DeployEnvEntry> = {
   FRONTEND_URL: { kind: 'config', consumer: 'apps/backend/src/config/environment.validation.ts' },
   // Opcional: solo se escribe si no esta vacio (validador de fotoUrl y adaptadores de Cloudinary).
   CLOUDINARY_CLOUD_NAME: { kind: 'config', consumer: 'apps/backend/src/config/environment.validation.ts' },
+  CLOUDINARY_API_KEY: { kind: 'secret', consumer: 'apps/backend/src/config/environment.validation.ts' },
+  CLOUDINARY_API_SECRET: { kind: 'secret', consumer: 'apps/backend/src/config/environment.validation.ts' },
   // MEJ-80: SMTP opcional, solo se escribe si SMTP_HOST no esta vacio.
   SMTP_HOST: { kind: 'config', consumer: 'apps/backend/src/config/smtp-config.ts' },
   SMTP_PORT: { kind: 'config', consumer: 'apps/backend/src/config/smtp-config.ts' },

@@ -421,7 +421,7 @@ function SprintDetailContent({
           <SeccionVacia icon={ListChecks} mensaje="Este Sprint no tiene tareas registradas." />
         ) : (
           <div className={DATA_TABLE_CARD}>
-            <Table>
+            <Table containerLabel="Tareas del Sprint">
               <TableHeader>
                 <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
                   <TableHead scope="col" className={TH}>
@@ -465,7 +465,7 @@ function SprintDetailContent({
           <SeccionVacia icon={Users} mensaje="No hay participantes registrados para este Sprint." />
         ) : (
           <div className={DATA_TABLE_CARD}>
-            <Table>
+            <Table containerLabel="Participantes y contribución">
               <TableHeader>
                 <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
                   <TableHead scope="col" className={TH}>

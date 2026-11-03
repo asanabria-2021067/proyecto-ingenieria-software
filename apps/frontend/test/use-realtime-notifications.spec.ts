@@ -319,3 +319,24 @@ describe('useRealtimeNotifications — cuentas pendientes de verificación', () 
     );
   });
 });
+
+describe('useRealtimeNotifications - organizaciones', () => {
+  it('una notificacion de organizacion invalida las consultas de organizaciones; otra no', () => {
+    const socket = createMockSocket();
+    mockIo.mockReturnValue(socket);
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    renderHook(() => useRealtimeNotifications(true), { wrapper });
+
+    act(() => {
+      socket.__emit('notification', { tipoNotificacion: 'X', tituloNotificacion: 'Hola' });
+    });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['organizaciones'] });
+
+    act(() => {
+      socket.__emit('notification', { tipoNotificacion: 'ORGANIZACION_ACTUALIZADA', tituloNotificacion: 'Acepto tu invitacion' });
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['organizaciones'] });
+  });
+});

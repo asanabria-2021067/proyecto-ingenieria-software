@@ -168,6 +168,15 @@ export class EventsService {
       .map(conOrigen);
   }
 
+  /** Nombre para el X-WR-CALNAME del .ics; llamar solo tras verificar la membresía. */
+  async nombreOrganizacion(idOrganizacion: number) {
+    const org = await this.prisma.organizacion.findUnique({
+      where: { idOrganizacion },
+      select: { nombreOrganizacion: true },
+    });
+    return org?.nombreOrganizacion;
+  }
+
   /**
    * MEJ-34: eventos de los proyectos de la organización para sus miembros activos (cualquier rol).
    * Solo los abiertos a todo el proyecto (sin invitados): un evento con invitados es privado de ellos.

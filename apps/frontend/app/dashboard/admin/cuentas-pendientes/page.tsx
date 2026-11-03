@@ -227,7 +227,7 @@ export default function AdminCuentasPendientesPage() {
               </Button>
             </div>
             <div className={DATA_TABLE_CARD}>
-              <Table>
+              <Table containerLabel="Cuentas pendientes">
                 <caption className="sr-only">Cuentas que esperan verificación</caption>
                 <TableHeader>
                   <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>

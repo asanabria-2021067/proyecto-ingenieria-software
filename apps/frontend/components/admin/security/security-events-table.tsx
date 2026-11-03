@@ -68,7 +68,7 @@ export function SecurityEventsTable({
 }) {
   return (
     <div className={DATA_TABLE_CARD}>
-      <Table>
+      <Table containerLabel="Eventos de seguridad">
         <caption className="sr-only">Eventos de seguridad, del más reciente al más antiguo</caption>
         <TableHeader>
           <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>

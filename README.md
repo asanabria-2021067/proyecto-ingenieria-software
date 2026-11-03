@@ -197,6 +197,14 @@ Luego completá en `.env` las variables marcadas `[obligatoria]`: `DB_PASSWORD`,
 el backend se niegan a arrancar. pgAdmin no tiene contraseña por defecto:
 definí `PGADMIN_PASSWORD` antes de usar el perfil `tools`.
 
+Secretos de GitHub Actions para el deploy: además de los de base de datos y JWT,
+las notas de voz, los adjuntos y las fotos exigen en el backend
+`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET`
+(`apps/backend/src/config/environment.validation.ts`). Créalos en
+Settings > Secrets and variables > Actions con los valores de tu cuenta de
+Cloudinary; `deploy.yml` solo los escribe al `.env` si no están vacíos. Sin
+`CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET` esas subidas responden 503.
+
 ### 2) Levantar entorno con Docker
 
 Todo el entorno (DB + Backend + Frontend):
@@ -349,7 +357,7 @@ Todos usan la misma contrasena: `Test1234!`
 
 ## Demo final (`apps/backend/prisma/seed-demo-final.ts`)
 
-Dataset idempotente de demo: 15 estudiantes `demo.cs01..15`, asociacion con junta, 2 organizaciones con chat, proyectos en distintos estados, metas de horas (Carlos: beca 50/20, extension 40/10; 12 de los 15 con metas) y una tarea de Carlos con checklist en el Hackathon. Falla si los estudiantes en riesgo de la asociacion quedan fuera de 4-8. No entra a `dist` ni depende de la compilacion de Nest.
+Dataset idempotente de demo: 15 estudiantes `demo.cs01..15`, asociacion con junta, 2 organizaciones con chat, proyectos en distintos estados, metas de horas (Carlos: beca 50/20, extension 40/10; 12 de los 15 con metas) una tarea de Carlos con checklist en el Hackathon, horas del semestre anterior para 8 cuentas demo (alimentan «Comparar semestres» y el comparativo) y, en «Demo - App de tutorías entre pares» (lidera demo.cs05), un rol con requisitos de habilidad y 2 postulaciones pendientes con coincidencia parcial (67 % y 33 %) para «Ordenar por coincidencia». Si faltan, crea las habilidades React, TypeScript y Figma del catálogo. Falla si los estudiantes en riesgo de la asociacion quedan fuera de 4-8. No entra a `dist` ni depende de la compilacion de Nest.
 
 Requiere `DEMO_PASSWORD` (solo se hashea para cuentas nuevas) y que `carlos.mendoza@uvg.edu.gt` exista. `DRY_RUN=1` ejecuta todo en una transaccion y la revierte.
 

@@ -366,7 +366,7 @@ export function TaskBoard({
       } else if (e.key === 'Enter' && enfocada !== null && document.activeElement === cardRefs.current.get(enfocada)) {
         e.preventDefault();
         router.push(`/dashboard/projects/${idProyecto}/kanban/tasks/${enfocada}`);
-      } else if (e.key.startsWith('Arrow') && (enfocada !== null || destino === document.body)) {
+      } else if (e.key.startsWith('Arrow') && (enfocada !== null || destino === document.body || destino?.tagName === 'MAIN')) {
         const siguiente = siguienteTareaEnTablero(columnas, enfocada, e.key as TeclaFlecha);
         if (siguiente === null) return;
         e.preventDefault();

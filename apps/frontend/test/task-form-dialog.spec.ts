@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 } }) }));
 // Los extras (plantilla, bloqueo, repetición) hacen consultas; sus pruebas viven en tasks-mej-f.spec.tsx.
-vi.mock('../components/projects/task-form-extras', () => ({ TaskFormExtras: () => null }));
+vi.mock('../components/projects/task-form-extras', () => ({ TaskFormExtras: ({ parte }: { parte?: string }) => createElement('div', { 'data-testid': 'extras', 'data-parte': parte }) }));
 vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }),
 }));
@@ -196,6 +196,15 @@ describe('TaskFormDialog — reutilización', () => {
 
 describe('TaskFormDialog — creación', () => {
   afterEach(() => cleanupDialog());
+
+  it('MEJ-2: la plantilla va en el paso 1 y bloqueada por / repetir en el de planificacion', () => {
+    renderDialog({ mode: 'create', task: null, idProyecto: 10 });
+    expect(screen.getByTestId('extras')).toHaveAttribute('data-parte', 'plantilla');
+    fireEvent.click(screen.getByRole('button', { name: /^Paso 2 de 3/ }));
+    expect(screen.getByTestId('extras')).toHaveAttribute('data-parte', 'planificacion');
+    irAlUltimoPaso();
+    expect(screen.queryByTestId('extras')).not.toBeInTheDocument();
+  });
 
   it('valores iniciales vacíos en creación', () => {
     renderDialog({ mode: 'create', task: null });

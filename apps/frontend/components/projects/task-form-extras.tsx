@@ -30,10 +30,12 @@ interface Props {
   idTareaActual: number | null;
   value: TaskExtrasValue;
   onChange: (value: TaskExtrasValue) => void;
+  /** En la creación por pasos: la plantilla va primero (rellena el título) y bloqueo/repetición con la planificación. */
+  parte?: 'plantilla' | 'planificacion';
 }
 
 /** MEJ-48 (bloqueada por), MEJ-47 (repetición) y MEJ-52 (plantilla) dentro del formulario de tarea. */
-export function TaskFormExtras({ idProyecto, mode, idTareaActual, value, onChange }: Props) {
+export function TaskFormExtras({ idProyecto, mode, idTareaActual, value, onChange, parte }: Props) {
   const form = useFormContext<TaskFormValues>();
   const { tasks } = useProjectTasks(idProyecto);
   const { plantillas } = useTaskTemplates(idProyecto, mode === 'create');
@@ -53,7 +55,7 @@ export function TaskFormExtras({ idProyecto, mode, idTareaActual, value, onChang
 
   return (
     <div className="mt-6 space-y-4 border-t border-outline-variant/40 pt-5">
-      {mode === 'create' && (
+      {mode === 'create' && parte !== 'planificacion' && (
         <div className="space-y-1.5">
           <Label htmlFor="tarea-plantilla">Plantilla</Label>
           {plantillas.length === 0 ? (
@@ -84,6 +86,7 @@ export function TaskFormExtras({ idProyecto, mode, idTareaActual, value, onChang
         </div>
       )}
 
+      {parte !== 'plantilla' && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="tarea-bloqueante">Bloqueada por</Label>
@@ -127,6 +130,7 @@ export function TaskFormExtras({ idProyecto, mode, idTareaActual, value, onChang
           <p className="text-xs text-tertiary">Se crea una copia en el sprint activo en cada ocurrencia.</p>
         </div>
       </div>
+      )}
     </div>
   );
 }

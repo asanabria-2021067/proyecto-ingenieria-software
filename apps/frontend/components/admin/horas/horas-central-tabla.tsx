@@ -65,7 +65,7 @@ export function Horas({
 export function HorasCentralTabla({ filas }: { filas: FilaHorasCentral[] }) {
   return (
     <div className={DATA_TABLE_CARD}>
-      <Table>
+      <Table containerLabel="Horas por estudiante en el semestre">
         <caption className="sr-only">Horas beca y de extensión por estudiante en el semestre</caption>
         <TableHeader>
           <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>

@@ -545,7 +545,7 @@ export function ActiveProjectsBoard() {
         </Empty>
       ) : (
         <div className={DATA_TABLE_CARD}>
-          <Table className="table-fixed">
+          <Table containerLabel="Proyectos activos" className="table-fixed">
             <TableHeader>
               <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
                 <TableHead scope="col" className={TH}>

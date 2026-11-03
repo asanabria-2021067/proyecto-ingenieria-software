@@ -26,6 +26,7 @@ vi.mock('../lib/services/task-hours', () => ({ registrarHorasTarea: vi.fn() }));
 import { AccionesRapidasTarea, parseHorasRapidas } from '../components/dashboard/acciones-rapidas-tarea';
 import { VencenEstaSemana } from '../components/dashboard/vencen-esta-semana';
 import { construirSerieHorasProyecto } from '../components/hours/horas-por-proyecto';
+import { recortar } from '../components/hours/horas-por-proyecto-plot';
 import { SemestreHorasHistorial } from '../components/hours/semestre-horas-historial';
 import { AvailableProjectCard } from '../components/projects/available-project-card';
 import { downloadBlob } from '../lib/download-file';
@@ -123,6 +124,12 @@ describe('MEJ-14 horas por proyecto', () => {
       { nombre: 'P1', registradas: 4.5, acreditadas: 0 },
       { nombre: 'P3', registradas: 0, acreditadas: 8 },
     ]);
+  });
+
+  it('recorta con elipsis las etiquetas largas del eje', () => {
+    expect(recortar('Demo - Semana de la Computacion (cerrado)')).toHaveLength(18);
+    expect(recortar('Demo - Semana de la Computacion (cerrado)').endsWith('…')).toBe(true);
+    expect(recortar('Feria')).toBe('Feria');
   });
 
   it('limita a 8 proyectos', () => {

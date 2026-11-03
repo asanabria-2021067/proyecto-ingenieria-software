@@ -450,6 +450,21 @@ describe('ProjectHoursSummaryService.forUserBreakdown', () => {
     });
   });
 
+  it('las metas salen del registro del semestre actual, con el perfil solo de respaldo', async () => {
+    const { prisma, llamadas } = prismaDe(mundoBase());
+    const original = prisma.perfilEstudiante.findUnique.bind(prisma.perfilEstudiante);
+    (prisma.perfilEstudiante as { findUnique: unknown }).findUnique = async (args: Parameters<typeof original>[0]) => ({
+      ...(await original(args)),
+      usuario: { registrosHorasSemestre: [{ metaBeca: 80, metaExtension: null }] },
+    });
+
+    const vista = await new ProjectHoursSummaryService(prisma).forUserBreakdown(ESTUDIANTE);
+
+    expect(vista.requisitos).toEqual({ horasBecaRequeridas: 80, horasExtensionRequeridas: null });
+    const select = JSON.stringify(llamadas.find((l) => l.modelo === 'perfilEstudiante.findUnique')!.args.select);
+    expect(select).toContain('registrosHorasSemestre');
+  });
+
   it('totales, metas y desglose por tipo del mundo base', async () => {
     const vista = await servicio(mundoBase()).forUserBreakdown(ESTUDIANTE);
 

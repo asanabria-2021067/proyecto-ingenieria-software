@@ -148,7 +148,7 @@ export default function AdminAsociacionesPage() {
                 <p className="type-meta">Sin junta directiva todavía.</p>
               ) : (
                 <div className={DATA_TABLE_CARD}>
-                  <Table>
+                  <Table containerLabel={`Junta directiva de ${a.nombre}`}>
                     <caption className="sr-only">Junta directiva de {a.nombre}</caption>
                     <TableHeader>
                       <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>

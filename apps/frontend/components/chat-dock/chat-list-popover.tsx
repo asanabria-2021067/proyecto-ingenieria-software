@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { BellOff, Bookmark, Hash, Search, SquarePen, Users as UsersIcon, UserCog } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,8 @@ import { getIniciales } from '@/components/projects/available-project-card';
 import { nombreMostrado, nombreReal } from '@/lib/chat-apodos';
 import { useAllConversations } from '@/hooks/use-chat';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useMisOrganizaciones } from '@/hooks/use-organizations';
+import { OrgAvatar } from '@/components/organizations/org-avatar';
 import { useChatDock } from '@/components/chat-dock/chat-dock-context';
 import { NewChatDialog } from '@/components/chat-dock/new-chat-dialog';
 import { estaSilenciada } from '@/lib/chat-silencio';
@@ -61,6 +64,16 @@ export function ChatListPopover({ onClose, onOpenSaved, pagina = false, idActiva
   }, [query]);
 
   const { conversations, isLoading } = useAllConversations(debouncedQuery);
+
+  // CHAT: el canal #general de cada organización (solo de la que soy miembro) vive en la pestaña Chat de la org.
+  // ponytail: se busca por nombre de organización o de canal; el texto de los mensajes de la org no se indexa aquí.
+  const { data: misOrganizaciones } = useMisOrganizaciones();
+  const organizaciones = useMemo(() => {
+    const q = debouncedQuery.trim().toLowerCase();
+    return (misOrganizaciones ?? []).filter(
+      (o) => o.miRol !== null && (!q || o.nombreOrganizacion.toLowerCase().includes(q) || 'general'.includes(q)),
+    );
+  }, [misOrganizaciones, debouncedQuery]);
 
   // Los canales viven en su propia sección, fuera de las pestañas Prioritarios/Otros.
   const canales = useMemo(() => conversations.filter((c) => c.esCanal), [conversations]);
@@ -195,10 +208,36 @@ export function ChatListPopover({ onClose, onOpenSaved, pagina = false, idActiva
             </ul>
           </section>
         )}
+        {organizaciones.length > 0 && (
+          <section aria-labelledby="chat-organizaciones-titulo" className="border-b border-outline-variant">
+            <h3 id="chat-organizaciones-titulo" className="px-3 pb-1 pt-2.5 text-[11px] font-bold uppercase tracking-wide text-text-secondary">
+              Organizaciones
+            </h3>
+            <ul>
+              {organizaciones.map((o) => (
+                <li key={o.idOrganizacion} className="hover:bg-surface-container-high">
+                  <Link
+                    href={`/dashboard/organizaciones/${o.idOrganizacion}?tab=chat`}
+                    onClick={onClose}
+                    className="flex min-w-0 items-center gap-2.5 px-3 py-2 text-left"
+                  >
+                    <OrgAvatar nombre={o.nombreOrganizacion} logoUrl={o.logoUrl} className="size-7" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-on-surface">
+                        <span className="sr-only">Canal </span>#general
+                      </span>
+                      <span className="block truncate text-[10px] text-text-secondary">{o.nombreOrganizacion}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {isLoading && (
           <SkeletonList label="Cargando chats" count={4} lines={2} avatar="circle" layout="plain" className="px-4 py-stack" />
         )}
-        {!isLoading && filtradas.length === 0 && (
+        {!isLoading && filtradas.length === 0 && organizaciones.length === 0 && (
           <p className="px-4 py-6 text-center text-xs text-tertiary">
             {debouncedQuery ? 'Sin resultados para esa búsqueda.' : 'No tienes chats aquí todavía.'}
           </p>

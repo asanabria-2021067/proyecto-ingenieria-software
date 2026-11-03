@@ -201,3 +201,18 @@ describe('FG10-C01 · A11Y-02: días de otro mes en el mini calendario de Sprint
     expect(css).toContain('--color-text-disabled: color-mix(in srgb, var(--color-on-surface) 38%, transparent);');
   });
 });
+
+describe('A11Y-2: rótulo "Guía UVGenius" del tour', () => {
+  const tour = leer('components/dashboard/OnboardingTour.tsx');
+
+  it('usa el token primary, no un hex fijo', () => {
+    expect(tour).not.toContain('#006735]');
+    expect(tour).toContain('text-primary bg-primary/10');
+  });
+
+  it.each(['claro', 'oscuro'] as const)('tema %s: primary sobre la tarjeta alcanza AA', (tema) => {
+    const fondo = rgb(token('surface-container-lowest', tema));
+    const p = rgb(token('primary', tema));
+    expect(contraste(p, sobre(p, fondo, 0.1))).toBeGreaterThanOrEqual(AA_TEXTO_NORMAL);
+  });
+});

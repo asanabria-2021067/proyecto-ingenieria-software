@@ -53,7 +53,7 @@ export function SemestreHorasComparar({ historial }: { historial: HorasSemestreH
       </div>
       {a && b && (
         <div className={DATA_TABLE_CARD}>
-          <Table>
+          <Table containerLabel={`Comparación de horas: ${etiquetaSemestre(a.semestre)} frente a ${etiquetaSemestre(b.semestre)}`}>
             <caption className="sr-only">
               Horas de {etiquetaSemestre(a.semestre)} frente a {etiquetaSemestre(b.semestre)}
             </caption>

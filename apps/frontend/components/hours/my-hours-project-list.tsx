@@ -57,7 +57,7 @@ function TablaTareas({ proyecto }: { proyecto: MisHorasProyecto }) {
     return <p className="type-meta">Aún no registras horas en este proyecto.</p>;
   }
   return (
-    <Table aria-label={`Horas por tarea en ${proyecto.tituloProyecto}`}>
+    <Table containerLabel={`Horas por tarea en ${proyecto.tituloProyecto}`}>
       <TableHeader>
         <TableRow className={FILA_TABLA}>
           <TableHead>Tarea</TableHead>
@@ -188,7 +188,16 @@ function ProyectoCerrado({ proyecto }: { proyecto: MisHorasProyecto }) {
  */
 export function MyHoursProjectList({ proyectos }: { proyectos: MisHorasProyecto[] }) {
   const abiertos = proyectos.filter((proyecto) => proyecto.abierto);
-  const cerrados = proyectos.filter((proyecto) => !proyecto.abierto);
+  // Un borrador o un proyecto en revisión no está cerrado: solo se lista si ya tiene horas.
+  const cerrados = proyectos.filter(
+    (proyecto) =>
+      !proyecto.abierto &&
+      (proyecto.eliminado ||
+        proyecto.estadoProyecto === 'CERRADO' ||
+        proyecto.estadoProyecto === 'CANCELADO' ||
+        Number(proyecto.acreditadas) > 0 ||
+        Number(proyecto.propuestasPendientes) > 0),
+  );
 
   return (
     <>

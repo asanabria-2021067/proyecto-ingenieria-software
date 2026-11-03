@@ -234,10 +234,13 @@ describeIntegration('perfil, calendario y anuncios de entidades (PostgreSQL real
     const cuerpo = await propio.text();
     expect(cuerpo).toContain('BEGIN:VCALENDAR');
     expect(cuerpo).toContain(`SUMMARY:Abierto ${marca}`);
+    expect(cuerpo).toContain('X-WR-CALNAME:Mi calendario');
 
     const org = await fetch(`${http.url}/organizaciones/${ids.orgPublica}/calendario/ics?${rango()}`, { headers: { authorization: `Bearer ${u.lector.token}` } });
     expect(org.status).toBe(200);
-    expect(await org.text()).toContain(`SUMMARY:Abierto ${marca}`);
+    const cuerpoOrg = await org.text();
+    expect(cuerpoOrg).toContain(`SUMMARY:Abierto ${marca}`);
+    expect(cuerpoOrg).toContain(`X-WR-CALNAME:Org PUBLICA ${marca}`);
     const ajeno = await fetch(`${http.url}/organizaciones/${ids.orgPublica}/calendario/ics?${rango()}`, { headers: { authorization: `Bearer ${u.outsider.token}` } });
     expect(ajeno.status).toBe(403);
     expect((await fetch(`${http.url}/usuarios/me/eventos/ics?${rango()}`)).status).toBe(401);

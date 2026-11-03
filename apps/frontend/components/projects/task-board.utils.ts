@@ -197,7 +197,8 @@ export function estaVencida(tarea: TareaPublicaDTO, ahora: Date = new Date()): b
  * horaria detrás de UTC (p. ej. Guatemala, UTC-6).
  */
 export function formatearFechaLimite(fecha: string): string {
-  const [anio, mes, dia] = fecha.split('-').map(Number);
+  // Acepta también ISO completo (Hito.fechaLimite llega como 'YYYY-MM-DDT00:00:00.000Z').
+  const [anio, mes, dia] = fecha.slice(0, 10).split('-').map(Number);
   const fechaUtc = new Date(Date.UTC(anio, mes - 1, dia));
   return fechaUtc.toLocaleDateString('es-GT', {
     year: 'numeric',

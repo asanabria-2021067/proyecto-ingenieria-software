@@ -25,11 +25,12 @@ export function formatearDiaMes(dia: string): string {
   return `${d}/${mes}`;
 }
 
-/** Frase de proyección de un tramo; null si no hay meta ni ritmo para proyectar. */
-export function textoProyeccion(tipo: TipoHorasSemestre, tramo: TramoProgreso): string | null {
+/** Frase de proyección de un tramo; null si no hay meta ni ritmo para proyectar. `finSemestre` (YYYY-MM-DD): una fecha posterior no se promete. */
+export function textoProyeccion(tipo: TipoHorasSemestre, tramo: TramoProgreso, finSemestre?: string): string | null {
   if (tramo.meta === null || tramo.meta <= 0) return null;
   if (tramo.avance >= tramo.meta) return `Ya completaste tus ${ETIQUETA_TIPO[tipo]} de este semestre`;
   if (!tramo.fechaProyectada) return `Registra horas para proyectar cuándo completas tus ${ETIQUETA_TIPO[tipo]}`;
+  if (finSemestre && tramo.fechaProyectada > finSemestre) return 'A este ritmo no alcanzas la meta este semestre';
   return `A este ritmo completas tus ${ETIQUETA_TIPO[tipo]} el ${formatearDiaMes(tramo.fechaProyectada)}`;
 }
 
