@@ -130,6 +130,10 @@ export function useRealtimeNotifications(enabled: boolean) {
       if (data?.tipoNotificacion === 'CUENTA_PENDIENTE_VERIFICACION') {
         queryClient.invalidateQueries({ queryKey: adminCuentasPendientesQueryKey });
       }
+      // ORG-3: aceptar o rechazar una invitación cambia miembros y contadores de la organización abierta.
+      if (data?.tipoNotificacion?.includes('ORGANIZACION')) {
+        queryClient.invalidateQueries({ queryKey: ['organizaciones'] });
+      }
     };
 
     // F6 (A4/A9.1): el estado real de un Sprint sigue viviendo en la query
