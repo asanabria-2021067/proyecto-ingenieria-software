@@ -39,11 +39,12 @@ const celda = (n: number | null) => (n === null ? '' : n);
 
 const SIN_METAS = 'Aún no registra sus metas del semestre';
 
-const filaTabla = (f: FilaReporteHoras) => [
+/** `rotular`: el PDF explica la ausencia de metas; el CSV deja la celda vacia porque la columna es numerica. */
+const filaTabla = (f: FilaReporteHoras, rotular: boolean) => [
   `${f.nombre} ${f.apellido}`,
   f.carne,
   f.carrera ?? '',
-  f.metaBeca === null && f.metaExtension === null ? SIN_METAS : celda(f.metaBeca),
+  rotular && f.metaBeca === null && f.metaExtension === null ? SIN_METAS : celda(f.metaBeca),
   f.becaDeclarada,
   f.becaAcreditada,
   celda(f.faltaBeca),
@@ -54,7 +55,7 @@ const filaTabla = (f: FilaReporteHoras) => [
   f.enRiesgo ? 'Sí' : 'No',
 ];
 
-export const buildHorasCsv = (filas: FilaReporteHoras[]) => buildCsv([...HEADER], filas.map(filaTabla));
+export const buildHorasCsv = (filas: FilaReporteHoras[]) => buildCsv([...HEADER], filas.map((f) => filaTabla(f, false)));
 
 export function renderTablaPdf(titulo: string, head: readonly string[], body: (string | number)[][]): Buffer {
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
@@ -76,4 +77,4 @@ export function renderTablaPdf(titulo: string, head: readonly string[], body: (s
 }
 
 export const renderHorasPdf = (titulo: string, filas: FilaReporteHoras[]) =>
-  renderTablaPdf(titulo, HEADER, filas.map(filaTabla));
+  renderTablaPdf(titulo, HEADER, filas.map((f) => filaTabla(f, true)));

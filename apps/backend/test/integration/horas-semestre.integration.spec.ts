@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
-import { createIntegrationUser } from './setup/fixtures';
+import {
+  createIntegrationParticipation,
+  createIntegrationProject,
+  createIntegrationProjectRole,
+  createIntegrationUser,
+} from './setup/fixtures';
 import { HorasSemestreService } from '../../src/horas-semestre/horas-semestre.service';
 import { semestreDe } from '../../src/horas-semestre/semestre';
 import type { PrismaService } from '../../src/prisma/prisma.service';
@@ -11,6 +16,7 @@ describeIntegration('HRS registro de horas por semestre', () => {
   let db: PrismaClient;
   let service: HorasSemestreService;
   const userIds: number[] = [];
+  const proyectoIds: number[] = [];
 
   beforeAll(async () => {
     db = createIntegrationPrismaClient();
@@ -19,6 +25,10 @@ describeIntegration('HRS registro de horas por semestre', () => {
   });
 
   afterAll(async () => {
+    await db.horasParticipacion.deleteMany({ where: { participacion: { idUsuario: { in: userIds } } } });
+    await db.participacionProyecto.deleteMany({ where: { idUsuario: { in: userIds } } });
+    await db.rolProyecto.deleteMany({ where: { idProyecto: { in: proyectoIds } } });
+    await db.proyecto.deleteMany({ where: { idProyecto: { in: proyectoIds } } });
     await db.usuarioRolAcceso.deleteMany({ where: { idUsuario: { in: userIds } } });
     await db.registroHorasSemestre.deleteMany({ where: { idUsuario: { in: userIds } } });
     await db.perfilEstudiante.deleteMany({ where: { idUsuario: { in: userIds } } });
@@ -105,5 +115,50 @@ describeIntegration('HRS registro de horas por semestre', () => {
 
     const enRiesgo = await service.recorrerTodas({ ...q, enRiesgo: true });
     expect(enRiesgo.filas.map((x) => x.idUsuario)).toEqual([b, a]);
+  });
+
+  it('el comparativo del semestre actual coincide con los totales por carrera (misma poblacion y formula)', async () => {
+    const admin = await createIntegrationUser(db);
+    userIds.push(admin.idUsuario);
+    const rol = await db.rolAcceso.upsert({ where: { nombrePerfil: 'administrador' }, update: {}, create: { nombrePerfil: 'administrador' } });
+    await db.usuarioRolAcceso.create({ data: { idUsuario: admin.idUsuario, idRolAcceso: rol.idRolAcceso } });
+    const proyecto = await createIntegrationProject(db, admin.idUsuario);
+    proyectoIds.push(proyecto.idProyecto);
+    const rolProyecto = await createIntegrationProjectRole(db, proyecto.idProyecto);
+    const aprobar = async (idUsuario: number, horas: number) => {
+      const part = await createIntegrationParticipation(db, idUsuario, rolProyecto.idRolProyecto);
+      await db.horasParticipacion.create({
+        data: {
+          idParticipacion: part.idParticipacion,
+          periodoInicio: new Date(),
+          periodoFin: new Date(),
+          horasReportadas: horas,
+          horasAprobadas: horas,
+          estadoHoras: 'APROBADA',
+          fechaAprobacion: new Date(),
+        },
+      });
+    };
+    const activo = await estudiante();
+    const bloqueado = await estudiante();
+    await db.usuario.update({ where: { idUsuario: bloqueado.idUsuario }, data: { estado: 'BLOQUEADO' } });
+    const sinPerfil = await createIntegrationUser(db);
+    userIds.push(sinPerfil.idUsuario);
+    await service.actualizarActual(activo.idUsuario, { metaBeca: 50, becaDeclarada: 7 });
+    await aprobar(activo.idUsuario, 8);
+    await aprobar(bloqueado.idUsuario, 20);
+    await aprobar(sinPerfil.idUsuario, 25);
+
+    const { semestres } = await service.comparativo(admin.idUsuario);
+    const { porCarrera } = await service.totales(admin.idUsuario, {});
+    const suma = (campo: 'becaAcreditada' | 'becaDeclarada' | 'extensionAcreditada' | 'metaBeca') =>
+      porCarrera.reduce((t, g) => t + g[campo], 0);
+    expect(semestres[0].becaAcreditada).toBe(suma('becaAcreditada'));
+    expect(semestres[0].becaDeclarada).toBe(suma('becaDeclarada'));
+    expect(semestres[0].extensionAcreditada).toBe(suma('extensionAcreditada'));
+    expect(semestres[0].metaBeca).toBe(suma('metaBeca'));
+    // las horas del bloqueado y de la cuenta sin perfil no entran en ninguna cifra
+    const fila = (await service.todasLasFilas(admin.idUsuario, {})).filas.find((f) => f.idUsuario === activo.idUsuario);
+    expect(fila).toMatchObject({ becaDeclarada: 7, becaAcreditada: 8 });
   });
 });

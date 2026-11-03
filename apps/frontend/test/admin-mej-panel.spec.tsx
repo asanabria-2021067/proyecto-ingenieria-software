@@ -192,6 +192,10 @@ describe('MEJ-36 y MEJ-68: asociaciones y organizaciones', () => {
     expect(await screen.findByText('Robótica')).toBeInTheDocument();
     expect(screen.getByText('Pública')).toBeInTheDocument();
     expect(screen.getByText('Archivada')).toBeInTheDocument();
+    // En movil las tablas se desplazan de lado: cada una avisa (visible solo bajo md).
+    const pistas = screen.getAllByTestId('pista-desplazar');
+    expect(pistas).toHaveLength(3);
+    for (const pista of pistas) expect(pista).toHaveClass('md:hidden');
   });
 
   it('sin asociaciones ni organizaciones ofrece una acción', async () => {

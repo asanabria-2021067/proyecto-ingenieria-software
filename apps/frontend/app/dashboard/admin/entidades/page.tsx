@@ -23,6 +23,17 @@ import { getAdminMetricasEntidades } from '@/lib/services/admin';
 
 const TH = `h-auto whitespace-normal px-stack py-tight ${DATA_TABLE_HEAD_TEXT}`;
 const TD = 'px-stack py-inline align-top tabular-nums';
+/** Primera columna: el nombre se parte en vez de cortarse, y deja asomar la siguiente columna en movil. */
+const TD_NOMBRE = `${TD} min-w-36 whitespace-normal`;
+
+/** En movil las tablas se desplazan de lado; la pista lo dice (las columnas de metricas quedan fuera de pantalla). */
+function PistaDesplazar() {
+  return (
+    <p className="type-meta md:hidden" data-testid="pista-desplazar">
+      Desliza la tabla hacia los lados para ver todas las columnas.
+    </p>
+  );
+}
 
 function Cargando({ etiqueta }: { etiqueta: string }) {
   return (
@@ -93,6 +104,7 @@ function ResumenAsociaciones() {
           <p className="type-meta">
             Semestre {data!.semestre.periodo} de {data!.semestre.anio}. Las horas declaradas se muestran siempre aparte de las acreditadas en UVGenius.
           </p>
+          <PistaDesplazar />
           <div className={DATA_TABLE_CARD}>
             <Table containerLabel="Tabla del resumen por asociación">
               <caption className="sr-only">Resumen de estudiantes, horas y proyectos por asociación</caption>
@@ -114,7 +126,7 @@ function ResumenAsociaciones() {
               <TableBody>
                 {lista.map((a) => (
                   <TableRow key={a.idAsociacion} className={DATA_TABLE_ROW_BORDER}>
-                    <TableCell className={`${TD} min-w-40`}>
+                    <TableCell className={TD_NOMBRE}>
                       <span className="font-semibold">{a.nombre}</span>
                       <span className="type-meta block">{a.carreras.join(', ')}</span>
                     </TableCell>
@@ -151,6 +163,7 @@ function ActividadEntidades() {
   return (
     <>
       <Seccion id="proyectos-asociaciones" titulo="Proyectos por asociación">
+        <PistaDesplazar />
         <div className={DATA_TABLE_CARD}>
           <Table containerLabel="Tabla de proyectos por asociación">
             <caption className="sr-only">Proyectos publicados a nombre de cada asociación</caption>
@@ -167,7 +180,7 @@ function ActividadEntidades() {
             <TableBody>
               {data.asociaciones.map((a) => (
                 <TableRow key={a.idAsociacion} className={DATA_TABLE_ROW_BORDER}>
-                  <TableCell className={`${TD} min-w-40 font-semibold`}>
+                  <TableCell className={`${TD_NOMBRE} font-semibold`}>
                     {a.nombre} {a.archivada && <Tag tone="slate" size="sm">Archivada</Tag>}
                   </TableCell>
                   <TableCell className={TD}>{a.carreras}</TableCell>
@@ -194,35 +207,38 @@ function ActividadEntidades() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <div className={DATA_TABLE_CARD}>
-            <Table containerLabel="Tabla de organizaciones">
-              <caption className="sr-only">Miembros y proyectos de cada organización</caption>
-              <TableHeader>
-                <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
-                  <TableHead scope="col" className={TH}>Organización</TableHead>
-                  <TableHead scope="col" className={TH}>Visibilidad</TableHead>
-                  <TableHead scope="col" className={TH}>Miembros</TableHead>
-                  <TableHead scope="col" className={TH}>Proyectos</TableHead>
-                  <TableHead scope="col" className={TH}>Activos</TableHead>
-                  <TableHead scope="col" className={TH}>Cerrados</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.organizaciones.map((o) => (
-                  <TableRow key={o.idOrganizacion} className={DATA_TABLE_ROW_BORDER}>
-                    <TableCell className={`${TD} min-w-40 font-semibold`}>
-                      {o.nombre} {o.archivada && <Tag tone="slate" size="sm">Archivada</Tag>}
-                    </TableCell>
-                    <TableCell className={TD}>{o.visibilidad === 'PUBLICA' ? 'Pública' : 'Privada'}</TableCell>
-                    <TableCell className={TD}>{o.miembros}</TableCell>
-                    <TableCell className={TD}>{o.proyectosTotales}</TableCell>
-                    <TableCell className={TD}>{o.proyectosActivos}</TableCell>
-                    <TableCell className={TD}>{o.proyectosCerrados}</TableCell>
+          <>
+            <PistaDesplazar />
+            <div className={DATA_TABLE_CARD}>
+              <Table containerLabel="Tabla de organizaciones">
+                <caption className="sr-only">Miembros y proyectos de cada organización</caption>
+                <TableHeader>
+                  <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
+                    <TableHead scope="col" className={TH}>Organización</TableHead>
+                    <TableHead scope="col" className={TH}>Visibilidad</TableHead>
+                    <TableHead scope="col" className={TH}>Miembros</TableHead>
+                    <TableHead scope="col" className={TH}>Proyectos</TableHead>
+                    <TableHead scope="col" className={TH}>Activos</TableHead>
+                    <TableHead scope="col" className={TH}>Cerrados</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {data.organizaciones.map((o) => (
+                    <TableRow key={o.idOrganizacion} className={DATA_TABLE_ROW_BORDER}>
+                      <TableCell className={`${TD_NOMBRE} font-semibold`}>
+                        {o.nombre} {o.archivada && <Tag tone="slate" size="sm">Archivada</Tag>}
+                      </TableCell>
+                      <TableCell className={TD}>{o.visibilidad === 'PUBLICA' ? 'Pública' : 'Privada'}</TableCell>
+                      <TableCell className={TD}>{o.miembros}</TableCell>
+                      <TableCell className={TD}>{o.proyectosTotales}</TableCell>
+                      <TableCell className={TD}>{o.proyectosActivos}</TableCell>
+                      <TableCell className={TD}>{o.proyectosCerrados}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </Seccion>
     </>

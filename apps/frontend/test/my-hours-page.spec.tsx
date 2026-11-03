@@ -147,10 +147,10 @@ describe('MisHorasPage', () => {
     });
     render(<MisHorasPage />);
 
-    for (const nombre of ['Registradas en proyectos abiertos', 'Propuestas para acreditación', 'Acreditadas']) {
+    for (const nombre of ['Registradas en proyectos abiertos', 'Propuestas para acreditación', 'Acreditadas en total']) {
       expect(within(kpi(nombre)).getByText('0 h')).toBeInTheDocument();
     }
-    expect(screen.getByRole('region', { name: 'Progreso de acreditación' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Acreditadas en total por tipo' })).toBeInTheDocument();
     expect(screen.getByText('Aún no tienes horas registradas')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ir a Mis Tareas' })).toHaveAttribute('href', '/dashboard/mis-tareas');
     expect(screen.getByRole('link', { name: 'Explorar Proyectos' })).toHaveAttribute('href', '/dashboard/proyectos');
@@ -164,11 +164,14 @@ describe('MisHorasPage', () => {
 
     expect(within(kpi('Registradas en proyectos abiertos')).getByText('75 h')).toBeInTheDocument();
     expect(within(kpi('Propuestas para acreditación')).getByText('4.5 h')).toBeInTheDocument();
-    expect(within(kpi('Acreditadas')).getByText('22.25 h')).toBeInTheDocument();
-    expect(kpi('Acreditadas')).toHaveAttribute('data-destacado', 'true');
+    expect(within(kpi('Acreditadas en total')).getByText('22.25 h')).toBeInTheDocument();
+    expect(kpi('Acreditadas en total')).toHaveAttribute('data-destacado', 'true');
     expect(within(kpi('Propuestas para acreditación')).getByText('Pendientes de aprobación al cierre del proyecto')).toBeInTheDocument();
-    // Y el progreso usa las acreditadas por tipo del API: 22.25 / 150 → 14 %.
-    expect(screen.getByRole('progressbar', { name: 'Progreso de horas beca' })).toHaveAttribute('aria-valuenow', '14');
+    // El total por tipo usa las acreditadas del API y no se mide contra la meta del semestre.
+    const porTipo = screen.getByRole('region', { name: 'Acreditadas en total por tipo' });
+    expect(within(porTipo).getByRole('listitem', { name: 'Horas beca' })).toHaveTextContent('22.25 h');
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.queryByText(/de 150 h/)).not.toBeInTheDocument();
   });
 
   it('legacy: nota aparte bajo las registradas, nunca sumada al KPI, y columna propia en la tabla', () => {
@@ -259,21 +262,13 @@ describe('MisHorasPage', () => {
     expect(within(fila).queryByRole('link')).not.toBeInTheDocument();
   });
 
-  it('sin meta: «Sin meta configurada» con enlace al perfil', () => {
-    mockEstado({ data: vista({ requisitos: { horasBecaRequeridas: null, horasExtensionRequeridas: null } }) });
-    render(<MisHorasPage />);
-
-    const progreso = screen.getByRole('region', { name: 'Progreso de acreditación' });
-    expect(within(progreso).queryByRole('progressbar')).not.toBeInTheDocument();
-    expect(within(progreso).getAllByRole('link', { name: 'Configúrala en tu perfil' })[0]).toHaveAttribute('href', '/dashboard/perfil');
-  });
-
-  it('meta cumplida: barra al 100 % y pill «Meta cumplida»', () => {
+  it('Carlos: 10 h acreditadas en otro semestre se rotulan como total y no se miden contra la meta de 50 h', () => {
     mockEstado({
       data: vista({
-        requisitos: { horasBecaRequeridas: 20, horasExtensionRequeridas: 40 },
+        requisitos: { horasBecaRequeridas: 50, horasExtensionRequeridas: 40 },
+        totales: { registradasEnProyectosAbiertos: '0.00', legacyEnProyectosAbiertos: '0.00', propuestasPendientes: '0.00', acreditadas: '10.00' },
         porTipo: [
-          { tipoProyecto: 'ACADEMICO_HORAS_BECA', ...cero, acreditadas: '22.25' },
+          { tipoProyecto: 'ACADEMICO_HORAS_BECA', ...cero, acreditadas: '10.00' },
           { tipoProyecto: 'EXTRACURRICULAR_EXTENSION', ...cero },
           { tipoProyecto: 'ACADEMICO_EXPERIENCIA', ...cero },
         ],
@@ -281,8 +276,11 @@ describe('MisHorasPage', () => {
     });
     render(<MisHorasPage />);
 
-    expect(screen.getByRole('progressbar', { name: 'Progreso de horas beca' })).toHaveAttribute('aria-valuenow', '100');
-    expect(screen.getByText('Meta cumplida')).toHaveClass('pill-success');
+    expect(within(kpi('Acreditadas en total')).getByText('10 h')).toBeInTheDocument();
+    const porTipo = screen.getByRole('region', { name: 'Acreditadas en total por tipo' });
+    expect(within(porTipo).getByRole('listitem', { name: 'Horas beca' })).toHaveTextContent('10 h');
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.queryByText(/de 50 h|20 %|Meta cumplida/)).not.toBeInTheDocument();
   });
 });
 
@@ -354,7 +352,7 @@ describe('MisHorasPage — iconos y colores neutros', () => {
     mockEstado({ data: vista() });
     render(<MisHorasPage />);
 
-    for (const nombre of ['Registradas en proyectos abiertos', 'Propuestas para acreditación', 'Acreditadas']) {
+    for (const nombre of ['Registradas en proyectos abiertos', 'Propuestas para acreditación', 'Acreditadas en total']) {
       const grupo = kpi(nombre);
       const icono = grupo.querySelector('svg')!;
       expect(within(grupo).getByText(nombre)).toContainElement(icono as unknown as HTMLElement);
@@ -376,7 +374,7 @@ describe('MisHorasPage — KPI limpias y barras institucionales', () => {
     mockEstado({ data: vista() });
     render(<MisHorasPage />);
 
-    const clases = ['Registradas en proyectos abiertos', 'Propuestas para acreditación', 'Acreditadas'].map((nombre) => {
+    const clases = ['Registradas en proyectos abiertos', 'Propuestas para acreditación', 'Acreditadas en total'].map((nombre) => {
       const grupo = kpi(nombre);
       expect(grupo.querySelector('[data-slot="kpi-icono-fondo"]'), nombre).toBeNull();
       expect(grupo.querySelectorAll('svg'), nombre).toHaveLength(1);
@@ -384,15 +382,5 @@ describe('MisHorasPage — KPI limpias y barras institucionales', () => {
       return grupo.className;
     });
     expect(new Set(clases).size).toBe(1);
-  });
-
-  it('las barras usan el verde institucional (primary) sobre su pista clara, no el lima', () => {
-    mockEstado({ data: vista() });
-    render(<MisHorasPage />);
-
-    const barra = screen.getByRole('progressbar', { name: 'Progreso de horas beca' });
-    expect(barra).toHaveClass('h-1.5', 'bg-primary/10');
-    expect(barra.className).not.toMatch(/secondary-fixed/);
-    expect(barra.querySelector('[data-slot="progress-indicator"]')).toHaveClass('bg-primary');
   });
 });

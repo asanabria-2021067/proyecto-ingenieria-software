@@ -55,6 +55,9 @@ const ESTADOS_ACTIVOS = ['PUBLICADO', 'EN_PROGRESO', 'EN_SOLICITUD_CIERRE'] as c
 
 const LOTE = 200;
 
+/** Poblacion de toda cifra de horas del semestre: estudiantes activos con perfil. */
+const ESTUDIANTE_ACTIVO = { estado: 'ACTIVO', perfil: { isNot: null } } as const;
+
 /** Instante UTC del inicio de un dia de Guatemala (UTC-6, sin horario de verano). */
 export const inicioDeDia = (dia: string) => new Date(`${dia}T06:00:00Z`);
 
@@ -74,13 +77,16 @@ export class HorasSemestreService {
     return semestreDeAnioPeriodo(q.anio ?? actual.anio, q.periodo ?? actual.periodo);
   }
 
-  /** Horas aprobadas por un administrador cuya fecha de aprobacion cae en el semestre, por usuario. */
-  private async acreditadasPorUsuario(s: Semestre, idsUsuario: number[]) {
+  /**
+   * Horas aprobadas por un administrador cuya fecha de aprobacion cae en el semestre, por usuario.
+   * Sin `idsUsuario` abarca a todos los estudiantes activos (misma poblacion que la vista central).
+   */
+  private async acreditadasPorUsuario(s: Semestre, idsUsuario?: number[]) {
     const filas = await this.prisma.horasParticipacion.findMany({
       where: {
         estadoHoras: 'APROBADA',
         fechaAprobacion: ventana(s),
-        participacion: { idUsuario: { in: idsUsuario } },
+        participacion: idsUsuario ? { idUsuario: { in: idsUsuario } } : { usuario: ESTUDIANTE_ACTIVO },
       },
       select: {
         horasAprobadas: true,
@@ -331,7 +337,7 @@ export class HorasSemestreService {
       const usuarios = await this.prisma.usuario.findMany({
         where: {
           idUsuario: { gt: cursor },
-          estado: 'ACTIVO',
+          ...ESTUDIANTE_ACTIVO,
           ...(terminos.length
             ? {
                 AND: terminos.map((t) => ({
@@ -444,27 +450,19 @@ export class HorasSemestreService {
     }
     const filas = await Promise.all(
       semestres.map(async (semestre) => {
-        const [registros, aprobadas] = await Promise.all([
+        const [registros, acreditadas] = await Promise.all([
           this.prisma.registroHorasSemestre.aggregate({
-            where: { anio: semestre.anio, periodo: semestre.periodo },
+            where: { anio: semestre.anio, periodo: semestre.periodo, usuario: ESTUDIANTE_ACTIVO },
             _count: { _all: true },
             _sum: { metaBeca: true, becaDeclarada: true, metaExtension: true, extensionDeclarada: true },
           }),
-          this.prisma.horasParticipacion.findMany({
-            where: { estadoHoras: 'APROBADA', fechaAprobacion: ventana(semestre) },
-            select: {
-              horasAprobadas: true,
-              participacion: { select: { rolProyecto: { select: { proyecto: { select: { tipoProyecto: true } } } } } },
-            },
-          }),
+          this.acreditadasPorUsuario(semestre),
         ]);
         let becaAcreditada = 0;
         let extensionAcreditada = 0;
-        for (const a of aprobadas) {
-          const horas = Number(a.horasAprobadas ?? 0);
-          const tipo = a.participacion.rolProyecto.proyecto.tipoProyecto;
-          if (tipo === TipoProyecto.ACADEMICO_HORAS_BECA) becaAcreditada += horas;
-          else if (tipo === TipoProyecto.EXTRACURRICULAR_EXTENSION) extensionAcreditada += horas;
+        for (const a of acreditadas.values()) {
+          becaAcreditada += a.beca;
+          extensionAcreditada += a.extension;
         }
         const suma = registros._sum;
         return {
