@@ -259,9 +259,11 @@ describe('reportes de horas', () => {
     expect(lineas[1]).toBe("'=Ana Perez;123;Computacion;100;10;20;70;;0;0;;Sí");
   });
 
-  it('CSV rotula con texto claro al estudiante sin metas registradas', () => {
+  it('CSV deja vacia la celda numerica «Meta beca» del estudiante sin metas, sin texto', () => {
     const sinMetas = { ...fila, metaBeca: null, metaExtension: null, faltaBeca: null, faltaExtension: null, enRiesgo: false };
-    expect(buildHorasCsv([sinMetas]).split('\r\n')[1]).toContain(';Aún no registra sus metas del semestre;');
+    const linea = buildHorasCsv([sinMetas]).split('\r\n')[1];
+    expect(linea).toBe("'=Ana Perez;123;Computacion;;10;20;;;0;0;;No");
+    expect(linea).not.toContain('Aún no registra');
   });
 
   it('PDF genera un documento valido', () => {
