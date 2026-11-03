@@ -492,7 +492,7 @@ export default function MiembrosProyectoPage() {
       ) : isLoading ? (
         <SkeletonRegion label="Cargando integrantes" className={DATA_TABLE_CARD}>
           <div className="overflow-x-auto">
-            <Table containerLabel="Cargando integrantes">
+            <table className="w-full caption-bottom type-body">
               <TableHeader>
                 <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
                   {COLUMNAS_ORDENABLES.map((columna) => (
@@ -508,7 +508,7 @@ export default function MiembrosProyectoPage() {
               <TableBody>
                 <SkeletonRows />
               </TableBody>
-            </Table>
+            </table>
           </div>
         </SkeletonRegion>
       ) : (

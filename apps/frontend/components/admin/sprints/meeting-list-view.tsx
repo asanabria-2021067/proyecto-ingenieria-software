@@ -70,7 +70,7 @@ export function MeetingListView({ busqueda }: { busqueda: string }) {
         </p>
       ) : (
         <div className="card-base overflow-hidden p-0">
-          <Table className="table-fixed">
+          <Table containerLabel="Reuniones administrativas próximas" className="table-fixed">
             <TableHeader>
               <TableRow className="border-outline-variant/50 bg-surface-container-low hover:bg-surface-container-low">
                 <TableHead scope="col" className={TH}>

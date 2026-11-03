@@ -412,7 +412,7 @@ export default function TareasExplorerClient({ idProyecto }: Props) {
         )}
 
         {!isLoading && !isError && paginado.items.length > 0 && (
-            <Table>
+            <Table containerLabel="Tareas del proyecto">
               <TableHeader>
                 <TableRow className={FILA_GUIA}>
                   {isLeader && (

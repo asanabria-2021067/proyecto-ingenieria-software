@@ -580,7 +580,7 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
                 <p className="type-body px-card py-card text-text-secondary">Sin integrantes registrados.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table containerLabel="Revisión de cierre del proyecto">
                     <TableHeader>
                       <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
                         <TableHead className={TH}>Integrante</TableHead>
