@@ -94,7 +94,7 @@ function ResumenAsociaciones() {
             Semestre {data!.semestre.periodo} de {data!.semestre.anio}. Las horas declaradas se muestran siempre aparte de las acreditadas en UVGenius.
           </p>
           <div className={DATA_TABLE_CARD}>
-            <Table>
+            <Table containerLabel="Resumen por asociación">
               <caption className="sr-only">Resumen de estudiantes, horas y proyectos por asociación</caption>
               <TableHeader>
                 <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
@@ -152,7 +152,7 @@ function ActividadEntidades() {
     <>
       <Seccion id="proyectos-asociaciones" titulo="Proyectos por asociación">
         <div className={DATA_TABLE_CARD}>
-          <Table>
+          <Table containerLabel="Proyectos por asociación">
             <caption className="sr-only">Proyectos publicados a nombre de cada asociación</caption>
             <TableHeader>
               <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
@@ -195,7 +195,7 @@ function ActividadEntidades() {
           </Empty>
         ) : (
           <div className={DATA_TABLE_CARD}>
-            <Table>
+            <Table containerLabel="Organizaciones">
               <caption className="sr-only">Miembros y proyectos de cada organización</caption>
               <TableHeader>
                 <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>

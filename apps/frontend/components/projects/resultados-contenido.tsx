@@ -111,7 +111,7 @@ export function ResultadosContenido({ resultados, idProyecto }: { resultados: Re
           <VacioSeccion mensaje="No se cerró ningún sprint en este proyecto." />
         ) : (
           <div className={DATA_TABLE_CARD}>
-            <Table>
+            <Table containerLabel="Sprints">
               <TableHeader>
                 <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
                   <TableHead scope="col" className={DATA_TABLE_HEAD_TEXT}>
@@ -146,7 +146,7 @@ export function ResultadosContenido({ resultados, idProyecto }: { resultados: Re
           <VacioSeccion mensaje="La lista del equipo solo la ven quienes participaron en el proyecto." />
         ) : (
           <div className={DATA_TABLE_CARD}>
-            <Table>
+            <Table containerLabel="Equipo">
               <TableHeader>
                 <TableRow className={`${DATA_TABLE_HEAD_ROW} hover:bg-surface-container-low`}>
                   <TableHead scope="col" className={DATA_TABLE_HEAD_TEXT}>
