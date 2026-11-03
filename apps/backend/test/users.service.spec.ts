@@ -92,6 +92,24 @@ describe('UsersService', () => {
     getProfileSpy.mockRestore();
   });
 
+  it('updateProfile con metas de horas tambien las actualiza en el registro existente del semestre actual', async () => {
+    const prisma = prismaMock();
+    const tx = {
+      usuario: { update: vi.fn() },
+      perfilEstudiante: { update: vi.fn() },
+      registroHorasSemestre: { updateMany: vi.fn() },
+    };
+    prisma.$transaction = vi.fn(async (cb: (arg: typeof tx) => unknown) => cb(tx)) as typeof prisma.$transaction;
+    const service = new UsersService(prisma);
+    vi.spyOn(service, 'getProfile').mockResolvedValue({} as unknown as Awaited<ReturnType<typeof service.getProfile>>);
+
+    await service.updateProfile(1, { horasBecaRequeridas: 90, horasExtensionRequeridas: null });
+
+    const llamada = tx.registroHorasSemestre.updateMany.mock.calls[0][0];
+    expect(llamada.where).toMatchObject({ idUsuario: 1 });
+    expect(llamada.data).toEqual({ metaBeca: 90, metaExtension: null });
+  });
+
   it('replaceIntereses reemplaza y retorna count', async () => {
     const prisma = prismaMock();
     const tx = { usuarioInteres: { deleteMany: vi.fn(), createMany: vi.fn() } };
@@ -130,6 +148,26 @@ describe('UsersService', () => {
     expect(result.horasTotal).toBe(12);
     expect(result.horasBeca).toBe(5);
     expect(result.horasExtension).toBe(7);
+    // sin registro del semestre, la meta es la del perfil (respaldo)
+    expect(result.horasBecaRequeridas).toBe(40);
+    expect(result.horasExtensionRequeridas).toBe(20);
+  });
+
+  it('getDashboard usa la meta del registro del semestre y no la del perfil', async () => {
+    const prisma = prismaMock();
+    prisma.perfilEstudiante.findUnique.mockResolvedValue({
+      horasBecaRequeridas: null,
+      horasExtensionRequeridas: null,
+      usuario: { registrosHorasSemestre: [{ metaBeca: 80, metaExtension: 40 }] },
+    });
+    prisma.horasParticipacion.aggregate.mockResolvedValue({ _sum: { horasAprobadas: 0 } });
+    prisma.participacionProyecto.count.mockResolvedValue(0);
+    prisma.postulacion.findMany.mockResolvedValue([]);
+
+    const result = await new UsersService(prisma).getDashboard(1);
+
+    expect(result.horasBecaRequeridas).toBe(80);
+    expect(result.horasExtensionRequeridas).toBe(40);
   });
 
   // T-267: GET /usuarios/me/tareas no acepta ningún id externo (el DTO de

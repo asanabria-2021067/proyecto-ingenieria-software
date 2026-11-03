@@ -138,6 +138,16 @@ export default function CompleteProfileDialog({ open, onComplete, allowClose = f
     setHorasForm(formDesdeRegistro(horasActual.registro, currentUser?.perfil ?? undefined));
   }, [open, horasActual, currentUser?.perfil]);
 
+  // La meta vigente es la del registro del semestre; la del perfil (legacy) solo es respaldo.
+  const registroActual = horasActual?.registro;
+  useEffect(() => {
+    if (!open || !registroActual) return;
+    setRequiereHorasBeca((registroActual.metaBeca ?? 0) > 0);
+    setHorasBecaRequeridas(registroActual.metaBeca ?? 150);
+    setRequiereHorasExtension((registroActual.metaExtension ?? 0) > 0);
+    setHorasExtensionRequeridas(registroActual.metaExtension ?? 40);
+  }, [open, registroActual]);
+
   const normalizeText = (text: string) =>
     text
       .normalize('NFD')

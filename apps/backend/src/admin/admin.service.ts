@@ -20,6 +20,7 @@ import {
   TipoProyecto,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolverMetas, selectRegistroActual } from '../horas-semestre/metas-vigentes';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailService } from '../mail/mail.service';
 import { correoCuentaAprobada, correoRecuperacion, urlApp } from '../mail/mail-templates';
@@ -131,7 +132,7 @@ export class AdminService {
         idUsuario: true,
         semestre: true,
         horasExtensionRequeridas: true,
-        usuario: { select: { nombre: true, apellido: true } },
+        usuario: { select: { nombre: true, apellido: true, ...selectRegistroActual() } },
       },
       take: 20,
     });
@@ -171,7 +172,7 @@ export class AdminService {
       apellido: p.usuario.apellido,
       semestre: p.semestre,
       horasExtension: Number(horasPorUsuario.get(p.idUsuario) ?? 0),
-      horasExtensionRequeridas: p.horasExtensionRequeridas ?? 100,
+      horasExtensionRequeridas: resolverMetas(p.usuario.registrosHorasSemestre, p).extension ?? 100,
     }));
 
     estudiantesConHoras.sort((a, b) => a.horasExtension - b.horasExtension);
@@ -412,19 +413,21 @@ export class AdminService {
         disponibilidadHorasSemana: true,
         horasBecaRequeridas: true,
         horasExtensionRequeridas: true,
+        usuario: { select: selectRegistroActual() },
         carrera: { select: { nombreCarrera: true } },
       },
     });
 
     if (!perfil) return null;
 
+    const metas = resolverMetas(perfil.usuario.registrosHorasSemestre, perfil);
     return {
       carrera: perfil.carrera?.nombreCarrera ?? null,
       carne: perfil.carne,
       semestre: perfil.semestre,
       disponibilidadHorasSemana: perfil.disponibilidadHorasSemana,
-      horasBecaRequeridas: perfil.horasBecaRequeridas,
-      horasExtensionRequeridas: perfil.horasExtensionRequeridas ?? 100,
+      horasBecaRequeridas: metas.beca,
+      horasExtensionRequeridas: metas.extension ?? 100,
     };
   }
 
