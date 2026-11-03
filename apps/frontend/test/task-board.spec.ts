@@ -151,6 +151,29 @@ describe('TaskBoard', () => {
     expect(seleccion.alternar).toHaveBeenCalledWith(3, { rango: false, orden: [3] });
   });
 
+  it('MEJ-79: las flechas arrancan con el foco en <main> (tras clicar una zona vacia)', () => {
+    const { container } = renderBoard({ tasks: [tarea({ idTarea: 7, tituloTarea: 'Primera' })] });
+    const main = document.createElement('main');
+    document.body.appendChild(main);
+    fireEvent.keyDown(main, { key: 'ArrowRight' });
+    fireEvent.keyDown(main, { key: 'ArrowDown' });
+    expect(container.contains(document.activeElement) && document.activeElement !== document.body).toBe(true);
+    main.remove();
+  });
+
+  it('MEJ-79: las flechas no se capturan con el foco en un input', () => {
+    const { container } = renderBoard({ tasks: [tarea({ idTarea: 7 }), tarea({ idTarea: 8 })] });
+    // El input vive dentro de una tarjeta: sin el guard, la flecha moveria el foco a otra tarjeta.
+    const tarjeta = container.querySelector<HTMLElement>('[data-prioridad]') as HTMLElement;
+    const input = document.createElement('input');
+    tarjeta.appendChild(input);
+    input.focus();
+    const ev = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+    input.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    input.remove();
+  });
+
   it('renderiza exactamente cuatro columnas en el orden correcto', () => {
     renderBoard({ tasks: [tarea()] });
     const encabezados = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);

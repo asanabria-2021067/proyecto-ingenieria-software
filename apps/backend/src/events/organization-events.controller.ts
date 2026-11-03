@@ -29,6 +29,6 @@ export class OrganizationEventsController {
     @Res() res: Response,
   ) {
     const eventos = await this.eventsService.findForOrganizationInRange(id, user.userId, query.desde, query.hasta);
-    enviarIcs(res, construirIcs(eventos), `organizacion-${id}.ics`);
+    enviarIcs(res, construirIcs(eventos, await this.eventsService.nombreOrganizacion(id)), `organizacion-${id}.ics`);
   }
 }

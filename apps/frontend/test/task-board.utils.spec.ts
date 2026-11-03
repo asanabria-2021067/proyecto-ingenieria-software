@@ -144,6 +144,12 @@ describe('formatearFechaLimite', () => {
     expect(formatearFechaLimite('2026-12-25')).toContain('25');
     expect(formatearFechaLimite('2026-01-01')).toContain('1');
   });
+
+  it('acepta una fecha ISO completa sin devolver Invalid Date', () => {
+    const r = formatearFechaLimite('2026-10-28T00:00:00.000Z');
+    expect(r).not.toContain('Invalid');
+    expect(r).toContain('28');
+  });
 });
 
 describe('derivarOpcionesRol', () => {

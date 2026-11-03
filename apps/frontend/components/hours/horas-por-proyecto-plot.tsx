@@ -17,6 +17,13 @@ const CONFIG = {
   acreditadas: { label: 'Acreditadas' },
 };
 
+const MAX_ETIQUETA = 18;
+
+/** Etiqueta del eje en una sola línea; el nombre completo va en el tooltip y en la lista inferior. */
+export function recortar(nombre: string): string {
+  return nombre.length > MAX_ETIQUETA ? `${nombre.slice(0, MAX_ETIQUETA - 1)}…` : nombre;
+}
+
 /** Solo el dibujo de recharts; HorasPorProyecto lo carga con next/dynamic. */
 export default function HorasPorProyectoPlot({ serie }: { serie: PuntoHorasProyecto[] }) {
   return (
@@ -24,7 +31,7 @@ export default function HorasPorProyectoPlot({ serie }: { serie: PuntoHorasProye
       <BarChart accessibilityLayer layout="vertical" data={serie} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
         <CartesianGrid {...CHART_GRID_PROPS} horizontal={false} vertical />
         <XAxis type="number" allowDecimals={false} {...CHART_AXIS_PROPS} unit=" h" />
-        <YAxis type="category" dataKey="nombre" width={120} {...CHART_AXIS_PROPS} />
+        <YAxis type="category" dataKey="nombre" width={140} tickFormatter={recortar} {...CHART_AXIS_PROPS} />
         <ChartTooltip content={<ChartTooltipContent valueFormatter={(valor) => `${String(valor)} h`} />} />
         <ChartLegend content={<ChartLegendContent />} />
         <Bar dataKey="registradas" name="Registradas" fill="var(--color-primary)" radius={[0, 6, 6, 0]} isAnimationActive={false} />
