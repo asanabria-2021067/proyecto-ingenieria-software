@@ -286,6 +286,47 @@ async function armarProyecto(d: ProyectoDef) {
   return proyecto;
 }
 
+/** Mensaje de demo: `cita` es el indice (en la misma lista) del mensaje respondido; `horas` = antiguedad. */
+interface MensajeDef { de: number; texto: string; horas: number; cita?: number; reacciones?: [number, string][] }
+
+/** Siembra #general de un proyecto (mismo canal que ChatCanalesService.sincronizar) con sus mensajes. */
+async function sembrarChatProyecto(idProyecto: number, creadaPor: number, miembros: number[], mensajes: MensajeDef[]) {
+  const general = await asegurar(
+    'chat_proyecto_general',
+    () => prisma.conversacion.findFirst({ where: { idProyecto, esCanal: true, nombreCanal: 'general' } }),
+    () => prisma.conversacion.create({ data: { idProyecto, tipo: 'GRUPAL', nombre: 'general', nombreCanal: 'general', esCanal: true, creadaPor } }),
+  );
+  for (const idUsuario of miembros) {
+    await asegurar(
+      'chat_proyecto_participantes',
+      () => prisma.conversacionParticipante.findUnique({ where: { idConversacion_idUsuario: { idConversacion: general.idConversacion, idUsuario } } }),
+      () => prisma.conversacionParticipante.create({ data: { idConversacion: general.idConversacion, idUsuario } }),
+    );
+  }
+  const ids: number[] = [];
+  for (const m of mensajes) {
+    const mensaje = await asegurar(
+      'chat_proyecto_mensajes',
+      () => prisma.mensajeChat.findFirst({ where: { idConversacion: general.idConversacion, idRemitente: m.de, contenido: m.texto } }),
+      () =>
+        prisma.mensajeChat.create({
+          data: {
+            idConversacion: general.idConversacion, idRemitente: m.de, contenido: m.texto,
+            idMensajeCitado: m.cita === undefined ? null : ids[m.cita], enviadoEn: new Date(Date.now() - m.horas * 3_600_000),
+          },
+        }),
+    );
+    ids.push(mensaje.idMensaje);
+    for (const [idUsuario, emoji] of m.reacciones ?? []) {
+      await asegurar(
+        'chat_proyecto_reacciones',
+        () => prisma.reaccionMensajeChat.findUnique({ where: { idMensaje_idUsuario_emoji: { idMensaje: mensaje.idMensaje, idUsuario, emoji } } }),
+        () => prisma.reaccionMensajeChat.create({ data: { idMensaje: mensaje.idMensaje, idUsuario, emoji } }),
+      );
+    }
+  }
+}
+
 // ─── Principal ──────────────────────────────────────────────────────────────
 
 async function main() {
@@ -424,7 +465,8 @@ async function main() {
       descripcion: 'Comunidad privada de demo para proyectos de análisis de datos.',
       visibilidad: 'PRIVADA',
       propietario: est[2],
-      miembros: [[est[7], 'ADMINISTRADOR'], [est[8], 'EDITOR'], [est[9], 'EDITOR'], [est[10], 'LECTURA'], [est[11], 'MIEMBRO']],
+      // demo.cs05 (est[4]) tambien esta en el Laboratorio: una sola cuenta muestra ambas organizaciones.
+      miembros: [[est[7], 'ADMINISTRADOR'], [est[8], 'EDITOR'], [est[9], 'EDITOR'], [est[10], 'LECTURA'], [est[11], 'MIEMBRO'], [est[4], 'LECTURA']],
       mensajes: [[est[2], 'Hola equipo, este es el canal general.'], [est[7], 'Compartan sus datasets favoritos.'], [est[9], 'Tengo uno de datos abiertos de Guatemala.']],
     },
   ];
@@ -526,6 +568,81 @@ async function main() {
   ];
   const armados: Awaited<ReturnType<typeof armarProyecto>>[] = [];
   for (const p of proyectos) armados.push(await armarProyecto(p));
+
+  // ─── Chat #general de los proyectos en progreso (tutorias y hackathon) ────
+  const nombre = (i: number) => `${NOMBRES[i][0]} ${NOMBRES[i][1]}`;
+  const mencion = (idUsuario: number, etiqueta: string) => `@[${etiqueta}](${idUsuario})`;
+  const [paula, marco, lucia, kevin] = [est[4], est[5], est[6], est[13]];
+  await sembrarChatProyecto(armados[0].idProyecto, paula, [paula, marco, lucia, kevin], [
+    { de: paula, texto: 'Equipo, ya arrancó el sprint 1 de la app de tutorías. Revisen sus tareas en el tablero.', horas: 96 },
+    { de: marco, texto: 'Listo, ya subí el prototipo de la pantalla de búsqueda de tutores.', horas: 80 },
+    { de: paula, texto: `Excelente ${mencion(marco, nombre(5))}. ${mencion(lucia, nombre(6))}, ¿puedes revisar esa pantalla antes del viernes?`, horas: 70, reacciones: [[kevin, '👍']] },
+    { de: lucia, texto: 'Sí, la reviso mañana en la tarde y dejo mis comentarios en la tarea.', horas: 52, cita: 2, reacciones: [[paula, '🙏']] },
+    { de: kevin, texto: '¿Quién tiene el borrador de la documentación? Quiero ajustar los diagramas.', horas: 30 },
+    { de: marco, texto: 'Está en la carpeta compartida, ya lo marqué con tu nombre.', horas: 26, cita: 4 },
+    { de: paula, texto: 'Gracias a todos. Nos vemos en la reunión del lunes.', horas: 5 },
+  ]);
+  const [valeria, daniela, andres] = [est[0], est[2], est[3]];
+  await sembrarChatProyecto(armados[3].idProyecto, presidente.idUsuario, [presidente.idUsuario, valeria, daniela, andres], [
+    { de: presidente.idUsuario, texto: 'Bienvenidos al equipo del Hackathon de Computación. Este canal es para coordinar la logística.', horas: 100 },
+    { de: valeria, texto: 'Ya tengo la lista de patrocinadores, la subo hoy al tablero.', horas: 84, reacciones: [[presidente.idUsuario, '👍']] },
+    { de: presidente.idUsuario, texto: `Perfecto ${mencion(valeria, nombre(0))}. ${mencion(daniela, nombre(2))}, ¿ya tienes confirmados a los jurados?`, horas: 72 },
+    { de: daniela, texto: 'Tengo a dos confirmados, me faltan tres. Los cierro esta semana.', horas: 60, cita: 2 },
+    { de: andres, texto: 'Puedo encargarme del material de registro si Carlos lo aprueba.', horas: 40 },
+    { de: presidente.idUsuario, texto: 'Aprobado, Andrés. Yo sigo con la reserva del auditorio.', horas: 28, cita: 4, reacciones: [[andres, '🙏']] },
+  ]);
+
+  // ─── Calendario del Laboratorio: 3 eventos futuros en su proyecto ─────────
+  // Solo cuentan los eventos sin invitados (EventsService.findForOrganizationInRange).
+  const alHora = (dias: number, hora: number) => {
+    const f = enDias(dias);
+    f.setHours(hora);
+    return f;
+  };
+  const eventos = [
+    { titulo: 'Demo - Reunión de planeación del laboratorio', tipo: 'REUNION', modalidad: 'VIRTUAL', dias: 6, hora: 18, duracion: 1, link: 'https://meet.example.com/demo-laboratorio' },
+    { titulo: 'Demo - Taller de prototipado abierto', tipo: 'TALLER', modalidad: 'PRESENCIAL', dias: 18, hora: 14, duracion: 2, lugar: 'Laboratorio de Innovación, UVG' },
+    { titulo: 'Demo - Entrega del prototipo de la estación', tipo: 'ENTREGA', modalidad: 'VIRTUAL', dias: 35, hora: 12, duracion: 1 },
+  ] as const;
+  for (const e of eventos) {
+    const fechaInicio = alHora(e.dias, e.hora);
+    const fechaFin = alHora(e.dias, e.hora + e.duracion);
+    await asegurar(
+      'eventos_calendario_organizacion',
+      () => prisma.eventoProyecto.findFirst({ where: { idProyecto: armados[1].idProyecto, tituloEvento: e.titulo } }),
+      () =>
+        prisma.eventoProyecto.create({
+          data: {
+            idProyecto: armados[1].idProyecto, idCreador: est[1], tituloEvento: e.titulo, descripcionEvento: 'Evento de demo del calendario de la organización.',
+            fechaInicio, fechaFin, tipoEvento: e.tipo, modalidad: e.modalidad, linkSesion: 'link' in e ? e.link : null, ubicacionNombre: 'lugar' in e ? e.lugar : null,
+          },
+        }),
+      // Una corrida posterior los mantiene a futuro.
+      (v) =>
+        v.eliminadoEn !== null || v.fechaInicio.getTime() !== fechaInicio.getTime()
+          ? prisma.eventoProyecto.update({ where: { idEvento: v.idEvento }, data: { fechaInicio, fechaFin, eliminadoEn: null } })
+          : undefined,
+    );
+  }
+
+  // ─── Hitos de «Tutorias»: uno atrasado (alerta roja) y uno proximo ────────
+  const dia = (n: number) => new Date(`${addDaysToDay(hoy, n)}T00:00:00Z`);
+  const hitos = [
+    { titulo: 'Demo - Prototipo navegable de tutorías', descripcion: 'Hito atrasado de demo: su fecha límite ya pasó y sigue sin terminar.', estado: 'EN_PROGRESO', dias: -6, orden: 1 },
+    { titulo: 'Demo - Lanzamiento piloto con 20 estudiantes', descripcion: 'Hito próximo de demo.', estado: 'PENDIENTE', dias: 10, orden: 2 },
+  ] as const;
+  for (const h of hitos) {
+    await asegurar(
+      'hitos',
+      () => prisma.hito.findFirst({ where: { idProyecto: armados[0].idProyecto, tituloHito: h.titulo } }),
+      () => prisma.hito.create({ data: { idProyecto: armados[0].idProyecto, tituloHito: h.titulo, descripcionHito: h.descripcion, fechaLimite: dia(h.dias), estadoHito: h.estado, orden: h.orden } }),
+      // Si alguien lo completo o la fecha quedo vieja, vuelve a su estado de demo.
+      (v) =>
+        v.estadoHito !== h.estado || v.fechaLimite?.getTime() !== dia(h.dias).getTime()
+          ? prisma.hito.update({ where: { idHito: v.idHito }, data: { estadoHito: h.estado, fechaLimite: dia(h.dias), alertaAtrasoEnviadaEn: null } })
+          : undefined,
+    );
+  }
 
   // ─── Postulaciones pendientes con requisitos de habilidad (MEJ-21) ────────
   // «Tutorías» lo lidera demo.cs05 (est[4]). Cumplimiento: est[10] 2 de 3 (67 %), est[11] 1 de 3 (33 %).
