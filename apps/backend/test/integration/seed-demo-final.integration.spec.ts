@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
+import { EMOJIS_REACCION } from '../../src/chat/dto/toggle-reaction.dto';
 import { calcularCoincidencia } from '../../src/common/coincidencia-habilidades';
 import { semestreDe } from '../../src/horas-semestre/semestre';
 import { describeIntegration } from './setup/database';
@@ -164,6 +165,8 @@ describeIntegration('DEMO seed-demo-final', () => {
       const ahora = Date.now();
       for (const m of mensajes) expect(ahora - m.enviadoEn.getTime()).toBeLessThan(7 * 86_400_000);
     }
+    // Toda reaccion sembrada debe poder alternarse desde el chip (ToggleReactionDto).
+    for (const r of await db.reaccionMensajeChat.findMany()) expect(EMOJIS_REACCION, r.emoji).toContain(r.emoji);
     expect(await db.mensajeChat.count({ where: { remitente: { correo: 'carlos.mendoza@uvg.edu.gt' }, conversacion: { proyecto: { tituloProyecto: 'Demo - Hackathon de Computación' } } } })).toBeGreaterThan(0);
 
     // Calendario del Laboratorio: 3 eventos futuros (reunion, taller, entrega) dentro de 60 dias y sin invitados.

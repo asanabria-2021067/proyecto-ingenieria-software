@@ -577,7 +577,7 @@ async function main() {
     { de: paula, texto: 'Equipo, ya arrancó el sprint 1 de la app de tutorías. Revisen sus tareas en el tablero.', horas: 96 },
     { de: marco, texto: 'Listo, ya subí el prototipo de la pantalla de búsqueda de tutores.', horas: 80 },
     { de: paula, texto: `Excelente ${mencion(marco, nombre(5))}. ${mencion(lucia, nombre(6))}, ¿puedes revisar esa pantalla antes del viernes?`, horas: 70, reacciones: [[kevin, '👍']] },
-    { de: lucia, texto: 'Sí, la reviso mañana en la tarde y dejo mis comentarios en la tarea.', horas: 52, cita: 2, reacciones: [[paula, '🙌']] },
+    { de: lucia, texto: 'Sí, la reviso mañana en la tarde y dejo mis comentarios en la tarea.', horas: 52, cita: 2, reacciones: [[paula, '🙏']] },
     { de: kevin, texto: '¿Quién tiene el borrador de la documentación? Quiero ajustar los diagramas.', horas: 30 },
     { de: marco, texto: 'Está en la carpeta compartida, ya lo marqué con tu nombre.', horas: 26, cita: 4 },
     { de: paula, texto: 'Gracias a todos. Nos vemos en la reunión del lunes.', horas: 5 },
@@ -589,7 +589,7 @@ async function main() {
     { de: presidente.idUsuario, texto: `Perfecto ${mencion(valeria, nombre(0))}. ${mencion(daniela, nombre(2))}, ¿ya tienes confirmados a los jurados?`, horas: 72 },
     { de: daniela, texto: 'Tengo a dos confirmados, me faltan tres. Los cierro esta semana.', horas: 60, cita: 2 },
     { de: andres, texto: 'Puedo encargarme del material de registro si Carlos lo aprueba.', horas: 40 },
-    { de: presidente.idUsuario, texto: 'Aprobado, Andrés. Yo sigo con la reserva del auditorio.', horas: 28, cita: 4, reacciones: [[andres, '🙌']] },
+    { de: presidente.idUsuario, texto: 'Aprobado, Andrés. Yo sigo con la reserva del auditorio.', horas: 28, cita: 4, reacciones: [[andres, '🙏']] },
   ]);
 
   // ─── Calendario del Laboratorio: 3 eventos futuros en su proyecto ─────────
