@@ -52,6 +52,10 @@ vi.mock('@/components/profile/CompleteProfileDialog', () => ({
   default: () => null,
 }));
 
+vi.mock('@/hooks/use-horas-semestre', () => ({
+  useHorasActual: () => ({ data: undefined }),
+  useHorasProgreso: () => ({ data: undefined }),
+}));
 vi.mock('@/hooks/use-current-user', () => ({
   useCurrentUser: () => ({
     data: {

@@ -24,6 +24,7 @@ vi.mock('@/components/hours/semestre-horas-card', () => ({ SemestreHorasCard: ()
 const estado = vi.hoisted(() => ({ perfilIncompleto: false, necesitaRegistro: true }));
 vi.mock('@/hooks/use-horas-semestre', () => ({
   useHorasActual: () => ({ data: { necesitaRegistro: estado.necesitaRegistro } }),
+  useHorasProgreso: () => ({ data: undefined }),
 }));
 // Doble del asistente: expone solo si se pidio el paso unico de horas.
 vi.mock('@/components/profile/CompleteProfileDialog', () => ({
