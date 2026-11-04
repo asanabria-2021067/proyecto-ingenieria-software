@@ -188,6 +188,45 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     expect(nuevas.every((r) => r.guards.includes(JwtAuthGuard) && r.guards.includes(RolesGuard) && r.roles.includes('administrador'))).toBe(true);
   });
 
+  // ROL-1: unica lista de rutas abiertas al coordinador academico; el alcance se verifica en cada servicio.
+  it('solo estas rutas admiten coordinador_academico, todas con JwtAuthGuard y RolesGuard', () => {
+    const esperadas = [
+      'GET /api/admin/horas-semestre',
+      'GET /api/admin/horas-semestre/csv',
+      'GET /api/admin/horas-semestre/pdf',
+      'GET /api/admin/horas-semestre/totales',
+      'GET /api/admin/proyectos/:projectId',
+      'GET /api/coordinador/mi-alcance',
+      'GET /api/coordinador/pendientes',
+      'GET /api/revisiones/admin/bandeja',
+      'POST /api/proyectos/:projectId/aprobar-cierre',
+      'POST /api/proyectos/:projectId/cierre/correccion-documental',
+      'POST /api/proyectos/:projectId/rechazar-cierre',
+      'POST /api/revisiones/proyectos/:idProyecto/reclamar',
+      'POST /api/revisiones/proyectos/:idProyecto/resolver',
+    ];
+    const abiertas = rutas.filter((r) => r.roles.includes('coordinador_academico'));
+    expect(abiertas.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(abiertas.filter((r) => !r.guards.includes(JwtAuthGuard) || !r.guards.includes(RolesGuard)).map((r) => r.id)).toEqual([]);
+  });
+
+  // Lecturas sin @Roles que el servicio abre al coordinador solo dentro de su alcance (nada de escrituras).
+  it('las lecturas de preparacion de cierre y canal de revision existen con JwtAuthGuard', () => {
+    const lecturas = ['GET /api/proyectos/:projectId/cierre/readiness', 'GET /api/mensajes-revision/proyectos/:idProyecto'];
+    const halladas = rutas.filter((r) => lecturas.includes(r.id));
+    expect(halladas.map((r) => r.id).sort()).toEqual([...lecturas].sort());
+    expect(halladas.every((r) => r.guards.includes(JwtAuthGuard) && r.roles.length === 0)).toBe(true);
+  });
+
+  it('la asignacion del alcance del coordinador es solo de administrador', () => {
+    const rutasAlcance = rutas.filter((r) => r.path.startsWith('admin/coordinadores'));
+    expect(rutasAlcance.map((r) => r.id).sort()).toEqual([
+      'GET /api/admin/coordinadores/:idUsuario/alcance',
+      'PUT /api/admin/coordinadores/:idUsuario/alcance',
+    ]);
+    expect(rutasAlcance.every((r) => r.guards.includes(JwtAuthGuard) && r.guards.includes(RolesGuard) && r.roles.join() === 'administrador')).toBe(true);
+  });
+
   it('asociaciones: la gestion es solo de admin y las rutas de junta exigen JuntaGuard', () => {
     const ids = (f: (r: Ruta) => boolean) => rutas.filter(f).map((r) => r.id).sort();
     expect(ids((r) => r.path.startsWith('admin/asociaciones'))).toEqual([

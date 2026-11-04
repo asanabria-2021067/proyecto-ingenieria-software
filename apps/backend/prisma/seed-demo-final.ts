@@ -10,15 +10,16 @@
  * una segunda corrida no duplica nada. Solo crea o actualiza entidades de
  * demo; no usa updateMany ni deleteMany y nunca toca otras cuentas.
  *
- * Requiere DEMO_PASSWORD (contrasena de las cuentas demo NUEVAS; nunca se
- * imprime ni se guarda) y que carlos.mendoza@uvg.edu.gt ya exista.
+ * Requiere DEMO_PASSWORD y DEMO_COORDINADOR_PASSWORD (contrasenas de las cuentas
+ * demo NUEVAS; nunca se imprimen ni se guardan) y que carlos.mendoza@uvg.edu.gt ya exista.
  * DRY_RUN=1 corre todo dentro de una transaccion y la revierte al final.
  *
- * Uso: DEMO_PASSWORD="..." npm run prisma:seed-demo-final (en la imagen de
+ * Uso: DEMO_PASSWORD="..." DEMO_COORDINADOR_PASSWORD="..." npm run prisma:seed-demo-final (en la imagen de
  * produccion no hay tsx; ver README, seccion Demo).
  */
 import { Prisma, PrismaClient, type EstadoProyecto, type EstadoTarea, type RolOrganizacion, type TipoProyecto } from '@prisma/client';
 import { hashSync } from 'bcryptjs';
+import { createHash } from 'node:crypto';
 import { addDaysToDay, todayInGuatemala } from '../src/common/utils/guatemala-date';
 import { esEnRiesgo, semestreDe, type Semestre } from '../src/horas-semestre/semestre';
 
@@ -329,9 +330,76 @@ async function sembrarChatProyecto(idProyecto: number, creadaPor: number, miembr
 
 // ─── Principal ──────────────────────────────────────────────────────────────
 
+const CORREO_COORDINADOR = 'demo.coordinador@uvg.edu.gt';
+
+/** Coordinador academico de Computacion con alcance en esa carrera, un proyecto en revision y un cierre pendiente de lideres de la carrera. */
+async function sembrarCoordinador(passwordCoordinador: string, idCarrera: number, lideres: [number, number]) {
+  const rol = await prisma.rolAcceso.upsert({
+    where: { nombrePerfil: 'coordinador_academico' },
+    update: {},
+    create: { nombrePerfil: 'coordinador_academico', descripcion: 'Coordinador académico con alcance por carrera' },
+  });
+  const coordinador = await asegurar(
+    'coordinador_usuario',
+    () => prisma.usuario.findUnique({ where: { correo: CORREO_COORDINADOR } }),
+    () => prisma.usuario.create({ data: { correo: CORREO_COORDINADOR, contrasena: hashSync(passwordCoordinador, 10), nombre: 'Sofía', apellido: 'Arévalo', estado: 'ACTIVO' } }),
+    (u) => (u.estado !== 'ACTIVO' ? prisma.usuario.update({ where: { idUsuario: u.idUsuario }, data: { estado: 'ACTIVO' } }) : undefined),
+  );
+  await asegurar(
+    'coordinador_rol',
+    () => prisma.usuarioRolAcceso.findFirst({ where: { idUsuario: coordinador.idUsuario, idRolAcceso: rol.idRolAcceso } }),
+    () => prisma.usuarioRolAcceso.create({ data: { idUsuario: coordinador.idUsuario, idRolAcceso: rol.idRolAcceso } }),
+  );
+  await asegurar(
+    'coordinador_alcance',
+    () => prisma.alcanceCoordinador.findUnique({ where: { idUsuario_idCarrera: { idUsuario: coordinador.idUsuario, idCarrera } } }),
+    () => prisma.alcanceCoordinador.create({ data: { idUsuario: coordinador.idUsuario, idCarrera } }),
+  );
+
+  const enRevision = await asegurar(
+    'coordinador_proyectos',
+    () => prisma.proyecto.findFirst({ where: { tituloProyecto: 'Demo - Plataforma de reciclaje del campus' } }),
+    () =>
+      prisma.proyecto.create({
+        data: { tituloProyecto: 'Demo - Plataforma de reciclaje del campus', descripcionProyecto: 'Proyecto de demo enviado a revisión de publicación.', tipoProyecto: 'ACADEMICO_HORAS_BECA', estadoProyecto: 'EN_REVISION', creadoPor: lideres[0] },
+      }),
+    (p) => (p.estadoProyecto !== 'EN_REVISION' ? prisma.proyecto.update({ where: { idProyecto: p.idProyecto }, data: { estadoProyecto: 'EN_REVISION' } }) : undefined),
+  );
+  await asegurar(
+    'coordinador_revisiones',
+    () => prisma.revisionProyecto.findFirst({ where: { idProyecto: enRevision.idProyecto, numeroEnvio: 1 } }),
+    () => prisma.revisionProyecto.create({ data: { idProyecto: enRevision.idProyecto, numeroEnvio: 1 } }),
+    (r) => (r.estadoRevision !== 'PENDIENTE' ? prisma.revisionProyecto.update({ where: { idRevisionProyecto: r.idRevisionProyecto }, data: { estadoRevision: 'PENDIENTE', revisadaEn: null, idRevisor: null } }) : undefined),
+  );
+
+  const enCierre = await asegurar(
+    'coordinador_proyectos',
+    () => prisma.proyecto.findFirst({ where: { tituloProyecto: 'Demo - Laboratorio de robótica educativa' } }),
+    () =>
+      prisma.proyecto.create({
+        data: { tituloProyecto: 'Demo - Laboratorio de robótica educativa', descripcionProyecto: 'Proyecto de demo con solicitud de cierre pendiente.', tipoProyecto: 'ACADEMICO_HORAS_BECA', estadoProyecto: 'EN_SOLICITUD_CIERRE', creadoPor: lideres[1], fechaPublicacion: enDias(-60), fechaInicio: enDias(-55) },
+      }),
+    (p) => (p.estadoProyecto !== 'EN_SOLICITUD_CIERRE' ? prisma.proyecto.update({ where: { idProyecto: p.idProyecto }, data: { estadoProyecto: 'EN_SOLICITUD_CIERRE' } }) : undefined),
+  );
+  await asegurar(
+    'coordinador_cierres',
+    () => prisma.revisionCierreProyecto.findUnique({ where: { idProyecto_numeroRevision: { idProyecto: enCierre.idProyecto, numeroRevision: 1 } } }),
+    () =>
+      prisma.revisionCierreProyecto.create({
+        data: {
+          idProyecto: enCierre.idProyecto, numeroRevision: 1, estadoRevision: 'ENVIADA', idSolicitante: lideres[1], enviadaEn: new Date(),
+          fingerprintEntrega: createHash('sha256').update(`demo-cierre-${enCierre.idProyecto}`).digest('hex'),
+        },
+      }),
+    (r) => (r.estadoRevision !== 'ENVIADA' ? prisma.revisionCierreProyecto.update({ where: { idRevisionCierre: r.idRevisionCierre }, data: { estadoRevision: 'ENVIADA', idRevisor: null, resueltaEn: null, comentarioRevisor: null } }) : undefined),
+  );
+}
+
 async function main() {
   const password = process.env.DEMO_PASSWORD;
   if (!password) throw new Error('Falta la variable de entorno DEMO_PASSWORD (contraseña de las cuentas demo nuevas).');
+  const passwordCoordinador = process.env.DEMO_COORDINADOR_PASSWORD;
+  if (!passwordCoordinador) throw new Error('Falta la variable de entorno DEMO_COORDINADOR_PASSWORD (contraseña de la cuenta demo del coordinador).');
 
   const semestre = semestreDe(new Date());
   const hoy = todayInGuatemala();
@@ -685,6 +753,8 @@ async function main() {
       () => prisma.postulacion.create({ data: { idUsuarioPostulante: idUsuario, idRolProyecto: rolFrontend.idRolProyecto, justificacion: 'Me interesa sumarme al equipo de la app de tutorías.' } }),
     );
   }
+
+  await sembrarCoordinador(passwordCoordinador, carrera.idCarrera, [est[2], est[3]]);
 
   // ─── Verificacion final contra la base ────────────────────────────────────
   // Mismo universo que la asociacion: estudiantes activos de sus carreras.

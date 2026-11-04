@@ -36,10 +36,10 @@ const PUBLICATION_REVIEW_WRITE: ProjectWriteMetadata = {
 export class RevisionesController {
   constructor(private revisionesService: RevisionesService) {}
 
-  /** E040: bandeja admin (lectura; se amplía en C133). */
+  /** E040: bandeja admin (lectura; se amplía en C133). El coordinador solo ve su alcance. */
   @Get('admin/bandeja')
   @UseGuards(RolesGuard)
-  @Roles('administrador')
+  @Roles('administrador', 'coordinador_academico')
   findAdminInbox(@CurrentUser() user: { userId: number }) {
     return this.revisionesService.findAdminInbox(user.userId);
   }
@@ -53,10 +53,10 @@ export class RevisionesController {
     return this.revisionesService.findByProyecto(idProyecto, user.userId);
   }
 
-  /** E042: reclamar la revisión pendiente (admin, proyecto en R). */
+  /** E042: reclamar la revisión pendiente (admin o coordinador del alcance, proyecto en R). */
   @Post('proyectos/:idProyecto/reclamar')
   @UseGuards(RolesGuard, ProjectWriteGuard)
-  @Roles('administrador')
+  @Roles('administrador', 'coordinador_academico')
   @ProjectWrite(PUBLICATION_REVIEW_WRITE)
   @HttpCode(HttpStatus.OK)
   reclamar(
@@ -66,10 +66,10 @@ export class RevisionesController {
     return this.revisionesService.reclamar(idProyecto, user.userId);
   }
 
-  /** E043: resolver la revisión pendiente (admin, proyecto en R). */
+  /** E043: resolver la revisión pendiente (admin o coordinador del alcance, proyecto en R). */
   @Post('proyectos/:idProyecto/resolver')
   @UseGuards(RolesGuard, ProjectWriteGuard)
-  @Roles('administrador')
+  @Roles('administrador', 'coordinador_academico')
   @ProjectWrite(PUBLICATION_REVIEW_WRITE)
   @HttpCode(HttpStatus.OK)
   resolver(

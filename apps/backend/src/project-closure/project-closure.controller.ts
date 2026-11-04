@@ -53,7 +53,7 @@ export class ProjectClosureController {
   @Post('aprobar-cierre')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RolesGuard, ProjectWriteGuard)
-  @Roles('administrador')
+  @Roles('administrador', 'coordinador_academico')
   @ProjectWrite({ source: { kind: 'param', name: 'projectId' }, states: ['S'], sprint: 'NONE_OPERABLE', family: 'CIERRE_VEREDICTO' })
   approve(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }, @Body() dto: ApproveClosureDto) {
     return this.review.approveClosure(projectId, user.userId, dto);
@@ -62,7 +62,7 @@ export class ProjectClosureController {
   @Post('rechazar-cierre')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RolesGuard, ProjectWriteGuard)
-  @Roles('administrador')
+  @Roles('administrador', 'coordinador_academico')
   @ProjectWrite({ source: { kind: 'param', name: 'projectId' }, states: ['S'], sprint: 'NONE_OPERABLE', family: 'CIERRE_VEREDICTO' })
   returnToExecution(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }, @Body() dto: ReturnExecutionDto) {
     return this.review.returnToExecution(projectId, user.userId, dto);
@@ -80,7 +80,7 @@ export class ProjectClosureController {
   @Post('cierre/correccion-documental')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RolesGuard, ProjectWriteGuard)
-  @Roles('administrador')
+  @Roles('administrador', 'coordinador_academico')
   @ProjectWrite({ source: { kind: 'param', name: 'projectId' }, states: ['S'], sprint: 'NONE_OPERABLE', family: 'CIERRE_VEREDICTO' })
   correction(@Param('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: { userId: number }, @Body() dto: CorrectionDto) {
     return this.review.requestDocumentaryCorrection(projectId, user.userId, dto);

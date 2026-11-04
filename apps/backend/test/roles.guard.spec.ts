@@ -164,23 +164,23 @@ describe('Rutas exclusivas de administración (T-286)', () => {
     }
   });
 
-  it('RevisionesController: bandeja, reclamar y resolver exigen administrador', () => {
+  it('RevisionesController: bandeja, reclamar y resolver exigen administrador o coordinador académico', () => {
     expect(guardsOf(RevisionesController)).toEqual([JwtAuthGuard]);
     expect(guardsOf(RevisionesController.prototype.findAdminInbox)).toEqual([RolesGuard]);
     expect(guardsOf(RevisionesController.prototype.reclamar)).toEqual([RolesGuard, ProjectWriteGuard]);
     expect(guardsOf(RevisionesController.prototype.resolver)).toEqual([RolesGuard, ProjectWriteGuard]);
     for (const handler of ['findAdminInbox', 'reclamar', 'resolver'] as const) {
-      expect(rolesOf(RevisionesController.prototype[handler])).toEqual(['administrador']);
+      expect(rolesOf(RevisionesController.prototype[handler])).toEqual(['administrador', 'coordinador_academico']);
     }
     // El historial lo leen líder y admin: sin @Roles.
     expect(rolesOf(RevisionesController.prototype.findByProyecto)).toBeUndefined();
   });
 
-  it('ProjectClosureController: solo los veredictos exigen administrador', () => {
+  it('ProjectClosureController: solo los veredictos exigen administrador o coordinador académico', () => {
     expect(guardsOf(ProjectClosureController)).toEqual([JwtAuthGuard]);
     for (const handler of ['approve', 'returnToExecution', 'correction'] as const) {
       expect(guardsOf(ProjectClosureController.prototype[handler])).toEqual([RolesGuard, ProjectWriteGuard]);
-      expect(rolesOf(ProjectClosureController.prototype[handler])).toEqual(['administrador']);
+      expect(rolesOf(ProjectClosureController.prototype[handler])).toEqual(['administrador', 'coordinador_academico']);
     }
     for (const handler of ['resubmit', 'prepare', 'generateReport', 'requestClose', 'readiness'] as const) {
       expect(rolesOf(ProjectClosureController.prototype[handler])).toBeUndefined();

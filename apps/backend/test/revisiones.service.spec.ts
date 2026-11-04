@@ -23,6 +23,9 @@ function makePrisma() {
     usuario: { findUnique: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     seguimientoEntidad: { findMany: vi.fn().mockResolvedValue([]) },
     notificacion: { create: vi.fn() },
+    usuarioRolAcceso: { findFirst: vi.fn().mockResolvedValue(null) },
+    alcanceCoordinador: { findMany: vi.fn().mockResolvedValue([]) },
+    carrera: { findMany: vi.fn().mockResolvedValue([]) },
   };
 }
 
@@ -45,8 +48,25 @@ describe('RevisionesService', () => {
     await expect(service.findAdminInbox(1)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('findAdminInbox del coordinador filtra las tres bandejas a su alcance', async () => {
+    const prisma = makePrisma();
+    prisma.usuarioRolAcceso.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ idUsuarioRolAcceso: 1 })
+      .mockResolvedValueOnce({ idUsuarioRolAcceso: 1 });
+    prisma.alcanceCoordinador.findMany.mockResolvedValue([{ idCarrera: 5, facultad: null }]);
+    prisma.revisionProyecto.findMany.mockResolvedValue([]);
+    prisma.proyecto.findMany.mockResolvedValue([]);
+    await makeService(prisma).findAdminInbox(9);
+    const enAlcance = expect.objectContaining({ OR: expect.any(Array) });
+    expect(prisma.revisionProyecto.findMany.mock.calls[0][0].where.proyecto).toEqual(enAlcance);
+    expect(prisma.revisionCierreProyecto.findMany.mock.calls[0][0].where.proyecto).toEqual(enAlcance);
+    expect(prisma.proyecto.findMany.mock.calls[0][0].where).toEqual(enAlcance);
+  });
+
   it('findAdminInbox retorna ambas bandejas', async () => {
     const prisma = makePrisma();
+    prisma.usuarioRolAcceso.findFirst.mockResolvedValue({ idUsuarioRolAcceso: 1 });
     prisma.revisionProyecto.findMany.mockResolvedValue([{ idRevisionProyecto: 1 }]);
     prisma.proyecto.findMany.mockResolvedValue([{ idProyecto: 2 }]);
     const service = makeService(prisma, {

@@ -110,7 +110,7 @@ export function accessTokenFor(user: { idUsuario: number; correo: string }): str
 
 export async function requestJson(
   url: string,
-  init: { method?: 'GET' | 'POST'; token?: string; body?: unknown } = {},
+  init: { method?: 'GET' | 'POST' | 'PUT'; token?: string; body?: unknown } = {},
   // El cuerpo es JSON arbitrario de la API; cada suite afirma su forma.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ status: number; body: any }> {

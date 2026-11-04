@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { EstadoParticipacion, EstadoProyecto, EstadoSprint, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { esMiembroDeOrganizacionDelProyecto } from '../../organizations/organization-access';
+import { coordinadorCubreProyecto } from '../../coordinador/coordinador-alcance';
 
 /**
  * Sprint 7 (06 v2 §34/§40/§41): decisor único de LECTURA por proyecto.
@@ -152,7 +153,8 @@ export class ProjectReadPolicyService {
     if (project.creadoPor === actorId) {
       return 'LIDER';
     }
-    if (await this.isAdmin(db, actorId)) {
+    // El coordinador lee como administrador solo los proyectos de su alcance.
+    if ((await this.isAdmin(db, actorId)) || (await coordinadorCubreProyecto(db, actorId, project.idProyecto))) {
       return 'ADMIN';
     }
     const participations = await db.participacionProyecto.findMany({
