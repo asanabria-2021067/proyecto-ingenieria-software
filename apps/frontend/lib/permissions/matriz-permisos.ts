@@ -30,6 +30,8 @@ export const MATRIZ_PERMISOS = {
   'admin.revisiones': COORDINACION_Y_ADMINISTRACION,
   'coordinador.panel': COORDINACION_Y_ADMINISTRACION,
   'coordinador.horas': COORDINACION_Y_ADMINISTRACION,
+  'admin.mantenimiento': SOLO_ADMINISTRACION,
+  'admin.tablas': SOLO_ADMINISTRACION,
   'perfil.ver': TODOS,
   'notificaciones.ver': TODOS,
   'perfil.editar': SIN_ADMINISTRACION,

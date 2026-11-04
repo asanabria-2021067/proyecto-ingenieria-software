@@ -34,6 +34,10 @@ COPY --from=build --chown=nestjs:nodejs /app/node_modules/@prisma/client ./node_
 COPY --from=build --chown=nestjs:nodejs /app/package.json ./
 COPY --from=build --chown=nestjs:nodejs /app/prisma ./prisma
 
+ARG GIT_SHA=desconocido
+ARG BUILD_DATE=desconocido
+ENV GIT_SHA=$GIT_SHA BUILD_DATE=$BUILD_DATE
+
 USER nestjs
 EXPOSE 3001
 # G01 (OWASP25-C029): el arranque productivo solo migra y arranca; nunca siembra

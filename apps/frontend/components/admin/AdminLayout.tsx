@@ -25,6 +25,9 @@ import {
   ScrollText,
   ShieldAlert,
   ShieldCheck,
+  Server,
+  Table2,
+  Wrench,
   UserCheck,
   UserCog,
   Users,
@@ -130,6 +133,15 @@ export const adminNavEntries: NavEntry[] = [
       { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
       // T-310: visor de solo lectura de los eventos de seguridad que ya se registran.
       { href: '/dashboard/admin/seguridad', label: 'Eventos de seguridad', icon: ScrollText },
+    ],
+  },
+  {
+    type: 'group',
+    label: 'Sistema',
+    icon: Server,
+    items: [
+      { href: '/dashboard/admin/mantenimiento', label: 'Modo mantenimiento', icon: Wrench },
+      { href: '/dashboard/admin/tablas', label: 'Tablas del sistema', icon: Table2 },
     ],
   },
 ];

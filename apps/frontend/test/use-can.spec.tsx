@@ -61,6 +61,8 @@ const ACCIONES_ADMINISTRACION: AccionPermiso[] = [
   'admin.solicitudesRecuperacion',
   'admin.apelaciones',
   'admin.proyectos',
+  'admin.mantenimiento',
+  'admin.tablas',
 ];
 
 const ACCIONES_COORDINACION: AccionPermiso[] = [

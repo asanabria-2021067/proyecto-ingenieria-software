@@ -258,6 +258,27 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     ).toBe(true);
   });
 
+  it('ADM-1: mantenimiento, tablas y estado del sistema existen; solo el estado de mantenimiento es publico, el resto es solo de administrador', () => {
+    const admin = [
+      'GET /api/admin/mantenimiento',
+      'PUT /api/admin/mantenimiento',
+      'GET /api/admin/estado-sistema',
+      'GET /api/admin/tablas',
+      'GET /api/admin/tablas/:entidad',
+      'GET /api/admin/tablas/:entidad/exportar',
+      'GET /api/admin/tablas/:entidad/:id',
+    ];
+    const encontradas = rutas.filter((r) => admin.includes(r.id));
+    expect(encontradas.map((r) => r.id).sort()).toEqual([...admin].sort());
+    expect(
+      encontradas.every((r) => r.guards.includes(JwtAuthGuard) && r.guards.includes(RolesGuard) && r.roles.length === 1 && r.roles[0] === 'administrador'),
+    ).toBe(true);
+    expect(encontradas.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+    const publica = rutas.filter((r) => r.id === 'GET /api/mantenimiento');
+    expect(publica).toHaveLength(1);
+    expect(PUBLICAS.has('GET /api/mantenimiento')).toBe(true);
+  });
+
   it('asociaciones: la gestion es solo de admin y las rutas de junta exigen JuntaGuard', () => {
     const ids = (f: (r: Ruta) => boolean) => rutas.filter(f).map((r) => r.id).sort();
     expect(ids((r) => r.path.startsWith('admin/asociaciones'))).toEqual([

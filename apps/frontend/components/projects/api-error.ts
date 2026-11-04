@@ -215,6 +215,10 @@ export function getApiErrorMessage(
   fallback: string = MENSAJE_ERROR_GENERICO,
 ): string {
   const statusCode = getApiErrorStatus(error);
+  // El mensaje ya viene armado por `apiFetch` con el servicio afectado.
+  if (statusCode === 503 && getApiErrorCode(error) === 'SERVICIO_NO_DISPONIBLE') {
+    return (error as Error).message;
+  }
   const backendMessage = mensajeLegibleDelBackend(error);
 
   switch (statusCode) {
