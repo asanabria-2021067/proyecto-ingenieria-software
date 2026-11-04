@@ -1045,6 +1045,7 @@ export class ChatService {
               OR: [
                 { nombre: { contains: query, mode: 'insensitive' } },
                 { nombrePersonalizado: { contains: query, mode: 'insensitive' } },
+                { proyecto: { tituloProyecto: { contains: query, mode: 'insensitive' } } },
                 {
                   participantes: {
                     some: {

@@ -331,7 +331,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       expect(llamada.where.proyecto).toEqual({ estadoProyecto: { not: 'CERRADO' } });
     });
 
-    it('con q, busca por nombre, participante y contenido de mensajes', async () => {
+    it('con q, busca por nombre, proyecto, participante y contenido de mensajes', async () => {
       prisma.conversacion.findMany.mockResolvedValue([]);
 
       await service.listAllConversations(1, 'rosa');
@@ -340,6 +340,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       expect(llamada.where.OR).toEqual([
         { nombre: { contains: 'rosa', mode: 'insensitive' } },
         { nombrePersonalizado: { contains: 'rosa', mode: 'insensitive' } },
+        { proyecto: { tituloProyecto: { contains: 'rosa', mode: 'insensitive' } } },
         {
           participantes: {
             some: {
