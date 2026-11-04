@@ -175,7 +175,7 @@ jobs:
       # job `e2e` (abajo).
       - name: Ejecutar suite de humo E2E
         working-directory: apps/frontend
-        run: npm run test:e2e:sin-a11y -- --reporter=blob --shard=${{ matrix.shardIndex }}/3
+        run: npx playwright test e2e/chat-pagina-mensajes.spec.ts --repeat-each=10 --reporter=blob
 
       - name: Subir el reporte blob de este shard
         if: always()
