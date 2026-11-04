@@ -27,7 +27,12 @@ test('abrir desde la barra, buscar la conversación, enviar y verlo en la otra s
     // Desde la barra superior se llega a la página y se busca la conversación.
     await iconoMensajes(pageA).click();
     await expect(pageA).toHaveURL(/\/dashboard\/mensajes$/);
+    // El filtro se aplica tras un debounce y una petición /chats?q=: se espera su respuesta y que la lista deje de cargar,
+    // para no pulsar un botón de la lista previa que se reemplaza a mitad del clic.
+    const busqueda = pageA.waitForResponse((r) => r.url().includes('/chats?q=') && r.request().method() === 'GET');
     await pageA.getByPlaceholder('Buscar mensajes').fill('José');
+    await busqueda;
+    await expect(pageA.getByLabel('Cargando chats')).toBeHidden();
     await pageA.getByRole('button', { name: /José/ }).first().click();
     await expect(pageA).toHaveURL(/\/dashboard\/mensajes\/(\d+)$/);
     const idConversacion = /(\d+)$/.exec(pageA.url())?.[1];

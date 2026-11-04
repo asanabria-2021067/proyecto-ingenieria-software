@@ -7,7 +7,12 @@ export function useCurrentUser() {
   return useQuery<UserProfile>({
     queryKey: ['currentUser'],
     queryFn: getMe,
-    retry: false,
+    // Un 429 (rate limit) o un fallo de red transitorio no es una sesión inválida: sin reintento el layout
+    // mandaba a /login y el usuario quedaba atascado en el esqueleto. El resto de errores 4xx (401 ya refresca) no se reintenta.
+    retry: (intentos, error) => {
+      const status = (error as { statusCode?: number }).statusCode;
+      return intentos < 3 && (status === undefined || status === 429 || status >= 500);
+    },
     staleTime: 5 * 60 * 1000,
   });
 }
