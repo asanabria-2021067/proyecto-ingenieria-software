@@ -124,6 +124,19 @@ export function Step1({ form, update, errors, partial = false }: Props) {
       </div>
 
       <div>
+        <label htmlFor="fechaLimitePostulacion" className={labelClass}>Fecha límite de postulación</label>
+        <input
+          id="fechaLimitePostulacion"
+          type="date"
+          className={`${inputClass} ${hasError('fechaLimitePostulacion', errors) ? 'border-error focus:border-error focus:ring-error/20' : ''}`}
+          value={form.fechaLimitePostulacion}
+          onChange={(e) => update('fechaLimitePostulacion', e.target.value)}
+        />
+        <p className="mt-1 text-xs text-tertiary">Opcional. Solo informa a quienes exploran: no bloquea postulaciones.</p>
+        <ErrMsg field="fechaLimitePostulacion" errors={errors} />
+      </div>
+
+      <div>
         <label className={labelClass}>URL recurso externo</label>
         <input maxLength={255} className={`${inputClass} ${hasError('urlRecursoExterno', errors) ? 'border-error' : ''}`} placeholder="https://..." value={form.urlRecursoExterno} onChange={(e) => update('urlRecursoExterno', e.target.value)} />
         <ErrMsg field="urlRecursoExterno" errors={errors} />

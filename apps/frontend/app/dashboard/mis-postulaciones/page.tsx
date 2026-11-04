@@ -3,14 +3,15 @@
 import { PageTitle } from '@/components/ui/page-title';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { AlertCircle, ChevronRight, ClipboardList, Trash2 } from 'lucide-react';
-import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
+import { AlertCircle, ChevronRight, ClipboardList, Undo2 } from 'lucide-react';
+import { ESTADO_POSTULACION_STYLE, MOTIVO_RECHAZO_LABEL } from '@/components/projects/application-status.utils';
+import { PostulacionLineaTiempo } from '@/components/projects/postulacion-linea-tiempo';
 import { Tag } from '@/components/ui/tag';
 import { useState } from 'react';
 import { apiFetch } from '@/lib/api/client';
 import { deletePostulacion } from '@/lib/services/applications';
 import { Postulacion, EstadoPostulacion } from '@/types';
-import uvgSwal from '@/lib/swal';
+import { aviso, confirmar } from '@/lib/mensajes';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import {
   Empty,
@@ -50,7 +51,7 @@ export default function MisPostulacionesPage() {
       acc[p.estadoPostulacion] = (acc[p.estadoPostulacion] ?? 0) + 1;
       return acc;
     },
-    { PENDIENTE: 0, ACEPTADA: 0, RECHAZADA: 0 },
+    { PENDIENTE: 0, ACEPTADA: 0, RECHAZADA: 0, RETIRADA: 0 },
   );
 
   const filtradas = postulaciones.filter((p) => {
@@ -63,41 +64,26 @@ export default function MisPostulacionesPage() {
     return coincideTexto && coincideEstado;
   });
 
-  const deleteMutation = useMutation({
+  // MEJ-96: retirar no borra, deja la postulación como RETIRADA.
+  const retirarMutation = useMutation({
     mutationFn: (id: number) => deletePostulacion(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mis-postulaciones'] });
-      uvgSwal.fire({
-        icon: 'success',
-        title: 'Postulación cancelada',
-        text: 'Tu postulación fue cancelada exitosamente',
-        timer: 2000,
-      });
+      aviso.exito('Postulación retirada', 'El líder del proyecto fue avisado.');
     },
     onError: (error: any) => {
-      uvgSwal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: getApiErrorMessage(error, 'general', 'No se pudo cancelar la postulación'),
-      });
+      aviso.error('No se pudo retirar la postulación', getApiErrorMessage(error, 'general', 'Intenta de nuevo en unos minutos.'));
     },
   });
 
-  const handleCancelar = (id: number) => {
-    uvgSwal
-      .fire({
-        icon: 'warning',
-        title: '¿Cancelar postulación?',
-        text: 'Esta acción no se puede deshacer',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, cancelar',
-        cancelButtonText: 'No',
-      })
-      .then((result) => {
-        if (result.isConfirmed) {
-          deleteMutation.mutate(id);
-        }
-      });
+  const handleRetirar = async (id: number, nombreRol: string) => {
+    const confirmado = await confirmar({
+      titulo: `¿Retirar tu postulación a ${nombreRol}?`,
+      descripcion: 'El líder del proyecto será avisado. Podrás volver a postularte a este rol.',
+      textoAccion: 'Retirar postulación',
+      destructiva: true,
+    });
+    if (confirmado) retirarMutation.mutate(id);
   };
 
   return (
@@ -174,6 +160,9 @@ export default function MisPostulacionesPage() {
                 </SelectItem>
                 <SelectItem value="RECHAZADA" className="focus:bg-primary focus:text-on-primary">
                   Rechazada
+                </SelectItem>
+                <SelectItem value="RETIRADA" className="focus:bg-primary focus:text-on-primary">
+                  Retirada
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -285,6 +274,15 @@ export default function MisPostulacionesPage() {
                   {p.justificacion}
                 </p>
 
+                {p.motivoRechazo && (
+                  <div className="bg-surface-container rounded-xl px-4 py-3 mb-3">
+                    <p className="text-xs font-bold text-tertiary uppercase tracking-wide mb-0.5">
+                      Motivo del rechazo
+                    </p>
+                    <p className="text-on-surface text-sm">{MOTIVO_RECHAZO_LABEL[p.motivoRechazo] ?? p.motivoRechazo}</p>
+                  </div>
+                )}
+
                 {p.comentarioResolucion && (
                   <div className="bg-surface-container rounded-xl px-4 py-3 mb-3">
                     <p className="text-xs font-bold text-tertiary uppercase tracking-wide mb-0.5">
@@ -293,6 +291,8 @@ export default function MisPostulacionesPage() {
                     <p className="text-on-surface text-sm">{p.comentarioResolucion}</p>
                   </div>
                 )}
+
+                <PostulacionLineaTiempo eventos={p.eventos} />
 
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-tertiary">
@@ -307,13 +307,13 @@ export default function MisPostulacionesPage() {
                     {p.estadoPostulacion === 'PENDIENTE' && (
                       <button
                         type="button"
-                        onClick={() => handleCancelar(p.idPostulacion)}
-                        disabled={deleteMutation.isPending}
-                        aria-label={`Cancelar postulación a ${p.rolProyecto.nombreRol}`}
+                        onClick={() => void handleRetirar(p.idPostulacion, p.rolProyecto.nombreRol)}
+                        disabled={retirarMutation.isPending}
+                        aria-label={`Retirar postulación a ${p.rolProyecto.nombreRol}`}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-error/10 text-error text-xs font-semibold hover:bg-error/20 transition-colors disabled:opacity-50"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Cancelar
+                        <Undo2 className="w-3.5 h-3.5" aria-hidden="true" />
+                        Retirar
                       </button>
                     )}
                     <Link

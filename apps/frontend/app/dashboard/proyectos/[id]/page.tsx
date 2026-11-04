@@ -80,6 +80,7 @@ import type { Rol } from '@/types';
 import type { HistoricalProjectView, HistoricalRevision } from '@/lib/services/historical';
 import { ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 import { TipoBadge } from '@/components/projects/tipo-badge';
+import { ProyectosParecidos } from '@/components/projects/proyectos-parecidos';
 
 const MODALIDAD_BADGE = 'pill-neutral';
 
@@ -87,6 +88,7 @@ const ESTADO_POSTULACION_LABEL: Record<string, string> = {
   PENDIENTE: 'Pendiente',
   ACEPTADA: 'Aceptada',
   RECHAZADA: 'Rechazada',
+  RETIRADA: 'Retirada',
 };
 
 const ULTIMO_ROL_MSG = 'No puedes abandonar tu último rol desde esta opción.';
@@ -247,6 +249,7 @@ export default function ProyectoDetallePage() {
             estadoProyecto={proyecto.estadoProyecto}
             modalidadProyecto={proyecto.modalidadProyecto}
             etiquetas={proyecto.intereses.map(({ interes }) => interes.nombreInteres)}
+            cierraPronto={proyecto.cierraPronto}
           />
           <OrgSoloLecturaBanner proyecto={detalle.data} participantes={isLoadingMembers ? undefined : members} />
         </ProjectGridFull>
@@ -450,6 +453,13 @@ export default function ProyectoDetallePage() {
               {proyecto.fechaInicio && (
                 <DetalleRow icon={Calendar} label="Fecha de inicio" value={formatFechaCorta(proyecto.fechaInicio)} />
               )}
+              {proyecto.fechaLimitePostulacion && (
+                <DetalleRow
+                  icon={CalendarCheck}
+                  label="Fecha límite de postulación"
+                  value={formatFechaCorta(proyecto.fechaLimitePostulacion)}
+                />
+              )}
               {proyecto.fechaFinEstimada && (
                 <DetalleRow
                   icon={CalendarCheck}
@@ -477,6 +487,8 @@ export default function ProyectoDetallePage() {
             </ul>
           </CardShell>
         </ProjectGridAside>
+
+        <ProyectosParecidos idProyecto={projectId} />
       </ProjectContentGrid>
     );
   }

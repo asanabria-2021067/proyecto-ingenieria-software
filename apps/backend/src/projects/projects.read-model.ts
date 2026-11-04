@@ -1,5 +1,6 @@
 import { EstadoHito, EstadoProyecto } from '@prisma/client';
 import { calcularProgresoHito } from '../common/hito-progreso';
+import { dateOnlyToDay, diffInDays, todayInGuatemala } from '../common/utils/guatemala-date';
 
 /**
  * Constantes de estados, selects de Prisma y cálculos de avance de Proyecto.
@@ -158,14 +159,26 @@ export function avanceParaTarjeta(proyecto: {
   return { avanceProyecto: calcularAvanceProyecto(proyecto.tareas, proyecto.hitos), sprintActual };
 }
 
+/** MEJ-95: «Cierra pronto» = faltan 7 días o menos (hoy incluido) para la fecha límite de postulación. */
+export const DIAS_CIERRA_PRONTO = 7;
+
+export function cierraPronto(fechaLimite: Date | null | undefined, hoy: string = todayInGuatemala()): boolean {
+  if (!fechaLimite) return false;
+  const faltan = diffInDays(dateOnlyToDay(fechaLimite), hoy);
+  return faltan >= 0 && faltan <= DIAS_CIERRA_PRONTO;
+}
+
 /**
  * Los participantes activos ocupan cupos (incluidos los miembros de una
  * organización que entran directo): el listado expone `cuposDisponibles`
  * además del total `cupos` de cada rol.
  */
-export function conCuposDisponibles<P extends { roles: { cupos: number; _count: { participaciones: number } }[] }>(proyecto: P) {
+export function conCuposDisponibles<
+  P extends { roles: { cupos: number; _count: { participaciones: number } }[]; fechaLimitePostulacion?: Date | null },
+>(proyecto: P) {
   return {
     ...proyecto,
+    cierraPronto: cierraPronto(proyecto.fechaLimitePostulacion),
     roles: proyecto.roles.map(({ cupos, _count }) => ({
       cupos,
       cuposDisponibles: Math.max(0, cupos - _count.participaciones),
@@ -181,6 +194,7 @@ export const proyectoListSelect = {
   estadoProyecto: true,
   modalidadProyecto: true,
   fechaPublicacion: true,
+  fechaLimitePostulacion: true,
   creador: {
     select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
   },
@@ -218,6 +232,7 @@ export const proyectoDetalleSelect = {
   contextoAcademico: true,
   urlRecursoExterno: true,
   fechaPublicacion: true,
+  fechaLimitePostulacion: true,
   fechaInicio: true,
   fechaFinEstimada: true,
   fechaCreacion: true,
@@ -263,6 +278,10 @@ export const proyectoDetalleSelect = {
       horasSemanalesEstimadas: true,
       carreraRequerida: {
         select: { idCarrera: true, nombreCarrera: true, facultad: true },
+      },
+      preguntas: {
+        select: { idPregunta: true, enunciado: true, tipo: true, obligatoria: true },
+        orderBy: { orden: 'asc' as const },
       },
       requisitos: {
         select: {

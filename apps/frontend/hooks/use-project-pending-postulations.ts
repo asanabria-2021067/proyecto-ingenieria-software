@@ -5,7 +5,7 @@ import { apiFetch } from '@/lib/api/client';
 import { updateEstadoPostulacion } from '@/lib/services/applications';
 import { projectPendingPostulationsQueryKey } from '@/lib/query-keys/applications';
 import { projectTeamSummaryQueryKey } from '@/lib/query-keys/members';
-import type { PostulacionRecibida } from '@/types';
+import type { MotivoRechazo, PostulacionRecibida } from '@/types';
 
 function isValidProjectId(idProyecto: number): boolean {
   return Number.isInteger(idProyecto) && idProyecto > 0;
@@ -42,6 +42,8 @@ export function useProjectPendingPostulations(idProyecto: number) {
 interface ResolverPostulacionInput {
   postulacionId: number;
   estadoPostulacion: 'ACEPTADA' | 'RECHAZADA';
+  /** Obligatorio al rechazar (MEJ-99). */
+  motivoRechazo?: MotivoRechazo;
   comentarioResolucion?: string;
 }
 
@@ -65,8 +67,7 @@ export function useResolvePostulacion(idProyecto: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ postulacionId, estadoPostulacion, comentarioResolucion }: ResolverPostulacionInput) =>
-      updateEstadoPostulacion(postulacionId, { estadoPostulacion, comentarioResolucion }),
+    mutationFn: ({ postulacionId, ...payload }: ResolverPostulacionInput) => updateEstadoPostulacion(postulacionId, payload),
     onSuccess: (_data, variables) => {
       if (variables.estadoPostulacion === 'ACEPTADA') {
         queryClient.invalidateQueries({ queryKey: projectTeamSummaryQueryKey(idProyecto) });

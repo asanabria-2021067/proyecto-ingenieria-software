@@ -1,6 +1,6 @@
-import { CheckCircle, Clock, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, Undo2, XCircle } from 'lucide-react';
 import type { TagTone } from '@/components/ui/tag';
-import type { EstadoPostulacion } from '@/types';
+import type { EstadoPostulacion, MotivoRechazo, TipoEventoPostulacion } from '@/types';
 
 /**
  * Etiqueta de estado de postulación, compartida por Mis Postulaciones, las
@@ -12,4 +12,21 @@ export const ESTADO_POSTULACION_STYLE: Record<EstadoPostulacion, { label: string
   PENDIENTE: { label: 'Pendiente', icon: Clock, tone: 'neutral' },
   ACEPTADA: { label: 'Aceptada', icon: CheckCircle, tone: 'success' },
   RECHAZADA: { label: 'Rechazada', icon: XCircle, tone: 'red' },
+  RETIRADA: { label: 'Retirada', icon: Undo2, tone: 'slate' },
+};
+
+export const MOTIVO_RECHAZO_LABEL: Record<MotivoRechazo, string> = {
+  PERFIL_NO_COINCIDE: 'El perfil no coincide con lo que busca el rol',
+  CUPO_LLENO: 'El cupo del rol ya está lleno',
+  HORARIO: 'El horario no es compatible',
+  OTRO: 'Otro motivo',
+};
+
+export const EVENTO_POSTULACION_LABEL: Record<TipoEventoPostulacion, string> = {
+  ENVIADA: 'Enviada',
+  VISTA: 'Vista por el líder',
+  EN_REVISION: 'En revisión',
+  ACEPTADA: 'Aceptada',
+  RECHAZADA: 'Rechazada',
+  RETIRADA: 'Retirada',
 };

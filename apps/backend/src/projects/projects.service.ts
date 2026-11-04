@@ -39,6 +39,7 @@ import {
   avanceParaTarjeta,
   calcularAvanceProyecto,
   conCuposDisponibles,
+  cierraPronto,
   sprintActivoSelect,
   proyectoDetalleAnonimoSelect,
   proyectoDetallePublicoSelect,
@@ -51,6 +52,7 @@ import { ProjectsAffinityService } from './projects-affinity.service';
 import { ProjectsRevisionsService } from './projects-revisions.service';
 import { assertPuedePublicar, puedeEditarComoOrganizacion } from '../organizations/organization-access';
 import { crearParticipaciones, validarParticipantes } from '../organizations/organization-projects';
+import { preguntasCreate } from '../applications/dto/pregunta-rol.dto';
 
 export { PESOS_ORDEN_DISPONIBLES } from './projects.read-model';
 
@@ -216,6 +218,8 @@ export class ProjectsService {
     organizacionId?: number;
     habilidadId?: number;
     duenio?: string;
+    /** MEJ-95: `fechaLimite` ordena por fecha límite de postulación ascendente (sin fecha al final). */
+    orden?: string;
     page: number;
     limit: number;
   }) {
@@ -227,7 +231,10 @@ export class ProjectsService {
       this.prisma.proyecto.findMany({
         where: { AND: andConditions },
         select: proyectoListSelect,
-        orderBy: { fechaCreacion: 'desc' },
+        orderBy:
+          filters.orden === 'fechaLimite'
+            ? [{ fechaLimitePostulacion: { sort: 'asc', nulls: 'last' } }, { fechaCreacion: 'desc' }]
+            : { fechaCreacion: 'desc' },
         take: limit,
         skip,
       }),
@@ -240,6 +247,11 @@ export class ProjectsService {
       page,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  /** MEJ-93: ver `ProjectsAffinityService.similares`. */
+  async similares(idProyecto: number, userId: number) {
+    return this.affinity.similares(idProyecto, userId, this._buildListConditions({}));
   }
 
   /** MEJ-15: ver `ProjectsAffinityService.paraTi`. Respeta los mismos filtros de dueño que el catálogo. */
@@ -346,7 +358,7 @@ export class ProjectsService {
     if (!proyecto) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
     }
-    return proyecto;
+    return { ...proyecto, cierraPronto: cierraPronto(proyecto.fechaLimitePostulacion) };
   }
 
   async findOneAdmin(id: number, adminId: number) {
@@ -395,7 +407,7 @@ export class ProjectsService {
     if (proyecto.creadoPor !== userId) {
       throw new ForbiddenException('No tienes acceso a este proyecto');
     }
-    return proyecto;
+    return { ...proyecto, cierraPronto: cierraPronto(proyecto.fechaLimitePostulacion) };
   }
 
   /**
@@ -577,7 +589,7 @@ export class ProjectsService {
   }
 
   async createFull(data: CreateProjectFullDto, creadoPor: number) {
-    const { fechaInicio, fechaFinEstimada, organizacionesIds, idOrganizacion, participantes, roles, accion, ...rest } = data;
+    const { fechaInicio, fechaFinEstimada, fechaLimitePostulacion, organizacionesIds, idOrganizacion, participantes, roles, accion, ...rest } = data;
     const idsOrganizacion = [...new Set([...(organizacionesIds ?? []), ...(idOrganizacion === undefined ? [] : [idOrganizacion])])];
     const estadoProyecto =
       accion === 'EN_REVISION' ? EstadoProyecto.EN_REVISION : EstadoProyecto.BORRADOR;
@@ -598,6 +610,7 @@ export class ProjectsService {
           creadoPor,
           fechaInicio: fechaInicio ? new Date(fechaInicio) : undefined,
           fechaFinEstimada: fechaFinEstimada ? new Date(fechaFinEstimada) : undefined,
+          fechaLimitePostulacion: fechaLimitePostulacion ? new Date(fechaLimitePostulacion) : undefined,
           ...(idsOrganizacion.length && {
             organizaciones: {
               create: idsOrganizacion.map((idOrganizacion) => ({ idOrganizacion })),
@@ -611,6 +624,7 @@ export class ProjectsService {
                 idCarreraRequerida: rol.idCarreraRequerida,
                 cupos: rol.cupos,
                 horasSemanalesEstimadas: rol.horasSemanalesEstimadas,
+                preguntas: preguntasCreate(rol.preguntas),
                 ...(rol.requisitos?.length && {
                   requisitos: {
                     create: rol.requisitos.map((req) => ({
@@ -748,6 +762,7 @@ export class ProjectsService {
     const {
       fechaInicio,
       fechaFinEstimada,
+      fechaLimitePostulacion,
       organizacionesIds,
       roles,
       ...camposGenerales
@@ -760,6 +775,10 @@ export class ProjectsService {
           fechaInicio: fechaInicio !== undefined ? new Date(fechaInicio) : undefined,
           fechaFinEstimada:
             fechaFinEstimada !== undefined ? new Date(fechaFinEstimada) : undefined,
+          fechaLimitePostulacion:
+            fechaLimitePostulacion === null || fechaLimitePostulacion === undefined
+              ? fechaLimitePostulacion
+              : new Date(fechaLimitePostulacion),
           fechaActualizacion: new Date(),
         },
       });
@@ -813,6 +832,7 @@ export class ProjectsService {
                 idCarreraRequerida: rol.idCarreraRequerida,
                 cupos: rol.cupos,
                 horasSemanalesEstimadas: rol.horasSemanalesEstimadas,
+                preguntas: preguntasCreate(rol.preguntas),
               },
             });
             if (rol.requisitos?.length) {
@@ -868,6 +888,10 @@ export class ProjectsService {
     if (data.urlRecursoExterno !== undefined) updateData.urlRecursoExterno = data.urlRecursoExterno;
     if (data.fechaFinEstimada !== undefined) {
       updateData.fechaFinEstimada = new Date(data.fechaFinEstimada);
+    }
+    if (data.fechaLimitePostulacion !== undefined) {
+      updateData.fechaLimitePostulacion =
+        data.fechaLimitePostulacion === null ? null : new Date(data.fechaLimitePostulacion);
     }
 
     await db.proyecto.update({ where: { idProyecto: id }, data: updateData });
@@ -1115,8 +1139,11 @@ export class ProjectsService {
     const postulaciones = await this.prisma.postulacion.findMany({
       where: {
         rolProyecto: { idProyecto },
+        estadoPostulacion: { not: 'RETIRADA' },
       },
       include: {
+        respuestas: { orderBy: { orden: 'asc' } },
+        eventos: { select: { tipo: true, fecha: true }, orderBy: { fecha: 'asc' } },
         postulante: {
           select: {
             idUsuario: true,

@@ -1,16 +1,18 @@
 import { Clock, User } from 'lucide-react';
 import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
 import { Tag } from '@/components/ui/tag';
+import { PostulacionRespuestas } from '@/components/projects/postulacion-respuestas';
 
 interface Props {
   nombre: string;
   correo: string;
   nombreRol: string;
   justificacion: string;
+  respuestas?: { enunciado: string; respuesta: string }[];
 }
 
 /** La postulación tal como la verá el líder del proyecto en «Postulaciones». */
-export function PostulacionVistaPrevia({ nombre, correo, nombreRol, justificacion }: Props) {
+export function PostulacionVistaPrevia({ nombre, correo, nombreRol, justificacion, respuestas }: Props) {
   const config = ESTADO_POSTULACION_STYLE.PENDIENTE;
   return (
     <article
@@ -38,10 +40,12 @@ export function PostulacionVistaPrevia({ nombre, correo, nombreRol, justificacio
         <p className="text-sm font-medium text-on-surface">{nombreRol}</p>
       </div>
 
-      <div>
+      <div className="mb-3">
         <p className="mb-1 text-xs font-bold uppercase tracking-wide text-tertiary">Justificación</p>
         <p className="whitespace-pre-line break-words text-sm leading-relaxed text-on-surface">{justificacion}</p>
       </div>
+
+      <PostulacionRespuestas respuestas={respuestas} />
     </article>
   );
 }

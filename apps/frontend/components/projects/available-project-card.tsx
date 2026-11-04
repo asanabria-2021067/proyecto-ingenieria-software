@@ -545,6 +545,15 @@ export function AvailableProjectCard(props: AvailableProjectCardProps) {
         </p>
       )}
 
+      {esExplorar && (proyecto as ProyectoDisponibleResumen).cierraPronto && (
+        <p className="mt-inline">
+          <Tag tone="amber" size="sm">
+            <Clock aria-hidden="true" />
+            Cierra pronto
+          </Tag>
+        </p>
+      )}
+
       {publicadoPor && (
         <p className="mt-inline flex items-center gap-1.5 text-[12px] text-on-surface-variant">
           <Building2 aria-hidden="true" className="size-4 shrink-0" />

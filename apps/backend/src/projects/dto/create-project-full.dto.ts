@@ -16,6 +16,7 @@ import {
 import { Type } from 'class-transformer';
 import { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@prisma/client';
 import { IsHttpUrl } from '../../common/validators/http-url.validator';
+import { PreguntaRolDto, PreguntasDelRol } from '../../applications/dto/pregunta-rol.dto';
 
 export class RequisitoHabilidadDto {
   @IsInt()
@@ -58,6 +59,9 @@ export class RolProyectoDto {
   @ValidateNested({ each: true })
   @Type(() => RequisitoHabilidadDto)
   requisitos?: RequisitoHabilidadDto[];
+
+  @PreguntasDelRol()
+  preguntas?: PreguntaRolDto[];
 }
 
 export class ParticipanteOrganizacionDto {
@@ -121,6 +125,10 @@ export class CreateProjectFullDto {
   @IsOptional()
   @IsDateString({}, { message: 'fechaFinEstimada debe ser una fecha válida (ISO 8601)' })
   fechaFinEstimada?: string;
+
+  @IsOptional()
+  @IsDateString({}, { message: 'fechaLimitePostulacion debe ser una fecha válida (ISO 8601)' })
+  fechaLimitePostulacion?: string | null;
 
   @IsOptional()
   @IsArray()

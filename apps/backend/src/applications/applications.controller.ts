@@ -88,14 +88,25 @@ export class ApplicationsController {
     return this.applicationsService.updateEstado(id, dto, user.userId);
   }
 
-  /** E090: retirar la postulación propia mientras siga PENDIENTE. */
-  @Delete(':id')
+  /** MEJ-100: el líder marca la postulación «en revisión» (solo el líder del proyecto). */
+  @Post(':id/en-revision')
   @UseGuards(JwtAuthGuard, ProjectWriteGuard)
   @ProjectWrite(APPLICATION_RESOLVE)
-  delete(
+  marcarEnRevision(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { userId: number },
   ) {
-    return this.applicationsService.delete(id, user.userId);
+    return this.applicationsService.marcarEnRevision(id, user.userId);
+  }
+
+  /** E090 / MEJ-96: retirar la postulación propia mientras siga PENDIENTE (queda RETIRADA, no se borra). */
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, ProjectWriteGuard)
+  @ProjectWrite(APPLICATION_RESOLVE)
+  retirar(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.applicationsService.retirar(id, user.userId);
   }
 }

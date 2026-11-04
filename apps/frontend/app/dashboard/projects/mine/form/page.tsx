@@ -58,7 +58,7 @@ const FORM_VACIO: FormData = {
   tituloProyecto: '', descripcionProyecto: '', tipoProyecto: '',
   modalidadProyecto: '', objetivosProyecto: '', ubicacionProyecto: '',
   contextoAcademico: '', urlRecursoExterno: '', fechaInicio: '',
-  fechaFinEstimada: '', roles: [],
+  fechaFinEstimada: '', fechaLimitePostulacion: '', roles: [],
 };
 
 interface BorradorProyecto {
@@ -127,7 +127,8 @@ function NewProjectFormContent() {
     // La organización que llega por `?org=` no cuenta como cambio del usuario.
     valor: { form, idOrganizacion: idOrganizacion === orgParam ? null : idOrganizacion, idAsociacion, participantes },
     alRestaurar: (b) => {
-      setForm(b.form);
+      // Borradores anteriores a las preguntas por rol no traen `preguntas`.
+      setForm({ ...b.form, fechaLimitePostulacion: b.form.fechaLimitePostulacion ?? '', roles: b.form.roles.map((r) => ({ ...r, preguntas: r.preguntas ?? [] })) });
       // `?org=` manda sobre el borrador: sus participantes no calzarían con otra organización.
       if (orgParam === null) {
         setIdOrganizacion(b.idOrganizacion);
@@ -194,6 +195,7 @@ function NewProjectFormContent() {
       urlRecursoExterno: p.urlRecursoExterno ?? '',
       fechaInicio: p.fechaInicio ? p.fechaInicio.split('T')[0] : '',
       fechaFinEstimada: p.fechaFinEstimada ? p.fechaFinEstimada.split('T')[0] : '',
+      fechaLimitePostulacion: p.fechaLimitePostulacion ? p.fechaLimitePostulacion.split('T')[0] : '',
       roles: p.roles.map((r) => ({
         id: safeId(),
         nombreRol: r.nombreRol,
@@ -207,6 +209,7 @@ function NewProjectFormContent() {
           nivelMinimo: req.nivelMinimo as NivelHabilidad,
           obligatorio: req.obligatorio,
         })),
+        preguntas: (r.preguntas ?? []).map((q) => ({ id: safeId(), enunciado: q.enunciado, tipo: q.tipo, obligatoria: q.obligatoria })),
       })),
     });
   }, [proyectoExistente, editId, router]);
@@ -274,6 +277,7 @@ function NewProjectFormContent() {
     urlRecursoExterno: normalizeUrlInput(form.urlRecursoExterno),
     fechaInicio: form.fechaInicio || undefined,
     fechaFinEstimada: form.fechaFinEstimada || undefined,
+    fechaLimitePostulacion: form.fechaLimitePostulacion || null,
     roles: form.roles.length > 0 ? form.roles.map((r) => ({
       nombreRol: r.nombreRol,
       descripcionRolProyecto: r.descripcionRolProyecto || undefined,
@@ -283,6 +287,7 @@ function NewProjectFormContent() {
       requisitos: r.requisitos
         .filter((req) => req.idHabilidad !== null && req.nivelMinimo !== '')
         .map((req) => ({ idHabilidad: req.idHabilidad!, nivelMinimo: req.nivelMinimo as NivelHabilidad, obligatorio: req.obligatorio })),
+      preguntas: r.preguntas.map((q) => ({ enunciado: q.enunciado.trim(), tipo: q.tipo, obligatoria: q.obligatoria })),
     })) : undefined,
     ...(!editId && idAsociacion !== null && { idAsociacion }),
     ...(!editId && idOrganizacion !== null && { idOrganizacion }),
@@ -305,6 +310,7 @@ function NewProjectFormContent() {
     idCarreraRequerida: 'Carrera requerida', tituloProyecto: 'Título del proyecto',
     descripcionProyecto: 'Descripción', tipoProyecto: 'Tipo de proyecto',
     modalidadProyecto: 'Modalidad', fechaInicio: 'Fecha de inicio', fechaFinEstimada: 'Fecha fin estimada',
+    fechaLimitePostulacion: 'Fecha límite de postulación', enunciado: 'Pregunta',
   };
 
   const API_ISSUE_LABELS: Record<string, string> = {
@@ -406,6 +412,7 @@ function NewProjectFormContent() {
     contextoAcademico: form.contextoAcademico || undefined,
     urlRecursoExterno: normalizeUrlInput(form.urlRecursoExterno),
     fechaFinEstimada: form.fechaFinEstimada || undefined,
+    fechaLimitePostulacion: form.fechaLimitePostulacion || null,
   });
 
   const partialResult = partialProjectSchema.safeParse(form);

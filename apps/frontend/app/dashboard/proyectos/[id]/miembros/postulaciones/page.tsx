@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { AlertCircle, BriefcaseBusiness, Calendar, Clock3, UserRoundPlus, Users, type LucideIcon } from 'lucide-react';
+import { useState } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,17 +12,12 @@ import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectPendingPostulations, useResolvePostulacion } from '@/hooks/use-project-pending-postulations';
 import { aviso, confirmar } from '@/lib/mensajes';
-import type { PostulacionRecibida } from '@/types';
+import type { MotivoRechazo, PostulacionRecibida } from '@/types';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
 import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
-
-type Accion = 'ACEPTADA' | 'RECHAZADA';
-
-interface ConfirmTarget {
-  postulacion: PostulacionRecibida;
-  accion: Accion;
-}
+import { PostulacionRespuestas } from '@/components/projects/postulacion-respuestas';
+import { RechazoPostulacionDialog } from '@/components/projects/rechazo-postulacion-dialog';
 
 function getInitials(nombre: string, apellido: string): string {
   return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -81,38 +77,44 @@ export default function ProjectPendingPostulationsPage() {
 
   const { postulaciones, isLoading, isError, error, refetch } = useProjectPendingPostulations(idProyecto);
   const resolver = useResolvePostulacion(idProyecto);
+  const [rechazando, setRechazando] = useState<PostulacionRecibida | null>(null);
 
   const rolesConSolicitudes = new Set(postulaciones.map((p) => p.rolProyecto.idRolProyecto)).size;
   const postulantesUnicos = new Set(postulaciones.map((p) => p.postulante.idUsuario)).size;
   const cargandoDatos = isLoading || cargandoPermisos;
 
-  async function pedirConfirmacion(postulacion: PostulacionRecibida, accion: Accion) {
+  async function aceptar(postulacion: PostulacionRecibida) {
     const { nombre, apellido } = postulacion.postulante;
     const nombrePostulante = `${nombre} ${apellido}`;
     const confirmado = await confirmar({
-      titulo: accion === 'ACEPTADA' ? `¿Aceptar la postulación de ${nombrePostulante}?` : `¿Rechazar la postulación de ${nombrePostulante}?`,
-      descripcion:
-        accion === 'ACEPTADA'
-          ? `${nombrePostulante} se une al proyecto en el rol solicitado.`
-          : `${nombrePostulante} no se une al proyecto en el rol solicitado.`,
-      textoAccion: accion === 'ACEPTADA' ? 'Aceptar postulación' : 'Rechazar postulación',
-      destructiva: accion === 'RECHAZADA',
+      titulo: `¿Aceptar la postulación de ${nombrePostulante}?`,
+      descripcion: `${nombrePostulante} se une al proyecto en el rol solicitado.`,
+      textoAccion: 'Aceptar postulación',
+      destructiva: false,
     });
     if (!confirmado) return;
 
     resolver.mutate(
-      { postulacionId: postulacion.idPostulacion, estadoPostulacion: accion },
+      { postulacionId: postulacion.idPostulacion, estadoPostulacion: 'ACEPTADA' },
+      {
+        onSuccess: () =>
+          aviso.exito('Nueva miembro activa', `${nombrePostulante} ya es parte del equipo y aparece en la lista de miembros activos.`),
+        onError: (mutationError: any) => aviso.error('No se pudo resolver la postulación', mutationError?.message),
+      },
+    );
+  }
+
+  // MEJ-99: rechazar pide el motivo en su propio diálogo, que sustituye a la confirmación.
+  function rechazar(datos: { motivoRechazo: MotivoRechazo; comentarioResolucion?: string }) {
+    if (!rechazando) return;
+    resolver.mutate(
+      { postulacionId: rechazando.idPostulacion, estadoPostulacion: 'RECHAZADA', ...datos },
       {
         onSuccess: () => {
-          aviso.exito(
-            accion === 'ACEPTADA' ? 'Nueva miembro activa' : 'Postulación rechazada',
-            accion === 'ACEPTADA'
-              ? `${nombrePostulante} ya es parte del equipo y aparece en la lista de miembros activos.`
-              : undefined,
-          );
+          setRechazando(null);
+          aviso.exito('Postulación rechazada');
         },
-        onError: (mutationError: any) =>
-          aviso.error('No se pudo resolver la postulación', mutationError?.message),
+        onError: (mutationError: any) => aviso.error('No se pudo resolver la postulación', mutationError?.message),
       },
     );
   }
@@ -226,6 +228,7 @@ export default function ProjectPendingPostulationsPage() {
                           <p className="text-sm leading-relaxed text-on-surface-variant">
                             {postulacion.justificacion || 'Sin justificación registrada.'}
                           </p>
+                          <PostulacionRespuestas respuestas={postulacion.respuestas} />
                           <p className="flex items-center gap-2 text-xs text-tertiary">
                             <Calendar aria-hidden="true" className="h-4 w-4" />
                             Solicitada el {formatFecha(postulacion.fechaPostulacion)}
@@ -240,7 +243,7 @@ export default function ProjectPendingPostulationsPage() {
                             <Button
                               type="button"
                               variant="outline"
-                              onClick={() => void pedirConfirmacion(postulacion, 'RECHAZADA')}
+                              onClick={() => setRechazando(postulacion)}
                               disabled={enCurso}
                               aria-label={`Rechazar postulación de ${nombreCompleto}`}
                               className="border-error px-4 font-bold text-error hover:bg-error-container"
@@ -249,7 +252,7 @@ export default function ProjectPendingPostulationsPage() {
                             </Button>
                             <Button
                               type="button"
-                              onClick={() => void pedirConfirmacion(postulacion, 'ACEPTADA')}
+                              onClick={() => void aceptar(postulacion)}
                               disabled={enCurso}
                               aria-label={`Aceptar postulación de ${nombreCompleto}`}
                               className="px-4 font-bold text-on-primary"
@@ -268,6 +271,14 @@ export default function ProjectPendingPostulationsPage() {
         </>
       )}
 
+      {rechazando && (
+        <RechazoPostulacionDialog
+          nombrePostulante={`${rechazando.postulante.nombre} ${rechazando.postulante.apellido}`}
+          pendiente={resolver.isPending}
+          onCerrar={() => setRechazando(null)}
+          onConfirmar={rechazar}
+        />
+      )}
     </ProjectPageShell>
   );
 }

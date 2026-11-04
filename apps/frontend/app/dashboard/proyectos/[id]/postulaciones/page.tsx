@@ -1,18 +1,20 @@
 'use client';
 
 import { PageTitle } from '@/components/ui/page-title';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle, XCircle, User, Sparkles } from 'lucide-react';
-import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
+import { ArrowLeft, CheckCircle, Eye, XCircle, User, Sparkles } from 'lucide-react';
+import { ESTADO_POSTULACION_STYLE, MOTIVO_RECHAZO_LABEL } from '@/components/projects/application-status.utils';
+import { PostulacionRespuestas } from '@/components/projects/postulacion-respuestas';
+import { RechazoPostulacionDialog } from '@/components/projects/rechazo-postulacion-dialog';
 import { Tag } from '@/components/ui/tag';
 import { apiFetch } from '@/lib/api/client';
 import { getApiErrorStatus } from '@/components/projects/api-error';
 import { useRequireCan } from '@/hooks/use-can';
 import { projectAllPostulationsQueryKey } from '@/lib/query-keys/applications';
-import { EstadoPostulacion, PostulacionRecibida } from '@/types';
+import { MotivoRechazo, PostulacionRecibida } from '@/types';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 
@@ -20,7 +22,6 @@ import { Button } from '@/components/ui/button';
 type ModalState = {
   open: boolean;
   postulacionId: number | null;
-  accion: 'ACEPTADA' | 'RECHAZADA' | null;
   comentario: string;
 };
 
@@ -33,9 +34,9 @@ export default function PostulacionesProyectoPage() {
   const [modal, setModal] = useState<ModalState>({
     open: false,
     postulacionId: null,
-    accion: null,
     comentario: '',
   });
+  const [rechazando, setRechazando] = useState<PostulacionRecibida | null>(null);
 
   const {
     data: postulaciones = [],
@@ -47,6 +48,16 @@ export default function PostulacionesProyectoPage() {
     queryFn: () => apiFetch(orden === 'coincidencia' ? `/proyectos/${id}/postulaciones?orden=coincidencia` : `/proyectos/${id}/postulaciones`),
   });
 
+  // MEJ-100: abrir la lista cuenta como que el líder vio la postulación (una sola vez por postulación).
+  const vistas = useRef(new Set<number>());
+  useEffect(() => {
+    for (const p of postulaciones) {
+      if (p.estadoPostulacion !== 'PENDIENTE' || vistas.current.has(p.idPostulacion)) continue;
+      vistas.current.add(p.idPostulacion);
+      apiFetch(`/postulaciones/${p.idPostulacion}`).catch(() => vistas.current.delete(p.idPostulacion));
+    }
+  }, [postulaciones]);
+
   const { denegado } = useRequireCan('proyecto.postulaciones.resolver', {
     esLider: getApiErrorStatus(error) !== 403,
     listo: !isLoading,
@@ -56,35 +67,43 @@ export default function PostulacionesProyectoPage() {
     mutationFn: ({
       postulacionId,
       estadoPostulacion,
+      motivoRechazo,
       comentarioResolucion,
     }: {
       postulacionId: number;
       estadoPostulacion: 'ACEPTADA' | 'RECHAZADA';
+      motivoRechazo?: MotivoRechazo;
       comentarioResolucion?: string;
     }) =>
       apiFetch(`/postulaciones/${postulacionId}/estado`, {
         method: 'PATCH',
-        body: JSON.stringify({ estadoPostulacion, comentarioResolucion: comentarioResolucion || undefined }),
+        body: JSON.stringify({ estadoPostulacion, motivoRechazo, comentarioResolucion: comentarioResolucion || undefined }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectAllPostulationsQueryKey(id) });
       cerrarModal();
+      setRechazando(null);
     },
   });
 
-  function abrirModal(postulacionId: number, accion: 'ACEPTADA' | 'RECHAZADA') {
-    setModal({ open: true, postulacionId, accion, comentario: '' });
+  const { mutate: marcarEnRevision, isPending: marcando } = useMutation({
+    mutationFn: (postulacionId: number) => apiFetch(`/postulaciones/${postulacionId}/en-revision`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: projectAllPostulationsQueryKey(id) }),
+  });
+
+  function abrirModal(postulacionId: number) {
+    setModal({ open: true, postulacionId, comentario: '' });
   }
 
   function cerrarModal() {
-    setModal({ open: false, postulacionId: null, accion: null, comentario: '' });
+    setModal({ open: false, postulacionId: null, comentario: '' });
   }
 
   function confirmar() {
-    if (!modal.postulacionId || !modal.accion) return;
+    if (!modal.postulacionId) return;
     resolverPostulacion({
       postulacionId: modal.postulacionId,
-      estadoPostulacion: modal.accion,
+      estadoPostulacion: 'ACEPTADA',
       comentarioResolucion: modal.comentario.trim() || undefined,
     });
   }
@@ -194,6 +213,21 @@ export default function PostulacionesProyectoPage() {
                   <p className="text-on-surface text-sm leading-relaxed">{p.justificacion}</p>
                 </div>
 
+                {p.respuestas?.length ? (
+                  <div className="mb-4">
+                    <PostulacionRespuestas respuestas={p.respuestas} />
+                  </div>
+                ) : null}
+
+                {p.motivoRechazo && (
+                  <div className="bg-surface-container rounded-xl px-4 py-3 mb-4">
+                    <p className="text-xs font-bold text-tertiary uppercase tracking-wide mb-0.5">
+                      Motivo del rechazo
+                    </p>
+                    <p className="text-on-surface text-sm">{MOTIVO_RECHAZO_LABEL[p.motivoRechazo] ?? p.motivoRechazo}</p>
+                  </div>
+                )}
+
                 {/* Comentario de resolución (solo si existe) */}
                 {p.comentarioResolucion && (
                   <div className="bg-surface-container rounded-xl px-4 py-3 mb-4">
@@ -216,17 +250,28 @@ export default function PostulacionesProyectoPage() {
                   </span>
 
                   {p.estadoPostulacion === 'PENDIENTE' && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      {!p.eventos?.some((e) => e.tipo === 'EN_REVISION') && (
+                        <Button
+                          variant="outline"
+                          onClick={() => marcarEnRevision(p.idPostulacion)}
+                          disabled={marcando}
+                          className="h-auto gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold has-[>svg]:px-4"
+                        >
+                          <Eye className="w-4 h-4" aria-hidden="true" />
+                          Marcar en revisión
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
-                        onClick={() => abrirModal(p.idPostulacion, 'RECHAZADA')}
+                        onClick={() => setRechazando(p)}
                         className="h-auto gap-1.5 rounded-xl border-outline-variant bg-transparent px-4 py-2 text-sm font-semibold text-error shadow-none hover:bg-error-container hover:text-error has-[>svg]:px-4 dark:border-outline-variant dark:bg-transparent dark:hover:bg-error-container"
                       >
                         <XCircle className="w-4 h-4" />
                         Rechazar
                       </Button>
                       <Button
-                        onClick={() => abrirModal(p.idPostulacion, 'ACEPTADA')}
+                        onClick={() => abrirModal(p.idPostulacion)}
                         className="h-auto gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary has-[>svg]:px-4 motion-glow-primary"
                       >
                         <CheckCircle className="w-4 h-4" />
@@ -241,7 +286,18 @@ export default function PostulacionesProyectoPage() {
         </div>
       </div>
 
-      {/* Modal personalizado con soporte para comentario */}
+      {rechazando && (
+        <RechazoPostulacionDialog
+          nombrePostulante={`${rechazando.postulante.nombre} ${rechazando.postulante.apellido}`}
+          pendiente={isPending}
+          onCerrar={() => setRechazando(null)}
+          onConfirmar={(datos) =>
+            resolverPostulacion({ postulacionId: rechazando.idPostulacion, estadoPostulacion: 'RECHAZADA', ...datos })
+          }
+        />
+      )}
+
+      {/* Aceptar, con comentario opcional */}
       {modal.open && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
@@ -251,15 +307,9 @@ export default function PostulacionesProyectoPage() {
             className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-7 w-full max-w-md mx-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="font-headline font-bold text-on-surface text-xl mb-2">
-              {modal.accion === 'ACEPTADA' ? 'Aceptar postulación' : 'Rechazar postulación'}
-            </h2>
+            <h2 className="font-headline font-bold text-on-surface text-xl mb-2">Aceptar postulación</h2>
 
-            <p className="text-tertiary text-sm mb-5">
-              {modal.accion === 'ACEPTADA'
-                ? '¿Confirmas que deseas aceptar esta postulación?'
-                : '¿Confirmas que deseas rechazar esta postulación?'}
-            </p>
+            <p className="text-tertiary text-sm mb-5">¿Confirmas que deseas aceptar esta postulación?</p>
 
             <div className="mb-5">
               <label className="block text-xs font-bold text-tertiary uppercase tracking-wide mb-1.5">
@@ -287,20 +337,11 @@ export default function PostulacionesProyectoPage() {
               </Button>
 
               <Button
-                variant={modal.accion === 'ACEPTADA' ? 'default' : 'destructive'}
                 onClick={confirmar}
                 disabled={isPending}
-                className={`h-auto rounded-xl px-5 py-2.5 text-sm font-bold ${
-                  modal.accion === 'ACEPTADA'
-                    ? 'bg-primary text-on-primary hover:bg-primary motion-glow-primary'
-                    : 'bg-error text-on-error hover:bg-error dark:bg-error'
-                }`}
+                className="h-auto rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary hover:bg-primary motion-glow-primary"
               >
-                {isPending
-                  ? 'Guardando...'
-                  : modal.accion === 'ACEPTADA'
-                  ? 'Sí, aceptar'
-                  : 'Sí, rechazar'}
+                {isPending ? 'Guardando...' : 'Sí, aceptar'}
               </Button>
             </div>
           </div>

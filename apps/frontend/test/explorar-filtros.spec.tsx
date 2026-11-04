@@ -11,8 +11,8 @@ vi.mock('next/navigation', () => ({
 const base = { descripcionProyecto: '', estadoProyecto: 'PUBLICADO', modalidadProyecto: 'MIXTA', organizaciones: [], intereses: [] };
 const PROYECTOS = [
   { ...base, idProyecto: 1, tituloProyecto: 'Tutorías', tipoProyecto: 'ACADEMICO_HORAS_BECA', roles: [{ cupos: 2 }], mismaCarrera: true },
-  { ...base, idProyecto: 2, tituloProyecto: 'Huerto', tipoProyecto: 'EXTRACURRICULAR_EXTENSION', roles: [{ cupos: 0 }] },
-  { ...base, idProyecto: 3, tituloProyecto: 'App móvil', tipoProyecto: 'ACADEMICO_EXPERIENCIA', roles: [{ cupos: 1 }] },
+  { ...base, idProyecto: 2, tituloProyecto: 'Huerto', tipoProyecto: 'EXTRACURRICULAR_EXTENSION', roles: [{ cupos: 0 }], fechaLimitePostulacion: '2026-11-20' },
+  { ...base, idProyecto: 3, tituloProyecto: 'App móvil', tipoProyecto: 'ACADEMICO_EXPERIENCIA', roles: [{ cupos: 1 }], fechaLimitePostulacion: '2026-12-01' },
   { ...base, idProyecto: 4, tituloProyecto: 'Archivo', tipoProyecto: 'ACADEMICO_EXPERIENCIA', estadoProyecto: 'CERRADO', roles: [{ cupos: 3 }] },
 ];
 
@@ -84,6 +84,16 @@ describe('Explorar: filtros visibles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Limpiar filtros y ver todos' }));
     expect(screen.getByText('Huerto')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Con vacantes' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('«Ordenar por fecha límite» pone primero la más cercana y deja al final los que no tienen fecha (MEJ-95)', async () => {
+    await renderPage();
+    const titulos = () => screen.getAllByRole('article').map((a) => a.textContent);
+    expect(titulos()).toEqual(['Tutorías', 'Huerto', 'App móvil', 'Archivo']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ordenar por fecha límite' }));
+    expect(screen.getByRole('button', { name: 'Ordenar por fecha límite' })).toHaveAttribute('aria-pressed', 'true');
+    expect(titulos()).toEqual(['Huerto', 'App móvil', 'Tutorías', 'Archivo']);
   });
 
   it('con ?q= pide el texto al backend (que filtra por título y devuelve solo 20)', async () => {

@@ -10,7 +10,7 @@ import { INSIGNIAS_EVENTO } from '../insignias/insignias.catalog';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService, type PostCommitEffect } from '../notifications/notifications.service';
 import { ApplicationCreatedEvent } from '../notifications/events/application-created.event';
-import { EstadoProyecto, Prisma, TipoNotificacion } from '@prisma/client';
+import { EstadoProyecto, MotivoRechazoPostulacion, Prisma, TipoEventoPostulacion, TipoNotificacion } from '@prisma/client';
 import {
   ProjectTransactionService,
   type ProjectLockRow,
@@ -22,6 +22,15 @@ import { ChatCanalesService } from '../chat/chat-canales.service';
 import { AdminMeetingsService } from '../events/admin-meetings.service';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
+import { MAX_RESPUESTA_CORTA, MAX_RESPUESTA_LARGA } from './dto/pregunta-rol.dto';
+
+/** MEJ-99: texto de cada motivo en el aviso al postulante. */
+const TEXTO_MOTIVO: Record<MotivoRechazoPostulacion, string> = {
+  PERFIL_NO_COINCIDE: 'Tu perfil no coincide con lo que busca el rol',
+  CUPO_LLENO: 'El cupo del rol ya está lleno',
+  HORARIO: 'El horario no es compatible',
+  OTRO: 'Otro motivo',
+};
 
 /**
  * C043 (06 v2 §23/§32): crear, resolver y retirar una postulación corren en
@@ -51,6 +60,66 @@ export class ApplicationsService {
       throw new NotFoundException('Proyecto no encontrado');
     }
     return ctx.project;
+  }
+
+  /** MEJ-100: un paso por tipo y postulación; registrarlo otra vez no hace nada (índice único). */
+  private registrarEvento(db: Prisma.TransactionClient | PrismaService, idPostulacion: number, tipo: TipoEventoPostulacion) {
+    return db.eventoPostulacion.createMany({ data: [{ idPostulacion, tipo }], skipDuplicates: true });
+  }
+
+  /**
+   * MEJ-97: valida las respuestas contra las preguntas VIGENTES del rol (obligatorias respondidas,
+   * límite por tipo, sin ids ajenos ni repetidos) y devuelve las filas con copia del enunciado.
+   */
+  private async validarRespuestas(
+    tx: Prisma.TransactionClient,
+    idRolProyecto: number,
+    respuestas: CreatePostulacionDto['respuestas'] = [],
+  ) {
+    const preguntas = await tx.preguntaRol.findMany({ where: { idRolProyecto }, orderBy: { orden: 'asc' } });
+    const dadas = new Map<number, string>();
+    for (const r of respuestas) {
+      if (!preguntas.some((p) => p.idPregunta === r.idPregunta)) {
+        throw new BadRequestException('Una respuesta no corresponde a una pregunta de este rol');
+      }
+      if (dadas.has(r.idPregunta)) {
+        throw new BadRequestException('Una pregunta no puede responderse más de una vez');
+      }
+      dadas.set(r.idPregunta, r.respuesta.trim());
+    }
+    const filas: Prisma.RespuestaPostulacionCreateWithoutPostulacionInput[] = [];
+    for (const p of preguntas) {
+      const respuesta = dadas.get(p.idPregunta) ?? '';
+      if (!respuesta) {
+        if (p.obligatoria) throw new BadRequestException(`Responde la pregunta obligatoria: "${p.enunciado}"`);
+        continue;
+      }
+      const maximo = p.tipo === 'CORTA' ? MAX_RESPUESTA_CORTA : MAX_RESPUESTA_LARGA;
+      if (respuesta.length > maximo) {
+        throw new BadRequestException(`La respuesta a "${p.enunciado}" no puede superar ${maximo} caracteres`);
+      }
+      filas.push({ pregunta: { connect: { idPregunta: p.idPregunta } }, enunciado: p.enunciado, tipo: p.tipo, respuesta, orden: p.orden });
+    }
+    return filas;
+  }
+
+  /** MEJ-100: eventos guardados + los pasos de postulaciones anteriores a la línea de tiempo (fecha de envío y de resolución). */
+  private conLineaDeTiempo<
+    P extends {
+      estadoPostulacion: string;
+      fechaPostulacion: Date;
+      fechaResolucion: Date | null;
+      eventos: { tipo: TipoEventoPostulacion; fecha: Date }[];
+    },
+  >(p: P) {
+    const eventos = [...p.eventos];
+    const falta = (tipo: TipoEventoPostulacion) => !eventos.some((e) => e.tipo === tipo);
+    if (falta('ENVIADA')) eventos.push({ tipo: 'ENVIADA', fecha: p.fechaPostulacion });
+    const resuelta = p.estadoPostulacion as TipoEventoPostulacion;
+    if (p.fechaResolucion && ['ACEPTADA', 'RECHAZADA', 'RETIRADA'].includes(resuelta) && falta(resuelta)) {
+      eventos.push({ tipo: resuelta, fecha: p.fechaResolucion });
+    }
+    return { ...p, eventos: eventos.sort((a, b) => a.fecha.getTime() - b.fecha.getTime()) };
   }
 
   async create(dto: CreatePostulacionDto, postulanteId: number) {
@@ -121,6 +190,7 @@ export class ApplicationsService {
         where: {
           idUsuarioPostulante: postulanteId,
           idRolProyecto: dto.idRolProyecto,
+          estadoPostulacion: { not: 'RETIRADA' },
         },
       });
 
@@ -132,11 +202,14 @@ export class ApplicationsService {
 
       await this.policy.assertWriteTx(tx, proyectoBloqueado, 'POSTULACION', postulanteId);
 
+      const respuestas = await this.validarRespuestas(tx, dto.idRolProyecto, dto.respuestas);
       const creada = await tx.postulacion.create({
         data: {
           idUsuarioPostulante: postulanteId,
           idRolProyecto: dto.idRolProyecto,
           justificacion: dto.justificacion,
+          respuestas: { create: respuestas },
+          eventos: { create: { tipo: 'ENVIADA' } },
         },
         include: {
           rolProyecto: {
@@ -203,7 +276,8 @@ export class ApplicationsService {
             where: {
               OR: [
                 { idUsuarioPostulante: actorId },
-                { rolProyecto: { proyecto: { creadoPor: actorId } } },
+                // Una retirada solo le interesa a su autor.
+                { rolProyecto: { proyecto: { creadoPor: actorId } }, estadoPostulacion: { not: 'RETIRADA' } },
               ],
             },
           }),
@@ -216,6 +290,7 @@ export class ApplicationsService {
             correo: true,
           },
         },
+        respuestas: { orderBy: { orden: 'asc' } },
         rolProyecto: {
           include: { proyecto: true },
         },
@@ -226,9 +301,11 @@ export class ApplicationsService {
 
   /** C043 (§41 E087): alcance personal por definición — solo las propias. */
   async findMine(userId: number) {
-    return this.prisma.postulacion.findMany({
+    const postulaciones = await this.prisma.postulacion.findMany({
       where: { idUsuarioPostulante: userId },
       include: {
+        respuestas: { orderBy: { orden: 'asc' } },
+        eventos: { select: { tipo: true, fecha: true }, orderBy: { fecha: 'asc' } },
         rolProyecto: {
           include: {
             proyecto: {
@@ -243,6 +320,7 @@ export class ApplicationsService {
       },
       orderBy: { fechaPostulacion: 'desc' },
     });
+    return postulaciones.map((p) => this.conLineaDeTiempo(p));
   }
 
   /**
@@ -262,6 +340,7 @@ export class ApplicationsService {
             correo: true,
           },
         },
+        respuestas: { orderBy: { orden: 'asc' } },
         rolProyecto: {
           include: {
             proyecto: true,
@@ -286,6 +365,8 @@ export class ApplicationsService {
       if (postulacion.rolProyecto.proyecto.creadoPor !== actorId) {
         throw new NotFoundException(`Postulación con id ${id} no encontrada`);
       }
+      // MEJ-100: la primera apertura del líder queda como «vista» (idempotente); una ya resuelta o retirada no cambia.
+      if (postulacion.estadoPostulacion === 'PENDIENTE') await this.registrarEvento(this.prisma, id, 'VISTA');
     }
 
     return postulacion;
@@ -388,6 +469,14 @@ export class ApplicationsService {
     }
 
     const esAceptada = dto.estadoPostulacion === 'ACEPTADA';
+    const comentario = dto.comentarioResolucion?.trim() || null;
+    const motivo = esAceptada ? null : (dto.motivoRechazo ?? null);
+    if (!esAceptada) {
+      if (!motivo) throw new BadRequestException('Elige el motivo del rechazo');
+      if (motivo === 'OTRO' && !comentario) {
+        throw new BadRequestException('Con el motivo "Otro" el comentario es obligatorio');
+      }
+    }
     const tituloProyecto = postulacion.rolProyecto.proyecto.tituloProyecto;
     const nombreRol = postulacion.rolProyecto.nombreRol;
     const estado = dto.estadoPostulacion;
@@ -410,7 +499,8 @@ export class ApplicationsService {
         where: { idPostulacion: id, estadoPostulacion: 'PENDIENTE' },
         data: {
           estadoPostulacion: dto.estadoPostulacion,
-          comentarioResolucion: dto.comentarioResolucion ?? null,
+          comentarioResolucion: comentario,
+          motivoRechazo: motivo,
           resueltaPor: resolutorId,
           fechaResolucion: new Date(),
         },
@@ -418,6 +508,8 @@ export class ApplicationsService {
       if (resuelta.count !== 1) {
         throw new ConflictException('Esta postulación ya fue resuelta');
       }
+
+      await this.registrarEvento(tx, id, esAceptada ? 'ACEPTADA' : 'RECHAZADA');
 
       if (esAceptada) {
         await this.activarParticipacionPorPostulacion(
@@ -446,12 +538,13 @@ export class ApplicationsService {
             : 'Tu postulación fue rechazada',
           mensajeNotificacion: esAceptada
             ? `Felicidades, tu postulación para el rol "${nombreRol}" en el proyecto "${tituloProyecto}" ha sido aceptada.`
-            : `Tu postulación para el rol "${nombreRol}" en el proyecto "${tituloProyecto}" ha sido rechazada.${dto.comentarioResolucion ? ` Comentario: ${dto.comentarioResolucion}` : ''}`,
+            : `Tu postulación para el rol "${nombreRol}" en el proyecto "${tituloProyecto}" ha sido rechazada. Motivo: ${motivo ? TEXTO_MOTIVO[motivo] : ''}.${comentario ? ` Comentario: ${comentario}` : ''}`,
           datosJson: {
             idPostulacion: postulacion.idPostulacion,
             idProyecto: postulacion.rolProyecto.proyecto.idProyecto,
             idRolProyecto: postulacion.idRolProyecto,
             estadoPostulacion: estado,
+            motivoRechazo: motivo,
           },
         },
         { add: (effect) => effects.push(effect) },
@@ -475,16 +568,21 @@ export class ApplicationsService {
 
   /**
    * C043 (§23): retirar la propia postulación solo mientras siga PENDIENTE.
-   * Autoría y estado se reevalúan dentro del lock del proyecto.
+   * Autoría y estado se reevalúan dentro del lock del proyecto. MEJ-96: ya no
+   * se borra; queda RETIRADA con su paso en la línea de tiempo y se avisa al líder.
    */
-  async delete(id: number, userId: number) {
+  async retirar(id: number, userId: number) {
     const postulacion = await this.prisma.postulacion.findUnique({
       where: { idPostulacion: id },
       select: {
         idPostulacion: true,
         idUsuarioPostulante: true,
+        idRolProyecto: true,
         estadoPostulacion: true,
-        rolProyecto: { select: { idProyecto: true } },
+        postulante: { select: { nombre: true, apellido: true } },
+        rolProyecto: {
+          select: { nombreRol: true, proyecto: { select: { idProyecto: true, creadoPor: true, tituloProyecto: true } } },
+        },
       },
     });
 
@@ -504,22 +602,68 @@ export class ApplicationsService {
       );
     }
 
-    await this.projectTx.run(
-      postulacion.rolProyecto.idProyecto,
-      userId,
-      'applications.delete',
-      async (ctx) => {
-        const { tx } = ctx;
-        await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'POSTULACION', userId);
-        const retirada = await tx.postulacion.deleteMany({
-          where: { idPostulacion: id, idUsuarioPostulante: userId, estadoPostulacion: 'PENDIENTE' },
-        });
-        if (retirada.count !== 1) {
-          throw new ConflictException('Esta postulación ya fue resuelta o retirada');
-        }
-      },
-    );
+    const proyecto = postulacion.rolProyecto.proyecto;
+    const effects: PostCommitEffect[] = [];
+    await this.projectTx.run(proyecto.idProyecto, userId, 'applications.retirar', async (ctx) => {
+      const { tx } = ctx;
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'POSTULACION', userId);
+      const retirada = await tx.postulacion.updateMany({
+        where: { idPostulacion: id, idUsuarioPostulante: userId, estadoPostulacion: 'PENDIENTE' },
+        data: { estadoPostulacion: 'RETIRADA', fechaResolucion: new Date() },
+      });
+      if (retirada.count !== 1) {
+        throw new ConflictException('Esta postulación ya fue resuelta o retirada');
+      }
+      await this.registrarEvento(tx, id, 'RETIRADA');
+      if (proyecto.creadoPor !== userId) {
+        const userName = `${postulacion.postulante.nombre} ${postulacion.postulante.apellido}`;
+        const roleName = postulacion.rolProyecto.nombreRol;
+        await this.notificationsService.persistUsersTx(
+          tx,
+          [proyecto.creadoPor],
+          {
+            tipoNotificacion: TipoNotificacion.NUEVA_POSTULACION,
+            tituloNotificacion: 'Postulación retirada',
+            mensajeNotificacion: `${userName} retiró su postulación para el rol "${roleName}" en tu proyecto "${proyecto.tituloProyecto}".`,
+            datosJson: {
+              userName,
+              roleName,
+              projectTitle: proyecto.tituloProyecto,
+              projectId: proyecto.idProyecto,
+              applicationId: id,
+              roleId: postulacion.idRolProyecto,
+              retirada: true,
+            },
+          },
+          { add: (effect) => effects.push(effect) },
+        );
+      }
+    });
+    await this.notificationsService.publishEffects(effects);
 
-    return { mensaje: 'Postulación cancelada exitosamente' };
+    return { mensaje: 'Postulación retirada exitosamente', estadoPostulacion: 'RETIRADA' };
+  }
+
+  /** MEJ-100: el líder marca la postulación «en revisión». Idempotente; solo mientras siga PENDIENTE. */
+  async marcarEnRevision(id: number, actorId: number) {
+    const postulacion = await this.prisma.postulacion.findUnique({
+      where: { idPostulacion: id },
+      select: { estadoPostulacion: true, rolProyecto: { select: { proyecto: { select: { creadoPor: true } } } } },
+    });
+    if (!postulacion) {
+      throw new NotFoundException(`Postulación con id ${id} no encontrada`);
+    }
+    if (postulacion.rolProyecto.proyecto.creadoPor !== actorId) {
+      throw new ForbiddenException('Solo el creador del proyecto puede revisar postulaciones');
+    }
+    if (postulacion.estadoPostulacion !== 'PENDIENTE') {
+      throw new BadRequestException('Esta postulación ya fue resuelta');
+    }
+    await this.registrarEvento(this.prisma, id, 'EN_REVISION');
+    return this.prisma.eventoPostulacion.findMany({
+      where: { idPostulacion: id },
+      select: { tipo: true, fecha: true },
+      orderBy: { fecha: 'asc' },
+    });
   }
 }

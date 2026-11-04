@@ -7,6 +7,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { SugerenciasInvitado } from '@/components/projects/sugerencias-invitado';
+import { RolPreguntas } from './RolPreguntas';
 import { inputClass, labelClass, type RolFormItem, type RequisitoFormItem, type FieldErrors } from './types';
 
 type Props = {
@@ -169,6 +170,12 @@ export function Step2({
               ))}
             </div>
           </div>
+
+          <RolPreguntas
+            preguntas={rol.preguntas}
+            errors={rolErrors}
+            onChange={(preguntas) => onUpdateRol(rol.id, 'preguntas', preguntas)}
+          />
 
           <SugerenciasInvitado
             habilidades={rol.requisitos.flatMap((r) => (r.idHabilidad ? [r.idHabilidad] : []))}
