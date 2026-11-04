@@ -24,7 +24,13 @@ export type TipoProyecto =
   | 'ACADEMICO_EXPERIENCIA'
   | 'EXTRACURRICULAR_EXTENSION';
 export type ModalidadProyecto = 'PRESENCIAL' | 'VIRTUAL' | 'MIXTA';
-export type EstadoPostulacion = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
+export type EstadoPostulacion = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA' | 'RETIRADA';
+export type MotivoRechazo = 'PERFIL_NO_COINCIDE' | 'CUPO_LLENO' | 'HORARIO' | 'OTRO';
+export type TipoPregunta = 'CORTA' | 'LARGA';
+export type PreguntaRol = { idPregunta: number; enunciado: string; tipo: TipoPregunta; obligatoria: boolean };
+export type RespuestaPostulacion = { idRespuesta?: number; enunciado: string; tipo?: TipoPregunta; respuesta: string };
+export type TipoEventoPostulacion = 'ENVIADA' | 'VISTA' | 'EN_REVISION' | 'ACEPTADA' | 'RECHAZADA' | 'RETIRADA';
+export type EventoPostulacion = { tipo: TipoEventoPostulacion; fecha: string };
 export type NivelHabilidad = 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
 
 export type Habilidad = { nombreHabilidad: string };
@@ -41,6 +47,7 @@ export type Rol = {
   horasSemanalesEstimadas?: number;
   carreraRequerida?: { nombreCarrera: string };
   requisitos: Requisito[];
+  preguntas?: PreguntaRol[];
 };
 export type Proyecto = {
   idProyecto: number;
@@ -54,6 +61,8 @@ export type Proyecto = {
   fechaInicio?: string;
   fechaFinEstimada?: string;
   fechaPublicacion?: string;
+  fechaLimitePostulacion?: string | null;
+  cierraPronto?: boolean;
   creador: { idUsuario: number; nombre: string; apellido: string; correo: string };
   organizaciones: { organizacion: { nombreOrganizacion: string } }[];
   intereses: { interes: { nombreInteres: string } }[];
@@ -67,6 +76,9 @@ export type ProyectoResumen = {
   estadoProyecto: EstadoProyecto;
   modalidadProyecto: ModalidadProyecto;
   fechaPublicacion?: string;
+  /** MEJ-95: 'YYYY-MM-DD'; `cierraPronto` si faltan 7 días o menos. */
+  fechaLimitePostulacion?: string | null;
+  cierraPronto?: boolean;
   organizaciones: { organizacion: { nombreOrganizacion: string } }[];
   intereses: { interes: { nombreInteres: string } }[];
   roles?: { idRolProyecto: number }[];
@@ -80,6 +92,8 @@ export type Postulacion = {
   estadoPostulacion: EstadoPostulacion;
   fechaPostulacion: string;
   comentarioResolucion?: string;
+  motivoRechazo?: MotivoRechazo | null;
+  eventos?: EventoPostulacion[];
   rolProyecto: {
     idRolProyecto: number;
     nombreRol: string;
@@ -114,6 +128,9 @@ export type PostulacionRecibida = {
   fechaPostulacion: string;
   fechaResolucion?: string;
   comentarioResolucion?: string;
+  motivoRechazo?: MotivoRechazo | null;
+  respuestas?: RespuestaPostulacion[];
+  eventos?: EventoPostulacion[];
   /** MEJ-21: % de los requisitos de habilidad del rol que cumple el postulante; null si el rol no pide ninguna. */
   coincidencia?: { porcentaje: number; cumplidos: number; total: number } | null;
   postulante: {

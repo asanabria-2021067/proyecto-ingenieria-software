@@ -166,6 +166,7 @@ describe('resumen del proyecto', () => {
     urlRecursoExterno: '',
     fechaInicio: '',
     fechaFinEstimada: '',
+    fechaLimitePostulacion: '',
     roles,
   };
 

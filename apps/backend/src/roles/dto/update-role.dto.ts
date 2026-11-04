@@ -10,6 +10,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RoleRequisitoDto } from './create-role.dto';
+import { PreguntaRolDto, PreguntasDelRol } from '../../applications/dto/pregunta-rol.dto';
 
 /**
  * Edición de un rol existente (Sección 8). Todos los campos son opcionales:
@@ -49,4 +50,8 @@ export class UpdateRoleDto {
   @ValidateNested({ each: true })
   @Type(() => RoleRequisitoDto)
   requisitos?: RoleRequisitoDto[];
+
+  /** Si se envía, reemplaza las preguntas del rol; las respuestas ya enviadas conservan su enunciado. */
+  @PreguntasDelRol()
+  preguntas?: PreguntaRolDto[];
 }

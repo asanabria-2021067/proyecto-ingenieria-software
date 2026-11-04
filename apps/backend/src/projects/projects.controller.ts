@@ -60,6 +60,7 @@ export class ProjectsController {
     @Query('organizacionId') organizacionId?: string,
     @Query('habilidad') habilidad?: string,
     @Query('duenio') duenio?: string,
+    @Query('orden') orden?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @CurrentUser() user?: { userId: number },
@@ -76,7 +77,7 @@ export class ProjectsController {
     if (page !== undefined) {
       const parsedPage = Math.max(1, parseInt(page, 10) || 1);
       const parsedLimit = Math.min(50, Math.max(1, parseInt(limit || '12', 10) || 12));
-      return this.projectsService.findAllPaginated({ ...filters, page: parsedPage, limit: parsedLimit });
+      return this.projectsService.findAllPaginated({ ...filters, orden, page: parsedPage, limit: parsedLimit });
     }
 
     // T-251/T-252: sin filtros de página es el catálogo corto que usa el
@@ -114,6 +115,13 @@ export class ProjectsController {
   @UseGuards(JwtAuthGuard)
   findFeatured() {
     return this.projectsService.findFeatured();
+  }
+
+  /** MEJ-93: proyectos parecidos (máximo 6), solo entre los que Explorar muestra a cualquiera. */
+  @Get(':id/similares')
+  @UseGuards(JwtAuthGuard)
+  similares(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number }) {
+    return this.projectsService.similares(id, user.userId);
   }
 
   @Get(':id')

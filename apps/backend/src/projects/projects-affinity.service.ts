@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { NivelHabilidad, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SocialService } from '../social/social.service';
 import { calcularCoincidencia, mejorCoincidencia, UMBRAL_COINCIDE } from '../common/coincidencia-habilidades';
-import { PESOS_ORDEN_DISPONIBLES, conCuposDisponibles, proyectoListSelect } from './projects.read-model';
+import { ESTADOS_CON_DETALLE, PESOS_ORDEN_DISPONIBLES, conCuposDisponibles, proyectoListSelect } from './projects.read-model';
 
 /** Cuántos proyectos abiertos recientes se comparan en «Para ti» (una sola consulta, sin N+1). */
 const PARA_TI_VENTANA = 100;
@@ -11,6 +11,13 @@ const PARA_TI_VENTANA = 100;
 const PARA_TI_MAXIMO = 20;
 /** Cada interés compartido suma esto al orden, por debajo de un requisito de habilidad cumplido al 100 %. */
 const PESO_INTERES = 10;
+
+/** MEJ-93: cuántos proyectos parecidos se muestran y cuántos candidatos recientes se comparan. */
+const SIMILARES_MAXIMO = 6;
+const SIMILARES_VENTANA = 100;
+/** MEJ-93: puntos por mismo tipo de horas y por carrera compartida; las habilidades suman su % de coincidencia (0-100). */
+const PESO_SIMILAR_TIPO = 20;
+const PESO_SIMILAR_CARRERA = 30;
 
 /** Marca de guardado y orden por afinidad del listado de proyectos (extraído de ProjectsService). */
 @Injectable()
@@ -187,6 +194,62 @@ export class ProjectsAffinityService {
       ...conCuposDisponibles({ ...x.proyecto, intereses: x.proyecto.intereses.map(({ interes }) => ({ interes })) }),
       coincidencia: x.coincidencia,
     }));
+    return this.conGuardado(conCupos, userId);
+  }
+
+  /**
+   * MEJ-93: «Proyectos parecidos». Puntúa cada candidato por tipo de horas, carrera de sus roles y
+   * habilidades que piden sus roles (reutiliza `calcularCoincidencia`: las habilidades del proyecto
+   * base hacen de «persona»). `condiciones` son las del catálogo, o sea solo lo que cualquiera
+   * puede ver en Explorar; el proyecto base se excluye. 404 si el base no es visible.
+   */
+  async similares(idProyecto: number, userId: number, condiciones: Prisma.ProyectoWhereInput[]) {
+    const base = await this.prisma.proyecto.findFirst({
+      where: { idProyecto, estadoProyecto: { in: ESTADOS_CON_DETALLE }, eliminadoEn: null },
+      select: {
+        tipoProyecto: true,
+        roles: { select: { idCarreraRequerida: true, requisitos: { select: { idHabilidad: true } } } },
+      },
+    });
+    if (!base) throw new NotFoundException(`Proyecto con id ${idProyecto} no encontrado`);
+
+    const carreras = new Set(base.roles.flatMap((r) => (r.idCarreraRequerida === null ? [] : [r.idCarreraRequerida])));
+    const habilidades = new Map<number, NivelHabilidad>(
+      base.roles.flatMap((r) => r.requisitos.map((q): [number, NivelHabilidad] => [q.idHabilidad, 'AVANZADO'])),
+    );
+    const candidatos = await this.prisma.proyecto.findMany({
+      where: { AND: [...condiciones, { idProyecto: { not: idProyecto } }] },
+      select: {
+        ...proyectoListSelect,
+        roles: {
+          select: {
+            cupos: true,
+            idCarreraRequerida: true,
+            requisitos: { select: { idHabilidad: true, nivelMinimo: true, obligatorio: true } },
+            _count: { select: { participaciones: { where: { estadoParticipacion: 'ACTIVO' } } } },
+          },
+        },
+      },
+      orderBy: { fechaCreacion: 'desc' },
+      take: SIMILARES_VENTANA,
+    });
+
+    const puntuados = candidatos
+      .map((p) => {
+        const mismoTipo = p.tipoProyecto === base.tipoProyecto;
+        const mismaCarrera = p.roles.some((r) => r.idCarreraRequerida !== null && carreras.has(r.idCarreraRequerida));
+        const habilidadesPorcentaje =
+          mejorCoincidencia(p.roles.map((r) => calcularCoincidencia(r.requisitos, habilidades)))?.porcentaje ?? 0;
+        const puntaje =
+          (mismoTipo ? PESO_SIMILAR_TIPO : 0) + (mismaCarrera ? PESO_SIMILAR_CARRERA : 0) + habilidadesPorcentaje;
+        return { puntaje, proyecto: p, similitud: { mismoTipo, mismaCarrera, habilidadesPorcentaje } };
+      })
+      .filter((x) => x.puntaje > 0)
+      // Estable: a igual puntaje se conserva la recencia de la consulta.
+      .sort((a, b) => b.puntaje - a.puntaje)
+      .slice(0, SIMILARES_MAXIMO);
+
+    const conCupos = puntuados.map((x) => ({ ...conCuposDisponibles(x.proyecto), similitud: x.similitud }));
     return this.conGuardado(conCupos, userId);
   }
 

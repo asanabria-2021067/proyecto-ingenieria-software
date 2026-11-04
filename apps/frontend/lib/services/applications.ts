@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api/client';
+import type { MotivoRechazo } from '@/types';
 
 export interface Postulacion {
   idPostulacion: number;
@@ -29,10 +30,13 @@ export interface Postulacion {
 export interface CreatePostulacionPayload {
   idRolProyecto: number;
   justificacion: string;
+  respuestas?: { idPregunta: number; respuesta: string }[];
 }
 
 export interface UpdateEstadoPostulacionPayload {
   estadoPostulacion: 'ACEPTADA' | 'RECHAZADA';
+  /** Obligatorio al rechazar; con `OTRO` el comentario también lo es. */
+  motivoRechazo?: MotivoRechazo;
   comentarioResolucion?: string;
 }
 
@@ -61,6 +65,7 @@ export async function updateEstadoPostulacion(
   });
 }
 
-export async function deletePostulacion(id: number): Promise<{ mensaje: string }> {
-  return apiFetch<{ mensaje: string }>(`/postulaciones/${id}`, { method: 'DELETE' });
+/** MEJ-96: no borra; deja la postulación pendiente como RETIRADA. */
+export async function deletePostulacion(id: number): Promise<{ mensaje: string; estadoPostulacion: 'RETIRADA' }> {
+  return apiFetch<{ mensaje: string; estadoPostulacion: 'RETIRADA' }>(`/postulaciones/${id}`, { method: 'DELETE' });
 }

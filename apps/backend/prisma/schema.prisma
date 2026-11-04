@@ -156,6 +156,32 @@ enum EstadoPostulacion {
   PENDIENTE
   ACEPTADA
   RECHAZADA
+  /// MEJ-96: el postulante la retiró mientras estaba PENDIENTE (se conserva, ya no se borra).
+  RETIRADA
+}
+
+/// MEJ-99: motivo con que el líder rechaza una postulación.
+enum MotivoRechazoPostulacion {
+  PERFIL_NO_COINCIDE
+  CUPO_LLENO
+  HORARIO
+  OTRO
+}
+
+/// MEJ-97: pregunta de postulación de texto corto (<= 200) o largo (<= 2000).
+enum TipoPreguntaPostulacion {
+  CORTA
+  LARGA
+}
+
+/// MEJ-100: pasos de la línea de tiempo de una postulación.
+enum TipoEventoPostulacion {
+  ENVIADA
+  VISTA
+  EN_REVISION
+  ACEPTADA
+  RECHAZADA
+  RETIRADA
 }
 
 enum EstadoParticipacion {
@@ -845,6 +871,8 @@ model Proyecto {
   contextoAcademico   String?           @map("contexto_academico") @db.VarChar(255)
   urlRecursoExterno   String?           @map("url_recurso_externo") @db.VarChar(255)
   fechaPublicacion    DateTime?         @map("fecha_publicacion") @db.Date
+  /// MEJ-95: último día para postularse; null = sin fecha límite. Explorar marca «Cierra pronto» a 7 días o menos.
+  fechaLimitePostulacion DateTime?      @map("fecha_limite_postulacion") @db.Date
   fechaInicio         DateTime?         @map("fecha_inicio") @db.Date
   fechaFinEstimada    DateTime?         @map("fecha_fin_estimada") @db.Date
   /// Fuente de verdad del líder del proyecto. No existe una `ParticipacionProyecto` equivalente para el líder: no asumirla ni inventarla.
@@ -1125,6 +1153,7 @@ model RolProyecto {
   participaciones  ParticipacionProyecto[]
   tareas           Tarea[]
   invitaciones     InvitacionRolProyecto[]
+  preguntas        PreguntaRol[]
 
   @@index([idProyecto])
   @@map("rol_proyecto")
@@ -1155,16 +1184,66 @@ model Postulacion {
   fechaResolucion      DateTime?         @map("fecha_resolucion")
   resueltaPor          Int?              @map("resuelta_por")
   comentarioResolucion String?           @map("comentario_resolucion") @db.Text
+  /// MEJ-99: solo al rechazar; `OTRO` exige comentario.
+  motivoRechazo        MotivoRechazoPostulacion? @map("motivo_rechazo")
 
   postulante      Usuario                 @relation("Postulante", fields: [idUsuarioPostulante], references: [idUsuario], onDelete: Restrict)
   resolutor       Usuario?                @relation("PostulacionResolutor", fields: [resueltaPor], references: [idUsuario], onDelete: SetNull)
   rolProyecto     RolProyecto             @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: Restrict)
   participaciones ParticipacionProyecto[]
+  respuestas      RespuestaPostulacion[]
+  eventos         EventoPostulacion[]
 
   @@index([idUsuarioPostulante, idRolProyecto])
   @@index([estadoPostulacion])
   @@index([idRolProyecto, estadoPostulacion])
   @@map("postulacion")
+}
+
+/// MEJ-97: pregunta que el líder agrega a un rol (hasta 5 por rol). La pregunta general «¿Por qué te gustaría participar?» es `Postulacion.justificacion`, no una fila de esta tabla.
+model PreguntaRol {
+  idPregunta    Int                     @id @default(autoincrement()) @map("id_pregunta")
+  idRolProyecto Int                     @map("id_rol_proyecto")
+  enunciado     String                  @db.VarChar(200)
+  tipo          TipoPreguntaPostulacion
+  obligatoria   Boolean                 @default(true)
+  orden         Int                     @default(0)
+
+  rolProyecto RolProyecto            @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: Cascade)
+  respuestas  RespuestaPostulacion[]
+
+  @@index([idRolProyecto])
+  @@map("pregunta_rol")
+}
+
+/// MEJ-97: respuesta enviada con la postulación. Guarda copia del enunciado y del tipo para que editar o borrar la pregunta no altere lo ya enviado.
+model RespuestaPostulacion {
+  idRespuesta   Int                     @id @default(autoincrement()) @map("id_respuesta")
+  idPostulacion Int                     @map("id_postulacion")
+  idPregunta    Int?                    @map("id_pregunta")
+  enunciado     String                  @db.VarChar(200)
+  tipo          TipoPreguntaPostulacion
+  respuesta     String                  @db.Text
+  orden         Int                     @default(0)
+
+  postulacion Postulacion  @relation(fields: [idPostulacion], references: [idPostulacion], onDelete: Cascade)
+  pregunta    PreguntaRol? @relation(fields: [idPregunta], references: [idPregunta], onDelete: SetNull)
+
+  @@index([idPostulacion])
+  @@map("respuesta_postulacion")
+}
+
+/// MEJ-100: un paso por tipo y postulación (único), así registrarlo de nuevo es idempotente.
+model EventoPostulacion {
+  idEvento      Int                   @id @default(autoincrement()) @map("id_evento")
+  idPostulacion Int                   @map("id_postulacion")
+  tipo          TipoEventoPostulacion
+  fecha         DateTime              @default(now())
+
+  postulacion Postulacion @relation(fields: [idPostulacion], references: [idPostulacion], onDelete: Cascade)
+
+  @@unique([idPostulacion, tipo])
+  @@map("evento_postulacion")
 }
 
 /// Invariante enforced por PostgreSQL (no por Prisma): a lo sumo una participación ACTIVO por (idUsuario, idRolProyecto), vía índice único parcial `participacion_proyecto_activa_unique` (migración `20260726000100_enforce_one_active_participation`).

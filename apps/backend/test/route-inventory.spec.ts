@@ -310,4 +310,16 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     expect(nuevas.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
     expect(nuevas.filter((r) => r.path.startsWith('asociaciones/') && !r.guards.includes(JuntaGuard))).toEqual([]);
   });
+
+  // MEJ-93/96/100: proyectos parecidos, retiro (DELETE conserva la ruta) y «en revisión» de una postulación.
+  it('parecidos y revisión de postulaciones: las rutas nuevas existen, exigen JwtAuthGuard y las de escritura el ProjectWriteGuard', () => {
+    const esperadas = ['GET /api/proyectos/:id/similares', 'POST /api/postulaciones/:id/en-revision'];
+    const nuevas = rutas.filter((r) => esperadas.includes(r.id));
+    expect(nuevas.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(nuevas.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+    expect(nuevas.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+    expect(nuevas.filter((r) => r.id.startsWith('POST') && !r.guards.includes(ProjectWriteGuard))).toEqual([]);
+    const retiro = rutas.find((r) => r.id === 'DELETE /api/postulaciones/:id');
+    expect(retiro?.guards).toEqual(expect.arrayContaining([JwtAuthGuard, ProjectWriteGuard]));
+  });
 });

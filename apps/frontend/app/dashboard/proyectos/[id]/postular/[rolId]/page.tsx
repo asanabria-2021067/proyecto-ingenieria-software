@@ -16,9 +16,10 @@ import { Postulacion, Proyecto } from '@/types';
 import { SkeletonCard, SkeletonDetail } from '@/components/ui/skeleton';
 import { DraftNotice } from '@/components/ui/draft-notice';
 import { PostulacionVistaPrevia } from '@/components/projects/postulacion-vista-previa';
+import { ESTADO_POSTULACION_STYLE } from '@/components/projects/application-status.utils';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useFormDraft } from '@/hooks/use-form-draft';
-import { JUSTIFICACION_MAX, JUSTIFICACION_MIN, caracteresFaltantes } from '@/lib/forms/postulacion';
+import { JUSTIFICACION_MAX, JUSTIFICACION_MIN, caracteresFaltantes, respuestaMax, validarRespuestas } from '@/lib/forms/postulacion';
 
 export const postulacionSchema = z.object({
   justificacion: z
@@ -35,6 +36,9 @@ export default function PostularPage() {
   const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState('');
   const [vistaPrevia, setVistaPrevia] = useState(false);
+  // MEJ-97: respuestas a las preguntas del rol, por idPregunta.
+  const [respuestas, setRespuestas] = useState<Record<number, string>>({});
+  const [intentoRespuestas, setIntentoRespuestas] = useState(false);
   const { data: usuario } = useCurrentUser();
 
   const { data: proyecto, isLoading } = useQuery<Proyecto>({
@@ -43,6 +47,11 @@ export default function PostularPage() {
   });
 
   const rol = proyecto?.roles.find((r) => r.idRolProyecto === Number(rolId));
+  const preguntas = rol?.preguntas ?? [];
+  const erroresRespuestas = validarRespuestas(preguntas, respuestas);
+  const respuestasEnviadas = preguntas
+    .filter((q) => (respuestas[q.idPregunta] ?? '').trim())
+    .map((q) => ({ idPregunta: q.idPregunta, enunciado: q.enunciado, respuesta: respuestas[q.idPregunta].trim() }));
 
   const {
     data: misPostulaciones = [],
@@ -57,7 +66,8 @@ export default function PostularPage() {
     misPostulaciones.find(
       (p) =>
         p.rolProyecto.proyecto.idProyecto === proyecto.idProyecto &&
-        p.estadoPostulacion !== 'RECHAZADA',
+        p.estadoPostulacion !== 'RECHAZADA' &&
+        p.estadoPostulacion !== 'RETIRADA',
     );
 
   const {
@@ -72,18 +82,25 @@ export default function PostularPage() {
   const justificacion = useWatch({ control, name: 'justificacion', defaultValue: '' });
   const faltan = caracteresFaltantes(justificacion ?? '');
 
-  const borrador = useFormDraft<{ justificacion: string }>({
+  const borrador = useFormDraft<{ justificacion: string; respuestas?: Record<number, string> }>({
     clave: `postulacion-${id}-${rolId}`,
-    valor: { justificacion: justificacion ?? '' },
-    alRestaurar: (b) => setValue('justificacion', b.justificacion),
+    valor: { justificacion: justificacion ?? '', respuestas },
+    alRestaurar: (b) => {
+      setValue('justificacion', b.justificacion);
+      setRespuestas(b.respuestas ?? {});
+    },
     alDescartar: () => {
       setValue('justificacion', '');
+      setRespuestas({});
+      setIntentoRespuestas(false);
       setVistaPrevia(false);
     },
   });
 
   const verVistaPrevia = async () => {
-    if (await trigger('justificacion')) setVistaPrevia(true);
+    setIntentoRespuestas(true);
+    const justificacionValida = await trigger('justificacion');
+    if (justificacionValida && Object.keys(erroresRespuestas).length === 0) setVistaPrevia(true);
   };
 
   const mutation = useMutation({
@@ -93,6 +110,9 @@ export default function PostularPage() {
         body: JSON.stringify({
           idRolProyecto: Number(rolId),
           justificacion: data.justificacion,
+          ...(respuestasEnviadas.length > 0 && {
+            respuestas: respuestasEnviadas.map(({ idPregunta, respuesta }) => ({ idPregunta, respuesta })),
+          }),
         }),
       });
     },
@@ -193,11 +213,7 @@ export default function PostularPage() {
                     </p>
                     <p className="text-xs text-tertiary mt-1">
                       Rol: {postulacionActiva.rolProyecto.nombreRol} · Estado:{' '}
-                      {postulacionActiva.estadoPostulacion === 'PENDIENTE'
-                        ? 'Pendiente'
-                        : postulacionActiva.estadoPostulacion === 'ACEPTADA'
-                        ? 'Aceptada'
-                        : 'Rechazada'}
+                      {ESTADO_POSTULACION_STYLE[postulacionActiva.estadoPostulacion].label}
                     </p>
                   </div>
                 </div>
@@ -252,6 +268,47 @@ export default function PostularPage() {
                   </div>
                 </div>
 
+                {/* Preguntas del rol: siguen montadas en la vista previa para conservar lo escrito. */}
+                {preguntas.length > 0 && (
+                  <fieldset className={`space-y-4 ${vistaPrevia ? 'hidden' : ''}`}>
+                    <legend className="mb-2 text-sm font-semibold text-on-surface">Preguntas del rol</legend>
+                    {preguntas.map((q) => {
+                      const error = intentoRespuestas ? erroresRespuestas[q.idPregunta] : undefined;
+                      const campo = `pregunta-${q.idPregunta}`;
+                      const comun = {
+                        id: campo,
+                        value: respuestas[q.idPregunta] ?? '',
+                        onChange: (e: { target: { value: string } }) => setRespuestas((r) => ({ ...r, [q.idPregunta]: e.target.value })),
+                        'aria-invalid': error ? true : undefined,
+                        'aria-describedby': error ? `${campo}-error` : undefined,
+                        className: `w-full px-4 py-3 rounded-xl border text-on-surface text-sm outline-none transition-colors ${
+                          error
+                            ? 'border-error bg-error-container/10 focus:ring-2 focus:ring-error'
+                            : 'border-outline-variant bg-surface-container-lowest focus:ring-2 focus:ring-primary'
+                        }`,
+                      };
+                      return (
+                        <div key={q.idPregunta}>
+                          <label htmlFor={campo} className="block text-sm font-semibold text-on-surface mb-1.5">
+                            {q.enunciado} {q.obligatoria ? <span className="text-error">*</span> : <span className="text-xs font-normal text-tertiary">(opcional)</span>}
+                          </label>
+                          {q.tipo === 'LARGA' ? <textarea {...comun} rows={5} className={`${comun.className} resize-none leading-relaxed`} /> : <input type="text" {...comun} />}
+                          <div className="flex items-start justify-between gap-3 mt-1.5">
+                            {error ? (
+                              <p id={`${campo}-error`} role="alert" className="text-xs text-error">{error}</p>
+                            ) : (
+                              <span />
+                            )}
+                            <span className="text-xs text-tertiary ml-auto shrink-0">
+                              {(respuestas[q.idPregunta] ?? '').length} / {respuestaMax(q.tipo)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </fieldset>
+                )}
+
                 {vistaPrevia && rol && (
                   <div className="space-y-3">
                     <p className="text-xs text-tertiary">
@@ -262,6 +319,7 @@ export default function PostularPage() {
                       correo={usuario?.correo ?? ''}
                       nombreRol={rol.nombreRol}
                       justificacion={justificacion ?? ''}
+                      respuestas={respuestasEnviadas}
                     />
                   </div>
                 )}

@@ -71,6 +71,8 @@ function ProyectosContenido() {
   const [duenioFiltro, setDuenioFiltro] = useState<DuenioProyecto | ''>('');
   const [soloParaTi, setSoloParaTi] = useState(false);
   const [soloGuardados, setSoloGuardados] = useState(false);
+  // MEJ-95: el catálogo corto no se pagina, así que el orden por fecha límite se aplica aquí.
+  const [porFechaLimite, setPorFechaLimite] = useState(false);
 
   const catalogo = useQuery<ProyectoDisponibleResumen[]>({
     queryKey: ['proyectos', duenioFiltro, qParam],
@@ -103,7 +105,13 @@ function ProyectosContenido() {
     })
     // S7 (VIEW-09): los cerrados no aceptan postulaciones; van al final y solo se consultan.
     // «Para ti» conserva el orden por coincidencia del servidor (sort es estable).
-    .sort((a, b) => Number(a.estadoProyecto === 'CERRADO') - Number(b.estadoProyecto === 'CERRADO'));
+    .sort(
+      (a, b) =>
+        Number(a.estadoProyecto === 'CERRADO') - Number(b.estadoProyecto === 'CERRADO') ||
+        (porFechaLimite
+          ? (a.fechaLimitePostulacion ?? '9999-12-31').localeCompare(b.fechaLimitePostulacion ?? '9999-12-31')
+          : 0),
+    );
   const cerrados = filtrados.filter((p) => p.estadoProyecto === 'CERRADO').length;
   const hasActiveFilters = Boolean(busqueda || tipoFiltro || duenioFiltro || soloParaTi || soloGuardados || soloVacantes || soloMiCarrera);
   const activos = proyectos.filter((p) => p.estadoProyecto !== 'CERRADO').length;
@@ -217,6 +225,9 @@ function ProyectosContenido() {
               ))}
               <button type="button" onClick={() => setSoloVacantes((v) => !v)} aria-pressed={soloVacantes} className={chipClase(soloVacantes)}>
                 Con vacantes
+              </button>
+              <button type="button" onClick={() => setPorFechaLimite((v) => !v)} aria-pressed={porFechaLimite} className={chipClase(porFechaLimite)}>
+                Ordenar por fecha límite
               </button>
               {(hayMiCarrera || soloMiCarrera) && (
                 <button type="button" onClick={() => setSoloMiCarrera((v) => !v)} aria-pressed={soloMiCarrera} className={chipClase(soloMiCarrera)}>

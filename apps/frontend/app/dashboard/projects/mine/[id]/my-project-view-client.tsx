@@ -153,7 +153,7 @@ export default function MyProjectViewClient({ id }: Props) {
     tituloProyecto: '', descripcionProyecto: '', tipoProyecto: '' as TipoProyecto,
     modalidadProyecto: '' as ModalidadProyecto, objetivosProyecto: '', ubicacionProyecto: '',
     contextoAcademico: '', urlRecursoExterno: '', fechaInicio: '',
-    fechaFinEstimada: '', roles: [],
+    fechaFinEstimada: '', fechaLimitePostulacion: '', roles: [],
   });
 
   const { data: proyecto, isLoading, error } = useQuery<ProyectoDetalleDTO>({
@@ -205,6 +205,7 @@ export default function MyProjectViewClient({ id }: Props) {
       urlRecursoExterno: proyecto.urlRecursoExterno ?? '',
       fechaInicio: proyecto.fechaInicio ? proyecto.fechaInicio.split('T')[0] : '',
       fechaFinEstimada: proyecto.fechaFinEstimada ? proyecto.fechaFinEstimada.split('T')[0] : '',
+      fechaLimitePostulacion: proyecto.fechaLimitePostulacion ? proyecto.fechaLimitePostulacion.split('T')[0] : '',
       roles: proyecto.roles.map((r) => ({
         id: safeId(),
         nombreRol: r.nombreRol,
@@ -218,6 +219,7 @@ export default function MyProjectViewClient({ id }: Props) {
           nivelMinimo: req.nivelMinimo as NivelHabilidad,
           obligatorio: req.obligatorio,
         })),
+        preguntas: (r.preguntas ?? []).map((q) => ({ id: safeId(), enunciado: q.enunciado, tipo: q.tipo, obligatoria: q.obligatoria })),
       })),
     });
   }, [proyecto, isEditing]);
@@ -262,6 +264,7 @@ export default function MyProjectViewClient({ id }: Props) {
     urlRecursoExterno: normalizeUrlInput(form.urlRecursoExterno),
     fechaInicio: form.fechaInicio || undefined,
     fechaFinEstimada: form.fechaFinEstimada || undefined,
+    fechaLimitePostulacion: form.fechaLimitePostulacion || null,
     roles: form.roles.length > 0
       ? form.roles.map((r) => ({
           nombreRol: r.nombreRol,
@@ -276,6 +279,7 @@ export default function MyProjectViewClient({ id }: Props) {
               nivelMinimo: req.nivelMinimo as NivelHabilidad,
               obligatorio: req.obligatorio,
             })),
+          preguntas: r.preguntas.map((q) => ({ enunciado: q.enunciado.trim(), tipo: q.tipo, obligatoria: q.obligatoria })),
         }))
       : undefined,
   });
