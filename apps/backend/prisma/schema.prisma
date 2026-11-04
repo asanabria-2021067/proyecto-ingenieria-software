@@ -1312,6 +1312,9 @@ model ParticipacionProyecto {
   estadoParticipacion EstadoParticipacion @default(ACTIVO) @map("estado_participacion")
   fechaIngreso        DateTime            @default(now()) @map("fecha_ingreso") @db.Date
   fechaSalida         DateTime?           @map("fecha_salida") @db.Date
+  /// MEJ-105: baja por administracion; el motivo y quien la ejecuto se conservan junto con fechaSalida.
+  motivoBaja          String?             @map("motivo_baja") @db.Text
+  bajaPor             Int?                @map("baja_por")
 
   usuario           Usuario              @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
   rolProyecto       RolProyecto          @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: Restrict)
