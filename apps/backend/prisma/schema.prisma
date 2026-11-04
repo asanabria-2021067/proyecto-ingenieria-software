@@ -399,6 +399,11 @@ enum EstadoSolicitudDesactivacion {
   RECHAZADA
 }
 
+enum EstadoReporteProblema {
+  PENDIENTE
+  ATENDIDO
+}
+
 enum EstadoSolicitudSalida {
   PREPARACION
   PENDIENTE_LIDER
@@ -435,6 +440,8 @@ model Usuario {
   fechaUltimaSesion DateTime?     @map("fecha_ultima_sesion")
   // Se incrementa al resetear la contraseña o dejar la cuenta no ACTIVO: invalida los access tokens ya emitidos (claim `sv`).
   sesionVersion     Int           @default(0) @map("sesion_version")
+  // Cierre de la tarjeta «Primeros pasos» del dashboard.
+  primerosPasosCerradosEn DateTime? @map("primeros_pasos_cerrados_en")
 
   telefonos                        UsuarioTelefono[]
   preferenciaNoMolestar            PreferenciaNoMolestar?
@@ -527,6 +534,8 @@ model Usuario {
   votosEncuestaChat                VotoEncuestaChat[]
   reunionesAdministracionCreadas   ReunionAdministracion[]      @relation("ReunionesAdministracionCreadas")
   reunionesAdministracionEditables ReunionAdministradorEditor[] @relation("ReunionesAdministracionEditables")
+  reportesProblema                 ReporteProblema[]            @relation("ReporteProblemaAutor")
+  reportesProblemaAtendidos        ReporteProblema[]            @relation("ReporteProblemaAtendidoPor")
 
   @@index([estado, fechaCreacion])
   @@map("usuario")
@@ -1390,6 +1399,8 @@ model Sprint {
   fechaFinalizacionIniciada DateTime?    @map("fecha_finalizacion_iniciada")
   fechaCierre               DateTime?    @map("fecha_cierre")
   cerradoPor                Int?         @map("cerrado_por")
+  /// Sprint de ejemplo que se ofrece al líder del primer proyecto; se borra de una vez.
+  esEjemplo                 Boolean      @default(false) @map("es_ejemplo")
 
   /// T-239 (HU-160): instantánea congelada de la fila al cerrar el Sprint —
   /// null hasta CERRADO, escrita una única vez dentro de la misma transacción
@@ -1463,6 +1474,8 @@ model Tarea {
   repeticion          RepeticionTarea?
   repeticionProxima   DateTime?        @map("repeticion_proxima") @db.Date
   idTareaOrigen       Int?             @map("id_tarea_origen")
+  /// Tarea de ejemplo creada junto al Sprint de ejemplo.
+  esEjemplo           Boolean          @default(false) @map("es_ejemplo")
 
   proyecto      Proyecto            @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
   bloqueante    Tarea?               @relation("TareaBloqueo", fields: [idTareaBloqueante], references: [idTarea], onDelete: SetNull)
@@ -2033,6 +2046,26 @@ model SolicitudRecuperacion {
 
   @@index([estado])
   @@map("solicitud_recuperacion")
+}
+
+/// MEJ-90: problema reportado por un usuario desde la app; lo atiende un administrador.
+model ReporteProblema {
+  idReporte   Int                   @id @default(autoincrement()) @map("id_reporte")
+  idUsuario   Int                   @map("id_usuario")
+  ruta        String                @db.VarChar(300)
+  userAgent   String                @map("user_agent") @db.VarChar(300)
+  descripcion String                @db.VarChar(2000)
+  urlCaptura  String?               @map("url_captura") @db.VarChar(500)
+  estado      EstadoReporteProblema @default(PENDIENTE)
+  creadoEn    DateTime              @default(now()) @map("creado_en")
+  atendidoEn  DateTime?             @map("atendido_en")
+  atendidoPor Int?                  @map("atendido_por")
+
+  usuario   Usuario  @relation("ReporteProblemaAutor", fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  atendente Usuario? @relation("ReporteProblemaAtendidoPor", fields: [atendidoPor], references: [idUsuario], onDelete: SetNull)
+
+  @@index([estado, creadoEn])
+  @@map("reporte_problema")
 }
 
 model RolAcceso {

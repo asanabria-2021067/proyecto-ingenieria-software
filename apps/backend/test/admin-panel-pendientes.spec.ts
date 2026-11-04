@@ -24,6 +24,7 @@ describe('MEJ-69 bandeja unica de pendientes', () => {
       solicitudRecuperacion: { count: vi.fn().mockResolvedValue(4) },
       apelacionLiderazgo: { count: vi.fn().mockResolvedValue(5) },
       solicitudDesactivacion: { count: vi.fn().mockResolvedValue(2) },
+      reporteProblema: { count: vi.fn().mockResolvedValue(6) },
     };
     return new AdminService(prisma as unknown as PrismaService, new JwtService({}));
   }
@@ -37,8 +38,9 @@ describe('MEJ-69 bandeja unica de pendientes', () => {
       { clave: 'recuperaciones', total: 4 },
       { clave: 'apelaciones', total: 5 },
       { clave: 'desactivaciones', total: 2 },
+      { clave: 'reportes', total: 6 },
     ]);
-    expect(r.total).toBe(17);
+    expect(r.total).toBe(23);
   });
 
   it('un no administrador recibe 403', async () => {

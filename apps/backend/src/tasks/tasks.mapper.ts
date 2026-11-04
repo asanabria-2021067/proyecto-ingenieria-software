@@ -25,6 +25,7 @@ export const TASK_SELECT = {
   idTareaBloqueante: true,
   repeticion: true,
   repeticionProxima: true,
+  esEjemplo: true,
   bloqueante: {
     select: { idTarea: true, tituloTarea: true, estadoTarea: true, eliminadoEn: true },
   },
@@ -120,6 +121,8 @@ export interface TareaPublica {
   /** MEJ-47 */
   repeticion: RepeticionTarea | null;
   repeticionProxima: string | null;
+  /** MEJ-89: tarea del sprint de ejemplo. */
+  esEjemplo: boolean;
   /** MEJ-6 */
   checklist: { idItem: number; texto: string; completado: boolean }[];
 }
@@ -182,6 +185,7 @@ export function mapTarea(row: TareaRow): TareaPublica {
         : null,
     repeticion: row.repeticion,
     repeticionProxima: toDateOnly(row.repeticionProxima),
+    esEjemplo: row.esEjemplo,
     checklist: row.checklist,
   };
 }

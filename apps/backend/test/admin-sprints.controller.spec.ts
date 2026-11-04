@@ -10,6 +10,7 @@ import { AdminSprintsCalendarService as CalendarServiceClass } from '../src/spri
 import { AdminSprintCalendarQueryDto } from '../src/sprints/dto/admin-sprint-calendar-query.dto';
 import { ProjectWriteGuard } from '../src/common/guards/project-write.guard';
 import { SprintsModule } from '../src/sprints/sprints.module';
+import { EjemploProyectoController } from '../src/sprints/ejemplo-proyecto.controller';
 import { SprintsController } from '../src/sprints/sprints.controller';
 
 function makeService() {
@@ -83,6 +84,7 @@ describe('SprintsModule — registro del calendario administrativo', () => {
     expect(Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, SprintsModule)).toEqual([
       SprintsController,
       AdminSprintsController,
+      EjemploProyectoController,
     ]);
   });
 

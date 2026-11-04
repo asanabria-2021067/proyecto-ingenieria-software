@@ -320,7 +320,14 @@ export async function aprobarCuentasLote(ids: number[]): Promise<AprobarCuentasL
 
 // ─── GET /admin/pendientes ───────────────────────────────────────────────────
 
-export type ClavePendiente = 'cuentas' | 'revisiones' | 'cierres' | 'recuperaciones' | 'apelaciones' | 'desactivaciones';
+export type ClavePendiente =
+  | 'cuentas'
+  | 'revisiones'
+  | 'cierres'
+  | 'recuperaciones'
+  | 'apelaciones'
+  | 'desactivaciones'
+  | 'reportes';
 
 export interface AdminPendientes {
   total: number;

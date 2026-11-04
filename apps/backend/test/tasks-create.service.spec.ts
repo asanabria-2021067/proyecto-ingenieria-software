@@ -893,6 +893,7 @@ describe('TasksService.create', () => {
           'bloqueadaPor',
           'repeticion',
           'repeticionProxima',
+          'esEjemplo',
           'checklist',
         ].sort(),
       );

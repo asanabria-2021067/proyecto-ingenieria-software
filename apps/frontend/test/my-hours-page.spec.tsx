@@ -344,7 +344,8 @@ describe('MisHorasPage — iconos y colores neutros', () => {
     render(<MisHorasPage />);
 
     const encabezado = screen.getByRole('heading', { level: 1, name: 'Mis Horas' }).closest('header')!;
-    expect(encabezado.querySelector('svg')).toBeNull();
+    // El único icono permitido es el del botón «?» de ayuda (MEJ-87), no uno junto al título.
+    expect([...encabezado.querySelectorAll('svg')].filter((svg) => !svg.closest('button'))).toHaveLength(0);
     expect(within(encabezado).getByText('Tus horas registradas, propuestas y acreditadas en todos tus proyectos.')).toBeInTheDocument();
   });
 

@@ -40,9 +40,10 @@ describe('FG07-C02: primitivas de página', () => {
     // y la página propia de «Tendencias de uso» la vista central de horas y la gestión de asociaciones y juntas, más la bandeja única y las métricas de entidades. El catálogo temporal de etiquetas, que también usaba
     // el titular, se retiró del proyecto; el de botones, que también lo usaba, después.
     // MEJ-85: suma la bandeja de desactivación de cuentas (titular y entrada estándar).
+    // MEJ-90: suma la vista de reportes de problemas (titular y entrada estándar).
     // ADM-1 suma las páginas de mantenimiento y de tablas.
-    expect(conTitular).toHaveLength(18);
-    expect(conEntrada).toHaveLength(17);
+    expect(conTitular).toHaveLength(19);
+    expect(conEntrada).toHaveLength(18);
     for (const archivo of Object.values(VISTAS_ADMIN)) {
       expect(leer(archivo), archivo).not.toContain('className="type-display text-balance"');
       expect(leer(archivo), archivo).not.toMatch(/className="mt-(2|tight) max-w-2xl text-base text-tertiary"/);

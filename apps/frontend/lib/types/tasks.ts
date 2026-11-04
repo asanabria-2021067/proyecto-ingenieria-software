@@ -71,6 +71,8 @@ export interface TareaPublicaDTO {
   bloqueadaPor: { idTarea: number; tituloTarea: string; estadoTarea: EstadoTarea } | null;
   /** MEJ-47 */
   repeticion: RepeticionTarea | null;
+  /** MEJ-89: tarea del sprint de ejemplo. */
+  esEjemplo?: boolean;
   repeticionProxima: string | null;
   /** MEJ-6 */
   checklist: ChecklistItemDTO[];

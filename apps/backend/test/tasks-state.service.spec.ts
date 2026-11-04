@@ -416,6 +416,7 @@ describe('TasksService.updateEstado', () => {
           'bloqueadaPor',
           'repeticion',
           'repeticionProxima',
+          'esEjemplo',
           'checklist',
         ].sort(),
       );

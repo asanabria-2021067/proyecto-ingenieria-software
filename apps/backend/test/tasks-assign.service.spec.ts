@@ -840,6 +840,7 @@ describe('TasksService.assign', () => {
           'bloqueadaPor',
           'repeticion',
           'repeticionProxima',
+          'esEjemplo',
           'checklist',
         ].sort(),
       );

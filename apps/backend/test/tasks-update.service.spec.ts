@@ -959,6 +959,7 @@ describe('TasksService.update', () => {
           'bloqueadaPor',
           'repeticion',
           'repeticionProxima',
+          'esEjemplo',
           'checklist',
         ].sort(),
       );

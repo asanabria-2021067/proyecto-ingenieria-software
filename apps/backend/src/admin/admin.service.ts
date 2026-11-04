@@ -13,6 +13,7 @@ import {
   EstadoParticipacion,
   EstadoPostulacion,
   EstadoProyecto,
+  EstadoReporteProblema,
   EstadoSolicitudRecuperacion,
   EstadoTarea,
   EstadoUsuario,
@@ -809,13 +810,14 @@ export class AdminService {
   /** MEJ-69: todo lo que espera una decision del administrador, con su contador. */
   async getPendientes(callerId: number) {
     await this.requireAdmin(callerId);
-    const [cuentas, revisiones, cierres, recuperaciones, apelaciones, desactivaciones] = await Promise.all([
+    const [cuentas, revisiones, cierres, recuperaciones, apelaciones, desactivaciones, reportes] = await Promise.all([
       this.prisma.usuario.count({ where: { estado: EstadoUsuario.PENDIENTE_VERIFICACION } }),
       this.prisma.proyecto.count({ where: { estadoProyecto: EstadoProyecto.EN_REVISION, eliminadoEn: null } }),
       this.prisma.proyecto.count({ where: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE, eliminadoEn: null } }),
       this.prisma.solicitudRecuperacion.count({ where: { estado: EstadoSolicitudRecuperacion.PENDIENTE } }),
       this.prisma.apelacionLiderazgo.count({ where: { estadoApelacion: 'PENDIENTE' } }),
       this.prisma.solicitudDesactivacion.count({ where: { estado: 'PENDIENTE' } }),
+      this.prisma.reporteProblema.count({ where: { estado: EstadoReporteProblema.PENDIENTE } }),
     ]);
     const items = [
       { clave: 'cuentas', total: cuentas },
@@ -824,6 +826,7 @@ export class AdminService {
       { clave: 'recuperaciones', total: recuperaciones },
       { clave: 'apelaciones', total: apelaciones },
       { clave: 'desactivaciones', total: desactivaciones },
+      { clave: 'reportes', total: reportes },
     ];
     return { total: items.reduce((suma, i) => suma + i.total, 0), items };
   }

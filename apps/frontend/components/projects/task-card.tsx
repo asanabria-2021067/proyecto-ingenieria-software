@@ -257,6 +257,11 @@ export function TaskCard({
             {REPETICION_LABEL[tarea.repeticion]}
           </Tag>
         )}
+        {tarea.esEjemplo && (
+          <Tag tone="slate" size="sm">
+            De ejemplo
+          </Tag>
+        )}
       </div>
 
       {/* Avance del checklist (MEJ-6): 2/3 y barra */}

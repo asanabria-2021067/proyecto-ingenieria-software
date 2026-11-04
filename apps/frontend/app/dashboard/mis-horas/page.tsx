@@ -22,15 +22,25 @@ import { getApiErrorMessage } from '@/components/projects/api-error';
 import { useMisHoras } from '@/hooks/use-my-hours';
 import { formatearHoras } from '@/lib/hours/format';
 import type { MisHorasView } from '@/lib/services/users';
+import { BotonAyudaTour } from '@/components/ayuda/boton-ayuda-tour';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+
+const PASOS_AYUDA = [
+  { target: '#tour-horas-semestre', title: 'Horas del semestre', content: 'Declara aquí cuántas horas debes cumplir este semestre.' },
+  { target: '#tour-horas-resumen', title: 'Tu resumen', content: 'Registradas, propuestas y acreditadas: cada cifra viene calculada del sistema.' },
+  { target: '#tour-horas-proyectos', title: 'Horas por proyecto', content: 'El desglose de lo que llevas en cada proyecto.' },
+];
 
 function Encabezado() {
   return (
-    <header>
-      <PageTitle className="type-display">Mis Horas</PageTitle>
-      <p className="type-body mt-micro text-text-secondary">
-        Tus horas registradas, propuestas y acreditadas en todos tus proyectos.
-      </p>
+    <header className="flex items-start justify-between gap-inline">
+      <div>
+        <PageTitle className="type-display">Mis Horas</PageTitle>
+        <p className="type-body mt-micro text-text-secondary">
+          Tus horas registradas, propuestas y acreditadas en todos tus proyectos.
+        </p>
+      </div>
+      <BotonAyudaTour pasos={PASOS_AYUDA} />
     </header>
   );
 }
@@ -103,11 +113,13 @@ function Contenido({ vista }: { vista: MisHorasView }) {
 
   return (
     <>
-      <SemestreHorasCard editable />
+      <div id="tour-horas-semestre">
+        <SemestreHorasCard editable />
+      </div>
 
       {/* Tres KPI por fila solo si el contenido mide al menos 42rem: con la
           sidebar global abierta, a 768 px quedan ~500 px y no caben. */}
-      <section aria-label="Resumen de horas" className="grid gap-grid @2xl/mis-horas:grid-cols-3">
+      <section id="tour-horas-resumen" aria-label="Resumen de horas" className="grid gap-grid @2xl/mis-horas:grid-cols-3">
         <HoursKpiCard
           variante="en-linea"
           icon={Clock}
@@ -137,7 +149,9 @@ function Contenido({ vista }: { vista: MisHorasView }) {
 
       <MyHoursRequirements porTipo={vista.porTipo} />
 
-      {vista.proyectos.length === 0 ? <SinHoras /> : <MyHoursProjectList proyectos={vista.proyectos} />}
+      <div id="tour-horas-proyectos">
+        {vista.proyectos.length === 0 ? <SinHoras /> : <MyHoursProjectList proyectos={vista.proyectos} />}
+      </div>
 
       <SemestreHorasHistorial />
     </>
