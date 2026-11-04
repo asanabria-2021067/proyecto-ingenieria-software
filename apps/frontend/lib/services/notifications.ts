@@ -226,6 +226,13 @@ export function getNotificationLink(n: {
       return '/dashboard/admin/usuarios';
     case 'CUENTA_PENDIENTE_VERIFICACION':
       return '/dashboard/admin/cuentas-pendientes';
+    // MEJ-81/85: el aviso de navegador nuevo abre las sesiones abiertas; la solicitud de desactivación, su bandeja.
+    case 'NUEVO_INICIO_SESION':
+      return '/dashboard/configuracion#sesiones';
+    case 'SOLICITUD_DESACTIVACION':
+      return '/dashboard/admin/solicitudes-desactivacion';
+    case 'DESACTIVACION_RESUELTA':
+      return '/dashboard/configuracion';
     // HU-184: alguien compartió su calendario. G03 (UI-40): el enlace lleva el
     // `ownerId` validado y la página lo activa solo si la API lo lista entre
     // los calendarios recibidos; notificaciones antiguas sin id abren el calendario.

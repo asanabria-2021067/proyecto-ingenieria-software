@@ -52,7 +52,8 @@ const FAMILIAS = [
   ['Red de contactos', 4],
   // ORG-1 y ASO-1: INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA, JUNTA_ASOCIACION. ROL-1: + ALCANCE_COORDINADOR.
   ['Organizaciones y asociaciones', 5],
-  ['Cuenta y seguridad', 5],
+  // MEJ-81/82/85: + NUEVO_INICIO_SESION, SOLICITUD_DESACTIVACION, DESACTIVACION_RESUELTA.
+  ['Cuenta y seguridad', 8],
 ] as const;
 
 const familia = (titulo: string) => screen.getByRole('button', { name: new RegExp(`^${titulo}`) });
@@ -145,11 +146,14 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     expect(familia('Red de contactos')).toHaveTextContent('4 de 4 activas');
   });
 
-  it('la vista solo contiene las preferencias de notificación', () => {
+  it('la vista contiene las preferencias y las secciones reales de la cuenta, sin marcadores de futuro', () => {
     const pagina = fuente('app/dashboard/configuracion/page.tsx');
     expect(pagina).toContain('<PageTitle className="type-display">Configuración</PageTitle>');
-    expect(pagina).toContain('Administra qué notificaciones deseas recibir en UVGenius.');
-    expect(pagina).not.toMatch(/Próximamente|Apariencia|Contraseña|Sesiones|Privacidad|<Tabs/i);
+    expect(pagina).toContain('Administra tus notificaciones, tus sesiones y los datos de tu cuenta en UVGenius.');
+    for (const seccion of ['NotificationPreferencesSection', 'SesionesSection', 'CambiarContrasenaSection', 'MisDatosSection', 'DesactivacionSection']) {
+      expect(pagina).toContain(`<${seccion} />`);
+    }
+    expect(pagina).not.toMatch(/Próximamente|Apariencia|Privacidad|<Tabs/i);
   });
 });
 

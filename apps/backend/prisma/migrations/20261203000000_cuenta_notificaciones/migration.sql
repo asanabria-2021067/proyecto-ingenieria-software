@@ -1,0 +1,4 @@
+-- MEJ-82/85: valores nuevos del enum TipoNotificacion. Migracion aislada y ADITIVA.
+ALTER TYPE "TipoNotificacion" ADD VALUE IF NOT EXISTS 'NUEVO_INICIO_SESION';
+ALTER TYPE "TipoNotificacion" ADD VALUE IF NOT EXISTS 'SOLICITUD_DESACTIVACION';
+ALTER TYPE "TipoNotificacion" ADD VALUE IF NOT EXISTS 'DESACTIVACION_RESUELTA';

@@ -15,6 +15,8 @@ export const SECURITY_EVENT_TYPES = [
   'PASSWORD_RESET_ISSUED',
   'PASSWORD_RESET_COMPLETED',
   'USER_STATUS_CHANGED',
+  'PASSWORD_CHANGED',
+  'SESSION_REPORTED_UNKNOWN',
 ] as const;
 export type SecurityEventType = (typeof SECURITY_EVENT_TYPES)[number];
 

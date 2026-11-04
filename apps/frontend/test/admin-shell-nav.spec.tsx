@@ -276,6 +276,7 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Panel Admin',
     'Gestión de Usuarios',
     'Recuperación de contraseña',
+    'Desactivación de cuentas',
     'Asociaciones y juntas',
     'Activos',
     'Solicitudes de publicación',
@@ -515,7 +516,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
   it('el orden es estable: panel, usuarios, proyectos, gobernanza, métricas, comunicación y verificación', () => {
     expect(grupos()).toEqual([
       { enlace: 'Panel Admin' },
-      { grupo: 'Usuarios', items: ['Gestión de Usuarios', 'Recuperación de contraseña', 'Asociaciones y juntas'] },
+      { grupo: 'Usuarios', items: ['Gestión de Usuarios', 'Recuperación de contraseña', 'Desactivación de cuentas', 'Asociaciones y juntas'] },
       {
         grupo: 'Proyectos',
         items: ['Activos', 'Solicitudes de publicación', 'Solicitudes de cierre', 'Cerrados', 'Calendario de Sprints'],
@@ -567,6 +568,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
   it.each([
     ['/dashboard/admin/usuarios', 'Usuarios', 'Gestión de Usuarios'],
     ['/dashboard/admin/solicitudes-recuperacion', 'Usuarios', 'Recuperación de contraseña'],
+    ['/dashboard/admin/solicitudes-desactivacion', 'Usuarios', 'Desactivación de cuentas'],
     ['/dashboard/admin/asociaciones', 'Usuarios', 'Asociaciones y juntas'],
     ['/dashboard/admin/sprints', 'Proyectos', 'Calendario de Sprints'],
     ['/dashboard/admin/apelaciones', 'Gobernanza', 'Apelaciones'],
@@ -626,6 +628,7 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
   it.each([
     ['app/dashboard/admin/usuarios/page.tsx', '/dashboard/admin/usuarios', 'Gestión de Usuarios'],
     ['app/dashboard/admin/solicitudes-recuperacion/page.tsx', '/dashboard/admin/solicitudes-recuperacion', 'Recuperación de contraseña'],
+    ['app/dashboard/admin/solicitudes-desactivacion/page.tsx', '/dashboard/admin/solicitudes-desactivacion', 'Desactivación de cuentas'],
     ['app/dashboard/admin/cuentas-pendientes/page.tsx', '/dashboard/admin/cuentas-pendientes', 'Cuentas pendientes'],
     ['app/dashboard/admin/seguridad/page.tsx', '/dashboard/admin/seguridad', 'Eventos de seguridad'],
     ['app/dashboard/admin/anuncios/page.tsx', '/dashboard/admin/anuncios', 'Anuncios'],

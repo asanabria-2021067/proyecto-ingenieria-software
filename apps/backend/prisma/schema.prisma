@@ -349,6 +349,11 @@ enum TipoNotificacion {
   RECORDATORIO_HORAS
   // ROL-1: el administrador asignó o cambió el alcance de un coordinador académico.
   ALCANCE_COORDINADOR
+  // MEJ-82: inicio de sesion desde un navegador nuevo.
+  NUEVO_INICIO_SESION
+  // MEJ-85: solicitud de desactivar la cuenta (admin) y su resolucion (usuario).
+  SOLICITUD_DESACTIVACION
+  DESACTIVACION_RESUELTA
 }
 
 enum EstadoAmistad {
@@ -360,6 +365,12 @@ enum EstadoAmistad {
 enum EstadoSolicitudRecuperacion {
   PENDIENTE
   ATENDIDA
+}
+
+enum EstadoSolicitudDesactivacion {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
 }
 
 enum EstadoSolicitudSalida {
@@ -434,6 +445,9 @@ model Usuario {
   preferenciasNotificacion         PreferenciaNotificacion[]
   solicitudesRecuperacion          SolicitudRecuperacion[]      @relation("SolicitudRecuperacionUsuario")
   solicitudesRecuperacionAtendidas SolicitudRecuperacion[]      @relation("SolicitudRecuperacionAdmin")
+  dispositivos                     DispositivoUsuario[]
+  solicitudesDesactivacion         SolicitudDesactivacion[]     @relation("SolicitudDesactivacionUsuario")
+  solicitudesDesactivacionResueltas SolicitudDesactivacion[]    @relation("SolicitudDesactivacionResolutor")
   rolesAcceso                      UsuarioRolAcceso[]
   anunciosCerrados                 AnuncioCierre[]
   auditorias                       BitacoraAuditoria[]
@@ -499,11 +513,53 @@ model TokenRefresco {
   expiraEn        DateTime  @map("expira_en")
   revocadoEn      DateTime? @map("revocado_en")
   fechaCreacion   DateTime  @default(now()) @map("fecha_creacion")
+  /// MEJ-81: identifica la sesion; la rotacion del refresh la conserva. `fechaCreacion` de la fila viva es el ultimo uso.
+  idSesion        String?   @map("id_sesion") @db.VarChar(36)
+  navegador       String?   @db.VarChar(60)
+  sistema         String?   @db.VarChar(60)
+  /// MEJ-82: huella del dispositivo de la sesion (para «No fui yo»).
+  huella          String?   @db.VarChar(64)
 
   usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
 
   @@index([idUsuario])
+  @@index([idSesion])
   @@map("token_refresco")
+}
+
+/// MEJ-82: navegadores ya vistos por cuenta; «nuevo» = huella no registrada antes.
+model DispositivoUsuario {
+  idDispositivo Int      @id @default(autoincrement()) @map("id_dispositivo")
+  idUsuario     Int      @map("id_usuario")
+  huella        String   @db.VarChar(64)
+  navegador     String   @db.VarChar(60)
+  sistema       String   @db.VarChar(60)
+  primeraVezEn  DateTime @default(now()) @map("primera_vez_en")
+  ultimaVezEn   DateTime @default(now()) @map("ultima_vez_en")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@unique([idUsuario, huella])
+  @@map("dispositivo_usuario")
+}
+
+/// MEJ-85: la cuenta solo se marca inactiva al aprobarse; nada se borra. Un solo pendiente por usuario (indice parcial en la migracion).
+model SolicitudDesactivacion {
+  idSolicitud          Int                          @id @default(autoincrement()) @map("id_solicitud")
+  idUsuario            Int                          @map("id_usuario")
+  motivo               String?                      @db.VarChar(500)
+  estado               EstadoSolicitudDesactivacion @default(PENDIENTE)
+  creadaEn             DateTime                     @default(now()) @map("creada_en")
+  resueltaEn           DateTime?                    @map("resuelta_en")
+  resueltaPor          Int?                         @map("resuelta_por")
+  comentarioResolucion String?                      @map("comentario_resolucion") @db.VarChar(500)
+
+  usuario   Usuario  @relation("SolicitudDesactivacionUsuario", fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  resolutor Usuario? @relation("SolicitudDesactivacionResolutor", fields: [resueltaPor], references: [idUsuario], onDelete: SetNull)
+
+  @@index([estado])
+  @@index([idUsuario])
+  @@map("solicitud_desactivacion")
 }
 
 model Amistad {

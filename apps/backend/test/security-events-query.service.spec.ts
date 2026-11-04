@@ -93,6 +93,8 @@ describe('FG01-C03: filtros y paginación', () => {
         'PASSWORD_RESET_ISSUED',
         'PASSWORD_RESET_COMPLETED',
         'USER_STATUS_CHANGED',
+        'PASSWORD_CHANGED',
+        'SESSION_REPORTED_UNKNOWN',
       ],
     },
   };

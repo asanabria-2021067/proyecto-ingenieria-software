@@ -29,6 +29,6 @@ import { getJwtSecretFromConfig } from '../config/jwt-secret';
     { provide: AccountAttemptsService, useFactory: () => new AccountAttemptsService() },
     { provide: RECOVERY_ATTEMPTS, useFactory: () => new AccountAttemptsService(RECOVERY_ATTEMPT_POLICY) },
   ],
-  exports: [JwtModule],
+  exports: [JwtModule, AuthService],
 })
 export class AuthModule {}

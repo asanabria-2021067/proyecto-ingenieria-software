@@ -125,6 +125,8 @@ describe('FG01-C05: GET /api/admin/eventos-seguridad', () => {
       'PASSWORD_RESET_ISSUED',
       'PASSWORD_RESET_COMPLETED',
       'USER_STATUS_CHANGED',
+      'PASSWORD_CHANGED',
+      'SESSION_REPORTED_UNKNOWN',
     ]);
     expect(body.data).toEqual([
       {

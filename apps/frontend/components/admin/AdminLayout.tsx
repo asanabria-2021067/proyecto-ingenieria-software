@@ -20,6 +20,7 @@ import {
   Megaphone,
   Gavel,
   KeyRound,
+  UserX,
   LayoutDashboard,
   ScrollText,
   ShieldAlert,
@@ -74,6 +75,7 @@ export const adminNavEntries: NavEntry[] = [
     items: [
       { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: UserCog },
       { href: '/dashboard/admin/solicitudes-recuperacion', label: 'Recuperación de contraseña', icon: KeyRound },
+      { href: '/dashboard/admin/solicitudes-desactivacion', label: 'Desactivación de cuentas', icon: UserX },
       { href: '/dashboard/admin/asociaciones', label: 'Asociaciones y juntas', icon: Landmark },
     ],
   },

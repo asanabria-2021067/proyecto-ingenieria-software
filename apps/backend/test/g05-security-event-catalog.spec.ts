@@ -15,6 +15,8 @@ const ESPERADOS = [
   'PASSWORD_RESET_ISSUED',
   'PASSWORD_RESET_COMPLETED',
   'USER_STATUS_CHANGED',
+  'PASSWORD_CHANGED',
+  'SESSION_REPORTED_UNKNOWN',
 ];
 
 describe('G05-C02: catálogo de eventos de seguridad', () => {

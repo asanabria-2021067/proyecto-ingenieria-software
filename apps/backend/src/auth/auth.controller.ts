@@ -6,7 +6,8 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { setAuthCookies, clearAuthCookies } from './cookie.util';
+import { randomUUID } from 'crypto';
+import { setAuthCookies, clearAuthCookies, setDeviceCookie, DEVICE_COOKIE } from './cookie.util';
 import { securityRequestContext } from '../security-events/request-context';
 
 @Controller('auth')
@@ -16,7 +17,13 @@ export class AuthController {
   @Throttle({ short: { limit: 5, ttl: 60000 } })
   @Post('login')
   async login(@Body() loginDto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const { accessToken, refreshToken } = await this.authService.login(loginDto, securityRequestContext(req));
+    const cookie = req.cookies?.[DEVICE_COOKIE];
+    const idDispositivo = typeof cookie === 'string' && /^[0-9a-f-]{36}$/.test(cookie) ? cookie : randomUUID();
+    const { accessToken, refreshToken } = await this.authService.login(loginDto, securityRequestContext(req), {
+      userAgent: req.headers?.['user-agent'],
+      idDispositivo,
+    });
+    setDeviceCookie(res, idDispositivo);
     setAuthCookies(res, accessToken, refreshToken);
     return { mensaje: 'Sesión iniciada' };
   }

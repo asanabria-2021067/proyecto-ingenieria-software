@@ -243,6 +243,8 @@ describe('FG02-C04: filtros en la página', () => {
       'Enlace de recuperación emitido',
       'Contraseña restablecida',
       'Cambio de estado de cuenta',
+      'Cambio de contraseña',
+      'Inicio de sesión reportado como ajeno',
     ]);
   });
 

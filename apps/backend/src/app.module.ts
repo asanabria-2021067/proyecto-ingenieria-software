@@ -15,6 +15,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { MailModule } from './mail/mail.module';
 import { ProjectPolicyModule } from './common/project-policy/project-policy.module';
 import { AuthModule } from './auth/auth.module';
+import { CuentaModule } from './cuenta/cuenta.module';
 import { UsersModule } from './users/users.module';
 import { ProjectsModule } from './projects/projects.module';
 import { ApplicationsModule } from './applications/applications.module';
@@ -106,6 +107,7 @@ const skipThrottling = () => isThrottlerDisabled();
     MailModule,
     ProjectPolicyModule,
     AuthModule,
+    CuentaModule,
     UsersModule,
     ProjectsModule,
     ApplicationsModule,
