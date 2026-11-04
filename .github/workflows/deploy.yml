@@ -354,6 +354,9 @@ jobs:
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          CLOSURE_KEKS: ${{ secrets.CLOSURE_KEKS }}
+          CLOSURE_ACTIVE_KEY_ID: ${{ secrets.CLOSURE_ACTIVE_KEY_ID }}
+          CLOSURE_TICKET_HMAC_SECRET: ${{ secrets.CLOSURE_TICKET_HMAC_SECRET }}
           BACKEND_IMAGE: ${{ steps.vars.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ steps.vars.outputs.frontend_image }}
           # G04 (OWASP25-C021 + D2): '1' = un proxy (nginx del host) delante del
@@ -422,6 +425,16 @@ jobs:
             fi
             if [ -n "$CLOUDINARY_API_SECRET" ]; then
               printf 'CLOUDINARY_API_SECRET=%s\n' "$CLOUDINARY_API_SECRET"
+            fi
+            # Documentos de cierre privados: sin las tres primeras el backend responde 503 CLOSURE_NO_CONFIGURADO.
+            if [ -n "$CLOSURE_KEKS" ]; then
+              printf 'CLOSURE_KEKS=%s\n' "'$CLOSURE_KEKS'"
+            fi
+            if [ -n "$CLOSURE_ACTIVE_KEY_ID" ]; then
+              printf 'CLOSURE_ACTIVE_KEY_ID=%s\n' "$CLOSURE_ACTIVE_KEY_ID"
+            fi
+            if [ -n "$CLOSURE_TICKET_HMAC_SECRET" ]; then
+              printf 'CLOSURE_TICKET_HMAC_SECRET=%s\n' "$CLOSURE_TICKET_HMAC_SECRET"
             fi
             if [ -n "$SMTP_HOST" ]; then
               printf 'SMTP_HOST=%s\n' "$SMTP_HOST"

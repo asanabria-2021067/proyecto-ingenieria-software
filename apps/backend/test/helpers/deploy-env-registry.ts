@@ -37,6 +37,10 @@ export const DEPLOY_ENV_REGISTRY: Record<string, DeployEnvEntry> = {
   CLOUDINARY_CLOUD_NAME: { kind: 'config', consumer: 'apps/backend/src/config/environment.validation.ts' },
   CLOUDINARY_API_KEY: { kind: 'secret', consumer: 'apps/backend/src/config/environment.validation.ts' },
   CLOUDINARY_API_SECRET: { kind: 'secret', consumer: 'apps/backend/src/config/environment.validation.ts' },
+  // Documentos de cierre privados: sin ellas el backend responde 503 CLOSURE_NO_CONFIGURADO.
+  CLOSURE_KEKS: { kind: 'secret', consumer: 'apps/backend/src/config/environment.validation.ts' },
+  CLOSURE_ACTIVE_KEY_ID: { kind: 'config', consumer: 'apps/backend/src/config/environment.validation.ts' },
+  CLOSURE_TICKET_HMAC_SECRET: { kind: 'secret', consumer: 'apps/backend/src/config/environment.validation.ts' },
   // MEJ-80: SMTP opcional, solo se escribe si SMTP_HOST no esta vacio.
   SMTP_HOST: { kind: 'config', consumer: 'apps/backend/src/config/smtp-config.ts' },
   SMTP_PORT: { kind: 'config', consumer: 'apps/backend/src/config/smtp-config.ts' },
