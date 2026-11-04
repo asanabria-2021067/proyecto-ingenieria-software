@@ -54,7 +54,7 @@ export default function RecuperarContrasenaPage() {
             Recupera tu acceso
           </h2>
           <p className="text-lg font-medium text-white/90 drop-shadow-md">
-            Te enviaremos un enlace para restablecer tu contraseña de forma segura.
+            Un administrador te hará llegar un enlace para restablecer tu contraseña de forma segura.
           </p>
         </div>
       </div>
@@ -80,7 +80,7 @@ export default function RecuperarContrasenaPage() {
               </PageTitle>
               <p className="mt-2 text-base text-tertiary">
                 Ingresa tu carné y tu correo institucional. Un administrador revisará tu
-                solicitud y te enviará el enlace de recuperación manualmente.
+                solicitud y te hará llegar el enlace de recuperación de forma manual.
               </p>
             </div>
 
@@ -136,7 +136,7 @@ export default function RecuperarContrasenaPage() {
                 </h2>
                 <p className="text-sm text-tertiary mb-6">
                   Si tus datos son correctos, un administrador revisará tu solicitud y te
-                  hará llegar el enlace de recuperación por correo.
+                  hará llegar el enlace de recuperación. Si no recibes respuesta, contacta al administrador.
                 </p>
                 <button
                   onClick={() => {
