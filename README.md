@@ -204,6 +204,12 @@ las notas de voz, los adjuntos y las fotos exigen en el backend
 Settings > Secrets and variables > Actions con los valores de tu cuenta de
 Cloudinary; `deploy.yml` solo los escribe al `.env` si no están vacíos. Sin
 `CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET` esas subidas responden 503.
+El key y el secret deben ser de la misma nube que `CLOUDINARY_CLOUD_NAME`
+(si no, Cloudinary responde `cloud_name mismatch`). El entorno actual usa la
+nube `dv8tyo83a` y el preset sin firma `uvgenius` (secreto
+`CLOUDINARY_UPLOAD_PRESET`, `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` en el
+frontend); en desarrollo local esos son los valores por defecto de
+`docker-compose.dev.yml`.
 
 ### 2) Levantar entorno con Docker
 
