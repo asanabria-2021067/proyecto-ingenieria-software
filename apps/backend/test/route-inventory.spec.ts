@@ -227,6 +227,37 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     expect(rutasAlcance.every((r) => r.guards.includes(JwtAuthGuard) && r.guards.includes(RolesGuard) && r.roles.join() === 'administrador')).toBe(true);
   });
 
+  // MEJ-81 a 85: cuenta propia (el servicio opera siempre sobre el usuario del token) y bandeja de desactivaciones.
+  it('cuenta: sesiones, contrasena, descarga de datos y desactivacion existen todas y exigen JwtAuthGuard', () => {
+    const esperadas = [
+      'GET /api/cuenta/sesiones',
+      'POST /api/cuenta/sesiones/cerrar-otras',
+      'DELETE /api/cuenta/sesiones/:idSesion',
+      'POST /api/cuenta/sesiones/:idSesion/no-fui-yo',
+      'POST /api/cuenta/contrasena',
+      'GET /api/cuenta/mis-datos',
+      'GET /api/cuenta/desactivacion',
+      'POST /api/cuenta/desactivacion',
+    ];
+    const deCuenta = rutas.filter((r) => r.controller.startsWith('CuentaController.'));
+    expect(deCuenta.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(deCuenta.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+    expect(deCuenta.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+  });
+
+  it('solicitudes de desactivacion: solo administrador (el coordinador no resuelve)', () => {
+    const esperadas = [
+      'GET /api/admin/solicitudes-desactivacion',
+      'POST /api/admin/solicitudes-desactivacion/:id/aprobar',
+      'POST /api/admin/solicitudes-desactivacion/:id/rechazar',
+    ];
+    const propias = rutas.filter((r) => r.controller.startsWith('SolicitudesDesactivacionAdminController.'));
+    expect(propias.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(
+      propias.every((r) => r.guards.includes(JwtAuthGuard) && r.guards.includes(RolesGuard) && r.roles.length === 1 && r.roles[0] === 'administrador'),
+    ).toBe(true);
+  });
+
   it('asociaciones: la gestion es solo de admin y las rutas de junta exigen JuntaGuard', () => {
     const ids = (f: (r: Ruta) => boolean) => rutas.filter(f).map((r) => r.id).sort();
     expect(ids((r) => r.path.startsWith('admin/asociaciones'))).toEqual([

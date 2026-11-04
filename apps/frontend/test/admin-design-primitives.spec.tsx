@@ -39,8 +39,9 @@ describe('FG07-C02: primitivas de página', () => {
     // Incluye la vista de cuentas pendientes (HU-179, PR #270), migrada a las primitivas al integrarla,
     // y la página propia de «Tendencias de uso» la vista central de horas y la gestión de asociaciones y juntas, más la bandeja única y las métricas de entidades. El catálogo temporal de etiquetas, que también usaba
     // el titular, se retiró del proyecto; el de botones, que también lo usaba, después.
-    expect(conTitular).toHaveLength(15);
-    expect(conEntrada).toHaveLength(14);
+    // MEJ-85: suma la bandeja de desactivación de cuentas (titular y entrada estándar).
+    expect(conTitular).toHaveLength(16);
+    expect(conEntrada).toHaveLength(15);
     for (const archivo of Object.values(VISTAS_ADMIN)) {
       expect(leer(archivo), archivo).not.toContain('className="type-display text-balance"');
       expect(leer(archivo), archivo).not.toMatch(/className="mt-(2|tight) max-w-2xl text-base text-tertiary"/);

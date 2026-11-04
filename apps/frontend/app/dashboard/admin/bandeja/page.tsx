@@ -11,6 +11,7 @@ import {
   Inbox,
   KeyRound,
   UserCheck,
+  UserX,
   type LucideIcon,
 } from 'lucide-react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
@@ -53,6 +54,12 @@ const DESTINOS: Record<ClavePendiente, { titulo: string; descripcion: string; hr
     descripcion: 'Apelaciones de liderazgo por resolver',
     href: '/dashboard/admin/apelaciones',
     icono: Gavel,
+  },
+  desactivaciones: {
+    titulo: 'Desactivación de cuentas',
+    descripcion: 'Estudiantes que piden desactivar su cuenta',
+    href: '/dashboard/admin/solicitudes-desactivacion',
+    icono: UserX,
   },
 };
 

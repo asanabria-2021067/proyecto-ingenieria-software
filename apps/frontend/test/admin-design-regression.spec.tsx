@@ -54,7 +54,7 @@ describe('FG07-C04: regresión del diseño administrativo', () => {
     expect([...valores].sort()).toEqual(['rounded-lg', 'rounded-md', 'text-[13px]', 'text-[15px]']);
   });
 
-  it('39 de los 53 archivos del árbol quedan sin ningún literal', () => {
+  it('40 de los 54 archivos del árbol quedan sin ningún literal', () => {
     // 40 al cerrar T-320; entró la página propia de «Tendencias de uso» y salió el catálogo temporal de
     // etiquetas, ninguna de las dos con literales; después entraron la pantalla de anuncios (HU-191) y el
     // catálogo temporal de botones, tampoco con literales. Luego entró la lista de reuniones del
@@ -65,8 +65,9 @@ describe('FG07-C04: regresión del diseño administrativo', () => {
     // HRS: entran la vista central de horas y sus tres componentes (filtros, tabla y totales), sin literales.
     // ASO: entra la página de gestión de asociaciones y juntas, sin literales (sus diálogos viven en components/associations).
     // MEJ-69/36/68/72: entran la bandeja, las entidades y el comparativo de horas, sin literales.
-    expect(ARBOL).toHaveLength(53);
-    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(39);
+    // MEJ-85: entra la bandeja de desactivación de cuentas, sin literales.
+    expect(ARBOL).toHaveLength(54);
+    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(40);
   });
 });
 

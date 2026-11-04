@@ -24,6 +24,10 @@ export class TipoEventoSeguridad {
   static readonly PASSWORD_RESET_COMPLETED = 'PASSWORD_RESET_COMPLETED' as const;
   /** Un administrador cambia el estado de una cuenta (ACTIVO/INACTIVO/BLOQUEADO). */
   static readonly USER_STATUS_CHANGED = 'USER_STATUS_CHANGED' as const;
+  /** El propio usuario cambia su contraseña desde Configuración. */
+  static readonly PASSWORD_CHANGED = 'PASSWORD_CHANGED' as const;
+  /** El usuario reporta «No fui yo» sobre un inicio de sesión: se cierra esa sesión. */
+  static readonly SESSION_REPORTED_UNKNOWN = 'SESSION_REPORTED_UNKNOWN' as const;
 
   static readonly VALORES = [
     'LOGIN_FAILED',
@@ -32,6 +36,8 @@ export class TipoEventoSeguridad {
     'PASSWORD_RESET_ISSUED',
     'PASSWORD_RESET_COMPLETED',
     'USER_STATUS_CHANGED',
+    'PASSWORD_CHANGED',
+    'SESSION_REPORTED_UNKNOWN',
   ] as const;
 }
 

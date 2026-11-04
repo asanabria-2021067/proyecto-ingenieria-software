@@ -1,7 +1,8 @@
 import { COORDINADOR_TEMPLATES, type CoordinadorTemplateData } from './coordinador.templates';
+import { CUENTA_TEMPLATES, type CuentaTemplateData } from './cuenta.templates';
 import { HORAS_TEMPLATES, type HorasTemplateData } from './horas.templates';
 
-export interface NotificationTemplateData extends HorasTemplateData, CoordinadorTemplateData {
+export interface NotificationTemplateData extends HorasTemplateData, CoordinadorTemplateData, CuentaTemplateData {
   NUEVA_POSTULACION: {
     userName: string;
     roleName: string;
@@ -99,7 +100,6 @@ export interface NotificationTemplateData extends HorasTemplateData, Coordinador
     roleId: number;
     taskCount: number;
   };
-
   // Sección 18B: el líder se auto-asignó a un rol. El actor (líder) siempre se
   // excluye de los destinatarios, por lo que puede resultar en cero envíos.
   ROL_ASIGNADO_LIDER: {
@@ -429,7 +429,7 @@ export interface NotificationTemplateData extends HorasTemplateData, Coordinador
 }
 
 export const NOTIFICATION_TEMPLATES = {
-  ...HORAS_TEMPLATES, ...COORDINADOR_TEMPLATES,
+  ...HORAS_TEMPLATES, ...COORDINADOR_TEMPLATES, ...CUENTA_TEMPLATES,
   NUEVA_POSTULACION: {
     title: 'Nueva postulación recibida',
     message: (data: NotificationTemplateData['NUEVA_POSTULACION']) =>

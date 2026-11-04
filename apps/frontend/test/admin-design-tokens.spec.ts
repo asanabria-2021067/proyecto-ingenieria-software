@@ -19,6 +19,8 @@ const LINEA_BASE: Record<string, Medida> = {
   '/dashboard/admin': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/usuarios': { px: 1, radio: 4, hex: 0, boton: 2, titular: true },
   '/dashboard/admin/solicitudes-recuperacion': { px: 1, radio: 3, hex: 0, boton: 2, titular: true },
+  // MEJ-85: nació ya con los tokens; su línea base es su primera medición.
+  '/dashboard/admin/solicitudes-desactivacion': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   // HU-179 (PR #270): la vista llegó después de FG07; su línea base es la del PR #270.
   '/dashboard/admin/cuentas-pendientes': { px: 1, radio: 5, hex: 0, boton: 3, titular: false },
   // Página propia de «Tendencias de uso»: nació ya con los tokens; su línea base es su primera medición.
@@ -44,6 +46,7 @@ const ESTADO_ACTUAL: Record<string, Medida> = {
   '/dashboard/admin': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/usuarios': { px: 0, radio: 1, hex: 0, boton: 1, titular: true },
   '/dashboard/admin/solicitudes-recuperacion': { px: 0, radio: 3, hex: 0, boton: 2, titular: true },
+  '/dashboard/admin/solicitudes-desactivacion': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   // Al pasar a la tabla compartida perdió su radio literal y sus tres `<button>` propios.
   '/dashboard/admin/cuentas-pendientes': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },

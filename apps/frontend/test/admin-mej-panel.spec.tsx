@@ -55,13 +55,14 @@ describe('MEJ-71: respuestas rápidas', () => {
 describe('MEJ-69: bandeja única', () => {
   it('lista cada pendiente con su contador y enlace', async () => {
     vi.mocked(getAdminPendientes).mockResolvedValue({
-      total: 7,
+      total: 9,
       items: [
         { clave: 'cuentas', total: 3 },
         { clave: 'revisiones', total: 2 },
         { clave: 'cierres', total: 0 },
         { clave: 'recuperaciones', total: 1 },
         { clave: 'apelaciones', total: 1 },
+        { clave: 'desactivaciones', total: 2 },
       ],
     });
     conCliente(createElement(AdminBandejaPage));
@@ -76,7 +77,11 @@ describe('MEJ-69: bandeja única', () => {
       '/dashboard/admin/proyectos?grupo=cierres',
     );
     expect(document.querySelector('[data-fila="cuentas"]')).toHaveTextContent('3');
-    expect(screen.getByRole('status')).toHaveTextContent('7');
+    expect(screen.getByRole('link', { name: 'Desactivación de cuentas' })).toHaveAttribute(
+      'href',
+      '/dashboard/admin/solicitudes-desactivacion',
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('9');
   });
 
   it('con todo en cero muestra «Todo al día» con una acción', async () => {

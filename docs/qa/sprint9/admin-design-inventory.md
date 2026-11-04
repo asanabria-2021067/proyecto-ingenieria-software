@@ -38,6 +38,7 @@ motivo de comentario» de `docs/design-system.md`.
 | `/dashboard/admin` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/page.tsx` |
 | `/dashboard/admin/usuarios` | sí | 1 | 4 | 2 | 0 | `app/dashboard/admin/usuarios/page.tsx` |
 | `/dashboard/admin/solicitudes-recuperacion` | sí | 1 | 3 | 2 | 0 | `app/dashboard/admin/solicitudes-recuperacion/page.tsx` |
+| `/dashboard/admin/solicitudes-desactivacion` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/solicitudes-desactivacion/page.tsx` |
 | `/dashboard/admin/cuentas-pendientes` | no | 1 | 5 | 3 | 0 | `app/dashboard/admin/cuentas-pendientes/page.tsx` |
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/metricas/page.tsx` |
 | `/dashboard/admin/horas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/horas/page.tsx` |
@@ -107,6 +108,7 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/usuarios` | sí | 0 | 0 | 2 | 0 |
 | `/dashboard/admin/solicitudes-recuperacion` | sí | 0 | 2 | 2 | 0 |
+| `/dashboard/admin/solicitudes-desactivacion` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/cuentas-pendientes` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/horas` | sí | 0 | 0 | 0 | 0 |

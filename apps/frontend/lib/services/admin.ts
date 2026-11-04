@@ -320,7 +320,7 @@ export async function aprobarCuentasLote(ids: number[]): Promise<AprobarCuentasL
 
 // ─── GET /admin/pendientes ───────────────────────────────────────────────────
 
-export type ClavePendiente = 'cuentas' | 'revisiones' | 'cierres' | 'recuperaciones' | 'apelaciones';
+export type ClavePendiente = 'cuentas' | 'revisiones' | 'cierres' | 'recuperaciones' | 'apelaciones' | 'desactivaciones';
 
 export interface AdminPendientes {
   total: number;
@@ -398,3 +398,21 @@ export async function generatePasswordResetLink(
     { method: 'POST' },
   );
 }
+
+// ─── /admin/solicitudes-desactivacion (MEJ-85) ───────────────────────────────
+
+export interface AdminSolicitudDesactivacion {
+  idSolicitud: number;
+  motivo: string | null;
+  creadaEn: string;
+  usuario: { idUsuario: number; nombre: string; apellido: string; correo: string };
+}
+
+export const listSolicitudesDesactivacion = () =>
+  apiFetch<AdminSolicitudDesactivacion[]>('/admin/solicitudes-desactivacion');
+
+export const resolverSolicitudDesactivacion = (idSolicitud: number, tipo: 'aprobar' | 'rechazar', comentario: string) =>
+  apiFetch<unknown>(`/admin/solicitudes-desactivacion/${idSolicitud}/${tipo}`, {
+    method: 'POST',
+    body: JSON.stringify(comentario ? { comentario } : {}),
+  });

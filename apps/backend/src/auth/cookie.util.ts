@@ -25,6 +25,12 @@ export function setAuthCookies(res: Response, accessToken: string, refreshToken:
   res.cookie('refresh_token', refreshToken, cookieOptions(REFRESH_TOKEN_MAX_AGE_MS));
 }
 
+/** MEJ-82: identificador estable del navegador (no es un secreto de sesión); un año. */
+export const DEVICE_COOKIE = 'device_id';
+export function setDeviceCookie(res: Response, idDispositivo: string) {
+  res.cookie(DEVICE_COOKIE, idDispositivo, cookieOptions(365 * 24 * 60 * 60 * 1000));
+}
+
 export function clearAuthCookies(res: Response) {
   res.clearCookie('access_token', { path: '/' });
   res.clearCookie('refresh_token', { path: '/' });

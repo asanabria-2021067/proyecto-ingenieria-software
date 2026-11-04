@@ -25,9 +25,10 @@ comprobación en cada endpoint administrativo. Ninguna ruta de este inventario e
 | `/dashboard/admin/metricas` | Tendencias de uso | Sprint 9 · página propia de las métricas de HU-178 (T-301); hasta el cierre del Sprint era el ancla `/dashboard/admin#metricas` (T-321) | `GET /admin/metricas` (HU-178) |
 | `/dashboard/admin/horas` | Horas por semestre | HRS · vista central de las horas beca y de extensión de todos los estudiantes del semestre, con filtros, totales por asociación y reportes CSV y PDF | `GET /admin/horas-semestre` |
 | `/dashboard/admin/entidades` | Asociaciones y organizaciones | MEJ-36 y MEJ-68 · resumen de estudiantes, horas y proyectos por asociación, y miembros y proyectos por organización | `GET /admin/horas-semestre/resumen-asociaciones`, `GET /admin/metricas/entidades` |
-| `/dashboard/admin/bandeja` | Bandeja única | MEJ-69 · una sola lista con el contador de cuentas, publicaciones, cierres, recuperaciones y apelaciones por atender | `GET /admin/pendientes` |
+| `/dashboard/admin/bandeja` | Bandeja única | MEJ-69 · una sola lista con el contador de cuentas, publicaciones, cierres, recuperaciones, apelaciones y desactivaciones por atender | `GET /admin/pendientes` |
 | `/dashboard/admin/usuarios` | Gestión de Usuarios | Administración de cuentas | — |
 | `/dashboard/admin/solicitudes-recuperacion` | Recuperación de contraseña | HU-14 | — |
+| `/dashboard/admin/solicitudes-desactivacion` | Desactivación de cuentas | MEJ-85 · solicitudes de estudiantes que piden desactivar su cuenta; solo del administrador | `GET /admin/solicitudes-desactivacion` |
 | `/dashboard/admin/cuentas-pendientes` | Cuentas pendientes | HU-179 (PR #270); colocada en la estructura por T-321 | `GET /admin/cuentas-pendientes` |
 | `/dashboard/admin/seguridad` | Eventos de seguridad | Sprint 9 · T-310 (Vernel) | `GET /admin/eventos-seguridad` |
 | `/dashboard/admin/anuncios` | Anuncios | Sprint 9 · HU-191 · T-352 | `GET/POST/PATCH /admin/anuncios` |
@@ -42,7 +43,7 @@ El menú se agrupa por tema de trabajo. «Panel Admin» va suelto arriba y los g
 
 | Grupo | Destinos | Por qué van juntos |
 |---|---|---|
-| Usuarios | Gestión de Usuarios · Recuperación de contraseña · Asociaciones y juntas | Todo lo que se hace sobre una cuenta: consultarla, cambiar su estado y devolverle el acceso, y nombrar a quien integra la junta de una asociación. |
+| Usuarios | Gestión de Usuarios · Recuperación de contraseña · Desactivación de cuentas · Asociaciones y juntas | Todo lo que se hace sobre una cuenta: consultarla, cambiar su estado y devolverle el acceso, y nombrar a quien integra la junta de una asociación. |
 | Proyectos | Activos · Solicitudes de publicación · Solicitudes de cierre · Cerrados · Calendario de Sprints | El ciclo de vida de un proyecto, de la publicación al cierre, más la supervisión de sus Sprints. |
 | Gobernanza | Apelaciones | Decisiones sobre el liderazgo de un proyecto, que resuelve la administración. |
 | Métricas | Tendencias de uso · Horas por semestre · Asociaciones y organizaciones | Las métricas de uso de la plataforma (HU-178), la vista central de horas del semestre con su comparativo (HRS) y la actividad de asociaciones y organizaciones, cada una en su propia página. |

@@ -16,6 +16,7 @@ import {
   idInvitacionDeNotificacion,
   InvitacionAcciones,
 } from '@/components/organizations/invitacion-acciones';
+import { idSesionDeNotificacion, NoFuiYoAccion } from '@/components/profile/no-fui-yo-accion';
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -158,6 +159,7 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
               {recientes.map((n) => {
                 const isUnread = n.leidaEn === null;
                 const idInvitacion = isUnread ? idInvitacionDeNotificacion(n) : null;
+                const idSesion = isUnread ? idSesionDeNotificacion(n) : null;
                 const href = getNotificationLink(n) ?? resolveTaskNotificationLink(n) ?? resolveCommentNotificationLink(n);
 
                 const content = (
@@ -212,6 +214,11 @@ export function NotificationsBell({ onlyIcon = false }: { onlyIcon?: boolean }) 
                           idInvitacion={idInvitacion}
                           onResuelta={() => marcarLeida.mutate(n.idNotificacion)}
                         />
+                      </>
+                    ) : idSesion !== null ? (
+                      <>
+                        {content}
+                        <NoFuiYoAccion idSesion={idSesion} />
                       </>
                     ) : href ? (
                       <Link

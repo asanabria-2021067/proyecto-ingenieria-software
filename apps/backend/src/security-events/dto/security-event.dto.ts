@@ -85,6 +85,8 @@ const DETALLE_PERMITIDO: Record<TipoEventoSeguridadValor, Record<string, Regla>>
   PASSWORD_RESET_ISSUED: { idSolicitud: enteroNoNegativo, expiraEn: fechaIso },
   PASSWORD_RESET_COMPLETED: { idSolicitud: enteroNoNegativo, sesionesRevocadas: enteroNoNegativo },
   USER_STATUS_CHANGED: { estadoAnterior: estadoUsuario, estadoNuevo: estadoUsuario },
+  PASSWORD_CHANGED: { sesionesRevocadas: enteroNoNegativo },
+  SESSION_REPORTED_UNKNOWN: {},
 };
 
 function esTipo(accion: string): accion is TipoEventoSeguridadValor {

@@ -181,6 +181,21 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   },
   CUENTA_VERIFICADA: { grupo: 'cuenta', etiqueta: 'Cuenta verificada', descripcion: 'Administración verifica tu cuenta.' },
   ALERTA_SEGURIDAD: { grupo: 'cuenta', etiqueta: 'Alerta de seguridad', descripcion: 'La plataforma detecta actividad inusual de acceso.' },
+  NUEVO_INICIO_SESION: {
+    grupo: 'cuenta',
+    etiqueta: 'Nuevo inicio de sesión',
+    descripcion: 'Se inicia sesión en tu cuenta desde un navegador que no habíamos visto.',
+  },
+  SOLICITUD_DESACTIVACION: {
+    grupo: 'cuenta',
+    etiqueta: 'Solicitud de desactivación de cuenta',
+    descripcion: 'Un usuario pide desactivar su cuenta.',
+  },
+  DESACTIVACION_RESUELTA: {
+    grupo: 'cuenta',
+    etiqueta: 'Solicitud de desactivación resuelta',
+    descripcion: 'Administración resuelve tu solicitud de desactivar la cuenta.',
+  },
   JUNTA_ASOCIACION: {
     grupo: 'organizaciones',
     etiqueta: 'Junta de asociación',

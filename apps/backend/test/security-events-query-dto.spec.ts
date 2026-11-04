@@ -99,7 +99,7 @@ describe('FG01-C01: ListSecurityEventsQueryDto', () => {
     ['objeto', { in: ['LOGIN_FAILED'] }],
   ])('rechaza un tipo %s enumerando el catálogo real', async (_nombre, tipo) => {
     expect(await mensajes({ tipo })).toEqual([
-      'tipo debe ser uno de: LOGIN_FAILED, LOGIN_SUCCEEDED, ACCOUNT_LOCKED, PASSWORD_RESET_ISSUED, PASSWORD_RESET_COMPLETED, USER_STATUS_CHANGED',
+      'tipo debe ser uno de: LOGIN_FAILED, LOGIN_SUCCEEDED, ACCOUNT_LOCKED, PASSWORD_RESET_ISSUED, PASSWORD_RESET_COMPLETED, USER_STATUS_CHANGED, PASSWORD_CHANGED, SESSION_REPORTED_UNKNOWN',
     ]);
   });
 

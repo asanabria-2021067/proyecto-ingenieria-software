@@ -96,7 +96,7 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
         if (r.method() !== 'GET' && r.url().includes('/notificaciones/preferencias')) escrituras.push(r.method());
       });
       await page.goto('/dashboard/configuracion');
-      await expect(page.getByText('Administra qué notificaciones deseas recibir en UVGenius.')).toBeVisible();
+      await expect(page.getByText('Administra tus notificaciones, tus sesiones y los datos de tu cuenta en UVGenius.')).toBeVisible();
       const seccion = page.getByRole('region', { name: 'Preferencias de notificaciones', exact: true });
       await expect(seccion.getByText('Los cambios se guardan automáticamente.')).toBeVisible();
 
