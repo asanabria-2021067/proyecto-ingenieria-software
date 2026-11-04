@@ -151,7 +151,10 @@ function buildTaskSelectShape(row: Fixture['tareas'][number], state: Fixture) {
     rolProyecto: rol ? { idRolProyecto: rol.idRolProyecto, nombreRol: rol.nombreRol } : null,
     asignaciones: asignacionesActivas,
     etiquetas,
-    _count: { comentarios: 0 },
+    _count: { comentarios: 0, enlaces: 0 },
+    subtareas: [],
+    responsables: [],
+    idTareaPadre: null,
   };
 }
 

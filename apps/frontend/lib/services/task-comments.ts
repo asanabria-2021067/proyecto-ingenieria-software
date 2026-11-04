@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/api/client';
-import type { ComentarioListado } from '@/lib/services/comments';
+import type { ComentarioListado, ReaccionComentario } from '@/lib/services/comments';
 
 export interface TareaComentarioAutor {
   idUsuario: number;
@@ -75,5 +75,31 @@ export function eliminarComentarioTarea(
     {
       method: 'DELETE',
     },
+  );
+}
+
+/** MEJ-110: responder a un comentario (un solo nivel de hilo). */
+export function responderComentarioTarea(
+  idProyecto: number,
+  idTarea: number,
+  idComentario: number,
+  contenido: string,
+): Promise<TareaComentarioEscritura> {
+  return apiFetch<TareaComentarioEscritura>(
+    `/proyectos/${idProyecto}/tareas/${idTarea}/comentarios/${idComentario}/respuestas`,
+    { method: 'POST', body: JSON.stringify({ contenido }) },
+  );
+}
+
+/** MEJ-110: alterna la reacción propia; devuelve las reacciones agrupadas del comentario. */
+export function reaccionarComentarioTarea(
+  idProyecto: number,
+  idTarea: number,
+  idComentario: number,
+  emoji: string,
+): Promise<ReaccionComentario[]> {
+  return apiFetch<ReaccionComentario[]>(
+    `/proyectos/${idProyecto}/tareas/${idTarea}/comentarios/${idComentario}/reacciones`,
+    { method: 'POST', body: JSON.stringify({ emoji }) },
   );
 }

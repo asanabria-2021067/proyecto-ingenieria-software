@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { Pencil, Send, Trash2 } from 'lucide-react';
+import { CornerDownRight, Pencil, Send, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
 import { CommentContent } from '@/components/comments/comment-content';
 import { MentionTextarea } from '@/components/comments/mention-textarea';
+import { MessageReactions } from '@/components/chat-dock/message-reactions';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectMentionables } from '@/hooks/use-project-mentionables';
 import {
@@ -17,7 +18,9 @@ import {
   mencionesPresentes,
   type MencionSeleccionada,
 } from '@/lib/mentions/mention-tokens';
-import type { ComentarioListado, Mencionable } from '@/lib/services/comments';
+import { reaccionesDesdeSocket } from '@/lib/chat-reacciones';
+import type { ComentarioListado, Mencionable, ReaccionComentario } from '@/lib/services/comments';
+import type { ChatReaccion } from '@/lib/types/chat';
 import uvgSwal from '@/lib/swal';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +36,10 @@ export interface CommentThreadProps {
   crear: (contenido: string) => Promise<unknown>;
   editar: (idComentario: number, contenido: string) => Promise<unknown>;
   eliminar: (idComentario: number) => Promise<unknown>;
+  /** MEJ-110: con `responder` el hilo admite un nivel de respuestas (solo comentarios de tarea). */
+  responder?: (idComentario: number, contenido: string) => Promise<unknown>;
+  /** MEJ-110: alterna la reacción propia; el catálogo es el del chat. */
+  reaccionar?: (idComentario: number, emoji: string) => Promise<ReaccionComentario[]>;
   /** Invalidaciones adicionales tras crear, editar o eliminar (contadores, tablero). */
   onMutado?: () => void;
   /** Envuelve la lista en un ScrollArea (contenedores de altura fija). */
@@ -65,6 +72,24 @@ function ordenarRecientes(comentarios: ComentarioListado[]): ComentarioListado[]
 }
 
 /**
+ * MEJ-110: arma el hilo de un nivel. Las respuestas van tras su comentario, de la más antigua a la más
+ * reciente; una respuesta cuyo padre ya no está (eliminado) se muestra como comentario propio.
+ */
+export function armarHilo(comentarios: ComentarioListado[]): { comentario: ComentarioListado; esRespuesta: boolean }[] {
+  const ids = new Set(comentarios.map((c) => c.idComentario));
+  const esRespuesta = (c: ComentarioListado) => c.idComentarioPadre != null && ids.has(c.idComentarioPadre);
+  return comentarios
+    .filter((c) => !esRespuesta(c))
+    .flatMap((raiz) => [
+      { comentario: raiz, esRespuesta: false },
+      ...comentarios
+        .filter((c) => esRespuesta(c) && c.idComentarioPadre === raiz.idComentario)
+        .reverse()
+        .map((comentario) => ({ comentario, esRespuesta: true })),
+    ]);
+}
+
+/**
  * HU-200: hilo de comentarios reutilizable (composer + lista) para tareas,
  * proyecto e hitos. Concentra lo que antes vivía en TaskCommentsPanel
  * (consulta, invalidaciones, eliminar con confirmación) y suma las menciones
@@ -79,6 +104,8 @@ export function CommentThread({
   crear,
   editar,
   eliminar,
+  responder,
+  reaccionar,
   onMutado,
   scroll = true,
   puedeComentar = true,
@@ -94,6 +121,7 @@ export function CommentThread({
   const [menciones, setMenciones] = useState<MencionSeleccionada[]>([]);
   const [comentarioAEliminar, setComentarioAEliminar] = useState<ComentarioListado | null>(null);
   const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [respondiendoId, setRespondiendoId] = useState<number | null>(null);
 
   const { data = [], isLoading, isError } = useQuery<ComentarioListado[]>({
     queryKey,
@@ -101,6 +129,10 @@ export function CommentThread({
     enabled,
   });
   const comentarios = useMemo(() => ordenarRecientes(Array.isArray(data) ? data : []), [data]);
+  const hilo = useMemo(
+    () => (responder ? armarHilo(comentarios) : comentarios.map((comentario) => ({ comentario, esRespuesta: false }))),
+    [comentarios, responder],
+  );
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey });
@@ -127,6 +159,12 @@ export function CommentThread({
       setComentarioAEliminar(null);
       uvgSwal.fire({ icon: 'error', title: 'No se pudo eliminar el comentario', text: error.message });
     },
+  });
+
+  const reaccionarMutation = useMutation({
+    mutationFn: ({ idComentario, emoji }: { idComentario: number; emoji: string }) => reaccionar!(idComentario, emoji),
+    onSuccess: invalidate,
+    onError: (error: Error) => uvgSwal.fire({ icon: 'error', title: 'No se pudo reaccionar', text: error.message }),
   });
 
   const enviar = () => {
@@ -171,7 +209,7 @@ export function CommentThread({
       )}
 
       <ul className="space-y-2">
-        {comentarios.map((c) => (
+        {hilo.map(({ comentario: c, esRespuesta }) => (
           <li
             key={c.idComentario}
             id={`comentario-${c.idComentario}`}
@@ -181,10 +219,11 @@ export function CommentThread({
             }}
             className={cn(
               '-mx-2 flex items-start gap-3 rounded-xl px-2 py-2',
+              esRespuesta && 'ml-8 border-l-2 border-outline-variant/50 pl-3',
               comentarioDestacado === c.idComentario && 'comment-spotlight',
             )}
           >
-            <Avatar className="size-8 mt-0.5">
+            <Avatar className={cn('mt-0.5', esRespuesta ? 'size-6' : 'size-8')}>
               {c.autor.fotoUrl && <AvatarImage src={c.autor.fotoUrl} alt="" />}
               <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
                 {getInitials(c.autor.nombre, c.autor.apellido)}
@@ -201,6 +240,19 @@ export function CommentThread({
               onCerrarEdicion={() => setEditandoId(null)}
               onEliminar={() => setComentarioAEliminar(c)}
               eliminando={eliminarMutation.isPending}
+              respondiendo={respondiendoId === c.idComentario}
+              onResponder={responder && !esRespuesta && puedeComentar ? () => setRespondiendoId(c.idComentario) : undefined}
+              onCerrarRespuesta={() => setRespondiendoId(null)}
+              enviarRespuesta={async (contenido) => {
+                await responder?.(c.idComentario, contenido);
+                invalidate();
+              }}
+              reacciones={
+                reaccionar && puedeComentar
+                  ? reaccionesDesdeSocket(c.reacciones ?? [], currentUserId ?? undefined)
+                  : undefined
+              }
+              onReaccionar={(emoji) => reaccionarMutation.mutate({ idComentario: c.idComentario, emoji })}
               guardar={async (contenido) => {
                 await editar(c.idComentario, contenido);
                 invalidate();
@@ -286,6 +338,14 @@ interface ComentarioCuerpoProps {
   onEliminar: () => void;
   eliminando: boolean;
   guardar: (contenido: string) => Promise<void>;
+  respondiendo: boolean;
+  /** Ausente: el comentario no admite respuestas (ya es una respuesta o el hilo no las tiene). */
+  onResponder?: () => void;
+  onCerrarRespuesta: () => void;
+  enviarRespuesta: (contenido: string) => Promise<void>;
+  /** Ausente: el hilo no tiene reacciones. */
+  reacciones?: ChatReaccion[];
+  onReaccionar: (emoji: string) => void;
 }
 
 function ComentarioCuerpo({
@@ -300,6 +360,12 @@ function ComentarioCuerpo({
   onEliminar,
   eliminando,
   guardar,
+  respondiendo,
+  onResponder,
+  onCerrarRespuesta,
+  enviarRespuesta,
+  reacciones,
+  onReaccionar,
 }: ComentarioCuerpoProps) {
   return (
     <div className="flex-1 min-w-0">
@@ -356,7 +422,109 @@ function ComentarioCuerpo({
           currentUserId={currentUserId}
         />
       )}
+      {!editando && (onResponder || reacciones) && (
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          {onResponder && !respondiendo && (
+            <button
+              type="button"
+              onClick={onResponder}
+              aria-label={`Responder a ${c.autor.nombre} ${c.autor.apellido}`}
+              className="inline-flex items-center gap-1 rounded-md text-xs font-semibold text-tertiary transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <CornerDownRight className="size-3.5" aria-hidden="true" />
+              Responder
+            </button>
+          )}
+          {reacciones && <MessageReactions reacciones={reacciones} onToggle={onReaccionar} />}
+        </div>
+      )}
+      {respondiendo && (
+        <RespuestaComentario
+          currentUserId={currentUserId}
+          mencionables={mencionables}
+          onCancelar={onCerrarRespuesta}
+          guardar={async (contenido) => {
+            await enviarRespuesta(contenido);
+            onCerrarRespuesta();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function RespuestaComentario({
+  currentUserId,
+  mencionables,
+  onCancelar,
+  guardar,
+}: {
+  currentUserId: number | null;
+  mencionables: Mencionable[];
+  onCancelar: () => void;
+  guardar: (contenido: string) => Promise<void>;
+}) {
+  const [texto, setTexto] = useState('');
+  const [menciones, setMenciones] = useState<MencionSeleccionada[]>([]);
+  const mutation = useMutation({ mutationFn: guardar });
+  const contenido = editableAContenido(texto.trim(), mencionesPresentes(texto, menciones));
+
+  const enviar = () => {
+    if (!contenido || mutation.isPending) return;
+    mutation.mutate(contenido);
+  };
+
+  return (
+    <form
+      className="mt-1.5 space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        enviar();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && !e.defaultPrevented) {
+          e.stopPropagation();
+          onCancelar();
+        }
+      }}
+    >
+      <MentionTextarea
+        value={texto}
+        onChange={setTexto}
+        menciones={menciones}
+        onMencionesChange={setMenciones}
+        mencionables={mencionables}
+        currentUserId={currentUserId}
+        onSubmit={enviar}
+        placeholder="Escribe una respuesta..."
+        aria-label="Escribe una respuesta"
+        rows={2}
+        maxLength={MAX_CONTENIDO}
+        disabled={mutation.isPending}
+        autoFocus
+      />
+      <div className="flex items-center justify-between gap-2">
+        {mutation.isError ? <p className="text-xs text-red-500">{(mutation.error as Error).message}</p> : <span />}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onCancelar}
+            disabled={mutation.isPending}
+            className="h-auto rounded-xl px-3 py-1.5 text-xs font-semibold text-on-surface-variant hover:bg-surface-container hover:text-on-surface-variant dark:hover:bg-surface-container"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={!contenido || mutation.isPending}
+            className="h-auto rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-on-primary hover:bg-primary/90 motion-glow-primary"
+          >
+            {mutation.isPending ? 'Enviando...' : 'Responder'}
+          </Button>
+        </div>
+      </div>
+    </form>
   );
 }
 

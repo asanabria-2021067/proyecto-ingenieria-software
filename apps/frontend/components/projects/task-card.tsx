@@ -7,11 +7,12 @@ import {
   Flag,
   GripVertical,
   ListChecks,
+  ListTree,
   Lock,
   MessageCircle,
   Repeat,
 } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { TaskAvatares, textoResponsables } from '@/components/projects/task-avatares';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Tag } from '@/components/ui/tag';
@@ -28,15 +29,12 @@ import {
   estaVencida,
   formatearFechaLimite,
   prioridadTextoAccesible,
+  responsablesDe,
 } from '@/components/projects/task-board.utils';
 import type { TareaPublicaDTO } from '@/lib/types/tasks';
 
 /** Cuántas etiquetas se muestran en la tarjeta antes de resumir el resto en "+N". */
 const MAX_ETIQUETAS_VISIBLES = 2;
-
-function getInitials(nombre: string, apellido: string): string {
-  return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
-}
 
 export interface TaskCardProps {
   tarea: TareaPublicaDTO;
@@ -87,7 +85,8 @@ export function TaskCard({
   const seleccionable = onAlternarSeleccion !== undefined;
   const PrioridadIcon = PRIORIDAD_ICON[tarea.prioridad];
   const vencida = estaVencida(tarea);
-  const asignado = tarea.asignacionActiva?.usuario ?? null;
+  const responsables = responsablesDe(tarea);
+  const subtareas = tarea.subtareas ?? { hechas: 0, total: 0 };
   const checklist = resumenChecklist(tarea.checklist);
 
   const etiquetasVisibles = tarea.etiquetas.slice(0, MAX_ETIQUETAS_VISIBLES);
@@ -277,6 +276,14 @@ export function TaskCard({
         </div>
       )}
 
+      {/* Avance de subtareas (MEJ-106): distinto del checklist */}
+      {subtareas.total > 0 && (
+        <p data-slot="subtareas-avance" className="flex items-center gap-1 text-xs font-medium text-on-surface-variant">
+          <ListTree className="size-3.5 text-tertiary" aria-hidden="true" />
+          {subtareas.hechas}/{subtareas.total} {subtareas.total === 1 ? 'subtarea' : 'subtareas'}
+        </p>
+      )}
+
       {/* Tercera fila: hasta dos etiquetas + "+N" (Sección 41) */}
       {tarea.etiquetas.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -296,16 +303,12 @@ export function TaskCard({
 
       {/* Footer: asignado · fecha · comentarios · hito (Sección 36) */}
       <div className="flex items-center gap-2 text-xs text-tertiary">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <Avatar className="size-6 shrink-0">
-            {asignado?.fotoUrl && <AvatarImage src={asignado.fotoUrl} alt="" />}
-            <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
-              {asignado ? getInitials(asignado.nombre, asignado.apellido) : '—'}
-            </AvatarFallback>
-          </Avatar>
-          <span className="truncate text-on-surface-variant">
-            {asignado ? `${asignado.nombre} ${asignado.apellido}` : 'Sin asignar'}
-          </span>
+        <span
+          className="flex min-w-0 items-center gap-1.5"
+          title={responsables.map((r) => `${r.nombre} ${r.apellido}`).join(', ') || undefined}
+        >
+          <TaskAvatares responsables={responsables} />
+          <span className="truncate text-on-surface-variant">{textoResponsables(responsables)}</span>
         </span>
 
         <span className="ml-auto flex shrink-0 items-center gap-2.5">

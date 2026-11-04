@@ -244,7 +244,7 @@ export class TimeRecordsService {
   async recalculateAssignment(tx: Prisma.TransactionClient, idAsignacion: number): Promise<Prisma.Decimal> {
     const assignment = await tx.asignacionTarea.findUniqueOrThrow({
       where: { idAsignacion },
-      select: { origenReporte: true, horasReales: true, reconocidoEn: true },
+      select: { idUsuario: true, origenReporte: true, horasReales: true, reconocidoEn: true },
     });
     if (assignment.origenReporte === 'POR_CONCILIAR' || assignment.reconocidoEn !== null) {
       throw new ConflictException('El tramo requiere conciliación o ya fue consumido');
@@ -256,7 +256,8 @@ export class TimeRecordsService {
       return assignment.horasReales;
     }
     const sum = await tx.registroTiempoTarea.aggregate({
-      where: { idAsignacion, revocadoEn: null },
+      // MEJ-109: el tramo acredita solo las horas de su titular; las de otros responsables quedan en sus registros.
+      where: { idAsignacion, revocadoEn: null, idUsuario: assignment.idUsuario },
       _sum: { horas: true },
     });
     const hours = new Prisma.Decimal(sum._sum.horas ?? 0);
@@ -292,8 +293,12 @@ export class TimeRecordsService {
           'La tarea no tiene una asignación activa sobre la cual registrar horas',
         );
       }
-      if (asignacionActiva.idUsuario !== userId) {
-        throw new ForbiddenException('Solo el usuario asignado puede registrar horas en esta tarea');
+      // MEJ-109: los responsables adicionales registran sus propias horas (idUsuario del registro) en el tramo activo.
+      if (
+        asignacionActiva.idUsuario !== userId &&
+        !(await this.tasksContext.esResponsableAdicional(taskId, userId, tx))
+      ) {
+        throw new ForbiddenException('Solo un responsable de la tarea puede registrar horas en ella');
       }
 
       await this.tasksContext.assertActiveProjectParticipant(projectId, userId, tx);
@@ -771,9 +776,10 @@ export class TimeRecordsService {
         decision.project.estadoProyecto === EstadoProyecto.EN_PROGRESO) &&
       sprintAmbiente?.estado === EstadoSprint.ACTIVO &&
       sprintEntidad?.estado === EstadoSprint.ACTIVO;
+    const esAdicional = await this.tasksContext.esResponsableAdicional(tarea.idTarea, userId);
     const tramoPropioAbierto = tramos.some(
       (tramo) =>
-        tramo.idUsuario === userId &&
+        (tramo.idUsuario === userId || esAdicional) &&
         tramo.desasignadaEn === null &&
         tramo.origenReporte === 'GRANULAR' &&
         tramo.reconocidoEn === null,

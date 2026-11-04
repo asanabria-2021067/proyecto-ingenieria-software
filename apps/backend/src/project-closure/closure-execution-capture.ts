@@ -1,4 +1,5 @@
 import { EstadoSprint, Prisma } from '@prisma/client';
+import { registrosDelTitular } from '../time-records/registros-titular';
 import type { PrismaService } from '../prisma/prisma.service';
 import type {
   ClosureExecutionInput,
@@ -89,6 +90,7 @@ export async function captureClosureExecution(
             registrosTiempo: {
               select: {
                 idRegistroTiempo: true,
+                idUsuario: true,
                 horas: true,
                 fecha: true,
                 nota: true,
@@ -142,7 +144,7 @@ export async function captureClosureExecution(
 
   for (const tarea of tareas) {
     for (const tramo of tarea.asignaciones) {
-      const efectivas = tramo.registrosTiempo
+      const efectivas = registrosDelTitular(tramo)
         .filter((registro) => registro.revocadoEn === null)
         .reduce((acc, registro) => acc.plus(registro.horas), cero);
       const legacyTramo = tramo.origenReporte === 'LEGACY' ? (tramo.horasReales ?? cero) : cero;

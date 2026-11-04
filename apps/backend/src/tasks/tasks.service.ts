@@ -21,16 +21,19 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
+import type { SetResponsablesDto } from './dto/set-responsables.dto';
 import { CloseAssignmentDto } from './dto/close-assignment.dto';
 import type { BulkTaskActionDto } from './dto/bulk-task-action.dto';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
-import { TASK_SELECT, compareTareas, mapTarea, toDateOnly, type TareaPublica } from './tasks.mapper';
+import { TASK_SELECT, compareTareas, mapTarea, ordenarTareas, toDateOnly, type TareaPublica } from './tasks.mapper';
+import type { ListTasksQueryDto } from './dto/list-tasks-query.dto';
 import { TasksNotificationsService } from './tasks-notifications.service';
 import { TasksBulkService, type ResultadoAccionMasiva } from './tasks-bulk.service';
 import {
   assertBloqueanteValido,
   assertNoBloqueada,
+  assertPadreValido,
   createActiveAssignment,
   lockedProject,
   sumarRepeticion,
@@ -121,7 +124,7 @@ export class TasksService {
    * operativo `eliminadoEn: null` se conserva: la proyección histórica de
    * aportes eliminados es otra lectura, no esta.
    */
-  async findAll(projectId: number, userId: number): Promise<TareaPublica[]> {
+  async findAll(projectId: number, userId: number, query: ListTasksQueryDto = {}): Promise<TareaPublica[]> {
     const decision = await this.readPolicy.assertRead(undefined, {
       projectId,
       actorId: userId,
@@ -134,11 +137,13 @@ export class TasksService {
         idProyecto: projectId,
         eliminadoEn: null,
         ...this.tasksContext.taskScopeWhere(userId, this.readPolicy.scopeForActor(decision)),
+        ...this.tasksContext.taskFiltersWhere(query),
       },
       select: TASK_SELECT,
     });
 
-    return rows.map(mapTarea).sort(compareTareas);
+    const tareas = rows.map(mapTarea).sort(compareTareas);
+    return query.ordenarPor ? ordenarTareas(tareas, query.ordenarPor, query.direccion ?? 'asc') : tareas;
   }
 
   /**
@@ -191,7 +196,7 @@ export class TasksService {
     const row = await this.projectTx.run(projectId, userId, 'tasks.create', async (ctx) => {
       const { tx } = ctx;
       await this.tasksAuthorization.assertCanCreateTask(projectId, userId, tx);
-      if (dto.idUsuarioAsignado !== undefined) {
+      if (dto.idUsuarioAsignado !== undefined || dto.idsResponsablesAdicionales?.length) {
         await this.tasksAuthorization.assertCanAssignOnCreate(
           projectId,
           userId,
@@ -235,11 +240,15 @@ export class TasksService {
       if (dto.idTareaBloqueante !== undefined) {
         await assertBloqueanteValido(tx, projectId, null, dto.idTareaBloqueante);
       }
+      if (dto.idTareaPadre !== undefined) {
+        await assertPadreValido(tx, projectId, dto.idTareaPadre);
+      }
       const fechaLimiteCreada = new Date(`${dto.fechaLimite}T00:00:00.000Z`);
 
       const tarea = await tx.tarea.create({
         data: {
           idProyecto: projectId,
+          idTareaPadre: dto.idTareaPadre ?? null,
           idTareaBloqueante: dto.idTareaBloqueante ?? null,
           repeticion: dto.repeticion ?? null,
           repeticionProxima: dto.repeticion ? sumarRepeticion(fechaLimiteCreada, dto.repeticion) : null,
@@ -283,6 +292,16 @@ export class TasksService {
             desasignadaEn: null,
           },
         });
+      }
+
+      if (dto.idsResponsablesAdicionales?.length) {
+        await this.reemplazarResponsables(
+          tx,
+          projectId,
+          { idTarea: tarea.idTarea, idRolProyecto: tarea.idRolProyecto },
+          dto.idsResponsablesAdicionales,
+          userId,
+        );
       }
 
       if (dto.checklist && dto.checklist.length > 0) {
@@ -370,6 +389,11 @@ export class TasksService {
       );
     } else if (dto.idUsuarioAsignado !== undefined) {
       await this.notifier.notifyAssignment(tareaCreada, userId, dto.idUsuarioAsignado);
+    }
+    for (const idResponsable of dto.idsResponsablesAdicionales ?? []) {
+      if (idResponsable !== dto.idUsuarioAsignado) {
+        await this.notifier.notifyAssignment(tareaCreada, userId, idResponsable);
+      }
     }
 
     return tareaCreada;
@@ -708,6 +732,11 @@ export class TasksService {
       await this.policy.assertWriteTx(tx, lockedProject(ctx), 'TAREA_WRITE', userId, {
         sprintId: tarea?.idSprint ?? null,
       });
+      // MEJ-106: borrar un padre con subtareas vigentes se bloquea; el lider las elimina primero.
+      const subtareas = await tx.tarea.count({ where: { idTareaPadre: taskId, eliminadoEn: null } });
+      if (subtareas > 0) {
+        throw new ConflictException('La tarea tiene subtareas: elimínalas primero');
+      }
       const asignacionActiva = await this.tasksContext.getActiveAssignment(taskId, tx);
 
       const eliminadoEn = new Date();
@@ -941,6 +970,67 @@ export class TasksService {
     }
 
     return tareaAsignada;
+  }
+
+  /**
+   * MEJ-109: reemplaza los responsables adicionales de la tarea. Misma
+   * autoridad que asignar (lider o participante activo del rol de la tarea);
+   * cada usuario nuevo pasa por la misma validacion de elegibilidad que una
+   * asignacion y se le notifica despues del commit.
+   */
+  async setResponsables(
+    projectId: number,
+    taskId: number,
+    actorUserId: number,
+    dto: SetResponsablesDto,
+  ): Promise<TareaPublica> {
+    const { fila, nuevos } = await this.projectTx.run(projectId, actorUserId, 'tasks.setResponsables', async (ctx) => {
+      const { tx } = ctx;
+      const tarea = await this.tasksAuthorization.assertCanAssignTask(projectId, taskId, actorUserId, tx);
+      await this.policy.assertWriteTx(tx, lockedProject(ctx), 'TAREA_ASIGNACION', actorUserId, {
+        sprintId: tarea?.idSprint ?? null,
+      });
+      const nuevos = await this.reemplazarResponsables(tx, projectId, tarea, dto.idsUsuarios, actorUserId);
+      const fila = await tx.tarea.findFirst({
+        where: { idTarea: taskId, idProyecto: projectId, eliminadoEn: null },
+        select: TASK_SELECT,
+      });
+      if (!fila) {
+        throw new Error(`No se pudo leer la tarea con id ${taskId} dentro de la transacción`);
+      }
+      return { fila, nuevos };
+    });
+
+    const tarea = mapTarea(fila);
+    for (const idNuevo of nuevos) {
+      await this.notifier.notifyAssignment(tarea, actorUserId, idNuevo);
+    }
+    return tarea;
+  }
+
+  /** Deja `ids` (sin el principal) como responsables adicionales y devuelve los recien agregados. */
+  private async reemplazarResponsables(
+    tx: Prisma.TransactionClient,
+    projectId: number,
+    tarea: { idTarea: number; idRolProyecto: number | null },
+    ids: number[],
+    actorUserId: number,
+  ): Promise<number[]> {
+    const principal = (await this.tasksContext.getActiveAssignment(tarea.idTarea, tx))?.idUsuario;
+    const deseados = [...new Set(ids)].filter((id) => id !== principal);
+    const previos = (
+      await tx.tareaResponsable.findMany({ where: { idTarea: tarea.idTarea }, select: { idUsuario: true } })
+    ).map((r) => r.idUsuario);
+    const nuevos = deseados.filter((id) => !previos.includes(id));
+    for (const id of nuevos) {
+      await this.tasksRelations.assertUserAssignableToProject(projectId, id, tarea.idRolProyecto, tx, {
+        nuevaAsignacion: true,
+        actorId: actorUserId,
+      });
+    }
+    await tx.tareaResponsable.deleteMany({ where: { idTarea: tarea.idTarea, idUsuario: { notIn: deseados } } });
+    await tx.tareaResponsable.createMany({ data: nuevos.map((idUsuario) => ({ idTarea: tarea.idTarea, idUsuario })) });
+    return nuevos;
   }
 
   /**

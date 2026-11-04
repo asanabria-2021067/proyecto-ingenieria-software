@@ -8,7 +8,7 @@ export const SIN_ASIGNAR = 'sin-asignar';
 
 const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 
-function hoyGuatemalaISO(ahora: Date): string {
+export function hoyGuatemalaISO(ahora: Date): string {
   const partes = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Guatemala',
     year: 'numeric',

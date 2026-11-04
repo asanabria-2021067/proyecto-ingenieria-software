@@ -19,6 +19,7 @@ import { ProjectReadPolicyService } from '../common/project-policy/project-read-
 import { CreateComentarioDto } from './dto/create-comentario.dto';
 import { UpdateComentarioDto } from './dto/update-comentario.dto';
 import { extraerMenciones, normalizarMenciones } from './menciones/menciones.parser';
+import { agruparReacciones } from '../chat/chat.service';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
@@ -149,8 +150,9 @@ export class ComentariosService {
     taskId: number,
     userId: number,
     contenido: string,
+    idComentarioPadre?: number,
   ) {
-    const { tarea, comentario, mencionados } = await this.projectTx.run(
+    const { tarea, comentario, mencionados, autorPadre } = await this.projectTx.run(
       projectId,
       userId,
       'comentarios.createForTask',
@@ -161,16 +163,22 @@ export class ComentariosService {
         await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_TAREA', userId, {
           sprintId: tarea.idSprint,
         });
+        // MEJ-110: un solo nivel de hilo; el padre debe ser un comentario vigente de esta tarea.
+        const padre = idComentarioPadre === undefined ? null : await this.getComentarioEnTareaOrThrow(taskId, idComentarioPadre, tx);
+        if (padre?.idComentarioPadre) {
+          throw new BadRequestException('Solo se admite un nivel de respuestas');
+        }
         const menciones = await this.prepararMenciones(tx, projectId, contenido);
         const comentario = await tx.comentario.create({
           data: {
             idAutor: userId,
             idTarea: taskId,
+            ...(padre ? { idComentarioPadre: padre.idComentario } : {}),
             contenido: menciones.contenido,
           },
         });
         await this.sincronizarMenciones(tx, comentario.idComentario, menciones.mencionados, true);
-        return { tarea, comentario, mencionados: menciones.mencionados };
+        return { tarea, comentario, mencionados: menciones.mencionados, autorPadre: padre?.idAutor ?? null };
       },
     );
 
@@ -184,9 +192,10 @@ export class ComentariosService {
     });
 
     // HU-200: quien fue mencionado ya recibió un aviso más específico.
-    const recipientIds = (await this.getTaskCommentRecipientIds(taskId, tarea.creadaPor, userId)).filter(
-      (recipientId) => !mencionados.includes(recipientId),
-    );
+    const destinatarios = await this.getTaskCommentRecipientIds(taskId, tarea.creadaPor, userId);
+    // MEJ-110: quien recibe la respuesta es el autor del comentario respondido.
+    if (autorPadre !== null && autorPadre !== userId) destinatarios.push(autorPadre);
+    const recipientIds = [...new Set(destinatarios)].filter((recipientId) => !mencionados.includes(recipientId));
     await this.notifications.notifyUsers(recipientIds, {
       tipoNotificacion: TipoNotificacion.COMENTARIO_TAREA,
       tituloNotificacion: 'Nuevo comentario',
@@ -471,10 +480,42 @@ export class ComentariosService {
       entitySprintId: tarea.idSprint,
     });
     await this.assertChannelAReadAllowed(projectId, userId);
-    return this.prisma.comentario.findMany({
+    const comentarios = await this.prisma.comentario.findMany({
       where: { idTarea: taskId, eliminadoEn: null },
-      include: { autor: this.autorSelect, menciones: this.mencionesInclude },
+      include: {
+        autor: this.autorSelect,
+        menciones: this.mencionesInclude,
+        reacciones: { select: { emoji: true, idUsuario: true }, orderBy: { idReaccion: 'asc' } },
+      },
       orderBy: { creadoEn: 'desc' },
+    });
+    return comentarios.map(({ reacciones, ...comentario }) => ({ ...comentario, reacciones: agruparReacciones(reacciones) }));
+  }
+
+  /**
+   * MEJ-110: alterna la reaccion del usuario a un comentario de la tarea
+   * (crea si no estaba, quita si ya estaba). Mismo catalogo de emojis que el
+   * chat (lo valida el DTO); misma autoridad que comentar. El lock del
+   * proyecto serializa dos alternancias simultaneas del mismo usuario.
+   */
+  async toggleReaccionForTask(projectId: number, taskId: number, commentId: number, userId: number, emoji: string) {
+    return this.projectTx.run(projectId, userId, 'comentarios.reaccionarTarea', async (ctx) => {
+      const { tx } = ctx;
+      const tarea = await this.getTareaEnProyectoOrThrow(projectId, taskId, tx);
+      await this.assertChannelAWriteAllowed(projectId, userId, tx);
+      await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'COMENTARIO_TAREA', userId, {
+        sprintId: tarea.idSprint,
+      });
+      await this.getComentarioEnTareaOrThrow(taskId, commentId, tx);
+      const clave = { idComentario: commentId, idUsuario: userId, emoji };
+      const { count } = await tx.reaccionComentario.deleteMany({ where: clave });
+      if (count === 0) await tx.reaccionComentario.create({ data: clave });
+      const filas = await tx.reaccionComentario.findMany({
+        where: { idComentario: commentId },
+        select: { emoji: true, idUsuario: true },
+        orderBy: { idReaccion: 'asc' },
+      });
+      return agruparReacciones(filas);
     });
   }
 
@@ -529,7 +570,7 @@ export class ComentariosService {
   private async getComentarioEnTareaOrThrow(taskId: number, commentId: number, db: Db = this.prisma) {
     const comentario = await db.comentario.findFirst({
       where: { idComentario: commentId, idTarea: taskId, eliminadoEn: null },
-      select: { idComentario: true, idAutor: true },
+      select: { idComentario: true, idAutor: true, idComentarioPadre: true },
     });
     if (!comentario) {
       throw new NotFoundException(

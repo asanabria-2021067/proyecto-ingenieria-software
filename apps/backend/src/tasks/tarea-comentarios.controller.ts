@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, ParseIntPipe, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { ToggleReactionDto } from '../chat/dto/toggle-reaction.dto';
 import { ComentariosService } from '../comentarios/comentarios.service';
 import { CreateTareaComentarioDto } from './dto/create-tarea-comentario.dto';
 import { UpdateComentarioDto } from '../comentarios/dto/update-comentario.dto';
@@ -58,6 +59,35 @@ export class TareaComentariosController {
     @Body() dto: CreateTareaComentarioDto,
   ) {
     return this.comentariosService.createForTask(projectId, taskId, user.userId, dto.contenido);
+  }
+
+  /** MEJ-110: responder a un comentario (un solo nivel de hilo). */
+  @Post(':commentId/respuestas')
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(TASK_COMMENT_WRITE)
+  replyComentario(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Param('commentId', ParseIntPipe) commentId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: CreateTareaComentarioDto,
+  ) {
+    return this.comentariosService.createForTask(projectId, taskId, user.userId, dto.contenido, commentId);
+  }
+
+  /** MEJ-110: reaccionar o quitar la reaccion propia (alterna); devuelve las reacciones agrupadas. */
+  @Post(':commentId/reacciones')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(TASK_COMMENT_WRITE)
+  toggleReaccion(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Param('commentId', ParseIntPipe) commentId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: ToggleReactionDto,
+  ) {
+    return this.comentariosService.toggleReaccionForTask(projectId, taskId, commentId, user.userId, dto.emoji);
   }
 
   /** E035: editar comentario propio de tarea. */

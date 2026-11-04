@@ -76,6 +76,27 @@ export interface TareaPublicaDTO {
   repeticionProxima: string | null;
   /** MEJ-6 */
   checklist: ChecklistItemDTO[];
+  /** MEJ-106: tarea padre si esta es una subtarea (una sola profundidad). */
+  idTareaPadre?: number | null;
+  /** MEJ-106: avance de subtareas vigentes; distinto del checklist. */
+  subtareas?: { hechas: number; total: number };
+  /** MEJ-109: principal primero y luego los adicionales, sin duplicar. */
+  responsables?: UsuarioAsignadoResumen[];
+  /** MEJ-107 */
+  cantidadEnlaces?: number;
+}
+
+/** MEJ-107: tipo que decide el icono del enlace (no hay favicon remoto). */
+export type TipoEnlaceTarea = 'DRIVE' | 'FIGMA' | 'GITHUB' | 'GENERICO';
+
+export interface EnlaceTareaDTO {
+  idEnlace: number;
+  url: string;
+  titulo: string | null;
+  sitio: string | null;
+  tipo: TipoEnlaceTarea;
+  creadoPor: number;
+  creadoEn: string;
 }
 
 export type RepeticionTarea = 'DIARIA' | 'SEMANAL' | 'MENSUAL';
@@ -150,6 +171,10 @@ export interface CreateTaskInput {
   idTareaBloqueante?: number;
   repeticion?: RepeticionTarea;
   checklist?: string[];
+  /** MEJ-106: crea la tarea como subtarea de esta. */
+  idTareaPadre?: number;
+  /** MEJ-109: hasta 9 responsables además del principal. */
+  idsResponsablesAdicionales?: number[];
 }
 
 /** Body de `PATCH /proyectos/:projectId/tareas/:taskId` — equivalente a `UpdateTaskDto`. */

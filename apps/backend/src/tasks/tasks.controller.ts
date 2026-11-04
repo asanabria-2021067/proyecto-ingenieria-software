@@ -10,6 +10,8 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
+  Query,
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
@@ -20,6 +22,8 @@ import { UpdateTaskEstadoDto } from './dto/update-task-estado.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
 import { CloseAssignmentDto } from './dto/close-assignment.dto';
 import { BulkTaskActionDto } from './dto/bulk-task-action.dto';
+import { ListTasksQueryDto } from './dto/list-tasks-query.dto';
+import { SetResponsablesDto } from './dto/set-responsables.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
@@ -50,8 +54,9 @@ export class TasksController {
   findAll(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
+    @Query() query: ListTasksQueryDto,
   ) {
-    return this.tasksService.findAll(projectId, user.userId);
+    return this.tasksService.findAll(projectId, user.userId, query);
   }
 
   /** E045: detalle de una tarea; mismo alcance §34, con el Sprint de la tarea como entidad. */
@@ -140,6 +145,19 @@ export class TasksController {
     @Body() dto: AssignTaskDto,
   ) {
     return this.tasksService.assign(projectId, taskId, user.userId, dto);
+  }
+
+  /** MEJ-109: reemplaza los responsables adicionales de la tarea. */
+  @Put(':taskId/responsables')
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(TASK_ASSIGNMENT)
+  setResponsables(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() dto: SetResponsablesDto,
+  ) {
+    return this.tasksService.setResponsables(projectId, taskId, user.userId, dto);
   }
 
   @Delete(':taskId/asignar')

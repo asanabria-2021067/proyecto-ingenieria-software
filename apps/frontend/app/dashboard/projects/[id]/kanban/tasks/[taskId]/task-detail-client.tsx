@@ -51,6 +51,8 @@ import { Tag as Etiqueta } from '@/components/ui/tag';
 import { TaskLabelChip } from '@/components/projects/task-label-chip';
 import { TaskChecklist } from '@/components/projects/task-checklist';
 import { TaskEvidence } from '@/components/projects/task-evidence';
+import { TaskEnlaces } from '@/components/projects/task-enlaces';
+import { TaskSubtareas } from '@/components/projects/task-subtareas';
 import { TaskHistory } from '@/components/projects/task-history';
 import { REPETICION_LABEL } from '@/lib/tasks/extras';
 import { TaskCommentsPanel } from '@/components/projects/task-comments-panel';
@@ -70,6 +72,7 @@ import {
   PRIORIDAD_LABEL,
   estaVencida,
   formatearFechaLimite,
+  responsablesDe,
 } from '@/components/projects/task-board.utils';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
@@ -160,7 +163,7 @@ function TaskDetailView({
   const comentarioDestacado = comentarioParam && /^\d+$/.test(comentarioParam) ? Number(comentarioParam) : null;
 
   const { data: currentUser } = useCurrentUser();
-  const { cambiarEstadoTarea, eliminarTarea, crearTarea, editarTarea, asignarTarea, desasignarTarea } =
+  const { cambiarEstadoTarea, eliminarTarea, crearTarea, editarTarea, asignarTarea, desasignarTarea, fijarResponsables, tasks } =
     useProjectTasks(idProyecto);
   const { members, isLoading: cargandoMiembros } = useProjectMembers(idProyecto);
   const {
@@ -183,6 +186,11 @@ function TaskDetailView({
   const esAsignadoActivo =
     currentUser != null && tarea.asignacionActiva?.idUsuario === currentUser.idUsuario;
   const puedeCambiarEstado = isLeader || esAsignadoActivo;
+  // MEJ-109: todos los responsables (principal y adicionales) trabajan la tarea; cada uno registra sus horas.
+  const adicionales = responsablesDe(tarea).filter((r) => r.idUsuario !== asignado?.idUsuario);
+  const esResponsable = currentUser != null && responsablesDe(tarea).some((r) => r.idUsuario === currentUser.idUsuario);
+  const subtareas = tasks.filter((t) => t.idTareaPadre === tarea.idTarea);
+  const padre = tarea.idTareaPadre != null ? (tasks.find((t) => t.idTarea === tarea.idTareaPadre) ?? null) : null;
 
   // HU-141: gestión colaborativa por rol — un participante activo en el
   // MISMO rol que la tarea puede editarla/asignarla/desasignarla sin ser
@@ -458,6 +466,18 @@ function TaskDetailView({
           )}
         </div>
 
+        {padre && (
+          <p className="mt-3 text-sm text-on-surface-variant">
+            Subtarea de{' '}
+            <Link
+              href={`/dashboard/projects/${idProyecto}/kanban/tasks/${padre.idTarea}`}
+              className="font-semibold text-primary hover:underline"
+            >
+              {padre.tituloTarea}
+            </Link>
+          </p>
+        )}
+
         {tarea.bloqueadaPor && (
           <p
             role="status"
@@ -554,6 +574,24 @@ function TaskDetailView({
                 )}
               </DatoOrganizacion>
 
+              {adicionales.length > 0 && (
+                <DatoOrganizacion icon={User} label="Otros responsables">
+                  <ul className="space-y-1">
+                    {adicionales.map((r) => (
+                      <li key={r.idUsuario} className="inline-flex items-center gap-2 pr-3">
+                        <Avatar className="size-6">
+                          {r.fotoUrl && <AvatarImage src={r.fotoUrl} alt="" />}
+                          <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
+                            {getInitials(r.nombre, r.apellido)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {r.nombre} {r.apellido}
+                      </li>
+                    ))}
+                  </ul>
+                </DatoOrganizacion>
+              )}
+
               <DatoOrganizacion icon={Flag} label="Hito">
                 {tarea.hito ? tarea.hito.tituloHito : <span className="text-tertiary">Sin hito</span>}
               </DatoOrganizacion>
@@ -597,6 +635,16 @@ function TaskDetailView({
             tituloTarea={tarea.tituloTarea}
           />
 
+          <TaskSubtareas
+            idProyecto={idProyecto}
+            tarea={tarea}
+            subtareas={subtareas}
+            members={members}
+            isLeader={isLeader}
+            idUsuarioActual={currentUser?.idUsuario ?? null}
+            puedeAgregar={puedeGestionarTarea || esResponsable}
+          />
+
           {/* Horas de la tarea (HU-142 · S7 VIEW-04): el resumen del backend
               gobierna crear/editar/revocar; aquí no se infiere permiso alguno. */}
           <section className={CARD} aria-labelledby="horas-tarea-titulo">
@@ -636,6 +684,8 @@ function TaskDetailView({
               <p className="text-sm italic text-tertiary">Esta tarea no tiene etiquetas.</p>
             )}
           </section>
+
+          <TaskEnlaces idProyecto={idProyecto} idTarea={tarea.idTarea} puedeEditar={puedeCambiarEstado || esResponsable} />
 
           <TaskEvidence
             idProyecto={idProyecto}
@@ -698,6 +748,7 @@ function TaskDetailView({
           editarTarea={editarTarea}
           asignarTarea={asignarTarea}
           desasignarTarea={desasignarTarea}
+          fijarResponsables={fijarResponsables}
           onOpenChange={(open) => setEditarAbierto(open)}
           onRequestDelete={() => void solicitarEliminar()}
           onManageLabels={isLeader ? () => setEtiquetasAbierto(true) : undefined}

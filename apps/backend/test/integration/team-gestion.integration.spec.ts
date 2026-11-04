@@ -121,6 +121,10 @@ describeIntegration('MEJ-104/105 carga del equipo y baja de integrante (PostgreS
     const spCerrado = await fx.createIntegrationSprint(db, proyecto, { numero: 2, estado: 'CERRADO' });
     const tCerrada = await fx.createIntegrationTask(db, proyecto, f.lider, spCerrado.idSprint, { estadoTarea: 'EN_PROGRESO' });
     asignacionSprintCerrado = (await fx.createIntegrationTaskAssignment(db, tCerrada.idTarea, f.miembro, f.lider, { idParticipacion: participacionMiembro })).idAsignacion;
+    // MEJ-109: `otro` es responsable adicional de la tarea abierta del Sprint ACTIVO, de la abierta de un Sprint cerrado y de la HECHO.
+    await db.tareaResponsable.createMany({
+      data: [tareaAbierta, tCerrada.idTarea, tareaHecha].map((idTarea) => ({ idTarea, idUsuario: f.otro })),
+    });
     await chat.sincronizar(proyecto);
 
     const pc = await fx.createIntegrationProject(db, f.ajeno, { estadoProyecto: 'CERRADO' });
@@ -143,6 +147,7 @@ describeIntegration('MEJ-104/105 carga del equipo y baja de integrante (PostgreS
     await db.notificacion.deleteMany({ where: { idUsuario: { in: userIds } } });
     await db.conversacionParticipante.deleteMany({ where: { conversacion: { idProyecto: { in: proyectos } } } });
     await db.conversacion.deleteMany({ where: { idProyecto: { in: proyectos } } });
+    await db.tareaResponsable.deleteMany({ where: { tarea: { idProyecto: { in: proyectos } } } });
     await db.registroTiempoTarea.deleteMany({ where: { asignacion: { tarea: { idProyecto: { in: proyectos } } } } });
     await db.asignacionTarea.deleteMany({ where: { tarea: { idProyecto: { in: proyectos } } } });
     await db.tarea.deleteMany({ where: { idProyecto: { in: proyectos } } });
@@ -163,6 +168,8 @@ describeIntegration('MEJ-104/105 carga del equipo y baja de integrante (PostgreS
     expect(r.sprintActivo?.idSprint).toBe(sprint);
     expect(por(f.miembro)).toMatchObject({ tareasAbiertas: 2, horasSemana: 3.5, horasSprint: 7.5 });
     expect(por(f.sinHoras)).toMatchObject({ tareasAbiertas: 0, horasSemana: 0, horasSprint: 0 });
+    // Responsable adicional de dos tareas abiertas (la tercera esta HECHO): cuentan en su carga.
+    expect(por(f.otro)).toMatchObject({ tareasAbiertas: 2 });
     expect(r.integrantes.map((i) => i.idUsuario)).not.toContain(f.lider);
     expect(r.semana.hasta > r.semana.desde).toBe(true);
   });
@@ -243,5 +250,12 @@ describeIntegration('MEJ-104/105 carga del equipo y baja de integrante (PostgreS
 
   it('admin da de baja a otro integrante', async () => {
     await expect(service.darDeBaja(proyecto, f.otro, f.admin, MOTIVO)).resolves.toMatchObject({ participacionesRetiradas: 1, tareasSinAsignar: 0 });
+  });
+
+  it('baja: el responsable adicional sale de todas las tareas abiertas del proyecto, incluida la de un Sprint cerrado, y queda en la bitácora; la HECHO conserva su fila', async () => {
+    const filas = await db.tareaResponsable.findMany({ where: { idUsuario: f.otro, tarea: { idProyecto: proyecto } }, select: { idTarea: true } });
+    expect(filas.map((x) => x.idTarea)).toEqual([tareaHecha]);
+    const evento = await db.bitacoraAuditoria.findFirstOrThrow({ where: { accion: 'PARTICIPATION_REMOVED', idUsuario: f.admin } });
+    expect(evento.detalleJson).toMatchObject({ valorNuevo: { idUsuario: f.otro, adicionales: 2 } });
   });
 });

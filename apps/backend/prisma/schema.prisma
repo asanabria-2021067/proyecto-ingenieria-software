@@ -530,6 +530,8 @@ model Usuario {
   calendariosCompartidosConmigo    CalendarioCompartido[]       @relation("CalendarioInvitado")
   insignias                        InsigniaUsuario[]
   reaccionesChat                   ReaccionMensajeChat[]
+  reaccionesComentario             ReaccionComentario[]
+  tareasResponsable                TareaResponsable[]
   mensajesGuardados                MensajeGuardado[]
   votosEncuestaChat                VotoEncuestaChat[]
   reunionesAdministracionCreadas   ReunionAdministracion[]      @relation("ReunionesAdministracionCreadas")
@@ -1476,12 +1478,18 @@ model Tarea {
   idTareaOrigen       Int?             @map("id_tarea_origen")
   /// Tarea de ejemplo creada junto al Sprint de ejemplo.
   esEjemplo           Boolean          @default(false) @map("es_ejemplo")
+  /// MEJ-106: tarea padre; un solo nivel (una hija no tiene hijas), lo valida el servicio.
+  idTareaPadre        Int?             @map("id_tarea_padre")
 
   proyecto      Proyecto            @relation(fields: [idProyecto], references: [idProyecto], onDelete: Restrict)
   bloqueante    Tarea?               @relation("TareaBloqueo", fields: [idTareaBloqueante], references: [idTarea], onDelete: SetNull)
   bloqueadas    Tarea[]              @relation("TareaBloqueo")
   origen        Tarea?               @relation("TareaRepetida", fields: [idTareaOrigen], references: [idTarea], onDelete: SetNull)
   copias        Tarea[]              @relation("TareaRepetida")
+  padre         Tarea?               @relation("TareaSubtareas", fields: [idTareaPadre], references: [idTarea], onDelete: NoAction)
+  subtareas     Tarea[]              @relation("TareaSubtareas")
+  enlaces       TareaEnlace[]
+  responsables  TareaResponsable[]
   checklist     TareaChecklistItem[]
   hito          Hito?               @relation(fields: [idHito], references: [idHito], onDelete: SetNull)
   rolProyecto   RolProyecto?        @relation(fields: [idRolProyecto], references: [idRolProyecto], onDelete: SetNull)
@@ -1500,7 +1508,39 @@ model Tarea {
   @@index([idSprint])
   @@index([idTareaBloqueante])
   @@index([repeticionProxima])
+  @@index([idTareaPadre])
   @@map("tarea")
+}
+
+/// MEJ-107: enlace https de la tarea con su vista previa (`tipo` decide el icono en el cliente).
+model TareaEnlace {
+  idEnlace  Int      @id @default(autoincrement()) @map("id_enlace")
+  idTarea   Int      @map("id_tarea")
+  url       String   @db.VarChar(2048)
+  titulo    String?  @db.VarChar(200)
+  sitio     String?  @db.VarChar(100)
+  tipo      String   @db.VarChar(16)
+  creadoPor Int      @map("creado_por")
+  creadoEn  DateTime @default(now()) @map("creado_en")
+
+  tarea Tarea @relation(fields: [idTarea], references: [idTarea], onDelete: Cascade)
+
+  @@unique([idTarea, url])
+  @@map("tarea_enlace")
+}
+
+/// MEJ-109: responsables ademas del principal (el principal sigue en AsignacionTarea, que lleva las horas).
+model TareaResponsable {
+  idTarea    Int      @map("id_tarea")
+  idUsuario  Int      @map("id_usuario")
+  asignadoEn DateTime @default(now()) @map("asignado_en")
+
+  tarea   Tarea   @relation(fields: [idTarea], references: [idTarea], onDelete: Cascade)
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+
+  @@id([idTarea, idUsuario])
+  @@index([idUsuario])
+  @@map("tarea_responsable")
 }
 
 /// MEJ-6: items de checklist de una tarea.
@@ -2161,10 +2201,15 @@ model Comentario {
   idProyecto   Int?      @map("id_proyecto")
   idTarea      Int?      @map("id_tarea")
   idHito       Int?      @map("id_hito")
+  /// MEJ-110: comentario al que responde; un solo nivel de hilo (lo valida el servicio).
+  idComentarioPadre Int?     @map("id_comentario_padre")
   creadoEn     DateTime  @default(now()) @map("creado_en")
   editadoEn    DateTime? @map("editado_en")
   eliminadoEn  DateTime? @map("eliminado_en")
 
+  padre      Comentario?          @relation("RespuestasComentario", fields: [idComentarioPadre], references: [idComentario], onDelete: NoAction)
+  respuestas Comentario[]         @relation("RespuestasComentario")
+  reacciones ReaccionComentario[]
   autor     Usuario             @relation(fields: [idAutor], references: [idUsuario], onDelete: Restrict)
   proyecto  Proyecto?           @relation(fields: [idProyecto], references: [idProyecto], onDelete: SetNull)
   tarea     Tarea?              @relation(fields: [idTarea], references: [idTarea], onDelete: SetNull)
@@ -2172,7 +2217,24 @@ model Comentario {
   menciones MencionComentario[]
 
   @@index([idTarea])
+  @@index([idComentarioPadre])
   @@map("comentario")
+}
+
+/// MEJ-110: reaccion con emoji a un comentario (mismo catalogo que el chat; una por comentario+usuario+emoji).
+model ReaccionComentario {
+  idReaccion   Int      @id @default(autoincrement()) @map("id_reaccion")
+  idComentario Int      @map("id_comentario")
+  idUsuario    Int      @map("id_usuario")
+  emoji        String   @db.VarChar(16)
+  creadaEn     DateTime @default(now()) @map("creada_en")
+
+  comentario Comentario @relation(fields: [idComentario], references: [idComentario], onDelete: Cascade)
+  usuario    Usuario    @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+
+  @@unique([idComentario, idUsuario, emoji])
+  @@index([idComentario])
+  @@map("reaccion_comentario")
 }
 
 // HU-200 (T-376): integrante mencionado con @ en un comentario. El texto guarda

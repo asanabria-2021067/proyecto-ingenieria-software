@@ -346,7 +346,10 @@ function buildTareaSelectShape(row: TareaRow, state: FixtureState) {
     rolProyecto: rol ? { idRolProyecto: rol.idRolProyecto, nombreRol: rol.nombreRol } : null,
     asignaciones: asignacionesActivas,
     etiquetas,
-    _count: { comentarios: cantidadComentarios },
+    idTareaPadre: null,
+    subtareas: [],
+    responsables: [],
+    _count: { comentarios: cantidadComentarios, enlaces: 0 },
   };
 }
 
@@ -609,6 +612,7 @@ export function makeFakeDb(state: FixtureState) {
         );
         return rows.map((row) => (args.select ? buildTareaSelectShape(row, state) : row));
       }),
+      count: vi.fn(async () => 0),
       create: vi.fn(async (args: { data: Partial<TareaRow> }) => {
         maybeFail('tarea.create');
         const row: TareaRow = {
@@ -697,6 +701,9 @@ export function makeFakeDb(state: FixtureState) {
       }),
     },
 
+    tareaResponsable: {
+      findUnique: vi.fn(async () => null),
+    },
     tareaEtiqueta: {
       createMany: vi.fn(async (args: { data: TareaEtiquetaRow[] }) => {
         maybeFail('tareaEtiqueta.createMany');

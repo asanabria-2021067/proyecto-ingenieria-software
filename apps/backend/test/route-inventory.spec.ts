@@ -109,13 +109,17 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
   });
 
   // MEJ-6/10/49/52: checklist, historial, evidencias y plantillas de tarea (permisos por actor en el servicio).
-  it('las rutas de checklist, historial, evidencias y plantillas existen todas, con JwtAuthGuard y escrituras con ProjectWriteGuard', () => {
+  it('las rutas de checklist, historial, enlaces, evidencias y plantillas existen todas, con JwtAuthGuard y escrituras con ProjectWriteGuard', () => {
     const esperadas = {
       TasksExtrasController: [
         'GET /api/proyectos/:projectId/tareas/:taskId/historial',
         'POST /api/proyectos/:projectId/tareas/:taskId/checklist',
         'PATCH /api/proyectos/:projectId/tareas/:taskId/checklist/:itemId',
         'DELETE /api/proyectos/:projectId/tareas/:taskId/checklist/:itemId',
+        // MEJ-107: enlaces con vista previa (SSRF validado en el servicio).
+        'GET /api/proyectos/:projectId/tareas/:taskId/enlaces',
+        'POST /api/proyectos/:projectId/tareas/:taskId/enlaces',
+        'DELETE /api/proyectos/:projectId/tareas/:taskId/enlaces/:linkId',
       ],
       EvidenceController: [
         'GET /api/proyectos/:projectId/tareas/:taskId/evidencias',
@@ -141,8 +145,23 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
           r.controller.startsWith('PlantillasTareaController.')) &&
         r.metodo !== 'GET',
     );
-    expect(escriben.length).toBe(7);
+    expect(escriben.length).toBe(9);
     expect(escriben.filter((r) => !r.guards.includes(ProjectWriteGuard)).map((r) => r.id)).toEqual([]);
+  });
+
+  // MEJ-109/110: responsables adicionales y respuestas/reacciones de comentarios de tarea (permisos en los servicios).
+  it('las rutas de responsables, respuestas y reacciones existen, con JwtAuthGuard y ProjectWriteGuard', () => {
+    const base = 'POST /api/proyectos/:projectId/tareas/:taskId/comentarios/:commentId';
+    const esperadas = [
+      'PUT /api/proyectos/:projectId/tareas/:taskId/responsables',
+      `${base}/respuestas`,
+      `${base}/reacciones`,
+    ];
+    const nuevas = rutas.filter((r) => esperadas.includes(r.id));
+    expect(nuevas.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(nuevas.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+    expect(nuevas.filter((r) => !r.guards.includes(ProjectWriteGuard)).map((r) => r.id)).toEqual([]);
+    expect(nuevas.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
   });
 
   // MEJ-54/55/56/57/23/24: seguimiento, resultados, portafolios, reconocimientos, retrospectiva y reporte del Sprint (permisos en los servicios).

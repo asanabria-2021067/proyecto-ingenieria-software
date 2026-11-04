@@ -1,4 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import { registrosDelTitular } from '../time-records/registros-titular';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -80,11 +81,15 @@ export class HoursRecognitionService {
         reconocidoEn: null,
         origenReporte: 'GRANULAR',
         horasReales: null,
-        registrosTiempo: { none: { revocadoEn: null } },
       },
-      select: { idAsignacion: true },
+      select: {
+        idAsignacion: true,
+        idUsuario: true,
+        registrosTiempo: { where: { revocadoEn: null }, select: { idUsuario: true } },
+      },
     });
-    for (const assignment of assignments) {
+    // MEJ-109: solo cuentan los registros del titular; los de otros responsables no acreditan horas al tramo.
+    for (const assignment of assignments.filter((a) => registrosDelTitular(a).length === 0)) {
       // Mismo compare-and-set que usaba el writer ordinario: el tramo sigue
       // siendo granular y sin consumir en el instante de escribir.
       const updated = await tx.asignacionTarea.updateMany({

@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { registrosDelTitular } from '../time-records/registros-titular';
 import {
   EstadoParticipacion,
   EstadoProyecto,
@@ -556,7 +557,7 @@ export class LeadershipReadService {
           idTarea: true,
           origenReporte: true,
           horasReales: true,
-          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, idUsuario: true } },
         },
       }),
     ]);
@@ -579,7 +580,7 @@ export class LeadershipReadService {
 
     for (const tramo of tramos) {
       const propios = facts.get(tramo.idUsuario) ?? blank();
-      const granulares = tramo.registrosTiempo.reduce((acc, fila) => acc.plus(fila.horas), CERO);
+      const granulares = registrosDelTitular(tramo).reduce((acc, fila) => acc.plus(fila.horas), CERO);
       const legacy = tramo.origenReporte === 'LEGACY' ? (tramo.horasReales ?? CERO) : CERO;
       propios.horasReportadas = dec2(new Prisma.Decimal(propios.horasReportadas).plus(granulares));
       propios.horasLegacy = dec2(new Prisma.Decimal(propios.horasLegacy).plus(legacy));
