@@ -211,6 +211,24 @@ nube `dv8tyo83a` y el preset sin firma `uvgenius` (secreto
 frontend); en desarrollo local esos son los valores por defecto de
 `docker-compose.dev.yml`.
 
+Documentos de cierre privados: sin `CLOSURE_KEKS`, `CLOSURE_ACTIVE_KEY_ID` y
+`CLOSURE_TICKET_HMAC_SECRET` el endpoint `POST /api/proyectos/:id/cierre/documentos/firma`
+responde 503 `CLOSURE_NO_CONFIGURADO`. `deploy.yml` las escribe al `.env` si no están
+vacías. Se generan una sola vez:
+
+```bash
+# CLOSURE_KEKS: JSON id -> base64 de 32 bytes
+node -e "console.log(JSON.stringify({k1:require('crypto').randomBytes(32).toString('base64')}))" | gh secret set CLOSURE_KEKS
+# CLOSURE_ACTIVE_KEY_ID: id (no secreto) de la KEK activa; debe existir en CLOSURE_KEKS
+printf 'k1' | gh secret set CLOSURE_ACTIVE_KEY_ID
+# CLOSURE_TICKET_HMAC_SECRET: base64 de >=32 bytes, independiente de las KEKs
+openssl rand -base64 32 | gh secret set CLOSURE_TICKET_HMAC_SECRET
+```
+
+Advertencia: si pierdes o cambias una KEK, los documentos ya cifrados con ella
+quedan ilegibles. Respáldala y, para rotar, agrega una KEK nueva a `CLOSURE_KEKS`
+y cambia `CLOSURE_ACTIVE_KEY_ID` sin retirar las anteriores.
+
 ### 2) Levantar entorno con Docker
 
 Todo el entorno (DB + Backend + Frontend):
