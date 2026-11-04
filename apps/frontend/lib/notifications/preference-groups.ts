@@ -186,6 +186,11 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
     etiqueta: 'Junta de asociación',
     descripcion: 'Administración te nombra, cambia o quita de la junta de una asociación.',
   },
+  ALCANCE_COORDINADOR: {
+    grupo: 'organizaciones',
+    etiqueta: 'Alcance de coordinación',
+    descripcion: 'Administración te asigna o cambia las carreras que coordinas.',
+  },
   SOLICITUD_CONTACTO: {
     grupo: 'cuenta',
     etiqueta: 'Solicitud de contacto',

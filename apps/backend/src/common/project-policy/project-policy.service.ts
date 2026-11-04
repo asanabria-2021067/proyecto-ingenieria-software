@@ -22,6 +22,11 @@ import {
   type ResolvedProjectId,
 } from './project-id-resolver.service';
 import type { ProjectLockRow } from './project-transaction.service';
+import {
+  alcanceDelActor,
+  coordinadorCubreProyecto,
+  FUERA_DE_ALCANCE_MESSAGE,
+} from '../../coordinador/coordinador-alcance';
 
 /**
  * Sprint 7 (06 v2 §32/§33/§40): catálogo declarativo de políticas de
@@ -173,7 +178,7 @@ export const PROJECT_WRITE_POLICY_CATALOG: Readonly<Record<ProjectWriteFamily, P
     descripcion: 'Envío B→R y reenvío O→R de publicación',
   },
   PUBLICACION_REVISION: {
-    actor: 'ADMIN',
+    actor: 'ADMIN_O_COORDINADOR',
     states: ['R'],
     sprint: 'ANY',
     entity: 'ANY',
@@ -236,7 +241,7 @@ export const PROJECT_WRITE_POLICY_CATALOG: Readonly<Record<ProjectWriteFamily, P
     descripcion: 'Enviar (E) y reenvío documental (S): todos los Sprints CERRADO',
   },
   CIERRE_VEREDICTO: {
-    actor: 'ADMIN',
+    actor: 'ADMIN_O_COORDINADOR',
     states: ['S'],
     sprint: 'NONE_OPERABLE',
     entity: 'ANY',
@@ -331,6 +336,14 @@ export class ProjectPolicyService {
         return;
       case 'ADMIN':
         await this.assertAdminTx(tx, actorId);
+        return;
+      case 'ADMIN_O_COORDINADOR':
+        {
+          const alcance = await alcanceDelActor(tx, actorId);
+          if (alcance !== undefined && !(await coordinadorCubreProyecto(tx, actorId, project.idProyecto, alcance))) {
+            throw new ForbiddenException(FUERA_DE_ALCANCE_MESSAGE);
+          }
+        }
         return;
       case 'PARTICIPANTE_ACTIVO':
         if (!(await this.hasActiveParticipationTx(tx, project.idProyecto, actorId))) {

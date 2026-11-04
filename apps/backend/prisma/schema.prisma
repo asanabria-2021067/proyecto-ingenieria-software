@@ -347,6 +347,8 @@ enum TipoNotificacion {
   HORAS_EN_RIESGO
   // MEJ-60: recordatorio de registrar horas en tareas en progreso (max uno cada 3 dias).
   RECORDATORIO_HORAS
+  // ROL-1: el administrador asignó o cambió el alcance de un coordinador académico.
+  ALCANCE_COORDINADOR
 }
 
 enum EstadoAmistad {
@@ -402,6 +404,7 @@ model Usuario {
   perfil                           PerfilEstudiante?
   registrosHorasSemestre           RegistroHorasSemestre[]
   habilidades                      UsuarioHabilidad[]
+  alcancesCoordinador              AlcanceCoordinador[]
   intereses                        UsuarioInteres[]
   cualidades                       UsuarioCualidad[]
   experiencias                     ExperienciaPrevia[]
@@ -634,8 +637,28 @@ model Carrera {
   perfiles      PerfilEstudiante[]
   rolesProyecto RolProyecto[]
   asociaciones  AsociacionCarrera[]
+  proyectos     Proyecto[]
+  alcancesCoordinador AlcanceCoordinador[]
 
   @@map("carrera")
+}
+
+/// ROL-1: alcance de un coordinador académico. Cada fila es UNA carrera o UNA facultad completa (nombre en Carrera.facultad).
+model AlcanceCoordinador {
+  idAlcanceCoordinador Int      @id @default(autoincrement()) @map("id_alcance_coordinador")
+  idUsuario            Int      @map("id_usuario")
+  idCarrera            Int?     @map("id_carrera")
+  facultad             String?  @db.VarChar(255)
+  asignadoPor          Int?     @map("asignado_por")
+  fechaAsignacion      DateTime @default(now()) @map("fecha_asignacion")
+
+  usuario Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  carrera Carrera? @relation(fields: [idCarrera], references: [idCarrera], onDelete: Restrict)
+
+  @@unique([idUsuario, idCarrera])
+  @@unique([idUsuario, facultad])
+  @@index([idCarrera])
+  @@map("alcance_coordinador")
 }
 
 model Habilidad {
@@ -831,9 +854,12 @@ model Proyecto {
   eliminadoEn         DateTime?         @map("eliminado_en")
   /// Publicado a nombre de una asociación oficial (solo Presidente y Editores de su junta).
   idAsociacion        Int?              @map("id_asociacion")
+  /// ROL-1: carrera propia del proyecto; si existe, manda sobre la del líder y la de la asociación.
+  idCarrera           Int?              @map("id_carrera")
 
   creador           Usuario                   @relation(fields: [creadoPor], references: [idUsuario], onDelete: Restrict)
   asociacion        Asociacion?               @relation(fields: [idAsociacion], references: [idAsociacion], onDelete: Restrict)
+  carrera           Carrera?                  @relation(fields: [idCarrera], references: [idCarrera], onDelete: SetNull)
   organizaciones    ProyectoOrganizacion[]
   intereses         ProyectoInteres[]
   roles             RolProyecto[]
@@ -858,6 +884,7 @@ model Proyecto {
 
   @@index([estadoProyecto, eliminadoEn])
   @@index([idAsociacion])
+  @@index([idCarrera])
   @@map("proyecto")
 }
 

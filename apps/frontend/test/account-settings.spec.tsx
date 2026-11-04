@@ -50,8 +50,8 @@ const FAMILIAS = [
   ['Recordatorios y calendario', 7],
   // MEJ-44: + MENCION_CHAT.
   ['Red de contactos', 4],
-  // ORG-1 y ASO-1: INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA, JUNTA_ASOCIACION.
-  ['Organizaciones y asociaciones', 4],
+  // ORG-1 y ASO-1: INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA, JUNTA_ASOCIACION. ROL-1: + ALCANCE_COORDINADOR.
+  ['Organizaciones y asociaciones', 5],
   ['Cuenta y seguridad', 5],
 ] as const;
 

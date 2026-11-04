@@ -16,6 +16,11 @@ import {
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { avisarProyectoNuevo } from '../projects/new-project-notifications';
+import {
+  alcanceDelActor,
+  coordinadorCubreProyecto,
+  proyectoEnAlcanceWhere,
+} from '../coordinador/coordinador-alcance';
 
 /**
  * C039 (06 v2 §24/§32/§39): reclamar y resolver la revisión de publicación
@@ -36,11 +41,13 @@ export class RevisionesService {
     private readonly readPolicy: ProjectReadPolicyService,
   ) {}
   async findAdminInbox(adminId: number) {
-    await this._requireAdmin(adminId);
+    // Admin: todo. Coordinador: solo los proyectos de su alcance.
+    const alcance = await alcanceDelActor(this.prisma, adminId);
+    const enAlcance = alcance ? proyectoEnAlcanceWhere(alcance, adminId) : {};
 
     const [revisionesPendientes, cierresPendientes, correccionesEnviadas] = await Promise.all([
       this.prisma.revisionProyecto.findMany({
-        where: { estadoRevision: 'PENDIENTE', proyecto: { estadoProyecto: EstadoProyecto.EN_REVISION } },
+        where: { estadoRevision: 'PENDIENTE', proyecto: { estadoProyecto: EstadoProyecto.EN_REVISION, ...enAlcance } },
         select: {
           idRevisionProyecto: true,
           idProyecto: true,
@@ -59,7 +66,7 @@ export class RevisionesService {
         orderBy: { enviadaEn: 'desc' },
       }),
       this.prisma.revisionCierreProyecto.findMany({
-        where: { estadoRevision: 'ENVIADA', proyecto: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE, eliminadoEn: null } },
+        where: { estadoRevision: 'ENVIADA', proyecto: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE, eliminadoEn: null, ...enAlcance } },
         select: {
           idRevisionCierre: true,
           idProyecto: true,
@@ -71,7 +78,7 @@ export class RevisionesService {
         orderBy: { enviadaEn: 'desc' },
       }),
       this.prisma.proyecto.findMany({
-        where: { estadoProyecto: EstadoProyecto.OBSERVADO, eliminadoEn: null },
+        where: { estadoProyecto: EstadoProyecto.OBSERVADO, eliminadoEn: null, ...enAlcance },
         select: {
           idProyecto: true,
           tituloProyecto: true,
@@ -109,7 +116,7 @@ export class RevisionesService {
     await this.readPolicy.assertRead(undefined, { projectId: idProyecto, actorId: userId, scope: 'resumen' });
 
     const esAdmin = await this._esAdmin(userId);
-    if (!esAdmin && proyecto.creadoPor !== userId) {
+    if (!esAdmin && proyecto.creadoPor !== userId && !(await coordinadorCubreProyecto(this.prisma, userId, idProyecto))) {
       throw new ForbiddenException('No tienes permiso para ver las revisiones de este proyecto');
     }
 
@@ -140,7 +147,6 @@ export class RevisionesService {
   async reclamar(idProyecto: number, adminId: number) {
     return this.projectTx.run(idProyecto, adminId, 'revisiones.reclamar', async (ctx) => {
       const { tx } = ctx;
-      await this._requireAdmin(adminId);
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'PUBLICACION_REVISION', adminId);
 
       const proyecto = await tx.proyecto.findUnique({
@@ -194,7 +200,6 @@ export class RevisionesService {
   async resolver(idProyecto: number, adminId: number, dto: ResolverRevisionDto) {
     return this.projectTx.run(idProyecto, adminId, 'revisiones.resolver', async (ctx) => {
       const { tx } = ctx;
-      await this._requireAdmin(adminId);
       await this.policy.assertWriteTx(tx, this.lockedProject(ctx), 'PUBLICACION_REVISION', adminId);
 
       const revision = await tx.revisionProyecto.findFirst({
@@ -303,12 +308,5 @@ export class RevisionesService {
 
   private async _esAdmin(userId: number): Promise<boolean> {
     return this.notifications.isAdmin(userId);
-  }
-
-  private async _requireAdmin(userId: number): Promise<void> {
-    const esAdmin = await this._esAdmin(userId);
-    if (!esAdmin) {
-      throw new ForbiddenException('Se requieren permisos de administrador');
-    }
   }
 }

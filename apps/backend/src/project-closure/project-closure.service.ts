@@ -1,5 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { BitacoraEventosService } from '../bitacora/bitacora-eventos.service';
 import { TipoEventoBitacora } from '../bitacora/tipos-evento-bitacora';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
@@ -7,6 +6,7 @@ import { ProjectReadPolicyService } from '../common/project-policy/project-read-
 import { ProjectTransactionService } from '../common/project-policy/project-transaction.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { alcanceDelActor, coordinadorCubreProyecto, FUERA_DE_ALCANCE_MESSAGE } from '../coordinador/coordinador-alcance';
 import { canonicalDigest } from './closure-report-model';
 import type { ClosureResult, RequestCloseDto, ResubmitClosureDto } from './dto/closure.dto';
 import {
@@ -109,9 +109,13 @@ export class ProjectClosureService {
     // La preparación es información del LÍDER —enumera qué falta para cerrar,
     // y ni el equipo ni un externo la consultan— y de la ADMINISTRACIÓN, que
     // la necesita para resolver la solicitud: la fase `APPROVE` existe
-    // precisamente para su revisión, y el administrador nunca es el líder.
+    // precisamente para su revisión, y el administrador nunca es el líder. El
+    // coordinador académico la lee solo en los proyectos de su alcance.
     if (proyecto.creadoPor !== actorId) {
-      await this.policy.assertAdminTx(this.prisma as unknown as Prisma.TransactionClient, actorId);
+      const alcance = await alcanceDelActor(this.prisma, actorId);
+      if (alcance !== undefined && !(await coordinadorCubreProyecto(this.prisma, actorId, projectId, alcance))) {
+        throw new ForbiddenException(FUERA_DE_ALCANCE_MESSAGE);
+      }
     }
     return this.readinessService.evaluate(undefined, projectId, { phase });
   }

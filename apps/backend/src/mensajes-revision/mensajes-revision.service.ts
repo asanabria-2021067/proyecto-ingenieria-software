@@ -14,6 +14,7 @@ import {
 } from '../common/project-policy/project-transaction.service';
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
+import { coordinadorCubreProyecto } from '../coordinador/coordinador-alcance';
 import { CreateMensajeRevisionDto } from './dto/create-mensaje-revision.dto';
 
 type Db = Prisma.TransactionClient | PrismaService;
@@ -42,7 +43,7 @@ export class MensajesRevisionService {
     const proyecto = await this.getProjectAccessContext(idProyecto);
     // C038 (§34): política de lectura histórica antes de la autorización del canal.
     await this.readPolicy.assertRead(undefined, { projectId: idProyecto, actorId: userId, scope: 'resumen' });
-    await this.assertChannelBAccess(proyecto, userId, false);
+    await this.assertChannelBAccess(proyecto, userId, false, true);
 
     return this.prisma.mensajeRevisionProyecto.findMany({
       where: { idProyecto },
@@ -156,10 +157,16 @@ export class MensajesRevisionService {
     },
     userId: number,
     forWrite: boolean,
+    /** Solo la lectura del canal: el coordinador de la carrera del proyecto lo ve, no escribe. */
+    lecturaCoordinador = false,
   ) {
     const isAdmin = await this.notifications.isAdmin(userId);
     const isLeader = proyecto.creadoPor === userId;
-    if (!isAdmin && !isLeader) {
+    if (
+      !isAdmin &&
+      !isLeader &&
+      !(lecturaCoordinador && (await coordinadorCubreProyecto(this.prisma, userId, proyecto.idProyecto)))
+    ) {
       throw new ForbiddenException('Solo líder o administradores pueden acceder a este canal');
     }
 

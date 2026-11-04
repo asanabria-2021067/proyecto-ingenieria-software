@@ -50,6 +50,7 @@ export type EntitySprintRequirement = 'ACTIVO' | 'EN_FINALIZACION' | 'NO_CERRADO
 export type WriteActorRule =
   | 'LIDER'
   | 'ADMIN'
+  | 'ADMIN_O_COORDINADOR'
   | 'PARTICIPANTE_ACTIVO'
   | 'LIDER_O_PARTICIPANTE_ACTIVO'
   | 'ACTOR_EXISTENTE';

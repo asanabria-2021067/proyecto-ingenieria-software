@@ -19,7 +19,7 @@ function enviar(res: Response, bytes: Buffer, tipo: string, nombre: string) {
 
 @Controller('admin/horas-semestre')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('administrador')
+@Roles('administrador', 'coordinador_academico')
 export class AdminHorasSemestreController {
   constructor(private readonly service: HorasSemestreService) {}
 
@@ -34,11 +34,13 @@ export class AdminHorasSemestreController {
   }
 
   @Get('comparativo')
+  @Roles('administrador')
   comparativo(@CurrentUser() user: { userId: number }) {
     return this.service.comparativo(user.userId);
   }
 
   @Get('resumen-asociaciones')
+  @Roles('administrador')
   resumenAsociaciones(@CurrentUser() user: { userId: number }, @Query() query: HorasCentralQueryDto) {
     return this.service.resumenPorAsociacion(user.userId, query);
   }

@@ -17,6 +17,7 @@ const SIN_ADMINISTRACION: readonly PerfilPermiso[] = ['estudiante', 'lider', 'me
 const SIN_LIDER_NI_ADMINISTRACION: readonly PerfilPermiso[] = ['estudiante', 'mentor', 'coordinador'];
 const SOLO_LIDER: readonly PerfilPermiso[] = ['lider'];
 const SOLO_ADMINISTRACION: readonly PerfilPermiso[] = ['administracion'];
+const COORDINACION_Y_ADMINISTRACION: readonly PerfilPermiso[] = ['coordinador', 'administracion'];
 
 export const MATRIZ_PERMISOS = {
   'dashboard.inicio': SIN_ADMINISTRACION,
@@ -25,8 +26,10 @@ export const MATRIZ_PERMISOS = {
   'admin.solicitudesRecuperacion': SOLO_ADMINISTRACION,
   'admin.apelaciones': SOLO_ADMINISTRACION,
   'admin.proyectos': SOLO_ADMINISTRACION,
-  'admin.cierre': SOLO_ADMINISTRACION,
-  'admin.revisiones': SOLO_ADMINISTRACION,
+  'admin.cierre': COORDINACION_Y_ADMINISTRACION,
+  'admin.revisiones': COORDINACION_Y_ADMINISTRACION,
+  'coordinador.panel': COORDINACION_Y_ADMINISTRACION,
+  'coordinador.horas': COORDINACION_Y_ADMINISTRACION,
   'perfil.ver': TODOS,
   'notificaciones.ver': TODOS,
   'perfil.editar': SIN_ADMINISTRACION,

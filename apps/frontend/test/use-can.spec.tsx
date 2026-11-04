@@ -61,8 +61,13 @@ const ACCIONES_ADMINISTRACION: AccionPermiso[] = [
   'admin.solicitudesRecuperacion',
   'admin.apelaciones',
   'admin.proyectos',
+];
+
+const ACCIONES_COORDINACION: AccionPermiso[] = [
   'admin.cierre',
   'admin.revisiones',
+  'coordinador.panel',
+  'coordinador.horas',
 ];
 
 const ACCIONES_LIDER: AccionPermiso[] = [
@@ -105,9 +110,9 @@ const ACCIONES_NO_LIDER: AccionPermiso[] = ['proyecto.postular', 'proyecto.salid
 const ESPERADO: Record<PerfilPermiso, AccionPermiso[]> = {
   estudiante: [...ACCIONES_COMPARTIDAS, ...ACCIONES_PARTICIPANTE, ...ACCIONES_NO_LIDER],
   mentor: [...ACCIONES_COMPARTIDAS, ...ACCIONES_PARTICIPANTE, ...ACCIONES_NO_LIDER],
-  coordinador: [...ACCIONES_COMPARTIDAS, ...ACCIONES_PARTICIPANTE, ...ACCIONES_NO_LIDER],
+  coordinador: [...ACCIONES_COMPARTIDAS, ...ACCIONES_PARTICIPANTE, ...ACCIONES_NO_LIDER, ...ACCIONES_COORDINACION],
   lider: [...ACCIONES_COMPARTIDAS, ...ACCIONES_PARTICIPANTE, ...ACCIONES_LIDER],
-  administracion: [...ACCIONES_COMPARTIDAS, ...ACCIONES_ADMINISTRACION],
+  administracion: [...ACCIONES_COMPARTIDAS, ...ACCIONES_ADMINISTRACION, ...ACCIONES_COORDINACION],
 };
 
 const USUARIOS: Record<PerfilPermiso, { roles: string[]; esLider: boolean }> = {
@@ -150,6 +155,7 @@ describe('matriz de permisos', () => {
       ...ACCIONES_COMPARTIDAS,
       ...ACCIONES_PARTICIPANTE,
       ...ACCIONES_NO_LIDER,
+      ...ACCIONES_COORDINACION,
     ]);
     expect([...cubiertas].sort()).toEqual([...ACCIONES].sort());
   });
@@ -187,16 +193,18 @@ describe('useCan', () => {
   it('un estudiante no puede ninguna acción de líder ni de administración', () => {
     usarUsuario(['estudiante']);
 
-    [...ACCIONES_LIDER, ...ACCIONES_ADMINISTRACION].forEach((accion) => {
+    [...ACCIONES_LIDER, ...ACCIONES_ADMINISTRACION, ...ACCIONES_COORDINACION].forEach((accion) => {
       const { result } = renderHook(() => useCan(accion));
       expect({ accion, puede: result.current }).toEqual({ accion, puede: false });
     });
   });
 
-  it('mentor y coordinador tienen los mismos permisos que un estudiante', () => {
+  it('el mentor tiene los mismos permisos que un estudiante y el coordinador, los de estudiante más la coordinación', () => {
     ACCIONES.forEach((accion) => {
       expect(puede(accion, ['mentor'])).toBe(puede(accion, ['estudiante']));
-      expect(puede(accion, ['coordinador_academico'])).toBe(puede(accion, ['estudiante']));
+      expect(puede(accion, ['coordinador_academico'])).toBe(
+        puede(accion, ['estudiante']) || ACCIONES_COORDINACION.includes(accion),
+      );
     });
   });
 

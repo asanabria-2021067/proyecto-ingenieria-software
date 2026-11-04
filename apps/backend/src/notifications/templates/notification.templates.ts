@@ -1,6 +1,7 @@
+import { COORDINADOR_TEMPLATES, type CoordinadorTemplateData } from './coordinador.templates';
 import { HORAS_TEMPLATES, type HorasTemplateData } from './horas.templates';
 
-export interface NotificationTemplateData extends HorasTemplateData {
+export interface NotificationTemplateData extends HorasTemplateData, CoordinadorTemplateData {
   NUEVA_POSTULACION: {
     userName: string;
     roleName: string;
@@ -428,7 +429,7 @@ export interface NotificationTemplateData extends HorasTemplateData {
 }
 
 export const NOTIFICATION_TEMPLATES = {
-  ...HORAS_TEMPLATES,
+  ...HORAS_TEMPLATES, ...COORDINADOR_TEMPLATES,
   NUEVA_POSTULACION: {
     title: 'Nueva postulación recibida',
     message: (data: NotificationTemplateData['NUEVA_POSTULACION']) =>

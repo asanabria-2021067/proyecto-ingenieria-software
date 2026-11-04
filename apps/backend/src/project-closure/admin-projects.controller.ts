@@ -29,8 +29,9 @@ export class AdminProjectsController {
     return this.historical.adminList(user.userId, query);
   }
 
-  /** E117: detalle; en vivo solo Sprints cerrados, en cerrado el histórico. */
+  /** E117: detalle; en vivo solo Sprints cerrados, en cerrado el histórico. El coordinador, solo de su alcance. */
   @Get(':projectId')
+  @Roles('administrador', 'coordinador_academico')
   detail(
     @Param('projectId', ParseIntPipe) projectId: number,
     @CurrentUser() user: { userId: number },
