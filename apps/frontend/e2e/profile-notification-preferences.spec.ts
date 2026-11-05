@@ -149,7 +149,8 @@ test.describe('FG05-C03: preferencias de notificación por tipo en el perfil', (
     // El perfil sigue ahí, ya sin las preferencias.
     await carlos.goto('/dashboard/perfil');
     await expect(carlos.getByRole('button', { name: 'Editar perfil' })).toBeVisible();
-    await expect(carlos.getByRole('switch')).toHaveCount(0);
+    // El unico interruptor legitimo del perfil es el del portafolio publico (MEJ-146).
+    await expect(carlos.getByRole('switch', { name: /^(?!Portafolio público activo$)/ })).toHaveCount(0);
   });
 
   test('Chat: solo la mención (MEJ-44) y la respuesta en hilo (MEJ-131) tienen interruptor; los mensajes no generan notificaciones', async () => {
