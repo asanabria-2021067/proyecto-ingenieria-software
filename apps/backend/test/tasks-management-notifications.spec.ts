@@ -32,7 +32,7 @@ function makeTx() {
     // tarea creada/eliminada tiene idHito != null. Por defecto [] para no
     // romper los tests preexistentes (idHito: null en las fixtures de
     // este archivo).
-    tarea: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    tarea: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
     asignacionTarea: { create: vi.fn(), updateMany: vi.fn() },
     tareaEtiqueta: { createMany: vi.fn(), deleteMany: vi.fn() },
     // HU-186: update() borra los avisos de vencimiento al cambiar la fecha límite.
@@ -103,7 +103,10 @@ function tareaRow(overrides: Record<string, unknown> = {}) {
     rolProyecto: null,
     asignaciones: [],
     etiquetas: [],
-    _count: { comentarios: 0 },
+    _count: { comentarios: 0, enlaces: 0 },
+    subtareas: [],
+    responsables: [],
+    idTareaPadre: null,
     ...overrides,
   };
 }

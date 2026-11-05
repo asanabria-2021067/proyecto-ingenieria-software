@@ -78,7 +78,10 @@ function tareaRow(overrides: Record<string, unknown> = {}) {
     rolProyecto: null,
     asignaciones: [],
     etiquetas: [],
-    _count: { comentarios: 0 },
+    _count: { comentarios: 0, enlaces: 0 },
+    subtareas: [],
+    responsables: [],
+    idTareaPadre: null,
     ...overrides,
   };
 }
@@ -842,6 +845,10 @@ describe('TasksService.assign', () => {
           'repeticionProxima',
           'esEjemplo',
           'checklist',
+          'idTareaPadre',
+          'subtareas',
+          'responsables',
+          'cantidadEnlaces',
         ].sort(),
       );
       expect(result).not.toHaveProperty('eliminadoEn');

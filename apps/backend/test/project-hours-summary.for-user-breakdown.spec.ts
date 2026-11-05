@@ -165,7 +165,7 @@ function prismaDe(mundo: Mundo) {
               horasReales: dec(t.horasReales),
               registrosTiempo: t.registros
                 .filter((r) => !('revocadoEn' in filtroRegistros) || !r.revocado)
-                .map((r) => ({ horas: new Prisma.Decimal(r.horas) })),
+                .map((r) => ({ horas: new Prisma.Decimal(r.horas), idUsuario: t.idUsuario })),
               tarea: {
                 idTarea: ta.idTarea,
                 idProyecto: ta.idProyecto,
@@ -352,7 +352,7 @@ describe('ProjectHoursSummaryService.forUserOpenProjects — regresión', () => 
       },
     });
     expect(llamadas[0].args.select).toMatchObject({
-      registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+      registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, idUsuario: true } },
     });
     expect(llamadas[1].args.where).toEqual({ participacion: { idUsuario: ESTUDIANTE }, estadoHoras: 'APROBADA' });
   });

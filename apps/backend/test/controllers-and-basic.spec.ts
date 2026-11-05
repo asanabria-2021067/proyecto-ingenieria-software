@@ -203,8 +203,8 @@ describe('Controllers and basic services', () => {
       tasksService as unknown as ConstructorParameters<typeof TasksController>[0],
     );
 
-    tasks.findAll(1, { userId: 9 });
-    expect(tasksService.findAll).toHaveBeenCalledWith(1, 9);
+    tasks.findAll(1, { userId: 9 }, {});
+    expect(tasksService.findAll).toHaveBeenCalledWith(1, 9, {});
 
     tasks.findOne(1, 5, { userId: 9 });
     expect(tasksService.findOne).toHaveBeenCalledWith(1, 5, 9);

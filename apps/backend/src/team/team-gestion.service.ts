@@ -93,6 +93,11 @@ export class TeamGestionService {
         data: { desasignadaEn: ahora },
       });
 
+      // MEJ-109: como responsable adicional sale de TODAS las tareas abiertas del proyecto (no solo las del Sprint ACTIVO).
+      const adicionales = await tx.tareaResponsable.deleteMany({
+        where: { idUsuario, tarea: { idProyecto, eliminadoEn: null, estadoTarea: { not: 'HECHO' } } },
+      });
+
       const tareasSinAsignar = asignaciones.map((a) => a.idTarea);
       await this.bitacora.registrarEvento({
         tx,
@@ -102,7 +107,7 @@ export class TeamGestionService {
         tipoEntidad: 'PROYECTO',
         idEntidad: idProyecto,
         valorAnterior: { estadoParticipacion: 'ACTIVO' },
-        valorNuevo: { idUsuario, estadoParticipacion: 'RETIRADO', motivo, participaciones: activas, tareasSinAsignar },
+        valorNuevo: { idUsuario, estadoParticipacion: 'RETIRADO', motivo, participaciones: activas, tareasSinAsignar, adicionales: adicionales.count },
       });
       await this.notifications.notifyUsers(
         [idUsuario],
@@ -142,7 +147,7 @@ export class TeamGestionService {
     const usuarios = new Map(integrantes.map((i) => [i.usuario.idUsuario, i.usuario]));
     const ids = [...usuarios.keys()];
 
-    const [abiertas, registros] = await Promise.all([
+    const [abiertas, abiertasAdicional, registros] = await Promise.all([
       this.prisma.asignacionTarea.groupBy({
         by: ['idUsuario'],
         where: {
@@ -152,6 +157,12 @@ export class TeamGestionService {
         },
         _count: { _all: true },
       }),
+      // MEJ-109: las tareas abiertas donde es responsable adicional también cuentan en su carga.
+      this.prisma.tareaResponsable.groupBy({
+        by: ['idUsuario'],
+        where: { idUsuario: { in: ids }, tarea: { idProyecto, eliminadoEn: null, estadoTarea: { not: 'HECHO' } } },
+        _count: { _all: true },
+      }),
       this.prisma.registroTiempoTarea.findMany({
         where: { idUsuario: { in: ids }, revocadoEn: null, asignacion: { tarea: { idProyecto } } },
         select: { idUsuario: true, horas: true, fecha: true, asignacion: { select: { tarea: { select: { idSprint: true } } } } },
@@ -159,6 +170,8 @@ export class TeamGestionService {
     ]);
 
     const tareas = new Map(abiertas.map((a) => [a.idUsuario, a._count._all]));
+    // El principal nunca figura como adicional de la misma tarea, así que las dos cuentas no se solapan.
+    for (const a of abiertasAdicional) tareas.set(a.idUsuario, (tareas.get(a.idUsuario) ?? 0) + a._count._all);
     const horas = new Map<number, { semana: number; sprint: number }>();
     for (const r of registros) {
       const dia = r.fecha.toISOString().slice(0, 10);

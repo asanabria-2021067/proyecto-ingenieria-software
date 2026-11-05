@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { registrosDelTitular } from '../time-records/registros-titular';
 import { DestinoArrastre, EstadoSprint, EstadoTarea, Prisma, TipoNotificacion } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { INSIGNIAS_EVENTO } from '../insignias/insignias.catalog';
@@ -208,12 +209,13 @@ export class SprintsService {
       },
       select: {
         idAsignacion: true,
+        idUsuario: true,
         horasReales: true,
-        registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+        registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, idUsuario: true } },
       },
     });
     const descuadradas = granulares.filter((tramo) => {
-      const suma = tramo.registrosTiempo.reduce(
+      const suma = registrosDelTitular(tramo).reduce(
         (acc, fila) => acc.plus(fila.horas),
         new Prisma.Decimal(0),
       );
@@ -678,7 +680,7 @@ export class SprintsService {
           horasReales: true,
           reconocidoEn: true,
           tarea: { select: { tituloTarea: true, eliminadoEn: true, tiempoEstimadoHoras: true } },
-          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, justificacionExceso: true } },
+          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, justificacionExceso: true, idUsuario: true } },
           ajustes: { where: { anuladoEn: null }, select: { horasBase: true, deltaHoras: true, justificacion: true } },
         },
       }),
@@ -697,7 +699,8 @@ export class SprintsService {
 
     for (const tramo of tramos) {
       const cache = tramo.horasReales ?? cero;
-      const granulares = tramo.registrosTiempo.reduce((acc, fila) => acc.plus(fila.horas), cero);
+      const registrosTitular = registrosDelTitular(tramo);
+      const granulares = registrosTitular.reduce((acc, fila) => acc.plus(fila.horas), cero);
       // Sobreestimación DEL TRAMO: lo reportado por encima de la estimación de
       // su tarea. Sin estimación no hay exceso que medir (no es cero: es que la
       // pregunta no aplica), y por eso `estimacionTarea` viaja tal cual.
@@ -706,7 +709,7 @@ export class SprintsService {
         estimacionTarea === null ? cero : Prisma.Decimal.max(granulares.minus(estimacionTarea), 0);
       // El estudiante justifica su propio exceso al registrar las horas; un
       // tramo puede tener varios registros, así que se conservan todas.
-      const justificacionesExceso = tramo.registrosTiempo
+      const justificacionesExceso = registrosTitular
         .map((fila) => fila.justificacionExceso?.trim())
         .filter((texto): texto is string => !!texto);
       const legacyTramo = tramo.origenReporte === 'LEGACY' ? cache : cero;

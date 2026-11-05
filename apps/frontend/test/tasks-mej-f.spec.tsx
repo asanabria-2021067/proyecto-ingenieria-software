@@ -79,8 +79,8 @@ describe('funciones puras de tareas (MEJ-6/47/48/51/52)', () => {
   });
 
   it('extrasParaCrear solo incluye lo que tiene valor', () => {
-    expect(extrasParaCrear({ idTareaBloqueante: null, repeticion: null, checklist: [] })).toEqual({});
-    expect(extrasParaCrear({ idTareaBloqueante: 4, repeticion: 'SEMANAL', checklist: ['a'] })).toEqual({
+    expect(extrasParaCrear({ idTareaBloqueante: null, repeticion: null, checklist: [], idsResponsablesAdicionales: [] })).toEqual({});
+    expect(extrasParaCrear({ idTareaBloqueante: 4, repeticion: 'SEMANAL', checklist: ['a'], idsResponsablesAdicionales: [] })).toEqual({
       idTareaBloqueante: 4,
       repeticion: 'SEMANAL',
       checklist: ['a'],

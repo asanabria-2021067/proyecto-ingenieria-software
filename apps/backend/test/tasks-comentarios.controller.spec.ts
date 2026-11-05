@@ -69,8 +69,8 @@ describe('TareaComentariosController - comentarios de tarea (rutas anidadas, Tar
     it('todos los @Param usan ParseIntPipe', () => {
       const source = readFileSync(join(__dirname, '../src/tasks/tarea-comentarios.controller.ts'), 'utf-8');
       const paramDecorators = source.match(/@Param\('[^']+',\s*ParseIntPipe\)/g) ?? [];
-      // projectId+taskId en los 4 métodos (8) + commentId en update/remove (2) = 10.
-      expect(paramDecorators.length).toBe(10);
+      // projectId+taskId en los 6 métodos (12) + commentId en update/remove/responder/reaccionar (4) = 16.
+      expect(paramDecorators.length).toBe(16);
     });
 
     it('el controller no consulta Prisma ni abre transacciones', () => {

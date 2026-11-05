@@ -23,11 +23,24 @@ export const TASK_SELECT = {
   tiempoEstimadoHoras: true,
   puntosHistoria: true,
   idTareaBloqueante: true,
+  idTareaPadre: true,
   repeticion: true,
   repeticionProxima: true,
   esEjemplo: true,
   bloqueante: {
     select: { idTarea: true, tituloTarea: true, estadoTarea: true, eliminadoEn: true },
+  },
+  subtareas: {
+    where: { eliminadoEn: null },
+    select: { estadoTarea: true },
+  },
+  responsables: {
+    select: {
+      usuario: {
+        select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true },
+      },
+    },
+    orderBy: { asignadoEn: 'asc' },
   },
   checklist: {
     select: { idItem: true, texto: true, completado: true },
@@ -58,7 +71,7 @@ export const TASK_SELECT = {
     },
   },
   _count: {
-    select: { comentarios: { where: { eliminadoEn: null } } },
+    select: { comentarios: { where: { eliminadoEn: null } }, enlaces: true },
   },
 } satisfies Prisma.TareaSelect;
 
@@ -125,6 +138,13 @@ export interface TareaPublica {
   esEjemplo: boolean;
   /** MEJ-6 */
   checklist: { idItem: number; texto: string; completado: boolean }[];
+  /** MEJ-106: tarea padre (null si es raiz) y avance de sus subtareas vigentes. */
+  idTareaPadre: number | null;
+  subtareas: { hechas: number; total: number };
+  /** MEJ-109: responsable principal primero, luego los adicionales. */
+  responsables: UsuarioResumenPublico[];
+  /** MEJ-107 */
+  cantidadEnlaces: number;
 }
 
 /**
@@ -187,6 +207,16 @@ export function mapTarea(row: TareaRow): TareaPublica {
     repeticionProxima: toDateOnly(row.repeticionProxima),
     esEjemplo: row.esEjemplo,
     checklist: row.checklist,
+    idTareaPadre: row.idTareaPadre,
+    subtareas: {
+      hechas: row.subtareas.filter((s) => s.estadoTarea === EstadoTarea.HECHO).length,
+      total: row.subtareas.length,
+    },
+    responsables: [
+      ...(asignacion ? [asignacion.usuario] : []),
+      ...row.responsables.map((r) => r.usuario).filter((u) => u.idUsuario !== asignacion?.idUsuario),
+    ],
+    cantidadEnlaces: row._count.enlaces,
   };
 }
 
@@ -216,4 +246,51 @@ export function compareTareas(a: TareaPublica, b: TareaPublica): number {
   }
 
   return a.idTarea - b.idTarea;
+}
+
+export const ORDEN_COLUMNAS = ['estado', 'prioridad', 'fechaLimite', 'responsable', 'titulo'] as const;
+export type OrdenColumna = (typeof ORDEN_COLUMNAS)[number];
+
+const ESTADO_ORDER: Record<EstadoTarea, number> = {
+  POR_HACER: 0,
+  EN_PROGRESO: 1,
+  EN_REVISION: 2,
+  HECHO: 3,
+};
+
+function claveColumna(t: TareaPublica, columna: OrdenColumna): string | number | null {
+  switch (columna) {
+    case 'estado':
+      return ESTADO_ORDER[t.estadoTarea];
+    case 'prioridad':
+      return PRIORITY_ORDER[t.prioridad];
+    case 'fechaLimite':
+      return t.fechaLimite;
+    case 'responsable':
+      return t.responsables[0] ? `${t.responsables[0].apellido} ${t.responsables[0].nombre}`.toLowerCase() : null;
+    case 'titulo':
+      return t.tituloTarea.toLowerCase();
+  }
+}
+
+/**
+ * MEJ-112: orden por columna con direccion; los valores vacios (sin fecha,
+ * sin responsable) van siempre al final y idTarea desempata.
+ */
+export function ordenarTareas(
+  tareas: TareaPublica[],
+  columna: OrdenColumna,
+  direccion: 'asc' | 'desc',
+): TareaPublica[] {
+  const signo = direccion === 'asc' ? 1 : -1;
+  return [...tareas].sort((a, b) => {
+    const ka = claveColumna(a, columna);
+    const kb = claveColumna(b, columna);
+    if (ka !== kb) {
+      if (ka === null) return 1;
+      if (kb === null) return -1;
+      return (ka < kb ? -1 : 1) * signo;
+    }
+    return a.idTarea - b.idTarea;
+  });
 }

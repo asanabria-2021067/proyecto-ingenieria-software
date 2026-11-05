@@ -13,6 +13,7 @@ function makeContext() {
     assertProjectLeader: vi.fn(),
     assertActiveProjectParticipant: vi.fn(),
     esMiembroDeOrganizacionDelProyecto: vi.fn().mockResolvedValue(false),
+    esResponsableAdicional: vi.fn().mockResolvedValue(false),
   };
   return context as typeof context & TasksContextService;
 }
@@ -382,6 +383,18 @@ describe('TasksAuthorizationService', () => {
       const result = await service.assertCanChangeTaskState(1, 10, ASIGNADO_ID);
 
       expect(result).toBe(TAREA);
+    });
+
+    it('MEJ-109: permite a un responsable adicional aunque no sea el asignado activo', async () => {
+      const ctx = makeContext();
+      ctx.getTaskInProjectOrThrow.mockResolvedValue(TAREA);
+      ctx.getProjectOrThrow.mockResolvedValue(PROYECTO);
+      ctx.getActiveAssignment.mockResolvedValue({ idAsignacion: 1, idTarea: 10, idUsuario: ASIGNADO_ID, desasignadaEn: null });
+      ctx.esResponsableAdicional.mockResolvedValue(true);
+      const service = new TasksAuthorizationService(ctx);
+
+      await expect(service.assertCanChangeTaskState(1, 10, EXTERNO_ID)).resolves.toBe(TAREA);
+      expect(ctx.esResponsableAdicional).toHaveBeenCalledWith(10, EXTERNO_ID, undefined);
     });
 
     it('rechaza a un usuario distinto del asignado activo', async () => {

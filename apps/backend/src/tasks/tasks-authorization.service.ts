@@ -107,6 +107,11 @@ export class TasksAuthorizationService {
       return tarea;
     }
 
+    // MEJ-109: los responsables adicionales operan igual que el principal.
+    if (await this.tasksContext.esResponsableAdicional(taskId, userId, tx)) {
+      return tarea;
+    }
+
     throw new ForbiddenException('No tienes permiso para realizar esta acción sobre la tarea');
   }
 

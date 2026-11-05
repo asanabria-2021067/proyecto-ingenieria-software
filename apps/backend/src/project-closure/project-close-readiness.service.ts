@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { registrosDelTitular } from '../time-records/registros-titular';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { captureClosureExecution } from './closure-execution-capture';
@@ -152,12 +153,13 @@ export class ProjectCloseReadinessService {
         where: { tarea: { idProyecto: projectId } },
         select: {
           idAsignacion: true,
+          idUsuario: true,
           idParticipacion: true,
           desasignadaEn: true,
           horasReales: true,
           reconocidoEn: true,
           origenReporte: true,
-          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, idUsuario: true } },
           participacion: { select: { rolProyecto: { select: { idProyecto: true } } } },
         },
       }),
@@ -266,7 +268,7 @@ export class ProjectCloseReadinessService {
       if (tramo.origenReporte !== 'GRANULAR') {
         return false;
       }
-      const suma = tramo.registrosTiempo.reduce((acc, registro) => acc.plus(registro.horas), cero);
+      const suma = registrosDelTitular(tramo).reduce((acc, registro) => acc.plus(registro.horas), cero);
       const cache = tramo.horasReales ?? cero;
       return !cache.equals(suma);
     });

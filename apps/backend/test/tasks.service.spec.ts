@@ -64,7 +64,10 @@ function baseRow(overrides: Record<string, unknown> = {}) {
     rolProyecto: null,
     asignaciones: [],
     etiquetas: [],
-    _count: { comentarios: 0 },
+    _count: { comentarios: 0, enlaces: 0 },
+    subtareas: [],
+    responsables: [],
+    idTareaPadre: null,
     ...overrides,
   };
 }
@@ -240,6 +243,10 @@ describe('TasksService', () => {
           'repeticionProxima',
           'esEjemplo',
           'checklist',
+          'idTareaPadre',
+          'subtareas',
+          'responsables',
+          'cantidadEnlaces',
         ].sort(),
       );
     });
@@ -567,7 +574,12 @@ describe('TasksService', () => {
           { etiqueta: { idEtiqueta: 2, nombreEtiqueta: 'urgente', nombreNormalizado: 'urgente', color: '#EF4444' } },
           { etiqueta: { idEtiqueta: 1, nombreEtiqueta: 'backend', nombreNormalizado: 'backend', color: '#10B981' } },
         ],
-        _count: { comentarios: 4 },
+        _count: { comentarios: 4, enlaces: 3 },
+        subtareas: [{ estadoTarea: 'HECHO' }, { estadoTarea: 'POR_HACER' }],
+        responsables: [
+          { usuario: { idUsuario: 3, nombre: 'Ana', apellido: 'García', fotoUrl: null } },
+          { usuario: { idUsuario: 8, nombre: 'Luis', apellido: 'Pérez', fotoUrl: null } },
+        ],
       });
       prisma.tarea.findMany.mockResolvedValue([filaCompleta]);
       const service = makeService(prisma, auth);
@@ -607,6 +619,14 @@ describe('TasksService', () => {
         repeticionProxima: '2026-08-22',
         esEjemplo: false,
         checklist: [{ idItem: 1, texto: 'Medir', completado: true }],
+        idTareaPadre: null,
+        subtareas: { hechas: 1, total: 2 },
+        // El principal va primero y no se duplica si tambien figura como adicional.
+        responsables: [
+          { idUsuario: 3, nombre: 'Ana', apellido: 'García', fotoUrl: null },
+          { idUsuario: 8, nombre: 'Luis', apellido: 'Pérez', fotoUrl: null },
+        ],
+        cantidadEnlaces: 3,
       });
 
       // Campos internos que nunca deben aparecer, ni en este ni en ningún caso.

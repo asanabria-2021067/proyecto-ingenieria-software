@@ -7,6 +7,8 @@ import {
   editarComentarioTarea,
   eliminarComentarioTarea,
   getComentariosTarea,
+  reaccionarComentarioTarea,
+  responderComentarioTarea,
 } from '@/lib/services/task-comments';
 import { projectTasksQueryKey, taskCommentsQueryKey } from '@/lib/query-keys/tasks';
 
@@ -51,6 +53,8 @@ export function TaskCommentsPanel({
       crear={(contenido) => crearComentarioTarea(idProyecto, tarea, contenido)}
       editar={(idComentario, contenido) => editarComentarioTarea(idProyecto, tarea, idComentario, contenido)}
       eliminar={(idComentario) => eliminarComentarioTarea(idProyecto, tarea, idComentario)}
+      responder={(idComentario, contenido) => responderComentarioTarea(idProyecto, tarea, idComentario, contenido)}
+      reaccionar={(idComentario, emoji) => reaccionarComentarioTarea(idProyecto, tarea, idComentario, emoji)}
       onMutado={() => queryClient.invalidateQueries({ queryKey: projectTasksQueryKey(idProyecto) })}
       scroll={scroll}
       comentarioDestacado={comentarioDestacado}

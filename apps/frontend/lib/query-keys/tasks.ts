@@ -40,3 +40,7 @@ export const taskEvidenceQueryKey = (idProyecto: number, idTarea: number) =>
 
 /** MEJ-52 */
 export const taskTemplatesQueryKey = (idProyecto: number) => ['task-templates', idProyecto] as const;
+
+/** MEJ-107 */
+export const taskLinksQueryKey = (idProyecto: number, idTarea: number) =>
+  ['task-links', idProyecto, idTarea] as const;

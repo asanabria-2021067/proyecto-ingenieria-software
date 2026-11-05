@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  taskLinksQueryKey,
   taskEvidenceQueryKey,
   taskHistoryQueryKey,
   taskTemplatesQueryKey,
@@ -10,18 +11,22 @@ import {
 import {
   addChecklistItem,
   addTaskEvidence,
+  addTaskLink,
   createTaskTemplate,
   deleteTaskTemplate,
   getTaskEvidence,
   getTaskHistory,
+  getTaskLinks,
   getTaskTemplates,
   removeChecklistItem,
   removeTaskEvidence,
+  removeTaskLink,
   updateChecklistItem,
 } from '@/lib/services/tasks';
 import type {
   CreateEvidenciaInput,
   CreatePlantillaTareaInput,
+  EnlaceTareaDTO,
   EvidenciaTareaDTO,
   HistorialTareaEntradaDTO,
   PlantillaTareaDTO,
@@ -96,6 +101,38 @@ export function useTaskEvidence(idProyecto: number, idTarea: number) {
     refetch: query.refetch,
     subir,
     eliminar,
+  };
+}
+
+/** MEJ-107: enlaces de la tarea; `cantidadEnlaces` viaja en la tarea, así que también se invalida el tablero. */
+export function useTaskLinks(idProyecto: number, idTarea: number) {
+  const queryClient = useQueryClient();
+  const query = useQuery<EnlaceTareaDTO[]>({
+    queryKey: taskLinksQueryKey(idProyecto, idTarea),
+    queryFn: () => getTaskLinks(idProyecto, idTarea),
+    enabled: idProyecto > 0 && idTarea > 0,
+  });
+  const invalidar = () => {
+    queryClient.invalidateQueries({ queryKey: taskLinksQueryKey(idProyecto, idTarea) });
+    queryClient.invalidateQueries({ queryKey: projectTasksQueryKey(idProyecto) });
+  };
+
+  const agregar = useMutation({
+    mutationFn: (url: string) => addTaskLink(idProyecto, idTarea, url),
+    onSuccess: invalidar,
+  });
+  const quitar = useMutation({
+    mutationFn: (idEnlace: number) => removeTaskLink(idProyecto, idTarea, idEnlace),
+    onSuccess: invalidar,
+  });
+
+  return {
+    enlaces: query.data ?? [],
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
+    agregar,
+    quitar,
   };
 }
 

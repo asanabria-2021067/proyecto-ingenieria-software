@@ -25,6 +25,8 @@ const WRITE_HANDLERS = [
   'closeAssignment',
   // HU-202/T-383: acciones masivas del tablero.
   'bulkAction',
+  // MEJ-109: responsables adicionales.
+  'setResponsables',
 ] as const;
 
 function guardsOf(handlerName: string): unknown[] {

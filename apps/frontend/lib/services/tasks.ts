@@ -8,6 +8,7 @@ import type {
   CreateEvidenciaInput,
   CreatePlantillaTareaInput,
   CreateTaskInput,
+  EnlaceTareaDTO,
   EvidenciaTareaDTO,
   HistorialTareaEntradaDTO,
   PlantillaTareaDTO,
@@ -170,4 +171,28 @@ export function createTaskTemplate(idProyecto: number, input: CreatePlantillaTar
 
 export function deleteTaskTemplate(idProyecto: number, idPlantilla: number): Promise<void> {
   return apiFetch<void>(`/proyectos/${idProyecto}/plantillas-tarea/${idPlantilla}`, { method: 'DELETE' });
+}
+
+/** MEJ-109: reemplaza el conjunto de responsables ADICIONALES (el principal se cambia con asignar). */
+export function setTaskResponsables(idProyecto: number, idTarea: number, idsUsuarios: number[]): Promise<TareaPublicaDTO> {
+  return apiFetch<TareaPublicaDTO>(`/proyectos/${idProyecto}/tareas/${idTarea}/responsables`, {
+    method: 'PUT',
+    body: JSON.stringify({ idsUsuarios }),
+  });
+}
+
+/** MEJ-107 */
+export function getTaskLinks(idProyecto: number, idTarea: number): Promise<EnlaceTareaDTO[]> {
+  return apiFetch<EnlaceTareaDTO[]>(`/proyectos/${idProyecto}/tareas/${idTarea}/enlaces`);
+}
+
+export function addTaskLink(idProyecto: number, idTarea: number, url: string): Promise<EnlaceTareaDTO> {
+  return apiFetch<EnlaceTareaDTO>(`/proyectos/${idProyecto}/tareas/${idTarea}/enlaces`, {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  });
+}
+
+export function removeTaskLink(idProyecto: number, idTarea: number, idEnlace: number): Promise<void> {
+  return apiFetch<void>(`/proyectos/${idProyecto}/tareas/${idTarea}/enlaces/${idEnlace}`, { method: 'DELETE' });
 }

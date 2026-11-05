@@ -179,3 +179,21 @@ export async function assertNoBloqueada(
     }
   }
 }
+
+/** MEJ-106: la tarea padre debe existir en el proyecto y ser raiz (un solo nivel de subtareas). */
+export async function assertPadreValido(
+  tx: Prisma.TransactionClient,
+  projectId: number,
+  idPadre: number,
+): Promise<void> {
+  const padre = await tx.tarea.findFirst({
+    where: { idTarea: idPadre, idProyecto: projectId, eliminadoEn: null },
+    select: { idTareaPadre: true },
+  });
+  if (!padre) {
+    throw new BadRequestException('La tarea padre no existe en este proyecto');
+  }
+  if (padre.idTareaPadre !== null) {
+    throw new BadRequestException('Una subtarea no puede tener subtareas');
+  }
+}

@@ -107,7 +107,7 @@ export class LinkPreviewService {
   }
 
   /** Resuelve el DNS y exige que TODAS las direcciones sean publicas; devuelve la que se usara para conectar. */
-  private async resolveSafe(url: URL, signal: AbortSignal): Promise<Address> {
+  async resolveSafe(url: URL, signal: AbortSignal): Promise<Address> {
     const host = hostnameOf(url);
     const kind = isIP(host);
     const addresses = kind

@@ -75,7 +75,8 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
       // Desde la Tarea 18, @Body() existe únicamente para el DTO tipado de
       // creación (CreateTaskDto) — nunca para leer userId/creadaPor/
       // idProyecto directamente del payload del cliente.
-      expect(source).not.toMatch(/@Query\(/);
+      // MEJ-112: unico @Query permitido es el de filtros/orden del listado; nunca identidad.
+      expect(source).not.toMatch(/@Query\((?!\)\s+query:\s+ListTasksQueryDto)/);
       expect(source).not.toMatch(/@Headers\(/);
       expect(source).toMatch(/@Body\(\)\s+dto:\s+CreateTaskDto/);
       expect(source).not.toMatch(/@Body\('userId'/);
@@ -115,9 +116,9 @@ describe('TasksController - rutas, guard y códigos HTTP', () => {
       const service = makeService();
       const controller = makeController(service);
 
-      controller.findAll(5, { userId: 9 });
+      controller.findAll(5, { userId: 9 }, {});
 
-      expect(service.findAll).toHaveBeenCalledWith(5, 9);
+      expect(service.findAll).toHaveBeenCalledWith(5, 9, {});
     });
 
     it('findOne delega con projectId, taskId (Param) y userId (CurrentUser)', () => {

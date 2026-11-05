@@ -101,6 +101,7 @@ interface TaskBoardProps {
   editarTarea: ProjectTasksHook['editarTarea'];
   asignarTarea: ProjectTasksHook['asignarTarea'];
   desasignarTarea: ProjectTasksHook['desasignarTarea'];
+  fijarResponsables?: ProjectTasksHook['fijarResponsables'];
   roles: RolOpcion[];
   milestones: HitoOpcion[];
   members: MiembroProyecto[];
@@ -255,6 +256,7 @@ export function TaskBoard({
   editarTarea,
   asignarTarea,
   desasignarTarea,
+  fijarResponsables,
   roles,
   milestones,
   members,
@@ -864,6 +866,7 @@ export function TaskBoard({
           editarTarea={editarTarea}
           asignarTarea={asignarTarea}
           desasignarTarea={desasignarTarea}
+          fijarResponsables={fijarResponsables}
           onOpenChange={(open) => {
             if (!open) {
               setCrearAbierto(false);
