@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { OrganizationsService } from './organizations.service';
 import { OrganizationInvitationsService } from './organization-invitations.service';
+import { listarPlantillas } from './organization-templates';
 import { OrganizationChatService } from './organization-chat.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -41,6 +42,12 @@ export class OrganizationsController {
   @Post()
   create(@Body() dto: CreateOrganizationDto, @CurrentUser() user: Usuario) {
     return this.organizations.create(user.userId, dto);
+  }
+
+  /** MEJ-156: plantillas disponibles (la fuente es el backend). */
+  @Get('plantillas')
+  plantillas() {
+    return listarPlantillas();
   }
 
   /** `GET /organizaciones` ya es el catálogo de organizaciones (CatalogsController). */

@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { OrgAvatar } from '@/components/organizations/org-avatar';
-import { useActualizarOrganizacion, useCrearOrganizacion } from '@/hooks/use-organizations';
+import { PlantillaSelector } from '@/components/organizations/plantilla-selector';
+import { useActualizarOrganizacion, useCrearOrganizacion, usePlantillasOrganizacion } from '@/hooks/use-organizations';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { mensajeErrorOrganizacion } from '@/lib/organizations/errors';
 import {
@@ -19,7 +20,7 @@ import {
 } from '@/lib/organizations/form';
 import { normalizeUrlInput } from '@/lib/security/safe-url';
 import { aviso } from '@/lib/mensajes';
-import type { OrganizacionDetalle, VisibilidadOrganizacion } from '@/lib/types/organizations';
+import type { OrganizacionDetalle, PlantillaOrganizacion, VisibilidadOrganizacion } from '@/lib/types/organizations';
 
 const STEPS = [
   { title: 'Datos', icon: Building2, desc: 'Nombre y descripción' },
@@ -49,6 +50,9 @@ export function OrgForm({ org }: { org?: OrganizacionDetalle }) {
   const [sitioWeb, setSitioWeb] = useState(org?.sitioWeb ?? '');
   const [logo, setLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const plantillas = usePlantillasOrganizacion().data;
+  const [plantilla, setPlantilla] = useState<PlantillaOrganizacion | null>(null);
+  const [descripcionEditada, setDescripcionEditada] = useState(false);
   const [visibilidad, setVisibilidad] = useState<VisibilidadOrganizacion>(org?.visibilidad ?? 'PRIVADA');
   const [errores, setErrores] = useState<ErroresOrganizacion>({});
   const [guardando, setGuardando] = useState(false);
@@ -59,6 +63,12 @@ export function OrgForm({ org }: { org?: OrganizacionDetalle }) {
     },
     [logoPreview],
   );
+
+  // La plantilla sugiere la descripción, pero nunca pisa lo que la persona ya escribió.
+  const elegirPlantilla = (elegida: PlantillaOrganizacion | null) => {
+    setPlantilla(elegida);
+    if (!descripcionEditada) setDescripcion(elegida?.descripcion ?? '');
+  };
 
   const elegirLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const archivo = e.target.files?.[0] ?? null;
@@ -182,6 +192,9 @@ export function OrgForm({ org }: { org?: OrganizacionDetalle }) {
       <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm md:p-8">
         {step === 0 && (
           <div className="space-y-6">
+            {!org && plantillas && plantillas.length > 0 && (
+              <PlantillaSelector plantillas={plantillas} value={plantilla?.clave ?? null} onChange={elegirPlantilla} />
+            )}
             <div>
               <label htmlFor="org-nombre" className={labelClass}>
                 Nombre <span className="text-error">*</span>
@@ -207,7 +220,10 @@ export function OrgForm({ org }: { org?: OrganizacionDetalle }) {
                 className={inputClass}
                 placeholder="¿A qué se dedica y qué proyectos busca impulsar?"
                 value={descripcion}
-                onChange={(e) => setDescripcion(e.target.value)}
+                onChange={(e) => {
+                  setDescripcion(e.target.value);
+                  setDescripcionEditada(true);
+                }}
               />
               <ErrorCampo mensaje={errores.descripcion} />
             </div>

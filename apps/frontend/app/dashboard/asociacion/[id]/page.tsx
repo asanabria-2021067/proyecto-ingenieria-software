@@ -7,7 +7,9 @@ import { AlertCircle, Lock, Users } from 'lucide-react';
 import { AnunciosEntidad } from '@/components/anuncios/anuncios-entidad';
 import { AsociacionEstudiantesTabla } from '@/components/associations/asociacion-estudiantes-tabla';
 import { AsociacionFiltros } from '@/components/associations/asociacion-filtros';
+import { AsociacionMetas } from '@/components/associations/asociacion-metas';
 import { AsociacionProyectos } from '@/components/associations/asociacion-proyectos';
+import { AvisoEstudiantes } from '@/components/associations/aviso-estudiantes';
 import { ReporteBotones } from '@/components/associations/reporte-botones';
 import { PortafolioProyectos } from '@/components/projects/portafolio-proyectos';
 import { DATA_TABLE_CARD } from '@/components/dashboard/data-table';
@@ -21,7 +23,7 @@ import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useEstudiantesAsociacion, useMisJuntas } from '@/hooks/use-asociaciones';
 import { useHorasActual } from '@/hooks/use-horas-semestre';
-import { CARGO_LABEL, FILTROS_ASOCIACION_INICIALES, filtrosAsociacion, type FiltrosAsociacionUI } from '@/lib/asociaciones/vista';
+import { CARGO_LABEL, FILTROS_ASOCIACION_INICIALES, filtrosAsociacion, puedePublicarComoAsociacion, type FiltrosAsociacionUI } from '@/lib/asociaciones/vista';
 import { descargarEstudiantesAsociacion, descargarProyectosAsociacion } from '@/lib/services/asociaciones';
 
 const PASOS_AYUDA = [
@@ -114,6 +116,7 @@ export default function AsociacionDashboardPage() {
         </TabsList>
 
         <TabsContent value="estudiantes" className="flex flex-col gap-stack">
+          <AsociacionMetas idAsociacion={idAsociacion} puedeEditar={puedePublicarComoAsociacion(junta)} />
           <div id="tour-aso-filtros">
             <AsociacionFiltros value={ui} onChange={setUi} texto={texto} onTexto={setTexto} semestreActual={semestreActual} />
           </div>
@@ -129,6 +132,7 @@ export default function AsociacionDashboardPage() {
               nombre={`en-riesgo-${nombreSemestre}`}
               descargar={(f) => descargarEstudiantesAsociacion(idAsociacion, f, { ...filtros, enRiesgo: true })}
             />
+            <AvisoEstudiantes idAsociacion={idAsociacion} filtros={filtros} puedeEnviar={puedePublicarComoAsociacion(junta)} />
           </div>
 
           {estudiantes.isError ? (

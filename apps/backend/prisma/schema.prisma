@@ -334,6 +334,8 @@ enum TipoNotificacion {
   CUENTA_VERIFICADA
   // G05-C11 (OWASP25-C038): alerta de seguridad a administradores (emitida solo con SECURITY_ALERTS_ENABLED=true).
   ALERTA_SEGURIDAD
+  // MEJ-161: aviso de la junta a los estudiantes de una lista filtrada.
+  AVISO_ASOCIACION
   // HU-184: alguien compartió su calendario (solo lectura) con el usuario.
   CALENDARIO_COMPARTIDO
   // HU-186 (T-330): recordatorio de una tarea próxima a vencer (24 h / 48 h).
@@ -486,6 +488,7 @@ model Usuario {
   solicitudesDesactivacionResueltas SolicitudDesactivacion[]    @relation("SolicitudDesactivacionResolutor")
   rolesAcceso                      UsuarioRolAcceso[]
   anunciosCerrados                 AnuncioCierre[]
+  anunciosDirigidos                AnuncioDestinatario[]
   auditorias                       BitacoraAuditoria[]
   configuracionesActualizadas      ConfiguracionSistema[]
   revisionesProyectoRealizadas     RevisionProyecto[]           @relation("RevisionesProyectoRealizadas")
@@ -1001,8 +1004,31 @@ model Asociacion {
   proyectos Proyecto[]
   seguidores SeguimientoEntidad[]
   anuncios   Anuncio[]
+  metas      MetaAsociacion[]
 
   @@map("asociacion")
+}
+
+enum TipoHorasMeta {
+  BECA
+  EXTENSION
+}
+
+/// MEJ-162: meta por semestre, p. ej. 80% de los estudiantes al dia en horas beca.
+model MetaAsociacion {
+  idMeta             Int           @id @default(autoincrement()) @map("id_meta")
+  idAsociacion       Int           @map("id_asociacion")
+  anio               Int
+  periodo            Int
+  tipo               TipoHorasMeta
+  porcentajeObjetivo Int           @map("porcentaje_objetivo")
+  creadaEn           DateTime      @default(now()) @map("creada_en")
+  actualizadaEn      DateTime      @updatedAt @map("actualizada_en")
+
+  asociacion Asociacion @relation(fields: [idAsociacion], references: [idAsociacion], onDelete: Cascade)
+
+  @@unique([idAsociacion, anio, periodo, tipo])
+  @@map("meta_asociacion")
 }
 
 model AsociacionCarrera {
@@ -2672,11 +2698,25 @@ model Anuncio {
   organizacion Organizacion? @relation(fields: [idOrganizacion], references: [idOrganizacion], onDelete: Cascade)
   asociacion   Asociacion?   @relation(fields: [idAsociacion], references: [idAsociacion], onDelete: Cascade)
   cierres      AnuncioCierre[]
+  /// MEJ-161: si hay filas, el anuncio solo lo ven esos usuarios (aviso de la junta a una lista filtrada).
+  destinatarios AnuncioDestinatario[]
 
   @@index([idOrganizacion])
   @@index([idAsociacion])
   @@index([activo, fechaInicio, fechaFin])
   @@map("anuncio")
+}
+
+model AnuncioDestinatario {
+  idAnuncio Int @map("id_anuncio")
+  idUsuario Int @map("id_usuario")
+
+  anuncio Anuncio @relation(fields: [idAnuncio], references: [idAnuncio], onDelete: Cascade)
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+
+  @@id([idAnuncio, idUsuario])
+  @@index([idUsuario])
+  @@map("anuncio_destinatario")
 }
 
 model AnuncioCierre {

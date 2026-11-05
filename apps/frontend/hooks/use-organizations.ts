@@ -16,6 +16,7 @@ import {
   getMisInvitaciones,
   getMisOrganizaciones,
   getOrganizacion,
+  getPlantillasOrganizacion,
   getSolicitudesOrganizacion,
   invitarMiembro,
   quitarMiembro,
@@ -34,6 +35,7 @@ import {
   misInvitacionesOrgQueryKey,
   misOrganizacionesQueryKey,
   organizacionQueryKey,
+  plantillasOrgQueryKey,
   solicitudesOrgQueryKey,
 } from '@/lib/query-keys/organizations';
 import { reintentarSiNoEsTerminal } from '@/lib/api/query-retry';
@@ -91,6 +93,10 @@ export function useCandidatosOrg(id: number, q: string) {
     queryFn: () => buscarCandidatos(id, consulta),
     enabled: consulta.replace(/\s+/g, '').length >= 3,
   });
+}
+
+export function usePlantillasOrganizacion() {
+  return useQuery({ queryKey: plantillasOrgQueryKey, queryFn: getPlantillasOrganizacion, staleTime: Infinity, retry: false });
 }
 
 export function useCrearOrganizacion() {
