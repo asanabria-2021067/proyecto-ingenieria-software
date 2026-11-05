@@ -261,6 +261,13 @@ export const PROJECT_WRITE_POLICY_CATALOG: Readonly<Record<ProjectWriteFamily, P
     entity: 'ANY',
     descripcion: 'Crear actividad y marcar asistencia (HU-177): exclusivo del líder; no depende del Sprint ambiente',
   },
+  BAJA_INTEGRANTE: {
+    actor: 'ADMIN_O_COORDINADOR',
+    states: OPERATIVE,
+    sprint: 'NOT_FINALIZING',
+    entity: 'ANY',
+    descripcion: 'Baja de un integrante por administración o coordinador en alcance (MEJ-105); el líder no puede',
+  },
 };
 
 export interface WriteEntityContext {

@@ -1,11 +1,36 @@
-import { Controller, Get, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { BajaIntegranteDto } from './dto/baja-integrante.dto';
+import { TeamGestionService } from './team-gestion.service';
 import { TeamService } from './team.service';
 
 @Controller('proyectos')
 export class TeamController {
-  constructor(private teamService: TeamService) {}
+  constructor(
+    private teamService: TeamService,
+    private gestion: TeamGestionService,
+  ) {}
+
+  /** MEJ-104: tareas abiertas y horas (semana y Sprint activo) por integrante activo. */
+  @Get(':id/carga-equipo')
+  @UseGuards(JwtAuthGuard)
+  cargaEquipo(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number }) {
+    return this.gestion.cargaEquipo(id, user.userId);
+  }
+
+  /** MEJ-105: baja de un integrante; solo administración (el servicio lo verifica). */
+  @Post(':id/equipo/:idUsuario/baja')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  darDeBaja(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('idUsuario', ParseIntPipe) idUsuario: number,
+    @Body() dto: BajaIntegranteDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.gestion.darDeBaja(id, idUsuario, user.userId, dto.motivo);
+  }
 
   @Get(':id/miembros/postulaciones-pendientes')
   @UseGuards(JwtAuthGuard)

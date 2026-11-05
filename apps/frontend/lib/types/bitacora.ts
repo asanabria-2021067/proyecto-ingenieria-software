@@ -61,6 +61,9 @@ export class TipoEventoBitacora {
   // ---- MEJ-24: retrospectiva opcional del Sprint. ----
   static readonly SPRINT_RETROSPECTIVE_SAVED = 'SPRINT_RETROSPECTIVE_SAVED' as const;
 
+  // ---- MEJ-105: baja de un integrante por administracion. ----
+  static readonly PARTICIPATION_REMOVED = 'PARTICIPATION_REMOVED' as const;
+
   static readonly VALORES = [
     'TASK_CREATED',
     'TASK_UPDATED',
@@ -102,6 +105,7 @@ export class TipoEventoBitacora {
     'ACTIVITY_CREATED',
     'ATTENDANCE_MARKED',
     'SPRINT_RETROSPECTIVE_SAVED',
+    'PARTICIPATION_REMOVED',
   ] as const;
 }
 

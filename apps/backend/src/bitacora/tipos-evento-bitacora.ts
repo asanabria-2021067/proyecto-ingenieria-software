@@ -94,6 +94,10 @@ export class TipoEventoBitacora {
   /** Retrospective.save - Sprint, que paso / que mejorar / acuerdos. */
   static readonly SPRINT_RETROSPECTIVE_SAVED = 'SPRINT_RETROSPECTIVE_SAVED' as const;
 
+  // ---- MEJ-105: baja de un integrante por administracion. ----
+  /** Team.baja - proyecto, usuario, participaciones, motivo y tareas dejadas sin asignar. */
+  static readonly PARTICIPATION_REMOVED = 'PARTICIPATION_REMOVED' as const;
+
   static readonly VALORES = [
     'TASK_CREATED',
     'TASK_UPDATED',
@@ -135,6 +139,7 @@ export class TipoEventoBitacora {
     'ACTIVITY_CREATED',
     'ATTENDANCE_MARKED',
     'SPRINT_RETROSPECTIVE_SAVED',
+    'PARTICIPATION_REMOVED',
   ] as const;
 
   /**
@@ -192,6 +197,7 @@ export class TipoEventoBitacora {
     // oculta al participante igual que el resto de esta lista.
     'PROJECT_EXPORT_CSV_GENERATED',
     'PROJECT_EXPORT_PDF_GENERATED',
+    'PARTICIPATION_REMOVED',
   ]);
 }
 
