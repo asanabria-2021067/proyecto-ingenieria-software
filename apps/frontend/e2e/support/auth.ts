@@ -31,8 +31,17 @@ export async function login(page: Page, correo: string, destino = '/dashboard'):
   await page.goto('/login');
   await page.getByPlaceholder('usuario@uvg.edu.gt').fill(correo);
   await page.getByPlaceholder('Mínimo 8 caracteres').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Iniciar Sesión' }).click();
-  await page.waitForURL(`**${destino}`, { timeout: 45_000 });
+  // Si el límite de intentos responde 429, se espera a que venza la ventana y se repite; nunca se toca el límite.
+  for (let intento = 0; ; intento += 1) {
+    const limitado = page.waitForResponse((r) => r.url().endsWith('/api/auth/login') && r.status() === 429, { timeout: 45_000 });
+    const llego = page.waitForURL(`**${destino}`, { timeout: 45_000 });
+    limitado.catch(() => {});
+    llego.catch(() => {});
+    await page.getByRole('button', { name: 'Iniciar Sesión' }).click();
+    if (await Promise.race([llego.then(() => true), limitado.then(() => false)])) break;
+    if (intento >= 2) throw new Error('El inicio de sesión sigue limitado (429) tras esperar la ventana');
+    await new Promise((resolve) => setTimeout(resolve, 61_000));
+  }
 
   const cookies = await page.context().cookies();
   fs.mkdirSync(CACHE_DIR, { recursive: true });
