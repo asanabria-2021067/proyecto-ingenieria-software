@@ -14,6 +14,7 @@ import { SYNTHETIC_JWT_SECRET } from './helpers/synthetic-jwt-secret';
  */
 const uploadResultado = vi.fn();
 const firmar = vi.fn(() => 'firma-sintetica');
+const configurar = vi.fn();
 const destroyResultado = vi.fn(() => ({ result: 'ok' }));
 const inventarioResultado = vi.fn(() => ({ resources: [] as Array<{ public_id: string }> }));
 /** `api.resource` refleja por defecto lo que el upload acaba de devolver. */
@@ -30,6 +31,7 @@ const recursoResultado = vi.fn((publicId: string) => ({
 
 vi.mock('cloudinary', () => ({
   v2: {
+    config: (...args: unknown[]) => configurar(...(args as [])),
     utils: {
       api_sign_request: (...args: unknown[]) => firmar(...(args as [])),
     },
@@ -101,6 +103,7 @@ describe('S7 adaptador Cloudinary de cierre', () => {
   beforeEach(() => {
     uploadResultado.mockReset();
     firmar.mockClear();
+    configurar.mockClear();
     recursoResultado.mockClear();
     destroyResultado.mockClear();
     inventarioResultado.mockClear();
@@ -281,6 +284,32 @@ describe('S7 adaptador Cloudinary de cierre', () => {
     expect(inventarioResultado).toHaveBeenCalledTimes(3);
     for (const [options] of inventarioResultado.mock.calls) {
       expect(options).toMatchObject({ resource_type: 'raw', prefix: 'uvgenius/cierre/', max_results: 500 });
+    }
+  });
+
+  it('FIX-26: configura el SDK con las credenciales de cierre antes de cada operacion remota', async () => {
+    const subject = adapter();
+    const identity = subject.buildIdentity(41);
+    const esperado = {
+      cloud_name: 'cuenta-sintetica',
+      api_key: '123456789012345',
+      api_secret: 'secreto-sintetico-de-prueba',
+      secure: true,
+    };
+    const operaciones: Array<[ReturnType<typeof vi.fn>, () => unknown]> = [
+      [recursoResultado, () => subject.verifyAsset(identity)],
+      [destroyResultado, () => subject.destroy(identity)],
+      [inventarioResultado, () => subject.listClosurePublicIds()],
+      [firmar, () => subject.signUploadParams(identity)],
+    ];
+    for (const [remota, ejecutar] of operaciones) {
+      configurar.mockClear();
+      remota.mockClear();
+      await ejecutar();
+      expect(configurar).toHaveBeenCalledWith(esperado);
+      expect(Math.max(...configurar.mock.invocationCallOrder)).toBeLessThan(
+        Math.min(...remota.mock.invocationCallOrder),
+      );
     }
   });
 });
