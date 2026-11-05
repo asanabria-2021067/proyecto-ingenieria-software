@@ -131,13 +131,22 @@ export class CoordinadorService {
     return { todas: false, carreras, regla: REGLA_ALCANCE_COORDINADOR };
   }
 
-  /** Mismos conteos de revisiones y cierres que la bandeja del admin, filtrados al alcance. */
+  /**
+   * Mismos conteos que el panel del admin (revisiones `EN_REVISION`, cierres todo `EN_SOLICITUD_CIERRE`), filtrados
+   * al alcance; la bandeja de cierres del coordinador lista esa misma población.
+   */
   async pendientes(userId: number) {
     const ids = await alcanceDelActor(this.prisma, userId);
     const enAlcance = ids ? proyectoEnAlcanceWhere(ids, userId) : {};
     const [revisiones, cierres] = await Promise.all([
       this.prisma.proyecto.count({ where: { estadoProyecto: EstadoProyecto.EN_REVISION, eliminadoEn: null, ...enAlcance } }),
-      this.prisma.proyecto.count({ where: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE, eliminadoEn: null, ...enAlcance } }),
+      this.prisma.proyecto.count({
+        where: {
+          estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE,
+          eliminadoEn: null,
+          ...enAlcance,
+        },
+      }),
     ]);
     const items = [
       { clave: 'revisiones', total: revisiones },

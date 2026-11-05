@@ -90,7 +90,8 @@ describeIntegration('GPI01-C09 — autorización antes de validar en /admin/proy
   it.each(CONSULTAS)('estudiante, %s -> 403 sin revelar la validación', async (_nombre, consulta) => {
     const { status, body } = await pedir(consulta, tokens.estudiante);
     expect(status).toBe(403);
-    expect(body.message).toBe('Acceso restringido a administradores');
+    // La ruta admite también al coordinador (solo `cierres`, en su alcance): el guard usa el mensaje de varios roles.
+    expect(body.message).toBe('No tienes permisos para realizar esta acción');
     expect(JSON.stringify(body)).not.toContain('grupo');
     expect(adminList, 'la consulta no llega al servicio').not.toHaveBeenCalled();
   });

@@ -70,6 +70,7 @@ describeIntegration('ROL-1 coordinador académico: alcance por carrera (PostgreS
     pubB: number;
     cierreA: { idProyecto: number; idRevision: number };
     cierreB: { idProyecto: number; idRevision: number };
+    cierreSinEntregaA: number;
     admin: number;
     pubPropia: number;
     cierrePropio: { idProyecto: number; idRevision: number };
@@ -108,6 +109,13 @@ describeIntegration('ROL-1 coordinador académico: alcance por carrera (PostgreS
     return { idProyecto: p.idProyecto, idRevision: r.idRevisionCierre };
   }
 
+  /** EN_SOLICITUD_CIERRE sin ninguna entrega ENVIADA (p. ej. legacy): cuenta y se lista, solo se consulta. */
+  async function proyectoEnCierreSinEntrega(lider: number) {
+    const p = await createIntegrationProject(db, lider, { estadoProyecto: 'EN_SOLICITUD_CIERRE' });
+    collectInto(scope, 'projectIds', [p.idProyecto]);
+    return p.idProyecto;
+  }
+
   beforeAll(async () => {
     db = createIntegrationPrismaClient();
     await db.$connect();
@@ -138,6 +146,7 @@ describeIntegration('ROL-1 coordinador académico: alcance por carrera (PostgreS
     f.pubB = await proyectoEnRevision(liderB.idUsuario);
     f.cierreA = await proyectoEnCierre(liderA.idUsuario);
     f.cierreB = await proyectoEnCierre(liderB.idUsuario);
+    f.cierreSinEntregaA = await proyectoEnCierreSinEntrega(liderA.idUsuario);
     // Proyectos de la carrera A que el propio coordinador lidera o en los que participa.
     f.pubPropia = await proyectoEnRevision(coord.idUsuario, a.idCarrera);
     f.cierrePropio = await proyectoEnCierre(coord.idUsuario, a.idCarrera);
@@ -333,12 +342,40 @@ describeIntegration('ROL-1 coordinador académico: alcance por carrera (PostgreS
 
       const pendientes = await get('/coordinador/pendientes', tokens.coord);
       expect(pendientes.body).toEqual({
-        total: 2,
+        total: 3,
         items: [
           { clave: 'revisiones', total: 1 },
-          { clave: 'cierres', total: 1 },
+          { clave: 'cierres', total: 2 },
         ],
       });
+    });
+
+    it('la bandeja de cierres trae solo los de su alcance (con y sin entrega) y el contador coincide', async () => {
+      const lista = await get('/admin/proyectos?grupo=cierres', tokens.coord);
+      expect(lista.status).toBe(200);
+      const ids = lista.body.items.map((x: { idProyecto: number }) => x.idProyecto).sort((x: number, y: number) => x - y);
+      expect(ids).toEqual([f.cierreA.idProyecto, f.cierreSinEntregaA].sort((x, y) => x - y));
+      const sinEntrega = lista.body.items.find((x: { idProyecto: number }) => x.idProyecto === f.cierreSinEntregaA);
+      expect(sinEntrega.cierre.situacion).toBe('SIN_ENTREGA_FORMAL');
+      expect(ids).not.toContain(f.cierreB.idProyecto);
+      expect(ids).not.toContain(f.cierrePropio.idProyecto);
+
+      const pendientes = await get('/coordinador/pendientes', tokens.coord);
+      expect(pendientes.body.items.find((i: { clave: string }) => i.clave === 'cierres').total).toBe(lista.body.items.length);
+    });
+
+    it('el admin sigue viendo todos los cierres, el coordinador sin alcance ninguno y el estudiante recibe 403', async () => {
+      const admin = await get('/admin/proyectos?grupo=cierres', tokens.admin);
+      expect(admin.status).toBe(200);
+      const idsAdmin = admin.body.items.map((x: { idProyecto: number }) => x.idProyecto);
+      expect(idsAdmin).toEqual(expect.arrayContaining([f.cierreA.idProyecto, f.cierreB.idProyecto, f.cierreSinEntregaA]));
+      const vacio = await get('/admin/proyectos?grupo=cierres', tokens.vacio);
+      expect(vacio.status).toBe(200);
+      expect(vacio.body.items).toEqual([]);
+      expect((await get('/admin/proyectos?grupo=cierres', tokens.estudiante)).status).toBe(403);
+      for (const grupo of ['revision', 'cerrados']) {
+        expect((await get(`/admin/proyectos?grupo=${grupo}`, tokens.coord)).status).toBe(403);
+      }
     });
 
     it('ve las versiones revisadas de un proyecto de su carrera', async () => {

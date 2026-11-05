@@ -14,13 +14,14 @@ vi.mock('../lib/services/coordinador', () => ({
   getMiAlcance: vi.fn(),
   getPendientesCoordinador: vi.fn(),
 }));
-vi.mock('../lib/services/projects', () => ({ getAdminReviewInbox: vi.fn() }));
+vi.mock('../lib/services/admin-projects', () => ({ getAdminProjects: vi.fn() }));
 
 import CoordinadorPanelPage from '../app/dashboard/coordinador/page';
 import CoordinadorPendientesPage from '../app/dashboard/coordinador/pendientes/page';
 import CoordinadorCierresPage from '../app/dashboard/coordinador/cierres/page';
 import { getMiAlcance, getPendientesCoordinador } from '../lib/services/coordinador';
-import { getAdminReviewInbox } from '../lib/services/projects';
+import { getAdminProjects } from '../lib/services/admin-projects';
+import type { AdminProjectListItem } from '../lib/types/admin-projects';
 
 const REGLA = 'Un proyecto es tuyo si su carrera propia, la de su asociación o la de su líder está en tu alcance.';
 
@@ -110,26 +111,50 @@ describe('bandeja de pendientes del coordinador', () => {
   });
 });
 
+function solicitud(idProyecto: number, tituloProyecto: string, cierre: Partial<NonNullable<AdminProjectListItem['cierre']>>): AdminProjectListItem {
+  return {
+    idProyecto,
+    tituloProyecto,
+    tipoProyecto: 'EXTRACURRICULAR_EXTENSION',
+    estadoProyecto: 'EN_SOLICITUD_CIERRE',
+    lider: { idUsuario: 9, nombre: 'Ana', apellido: 'Lopez' },
+    usuariosActivos: 3,
+    sprintAmbiente: null,
+    accion: 'REVISAR_CIERRE',
+    cierre: { situacion: 'PENDIENTE_DE_EVALUACION', origen: null, revisionId: null, numeroRevision: null, enviadaEn: null, correccionSolicitadaEn: null, puedeResolver: false, ...cierre },
+  };
+}
+
 describe('solicitudes de cierre del coordinador', () => {
-  it('cada cierre abre la misma revisión de cierre de la administración', async () => {
-    vi.mocked(getAdminReviewInbox).mockResolvedValue({
-      revisionesPendientes: [],
-      correccionesEnviadas: [],
-      cierresPendientes: [{ idProyecto: 42, tituloProyecto: 'Huerto escolar', creadoPor: 9, fechaActualizacion: null }],
+  it('muestra la bandeja por etapas del admin: enviadas con su fecha y sin entrega solo para consulta', async () => {
+    vi.mocked(getAdminProjects).mockResolvedValue({
+      items: [
+        solicitud(42, 'Huerto escolar', { situacion: 'PENDIENTE_DE_EVALUACION', revisionId: 5, numeroRevision: 1, enviadaEn: '2026-10-01T18:00:00.000Z', puedeResolver: true }),
+        solicitud(43, 'Reciclaje', { situacion: 'REENVIADA_PARA_REVISION', revisionId: 6, numeroRevision: 2, enviadaEn: '2026-10-05T18:00:00.000Z', puedeResolver: true }),
+        solicitud(44, 'Proyecto legacy', { situacion: 'SIN_ENTREGA_FORMAL' }),
+      ],
+      total: 3,
+      page: 1,
+      limit: 20,
+      resumenCierre: { PENDIENTE_DE_EVALUACION: 1, REENVIADA_PARA_REVISION: 1, EN_ESPERA_DE_CORRECCIONES: 0, SIN_ENTREGA_FORMAL: 1, SIN_CLASIFICACION: 0 },
     });
     renderConCliente(<CoordinadorCierresPage />);
 
     expect(await screen.findByText('Huerto escolar')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Revisar cierre: Huerto escolar' })).toHaveAttribute(
-      'href',
-      '/dashboard/admin/proyectos/42/cierre',
-    );
+    expect(screen.getByRole('link', { name: 'Revisar cierre: Huerto escolar' })).toHaveAttribute('href', '/dashboard/admin/proyectos/42/cierre');
+    expect(screen.getByRole('link', { name: 'Revisar cierre: Reciclaje' })).toBeInTheDocument();
+    expect(screen.getByText(/Envío #1 · Recibida el 1 oct 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Envío #2 · Recibida el 5 oct 2026/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver proyecto: Proyecto legacy' })).toHaveAttribute('href', '/dashboard/admin/proyectos/44');
+    expect(screen.getByRole('group', { name: 'Reenviadas para revisión' })).toHaveTextContent('1');
+    expect(screen.getByRole('group', { name: 'Sin entrega formal' })).toHaveTextContent('1');
+    expect(getAdminProjects).toHaveBeenCalledWith(expect.objectContaining({ grupo: 'cierres' }));
   });
 
   it('sin cierres en su alcance muestra el vacío', async () => {
-    vi.mocked(getAdminReviewInbox).mockResolvedValue({ revisionesPendientes: [], correccionesEnviadas: [], cierresPendientes: [] });
+    vi.mocked(getAdminProjects).mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
     renderConCliente(<CoordinadorCierresPage />);
 
-    expect(await screen.findByText('No hay solicitudes de cierre en tu alcance')).toBeInTheDocument();
+    expect(await screen.findByText('No hay solicitudes pendientes de evaluación.')).toBeInTheDocument();
   });
 });

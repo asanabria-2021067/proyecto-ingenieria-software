@@ -35,7 +35,7 @@ function inbox(overrides: Partial<Inbox> = {}): Inbox {
       },
     ],
     cierresPendientes: [
-      { idProyecto: 123, tituloProyecto: 'Sistema de Tutorías Académicas UVG', creadoPor: 1, fechaActualizacion: '2026-08-12T12:00:00.000Z' },
+      { idRevisionCierre: 7, idProyecto: 123, numeroRevision: 1, enviadaEn: '2026-08-12T12:00:00.000Z', fingerprintEntrega: null, proyecto: { tituloProyecto: 'Sistema de Tutorías Académicas UVG', creadoPor: 1 } },
     ],
     correccionesEnviadas: [],
     ...overrides,

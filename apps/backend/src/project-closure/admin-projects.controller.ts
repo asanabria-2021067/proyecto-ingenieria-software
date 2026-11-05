@@ -23,8 +23,9 @@ import { HistoricalProjectReadService } from './historical-project-read.service'
 export class AdminProjectsController {
   constructor(protected readonly historical: HistoricalProjectReadService) {}
 
-  /** E116: bandeja por grupo, paginada. */
+  /** E116: bandeja por grupo, paginada. El coordinador solo recibe `cierres`, de su alcance (lo exige el servicio). */
   @Get()
+  @Roles('administrador', 'coordinador_academico')
   list(@CurrentUser() user: { userId: number }, @Query() query: AdminProjectsQueryDto) {
     return this.historical.adminList(user.userId, query);
   }
