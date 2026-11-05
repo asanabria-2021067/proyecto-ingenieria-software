@@ -37,6 +37,7 @@ import { SemestreHorasHistorial } from '@/components/hours/semestre-horas-histor
 import { HorasPorProyecto } from '@/components/hours/horas-por-proyecto';
 import { useMisInsignias } from '@/hooks/use-insignias';
 import { SkeletonCard, SkeletonDetail } from '@/components/ui/skeleton';
+import { EstadoPerfilPropio } from '@/components/chat-dock/estado-chat';
 
 function initials(nombre: string, apellido: string) {
   return `${nombre?.[0] ?? ''}${apellido?.[0] ?? ''}`.toUpperCase() || 'U';
@@ -140,6 +141,7 @@ export default function PerfilPage() {
               <PageTitle className="type-display">
                 {fullName || (isAdmin ? 'Administrador' : 'Perfil de estudiante')}
               </PageTitle>
+              <EstadoPerfilPropio />
 
               <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-on-surface-variant">
                 {isAdmin ? (

@@ -11,6 +11,7 @@ import {
   BarChart3,
   ChevronDown,
   ChevronUp,
+  FolderOpen,
   Link2,
   Hash,
   Loader2,
@@ -48,6 +49,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ChatLinksDialog } from './chat-links-dialog';
+import { ChatHiloPanel } from './chat-hilo-panel';
 import { AdjuntoIcono } from './chat-adjunto';
 import { ChatMessageItem } from './chat-message-item';
 import { ChatSearchPanel } from './chat-search';
@@ -137,6 +139,8 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
   const [renombrarAbierto, setRenombrarAbierto] = useState(false);
   const [noMolestarAbierto, setNoMolestarAbierto] = useState(false);
   const [enlacesAbierto, setEnlacesAbierto] = useState(false);
+  const [pestanaEnlaces, setPestanaEnlaces] = useState<'enlaces' | 'archivos'>('enlaces');
+  const [hiloId, setHiloId] = useState<number | null>(null);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
   const archivoInputRef = useRef<HTMLInputElement>(null);
@@ -293,13 +297,14 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
 
   const otro = conversacion?.tipo === 'INDIVIDUAL' ? conversacion.participantes.find((p) => p.idUsuario !== currentUserId) : null;
   const titulo = conversacion ? nombreConversacion(conversacion, currentUserId) : 'Chat';
+  const hiloMensaje = hiloId !== null && !minimized ? (messages.find((m) => m.idMensaje === hiloId) ?? null) : null;
 
   return (
     <div
       className={
         pagina
-          ? 'flex h-full min-h-0 w-full min-w-0 flex-col bg-surface-container-lowest'
-          : 'flex w-[36rem] shrink-0 flex-col rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest shadow-raised max-w-[calc(100vw-2rem)]'
+          ? 'relative flex h-full min-h-0 w-full min-w-0 flex-col bg-surface-container-lowest'
+          : 'relative flex w-[36rem] shrink-0 flex-col rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest shadow-raised max-w-[calc(100vw-2rem)]'
       }
     >
       <div className={`flex shrink-0 items-center gap-2 border-b border-outline-variant bg-surface-container px-3 py-2 ${pagina ? '' : 'rounded-t-xl'} ${claseAcentoCabecera(conversacion?.temaColor)}`}>
@@ -415,9 +420,23 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
               {conversacion?.archivadaManual ? <ArchiveRestore className="size-4" aria-hidden="true" /> : <Archive className="size-4" aria-hidden="true" />}
               {conversacion?.archivadaManual ? 'Desarchivar' : 'Archivar'}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setEnlacesAbierto(true)}>
+            <DropdownMenuItem
+              onClick={() => {
+                setPestanaEnlaces('enlaces');
+                setEnlacesAbierto(true);
+              }}
+            >
               <Link2 className="size-4" aria-hidden="true" />
               Enlaces compartidos
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setPestanaEnlaces('archivos');
+                setEnlacesAbierto(true);
+              }}
+            >
+              <FolderOpen className="size-4" aria-hidden="true" />
+              Archivos compartidos
             </DropdownMenuItem>
             {!conversacion?.esCanal && (
               <>
@@ -480,6 +499,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
                   participantes={conversacion?.participantes}
                   onRecordar={setRecordarMensaje}
                   onCrearTarea={setTareaMensaje}
+                  onAbrirHilo={(mensaje) => setHiloId(mensaje.idMensaje)}
                   puedeFijar={esLider || m.remitente.idUsuario === currentUserId}
                   onFijar={handleFijar}
                   onResponder={responder}
@@ -657,7 +677,17 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
       />
       <NuevaEncuestaDialog open={encuestaAbierta} onOpenChange={setEncuestaAbierta} idProyecto={idProyecto} idConversacion={idConversacion} />
 
-      <ChatLinksDialog open={enlacesAbierto} onOpenChange={setEnlacesAbierto} idProyecto={idProyecto} idConversacion={idConversacion} />
+      <ChatLinksDialog open={enlacesAbierto} onOpenChange={setEnlacesAbierto} idProyecto={idProyecto} idConversacion={idConversacion} pestana={pestanaEnlaces} />
+      {hiloMensaje && (
+        <ChatHiloPanel
+          idProyecto={idProyecto}
+          idConversacion={idConversacion}
+          mensaje={hiloMensaje}
+          idUsuarioActual={currentUserId}
+          participantes={conversacion?.participantes}
+          onCerrar={() => setHiloId(null)}
+        />
+      )}
       {apodosAbierto && conversacion && (
         <ApodosDialog
           open

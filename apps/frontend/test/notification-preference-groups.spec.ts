@@ -68,8 +68,8 @@ describe('FG03-C01: contrato existente de preferencias (backend sin cambios)', (
     }
   });
 
-  it('el único tipo de notificación de chat es la mención (MEJ-44)', () => {
-    expect(TIPOS_BACKEND.filter((tipo) => /CHAT|MENSAJE_DIRECTO|MENSAJE_CHAT/.test(tipo))).toEqual(['MENCION_CHAT']);
+  it('los únicos tipos de notificación de chat son la mención (MEJ-44) y la respuesta en hilo (MEJ-131)', () => {
+    expect(TIPOS_BACKEND.filter((tipo) => /CHAT|MENSAJE_DIRECTO|MENSAJE_CHAT/.test(tipo))).toEqual(['MENCION_CHAT', 'RESPUESTA_HILO_CHAT']);
     // El gateway no crea notificaciones; el servicio solo emite la plantilla de mención.
     expect(backend('src/chat/chat.gateway.ts')).not.toMatch(/TipoNotificacion|createNotification|notificationsService/i);
     const servicioChat = backend('src/chat/chat.service.ts');

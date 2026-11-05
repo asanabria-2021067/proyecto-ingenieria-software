@@ -35,6 +35,7 @@ import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
 import { PerfilActividad, PerfilCvAcciones, PerfilOrganizaciones } from '@/components/profile/perfil-social-secciones';
 import { useEnviarMensaje, usePerfilResumen } from '@/hooks/use-perfil-social';
 import { InvitarARolDialog } from '@/components/projects/invitar-a-rol-dialog';
+import { EstadoPerfilAjeno } from '@/components/chat-dock/estado-chat';
 
 function compartirPerfil() {
   navigator.clipboard
@@ -142,6 +143,7 @@ export default function PerfilPersonaPage() {
               <div>
                 <PageTitle className="type-display text-text-primary">{nombreCompleto}</PageTitle>
                 {perfil.carrera && <p className="type-body text-text-secondary">{perfil.carrera}</p>}
+                <EstadoPerfilAjeno idUsuario={perfil.idUsuario} />
               </div>
 
               <div className="flex flex-wrap items-center justify-center gap-tight sm:justify-start">

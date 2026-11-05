@@ -245,10 +245,9 @@ describe('ChatService - adjuntos', () => {
       prisma.adjuntoMensajeChat.findMany.mockResolvedValue([fila(1)]);
       const res = await service.getArchivos(10, 5, 1);
       expect(res.nextCursor).toBeNull();
-      // MEJ-41: las notas de voz (duracionSegundos) no van a la galeria de archivos.
+      // MEJ-135: sin filtro de tipo la galeria incluye imagenes, documentos y notas de voz.
       expect(prisma.adjuntoMensajeChat.findMany.mock.calls[0][0].where).toEqual({
         idConversacion: 5,
-        duracionSegundos: null,
         mensaje: { eliminadoEn: null },
       });
     });

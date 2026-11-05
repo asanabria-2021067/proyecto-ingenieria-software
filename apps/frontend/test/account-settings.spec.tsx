@@ -48,8 +48,8 @@ const FAMILIAS = [
   ['Horas y reconocimiento', 7],
   // HU-195: + REUNION_PROGRAMADA, REUNION_ACTUALIZADA, REUNION_CANCELADA. MEJ-46: + RECORDATORIO_MENSAJE. MEJ-60: + RECORDATORIO_HORAS.
   ['Recordatorios y calendario', 7],
-  // MEJ-44: + MENCION_CHAT.
-  ['Red de contactos', 4],
+  // MEJ-44: + MENCION_CHAT. MEJ-131: + RESPUESTA_HILO_CHAT.
+  ['Red de contactos', 5],
   // ORG-1 y ASO-1: INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA, JUNTA_ASOCIACION. ROL-1: + ALCANCE_COORDINADOR.
   ['Organizaciones y asociaciones', 5],
   // MEJ-81/82/85: + NUEVO_INICIO_SESION, SOLICITUD_DESACTIVACION, DESACTIVACION_RESUELTA.
@@ -92,7 +92,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     fireEvent.click(familia('Horas y reconocimiento'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'true');
     expect(familia('Horas y reconocimiento')).toHaveAttribute('aria-expanded', 'true');
-    expect(within(screen.getByRole('region', { name: 'Red de contactos' })).getAllByRole('switch')).toHaveLength(4);
+    expect(within(screen.getByRole('region', { name: 'Red de contactos' })).getAllByRole('switch')).toHaveLength(5);
 
     fireEvent.click(familia('Red de contactos'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'false');
@@ -129,10 +129,10 @@ describe('Configuración: preferencias en acordeones por familia', () => {
 
     fireEvent.click(screen.getByRole('switch', { name: 'Nuevo seguidor' }));
     expect(updateNotificationPreference).toHaveBeenCalledWith('NUEVO_SEGUIDOR', false);
-    expect(familia('Red de contactos')).toHaveTextContent('4 de 4 activas');
+    expect(familia('Red de contactos')).toHaveTextContent('5 de 5 activas');
 
     guardado.resolver(preferencias(['NUEVO_SEGUIDOR']));
-    await waitFor(() => expect(familia('Red de contactos')).toHaveTextContent('3 de 4 activas'));
+    await waitFor(() => expect(familia('Red de contactos')).toHaveTextContent('4 de 5 activas'));
     expect(familia('Red de contactos')).toHaveAttribute('aria-expanded', 'true');
     expect(familia('Tareas e hitos')).toHaveTextContent('10 de 10 activas');
   });
@@ -143,7 +143,7 @@ describe('Configuración: preferencias en acordeones por familia', () => {
     vi.mocked(updateNotificationPreference).mockRejectedValue(Object.assign(new Error('falló'), { statusCode: 500 }));
     fireEvent.click(screen.getByRole('switch', { name: 'Nuevo seguidor' }));
     await screen.findByRole('alert');
-    expect(familia('Red de contactos')).toHaveTextContent('4 de 4 activas');
+    expect(familia('Red de contactos')).toHaveTextContent('5 de 5 activas');
   });
 
   it('la vista contiene las preferencias y las secciones reales de la cuenta, sin marcadores de futuro', () => {

@@ -18,10 +18,11 @@ const TIPOS: Record<string, string[]> = {
 
 export const CHAT_ADJUNTO_ACCEPT = [...Object.keys(TIPOS), ...Object.values(TIPOS).flat().map((e) => `.${e}`)].join(',');
 
-export type CategoriaAdjunto = 'imagen' | 'pdf' | 'word' | 'excel' | 'powerpoint';
+export type CategoriaAdjunto = 'imagen' | 'audio' | 'pdf' | 'word' | 'excel' | 'powerpoint';
 
 export function categoriaAdjunto(mime: string): CategoriaAdjunto {
   if (mime.startsWith('image/')) return 'imagen';
+  if (mime.startsWith('audio/')) return 'audio';
   if (mime === 'application/pdf') return 'pdf';
   if (mime === DOCX) return 'word';
   if (mime === XLSX) return 'excel';

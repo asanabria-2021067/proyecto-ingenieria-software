@@ -207,6 +207,9 @@ export default function DashboardLayout({
     queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
     queryClient.invalidateQueries({ queryKey: ['notificaciones', 'conteo'] });
 
+    // MEJ-136: en horario de silencio la bandeja se actualiza, pero no aparece el aviso emergente.
+    if (latestNotification.silenciada) return;
+
     // HU-200: una mención o un comentario nuevo enlazan al comentario desde el aviso en vivo.
     const tareaHref = resolveAssignedTaskToastLink(latestNotification);
     if (tareaHref) {

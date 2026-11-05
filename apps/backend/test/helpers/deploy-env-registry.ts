@@ -47,6 +47,10 @@ export const DEPLOY_ENV_REGISTRY: Record<string, DeployEnvEntry> = {
   SMTP_USER: { kind: 'config', consumer: 'apps/backend/src/config/smtp-config.ts' },
   SMTP_PASSWORD: { kind: 'secret', consumer: 'apps/backend/src/config/smtp-config.ts' },
   SMTP_FROM: { kind: 'config', consumer: 'apps/backend/src/config/smtp-config.ts' },
+  // MEJ-137: Web Push opcional, solo se escribe si VAPID_PUBLIC_KEY no esta vacio.
+  VAPID_PUBLIC_KEY: { kind: 'secret', consumer: 'apps/backend/src/config/vapid-config.ts' },
+  VAPID_PRIVATE_KEY: { kind: 'secret', consumer: 'apps/backend/src/config/vapid-config.ts' },
+  VAPID_SUBJECT: { kind: 'secret', consumer: 'apps/backend/src/config/vapid-config.ts' },
   BACKEND_IMAGE: { kind: 'config', consumer: 'docker-compose.yml' },
   FRONTEND_IMAGE: { kind: 'config', consumer: 'docker-compose.yml' },
   // G04-C08 (OWASP25-C021 + D2): 1 = un proxy delante (nginx del host); el backend exige >=1 en produccion.

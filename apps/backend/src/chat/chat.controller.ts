@@ -30,6 +30,7 @@ import { LinkPreviewService } from './link-preview/link-preview.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { EditMessageDto } from './dto/edit-message.dto';
 import { ListLinksQueryDto } from './dto/list-links-query.dto';
+import { ListArchivosQueryDto } from './dto/list-archivos-query.dto';
 import { SendFileMessageDto } from './dto/send-file-message.dto';
 import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
 import { SetApodoDto } from './dto/set-apodo.dto';
@@ -117,7 +118,7 @@ export class ChatController {
   findFiles(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('conversationId', ParseIntPipe) conversationId: number,
-    @Query() query: ListLinksQueryDto,
+    @Query() query: ListArchivosQueryDto,
     @CurrentUser() user: { userId: number },
   ) {
     return this.chatService.getArchivos(projectId, conversationId, user.userId, query);

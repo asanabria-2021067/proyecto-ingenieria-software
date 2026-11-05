@@ -1,6 +1,8 @@
-import { Injectable, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from './push.service';
+import { usuariosEnSilencio } from './silencio-horario';
 import { LEADERSHIP_CHANGED, NotificationsGateway, SPRINT_HOURS_ADJUSTED } from './notifications.gateway';
 import {
   NOTIFICATION_TEMPLATES,
@@ -89,6 +91,7 @@ export class NotificationsService {
     // JwtService, así que nunca existió un ciclo que ocultar. Envolverlo
     // disfrazaría de circular una dependencia que es de un solo sentido.
     private gateway: NotificationsGateway,
+    @Optional() private push?: PushService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -270,9 +273,14 @@ export class NotificationsService {
   }
 
   private async emitNotification(userIds: number[], payload: NotificationInput): Promise<void> {
+    // La notificacion ya esta guardada; el horario de silencio solo quita el aviso emergente y el push.
+    const silenciados = await usuariosEnSilencio(this.prisma, userIds);
     if (this.gateway?.server) {
-      await this.gateway.notifyUsers(userIds, payload);
+      const activos = userIds.filter((id) => !silenciados.has(id));
+      if (activos.length > 0) await this.gateway.notifyUsers(activos, payload);
+      if (silenciados.size > 0) await this.gateway.notifyUsers([...silenciados], { ...payload, silenciada: true });
     }
+    void this.push?.enviar(userIds, { titulo: payload.tituloNotificacion, mensaje: payload.mensajeNotificacion });
   }
 
   findAll(userId?: number, filtros: FiltroNotificaciones = {}) {
@@ -512,9 +520,12 @@ export class NotificationsService {
       skipDuplicates: false,
     });
 
-    if (this.gateway?.server) {
-      await this.gateway.notifyUsers(recipients, payload);
-    }
+    await this.emitNotification(recipients, {
+      tipoNotificacion: payload.tipoNotificacion,
+      tituloNotificacion: payload.tituloNotificacion,
+      mensajeNotificacion: payload.mensajeNotificacion,
+      datosJson: payload.datosJson,
+    });
 
     return notifications;
   }

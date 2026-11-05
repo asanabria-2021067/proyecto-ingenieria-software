@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, GraduationCap, Loader2, MessageSquareText, MinusCircle, Smile } from 'lucide-react';
+import { CheckCircle2, GraduationCap, Loader2, MessageSquareText, MinusCircle, Moon, Smile, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tag } from '@/components/ui/tag';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Dialog,
@@ -15,11 +16,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useClearMiEstado, useMiEstado, useSetMiEstado } from '@/hooks/use-chat';
+import { useEstadoDe } from '@/hooks/use-chat-hilos';
+import { NoMolestarDialog } from './no-molestar-dialog';
 import type { ChatEstado, TipoEstadoChat } from '@/lib/types/chat';
 
 const OPCIONES: { tipo: TipoEstadoChat; etiqueta: string; Icono: typeof Smile }[] = [
   { tipo: 'EN_CLASE', etiqueta: 'En clase', Icono: GraduationCap },
   { tipo: 'OCUPADO', etiqueta: 'Ocupado', Icono: MinusCircle },
+  { tipo: 'EN_REUNION', etiqueta: 'En reunión', Icono: Users },
   { tipo: 'DISPONIBLE', etiqueta: 'Disponible', Icono: CheckCircle2 },
   { tipo: 'PERSONALIZADO', etiqueta: 'Personalizado', Icono: MessageSquareText },
 ];
@@ -110,12 +114,49 @@ export function MiEstadoBoton() {
   );
 }
 
+/** MEJ-132: estado propio en el perfil, con el mismo selector (texto libre, vencimiento) que el chat. */
+export function EstadoPerfilPropio() {
+  const { estado } = useMiEstado();
+  const vigente = useEstadoVigente(estado);
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      {vigente ? (
+        <Tag tone="subtle">
+          <IconoEstado tipo={vigente.tipo} className="size-3.5" />
+          {textoDe(vigente)}
+        </Tag>
+      ) : (
+        <span className="text-xs text-tertiary">Sin estado</span>
+      )}
+      <Button type="button" variant="outline" size="sm" onClick={() => setAbierto(true)}>
+        {vigente ? 'Cambiar estado' : 'Definir estado'}
+      </Button>
+      {abierto && <EstadoDialog onOpenChange={setAbierto} actual={vigente} />}
+    </div>
+  );
+}
+
+/** Estado de otra persona en su perfil; el servidor solo lo entrega si compartes una conversación con ella. */
+export function EstadoPerfilAjeno({ idUsuario }: { idUsuario: number }) {
+  const { estado } = useEstadoDe(idUsuario);
+  const vigente = useEstadoVigente(estado);
+  if (!vigente) return null;
+  return (
+    <Tag tone="subtle" className="mt-3">
+      <IconoEstado tipo={vigente.tipo} className="size-3.5" />
+      {textoDe(vigente)}
+    </Tag>
+  );
+}
+
 function EstadoDialog({ onOpenChange, actual }: { onOpenChange: (open: boolean) => void; actual: ChatEstado | null }) {
   const definir = useSetMiEstado();
   const limpiar = useClearMiEstado();
   const [tipo, setTipo] = useState<TipoEstadoChat>(actual?.tipo ?? 'DISPONIBLE');
   const [texto, setTexto] = useState(actual?.texto ?? '');
   const [caducidad, setCaducidad] = useState<Caducidad>('nunca');
+  const [noMolestarAbierto, setNoMolestarAbierto] = useState(false);
   const pendiente = definir.isPending || limpiar.isPending;
   const textoLimpio = texto.trim();
   const invalido = tipo === 'PERSONALIZADO' && !textoLimpio;
@@ -143,6 +184,7 @@ function EstadoDialog({ onOpenChange, actual }: { onOpenChange: (open: boolean) 
     });
 
   return (
+    <>
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="w-[96vw] max-w-[380px] gap-0 border-outline-variant bg-surface-container-lowest p-0">
         <form onSubmit={guardar}>
@@ -198,6 +240,11 @@ function EstadoDialog({ onOpenChange, actual }: { onOpenChange: (open: boolean) 
                 ))}
               </select>
             </div>
+
+            <Button type="button" variant="outline" size="sm" onClick={() => setNoMolestarAbierto(true)} className="gap-1.5">
+              <Moon className="size-3.5" aria-hidden="true" />
+              Horario de no molestar
+            </Button>
           </div>
 
           <DialogFooter className="gap-2 border-t border-outline-variant/35 px-6 py-4 sm:justify-end">
@@ -217,5 +264,7 @@ function EstadoDialog({ onOpenChange, actual }: { onOpenChange: (open: boolean) 
         </form>
       </DialogContent>
     </Dialog>
+    {noMolestarAbierto && <NoMolestarDialog open onOpenChange={setNoMolestarAbierto} />}
+    </>
   );
 }

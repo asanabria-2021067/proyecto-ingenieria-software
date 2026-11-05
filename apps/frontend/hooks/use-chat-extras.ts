@@ -14,7 +14,7 @@ import {
   votePoll,
 } from '@/lib/services/chat-extras';
 import { actualizarEncuestaEnCache, fijadosQueryKey, refrescarFijados } from '@/lib/chat-extras';
-import { conversationMessagesQueryKey } from '@/lib/query-keys/chat';
+import { conversationFilesQueryKey, conversationMessagesQueryKey } from '@/lib/query-keys/chat';
 import type { ChatMensaje, CrearEncuestaPayload } from '@/lib/types/chat';
 
 /** Notas de voz (MEJ-41), encuestas (MEJ-42) y fijados (MEJ-43) del chat de proyecto. */
@@ -25,6 +25,7 @@ function useAgregarMensaje(idProyecto: number, idConversacion: number) {
     queryClient.setQueryData<ChatMensaje[]>(conversationMessagesQueryKey(idProyecto, idConversacion), (actual) =>
       !actual ? [mensaje] : actual.some((m) => m.idMensaje === mensaje.idMensaje) ? actual : [...actual, mensaje],
     );
+    if (mensaje.adjunto) queryClient.invalidateQueries({ queryKey: conversationFilesQueryKey(idProyecto, idConversacion) });
     queryClient.invalidateQueries({ queryKey: ['chats-global'] });
   };
 }

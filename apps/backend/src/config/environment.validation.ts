@@ -1,6 +1,7 @@
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { EstadoUsuario, type Prisma } from '@prisma/client';
 import { readSmtpConfig } from './smtp-config';
+import { readVapidConfig } from './vapid-config';
 import { assertJwtSecret, JWT_SECRET_MIN_LENGTH, JWT_SECRET_VARIABLE } from './jwt-secret';
 
 /**
@@ -367,6 +368,12 @@ export function validateEnvironment(raw: RawEnvironment): ValidatedEnvironment {
   const smtp = readSmtpConfig(raw);
   if (smtp.motivos.length > 0) {
     logger.warn(`Correo SMTP desactivado: ${smtp.motivos.join('; ')}`);
+  }
+
+  // MEJ-137: Web Push opcional; llaves VAPID a medias lo desactivan con un aviso (sin imprimir valores).
+  const vapid = readVapidConfig(raw);
+  if (vapid.motivos.length > 0) {
+    logger.warn(`Web Push desactivado: ${vapid.motivos.join('; ')}`);
   }
 
   if (!closure.disponible) {

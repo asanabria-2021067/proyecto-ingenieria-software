@@ -349,6 +349,10 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          # MEJ-137: Web Push opcional. Sin las tres llaves VAPID el backend arranca con el push desactivado.
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           # G07 (P2/P4): la misma expresion que la variante y el build.
           NEXT_PUBLIC_API_URL: ${{ (vars.PUBLIC_API_URL || 'direct') != 'same-origin' && ((vars.PUBLIC_API_URL || 'direct') != 'direct' && (vars.PUBLIC_API_URL || 'direct') || secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001') || '' }}
           NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
@@ -445,6 +449,11 @@ jobs:
               printf 'SMTP_USER=%s\n' "$SMTP_USER"
               printf 'SMTP_PASSWORD=%s\n' "$SMTP_PASSWORD"
               printf 'SMTP_FROM=%s\n' "$SMTP_FROM"
+            fi
+            if [ -n "$VAPID_PUBLIC_KEY" ]; then
+              printf 'VAPID_PUBLIC_KEY=%s\n' "$VAPID_PUBLIC_KEY"
+              printf 'VAPID_PRIVATE_KEY=%s\n' "$VAPID_PRIVATE_KEY"
+              printf 'VAPID_SUBJECT=%s\n' "$VAPID_SUBJECT"
             fi
             printf 'BACKEND_IMAGE=%s\n' "$BACKEND_IMAGE"
             printf 'FRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE"

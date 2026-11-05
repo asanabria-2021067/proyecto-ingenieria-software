@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Put, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ChatEstadoService } from './chat-estado.service';
@@ -14,6 +14,11 @@ export class ChatEstadoController {
   @Get()
   async obtener(@CurrentUser() user: { userId: number }) {
     return { estado: await this.estadoService.obtener(user.userId) };
+  }
+
+  @Get(':idUsuario')
+  async obtenerDe(@Param('idUsuario', ParseIntPipe) idUsuario: number, @CurrentUser() user: { userId: number }) {
+    return { estado: await this.estadoService.obtenerDe(idUsuario, user.userId) };
   }
 
   @Put()

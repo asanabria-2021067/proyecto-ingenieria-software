@@ -108,6 +108,24 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     expect(deChat.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
   });
 
+  // MEJ-131/132/136/137: hilos, estado ajeno, horario de silencio y Web Push (permisos en los servicios).
+  it('las rutas de hilos, estado, silencio y push existen y exigen JwtAuthGuard', () => {
+    const hilo = 'proyectos/:projectId/conversaciones/:conversationId/mensajes/:messageId/respuestas';
+    const esperadas = [
+      `GET /api/${hilo}`,
+      `POST /api/${hilo}`,
+      'GET /api/chats/estado/:idUsuario',
+      'GET /api/notificaciones/silencio',
+      'PUT /api/notificaciones/silencio',
+      'GET /api/notificaciones/push/clave',
+      'POST /api/notificaciones/push/suscripciones',
+      'DELETE /api/notificaciones/push/suscripciones',
+    ];
+    const nuevas = rutas.filter((r) => esperadas.includes(r.id));
+    expect(nuevas.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(nuevas.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+  });
+
   // MEJ-6/10/49/52: checklist, historial, evidencias y plantillas de tarea (permisos por actor en el servicio).
   it('las rutas de checklist, historial, enlaces, evidencias y plantillas existen todas, con JwtAuthGuard y escrituras con ProjectWriteGuard', () => {
     const esperadas = {

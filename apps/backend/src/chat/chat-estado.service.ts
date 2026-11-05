@@ -38,6 +38,21 @@ export class ChatEstadoService {
     return estadoVigente(estado);
   }
 
+  /** MEJ-132: el estado ajeno solo lo ve quien comparte una conversacion activa con esa persona. */
+  async obtenerDe(idObjetivo: number, idSolicitante: number) {
+    if (idObjetivo !== idSolicitante) {
+      const comparten = await this.prisma.conversacionParticipante.findFirst({
+        where: {
+          idUsuario: idObjetivo,
+          conversacion: { eliminadaEn: null, participantes: { some: { idUsuario: idSolicitante } } },
+        },
+        select: { idConversacion: true },
+      });
+      if (!comparten) return null;
+    }
+    return this.obtener(idObjetivo);
+  }
+
   async definir(userId: number, dto: SetEstadoChatDto) {
     const ahora = Date.now();
     const venceEn = dto.venceEn ? new Date(dto.venceEn) : null;
