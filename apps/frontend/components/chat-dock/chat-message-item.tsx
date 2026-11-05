@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AlarmClock, Bookmark, BookmarkCheck, Check, ClipboardPlus, MessagesSquare, MoreVertical, Pencil, Pin, PinOff, Reply, Trash2, X } from 'lucide-react';
+import { AlarmClock, Bookmark, BookmarkCheck, Check, ClipboardPlus, Flag, MessagesSquare, MoreVertical, Pencil, Pin, PinOff, Reply, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
+import { ReportarDialog } from '@/components/profile/reportar-dialog';
 import { ChatAdjuntoChip } from './chat-adjunto';
 import { ChatCitaBloque } from './chat-cita';
 import { ChatEncuestaTarjeta } from './chat-encuesta';
@@ -112,6 +113,8 @@ export function ChatMessageItem({
   const tieneEnlaceInterno =
     typeof window !== 'undefined' && extraerEnlacesInternos(m.contenido, window.location.origin).length > 0;
   const hayAcciones = !simple && (onRecordar !== undefined || onCrearTarea !== undefined);
+  // MEJ-154: cualquier mensaje ajeno se puede reportar, tambien en los canales simples.
+  const reportable = !propio && !!m.remitente?.idUsuario;
 
   const empezarEdicion = () => {
     // Las menciones se editan como `@Nombre`; al guardar vuelven a su token.
@@ -260,7 +263,7 @@ export function ChatMessageItem({
           </button>
         )}
       </div>
-      {(propio || fijable || hayAcciones) && !eliminado && !editando && (!simple || fijable) && (
+      {(propio || fijable || hayAcciones || reportable) && !eliminado && !editando && (!simple || fijable || reportable) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -295,6 +298,19 @@ export function ChatMessageItem({
                 <Pencil className="size-4" aria-hidden="true" />
                 Editar
               </DropdownMenuItem>
+            )}
+            {reportable && (
+              <ReportarDialog
+                idReportado={m.remitente.idUsuario}
+                nombre={`${m.remitente.nombre} ${m.remitente.apellido}`.trim()}
+                idMensaje={m.idMensaje}
+                trigger={
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                    <Flag className="size-4" aria-hidden="true" />
+                    Reportar mensaje
+                  </DropdownMenuItem>
+                }
+              />
             )}
             {propio && !simple && (
               <DropdownMenuItem variant="destructive" onClick={handleEliminar}>

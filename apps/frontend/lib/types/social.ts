@@ -36,6 +36,8 @@ export interface UsuarioBusquedaDto extends UsuarioResumenDto {
   amigosEnComun: number;
   habilidades: string[];
   intereses: string[];
+  /** MEJ-151: habilidades en común con las buscadas (o las propias); solo con orden por coincidencia. */
+  coincidencia?: { enComun: number; total: number } | null;
 }
 
 export interface ProyectoParticipacionResumenDto {
@@ -75,6 +77,10 @@ export interface BuscarUsuariosFiltros {
   habilidades?: number[];
   intereses?: number[];
   semestreRango?: SemestreRango;
+  /** MEJ-151 */
+  idCarrera?: number;
+  diaDisponible?: number;
+  ordenar?: 'coincidencia';
   page?: number;
 }
 

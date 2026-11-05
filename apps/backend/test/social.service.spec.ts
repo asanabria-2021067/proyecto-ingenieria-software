@@ -7,6 +7,7 @@ import { FILTRO_DIRECTORIO, SocialService } from '../src/social/social.service';
 
 function makePrisma() {
   const prisma = {
+    restriccionUsuario: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
     amistad: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
@@ -110,7 +111,7 @@ describe('SocialService — amistades', () => {
       where: { idAmistad: 7 },
       data: { estado: EstadoAmistad.ACEPTADA, fechaResolucion: expect.any(Date) },
     });
-    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([2], 'AMISTAD_ACEPTADA', expect.any(Object));
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([2], 'AMISTAD_ACEPTADA', expect.any(Object), undefined, 1);
     expect(result.estado).toBe(EstadoAmistad.ACEPTADA);
   });
 
@@ -125,7 +126,7 @@ describe('SocialService — amistades', () => {
     expect(prisma.amistad.create).toHaveBeenCalledWith({
       data: { idUsuarioSolicitante: 1, idUsuarioReceptor: 2 },
     });
-    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([2], 'SOLICITUD_AMISTAD', expect.any(Object));
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([2], 'SOLICITUD_AMISTAD', expect.any(Object), undefined, 1);
   });
 
   it('rechaza resolver una solicitud ajena (no soy el receptor)', async () => {
@@ -238,6 +239,16 @@ describe('SocialService — seguimientos', () => {
     await expect(service.seguirUsuario(1, 1)).rejects.toThrow(BadRequestException);
   });
 
+  it('MEJ-153: con un bloqueo no se puede seguir (403) y no se escribe nada', async () => {
+    const prisma = makePrisma();
+    prisma.restriccionUsuario.findFirst.mockResolvedValue({ idRestriccion: 1 });
+    const { service, notifications } = makeService(prisma);
+
+    await expect(service.seguirUsuario(1, 2)).rejects.toThrow(ForbiddenException);
+    expect(prisma.seguimiento.create).not.toHaveBeenCalled();
+    expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
+  });
+
   it('rechaza seguir dos veces al mismo usuario', async () => {
     const prisma = makePrisma();
     prisma.seguimiento.findUnique.mockResolvedValue({ idSeguimiento: 1 });
@@ -254,7 +265,7 @@ describe('SocialService — seguimientos', () => {
 
     await service.seguirUsuario(1, 2);
 
-    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([2], 'NUEVO_SEGUIDOR', expect.any(Object));
+    expect(notifications.notifyFromTemplate).toHaveBeenCalledWith([2], 'NUEVO_SEGUIDOR', expect.any(Object), undefined, 1);
   });
 });
 
@@ -277,6 +288,49 @@ describe('SocialService — buscarUsuarios', () => {
     expect(prisma.usuario.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ skip: 0, take: 13 }),
     );
+  });
+
+  it('MEJ-151: ordena por habilidades en comun con las buscadas y expone la coincidencia', async () => {
+    const prisma = makePrisma();
+    const fila = (idUsuario: number) => ({ idUsuario, nombre: `N${idUsuario}`, apellido: 'A', fotoUrl: null, perfil: null, habilidades: [], intereses: [] });
+    prisma.usuario.findMany
+      .mockResolvedValueOnce([
+        { idUsuario: 5, habilidades: [{ idHabilidad: 1 }] },
+        { idUsuario: 6, habilidades: [{ idHabilidad: 1 }, { idHabilidad: 2 }] },
+        { idUsuario: 7, habilidades: [] },
+      ])
+      .mockResolvedValueOnce([fila(5), fila(6), fila(7)]);
+    const { service } = makeService(prisma);
+
+    const resultado = await service.buscarUsuarios(1, { habilidades: [1, 2], ordenar: 'coincidencia' });
+
+    expect(resultado.items.map((u) => [u.idUsuario, u.coincidencia])).toEqual([
+      [6, { enComun: 2, total: 2 }],
+      [5, { enComun: 1, total: 2 }],
+      [7, { enComun: 0, total: 2 }],
+    ]);
+  });
+
+  it('MEJ-153: no lista a quien bloqueo o fue bloqueado por quien busca', async () => {
+    const prisma = makePrisma();
+    prisma.restriccionUsuario.findMany.mockResolvedValue([{ idUsuario: 1, idObjetivo: 9 }, { idUsuario: 8, idObjetivo: 1 }]);
+    prisma.usuario.findMany.mockResolvedValue([]);
+    const { service } = makeService(prisma);
+
+    await service.buscarUsuarios(1, {});
+
+    expect(prisma.usuario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { AND: expect.arrayContaining([{ idUsuario: { notIn: [9, 8] } }]) } }),
+    );
+  });
+
+  it('MEJ-153: no envia solicitud de amistad si hay un bloqueo', async () => {
+    const prisma = makePrisma();
+    prisma.restriccionUsuario.findFirst.mockResolvedValue({ idRestriccion: 1 });
+    const { service } = makeService(prisma);
+
+    await expect(service.crearSolicitudAmistad(1, 2)).rejects.toThrow('No es posible interactuar con este usuario');
+    expect(prisma.amistad.create).not.toHaveBeenCalled();
   });
 
   it('solo lista cuentas ACTIVO (excluye PENDIENTE_VERIFICACION, BLOQUEADO e INACTIVO)', async () => {

@@ -4,6 +4,7 @@ import { MENSAJE_SIN_PROYECTO_COMPARTIDO, PerfilSocialService } from '../src/soc
 
 function build() {
   const prisma = {
+    restriccionUsuario: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
     usuario: { findFirst: vi.fn().mockResolvedValue({ idUsuario: 2 }), findUnique: vi.fn().mockResolvedValue({ nombre: 'Ana', apellido: 'Paz', perfil: null }) },
     usuarioOrganizacion: { findMany: vi.fn().mockResolvedValue([]) },
     perfilEstudiante: { findUnique: vi.fn().mockResolvedValue({ idCarrera: 5 }) },
@@ -111,6 +112,13 @@ describe('PerfilSocialService', () => {
       prisma.amistad.findFirst.mockResolvedValue(null);
       await expect(service.abrirMensajeDirecto(1, 2)).rejects.toBeInstanceOf(ForbiddenException);
       expect(prisma.amistad.findFirst.mock.calls[0][0].where.estado).toBe('ACEPTADA');
+      expect(chat.createConversation).not.toHaveBeenCalled();
+    });
+
+    it('MEJ-153: con un bloqueo es 403 y no abre ni crea conversacion', async () => {
+      const { prisma, chat, service } = build();
+      prisma.restriccionUsuario.findFirst.mockResolvedValue({ idRestriccion: 1 });
+      await expect(service.abrirMensajeDirecto(1, 2)).rejects.toBeInstanceOf(ForbiddenException);
       expect(chat.createConversation).not.toHaveBeenCalled();
     });
 

@@ -262,6 +262,7 @@ export class NotificationsService {
     db: TxClient | PrismaService,
     userIds: number[],
     tipo: NotificationInput['tipoNotificacion'],
+    idActor?: number,
   ): Promise<number[]> {
     if (userIds.length === 0) return userIds;
     const bloqueados = await db.preferenciaNotificacion.findMany({
@@ -269,6 +270,9 @@ export class NotificationsService {
       select: { idUsuario: true },
     });
     const ids = new Set(bloqueados.map((p) => p.idUsuario));
+    // MEJ-153: quien silencio a la persona que origina el aviso no lo recibe.
+    const silenciaron = idActor === undefined ? [] : await db.restriccionUsuario.findMany({ where: { idObjetivo: idActor, tipo: 'SILENCIO', idUsuario: { in: userIds } }, select: { idUsuario: true } });
+    for (const x of silenciaron) ids.add(x.idUsuario);
     return userIds.filter((id) => !ids.has(id));
   }
 
@@ -450,6 +454,7 @@ export class NotificationsService {
     templateKey: K,
     data: NotificationTemplateData[K],
     tx?: TxClient,
+    idActor?: number,
   ) {
     const template = NOTIFICATION_TEMPLATES[templateKey];
     // K liga templateKey con NotificationTemplateData[K] en la firma publica,
@@ -461,16 +466,10 @@ export class NotificationsService {
     const message = template.message(data as unknown as never);
     const datosJson = JSON.parse(JSON.stringify(data)) as Prisma.InputJsonValue;
 
-    await this.notifyUsers(
-      userIds,
-      {
-        tipoNotificacion: templateKey,
-        tituloNotificacion: title,
-        mensajeNotificacion: message,
-        datosJson,
-      },
-      tx,
-    );
+    const payload = { tipoNotificacion: templateKey, tituloNotificacion: title, mensajeNotificacion: message, datosJson };
+    // Sin actor, la llamada conserva su forma de siempre (tres argumentos).
+    if (idActor === undefined) await this.notifyUsers(userIds, payload, tx);
+    else await this.notifyUsers(userIds, payload, tx, idActor);
   }
 
   async notifyAdminsFromTemplate<K extends NotificationTemplateKey>(
@@ -502,11 +501,12 @@ export class NotificationsService {
       datosJson?: Prisma.InputJsonValue;
     },
     tx?: TxClient,
+    idActor?: number,
   ) {
     if (userIds.length === 0) return;
     const db = tx ?? this.prisma;
 
-    const recipients = await this.filterEnabledRecipients(db, userIds, payload.tipoNotificacion);
+    const recipients = await this.filterEnabledRecipients(db, userIds, payload.tipoNotificacion, idActor);
     if (recipients.length === 0) return;
 
     const notifications = await db.notificacion.createMany({

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AlertCircle, Bug } from 'lucide-react';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
+import { ReportesPerfilLista } from '@/components/profile/reportes-perfil-lista';
 import { ADMIN_TAB_LIST, ADMIN_TAB_TRIGGER } from '@/components/admin/admin-tabs';
 import { DATA_TABLE_CARD, DATA_TABLE_ROWS } from '@/components/dashboard/data-table';
 import { SafeExternalLink } from '@/components/profile/safe-external-link';
@@ -26,6 +27,7 @@ function fecha(valor: string): string {
 
 /** MEJ-90: reportes de problemas enviados por los usuarios; el administrador los marca como atendidos. */
 export default function AdminReportesPage() {
+  const [tipo, setTipo] = useState<'problemas' | 'perfiles'>('problemas');
   const [estado, setEstado] = useState<EstadoReporte>('PENDIENTE');
   const { data, isLoading, isError, refetch } = useReportesProblema(estado);
   const atender = useAtenderReporte();
@@ -38,6 +40,21 @@ export default function AdminReportesPage() {
         <p className={ADMIN_PAGE_LEAD}>Problemas que reportaron los usuarios, con la pantalla y el navegador desde donde los enviaron.</p>
       </section>
 
+      <Tabs value={tipo} onValueChange={(v) => setTipo(v as 'problemas' | 'perfiles')} className="mb-stack">
+        <TabsList className={ADMIN_TAB_LIST}>
+          <TabsTrigger value="problemas" className={ADMIN_TAB_TRIGGER}>
+            Problemas
+          </TabsTrigger>
+          <TabsTrigger value="perfiles" className={ADMIN_TAB_TRIGGER}>
+            Perfiles y mensajes
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {tipo === 'perfiles' ? (
+        <ReportesPerfilLista />
+      ) : (
+        <>
       <Tabs value={estado} onValueChange={(v) => setEstado(v as EstadoReporte)} className="mb-stack">
         <TabsList className={ADMIN_TAB_LIST}>
           <TabsTrigger value="PENDIENTE" className={ADMIN_TAB_TRIGGER}>
@@ -122,6 +139,8 @@ export default function AdminReportesPage() {
             </li>
           ))}
         </ul>
+      )}
+        </>
       )}
     </div>
   );

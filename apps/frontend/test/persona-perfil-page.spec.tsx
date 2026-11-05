@@ -8,6 +8,13 @@ vi.mock('next/navigation', () => ({
 }));
 
 // MEJ-22: el diálogo de invitar a un rol usa TanStack Query; aquí solo importa el perfil.
+vi.mock('@/components/profile/acciones-moderacion', () => ({ AccionesModeracion: () => null }));
+vi.mock('@/components/profile/personas-parecidas', () => ({ PersonasParecidas: () => null }));
+vi.mock('@/components/profile/enlaces-perfil', () => ({ EnlacesPerfilSeccion: () => null }));
+vi.mock('@/components/profile/disponibilidad-semanal', () => ({ DisponibilidadSemanal: () => null }));
+vi.mock('@/components/profile/habilidades-confirmables', () => ({
+  HabilidadesConfirmables: () => <span>habilidades</span>,
+}));
 vi.mock('@/components/projects/invitar-a-rol-dialog', () => ({ InvitarARolDialog: () => null }));
 
 // MEJ-132: el estado de la persona usa TanStack Query y tiene su propio spec.
@@ -126,7 +133,7 @@ describe('PerfilPersonaPage', () => {
     expect(screen.getAllByText('Ingeniería').length).toBeGreaterThan(0);
     expect(screen.getByText('Semestre 5')).toBeInTheDocument();
     expect(screen.getByText('De tu carrera')).toBeInTheDocument();
-    expect(screen.getByText('React')).toBeInTheDocument();
+    expect(screen.getByText('habilidades')).toBeInTheDocument();
   });
 
   it('«Enviar mensaje» aparece solo entre amigos y abre la conversación (MEJ-28)', () => {

@@ -20,6 +20,7 @@ import { ProjectPolicyService } from '../common/project-policy/project-policy.se
 import { ProjectReadPolicyService } from '../common/project-policy/project-read-policy.service';
 import { ChatCanalesService } from '../chat/chat-canales.service';
 import { AdminMeetingsService } from '../events/admin-meetings.service';
+import { BienvenidaService } from './bienvenida.service';
 import { CreatePostulacionDto } from './dto/create-postulacion.dto';
 import { UpdateEstadoPostulacionDto } from './dto/update-estado-postulacion.dto';
 import { MAX_RESPUESTA_CORTA, MAX_RESPUESTA_LARGA } from './dto/pregunta-rol.dto';
@@ -53,6 +54,8 @@ export class ApplicationsService {
     private readonly chatCanales?: ChatCanalesService,
     // HU-195: convocatoria a las reuniones de Administración futuras del proyecto al que entra.
     private readonly adminMeetings?: AdminMeetingsService,
+    // MEJ-102: bienvenida del lider en #general.
+    private readonly bienvenida?: BienvenidaService,
   ) {}
 
   private lockedProject(ctx: Pick<ProjectTransactionContext, 'project'>): ProjectLockRow {
@@ -561,6 +564,7 @@ export class ApplicationsService {
 
     // El nuevo integrante entra a #general (y a ningún otro canal).
     if (esAceptada) await this.chatCanales?.sincronizarSinFallar(postulacion.rolProyecto.proyecto.idProyecto);
+    if (esAceptada) await this.bienvenida?.enviarSinFallar(postulacion.rolProyecto.proyecto.idProyecto, postulacion.idUsuarioPostulante);
     if (esAceptada) this.eventEmitter.emit(INSIGNIAS_EVENTO, { claves: ['postulaciones'], idUsuarios: [postulacion.idUsuarioPostulante] });
 
     return postulacionActualizada;

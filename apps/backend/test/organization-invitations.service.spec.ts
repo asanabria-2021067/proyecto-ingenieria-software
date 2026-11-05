@@ -10,6 +10,7 @@ const PASADO = new Date(Date.now() - 86_400_000);
 
 function crearPrisma() {
   const prisma: Record<string, any> = {
+    restriccionUsuario: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
     $queryRaw: vi.fn().mockResolvedValue([]),
     organizacion: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn() },
     usuario: { findFirst: vi.fn(), findMany: vi.fn(), findUniqueOrThrow: vi.fn().mockResolvedValue({ nombre: 'Ana', apellido: 'Paz' }) },
@@ -68,6 +69,15 @@ describe('OrganizationInvitationsService', () => {
       await expect(service.invite(10, 1, { idUsuario: 20, rolOrganizacion: 'EDITOR' } as never)).rejects.toBeInstanceOf(BadRequestException);
       prisma.usuario.findFirst.mockResolvedValue(null);
       await expect(service.invite(10, 1, { correo: 'x@uvg.edu.gt', rolOrganizacion: 'EDITOR' } as never)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('MEJ-153: con un bloqueo es 403 y no crea la invitacion', async () => {
+      actuar('PROPIETARIO');
+      prisma.usuario.findFirst.mockResolvedValue(invitado);
+      prisma.restriccionUsuario.findFirst.mockResolvedValue({ idRestriccion: 1 });
+      await expect(service.invite(10, 1, { idUsuario: 20, rolOrganizacion: 'EDITOR' } as never)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.invitacionOrganizacion.create).not.toHaveBeenCalled();
+      expect(notifications.notifyFromTemplate).not.toHaveBeenCalled();
     });
 
     it('no invita a quien ya es miembro', async () => {

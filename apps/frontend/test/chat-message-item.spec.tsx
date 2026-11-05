@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 
 beforeAll(() => {
   if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false;
@@ -22,6 +22,8 @@ const confirmarMock = vi.fn();
 vi.mock('@/lib/mensajes', () => ({ confirmar: (...args: unknown[]) => confirmarMock(...args) }));
 const toastError = vi.fn();
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: (...args: unknown[]) => toastError(...args) } }));
+
+vi.mock('@/components/profile/reportar-dialog', () => ({ ReportarDialog: ({ trigger }: { trigger: unknown }) => trigger }));
 
 import { ChatMessageItem } from '../components/chat-dock/chat-message-item';
 import type { ChatMensaje } from '../lib/types/chat';
@@ -68,9 +70,12 @@ afterEach(() => {
 });
 
 describe('ChatMessageItem', () => {
-  it('un mensaje ajeno no muestra el menu de acciones', () => {
+  it('un mensaje ajeno solo ofrece reportarlo: sin editar ni eliminar (MEJ-154)', async () => {
     renderItem({}, false);
-    expect(screen.queryByRole('button', { name: 'Acciones del mensaje' })).not.toBeInTheDocument();
+    const menu = await abrirMenu();
+    expect(within(menu).getByText('Reportar mensaje')).toBeInTheDocument();
+    expect(within(menu).queryByText('Editar')).not.toBeInTheDocument();
+    expect(within(menu).queryByText('Eliminar')).not.toBeInTheDocument();
   });
 
   it('muestra la etiqueta (editado) solo si hay editadoEn', () => {

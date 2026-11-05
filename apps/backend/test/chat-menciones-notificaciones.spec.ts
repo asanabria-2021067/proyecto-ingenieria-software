@@ -59,7 +59,7 @@ describe('ChatService - menciones @ (MEJ-44)', () => {
       idProyecto: 10,
       idConversacion: 5,
       idMensaje: 99,
-    });
+    }, undefined, 1);
   });
 
   it('un mensaje sin menciones no consulta ni notifica', async () => {

@@ -23,6 +23,7 @@ import { ESTADO_CHAT_SELECT, estadoVigente } from './chat-estado.service';
 import { prepararMencionesChat } from './chat-menciones';
 import { normalizarMenciones } from '../comentarios/menciones/menciones.parser';
 import { NotificationsService } from '../notifications/notifications.service';
+import { assertSinBloqueo } from '../common/bloqueos';
 
 /**
  * T-234: "archivado" NO es un campo propio de Conversacion — se deriva de
@@ -336,6 +337,8 @@ export class ChatService {
     }
 
     if (dto.tipo === 'INDIVIDUAL') {
+      // MEJ-153: bloquear impide abrir mensajes directos.
+      for (const otro of idsUnicos.filter((id) => id !== userId)) await assertSinBloqueo(this.prisma, userId, otro);
       const existente = await this.prisma.conversacion.findFirst({
         where: {
           idProyecto,
@@ -660,6 +663,11 @@ export class ChatService {
       );
     }
 
+    // MEJ-153: tambien en un mensaje directo ya abierto, un bloqueo corta el envio.
+    if (conversacion.tipo === 'INDIVIDUAL') {
+      for (const p of conversacion.participantes) if (p.idUsuario !== userId) await assertSinBloqueo(this.prisma, userId, p.idUsuario);
+    }
+
     if (idMensajeCitado !== undefined) {
       // Filtrar por idConversacion impide citar un mensaje de otra conversación.
       const citado = await this.prisma.mensajeChat.findFirst({
@@ -785,7 +793,7 @@ export class ChatService {
         idProyecto,
         idConversacion,
         idMensaje,
-      });
+      }, undefined, autorId);
     } catch {
       // best effort: el mensaje ya se guardo y difundio
     }

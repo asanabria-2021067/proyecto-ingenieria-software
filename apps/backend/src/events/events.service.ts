@@ -395,6 +395,8 @@ export class EventsService {
    * participante ACTIVO). Un id ajeno es un 400, no se descarta en silencio:
    * el líder debe enterarse de que esa persona no recibirá el evento.
    */
+  // MEJ-153: sin chequeo de bloqueo a proposito: los invitados son integrantes del mismo proyecto y el evento no abre
+  // mensajes ni invitaciones; bloquear solo corta DM, amistad e invitaciones.
   private async normalizarInvitados(projectId: number, leaderId: number, invitados?: number[]): Promise<number[]> {
     const unicos = [...new Set(invitados ?? [])];
     if (unicos.length === 0) return [];

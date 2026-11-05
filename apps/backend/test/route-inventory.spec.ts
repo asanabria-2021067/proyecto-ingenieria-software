@@ -434,4 +434,40 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     const retiro = rutas.find((r) => r.id === 'DELETE /api/postulaciones/:id');
     expect(retiro?.guards).toEqual(expect.arrayContaining([JwtAuthGuard, ProjectWriteGuard]));
   });
+  // MEJ-102/142/146-154: perfil, portafolio, bloqueos, reportes y bienvenida. Solo el portafolio publico queda sin sesion.
+  it('perfil y portafolio: las rutas nuevas existen, exigen JwtAuthGuard y solo el portafolio publico queda abierto', () => {
+    const protegidas = [
+      'GET /api/perfil/me/portafolio',
+      'PUT /api/perfil/me/portafolio',
+      'POST /api/perfil/me/portafolio/regenerar',
+      'PUT /api/perfil/me/disponibilidad',
+      'PUT /api/perfil/me/enlaces',
+      'GET /api/perfil/me/semestre',
+      'GET /api/perfil/asistente-reuniones',
+      'GET /api/perfil/:id/habilidades',
+      'PUT /api/perfil/:id/habilidades/:idHabilidad/confirmacion',
+      'DELETE /api/perfil/:id/habilidades/:idHabilidad/confirmacion',
+      'GET /api/perfil/:id/personas-parecidas',
+      'GET /api/perfil/:id/disponibilidad',
+      'GET /api/perfil/:id/enlaces',
+      'GET /api/restricciones',
+      'PUT /api/restricciones/:tipo/:idObjetivo',
+      'DELETE /api/restricciones/:tipo/:idObjetivo',
+      'POST /api/reportes-perfil',
+      'GET /api/admin/reportes-perfil',
+      'PATCH /api/admin/reportes-perfil/:id',
+      'GET /api/proyectos/:id/mensaje-bienvenida',
+      'PUT /api/proyectos/:id/mensaje-bienvenida',
+    ];
+    const nuevas = rutas.filter((r) => protegidas.includes(r.id));
+    expect(nuevas.map((r) => r.id).sort()).toEqual([...protegidas].sort());
+    expect(nuevas.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+    expect(nuevas.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+    // La bandeja de reportes de perfil exige rol de administrador.
+    expect(nuevas.filter((r) => r.adminPath && !r.guards.includes(RolesGuard)).map((r) => r.id)).toEqual([]);
+
+    const publicas = rutas.filter((r) => r.path.startsWith('publico/'));
+    expect(publicas.map((r) => r.id)).toEqual(['GET /api/publico/portafolio/:token']);
+    expect(publicas.every((r) => PUBLICAS.has(r.id) && !r.guards.includes(JwtAuthGuard))).toBe(true);
+  });
 });

@@ -39,6 +39,6 @@ import { WsAuthService } from '../ws-auth/ws-auth.service';
   controllers: [ChatController, ChatHilosController, ChatArchivadoController, ChatEstadoController, MensajesProgramadosController, ChatCanalesController, ChatMensajesExtrasController],
   // G07 (OWASP25-C025): política del handshake con el JwtService de este módulo.
   providers: [ChatService, ChatHilosService, ChatCanalesService, ChatEstadoService, ChatGateway, WsAuthService, MensajesProgramadosService, LinkPreviewService, ChatTarjetasService, RecordatoriosMensajeService],
-  exports: [ChatCanalesService, ChatService, ChatGateway],
+  exports: [ChatCanalesService, ChatService, ChatGateway, LinkPreviewService],
 })
 export class ChatModule {}

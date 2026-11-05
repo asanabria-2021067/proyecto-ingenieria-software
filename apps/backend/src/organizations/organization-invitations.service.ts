@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailService } from '../mail/mail.service';
 import { correoInvitacionOrganizacion, urlApp } from '../mail/mail-templates';
+import { assertSinBloqueo } from '../common/bloqueos';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { OrganizationChatService } from './organization-chat.service';
 import {
@@ -85,6 +86,7 @@ export class OrganizationInvitationsService {
           throw new BadRequestException('Solo se puede invitar a usuarios activos que no sean administradores del sistema');
         }
         if (invitado.idUsuario === userId) throw new BadRequestException('No puedes invitarte a ti mismo');
+        await assertSinBloqueo(tx, userId, invitado.idUsuario);
 
         const miembro = await tx.usuarioOrganizacion.findUnique({
           where: { idUsuario_idOrganizacion: { idUsuario: invitado.idUsuario, idOrganizacion } },

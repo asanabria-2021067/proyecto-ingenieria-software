@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChatService } from '../chat/chat.service';
 import { HorasSemestreService } from '../horas-semestre/horas-semestre.service';
 import { listarInsigniasUsuario } from '../insignias/insignias.service';
+import { assertSinBloqueo, hayBloqueo } from '../common/bloqueos';
 import { FILTRO_DIRECTORIO } from './social.service';
 
 const ESTADOS_VISIBLES: EstadoProyecto[] = [
@@ -27,7 +28,7 @@ const orgVisiblePara = (idVisor: number): Prisma.OrganizacionWhereInput => ({
 });
 
 /** Proyecto no ligado a una organización privada ajena a quien mira. */
-const proyectoVisiblePara = (idVisor: number): Prisma.ProyectoWhereInput => ({
+export const proyectoVisiblePara = (idVisor: number): Prisma.ProyectoWhereInput => ({
   eliminadoEn: null,
   estadoProyecto: { in: ESTADOS_VISIBLES },
   organizaciones: { every: { organizacion: orgVisiblePara(idVisor) } },
@@ -265,6 +266,7 @@ export class PerfilSocialService {
   /** El botón «Enviar mensaje» solo se ofrece cuando abrirMensajeDirecto va a funcionar. */
   private async puedeMensaje(idVisor: number, idObjetivo: number) {
     if (idVisor === idObjetivo || !(await this.sonAmigos(idVisor, idObjetivo))) return false;
+    if (await hayBloqueo(this.prisma, idVisor, idObjetivo)) return false;
     return !!(await this.destinoMensaje(idVisor, idObjetivo));
   }
 
@@ -275,6 +277,7 @@ export class PerfilSocialService {
   async abrirMensajeDirecto(idUsuario: number, idAmigo: number) {
     if (idUsuario === idAmigo) throw new ForbiddenException('No puedes escribirte a ti mismo');
     if (!(await this.sonAmigos(idUsuario, idAmigo))) throw new ForbiddenException('Solo puedes escribir a tus amigos');
+    await assertSinBloqueo(this.prisma, idUsuario, idAmigo);
 
     const destino = await this.destinoMensaje(idUsuario, idAmigo);
     if (!destino) throw new ConflictException(MENSAJE_SIN_PROYECTO_COMPARTIDO);

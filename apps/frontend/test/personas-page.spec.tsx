@@ -49,6 +49,7 @@ vi.mock('@/lib/services/catalogs', () => ({
       { idHabilidad: 2, nombreHabilidad: 'Node' },
     ]),
   getIntereses: () => Promise.resolve([{ idInteres: 1, nombreInteres: 'IA' }]),
+  getCarreras: () => Promise.resolve([{ idCarrera: 1, nombreCarrera: 'Ingeniería', facultad: null }]),
 }));
 
 const swalFire = vi.fn();
