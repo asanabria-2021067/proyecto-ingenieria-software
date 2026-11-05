@@ -110,7 +110,7 @@ protección actual ya es correcta.
 | PATCH | `/notificaciones/leer-todas`, `/notificaciones/:id/leer` | Marcar como leídas | ✅ | ✅ | ✅ | ✅ | `JWT` + `S:self` (403 si la notificación es de otro) | — |
 | POST/PATCH/DELETE | `/social/amistades…`, `/social/seguimientos…` | Gestionar amistades y seguimientos propios | ✅ | ✅ | ✅ | ✅ | `JWT` + `S:self` | — |
 | GET | `/social/amistades…`, `/social/seguimientos/…`, `/social/usuarios/buscar`, `/social/usuarios/:id`, `/social/feed` | Leer red social / perfil público | ✅ | ✅ | ✅ | ✅ | `JWT` + `S:self` (excluye administradores de búsquedas; feed vacío para admin) | — |
-| GET | `/busqueda` | Búsqueda global | ✅ | ✅ | ✅ | ✅ | `JWT` + `S:self` | — |
+| GET | `/busqueda` | Búsqueda global (proyectos, personas, tareas y, desde FIX-32, mensajes y canales de las conversaciones donde el usuario participa) | ✅ | ✅ | ✅ | ✅ | `JWT` + `S:self` (mensajes y canales: solo conversaciones propias, mismo filtro que `GET /chats?q=`) | — |
 | GET | `/chats`, `/chats/archivados` | Conversaciones propias | ✅ | ✅ | ✅ | ✅ | `JWT` + `S:self` | — |
 
 ### 2.3 Proyectos

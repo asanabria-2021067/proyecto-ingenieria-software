@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
 import { GlobalSearchService } from '../src/search/global-search.service';
 import type { UserNameSearchService } from '../src/common/search/user-name-search.service';
+import type { ChatService } from '../src/chat/chat.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
 
 function makePrisma(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}) {
@@ -25,6 +26,12 @@ function makeUserNameSearch() {
   };
 }
 
+function makeChat(conversaciones: unknown[] = []) {
+  return { listAllConversations: vi.fn().mockResolvedValue(conversaciones) } as unknown as ChatService & {
+    listAllConversations: ReturnType<typeof vi.fn>;
+  };
+}
+
 describe('GlobalSearchService.buscarProyectos', () => {
   it('resuelve ids por SQL crudo y luego hidrata solo proyectos visibles', async () => {
     const prisma = makePrisma();
@@ -32,7 +39,7 @@ describe('GlobalSearchService.buscarProyectos', () => {
     prisma.proyecto.findMany.mockResolvedValueOnce([
       { idProyecto: 1, tituloProyecto: 'Móvil UVG', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' },
     ]);
-    const service = new GlobalSearchService(prisma, makeUserNameSearch());
+    const service = new GlobalSearchService(prisma, makeUserNameSearch(), makeChat());
 
     const resultado = await service.buscarProyectos('movil');
 
@@ -57,7 +64,7 @@ describe('GlobalSearchService.buscarProyectos', () => {
     }));
     prisma.$queryRaw.mockResolvedValueOnce(seisFilas.map((f) => ({ id_proyecto: f.idProyecto })));
     prisma.proyecto.findMany.mockResolvedValueOnce(seisFilas);
-    const service = new GlobalSearchService(prisma, makeUserNameSearch());
+    const service = new GlobalSearchService(prisma, makeUserNameSearch(), makeChat());
 
     const resultado = await service.buscarProyectos('proyecto');
 
@@ -67,7 +74,7 @@ describe('GlobalSearchService.buscarProyectos', () => {
 
   it('escapa los comodines de LIKE en el texto de busqueda', async () => {
     const prisma = makePrisma();
-    const service = new GlobalSearchService(prisma, makeUserNameSearch());
+    const service = new GlobalSearchService(prisma, makeUserNameSearch(), makeChat());
 
     await service.buscarProyectos('50%_raro\\');
 
@@ -84,7 +91,7 @@ describe('GlobalSearchService.buscarPersonas', () => {
     prisma.usuario.findMany.mockResolvedValueOnce([
       { idUsuario: 9, nombre: 'Saúl', apellido: 'Castillo', fotoUrl: null, perfil: { carrera: { nombreCarrera: 'Ing.' } } },
     ]);
-    const service = new GlobalSearchService(prisma, userNameSearch);
+    const service = new GlobalSearchService(prisma, userNameSearch, makeChat());
 
     const resultado = await service.buscarPersonas('saul');
 
@@ -108,7 +115,7 @@ describe('GlobalSearchService.buscarPersonas', () => {
     const userNameSearch = makeUserNameSearch();
     userNameSearch.findMatchingUserIds.mockResolvedValueOnce([]);
     prisma.usuario.findMany.mockResolvedValueOnce([]);
-    const service = new GlobalSearchService(prisma, userNameSearch);
+    const service = new GlobalSearchService(prisma, userNameSearch, makeChat());
 
     const resultado = await service.buscarPersonas('zzz-no-existe');
 
@@ -119,7 +126,7 @@ describe('GlobalSearchService.buscarPersonas', () => {
 describe('GlobalSearchService.buscarTareas', () => {
   it('excluye tareas de proyectos CANCELADO, aunque el usuario sea lider o participante activo', async () => {
     const prisma = makePrisma();
-    const service = new GlobalSearchService(prisma, makeUserNameSearch());
+    const service = new GlobalSearchService(prisma, makeUserNameSearch(), makeChat());
 
     await service.buscarTareas('login', 99);
 
@@ -146,7 +153,7 @@ describe('GlobalSearchService.buscarTareas', () => {
         proyecto: { tituloProyecto: 'App móvil' },
       },
     ]);
-    const service = new GlobalSearchService(prisma, makeUserNameSearch());
+    const service = new GlobalSearchService(prisma, makeUserNameSearch(), makeChat());
 
     const resultado = await service.buscarTareas('login', 99);
 
@@ -181,7 +188,7 @@ describe('GlobalSearchService.buscarTareas', () => {
     const prisma = makePrisma();
     prisma.$queryRaw.mockResolvedValueOnce([]);
     prisma.tarea.findMany.mockResolvedValueOnce([]);
-    const service = new GlobalSearchService(prisma, makeUserNameSearch());
+    const service = new GlobalSearchService(prisma, makeUserNameSearch(), makeChat());
 
     const resultado = await service.buscarTareas('cualquier-cosa', 1);
 
@@ -193,7 +200,7 @@ describe('GlobalSearchService.buscar', () => {
   it('query vacia devuelve estructura vacia sin tocar la base de datos', async () => {
     const prisma = makePrisma();
     const userNameSearch = makeUserNameSearch();
-    const service = new GlobalSearchService(prisma, userNameSearch);
+    const service = new GlobalSearchService(prisma, userNameSearch, makeChat());
 
     const resultado = await service.buscar(1, '   ');
 
@@ -201,6 +208,7 @@ describe('GlobalSearchService.buscar', () => {
       proyectos: { items: [], hasMore: false },
       personas: { items: [], hasMore: false },
       tareas: { items: [], hasMore: false },
+      mensajes: { items: [], hasMore: false },
     });
     expect(prisma.$queryRaw).not.toHaveBeenCalled();
     expect(prisma.proyecto.findMany).not.toHaveBeenCalled();
@@ -215,7 +223,7 @@ describe('GlobalSearchService.buscar', () => {
     prisma.tarea.findMany.mockResolvedValueOnce([]);
     userNameSearch.findMatchingUserIds.mockResolvedValueOnce([]);
     prisma.usuario.findMany.mockResolvedValueOnce([]);
-    const service = new GlobalSearchService(prisma, userNameSearch);
+    const service = new GlobalSearchService(prisma, userNameSearch, makeChat());
 
     const resultado = await service.buscar(1, 'react');
 
@@ -223,16 +231,86 @@ describe('GlobalSearchService.buscar', () => {
       proyectos: { items: [], hasMore: false },
       personas: { items: [], hasMore: false },
       tareas: { items: [], hasMore: false },
+      mensajes: { items: [], hasMore: false },
     });
   });
 
   it('rechaza un texto de un solo caracter sin tocar la base de datos', async () => {
     const prisma = makePrisma();
     const userNameSearch = makeUserNameSearch();
-    const service = new GlobalSearchService(prisma, userNameSearch);
+    const service = new GlobalSearchService(prisma, userNameSearch, makeChat());
 
     await expect(service.buscar(1, 'a')).rejects.toThrow(BadRequestException);
     expect(prisma.$queryRaw).not.toHaveBeenCalled();
     expect(userNameSearch.findMatchingUserIds).not.toHaveBeenCalled();
+  });
+});
+
+describe('GlobalSearchService.buscarMensajes', () => {
+  it('reutiliza ChatService.listAllConversations (misma busqueda que /dashboard/mensajes) con el usuario y el texto', async () => {
+    const chat = makeChat([
+      {
+        idConversacion: 9,
+        esCanal: true,
+        nombre: 'Demo - Hackathon de Computacion',
+        nombrePersonalizado: null,
+        tipo: 'GRUPAL',
+        proyecto: { tituloProyecto: 'Hackathon' },
+        participantes: [],
+      },
+      {
+        idConversacion: 10,
+        esCanal: false,
+        nombre: null,
+        nombrePersonalizado: null,
+        tipo: 'INDIVIDUAL',
+        proyecto: { tituloProyecto: 'Hackathon' },
+        participantes: [
+          { idUsuario: 1, nombre: 'Yo', apellido: 'Mismo', apodo: null },
+          { idUsuario: 2, nombre: 'Ana', apellido: 'Lopez', apodo: null },
+        ],
+      },
+    ]);
+    const service = new GlobalSearchService(makePrisma(), makeUserNameSearch(), chat);
+
+    const resultado = await service.buscarMensajes('patrocinadores', 1);
+
+    expect(chat.listAllConversations).toHaveBeenCalledWith(1, 'patrocinadores', 6);
+    expect(resultado).toEqual({
+      items: [
+        { idConversacion: 9, nombre: '#Demo - Hackathon de Computacion', esCanal: true, tituloProyecto: 'Hackathon' },
+        { idConversacion: 10, nombre: 'Ana Lopez', esCanal: false, tituloProyecto: 'Hackathon' },
+      ],
+      hasMore: false,
+    });
+  });
+
+  it('recorta a 5 y marca hasMore', async () => {
+    const seis = Array.from({ length: 6 }, (_, i) => ({
+      idConversacion: i + 1,
+      esCanal: true,
+      nombre: `c${i}`,
+      nombrePersonalizado: null,
+      tipo: 'GRUPAL',
+      proyecto: { tituloProyecto: 'P' },
+      participantes: [],
+    }));
+    const service = new GlobalSearchService(makePrisma(), makeUserNameSearch(), makeChat(seis));
+
+    const resultado = await service.buscarMensajes('c', 1);
+
+    expect(resultado.items).toHaveLength(5);
+    expect(resultado.hasMore).toBe(true);
+  });
+
+  it('buscar() incluye el grupo mensajes', async () => {
+    const chat = makeChat([
+      { idConversacion: 3, esCanal: true, nombre: 'general', nombrePersonalizado: null, tipo: 'GRUPAL', proyecto: { tituloProyecto: 'P' }, participantes: [] },
+    ]);
+    const service = new GlobalSearchService(makePrisma(), makeUserNameSearch(), chat);
+
+    const resultado = await service.buscar(1, 'general');
+
+    expect(resultado.mensajes.items).toEqual([{ idConversacion: 3, nombre: '#general', esCanal: true, tituloProyecto: 'P' }]);
   });
 });

@@ -16,7 +16,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { Filter, Keyboard, Plus, Tags } from 'lucide-react';
+import { Filter, Plus, Tags } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Kbd } from '@/components/ui/kbd';
@@ -119,6 +119,9 @@ interface TaskBoardProps {
   onFiltroRolChange?: (value: string) => void;
   onFiltroHitoChange?: (value: string) => void;
   mostrarToolbar?: boolean;
+  /** Diálogo de atajos, controlado desde el workspace (el botón vive en su barra). */
+  atajosAbierto?: boolean;
+  onAtajosChange?: (abierto: boolean) => void;
   /** Selección múltiple (HU-202/T-382); solo se pasa al líder. */
   seleccion?: TaskSelectionControl;
 }
@@ -273,6 +276,8 @@ export function TaskBoard({
   onFiltroRolChange,
   onFiltroHitoChange,
   mostrarToolbar = true,
+  atajosAbierto = false,
+  onAtajosChange = () => {},
   seleccion,
 }: TaskBoardProps) {
   const [filtroRolInterno, setFiltroRolInterno] = useState(FILTRO_TODOS);
@@ -289,7 +294,6 @@ export function TaskBoard({
   const [tareaEditar, setTareaEditar] = useState<TareaPublicaDTO | null>(null);
   const [etiquetasAbierto, setEtiquetasAbierto] = useState(false);
   const [filtrosMovilAbiertos, setFiltrosMovilAbiertos] = useState(false);
-  const [atajosAbierto, setAtajosAbierto] = useState(false);
   const [mobileSelectedState, setMobileSelectedState] = useState<EstadoTarea>('POR_HACER');
   const [activeDrag, setActiveDrag] = useState<TaskDragData | null>(null);
   const [dndAnnouncement, setDndAnnouncement] = useState<string | null>(null);
@@ -361,7 +365,7 @@ export function TaskBoard({
       const enfocada = [...cardRefs.current].find(([, el]) => el.contains(document.activeElement))?.[0] ?? null;
       if (e.key === '?') {
         e.preventDefault();
-        setAtajosAbierto(true);
+        onAtajosChange(true);
       } else if (e.key.toLowerCase() === 'n' && isLeader && !e.shiftKey) {
         e.preventDefault();
         setCrearAbierto(true);
@@ -377,7 +381,7 @@ export function TaskBoard({
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [atajosBloqueados, esMovil, ordenPorEstado, isLeader, idProyecto, router]);
+  }, [atajosBloqueados, esMovil, ordenPorEstado, isLeader, idProyecto, router, onAtajosChange]);
 
   const solicitarEliminar = async (tarea: TareaPublicaDTO) => {
     const confirmado = await confirmar({
@@ -691,17 +695,6 @@ export function TaskBoard({
               </Sheet>
             </div>
 
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setAtajosAbierto(true)}
-              className={`${CONTROL_CLASS} hidden gap-1.5 md:inline-flex`}
-            >
-              <Keyboard className="size-3.5" aria-hidden="true" />
-              Atajos
-            </Button>
-
             {isLeader && (
               <>
                 <Button
@@ -826,7 +819,7 @@ export function TaskBoard({
           {dndAnnouncement ?? ''}
         </div>
 
-        <Dialog open={atajosAbierto} onOpenChange={setAtajosAbierto}>
+        <Dialog open={atajosAbierto} onOpenChange={onAtajosChange}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Atajos del tablero</DialogTitle>
