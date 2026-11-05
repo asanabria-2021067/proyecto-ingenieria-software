@@ -51,7 +51,7 @@ export function DatePicker({
           {...triggerProps}
         >
           <CalendarDays className="size-4 shrink-0 text-on-surface-variant" aria-hidden="true" />
-          <span className="truncate capitalize">{value ? formatFecha(value) : placeholder}</span>
+          <span className="truncate">{value ? formatFecha(value) : placeholder}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
