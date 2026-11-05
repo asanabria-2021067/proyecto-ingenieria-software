@@ -28,6 +28,13 @@ export function useCan(accion: AccionPermiso, { esLider = false }: OpcionesPermi
   return puede(accion, user.roles, esLider);
 }
 
+/** Coordinador académico que no es administrador: el administrador conserva su propio shell. */
+export function useEsCoordinador(): boolean {
+  const coordina = useCan('coordinador.panel');
+  const administra = useCan('admin.panel');
+  return coordina && !administra;
+}
+
 export function useRequireCan(
   accion: AccionPermiso,
   { esLider = false, listo = true, activo = true }: OpcionesRequerirPermiso = {},

@@ -133,9 +133,10 @@ export class ProjectsController {
     return this.projectsService.findOne(id, Boolean(user?.userId));
   }
 
+  // ROL-2: lectura abierta al coordinador académico; su alcance se verifica en el servicio.
   @Get(':id/admin')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('administrador')
+  @Roles('administrador', 'coordinador_academico')
   findOneAdmin(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { userId: number },

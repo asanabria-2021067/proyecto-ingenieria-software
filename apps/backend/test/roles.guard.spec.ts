@@ -212,9 +212,9 @@ describe('Rutas exclusivas de administración (T-286)', () => {
     }
   });
 
-  it('ProjectsController: solo GET :id/admin exige administrador', () => {
+  it('ProjectsController: GET :id/admin exige administrador o coordinador (alcance en el servicio)', () => {
     expect(guardsOf(ProjectsController.prototype.findOneAdmin)).toEqual([JwtAuthGuard, RolesGuard]);
-    expect(rolesOf(ProjectsController.prototype.findOneAdmin)).toEqual(['administrador']);
+    expect(rolesOf(ProjectsController.prototype.findOneAdmin)).toEqual(['administrador', 'coordinador_academico']);
     expect(rolesOf(ProjectsController.prototype.findOneOwner)).toBeUndefined();
     expect(rolesOf(ProjectsController.prototype.create)).toBeUndefined();
   });

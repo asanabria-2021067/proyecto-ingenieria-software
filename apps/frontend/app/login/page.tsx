@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useLogin } from '@/hooks/use-login';
-import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { rutaInicioDe } from '@/lib/permissions/ruta-inicio';
 import { z } from 'zod';
 import { aviso } from '@/lib/mensajes';
 import { MOTIVO_SESION_EXPIRADA, readNextFromLocation } from '@/lib/api/session';
@@ -81,7 +82,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isSuccess) {
-      router.replace(readNextFromLocation() ?? (isAdminUser(user) ? '/dashboard/admin' : '/dashboard'));
+      router.replace(readNextFromLocation() ?? rutaInicioDe(user));
     }
   }, [isSuccess, user, router]);
 

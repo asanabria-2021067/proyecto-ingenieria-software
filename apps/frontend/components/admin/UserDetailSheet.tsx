@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
+import { CoordinadorAlcanceEditor } from '@/components/admin/CoordinadorAlcanceEditor';
 import uvgSwal from '@/lib/swal';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
@@ -361,6 +362,10 @@ function CoordinadorContent({ user }: { user: AdminUserDetail }) {
           <MetricCard label="Proyectos cerrados" value={act?.proyectosCerrados ?? 0} />
           <MetricCard label="Estudiantes vinculados" value={act?.estudiantesVinculados ?? 0} />
         </div>
+      </Section>
+
+      <Section title="Alcance académico">
+        <CoordinadorAlcanceEditor idUsuario={user.idUsuario} />
       </Section>
 
       <Section title="Proyectos recientes">

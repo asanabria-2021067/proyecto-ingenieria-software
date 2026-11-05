@@ -47,6 +47,7 @@ import {
   proyectoListSelect,
   toDateOnly,
 } from './projects.read-model';
+import { coordinadorCubreProyecto } from '../coordinador/coordinador-alcance';
 import { ProjectsCacheService } from './projects-cache.service';
 import { ProjectsAffinityService } from './projects-affinity.service';
 import { ProjectsRevisionsService } from './projects-revisions.service';
@@ -368,8 +369,8 @@ export class ProjectsService {
       scope: 'resumen',
     });
     const isAdmin = await this.notifications.isAdmin(adminId);
-    if (!isAdmin) {
-      throw new ForbiddenException('Se requieren permisos de administrador');
+    if (!isAdmin && !(await coordinadorCubreProyecto(this.prisma, adminId, id))) {
+      throw new ForbiddenException('Se requieren permisos de administrador o un proyecto dentro de tu alcance');
     }
     const proyecto = await this.prisma.proyecto.findFirst({
       where: { idProyecto: id, eliminadoEn: null },
