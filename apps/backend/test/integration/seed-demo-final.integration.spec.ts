@@ -20,6 +20,7 @@ const TABLAS = [
   'invitacion_organizacion', 'conversacion', 'conversacion_participante', 'mensaje_chat', 'proyecto', 'participacion_proyecto', 'sprint',
   'tarea', 'asignacion_tarea', 'registro_tiempo_tarea', 'horas_participacion', 'tarea_checklist_item',
   'rol_proyecto', 'postulacion', 'requisito_habilidad_rol', 'habilidad', 'usuario_habilidad',
+  'pregunta_rol', 'respuesta_postulacion', 'evento_postulacion', 'tarea_enlace', 'tarea_responsable', 'portafolio_publico', 'disponibilidad_semanal',
 ];
 
 describeIntegration('DEMO seed-demo-final', () => {
@@ -97,6 +98,8 @@ describeIntegration('DEMO seed-demo-final', () => {
     expect(primera).toContain('usuarios: creados 15, actualizados 0');
     expect(primera).toContain('proyectos: creados 5, actualizados 0');
     expect(primera).not.toContain(password);
+    for (const l of ['preguntas_rol: creados 3', 'postulaciones_release9: creados 2', 'respuestas_postulacion: creados 3', 'eventos_postulacion: creados 6', 'tareas_release9: creados 3', 'tarea_responsables: creados 1', 'tarea_enlaces: creados 2', 'chat_hilo_respuestas: creados 2', 'portafolio_publico: creados 1', 'disponibilidad_semanal: creados 6'])
+      expect(primera).toContain(`${l}, actualizados 0`);
     expect(primera).not.toContain('Contrasena-Coord-1');
     const trasPrimera = await conteos();
 
@@ -210,6 +213,42 @@ describeIntegration('DEMO seed-demo-final', () => {
     const cubiertos = { creador: { perfil: { idCarrera: carrera.idCarrera } } };
     expect(await db.revisionProyecto.count({ where: { estadoRevision: 'PENDIENTE', proyecto: { estadoProyecto: 'EN_REVISION', ...cubiertos } } })).toBe(1);
     expect(await db.revisionCierreProyecto.count({ where: { estadoRevision: 'ENVIADA', proyecto: { estadoProyecto: 'EN_SOLICITUD_CIERRE', ...cubiertos } } })).toBe(1);
+
+    // Entrega 9: preguntas del rol (MEJ-97), linea de tiempo (MEJ-100) y rechazo con motivo (MEJ-99).
+    const rolUx = await db.rolProyecto.findFirstOrThrow({ where: { nombreRol: 'Diseñador/a UX' }, include: { preguntas: true, postulaciones: { include: { respuestas: true, eventos: true } } } });
+    expect(rolUx.preguntas).toHaveLength(2);
+    expect(rolUx.postulaciones).toHaveLength(1);
+    expect(rolUx.postulaciones[0].respuestas).toHaveLength(2);
+    expect(rolUx.postulaciones[0].eventos.map((e) => e.tipo).sort()).toEqual(['ENVIADA', 'EN_REVISION', 'VISTA']);
+    const rechazada = await db.postulacion.findFirstOrThrow({ where: { estadoPostulacion: 'RECHAZADA', rolProyecto: { nombreRol: 'Logística del evento' } }, include: { eventos: true } });
+    expect(rechazada.motivoRechazo).toBe('HORARIO');
+    expect(rechazada.eventos.map((e) => e.tipo).sort()).toEqual(['ENVIADA', 'RECHAZADA', 'VISTA']);
+
+    // MEJ-117: sprint activo con objetivo.
+    expect((await db.sprint.findFirstOrThrow({ where: { estado: 'ACTIVO', proyecto: { tituloProyecto: 'Demo - App de tutorías entre pares' } } })).objetivo).toBeTruthy();
+
+    // MEJ-106/107/109: tarea con 2 subtareas, 2 enlaces https y 2 responsables (principal + uno adicional).
+    const conSubtareas = await db.tarea.findFirstOrThrow({
+      where: { tituloTarea: 'Tutorías: diseñar la pantalla de búsqueda' },
+      include: { subtareas: true, enlaces: true, responsables: true, asignaciones: { where: { desasignadaEn: null } } },
+    });
+    expect(conSubtareas.subtareas).toHaveLength(2);
+    expect(conSubtareas.subtareas.every((t) => t.idProyecto === conSubtareas.idProyecto && t.idTareaPadre === conSubtareas.idTarea)).toBe(true);
+    expect(conSubtareas.enlaces).toHaveLength(2);
+    for (const e of conSubtareas.enlaces) expect(e.url).toMatch(/^https:\/\//);
+    expect(conSubtareas.asignaciones.length + conSubtareas.responsables.length).toBe(2);
+
+    // MEJ-131: hilo de 2 respuestas bajo un mensaje del chat del Hackathon.
+    const raiz = await db.mensajeChat.findFirstOrThrow({ where: { idMensajePadre: null, hilo: { some: {} }, conversacion: { proyecto: { tituloProyecto: 'Demo - Hackathon de Computación' } } }, include: { hilo: true } });
+    expect(raiz.hilo).toHaveLength(2);
+
+    // MEJ-146/148: portafolio publico activo de una cuenta demo con token opaco, y su disponibilidad semanal.
+    const portafolio = await db.portafolioPublico.findMany({ include: { usuario: true } });
+    expect(portafolio).toHaveLength(1);
+    expect(portafolio[0]).toMatchObject({ activo: true, indexable: false });
+    expect(portafolio[0].usuario.correo).toMatch(/^demo\.cs\d+@uvg\.edu\.gt$/);
+    expect(portafolio[0].token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(await db.disponibilidadSemanal.count({ where: { idUsuario: portafolio[0].idUsuario } })).toBe(6);
 
     expect(await db.tarea.groupBy({ by: ['estadoTarea'] }).then((g) => g.map((x) => x.estadoTarea).sort())).toEqual(['EN_PROGRESO', 'EN_REVISION', 'HECHO', 'POR_HACER']);
   }, 120_000);
