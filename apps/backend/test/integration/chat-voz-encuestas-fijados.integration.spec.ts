@@ -118,13 +118,17 @@ describeIntegration('CHAT — notas de voz, encuestas y fijados (PostgreSQL real
 
   // ─── MEJ-41 ──────────────────────────────────────────────────────────────
 
-  it('una nota de voz valida se guarda con su duracion y no aparece en la galeria de archivos', async () => {
+  it('una nota de voz valida se guarda con su duracion y aparece en la galeria solo con el filtro de notas de voz o sin filtro (MEJ-135)', async () => {
     const m = await chat.createMessage(idProyecto, idConversacion, autor, '', { buffer: webm(), mimetype: 'audio/webm;codecs=opus', originalname: 'x' }, undefined, {
       duracionSegundos: 30,
     });
     expect(m.adjunto).toMatchObject({ mime: 'audio/webm', duracionSegundos: 30, nombreOriginal: 'nota-de-voz.webm' });
-    const archivos = await chat.getArchivos(idProyecto, idConversacion, autor);
-    expect(archivos.items.map((i) => i.idMensaje)).not.toContain(m.idMensaje);
+    const todos = await chat.getArchivos(idProyecto, idConversacion, autor);
+    expect(todos.items.map((i) => i.idMensaje)).toContain(m.idMensaje);
+    const audios = await chat.getArchivos(idProyecto, idConversacion, autor, { tipo: 'audio' });
+    expect(audios.items.map((i) => i.idMensaje)).toContain(m.idMensaje);
+    const documentos = await chat.getArchivos(idProyecto, idConversacion, autor, { tipo: 'documento' });
+    expect(documentos.items.map((i) => i.idMensaje)).not.toContain(m.idMensaje);
   });
 
   it('la base rechaza duraciones fuera de 1..120 s aunque se salte el servicio', async () => {

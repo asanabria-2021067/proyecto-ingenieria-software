@@ -58,9 +58,10 @@ import {
   scheduledMessagesQueryKey,
   searchMessagesQueryKey,
 } from '@/lib/query-keys/chat';
-import type { BuscarMensajesFiltros, ChatEncuesta, ChatLectura, ChatMensaje, ChatReaccion, ChatTemaColor, CreateChannelPayload, SetEstadoChatPayload, ChatReaccionSocket, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
+import type { TipoArchivoChat, BuscarMensajesFiltros, ChatEncuesta, ChatLectura, ChatMensaje, ChatReaccion, ChatTemaColor, CreateChannelPayload, SetEstadoChatPayload, ChatReaccionSocket, CreateConversationPayload, DuracionSilencio, ConfigNoMolestar, UpdateConversationPayload } from '@/lib/types/chat';
 import { alternarReaccionLocal, reaccionesDesdeSocket } from '@/lib/chat-reacciones';
 import { actualizarEncuestaEnCache, refrescarFijados } from '@/lib/chat-extras';
+import { descontarRespuesta, registrarRespuesta } from '@/lib/chat-hilos';
 import { realtimeBaseUrl } from '@/lib/realtime/socket-url';
 
 /**
@@ -214,10 +215,10 @@ export function useConversationLinks(idProyecto: number, idConversacion: number,
 }
 
 /** Galeria de archivos compartidos: paginada por cursor, solo consulta si `enabled`. */
-export function useConversationFiles(idProyecto: number, idConversacion: number, enabled: boolean) {
+export function useConversationFiles(idProyecto: number, idConversacion: number, enabled: boolean, tipo?: TipoArchivoChat) {
   const query = useInfiniteQuery({
-    queryKey: conversationFilesQueryKey(idProyecto, idConversacion),
-    queryFn: ({ pageParam }) => getFiles(idProyecto, idConversacion, pageParam),
+    queryKey: conversationFilesQueryKey(idProyecto, idConversacion, tipo),
+    queryFn: ({ pageParam }) => getFiles(idProyecto, idConversacion, pageParam, tipo),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
@@ -311,7 +312,7 @@ export function useSendMessage(idProyecto: number, idConversacion: number | null
 /** Sustituye en la caché el mensaje que cambió (editado o eliminado), conservando lo que el servidor no envía (reacciones, guardado, apodo). */
 function reemplazarMensaje(queryClient: ReturnType<typeof useQueryClient>, mensaje: ChatMensaje) {
   queryClient.setQueriesData<ChatMensaje[]>(
-    { predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === mensaje.idConversacion && query.queryKey[3] === 'mensajes' },
+    { predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === mensaje.idConversacion && (query.queryKey[3] === 'mensajes' || query.queryKey[3] === 'hilo') },
     (current) =>
       current?.map((m) => {
         if (m.idMensaje === mensaje.idMensaje) return { ...m, ...mensaje };
@@ -606,6 +607,17 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
       idConversacion: number;
       mensaje: ChatMensaje;
     }) => {
+      // MEJ-131: una respuesta de hilo no entra a la lista del canal; solo suma al contador del original.
+      if (mensaje.idMensajePadre) {
+        registrarRespuesta(queryClient, mensaje);
+        if (mensaje.adjunto) {
+          queryClient.invalidateQueries({ predicate: (query) => query.queryKey[2] === idConversacion && query.queryKey[3] === 'archivos' });
+        }
+        queryClient.invalidateQueries({ queryKey: ['chats-global'] });
+        updateRead(idConversacion, mensaje.remitente.idUsuario, mensaje.enviadoEn);
+        clearTyping(idConversacion, mensaje.remitente.idUsuario);
+        return;
+      }
       let huboCache = false;
       queryClient.setQueriesData<ChatMensaje[]>(
         { predicate: (query) => query.queryKey[0] === 'proyecto-conversaciones' && query.queryKey[2] === idConversacion && query.queryKey[3] === 'mensajes' },
@@ -695,6 +707,7 @@ export function useGlobalChatSocket(openConversationIds: number[]) {
 
     const handleMessageChanged = ({ mensaje }: { mensaje: ChatMensaje }) => {
       reemplazarMensaje(queryClient, mensaje);
+      descontarRespuesta(queryClient, mensaje);
       refrescarFijados(queryClient, mensaje.idConversacion);
     };
 

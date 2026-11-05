@@ -61,6 +61,7 @@ import { PendingExitRequestsCard } from '@/components/projects/pending-exit-requ
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { ExitRequestActions, ExitRequestBadge } from '@/components/projects/member-exit-request-actions';
 import { ProjectBackLink, ProjectPageHeader, ProjectPageShell } from '@/components/projects/detail/project-page-shell';
+import { CargaEquipoPanel } from '@/components/projects/carga-equipo-panel';
 import { HoursKpiCard } from '@/components/hours/hours-kpi-card';
 
 const COLUMNAS_ORDENABLES: { key: MiembroSortKey; label: string }[] = [
@@ -442,6 +443,10 @@ export default function MiembrosProyectoPage() {
           </button>
         </div>
       )}
+
+      <div className="mb-8">
+        <CargaEquipoPanel idProyecto={idProyecto} />
+      </div>
 
       <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4">
         <MetricTile

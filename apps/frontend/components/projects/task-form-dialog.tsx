@@ -20,12 +20,21 @@ import { DraftNotice } from '@/components/ui/draft-notice';
 import { useFormDraft } from '@/hooks/use-form-draft';
 import { TaskFormFields } from '@/components/projects/task-form-fields';
 import { TaskFormExtras } from '@/components/projects/task-form-extras';
-import { extrasIniciales, extrasParaCrear, extrasParaEditar, type TaskExtrasValue } from '@/lib/tasks/extras';
+import { TaskResponsablesField } from '@/components/projects/task-responsables-field';
+import {
+  candidatosResponsables,
+  extrasIniciales,
+  extrasParaCrear,
+  extrasParaEditar,
+  responsablesParaEditar,
+  type TaskExtrasValue,
+} from '@/lib/tasks/extras';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { toast } from 'sonner';
 import type { FieldErrors } from 'react-hook-form';
 import {
   SIN_ASIGNAR,
+  SIN_ROL,
   buildCreatePayload,
   buildTaskFormSchema,
   defaultTaskFormValues,
@@ -78,6 +87,8 @@ export interface TaskFormDialogProps {
   editarTarea: ProjectTasksHook['editarTarea'];
   asignarTarea: ProjectTasksHook['asignarTarea'];
   desasignarTarea: ProjectTasksHook['desasignarTarea'];
+  /** MEJ-109: guarda los responsables adicionales al editar; sin él el selector solo aplica al crear. */
+  fijarResponsables?: ProjectTasksHook['fijarResponsables'];
   onOpenChange: (open: boolean) => void;
   onRequestDelete?: (task: TareaPublicaDTO) => void;
   /**
@@ -142,6 +153,7 @@ function TaskFormDialogContent({
   editarTarea,
   asignarTarea,
   desasignarTarea,
+  fijarResponsables,
   onOpenChange,
   onRequestDelete,
   onManageLabels,
@@ -220,9 +232,21 @@ function TaskFormDialogContent({
     setSubmitError(null);
     setIsRunning(true);
 
+    // MEJ-109: solo viajan los adicionales que siguen siendo elegibles tras cambiar rol o principal.
+    const adicionales = candidatosResponsables(
+      members,
+      values.idRolProyecto === SIN_ROL ? null : Number(values.idRolProyecto),
+      values.idUsuarioAsignado === SIN_ASIGNAR ? null : Number(values.idUsuarioAsignado),
+    )
+      .map((m) => m.idUsuario)
+      .filter((id) => extras.idsResponsablesAdicionales.includes(id));
+
     try {
       if (mode === 'create') {
-        await crearTarea.mutateAsync({ ...buildCreatePayload(values), ...extrasParaCrear(extras) });
+        await crearTarea.mutateAsync({
+          ...buildCreatePayload(values),
+          ...extrasParaCrear({ ...extras, idsResponsablesAdicionales: adicionales }),
+        });
         borrador.limpiar();
         mostrarAvisoTareaGuardada('create');
         onOpenChange(false);
@@ -233,7 +257,8 @@ function TaskFormDialogContent({
 
       const steps = planTaskEditSteps(task, values);
       const cambiosExtras = idProyecto !== undefined ? extrasParaEditar(task, extras) : null;
-      if (steps.length === 0 && !cambiosExtras) {
+      const cambiosResponsables = fijarResponsables ? responsablesParaEditar(task, adicionales) : null;
+      if (steps.length === 0 && !cambiosExtras && !cambiosResponsables) {
         borrador.limpiar();
         onOpenChange(false);
         return;
@@ -267,6 +292,17 @@ function TaskFormDialogContent({
         } catch (error) {
           const prefijo = steps.length > 0 ? 'Los cambios anteriores se guardaron correctamente. ' : '';
           setSubmitError(`${prefijo}No se pudo guardar la dependencia o la repetición. ${getApiErrorMessage(error, 'task')}`);
+          return;
+        }
+      }
+
+      if (cambiosResponsables && fijarResponsables) {
+        setProgreso('Guardar los responsables');
+        try {
+          await fijarResponsables.mutateAsync({ taskId: task.idTarea, idsUsuarios: cambiosResponsables });
+        } catch (error) {
+          const prefijo = steps.length > 0 || cambiosExtras ? 'Los cambios anteriores se guardaron correctamente. ' : '';
+          setSubmitError(`${prefijo}No se pudieron guardar los responsables. ${getApiErrorMessage(error, 'assignment')}`);
           return;
         }
       }
@@ -326,6 +362,14 @@ function TaskFormDialogContent({
             mode={mode}
             hitoOriginal={task?.idHito ?? null}
           />
+
+          {idProyecto !== undefined && (!porPasos || paso === 2) && (mode === 'create' || fijarResponsables) && (
+            <TaskResponsablesField
+              members={members}
+              value={extras.idsResponsablesAdicionales}
+              onChange={(ids) => setExtras((actual) => ({ ...actual, idsResponsablesAdicionales: ids }))}
+            />
+          )}
 
           {idProyecto !== undefined && (!porPasos || paso < 2) && (
             <TaskFormExtras

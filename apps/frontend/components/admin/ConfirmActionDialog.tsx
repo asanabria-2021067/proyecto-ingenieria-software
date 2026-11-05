@@ -20,6 +20,8 @@ interface ConfirmActionDialogProps {
   cancelLabel?: string;
   variant?: 'destructive' | 'warning' | 'default';
   isPending?: boolean;
+  /** Contenido extra bajo la descripción (p. ej. un campo de comentario). */
+  children?: React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -41,6 +43,7 @@ export function ConfirmActionDialog({
   cancelLabel = 'Cancelar',
   variant = 'default',
   isPending = false,
+  children,
   onConfirm,
   onCancel,
 }: ConfirmActionDialogProps) {
@@ -53,6 +56,7 @@ export function ConfirmActionDialog({
             {description}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {children}
         <AlertDialogFooter>
           <AlertDialogCancel
             onClick={onCancel}

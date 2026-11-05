@@ -32,11 +32,18 @@ import { getAdminUserDetail, type AdminUserDetail } from '@/lib/services/admin';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
 import { PerfilActividad, PerfilCvAcciones, PerfilOrganizaciones } from '@/components/profile/perfil-social-secciones';
+import { DisponibilidadSemanal } from '@/components/profile/disponibilidad-semanal';
+import { EnlacesPerfilSeccion } from '@/components/profile/enlaces-perfil';
+import { HabilidadesConfirmables } from '@/components/profile/habilidades-confirmables';
+import { MiSemestreCard } from '@/components/profile/mi-semestre-card';
+import { PersonasParecidas } from '@/components/profile/personas-parecidas';
+import { PortafolioPublicoAjustes } from '@/components/profile/portafolio-publico-ajustes';
 import { SemestreHorasCard } from '@/components/hours/semestre-horas-card';
 import { SemestreHorasHistorial } from '@/components/hours/semestre-horas-historial';
 import { HorasPorProyecto } from '@/components/hours/horas-por-proyecto';
 import { useMisInsignias } from '@/hooks/use-insignias';
 import { SkeletonCard, SkeletonDetail } from '@/components/ui/skeleton';
+import { EstadoPerfilPropio } from '@/components/chat-dock/estado-chat';
 
 function initials(nombre: string, apellido: string) {
   return `${nombre?.[0] ?? ''}${apellido?.[0] ?? ''}`.toUpperCase() || 'U';
@@ -74,7 +81,6 @@ function rolLabel(rol: string) {
   const map: Record<string, string> = {
     administrador: 'Administrador',
     estudiante: 'Estudiante',
-    mentor: 'Mentor',
     lider_asociacion: 'Líder de asociación',
     coordinador_academico: 'Coordinador académico',
   };
@@ -141,6 +147,7 @@ export default function PerfilPage() {
               <PageTitle className="type-display">
                 {fullName || (isAdmin ? 'Administrador' : 'Perfil de estudiante')}
               </PageTitle>
+              <EstadoPerfilPropio />
 
               <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-on-surface-variant">
                 {isAdmin ? (
@@ -418,6 +425,11 @@ export default function PerfilPage() {
                   <p className="type-meta">Tus proyectos cerrados con rol, fechas y horas acreditadas. El enlace solo abre con sesión iniciada.</p>
                   <PerfilCvAcciones idUsuario={user.idUsuario} />
                 </section>
+                <MiSemestreCard />
+                <EnlacesPerfilSeccion idUsuario={user.idUsuario} propio />
+                <DisponibilidadSemanal idUsuario={user.idUsuario} editable />
+                <PortafolioPublicoAjustes />
+                <PersonasParecidas idUsuario={user.idUsuario} propio />
               </>
             )}
 
@@ -449,6 +461,11 @@ export default function PerfilPage() {
                   </div>
                 ) : (
                   <p className="mt-4 text-sm text-tertiary">No tienes habilidades registradas.</p>
+                )}
+                {user?.idUsuario && (
+                  <div className="mt-6">
+                    <HabilidadesConfirmables idUsuario={user.idUsuario} />
+                  </div>
                 )}
               </section>
             )}

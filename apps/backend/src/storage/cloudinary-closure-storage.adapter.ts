@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ServicioNoDisponibleException } from '../common/servicio-no-disponible.exception';
 import { randomUUID } from 'node:crypto';
 import { v2 as cloudinary, type ResourceApiResponse, type UploadApiResponse } from 'cloudinary';
 import {
@@ -66,7 +67,7 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
   protected cloudName(): string {
     const { cloudName } = this.availability();
     if (!cloudName) {
-      throw new ServiceUnavailableException('CLOUDINARY_CLOUD_NAME no está configurado');
+      throw new ServicioNoDisponibleException('cloudinary', 'CLOUDINARY_CLOUD_NAME no está configurado');
     }
     return cloudName;
   }
@@ -94,7 +95,8 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
       return CLOSURE_DEFAULT_PREFIX;
     }
     if (configurado.trim() !== CLOSURE_DEFAULT_PREFIX) {
-      throw new ServiceUnavailableException(
+      throw new ServicioNoDisponibleException(
+        'cloudinary',
         'CLOSURE_CLOUDINARY_PREFIX está fuera del namespace de cierre permitido',
       );
     }
@@ -131,7 +133,8 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
   protected deliveryType(): ClosureDeliveryType {
     const { deliveryMode } = this.availability();
     if (!(CLOSURE_DELIVERY_TYPES as readonly string[]).includes(deliveryMode)) {
-      throw new ServiceUnavailableException(
+      throw new ServicioNoDisponibleException(
+        'cloudinary',
         'CLOSURE_CLOUDINARY_DELIVERY_MODE no es una modalidad de entrega admitida',
       );
     }
@@ -142,7 +145,7 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
     const apiKey = this.config.get<string>('CLOUDINARY_API_KEY');
     const apiSecret = this.config.get<string>('CLOUDINARY_API_SECRET');
     if (!apiKey || !apiSecret) {
-      throw new ServiceUnavailableException('Las credenciales del proveedor no están configuradas');
+      throw new ServicioNoDisponibleException('cloudinary', 'Las credenciales del proveedor no están configuradas');
     }
     return { apiKey, apiSecret };
   }
@@ -245,7 +248,8 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
     } catch (error) {
       this.logger.warn(`Fallo del proveedor de almacenamiento durante la ${operacion}`);
       void error;
-      throw new ServiceUnavailableException(
+      throw new ServicioNoDisponibleException(
+        'cloudinary',
         `El almacenamiento de documentos de cierre no está disponible (${operacion})`,
       );
     }
@@ -311,7 +315,7 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
     }));
     if (result.result === 'ok') return 'deleted';
     if (result.result === 'not found') return 'absent';
-    throw new ServiceUnavailableException('El proveedor no confirmó la purga del documento de cierre');
+    throw new ServicioNoDisponibleException('cloudinary', 'El proveedor no confirmó la purga del documento de cierre');
   }
 
   /** Inventario diagnóstico; el dominio solo reporta IDs sin fila y nunca los borra por prefijo. */

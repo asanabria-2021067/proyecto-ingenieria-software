@@ -18,6 +18,13 @@ export interface MencionComentario {
   usuario: UsuarioComentario;
 }
 
+/** MEJ-110: reacciones agrupadas por emoji; cada cliente deriva «la mía» de `idsUsuarios`. */
+export interface ReaccionComentario {
+  emoji: string;
+  count: number;
+  idsUsuarios: number[];
+}
+
 /** Forma común de un comentario listado en cualquiera de los tres canales. */
 export interface ComentarioListado {
   idComentario: number;
@@ -28,6 +35,9 @@ export interface ComentarioListado {
   autor: UsuarioComentario;
   /** Opcional: respuestas previas a HU-200 y fixtures antiguos no la traen. */
   menciones?: MencionComentario[];
+  /** MEJ-110: solo los comentarios de tarea traen hilo y reacciones. */
+  idComentarioPadre?: number | null;
+  reacciones?: ReaccionComentario[];
 }
 
 export interface Mencionable extends UsuarioComentario {

@@ -19,6 +19,7 @@ import {
 import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
 import { CreateRoleDto, RoleRequisitoDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { preguntasCreate } from '../applications/dto/pregunta-rol.dto';
 import { ChatCanalesService } from '../chat/chat-canales.service';
 
 type TxClient = Prisma.TransactionClient;
@@ -144,6 +145,10 @@ export class RolesService {
         where: { estadoParticipacion: 'ACTIVO' as const },
         select: { idUsuario: true },
       },
+      preguntas: {
+        select: { idPregunta: true, enunciado: true, tipo: true, obligatoria: true },
+        orderBy: { orden: 'asc' as const },
+      },
     };
   }
 
@@ -199,6 +204,7 @@ export class RolesService {
           nivelMinimo: req.nivelMinimo,
           obligatorio: req.obligatorio,
         })),
+        preguntas: rol.preguntas,
         participantesActivos,
         cuposDisponibles: Math.max(0, rol.cupos - participantesActivos),
         isMine,
@@ -234,6 +240,7 @@ export class RolesService {
           idCarreraRequerida: dto.idCarreraRequerida ?? null,
           cupos: dto.cupos,
           horasSemanalesEstimadas: dto.horasSemanalesEstimadas ?? null,
+          preguntas: preguntasCreate(dto.preguntas),
           ...(dto.requisitos?.length && {
             requisitos: {
               create: dto.requisitos.map((req) => ({
@@ -318,6 +325,13 @@ export class RolesService {
             });
           }
         }
+        if (dto.preguntas !== undefined) {
+          // Las respuestas ya enviadas conservan su enunciado (idPregunta pasa a null).
+          await tx.preguntaRol.deleteMany({ where: { idRolProyecto: roleId } });
+          await tx.preguntaRol.createMany({
+            data: dto.preguntas.map((p, orden) => ({ idRolProyecto: roleId, enunciado: p.enunciado, tipo: p.tipo, obligatoria: p.obligatoria, orden })),
+          });
+        }
         const rol = await tx.rolProyecto.findUniqueOrThrow({
           where: { idRolProyecto: roleId },
           select: this.roleWithStatsSelect(),
@@ -365,7 +379,10 @@ export class RolesService {
         where: { idRolProyecto: roleId },
       });
       const tareas = await tx.tarea.count({ where: { idRolProyecto: roleId } });
-      const postulaciones = await tx.postulacion.count({ where: { idRolProyecto: roleId } });
+      // Una postulación retirada ya no cuenta como historial.
+      const postulaciones = await tx.postulacion.count({
+        where: { idRolProyecto: roleId, estadoPostulacion: { not: 'RETIRADA' } },
+      });
 
       if (participaciones > 0 || tareas > 0 || postulaciones > 0) {
         throw new BadRequestException(
@@ -375,6 +392,7 @@ export class RolesService {
 
       // Requisitos (configuración intrínseca) + rol en la misma transacción: si
       // algo falla, no queda información parcialmente eliminada.
+      await tx.postulacion.deleteMany({ where: { idRolProyecto: roleId, estadoPostulacion: 'RETIRADA' } });
       await tx.requisitoHabilidadRol.deleteMany({ where: { idRolProyecto: roleId } });
       await tx.rolProyecto.delete({ where: { idRolProyecto: roleId } });
     });
@@ -678,6 +696,7 @@ export class RolesService {
       habilidad: { idHabilidad: number; nombreHabilidad: string };
     }[];
     participaciones: { idUsuario: number }[];
+    preguntas: { idPregunta: number; enunciado: string; tipo: string; obligatoria: boolean }[];
   }) {
     const participantesActivos = rol.participaciones.length;
     return {
@@ -694,6 +713,7 @@ export class RolesService {
         nivelMinimo: req.nivelMinimo,
         obligatorio: req.obligatorio,
       })),
+      preguntas: rol.preguntas,
       participantesActivos,
       cuposDisponibles: Math.max(0, rol.cupos - participantesActivos),
     };

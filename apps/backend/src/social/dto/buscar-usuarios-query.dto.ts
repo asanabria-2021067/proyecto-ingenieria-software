@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 function toIdArray({ value }: { value: unknown }): unknown {
   if (Array.isArray(value)) return value.map(Number);
@@ -50,4 +50,24 @@ export class BuscarUsuariosQueryDto {
   @IsOptional()
   @IsIn(SEMESTRE_RANGOS)
   semestreRango?: SemestreRango;
+
+  /** MEJ-151: carrera concreta (no solo «la mia»). */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => Number(value))
+  @IsInt()
+  @Min(1)
+  idCarrera?: number;
+
+  /** MEJ-151: dia de la semana con disponibilidad declarada, 0 = lunes ... 6 = domingo. */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => Number(value))
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  diaDisponible?: number;
+
+  /** MEJ-151: `coincidencia` ordena por habilidades en comun; sin valor, el orden de siempre. */
+  @IsOptional()
+  @IsIn(['coincidencia'])
+  ordenar?: 'coincidencia';
 }

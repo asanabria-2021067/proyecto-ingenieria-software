@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { NotificationAvatar } from '@/components/notifications/notification-avatar';
 import { MensajeConCitas } from '@/components/notifications/inbox-list';
+import { idSesionDeNotificacion, NoFuiYoAccion } from '@/components/profile/no-fui-yo-accion';
 import type { Notificacion } from '@/lib/services/notifications';
 import {
   accionDeAviso,
@@ -142,6 +143,7 @@ export function NotificationReaderContent({
   const detalles = detallesDeAviso(n);
   const reunion = estadoDeReunion(n.tipoNotificacion);
   const accion = accionDeAviso(n);
+  const idSesion = idSesionDeNotificacion(n);
   const noLeida = n.leidaEn === null;
   const columnas = COLUMNAS_DATOS[Math.min(detalles.length, 3) - 1] ?? COLUMNAS_DATOS[0];
 
@@ -233,8 +235,9 @@ export function NotificationReaderContent({
           </p>
         )}
 
-        {(accion || onMarcarLeida) && (
+        {(accion || onMarcarLeida || idSesion) && (
           <footer className="flex flex-wrap items-center gap-x-stack gap-y-tight border-t border-outline-variant/60 pt-stack">
+            {idSesion && <NoFuiYoAccion idSesion={idSesion} className="" />}
             {accion && (
               <Link
                 href={accion.href}

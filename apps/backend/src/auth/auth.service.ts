@@ -7,6 +7,8 @@ import {
   ConflictException,
   BadRequestException,
   NotFoundException,
+  HttpException,
+  HttpStatus,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { EventEmitter2 } from "@nestjs/event-emitter";
@@ -18,6 +20,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { correoCoincideConIdentidad, correoInstitucionalEsperado, normalizarCorreo } from "./correo-institucional.util";
+import { huellaDispositivo, parseUserAgent, type DispositivoInfo } from "./user-agent.util";
 import { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL, REFRESH_TOKEN_MAX_AGE_MS } from "./cookie.util";
 import { getJwtSecret } from "../config/jwt-secret";
 import {
@@ -57,6 +60,22 @@ interface ResetTokenPayload {
   correo: string;
 }
 
+export const hashRefreshToken = (token: string): string => createHash("sha256").update(token).digest("hex");
+
+/** MEJ-81/82: lo que identifica una sesión; la rotación del refresh lo conserva. */
+export interface SesionMeta {
+  idSesion: string;
+  navegador?: string | null;
+  sistema?: string | null;
+  huella?: string | null;
+}
+
+/** Navegador desde el que se inicia sesión: user-agent y el identificador estable de la cookie device_id. */
+export interface OrigenDispositivo {
+  userAgent?: string;
+  idDispositivo: string;
+}
+
 /** Dos pestañas pueden refrescar con la misma cookie a la vez: dentro de esta ventana el segundo solo recibe 401. */
 const REFRESH_REUSE_GRACE_MS = 10_000;
 
@@ -84,11 +103,14 @@ export class AuthService {
   }
 
   private hashToken(token: string): string {
-    return createHash("sha256").update(token).digest("hex");
+    return hashRefreshToken(token);
   }
 
   /** Firma el par de tokens y persiste el hash del refresh token para poder revocarlo (logout, rotación). */
-  private async issueTokens(usuario: { idUsuario: number; correo: string; sesionVersion: number }) {
+  private async issueTokens(
+    usuario: { idUsuario: number; correo: string; sesionVersion: number },
+    sesion: SesionMeta,
+  ) {
     const accessToken = this.jwtService.sign(
       { sub: usuario.idUsuario, correo: usuario.correo, tipo: "access", sv: usuario.sesionVersion },
       { secret: getJwtSecret(), expiresIn: ACCESS_TOKEN_TTL },
@@ -106,13 +128,17 @@ export class AuthService {
         idUsuario: usuario.idUsuario,
         tokenHash: this.hashToken(refreshToken),
         expiraEn: new Date(Date.now() + REFRESH_TOKEN_MAX_AGE_MS),
+        idSesion: sesion.idSesion,
+        navegador: sesion.navegador ?? null,
+        sistema: sesion.sistema ?? null,
+        huella: sesion.huella ?? null,
       },
     });
 
     return { accessToken, refreshToken };
   }
 
-  async login(loginDto: LoginDto, origen?: SecurityRequestContext) {
+  async login(loginDto: LoginDto, origen?: SecurityRequestContext, dispositivo?: OrigenDispositivo) {
     // G04 (OWASP25-C036): una cuenta bloqueada sigue el MISMO camino (búsqueda
     // + bcrypt) y recibe la MISMA respuesta que unas credenciales inválidas.
     const cuenta = accountAttemptKey(loginDto.correo, origen?.ip);
@@ -190,7 +216,14 @@ export class AuthService {
       data: { fechaUltimaSesion: new Date() },
     });
 
-    const tokens = await this.issueTokens(usuario);
+    const info = dispositivo ? parseUserAgent(dispositivo.userAgent) : null;
+    const huella = dispositivo && info ? huellaDispositivo(dispositivo.idDispositivo, info) : null;
+    const idSesion = randomUUID();
+    const tokens = await this.issueTokens(usuario, { idSesion, ...info, huella });
+    if (huella && info) {
+      // El aviso de navegador nuevo nunca bloquea el inicio de sesión.
+      await this.registrarDispositivo(usuario.idUsuario, huella, info, idSesion).catch(() => undefined);
+    }
     // G05: el éxito se registra cuando los tokens ya existen (resultado real).
     await this.securityEvents.record({
       tipo: TipoEventoSeguridad.LOGIN_SUCCEEDED,
@@ -199,6 +232,23 @@ export class AuthService {
       idUsuarioAfectado: usuario.idUsuario,
     });
     return tokens;
+  }
+
+  /** MEJ-82: «nuevo» = huella no vista antes en la cuenta; la primera de todas no avisa. */
+  private async registrarDispositivo(idUsuario: number, huella: string, info: DispositivoInfo, idSesion: string) {
+    const conocidos = await this.prisma.dispositivoUsuario.count({ where: { idUsuario } });
+    const { count } = await this.prisma.dispositivoUsuario.createMany({
+      data: [{ idUsuario, huella, ...info }],
+      skipDuplicates: true,
+    });
+    if (count === 0) {
+      await this.prisma.dispositivoUsuario.update({
+        where: { idUsuario_huella: { idUsuario, huella } },
+        data: { ultimaVezEn: new Date() },
+      });
+    } else if (conocidos > 0) {
+      await this.notificationsService.notifyFromTemplate([idUsuario], "NUEVO_INICIO_SESION", { ...info, idSesion });
+    }
   }
 
   async register(registerDto: RegisterDto) {
@@ -384,7 +434,9 @@ export class AuthService {
     // Solo cuenta si el token es de la versión de sesión vigente: uno revocado por
     // un reset de contraseña o un bloqueo (versión anterior) es una pestaña vieja,
     // no un robo, y no debe tumbar la sesión nueva del usuario.
-    if (registro?.revocadoEn && Date.now() - registro.revocadoEn.getTime() > REFRESH_REUSE_GRACE_MS) {
+    // Un cierre deliberado (sesiones abiertas, «No fui yo») fija expiraEn <= revocadoEn: no es reuso, solo 401.
+    const cierreDeliberado = registro?.revocadoEn && registro.expiraEn <= registro.revocadoEn;
+    if (registro?.revocadoEn && !cierreDeliberado && Date.now() - registro.revocadoEn.getTime() > REFRESH_REUSE_GRACE_MS) {
       const dueno = await this.prisma.usuario.findUnique({
         where: { idUsuario: registro.idUsuario },
         select: { sesionVersion: true },
@@ -423,7 +475,71 @@ export class AuthService {
       throw new UnauthorizedException("Token de refresco inválido o expirado");
     }
 
-    return this.issueTokens(usuario);
+    return this.issueTokens(usuario, {
+      idSesion: registro.idSesion ?? randomUUID(),
+      navegador: registro.navegador,
+      sistema: registro.sistema,
+      huella: registro.huella,
+    });
+  }
+
+  /** MEJ-83: cambia la contraseña pidiendo la actual; cierra todas las sesiones y devuelve tokens nuevos para la actual. */
+  async cambiarContrasena(
+    idUsuario: number,
+    contrasenaActual: string,
+    nuevaContrasena: string,
+    refreshToken?: string,
+    origen?: SecurityRequestContext,
+  ) {
+    const cuenta = `cambio-contrasena:${idUsuario}`;
+    if (this.attempts.lockedUntil(cuenta) !== null) {
+      throw new HttpException("Demasiados intentos. Intenta de nuevo más tarde", HttpStatus.TOO_MANY_REQUESTS);
+    }
+    const usuario = await this.prisma.usuario.findUnique({ where: { idUsuario } });
+    if (!usuario || !(await bcrypt.compare(contrasenaActual, usuario.contrasena))) {
+      this.attempts.recordFailure(cuenta);
+      throw new BadRequestException("La contraseña actual no es correcta");
+    }
+    this.attempts.recordSuccess(cuenta);
+    if (contrasenaActual === nuevaContrasena) {
+      throw new BadRequestException("La nueva contraseña debe ser distinta de la actual");
+    }
+
+    const actual = refreshToken
+      ? await this.prisma.tokenRefresco.findFirst({ where: { tokenHash: this.hashToken(refreshToken), idUsuario } })
+      : null;
+    const contrasenaHash = await bcrypt.hash(nuevaContrasena, 10);
+    const { sesionVersion, sesionesRevocadas } = await this.prisma.$transaction(async (tx) => {
+      const actualizado = await tx.usuario.update({
+        where: { idUsuario },
+        data: { contrasena: contrasenaHash, sesionVersion: { increment: 1 } },
+        select: { sesionVersion: true },
+      });
+      const revocadas = await tx.tokenRefresco.updateMany({
+        where: { idUsuario, revocadoEn: null },
+        data: { revocadoEn: new Date() },
+      });
+      return { sesionVersion: actualizado.sesionVersion, sesionesRevocadas: revocadas.count };
+    });
+
+    const tokens = await this.issueTokens(
+      { idUsuario, correo: usuario.correo, sesionVersion },
+      {
+        idSesion: actual?.idSesion ?? randomUUID(),
+        navegador: actual?.navegador,
+        sistema: actual?.sistema,
+        huella: actual?.huella,
+      },
+    );
+    await this.securityEvents.record({
+      tipo: TipoEventoSeguridad.PASSWORD_CHANGED,
+      origen,
+      idActor: idUsuario,
+      idUsuarioAfectado: idUsuario,
+      detalle: { sesionesRevocadas },
+    });
+    this.events?.emit(ACCOUNT_ACCESS_REVOKED, { idUsuario } satisfies AccountAccessRevokedEvent);
+    return tokens;
   }
 
   async logout(refreshToken?: string) {

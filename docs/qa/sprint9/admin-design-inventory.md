@@ -38,13 +38,17 @@ motivo de comentario» de `docs/design-system.md`.
 | `/dashboard/admin` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/page.tsx` |
 | `/dashboard/admin/usuarios` | sí | 1 | 4 | 2 | 0 | `app/dashboard/admin/usuarios/page.tsx` |
 | `/dashboard/admin/solicitudes-recuperacion` | sí | 1 | 3 | 2 | 0 | `app/dashboard/admin/solicitudes-recuperacion/page.tsx` |
+| `/dashboard/admin/solicitudes-desactivacion` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/solicitudes-desactivacion/page.tsx` |
 | `/dashboard/admin/cuentas-pendientes` | no | 1 | 5 | 3 | 0 | `app/dashboard/admin/cuentas-pendientes/page.tsx` |
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/metricas/page.tsx` |
 | `/dashboard/admin/horas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/horas/page.tsx` |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/seguridad/page.tsx` |
+| `/dashboard/admin/mantenimiento` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/mantenimiento/page.tsx` |
+| `/dashboard/admin/tablas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/tablas/page.tsx` |
 | `/dashboard/admin/anuncios` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/anuncios/page.tsx` |
 | `/dashboard/admin/asociaciones` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/asociaciones/page.tsx` |
 | `/dashboard/admin/bandeja` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/bandeja/page.tsx` |
+| `/dashboard/admin/reportes` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/reportes/page.tsx` |
 | `/dashboard/admin/entidades` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/entidades/page.tsx` |
 | `/dashboard/admin/botones` | sí | 0 | 0 | 1 | 0 | `app/dashboard/admin/botones/page.tsx` |
 | `/dashboard/admin/etiquetas` | sí | 0 | 0 | 0 | 6 | `app/dashboard/admin/etiquetas/page.tsx` |
@@ -107,13 +111,17 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/usuarios` | sí | 0 | 0 | 2 | 0 |
 | `/dashboard/admin/solicitudes-recuperacion` | sí | 0 | 2 | 2 | 0 |
+| `/dashboard/admin/solicitudes-desactivacion` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/cuentas-pendientes` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/horas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/mantenimiento` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/tablas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/anuncios` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/asociaciones` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/bandeja` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/reportes` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/entidades` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/apelaciones` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/apelaciones/[apelacionId]` | sí | 0 | 0 | 0 | 0 |

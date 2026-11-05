@@ -77,6 +77,7 @@ export interface RolProyectoDTO {
   horasSemanalesEstimadas: number | null;
   requisitos: RequisitoHabilidadDTO[];
   carreraRequerida: CarreraDTO | null;
+  preguntas?: { idPregunta: number; enunciado: string; tipo: 'CORTA' | 'LARGA'; obligatoria: boolean }[];
 }
 
 export interface HitoDTO {
@@ -221,6 +222,8 @@ export interface CreateProjectPayload {
   urlRecursoExterno?: string;
   fechaInicio?: string;
   fechaFinEstimada?: string;
+  /** `null` quita la fecha límite al editar. */
+  fechaLimitePostulacion?: string | null;
   organizacionesIds?: number[];
   /** «¿A nombre de quién?»: ausente = proyecto personal. */
   idOrganizacion?: number;
@@ -234,6 +237,7 @@ export interface CreateProjectPayload {
     idCarreraRequerida?: number;
     cupos: number;
     horasSemanalesEstimadas?: number;
+    preguntas?: { enunciado: string; tipo: 'CORTA' | 'LARGA'; obligatoria: boolean }[];
     requisitos?: {
       idHabilidad: number;
       nivelMinimo: 'BASICO' | 'INTERMEDIO' | 'AVANZADO';
@@ -304,6 +308,7 @@ export interface ProyectoDetalleDTO {
   fechaPublicacion: string | null;
   fechaInicio: string | null;
   fechaFinEstimada: string | null;
+  fechaLimitePostulacion?: string | null;
   fechaCreacion: string;
   fechaActualizacion?: string | null;
   creador: CreadorDTO;

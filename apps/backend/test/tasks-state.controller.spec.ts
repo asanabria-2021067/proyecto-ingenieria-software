@@ -89,7 +89,7 @@ describe('TasksController.updateEstado (PATCH /proyectos/:projectId/tareas/:task
   it('usa UpdateTaskEstadoDto y no lee la identidad del actor desde body, query o headers', () => {
     const source = readFileSync(join(__dirname, '../src/tasks/tasks.controller.ts'), 'utf-8');
     expect(source).toMatch(/@Body\(\)\s+dto:\s+UpdateTaskEstadoDto/);
-    expect(source).not.toMatch(/@Query\(/);
+    expect(source).not.toMatch(/@Query\((?!\)\s+query:\s+ListTasksQueryDto)/);
     expect(source).not.toMatch(/@Headers\(/);
     expect(source).not.toMatch(/@Body\('userId'/);
     expect(source).not.toMatch(/dto\.userId/);

@@ -3,8 +3,11 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 import type { SocialService } from '../src/social/social.service';
 import { SocialFeedService } from '../src/social/social-feed.service';
 
-function makePrisma(nombresPerfil: string[]) {
+function makePrisma(nombresPerfil: string[], conJunta = false) {
   return {
+    juntaAsociacion: {
+      findMany: vi.fn().mockResolvedValue(conJunta ? [{ idJuntaAsociacion: 1 }] : []),
+    },
     usuarioRolAcceso: {
       findMany: vi.fn().mockResolvedValue(nombresPerfil.map((nombrePerfil) => ({ rolAcceso: { nombrePerfil } }))),
     },
@@ -50,8 +53,18 @@ describe('SocialFeedService', () => {
     expect(seguidosArgs.where.creadoPor).toBeUndefined();
   });
 
-  it('lider_asociacion: excluye sus propios proyectos en ambas secciones', async () => {
-    const prisma = makePrisma(['lider_asociacion']);
+  it('lider_asociacion sin junta ya no cuenta: la fila vieja se trata como estudiante', async () => {
+    const prisma = makePrisma(['estudiante', 'lider_asociacion']);
+    const service = makeService(prisma, makeSocial([1], [2]));
+
+    await service.getFeed(10);
+
+    const [amigosArgs] = prisma.proyecto.findMany.mock.calls.map((c) => c[0]);
+    expect(amigosArgs.where.creadoPor).toBeUndefined();
+  });
+
+  it('integrante de una junta activa: excluye sus propios proyectos en ambas secciones', async () => {
+    const prisma = makePrisma(['estudiante'], true);
     const social = makeSocial([1], [2]);
     const service = makeService(prisma, social);
 

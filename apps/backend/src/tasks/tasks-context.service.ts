@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { esMiembroDeOrganizacionDelProyecto } from '../organizations/organization-access';
+import type { ListTasksQueryDto } from './dto/list-tasks-query.dto';
 
 type TxClient = Prisma.TransactionClient;
 
@@ -60,6 +61,22 @@ export class TasksContextService {
     return db.asignacionTarea.findFirst({
       where: { idTarea: taskId, desasignadaEn: null },
     });
+  }
+
+  /** MEJ-109: responsable adicional de la tarea (el principal vive en la asignacion activa). */
+  async esResponsableAdicional(taskId: number, userId: number, tx?: TxClient): Promise<boolean> {
+    const db = tx ?? this.prisma;
+    const fila = await db.tareaResponsable.findUnique({
+      where: { idTarea_idUsuario: { idTarea: taskId, idUsuario: userId } },
+      select: { tarea: { select: { idProyecto: true } } },
+    });
+    if (fila === null) return false;
+    // Quien dejó el proyecto conserva la fila pero ya no es responsable: exige participación ACTIVO.
+    const participacion = await db.participacionProyecto.findFirst({
+      where: { idUsuario: userId, estadoParticipacion: 'ACTIVO', rolProyecto: { idProyecto: fila.tarea.idProyecto } },
+      select: { idParticipacion: true },
+    });
+    return participacion !== null;
   }
 
   async assertProjectLeader(projectId: number, userId: number, tx?: TxClient): Promise<void> {
@@ -148,8 +165,42 @@ export class TasksContextService {
   ): Prisma.TareaWhereInput {
     return {
       ...(Object.keys(scope.sprintWhere).length > 0 ? { sprint: scope.sprintWhere } : {}),
-      ...(scope.ownOnly ? { asignaciones: { some: { idUsuario: userId } } } : {}),
+      ...(scope.ownOnly
+        ? { OR: [{ asignaciones: { some: { idUsuario: userId } } }, { responsables: { some: { idUsuario: userId } } }] }
+        : {}),
     };
+  }
+
+  /**
+   * MEJ-112: filtros opcionales del listado, todos combinables (AND). El
+   * responsable incluye a los adicionales; el rol coincide con el rol de la
+   * tarea o con una participacion ACTIVO de algun responsable en ese rol.
+   */
+  taskFiltersWhere(q: ListTasksQueryDto): Prisma.TareaWhereInput {
+    const AND: Prisma.TareaWhereInput[] = [];
+    if (q.estado) AND.push({ estadoTarea: q.estado });
+    if (q.prioridad) AND.push({ prioridad: q.prioridad });
+    if (q.idHito) AND.push({ idHito: q.idHito });
+    if (q.idTareaPadre) AND.push({ idTareaPadre: q.idTareaPadre });
+    if (q.idUsuario) {
+      AND.push({
+        OR: [
+          { asignaciones: { some: { idUsuario: q.idUsuario, desasignadaEn: null } } },
+          { responsables: { some: { idUsuario: q.idUsuario } } },
+        ],
+      });
+    }
+    if (q.idRolProyecto) {
+      const usuario = { participaciones: { some: { idRolProyecto: q.idRolProyecto, estadoParticipacion: 'ACTIVO' as const } } };
+      AND.push({
+        OR: [
+          { idRolProyecto: q.idRolProyecto },
+          { asignaciones: { some: { desasignadaEn: null, usuario } } },
+          { responsables: { some: { usuario } } },
+        ],
+      });
+    }
+    return AND.length > 0 ? { AND } : {};
   }
 
   /**

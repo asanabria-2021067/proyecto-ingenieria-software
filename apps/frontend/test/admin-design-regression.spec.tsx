@@ -54,7 +54,7 @@ describe('FG07-C04: regresión del diseño administrativo', () => {
     expect([...valores].sort()).toEqual(['rounded-lg', 'rounded-md', 'text-[13px]', 'text-[15px]']);
   });
 
-  it('39 de los 53 archivos del árbol quedan sin ningún literal', () => {
+  it('45 de los 59 archivos del árbol quedan sin ningún literal', () => {
     // 40 al cerrar T-320; entró la página propia de «Tendencias de uso» y salió el catálogo temporal de
     // etiquetas, ninguna de las dos con literales; después entraron la pantalla de anuncios (HU-191) y el
     // catálogo temporal de botones, tampoco con literales. Luego entró la lista de reuniones del
@@ -62,11 +62,17 @@ describe('FG07-C04: regresión del diseño administrativo', () => {
     // calendario de Sprints pasó al control segmentado del estudiante (`rounded-pill`) y perdió su `rounded-md`.
     // HU-195 (T-363): entran el campo de proyectos invitados, los permisos de gestión y el diálogo de la
     // reunión de Administración, sin literales. Al final salió el catálogo temporal de botones.
+    // ADM-1: entran las páginas de mantenimiento y de tablas y la tarjeta de estado del sistema, sin literales.
+    // MEJ-90: entra la vista de reportes de problemas, sin literales.
     // HRS: entran la vista central de horas y sus tres componentes (filtros, tabla y totales), sin literales.
     // ASO: entra la página de gestión de asociaciones y juntas, sin literales (sus diálogos viven en components/associations).
     // MEJ-69/36/68/72: entran la bandeja, las entidades y el comparativo de horas, sin literales.
-    expect(ARBOL).toHaveLength(53);
-    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(39);
+    // MEJ-85: entra la bandeja de desactivación de cuentas, sin literales.
+    // ADM-1: entran las páginas de mantenimiento y de tablas y la tarjeta de estado del sistema, sin literales.
+    // MEJ-90: entra la vista de reportes de problemas, sin literales.
+    // ROL-2: entra el editor de alcance del coordinador (`CoordinadorAlcanceEditor.tsx`), sin literales.
+    expect(ARBOL).toHaveLength(59);
+    expect(ARBOL.filter((archivo) => literales(leer(archivo)).length === 0)).toHaveLength(45);
   });
 });
 

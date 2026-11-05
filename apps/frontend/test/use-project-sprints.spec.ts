@@ -140,10 +140,10 @@ describe('useStartSprint', () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useStartSprint(7), { wrapper });
 
-    result.current.mutate('2026-12-01');
+    result.current.mutate({ fechaFinPlaneada: '2026-12-01' });
 
     await waitFor(() => expect(startSprint).toHaveBeenCalledTimes(1));
-    expect(startSprint).toHaveBeenCalledWith(7, '2026-12-01');
+    expect(startSprint).toHaveBeenCalledWith(7, '2026-12-01', undefined);
   });
 
   it('en éxito invalida exactamente project-sprints del proyecto', async () => {
@@ -152,7 +152,7 @@ describe('useStartSprint', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useStartSprint(7), { wrapper });
 
-    result.current.mutate('2026-12-01');
+    result.current.mutate({ fechaFinPlaneada: '2026-12-01' });
 
     await waitFor(() => expect(startSprint).toHaveBeenCalledTimes(1));
     await waitFor(() =>
@@ -167,7 +167,7 @@ describe('useStartSprint', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useStartSprint(7), { wrapper });
 
-    await expect(result.current.mutateAsync('2026-12-01')).rejects.toThrow('409');
+    await expect(result.current.mutateAsync({ fechaFinPlaneada: '2026-12-01' })).rejects.toThrow('409');
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 });

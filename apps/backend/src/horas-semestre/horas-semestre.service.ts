@@ -14,6 +14,7 @@ import {
   type Semestre,
 } from './semestre';
 import { compararEstudiantes } from './orden-estudiantes';
+import { alcanceDelActor } from '../coordinador/coordinador-alcance';
 
 interface Acreditadas {
   beca: number;
@@ -49,6 +50,8 @@ export interface FiltroCentral extends HorasCentralListQueryDto {
   tipo?: TipoHoras;
   busqueda?: string;
   conProyectos?: boolean;
+  /** Carreras permitidas (alcance del coordinador); sin valor, todas. */
+  carreraIds?: number[];
 }
 
 const ESTADOS_ACTIVOS = ['PUBLICADO', 'EN_PROGRESO', 'EN_SOLICITUD_CIERRE'] as const;
@@ -295,8 +298,7 @@ export class HorasSemestreService {
    * Pagina con cursor de los estudiantes activos con sus horas del semestre (ver `paginaCentral`).
    */
   async listarCentral(idActor: number, q: HorasCentralListQueryDto) {
-    await this.requireAdmin(idActor);
-    return this.paginaCentral(q);
+    return this.paginaCentral({ ...q, carreraIds: await alcanceDelActor(this.prisma, idActor) });
   }
 
   private async requireAdmin(idUsuario: number) {
@@ -351,7 +353,11 @@ export class HorasSemestreService {
             : {}),
           perfil: {
             is: {
-              ...(q.idCarrera ? { idCarrera: q.idCarrera } : {}),
+              ...(q.carreraIds
+                ? { idCarrera: { in: q.idCarrera ? q.carreraIds.filter((c) => c === q.idCarrera) : q.carreraIds } }
+                : q.idCarrera
+                  ? { idCarrera: q.idCarrera }
+                  : {}),
               ...(q.idAsociacion ? { carrera: { asociaciones: { some: { idAsociacion: q.idAsociacion } } } } : {}),
             },
           },
@@ -426,8 +432,7 @@ export class HorasSemestreService {
 
   /** Todas las filas que cumplen el filtro (totales y reportes). */
   async todasLasFilas(idActor: number, q: HorasCentralQueryDto) {
-    await this.requireAdmin(idActor);
-    return this.recorrerTodas(q);
+    return this.recorrerTodas({ ...q, carreraIds: await alcanceDelActor(this.prisma, idActor) });
   }
 
   /** Igual que `todasLasFilas` sin verificar al actor: el llamador ya autorizo (junta de la asociacion). */

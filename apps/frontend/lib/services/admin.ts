@@ -7,7 +7,6 @@ export type AdminUserStatus = 'ACTIVO' | 'INACTIVO' | 'BLOQUEADO' | 'PENDIENTE_V
 
 export type AdminRole =
   | 'estudiante'
-  | 'mentor'
   | 'lider_asociacion'
   | 'coordinador_academico'
   | 'administrador'
@@ -157,21 +156,6 @@ export interface AdminActividadEstudiante {
   };
 }
 
-export interface AdminProyectoAsociadoMentor {
-  idProyecto: number;
-  tituloProyecto: string;
-  estadoProyecto: string;
-  rol: 'Mentor' | string;
-}
-
-export interface AdminActividadMentor {
-  proyectosDondeParticipa: number;
-  estudiantesMentorizados: number;
-  proyectosActivos: number;
-  proyectosCerrados: number;
-  proyectosAsociados: AdminProyectoAsociadoMentor[];
-}
-
 export interface AdminProyectoRecienteLider {
   idProyecto: number;
   tituloProyecto: string;
@@ -218,7 +202,6 @@ export interface AdminUserDetail {
   fechaUltimaSesion: string | null;
   perfilEstudiante: AdminPerfilEstudiante | null;
   actividadEstudiante: AdminActividadEstudiante | null;
-  actividadMentor: AdminActividadMentor | null;
   actividadLider: AdminActividadLider | null;
   actividadCoordinador: AdminActividadCoordinador | null;
   actividadAdmin: AdminActividadAdmin | null;
@@ -320,7 +303,14 @@ export async function aprobarCuentasLote(ids: number[]): Promise<AprobarCuentasL
 
 // ─── GET /admin/pendientes ───────────────────────────────────────────────────
 
-export type ClavePendiente = 'cuentas' | 'revisiones' | 'cierres' | 'recuperaciones' | 'apelaciones';
+export type ClavePendiente =
+  | 'cuentas'
+  | 'revisiones'
+  | 'cierres'
+  | 'recuperaciones'
+  | 'apelaciones'
+  | 'desactivaciones'
+  | 'reportes';
 
 export interface AdminPendientes {
   total: number;
@@ -398,3 +388,21 @@ export async function generatePasswordResetLink(
     { method: 'POST' },
   );
 }
+
+// ─── /admin/solicitudes-desactivacion (MEJ-85) ───────────────────────────────
+
+export interface AdminSolicitudDesactivacion {
+  idSolicitud: number;
+  motivo: string | null;
+  creadaEn: string;
+  usuario: { idUsuario: number; nombre: string; apellido: string; correo: string };
+}
+
+export const listSolicitudesDesactivacion = () =>
+  apiFetch<AdminSolicitudDesactivacion[]>('/admin/solicitudes-desactivacion');
+
+export const resolverSolicitudDesactivacion = (idSolicitud: number, tipo: 'aprobar' | 'rechazar', comentario: string) =>
+  apiFetch<unknown>(`/admin/solicitudes-desactivacion/${idSolicitud}/${tipo}`, {
+    method: 'POST',
+    body: JSON.stringify(comentario ? { comentario } : {}),
+  });

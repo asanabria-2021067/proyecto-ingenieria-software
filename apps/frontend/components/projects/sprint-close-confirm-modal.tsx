@@ -1,6 +1,6 @@
-﻿'use client';
+'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type { DestinoArrastre } from '@/lib/types/sprints';
 
 export interface SprintClosePendingTask {
@@ -34,38 +33,26 @@ export function SprintCloseConfirmModal({
   isPending,
   onConfirm,
 }: SprintCloseConfirmModalProps) {
-  const [destino, setDestino] = useState<DestinoArrastre | ''>('');
-  const [errorDestino, setErrorDestino] = useState<string | null>(null);
-
-  const handleOpenChange = (next: boolean) => {
-    if (!next) {
-      setDestino('');
-      setErrorDestino(null);
-    }
-    onOpenChange(next);
-  };
-
-  const handleConfirm = () => {
-    if (!destino) {
-      setErrorDestino('Selecciona el destino de las tareas pendientes.');
-      return;
-    }
+  const cantidad = tareasPendientes.length;
+  // Dos clics seguidos antes de que pase el estado pendiente enviarían el cierre dos veces.
+  const enviado = useRef(false);
+  const confirmar = (destino: DestinoArrastre) => {
+    if (enviado.current || isPending) return;
+    enviado.current = true;
     onConfirm(destino);
   };
-
-  const cantidad = tareasPendientes.length;
-  const etiquetaDestino =
-    destino === 'SIGUIENTE_SPRINT' ? 'al siguiente Sprint' : destino === 'BACKLOG' ? 'al backlog' : null;
-
+  useEffect(() => {
+    if (!open) enviado.current = false;
+  }, [open]);
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[96vw] max-w-[520px] gap-0 border-outline-variant bg-surface-container-lowest p-0">
         <DialogHeader className="border-b border-outline-variant/35 px-6 pb-4 pt-5 text-left">
           <DialogTitle className="type-subtitle font-bold text-on-surface">
             Este Sprint tiene {cantidad} {cantidad === 1 ? 'tarea pendiente' : 'tareas pendientes'}
           </DialogTitle>
           <DialogDescription className="text-sm text-on-surface-variant">
-            Elige a dónde se mueven antes de cerrar. Esta acción no se puede deshacer.
+            Pásalas todas al siguiente Sprint o déjalas en el backlog con un clic. Se cierra el Sprint y esta acción no se puede deshacer.
           </DialogDescription>
         </DialogHeader>
 
@@ -79,31 +66,6 @@ export function SprintCloseConfirmModal({
             ))}
           </ul>
 
-          <RadioGroup
-            value={destino}
-            onValueChange={(value) => {
-              setDestino(value as DestinoArrastre);
-              setErrorDestino(null);
-            }}
-            disabled={isPending}
-            aria-invalid={errorDestino ? 'true' : undefined}
-          >
-            <label
-              htmlFor="destino-siguiente-sprint"
-              className="card-base flex cursor-pointer items-center gap-3 py-3 text-sm font-medium text-on-surface"
-            >
-              <RadioGroupItem value="SIGUIENTE_SPRINT" id="destino-siguiente-sprint" />
-              Mover al siguiente Sprint
-            </label>
-            <label
-              htmlFor="destino-backlog"
-              className="card-base flex cursor-pointer items-center gap-3 py-3 text-sm font-medium text-on-surface"
-            >
-              <RadioGroupItem value="BACKLOG" id="destino-backlog" />
-              Mover al backlog
-            </label>
-          </RadioGroup>
-          {errorDestino && <p role="alert" className="text-xs text-error">{errorDestino}</p>}
         </div>
 
         <DialogFooter className="gap-2 border-t border-outline-variant/35 px-6 py-4 sm:justify-end">
@@ -111,21 +73,28 @@ export function SprintCloseConfirmModal({
             type="button"
             variant="outline"
             disabled={isPending}
-            onClick={() => handleOpenChange(false)}
+            onClick={() => onOpenChange(false)}
             className="h-10 rounded-md border-outline-variant text-xs font-bold"
           >
             Cancelar
           </Button>
           <Button
             type="button"
+            variant="outline"
             disabled={isPending}
-            onClick={handleConfirm}
+            onClick={() => confirmar('BACKLOG')}
+            className="h-10 rounded-md border-outline-variant text-xs font-bold"
+          >
+            Dejar en el backlog
+          </Button>
+          <Button
+            type="button"
+            disabled={isPending}
+            onClick={() => confirmar('SIGUIENTE_SPRINT')}
             className="h-10 gap-1.5 rounded-md bg-primary text-xs font-bold text-on-primary hover:bg-primary/90"
           >
             {isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
-            {etiquetaDestino
-              ? ("Cerrar y mover " + cantidad + " " + (cantidad === 1 ? 'tarea' : 'tareas') + " " + etiquetaDestino)
-              : 'Elige un destino para continuar'}
+            {cantidad === 1 ? 'Pasar la tarea al siguiente Sprint' : `Pasar las ${cantidad} tareas al siguiente Sprint`}
           </Button>
         </DialogFooter>
       </DialogContent>

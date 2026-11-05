@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { ClipboardCheck, Lock, MapPin, Tag } from 'lucide-react';
+import { ClipboardCheck, Clock, Lock, MapPin, Tag } from 'lucide-react';
+import { Tag as Etiqueta } from '@/components/ui/tag';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -70,6 +71,8 @@ interface ProjectHeaderCardProps {
   estadoProyecto: string;
   modalidadProyecto: string;
   etiquetas?: string[];
+  /** MEJ-95: faltan 7 días o menos para la fecha límite de postulación. */
+  cierraPronto?: boolean;
   /** Muestra «Líder del proyecto» y la línea «Eres el responsable del proyecto». */
   lider?: { nombre: string; apellido: string } | null;
   /** Acción principal del encabezado (preparar cierre, postularse…). */
@@ -92,6 +95,7 @@ export function ProjectHeaderCard({
   estadoProyecto,
   modalidadProyecto,
   etiquetas = [],
+  cierraPronto = false,
   lider = null,
   acciones,
 }: ProjectHeaderCardProps) {
@@ -112,6 +116,12 @@ export function ProjectHeaderCard({
                 <ModalidadIcon className="size-3" aria-hidden="true" />
                 {MODALIDAD_LABEL[modalidadProyecto as ModalidadProyecto] ?? modalidadProyecto}
               </span>
+              {cierraPronto && (
+                <Etiqueta tone="amber">
+                  <Clock aria-hidden="true" />
+                  Cierra pronto
+                </Etiqueta>
+              )}
             </div>
 
             <h2 className="type-section line-clamp-2 text-text-primary">{titulo}</h2>

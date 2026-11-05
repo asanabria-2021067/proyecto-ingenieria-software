@@ -6,6 +6,7 @@ export interface Miga {
 // Rutas del dashboard que existen como pagina (sin /dashboard/admin, que trae su propia miga).
 // Solo estas se enlazan: un tramo intermedio sin pagina se muestra como texto.
 const RUTAS = [
+  'ayuda',
   'calendario',
   'chats/archivados',
   'configuracion',
@@ -39,6 +40,7 @@ const RUTAS = [
 ].map((r) => new RegExp(`^${r.replace(/\*/g, '[^/]+')}$`));
 
 const ETIQUETAS: Record<string, string> = {
+  ayuda: 'Centro de ayuda',
   calendario: 'Calendario',
   chats: 'Chats',
   archivados: 'Archivados',

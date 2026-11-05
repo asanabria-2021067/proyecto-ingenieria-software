@@ -13,6 +13,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Prioridad, RepeticionTarea } from '@prisma/client';
+import { MAX_RESPONSABLES_ADICIONALES } from './set-responsables.dto';
 import { IsFutureCalendarDate } from './validators/is-future-calendar-date.validator';
 
 export class CreateTaskDto {
@@ -74,6 +75,21 @@ export class CreateTaskDto {
   @IsInt()
   @Min(1)
   idUsuarioAsignado?: number;
+
+  // MEJ-109: responsables ademas de idUsuarioAsignado (el principal).
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsArray()
+  @ArrayUnique()
+  @ArrayMaxSize(MAX_RESPONSABLES_ADICIONALES)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  idsResponsablesAdicionales?: number[];
+
+  // MEJ-106: crea la tarea como subtarea de esta (un solo nivel).
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  idTareaPadre?: number;
 
   @ValidateIf((_object, value) => value !== undefined)
   @IsArray()

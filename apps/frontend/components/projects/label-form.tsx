@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Input } from '@/components/ui/input';
+import { ColorPicker } from '@/components/ui/color-picker';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -75,26 +76,13 @@ export function LabelForm({ mode, label, onSubmit, onCancel, isPending, error }:
           render={({ field }) => (
             <FormItem>
               <FormLabel>Color</FormLabel>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  aria-label="Selector de color"
-                  value={HEX_COLOR.test(field.value) ? field.value : '#000000'}
-                  onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                  className="h-9 w-9 shrink-0 rounded-md border border-outline-variant cursor-pointer bg-transparent"
+              <FormControl>
+                <ColorPicker
+                  value={HEX_COLOR.test(field.value) ? field.value : '#006735'}
+                  onChange={(hex) => field.onChange(hex.toUpperCase())}
+                  disabled={isPending}
                 />
-                <FormControl>
-                  <Input
-                    value={field.value}
-                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                    onBlur={field.onBlur}
-                    name={field.name}
-                    placeholder="#RRGGBB"
-                    maxLength={7}
-                    className="font-mono"
-                  />
-                </FormControl>
-              </div>
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

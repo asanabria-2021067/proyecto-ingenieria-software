@@ -128,6 +128,9 @@ const EVENTO_STYLE: Record<TipoEventoBitacoraValor, EstiloEvento> = {
 
   // ---- MEJ-24: retrospectiva opcional del Sprint. ----
   SPRINT_RETROSPECTIVE_SAVED: { label: 'Retrospectiva del Sprint guardada', icon: MessageSquareText },
+
+  // ---- MEJ-105: baja de un integrante. ----
+  PARTICIPATION_REMOVED: { label: 'Integrante dado de baja', icon: UserMinus },
 };
 
 /**

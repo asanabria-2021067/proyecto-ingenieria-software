@@ -15,6 +15,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { MailModule } from './mail/mail.module';
 import { ProjectPolicyModule } from './common/project-policy/project-policy.module';
 import { AuthModule } from './auth/auth.module';
+import { CuentaModule } from './cuenta/cuenta.module';
 import { UsersModule } from './users/users.module';
 import { ProjectsModule } from './projects/projects.module';
 import { ApplicationsModule } from './applications/applications.module';
@@ -51,10 +52,14 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { InsigniasModule } from './insignias/insignias.module';
 import { AnunciosModule } from './anuncios/anuncios.module';
 import { ContactoModule } from './contacto/contacto.module';
+import { ReportesProblemaModule } from './reportes-problema/reportes-problema.module';
 import { AssociationsModule } from './associations/associations.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { FollowsModule } from './follows/follows.module';
 import { RoleInvitationsModule } from './role-invitations/role-invitations.module';
+import { CoordinadorModule } from './coordinador/coordinador.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
+import { PerfilPortafolioModule } from './perfil-portafolio/perfil-portafolio.module';
 
 const skipThrottling = () => isThrottlerDisabled();
 
@@ -105,6 +110,7 @@ const skipThrottling = () => isThrottlerDisabled();
     MailModule,
     ProjectPolicyModule,
     AuthModule,
+    CuentaModule,
     UsersModule,
     ProjectsModule,
     ApplicationsModule,
@@ -142,10 +148,14 @@ const skipThrottling = () => isThrottlerDisabled();
     InsigniasModule,
     AnunciosModule,
     ContactoModule,
+    ReportesProblemaModule,
     AssociationsModule,
     OrganizationsModule,
     FollowsModule,
     RoleInvitationsModule,
+    CoordinadorModule,
+    MaintenanceModule,
+    PerfilPortafolioModule,
   ],
   controllers: [AppController],
   providers: [

@@ -36,11 +36,18 @@ import { dashboardPage } from '@/components/layout/dashboard-page';
 import { DashboardSearchField, DASHBOARD_FILTER_TRIGGER_CLASS } from '@/components/dashboard/dashboard-search-field';
 import { SkeletonRegion } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { BotonAyudaTour } from '@/components/ayuda/boton-ayuda-tour';
 
 const CHIP_BASE =
   'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold motion-select focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
 const chipClase = (activo: boolean) =>
   `${CHIP_BASE} ${activo ? 'bg-primary text-on-primary' : 'bg-surface-container text-text-secondary hover:bg-surface-container-high'}`;
+
+const PASOS_AYUDA = [
+  { target: '#tour-explorar-buscar', title: 'Busca proyectos', content: 'Escribe un título o una descripción, o filtra por dueño.' },
+  { target: '#tour-explorar-filtros', title: 'Filtros rápidos', content: 'Quédate con los proyectos para ti, con vacantes o de tu carrera.' },
+  { target: '#tour-explorar-guardados', title: 'Tus guardados', content: 'Guarda proyectos que te interesen y vuelve a ellos aquí.' },
+];
 
 // useSearchParams exige Suspense en el prerender.
 export default function ProyectosPage() {
@@ -71,6 +78,8 @@ function ProyectosContenido() {
   const [duenioFiltro, setDuenioFiltro] = useState<DuenioProyecto | ''>('');
   const [soloParaTi, setSoloParaTi] = useState(false);
   const [soloGuardados, setSoloGuardados] = useState(false);
+  // MEJ-95: el catálogo corto no se pagina, así que el orden por fecha límite se aplica aquí.
+  const [porFechaLimite, setPorFechaLimite] = useState(false);
 
   const catalogo = useQuery<ProyectoDisponibleResumen[]>({
     queryKey: ['proyectos', duenioFiltro, qParam],
@@ -103,7 +112,13 @@ function ProyectosContenido() {
     })
     // S7 (VIEW-09): los cerrados no aceptan postulaciones; van al final y solo se consultan.
     // «Para ti» conserva el orden por coincidencia del servidor (sort es estable).
-    .sort((a, b) => Number(a.estadoProyecto === 'CERRADO') - Number(b.estadoProyecto === 'CERRADO'));
+    .sort(
+      (a, b) =>
+        Number(a.estadoProyecto === 'CERRADO') - Number(b.estadoProyecto === 'CERRADO') ||
+        (porFechaLimite
+          ? (a.fechaLimitePostulacion ?? '9999-12-31').localeCompare(b.fechaLimitePostulacion ?? '9999-12-31')
+          : 0),
+    );
   const cerrados = filtrados.filter((p) => p.estadoProyecto === 'CERRADO').length;
   const hasActiveFilters = Boolean(busqueda || tipoFiltro || duenioFiltro || soloParaTi || soloGuardados || soloVacantes || soloMiCarrera);
   const activos = proyectos.filter((p) => p.estadoProyecto !== 'CERRADO').length;
@@ -144,11 +159,14 @@ function ProyectosContenido() {
             </p>
           </div>
 
+          <div className="flex shrink-0 items-center gap-tight self-start lg:self-center">
+          <BotonAyudaTour pasos={PASOS_AYUDA} />
           <button
+            id="tour-explorar-guardados"
             type="button"
             onClick={() => setSoloGuardados((v) => !v)}
             aria-pressed={soloGuardados}
-            className={`inline-flex shrink-0 items-center gap-2 self-start rounded-control border px-4 py-2.5 text-sm font-semibold transition-colors lg:self-center ${
+            className={`inline-flex shrink-0 items-center gap-2 rounded-control border px-4 py-2.5 text-sm font-semibold transition-colors ${
               soloGuardados
                 ? 'border-primary bg-primary/10 text-primary'
                 : 'border-outline-variant bg-card text-text-primary hover:bg-surface-container'
@@ -160,11 +178,12 @@ function ProyectosContenido() {
               {totalGuardados}
             </span>
           </button>
+          </div>
         </div>
 
         {/* Buscador y filtros */}
         <div className="mb-section space-y-stack">
-          <div className="flex flex-col gap-stack sm:flex-row">
+          <div id="tour-explorar-buscar" className="flex flex-col gap-stack sm:flex-row">
             <DashboardSearchField
               containerClassName="flex-1"
               aria-label="Buscar proyectos por título o descripción"
@@ -193,6 +212,7 @@ function ProyectosContenido() {
           {/* Filtros principales siempre visibles; los tipos son los del enum real (TIPO_LABEL). */}
           {(soloParaTi || (!isLoading && !isError && proyectos.length > 0)) && (
             <div
+              id="tour-explorar-filtros"
               role="group"
               aria-label="Filtros de proyectos"
               className="flex items-center gap-tight overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -217,6 +237,9 @@ function ProyectosContenido() {
               ))}
               <button type="button" onClick={() => setSoloVacantes((v) => !v)} aria-pressed={soloVacantes} className={chipClase(soloVacantes)}>
                 Con vacantes
+              </button>
+              <button type="button" onClick={() => setPorFechaLimite((v) => !v)} aria-pressed={porFechaLimite} className={chipClase(porFechaLimite)}>
+                Ordenar por fecha límite
               </button>
               {(hayMiCarrera || soloMiCarrera) && (
                 <button type="button" onClick={() => setSoloMiCarrera((v) => !v)} aria-pressed={soloMiCarrera} className={chipClase(soloMiCarrera)}>

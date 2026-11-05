@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Download, FileImage, FileSpreadsheet, FileText, Loader2, Presentation } from 'lucide-react';
+import { Download, FileImage, FileSpreadsheet, FileText, Loader2, Mic, Presentation } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAttachmentThumbnail } from '@/hooks/use-chat';
 import { categoriaAdjunto, formatearTamano, type CategoriaAdjunto } from '@/lib/chat-adjuntos';
@@ -10,6 +10,7 @@ import type { ChatAdjunto } from '@/lib/types/chat';
 
 const ETIQUETA: Record<CategoriaAdjunto, string> = {
   imagen: 'Imagen',
+  audio: 'Nota de voz',
   pdf: 'PDF',
   word: 'Word',
   excel: 'Excel',
@@ -18,6 +19,7 @@ const ETIQUETA: Record<CategoriaAdjunto, string> = {
 
 const ICONO = {
   imagen: FileImage,
+  audio: Mic,
   pdf: FileText,
   word: FileText,
   excel: FileSpreadsheet,

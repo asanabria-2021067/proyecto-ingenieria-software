@@ -114,6 +114,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
         include: {
           autor: { select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true } },
           menciones: { select: { usuario: { select: { idUsuario: true, nombre: true, apellido: true, fotoUrl: true } } } },
+          reacciones: { select: { emoji: true, idUsuario: true }, orderBy: { idReaccion: 'asc' } },
         },
         orderBy: { creadoEn: 'desc' },
       });
@@ -123,11 +124,11 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
       const prisma = makePrisma();
       prisma.tarea.findFirst.mockResolvedValue(tareaFila());
       prisma.proyecto.findUnique.mockResolvedValue({ creadoPor: LEADER_ID });
-      prisma.comentario.findMany.mockResolvedValue([{ idComentario: 1 }]);
+      prisma.comentario.findMany.mockResolvedValue([{ idComentario: 1, reacciones: [{ emoji: 'x', idUsuario: 4 }] }]);
       const service = buildService(prisma, makeNotifications());
 
       const result = await service.findByTareaEnProyecto(PROJECT_ID, TASK_ID, LEADER_ID);
-      expect(result).toEqual([{ idComentario: 1 }]);
+      expect(result).toEqual([{ idComentario: 1, reacciones: [{ emoji: 'x', count: 1, idsUsuarios: [4] }] }]);
     });
 
     it('usuario externo: rechazado (403)', async () => {
@@ -325,7 +326,7 @@ describe('ComentariosService — contexto de tarea (Tarea 28)', () => {
 
       expect(prisma.comentario.findFirst).toHaveBeenCalledWith({
         where: { idComentario: COMMENT_ID, idTarea: TASK_ID, eliminadoEn: null },
-        select: { idComentario: true, idAutor: true },
+        select: { idComentario: true, idAutor: true, idComentarioPadre: true },
       });
       expect(prisma.comentario.update).toHaveBeenCalledWith({
         where: { idComentario: COMMENT_ID },

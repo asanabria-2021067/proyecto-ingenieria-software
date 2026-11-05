@@ -12,6 +12,6 @@ import { SocialFeedService } from './social-feed.service';
   imports: [NotificationsModule, HorasSemestreModule, ChatModule],
   controllers: [SocialController, PerfilSocialController],
   providers: [SocialService, SocialFeedService, PerfilSocialService],
-  exports: [SocialService],
+  exports: [SocialService, PerfilSocialService],
 })
 export class SocialModule {}

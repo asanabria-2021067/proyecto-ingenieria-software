@@ -242,6 +242,9 @@ jobs:
           push: true
           tags: |
             ${{ steps.vars.outputs.backend_tag }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp || 'desconocido' }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
 
@@ -346,6 +349,10 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          # MEJ-137: Web Push opcional. Sin las tres llaves VAPID el backend arranca con el push desactivado.
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           # G07 (P2/P4): la misma expresion que la variante y el build.
           NEXT_PUBLIC_API_URL: ${{ (vars.PUBLIC_API_URL || 'direct') != 'same-origin' && ((vars.PUBLIC_API_URL || 'direct') != 'direct' && (vars.PUBLIC_API_URL || 'direct') || secrets.PUBLIC_APP_URL || 'http://158.23.57.118:3001') || '' }}
           NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
@@ -354,6 +361,9 @@ jobs:
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          CLOSURE_KEKS: ${{ secrets.CLOSURE_KEKS }}
+          CLOSURE_ACTIVE_KEY_ID: ${{ secrets.CLOSURE_ACTIVE_KEY_ID }}
+          CLOSURE_TICKET_HMAC_SECRET: ${{ secrets.CLOSURE_TICKET_HMAC_SECRET }}
           BACKEND_IMAGE: ${{ steps.vars.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ steps.vars.outputs.frontend_image }}
           # G04 (OWASP25-C021 + D2): '1' = un proxy (nginx del host) delante del
@@ -423,12 +433,27 @@ jobs:
             if [ -n "$CLOUDINARY_API_SECRET" ]; then
               printf 'CLOUDINARY_API_SECRET=%s\n' "$CLOUDINARY_API_SECRET"
             fi
+            # Documentos de cierre privados: sin las tres primeras el backend responde 503 CLOSURE_NO_CONFIGURADO.
+            if [ -n "$CLOSURE_KEKS" ]; then
+              printf 'CLOSURE_KEKS=%s\n' "'$CLOSURE_KEKS'"
+            fi
+            if [ -n "$CLOSURE_ACTIVE_KEY_ID" ]; then
+              printf 'CLOSURE_ACTIVE_KEY_ID=%s\n' "$CLOSURE_ACTIVE_KEY_ID"
+            fi
+            if [ -n "$CLOSURE_TICKET_HMAC_SECRET" ]; then
+              printf 'CLOSURE_TICKET_HMAC_SECRET=%s\n' "$CLOSURE_TICKET_HMAC_SECRET"
+            fi
             if [ -n "$SMTP_HOST" ]; then
               printf 'SMTP_HOST=%s\n' "$SMTP_HOST"
               printf 'SMTP_PORT=%s\n' "$SMTP_PORT"
               printf 'SMTP_USER=%s\n' "$SMTP_USER"
               printf 'SMTP_PASSWORD=%s\n' "$SMTP_PASSWORD"
               printf 'SMTP_FROM=%s\n' "$SMTP_FROM"
+            fi
+            if [ -n "$VAPID_PUBLIC_KEY" ]; then
+              printf 'VAPID_PUBLIC_KEY=%s\n' "$VAPID_PUBLIC_KEY"
+              printf 'VAPID_PRIVATE_KEY=%s\n' "$VAPID_PRIVATE_KEY"
+              printf 'VAPID_SUBJECT=%s\n' "$VAPID_SUBJECT"
             fi
             printf 'BACKEND_IMAGE=%s\n' "$BACKEND_IMAGE"
             printf 'FRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE"

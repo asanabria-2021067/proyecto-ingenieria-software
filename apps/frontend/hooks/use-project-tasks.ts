@@ -9,6 +9,7 @@ import {
   createTask,
   deleteTask,
   getProjectTasks,
+  setTaskResponsables,
   unassignTask,
   updateTask,
   updateTaskEstado,
@@ -112,6 +113,13 @@ export function useProjectTasks(idProyecto: number) {
     onSuccess: invalidateTasks,
   });
 
+  // MEJ-109: reemplaza el conjunto de responsables adicionales de la tarea.
+  const fijarResponsables = useMutation({
+    mutationFn: ({ taskId, idsUsuarios }: { taskId: number; idsUsuarios: number[] }) =>
+      setTaskResponsables(idProyecto, taskId, idsUsuarios),
+    onSuccess: invalidateTasks,
+  });
+
   const desasignarTarea = useMutation({
     mutationFn: ({ taskId }: { taskId: number }) => unassignTask(idProyecto, taskId),
     onSuccess: invalidateTasks,
@@ -187,6 +195,7 @@ export function useProjectTasks(idProyecto: number) {
     editarTarea,
     cambiarEstadoTarea,
     asignarTarea,
+    fijarResponsables,
     desasignarTarea,
     cerrarAsignacion,
     eliminarTarea,

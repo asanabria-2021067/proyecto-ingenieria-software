@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { useStartSprint } from '@/hooks/use-project-sprints';
 import { parseFechaSolo, toDateKey } from '@/lib/calendar/utils';
@@ -22,6 +23,9 @@ interface StartSprintButtonProps {
 
 /** Horizonte máximo de planificación, igual al que valida el backend. */
 export const SPRINT_PLAN_MAX_DIAS = 90;
+
+/** Límite del objetivo opcional, igual al del backend. */
+export const OBJETIVO_SPRINT_MAX = 280;
 
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -68,6 +72,7 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
   const [open, setOpen] = useState(false);
   const [paso, setPaso] = useState<Paso>('planificacion');
   const [fechaFinPlaneada, setFechaFinPlaneada] = useState('');
+  const [objetivo, setObjetivo] = useState('');
   const [error, setError] = useState<string | null>(null);
   const fechaInputRef = useRef<HTMLInputElement>(null);
   const confirmTitleRef = useRef<HTMLHeadingElement>(null);
@@ -110,6 +115,7 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
       if (startSprint.isPending) return;
       setPaso('planificacion');
       setFechaFinPlaneada('');
+      setObjetivo('');
       setError(null);
     }
     setOpen(next);
@@ -132,7 +138,7 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
     enviandoRef.current = true;
     setError(null);
     try {
-      await startSprint.mutateAsync(fechaFinPlaneada);
+      await startSprint.mutateAsync({ fechaFinPlaneada, objetivo: objetivo.trim() || undefined });
       handleOpenChange(false);
     } catch (submitError) {
       setError(getApiErrorMessage(submitError, 'task', 'No se pudo iniciar el Sprint. Intenta de nuevo.'));
@@ -225,6 +231,25 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
                     </p>
                   )}
                 </div>
+
+                <div>
+                  <label htmlFor="sprint-objetivo" className="text-xs font-semibold text-on-surface">
+                    Objetivo del Sprint <span className="font-normal text-tertiary">(opcional)</span>
+                  </label>
+                  <Textarea
+                    id="sprint-objetivo"
+                    name="objetivo"
+                    rows={3}
+                    maxLength={OBJETIVO_SPRINT_MAX}
+                    value={objetivo}
+                    onChange={(event) => setObjetivo(event.target.value)}
+                    aria-describedby="sprint-objetivo-ayuda"
+                    className="mt-1 rounded-md border-outline-variant"
+                  />
+                  <p id="sprint-objetivo-ayuda" className="mt-1.5 text-xs text-tertiary">
+                    {objetivo.length}/{OBJETIVO_SPRINT_MAX}. Se muestra arriba del tablero; puedes cambiarlo después.
+                  </p>
+                </div>
               </div>
 
               <DialogFooter className="gap-2 border-t border-outline-variant/35 px-6 py-4 sm:justify-end">
@@ -274,6 +299,13 @@ export function StartSprintButton({ idProyecto }: StartSprintButtonProps) {
                     <dd className="mt-1 text-sm font-semibold tabular-nums text-on-surface">{formatDia(fechaFinPlaneada)}</dd>
                   </div>
                 </dl>
+
+                {objetivo.trim() && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-tertiary">Objetivo del Sprint</p>
+                    <p className="mt-1 whitespace-pre-line break-words text-sm text-on-surface">{objetivo.trim()}</p>
+                  </div>
+                )}
 
                 {error && (
                   <p role="alert" className="rounded-md bg-status-error px-3 py-2 text-xs font-medium text-on-status-error">

@@ -204,6 +204,30 @@ las notas de voz, los adjuntos y las fotos exigen en el backend
 Settings > Secrets and variables > Actions con los valores de tu cuenta de
 Cloudinary; `deploy.yml` solo los escribe al `.env` si no están vacíos. Sin
 `CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET` esas subidas responden 503.
+El key y el secret deben ser de la misma nube que `CLOUDINARY_CLOUD_NAME`
+(si no, Cloudinary responde `cloud_name mismatch`). El entorno actual usa la
+nube `dv8tyo83a` y el preset sin firma `uvgenius` (secreto
+`CLOUDINARY_UPLOAD_PRESET`, `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` en el
+frontend); en desarrollo local esos son los valores por defecto de
+`docker-compose.dev.yml`.
+
+Documentos de cierre privados: sin `CLOSURE_KEKS`, `CLOSURE_ACTIVE_KEY_ID` y
+`CLOSURE_TICKET_HMAC_SECRET` el endpoint `POST /api/proyectos/:id/cierre/documentos/firma`
+responde 503 `CLOSURE_NO_CONFIGURADO`. `deploy.yml` las escribe al `.env` si no están
+vacías. Se generan una sola vez:
+
+```bash
+# CLOSURE_KEKS: JSON id -> base64 de 32 bytes
+node -e "console.log(JSON.stringify({k1:require('crypto').randomBytes(32).toString('base64')}))" | gh secret set CLOSURE_KEKS
+# CLOSURE_ACTIVE_KEY_ID: id (no secreto) de la KEK activa; debe existir en CLOSURE_KEKS
+printf 'k1' | gh secret set CLOSURE_ACTIVE_KEY_ID
+# CLOSURE_TICKET_HMAC_SECRET: base64 de >=32 bytes, independiente de las KEKs
+openssl rand -base64 32 | gh secret set CLOSURE_TICKET_HMAC_SECRET
+```
+
+Advertencia: si pierdes o cambias una KEK, los documentos ya cifrados con ella
+quedan ilegibles. Respáldala y, para rotar, agrega una KEK nueva a `CLOSURE_KEKS`
+y cambia `CLOSURE_ACTIVE_KEY_ID` sin retirar las anteriores.
 
 ### 2) Levantar entorno con Docker
 
@@ -359,9 +383,9 @@ Todos usan la misma contrasena: `Test1234!`
 
 Dataset idempotente de demo: 15 estudiantes `demo.cs01..15`, asociacion con junta, 2 organizaciones con chat, proyectos en distintos estados, metas de horas (Carlos: beca 50/20, extension 40/10; 12 de los 15 con metas) una tarea de Carlos con checklist en el Hackathon, horas del semestre anterior para 8 cuentas demo (alimentan «Comparar semestres» y el comparativo) y, en «Demo - App de tutorías entre pares» (lidera demo.cs05), un rol con requisitos de habilidad y 2 postulaciones pendientes con coincidencia parcial (67 % y 33 %) para «Ordenar por coincidencia». Si faltan, crea las habilidades React, TypeScript y Figma del catálogo. Tambien siembra el chat #general de «App de tutorías» y «Hackathon» (6-7 mensajes con mencion, respuesta y reaccion; Carlos escribe en el Hackathon), 3 eventos futuros en el calendario del Laboratorio, un hito atrasado y uno proximo en «Tutorías», y a demo.cs05 como Lectura en ambas organizaciones. Falla si los estudiantes en riesgo de la asociacion quedan fuera de 4-8. No entra a `dist` ni depende de la compilacion de Nest.
 
-Requiere `DEMO_PASSWORD` (solo se hashea para cuentas nuevas) y que `carlos.mendoza@uvg.edu.gt` exista. `DRY_RUN=1` ejecuta todo en una transaccion y la revierte.
+Requiere `DEMO_PASSWORD` y `DEMO_COORDINADOR_PASSWORD` (cuenta `demo.coordinador@uvg.edu.gt`, coordinador de Computacion; solo se hashean para cuentas nuevas, sin valor por defecto) y que `carlos.mendoza@uvg.edu.gt` exista. `DRY_RUN=1` ejecuta todo en una transaccion y la revierte.
 
-Desarrollo (con `tsx`): `DEMO_PASSWORD=... npm run prisma:seed-demo-final -w apps/backend` (agregar `DRY_RUN=1` para probar).
+Desarrollo (con `tsx`): `DEMO_PASSWORD=... DEMO_COORDINADOR_PASSWORD=... npm run prisma:seed-demo-final -w apps/backend` (agregar `DRY_RUN=1` para probar).
 
 Produccion: la imagen no trae `tsx`, pero si `typescript`. Se copia el script con los dos modulos de `src/` que importa, se transpila dentro del contenedor y se ejecuta con `node` (probado en la VM con `DRY_RUN=1`):
 
@@ -372,9 +396,9 @@ tar cf - prisma/seed-demo-final.ts src/common/utils/guatemala-date.ts src/horas-
 docker exec -u root -w /app/.demo uvg-collab-backend node ../node_modules/typescript/bin/tsc --noCheck \
   --outDir out --rootDir . --module commonjs --target es2021 --esModuleInterop --skipLibCheck prisma/seed-demo-final.ts
 # Ensayo sin guardar nada:
-docker exec -u root -e DRY_RUN=1 -e DEMO_PASSWORD=ensayo -w /app/.demo uvg-collab-backend node out/prisma/seed-demo-final.js
+docker exec -u root -e DRY_RUN=1 -e DEMO_PASSWORD=ensayo -e DEMO_COORDINADOR_PASSWORD=ensayo -w /app/.demo uvg-collab-backend node out/prisma/seed-demo-final.js
 # Real (respaldo con pg_dump antes; DEMO_PASSWORD desde ~/.demo_password):
-docker exec -u root -e DEMO_PASSWORD="$(cat ~/.demo_password)" -w /app/.demo uvg-collab-backend node out/prisma/seed-demo-final.js
+docker exec -u root -e DEMO_PASSWORD="$(cat ~/.demo_password)" -e DEMO_COORDINADOR_PASSWORD="$(cat ~/.demo_coordinador_password)" -w /app/.demo uvg-collab-backend node out/prisma/seed-demo-final.js
 docker exec -u root uvg-collab-backend rm -rf /app/.demo
 ```
 

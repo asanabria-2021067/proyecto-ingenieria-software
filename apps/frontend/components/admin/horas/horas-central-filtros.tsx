@@ -27,9 +27,11 @@ interface Props {
   carreras: Carrera[];
   asociaciones: AsociacionResumen[];
   semestreActual?: Semestre;
+  /** El coordinador no consulta asociaciones: sin esa lista no hay filtro por asociación. */
+  conAsociaciones?: boolean;
 }
 
-export function HorasCentralFiltros({ value, onChange, carreras, asociaciones, semestreActual }: Props) {
+export function HorasCentralFiltros({ value, onChange, carreras, asociaciones, semestreActual, conAsociaciones = true }: Props) {
   const cambiar = (parcial: Partial<FiltrosUI>) => onChange({ ...value, ...parcial });
   const semestres = semestreActual ? ultimosSemestres(semestreActual) : [];
   const asociacion = asociaciones.find((a) => String(a.idAsociacion) === value.idAsociacion);
@@ -61,27 +63,29 @@ export function HorasCentralFiltros({ value, onChange, carreras, asociaciones, s
         </Select>
       </div>
 
-      <div className={CAMPO}>
-        <Label htmlFor="horas-filtro-asociacion">Asociación</Label>
-        <Select
-          value={value.idAsociacion || TODOS}
-          onValueChange={(v) => cambiar({ idAsociacion: v === TODOS ? '' : v, idCarrera: '' })}
-        >
-          <SelectTrigger id="horas-filtro-asociacion" className={SELECT}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TODOS}>Todas las asociaciones</SelectItem>
-            {asociaciones
-              .filter((a) => !a.archivada)
-              .map((a) => (
-                <SelectItem key={a.idAsociacion} value={String(a.idAsociacion)}>
-                  {a.nombre}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {conAsociaciones && (
+        <div className={CAMPO}>
+          <Label htmlFor="horas-filtro-asociacion">Asociación</Label>
+          <Select
+            value={value.idAsociacion || TODOS}
+            onValueChange={(v) => cambiar({ idAsociacion: v === TODOS ? '' : v, idCarrera: '' })}
+          >
+            <SelectTrigger id="horas-filtro-asociacion" className={SELECT}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TODOS}>Todas las asociaciones</SelectItem>
+              {asociaciones
+                .filter((a) => !a.archivada)
+                .map((a) => (
+                  <SelectItem key={a.idAsociacion} value={String(a.idAsociacion)}>
+                    {a.nombre}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className={CAMPO}>
         <Label htmlFor="horas-filtro-carrera">Carrera</Label>

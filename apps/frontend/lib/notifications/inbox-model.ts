@@ -116,6 +116,8 @@ const TYPE_ICON_RULES: Array<[string, LucideIcon]> = [
   ['ROL_', Users],
   ['ALERTA_SEGURIDAD', ShieldAlert],
   ['RECUPERACION', KeyRound],
+  ['INICIO_SESION', ShieldAlert],
+  ['DESACTIVACION', ShieldCheck],
   ['CUENTA', ShieldCheck],
   ['EVENTO', CalendarClock],
   ['REUNION', CalendarClock],
@@ -427,6 +429,7 @@ function etiquetaDeDestino(href: string, tipo: string): string {
   if (href.includes('/kanban')) return 'Ver tablero';
   if (href.startsWith('/dashboard/projects/') || href.startsWith('/dashboard/proyectos/')) return 'Ver proyecto';
   if (href.startsWith('/dashboard/admin/')) return 'Ir a administración';
+  if (href.startsWith('/dashboard/configuracion')) return 'Ir a configuración';
   return 'Abrir';
 }
 

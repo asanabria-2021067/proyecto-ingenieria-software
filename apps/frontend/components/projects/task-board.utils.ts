@@ -1,6 +1,7 @@
 import { AlertCircle, AlertTriangle, ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import type { TagTone } from '@/components/ui/tag';
-import type { EstadoTarea, Prioridad, TareaPublicaDTO } from '@/lib/types/tasks';
+import { sortTasks, type DireccionOrden } from '@/lib/tasks/filters';
+import type { EstadoTarea, Prioridad, TareaPublicaDTO, UsuarioAsignadoResumen } from '@/lib/types/tasks';
 
 export interface ColumnaConfig {
   estado: EstadoTarea;
@@ -172,6 +173,32 @@ export function ordenarTareas(tareas: TareaPublicaDTO[]): TareaPublicaDTO[] {
   });
 }
 
+export type ColumnaOrdenTabla = 'titulo' | 'estado' | 'prioridad' | 'fechaLimite' | 'responsable';
+
+/**
+ * MEJ-112: orden de la vista de tabla. El listado ya llegó completo, así que se ordena en el cliente
+ * con los mismos criterios del backend (`ordenarPor`): los vacíos (sin fecha, sin responsable) van
+ * siempre al final y el empate se resuelve por `idTarea`. No muta `tareas`.
+ */
+export function ordenarTabla(
+  tareas: TareaPublicaDTO[],
+  columna: ColumnaOrdenTabla,
+  direccion: DireccionOrden,
+): TareaPublicaDTO[] {
+  if (columna !== 'responsable') return sortTasks(tareas, columna, direccion);
+  const factor = direccion === 'desc' ? -1 : 1;
+  const nombre = (t: TareaPublicaDTO) => {
+    const primero = responsablesDe(t)[0];
+    return primero ? `${primero.nombre} ${primero.apellido}` : null;
+  };
+  return [...tareas].sort((a, b) => {
+    const na = nombre(a);
+    const nb = nombre(b);
+    if (na === null || nb === null) return na === nb ? a.idTarea - b.idTarea : na === null ? 1 : -1;
+    return na.localeCompare(nb, 'es', { sensitivity: 'base' }) * factor || a.idTarea - b.idTarea;
+  });
+}
+
 /** YYYY-MM-DD del día calendario local — nunca UTC, para no desplazar el día. */
 function hoyLocalISO(ahora: Date): string {
   const anio = ahora.getFullYear();
@@ -211,6 +238,7 @@ export function formatearFechaLimite(fecha: string): string {
 export const FILTRO_TODOS = 'todos';
 export const FILTRO_SIN_ROL = 'sin-rol';
 export const FILTRO_SIN_HITO = 'sin-hito';
+export const FILTRO_SIN_RESPONSABLE = 'sin-responsable';
 
 export interface OpcionFiltro {
   valor: string;
@@ -276,13 +304,51 @@ export function coincideFiltroHito(tarea: TareaPublicaDTO, filtro: string): bool
   return String(tarea.hito?.idHito ?? '') === filtro;
 }
 
-/** Combina ambos filtros con lógica AND. No muta `tareas`. */
+/** MEJ-109: principal primero y luego los adicionales; sin `responsables` (respuesta anterior) solo el principal. */
+export function responsablesDe(tarea: TareaPublicaDTO): UsuarioAsignadoResumen[] {
+  return tarea.responsables ?? (tarea.asignacionActiva ? [tarea.asignacionActiva.usuario] : []);
+}
+
+/** MEJ-112: opciones de responsable = integrantes del proyecto más quien ya figure en una tarea. */
+export function derivarOpcionesResponsable(
+  tareas: TareaPublicaDTO[],
+  miembros: readonly { idUsuario: number; nombre: string; apellido: string }[],
+): OpcionFiltro[] {
+  const mapa = new Map<number, string>();
+  for (const m of miembros) mapa.set(m.idUsuario, `${m.nombre} ${m.apellido}`);
+  let haySinResponsable = false;
+  for (const t of tareas) {
+    const responsables = responsablesDe(t);
+    if (responsables.length === 0) haySinResponsable = true;
+    for (const r of responsables) mapa.set(r.idUsuario, `${r.nombre} ${r.apellido}`);
+  }
+  const opciones = [...mapa.entries()]
+    .sort(([idA, nombreA], [idB, nombreB]) => nombreA.localeCompare(nombreB, 'es') || idA - idB)
+    .map(([id, nombre]) => ({ valor: String(id), etiqueta: nombre }));
+  if (haySinResponsable) opciones.push({ valor: FILTRO_SIN_RESPONSABLE, etiqueta: 'Sin responsable' });
+  return opciones;
+}
+
+export function coincideFiltroResponsable(tarea: TareaPublicaDTO, filtro: string): boolean {
+  if (filtro === FILTRO_TODOS) return true;
+  const responsables = responsablesDe(tarea);
+  if (filtro === FILTRO_SIN_RESPONSABLE) return responsables.length === 0;
+  return responsables.some((r) => String(r.idUsuario) === filtro);
+}
+
+/** Combina los filtros con lógica AND. No muta `tareas`. */
 export function filtrarTareas(
   tareas: TareaPublicaDTO[],
   filtroRol: string,
   filtroHito: string,
+  filtroResponsable: string = FILTRO_TODOS,
 ): TareaPublicaDTO[] {
-  return tareas.filter((t) => coincideFiltroRol(t, filtroRol) && coincideFiltroHito(t, filtroHito));
+  return tareas.filter(
+    (t) =>
+      coincideFiltroRol(t, filtroRol) &&
+      coincideFiltroHito(t, filtroHito) &&
+      coincideFiltroResponsable(t, filtroResponsable),
+  );
 }
 
 /**

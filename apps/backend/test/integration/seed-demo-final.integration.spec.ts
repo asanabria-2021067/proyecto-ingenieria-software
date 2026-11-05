@@ -30,12 +30,13 @@ describeIntegration('DEMO seed-demo-final', () => {
   const dbUrl = url.toString();
   const envBase: NodeJS.ProcessEnv = { ...process.env, DATABASE_URL: dbUrl, DIRECT_URL: dbUrl };
   delete envBase.DEMO_PASSWORD;
+  delete envBase.DEMO_COORDINADOR_PASSWORD;
   let db: PrismaClient;
 
   const node = (script: string[], env: NodeJS.ProcessEnv) =>
     execFileSync(process.execPath, [...script], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  const correrSeed = (password: string | null = 'Contrasena-Demo-1', extra: NodeJS.ProcessEnv = {}) =>
-    node([join(process.cwd(), 'node_modules/tsx/dist/cli.mjs'), 'prisma/seed-demo-final.ts'], { ...envBase, ...extra, ...(password && { DEMO_PASSWORD: password }) });
+  const correrSeed = (password: string | null = 'Contrasena-Demo-1', extra: NodeJS.ProcessEnv = {}, passwordCoordinador: string | null = 'Contrasena-Coord-1') =>
+    node([join(process.cwd(), 'node_modules/tsx/dist/cli.mjs'), 'prisma/seed-demo-final.ts'], { ...envBase, ...extra, ...(password && { DEMO_PASSWORD: password }), ...(passwordCoordinador && { DEMO_COORDINADOR_PASSWORD: passwordCoordinador }) });
   const conteos = async () => {
     const filas: Record<string, number> = {};
     for (const t of TABLAS) filas[t] = Number((await db.$queryRawUnsafe<{ n: bigint }[]>(`SELECT COUNT(*) AS n FROM "${t}"`))[0].n);
@@ -65,6 +66,7 @@ describeIntegration('DEMO seed-demo-final', () => {
 
   it('falla con mensaje claro sin DEMO_PASSWORD y sin el presidente, y no crea nada', async () => {
     expect(() => correrSeed(null)).toThrow(/DEMO_PASSWORD/);
+    expect(() => correrSeed('Contrasena-Demo-1', {}, null)).toThrow(/DEMO_COORDINADOR_PASSWORD/);
     expect(() => correrSeed()).toThrow(/carlos\.mendoza@uvg\.edu\.gt/);
     expect(await db.usuario.count()).toBe(0);
   }, 60_000);
@@ -95,10 +97,12 @@ describeIntegration('DEMO seed-demo-final', () => {
     expect(primera).toContain('usuarios: creados 15, actualizados 0');
     expect(primera).toContain('proyectos: creados 5, actualizados 0');
     expect(primera).not.toContain(password);
+    expect(primera).not.toContain('Contrasena-Coord-1');
     const trasPrimera = await conteos();
 
     const segunda = correrSeed(password);
     expect(segunda).not.toContain(password);
+    expect(segunda).not.toContain('Contrasena-Coord-1');
     const lineas = segunda.split('\n').filter((l) => l.includes(': creados'));
     expect(lineas.length).toBeGreaterThan(0);
     for (const l of lineas) expect(l, l).toMatch(/creados 0, actualizados 0$/);
@@ -193,6 +197,19 @@ describeIntegration('DEMO seed-demo-final', () => {
     expect(orgsCs05.map((m) => m.organizacion.nombreOrganizacion).sort()).toEqual(['Comunidad de Ciencia de Datos (Demo)', 'Laboratorio de Innovación Abierta (Demo)']);
     expect(await db.usuarioOrganizacion.findFirstOrThrow({ where: { usuario: { correo: 'demo.cs05@uvg.edu.gt' }, organizacion: { nombreOrganizacion: 'Comunidad de Ciencia de Datos (Demo)' } } })).toMatchObject({ rolOrganizacion: 'LECTURA' });
     expect(await db.usuarioOrganizacion.count({ where: { organizacion: { nombreOrganizacion: 'Comunidad de Ciencia de Datos (Demo)' } } })).toBeLessThanOrEqual(8);
+
+    // Coordinador de Computacion: alcance en esa carrera, un proyecto en revision y un cierre pendiente dentro de su alcance.
+    const coordinador = await db.usuario.findUniqueOrThrow({
+      where: { correo: 'demo.coordinador@uvg.edu.gt' },
+      include: { rolesAcceso: { include: { rolAcceso: true } }, alcancesCoordinador: true },
+    });
+    expect(coordinador.contrasena).toMatch(/^\$2[aby]\$10\$/);
+    expect(coordinador.contrasena).not.toContain('Contrasena-Coord-1');
+    expect(coordinador.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil)).toEqual(['coordinador_academico']);
+    expect(coordinador.alcancesCoordinador.map((a) => a.idCarrera)).toEqual([carrera.idCarrera]);
+    const cubiertos = { creador: { perfil: { idCarrera: carrera.idCarrera } } };
+    expect(await db.revisionProyecto.count({ where: { estadoRevision: 'PENDIENTE', proyecto: { estadoProyecto: 'EN_REVISION', ...cubiertos } } })).toBe(1);
+    expect(await db.revisionCierreProyecto.count({ where: { estadoRevision: 'ENVIADA', proyecto: { estadoProyecto: 'EN_SOLICITUD_CIERRE', ...cubiertos } } })).toBe(1);
 
     expect(await db.tarea.groupBy({ by: ['estadoTarea'] }).then((g) => g.map((x) => x.estadoTarea).sort())).toEqual(['EN_PROGRESO', 'EN_REVISION', 'HECHO', 'POR_HACER']);
   }, 120_000);

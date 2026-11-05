@@ -4,6 +4,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { AdminEntidadesService } from './admin-entidades.service';
+import { AdminTablasService } from './admin-tablas.service';
+import { AdminEstadoSistemaService } from './admin-estado-sistema.service';
 import { getJwtSecretFromConfig } from '../config/jwt-secret';
 import { NotificationsModule } from '../notifications/notifications.module';
 
@@ -19,6 +21,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
     }),
   ],
   controllers: [AdminController],
-  providers: [AdminService, AdminEntidadesService],
+  providers: [AdminService, AdminEntidadesService, AdminTablasService, AdminEstadoSistemaService],
 })
 export class AdminModule {}

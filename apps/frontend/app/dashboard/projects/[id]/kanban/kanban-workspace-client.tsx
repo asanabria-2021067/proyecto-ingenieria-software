@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FileText, Kanban, MousePointerClick, Plus, Tags, UserCheck } from 'lucide-react';
+import { FileText, Kanban, List, MousePointerClick, Plus, Table2, Tags, UserCheck } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { useProjectLabels } from '@/hooks/use-project-labels';
@@ -13,7 +13,10 @@ import { useProjectAvance } from '@/hooks/use-project-avance';
 import { useProjectSprints } from '@/hooks/use-project-sprints';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useTaskSelection } from '@/hooks/use-task-selection';
+import { useVistaTablero, type VistaTablero } from '@/hooks/use-vista-tablero';
 import { Button } from '@/components/ui/button';
+import { BorrarEjemploBoton, OfertaEjemploPrimerProyecto } from '@/components/projects/ejemplo-proyecto';
+import { BotonAyudaTour } from '@/components/ayuda/boton-ayuda-tour';
 import { Kbd } from '@/components/ui/kbd';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
@@ -26,7 +29,11 @@ import {
 } from '@/components/ui/empty';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskBoard } from '@/components/projects/task-board';
+import { TaskListView } from '@/components/projects/task-list-view';
+import { TaskTableView } from '@/components/projects/task-table-view';
+import { SEGMENTED_ITEM_CLASS, ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { StartSprintButton } from '@/components/projects/start-sprint-button';
+import { SprintObjetivo } from '@/components/projects/sprint-objetivo';
 import { SprintReconocimientos, candidatosAReconocer } from '@/components/projects/sprint-extras';
 import { HitosSection } from '@/components/projects/hitos-section';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
@@ -51,6 +58,7 @@ import {
   FILTRO_TODOS,
   computeTaskProgress,
   derivarOpcionesHito,
+  derivarOpcionesResponsable,
   derivarOpcionesRol,
   filtrarTareas,
   getProgressVisualState,
@@ -177,7 +185,70 @@ function WorkspaceSkeleton() {
   );
 }
 
+/** MEJ-112: Lista o Tabla del tablero, con la misma carga, error y vacios que el Kanban. */
+function VistaAlterna({
+  vista,
+  tasks,
+  hayTareas,
+  isLoading,
+  isError,
+  onRetry,
+  onLimpiarFiltros,
+  onAbrir,
+}: {
+  vista: Exclude<VistaTablero, 'kanban'>;
+  tasks: TareaPublicaDTO[];
+  hayTareas: boolean;
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+  onLimpiarFiltros: () => void;
+  onAbrir: (tarea: TareaPublicaDTO) => void;
+}) {
+  if (isLoading) {
+    return (
+      <SkeletonRegion label="Cargando tareas" className="space-y-2">
+        <Skeleton className="h-12 w-full rounded-lg" />
+        <Skeleton className="h-12 w-full rounded-lg" />
+        <Skeleton className="h-12 w-full rounded-lg" />
+      </SkeletonRegion>
+    );
+  }
+  if (isError) {
+    return (
+      <div role="alert" className="space-y-3 py-10 text-center">
+        <p className="type-body font-medium text-destructive">No se pudieron cargar las tareas. Intenta nuevamente.</p>
+        <Button variant="outline" size="sm" onClick={onRetry} className="min-h-11 rounded-lg border-primary text-xs font-bold text-primary hover:bg-primary/10">
+          Reintentar
+        </Button>
+      </div>
+    );
+  }
+  if (tasks.length === 0) {
+    return (
+      <div role="status" className="space-y-2 py-6 text-center">
+        <p className="text-sm text-tertiary">
+          {hayTareas ? 'No hay tareas que coincidan con los filtros seleccionados.' : 'Aún no hay tareas en este proyecto.'}
+        </p>
+        {hayTareas && (
+          <Button variant="outline" size="sm" onClick={onLimpiarFiltros} className={`${WORKSPACE_CONTROL_CLASS} border-primary text-primary hover:bg-primary/10`}>
+            Limpiar filtros
+          </Button>
+        )}
+      </div>
+    );
+  }
+  return vista === 'lista' ? <TaskListView tasks={tasks} onAbrir={onAbrir} /> : <TaskTableView tasks={tasks} onAbrir={onAbrir} />;
+}
+
 // ─── Workspace ─────────────────────────────────────────────────────────────
+const PASOS_AYUDA = [
+  { target: '#tour-kanban-pestanas', title: 'Tablero e hitos', content: 'Alterna entre el tablero de tareas y los hitos del proyecto.' },
+  { target: '#tour-kanban-filtros', title: 'Filtros', content: 'Filtra por rol o hito, o quédate solo con tus tareas.' },
+  { target: '#tour-kanban-nueva', title: 'Nueva tarea', content: 'Crea una tarea en el sprint activo.' },
+  { target: '#tour-kanban-tablero', title: 'Tus tareas', content: 'Abre una tarjeta para cambiar su estado o registrar horas.' },
+];
+
 function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const idProyecto = proyecto.idProyecto;
   const router = useRouter();
@@ -200,6 +271,9 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const [activeTab, setActiveTab] = useState(tabParam === 'hitos' ? 'hitos' : 'tablero');
   const [filtroRol, setFiltroRol] = useState(FILTRO_TODOS);
   const [filtroHito, setFiltroHito] = useState(FILTRO_TODOS);
+  // MEJ-112: responsable y vista viven aquí, no en cada vista, para conservarse al cambiar de Kanban a Lista o Tabla.
+  const [filtroResponsable, setFiltroResponsable] = useState(FILTRO_TODOS);
+  const [vista, setVista] = useVistaTablero(idProyecto);
   // MEJ-51: «Solo mis tareas» (asignación activa del usuario actual).
   const [soloMias, setSoloMias] = useState(false);
   const [plantillasAbierto, setPlantillasAbierto] = useState(false);
@@ -245,6 +319,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     editarTarea,
     asignarTarea,
     desasignarTarea,
+    fijarResponsables,
     accionMasiva,
   } = useProjectTasks(idProyecto);
   const {
@@ -263,22 +338,32 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const { crearHito, asignarHitoTareas } = useProjectMilestones(idProyecto);
   const opcionesRol = useMemo(() => derivarOpcionesRol(tasks), [tasks]);
   const opcionesHito = useMemo(() => derivarOpcionesHito(tasks), [tasks]);
-  const hayFiltrosActivos = filtroRol !== FILTRO_TODOS || filtroHito !== FILTRO_TODOS || soloMias;
+  const opcionesResponsable = useMemo(() => derivarOpcionesResponsable(tasks, members), [tasks, members]);
+  const hayFiltrosActivos =
+    filtroRol !== FILTRO_TODOS || filtroHito !== FILTRO_TODOS || filtroResponsable !== FILTRO_TODOS || soloMias;
   const limpiarFiltros = () => {
     setFiltroRol(FILTRO_TODOS);
     setFiltroHito(FILTRO_TODOS);
+    setFiltroResponsable(FILTRO_TODOS);
     setSoloMias(false);
   };
   const idUsuarioActual = currentUser?.idUsuario ?? null;
   const tareasVisibles = useMemo(
-    () => (soloMias ? soloMisTareas(tasks, idUsuarioActual) : tasks),
-    [soloMias, tasks, idUsuarioActual],
+    () => filtrarTareas(soloMias ? soloMisTareas(tasks, idUsuarioActual) : tasks, FILTRO_TODOS, FILTRO_TODOS, filtroResponsable),
+    [soloMias, tasks, idUsuarioActual, filtroResponsable],
   );
+  // Lista y Tabla aplican aqui el rol y el hito; el Kanban los aplica dentro de TaskBoard con los mismos valores.
+  const tareasFiltradas = useMemo(
+    () => filtrarTareas(tareasVisibles, filtroRol, filtroHito),
+    [tareasVisibles, filtroRol, filtroHito],
+  );
+  const abrirTarea = (tarea: TareaPublicaDTO) =>
+    router.push(`/dashboard/projects/${idProyecto}/kanban/tasks/${tarea.idTarea}`);
 
   // Selección múltiple (HU-202/T-382): solo el líder, solo en la pestaña
   // Tablero y sobre las tareas que los filtros dejan ver. Fuera de eso la
   // lista de visibles queda vacía y la selección se limpia sola.
-  const puedeSeleccionar = isLeader && activeTab === 'tablero' && haySprintDeTrabajo;
+  const puedeSeleccionar = isLeader && activeTab === 'tablero' && vista === 'kanban' && haySprintDeTrabajo;
   const idsVisibles = useMemo(
     () => (puedeSeleccionar ? filtrarTareas(tareasVisibles, filtroRol, filtroHito).map((t) => t.idTarea) : []),
     [puedeSeleccionar, tareasVisibles, filtroRol, filtroHito],
@@ -299,8 +384,17 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     return proyecto.roles.filter((rol) => misIds.has(rol.idRolProyecto));
   }, [currentUser, members, proyecto.roles]);
 
+  const ofrecerEjemplo =
+    isLeader &&
+    !!currentUser &&
+    !isLoadingSprints &&
+    !isErrorSprints &&
+    sprints.length === 0 &&
+    (estadoProyecto === 'PUBLICADO' || estadoProyecto === 'EN_PROGRESO');
+
   return (
     <ProjectPageShell>
+      {ofrecerEjemplo && <OfertaEjemploPrimerProyecto idProyecto={idProyecto} idUsuario={currentUser.idUsuario} />}
       {/* Identidad de la página fuera de las tarjetas: la vuelta al proyecto
           (antes breadcrumb + botón dentro de la tarjeta) va en el encabezado. */}
       <ProjectPageHeader
@@ -310,6 +404,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
         }}
         title="Tablero (Kanban)"
         description="Tus tareas y las del equipo por estado. Abre una tarjeta para cambiar su estado o registrar horas."
+        actions={<BotonAyudaTour pasos={PASOS_AYUDA} />}
       />
 
       <OrgSoloLecturaBanner proyecto={proyecto} participantes={cargandoMiembros ? undefined : members} className="mb-grid" />
@@ -358,7 +453,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           del tablero pertenece al área interna del board, no a la página. */}
       <div className="card-base min-h-0 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 gap-0">
-          <TabsList className="mb-7 h-9 w-full justify-start gap-0 rounded-none border-b border-outline-variant/40 bg-transparent p-0">
+          <TabsList id="tour-kanban-pestanas" className="mb-7 h-9 w-full justify-start gap-0 rounded-none border-b border-outline-variant/40 bg-transparent p-0">
             <TabsTrigger
               value="tablero"
               className="relative h-9 flex-none rounded-none border-x border-t border-transparent bg-transparent px-2.5 pb-2 text-sm font-semibold text-tertiary shadow-none data-[state=active]:border-outline-variant/50 data-[state=active]:border-b-surface-container-lowest data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:after:absolute data-[state=active]:after:inset-x-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-0.5 data-[state=active]:after:bg-primary"
@@ -389,7 +484,50 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <div id="tour-kanban-filtros" className="flex flex-wrap items-center gap-2 lg:justify-end">
+              {activeTab === 'tablero' && (
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value={vista}
+                  onValueChange={(valor) => valor && setVista(valor as VistaTablero)}
+                  aria-label="Vista del tablero"
+                  className="w-full sm:w-auto"
+                >
+                  <ToggleGroupItem value="kanban" aria-label="Vista Kanban" className={`${SEGMENTED_ITEM_CLASS} h-10 gap-1.5 px-3`}>
+                    <Kanban className="size-3.5" aria-hidden="true" />
+                    Kanban
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="lista" aria-label="Vista Lista" className={`${SEGMENTED_ITEM_CLASS} h-10 gap-1.5 px-3`}>
+                    <List className="size-3.5" aria-hidden="true" />
+                    Lista
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="tabla" aria-label="Vista Tabla" className={`${SEGMENTED_ITEM_CLASS} h-10 gap-1.5 px-3`}>
+                    <Table2 className="size-3.5" aria-hidden="true" />
+                    Tabla
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              )}
+
+              <Select value={filtroResponsable} onValueChange={setFiltroResponsable}>
+                <SelectTrigger
+                  size="sm"
+                  aria-label="Filtrar por responsable"
+                  className={`${WORKSPACE_CONTROL_CLASS} w-full justify-between bg-surface-container-lowest sm:w-48`}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={FILTRO_TODOS}>Todos los responsables</SelectItem>
+                  {opcionesResponsable.map((opcion) => (
+                    <SelectItem key={opcion.valor} value={opcion.valor}>
+                      {opcion.etiqueta}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Select value={filtroRol} onValueChange={setFiltroRol}>
                 <SelectTrigger
                   size="sm"
@@ -450,6 +588,8 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 </Button>
               )}
 
+              {isLeader && <BorrarEjemploBoton idProyecto={idProyecto} />}
+
               {isLeader && (
                 <Button
                   type="button"
@@ -494,6 +634,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                   que ocultarlo cierra por completo esa vía. */}
               {puedeCrear && haySprintDeTrabajo && (
                 <Button
+                  id="tour-kanban-nueva"
                   type="button"
                   size="sm"
                   onClick={() => setCrearAbierto(true)}
@@ -520,7 +661,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             </p>
           )}
 
-          <TabsContent value="tablero" className="mt-0 min-h-0">
+          <TabsContent id="tour-kanban-tablero" value="tablero" className="mt-0 min-h-0">
             {isLoadingSprints ? (
               <SkeletonRegion label="Cargando sprints" className="space-y-3">
                 <Skeleton className="h-9 w-48" />
@@ -542,6 +683,14 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               </div>
             ) : haySprintDeTrabajo ? (
               <>
+              {sprintActual && (
+                <SprintObjetivo
+                  idProyecto={idProyecto}
+                  idSprint={sprintActual.idSprint}
+                  objetivo={sprintActual.objetivo}
+                  puedeEditar={isLeader}
+                />
+              )}
               {soloMias && !isLoadingTasks && !isErrorTasks && tasks.length > 0 && tareasVisibles.length === 0 && (
                 <Empty tone="muted" size="compact" role="status" className="mb-4">
                   <EmptyMedia variant="compact" className="size-10 rounded-control border-transparent text-text-secondary">
@@ -558,6 +707,18 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                   </EmptyContent>
                 </Empty>
               )}
+              {vista !== 'kanban' ? (
+                <VistaAlterna
+                  vista={vista}
+                  tasks={tareasFiltradas}
+                  hayTareas={tasks.length > 0}
+                  isLoading={isLoadingTasks}
+                  isError={isErrorTasks}
+                  onRetry={() => refetchTasks()}
+                  onLimpiarFiltros={limpiarFiltros}
+                  onAbrir={abrirTarea}
+                />
+              ) : (
               <TaskBoard
                 idProyecto={idProyecto}
                 tasks={tareasVisibles}
@@ -589,7 +750,9 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 onFiltroHitoChange={setFiltroHito}
                 mostrarToolbar={false}
                 seleccion={puedeSeleccionar ? seleccion.control : undefined}
+                fijarResponsables={fijarResponsables}
               />
+              )}
               </>
             ) : proyectoEnCierre ? (
               /* S7: en cierre no se abre trabajo nuevo. Ofrecer «Iniciar
@@ -681,6 +844,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           editarTarea={editarTarea}
           asignarTarea={asignarTarea}
           desasignarTarea={desasignarTarea}
+          fijarResponsables={fijarResponsables}
           onOpenChange={setCrearAbierto}
           onManageLabels={isLeader ? () => setEtiquetasAbierto(true) : undefined}
         />

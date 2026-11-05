@@ -3,6 +3,10 @@ import { SprintsController } from './sprints.controller';
 import { SprintsContextService } from './sprints-context.service';
 import { SprintsAuthorizationService } from './sprints-authorization.service';
 import { SprintsService } from './sprints.service';
+import { EjemploProyectoController } from './ejemplo-proyecto.controller';
+import { EjemploProyectoService } from './ejemplo-proyecto.service';
+import { SprintObjetivoService } from './sprint-objetivo.service';
+import { SprintColumnTimeService } from './sprint-column-time.service';
 import { SprintsReadService } from './sprints-read.service';
 import { HoursRecognitionService } from './hours-recognition.service';
 import { ProjectHoursSummaryService } from './project-hours-summary.service';
@@ -15,11 +19,14 @@ import { ProjectPolicyModule } from '../common/project-policy/project-policy.mod
 
 @Module({
   imports: [NotificationsModule, BitacoraModule, ProjectPolicyModule],
-  controllers: [SprintsController, AdminSprintsController],
+  controllers: [SprintsController, AdminSprintsController, EjemploProyectoController],
   providers: [
     SprintsContextService,
     SprintsAuthorizationService,
     SprintsService,
+    EjemploProyectoService,
+    SprintObjetivoService,
+    SprintColumnTimeService,
     SprintsReadService,
     HoursRecognitionService,
     ProjectHoursSummaryService,

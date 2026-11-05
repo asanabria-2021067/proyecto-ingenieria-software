@@ -166,6 +166,8 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   SOLICITUD_AMISTAD: { grupo: 'contactos', etiqueta: 'Solicitud de amistad', descripcion: 'Recibes una solicitud de amistad.' },
   AMISTAD_ACEPTADA: { grupo: 'contactos', etiqueta: 'Amistad aceptada', descripcion: 'Aceptan tu solicitud de amistad.' },
   NUEVO_SEGUIDOR: { grupo: 'contactos', etiqueta: 'Nuevo seguidor', descripcion: 'Alguien empieza a seguirte.' },
+  // MEJ-131: aviso al autor del mensaje original cuando alguien responde en su hilo.
+  RESPUESTA_HILO_CHAT: { grupo: 'contactos', etiqueta: 'Respuestas en tus hilos', descripcion: 'Alguien responde en el hilo de un mensaje tuyo en una conversación de proyecto.' },
   // MEJ-44: llega aunque la conversacion este silenciada; solo esta preferencia la apaga.
   MENCION_CHAT: { grupo: 'contactos', etiqueta: 'Menciones en conversaciones', descripcion: 'Alguien te menciona con @ en una conversación de proyecto, aunque esté silenciada.' },
 
@@ -181,10 +183,35 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
   },
   CUENTA_VERIFICADA: { grupo: 'cuenta', etiqueta: 'Cuenta verificada', descripcion: 'Administración verifica tu cuenta.' },
   ALERTA_SEGURIDAD: { grupo: 'cuenta', etiqueta: 'Alerta de seguridad', descripcion: 'La plataforma detecta actividad inusual de acceso.' },
+  NUEVO_INICIO_SESION: {
+    grupo: 'cuenta',
+    etiqueta: 'Nuevo inicio de sesión',
+    descripcion: 'Se inicia sesión en tu cuenta desde un navegador que no habíamos visto.',
+  },
+  SOLICITUD_DESACTIVACION: {
+    grupo: 'cuenta',
+    etiqueta: 'Solicitud de desactivación de cuenta',
+    descripcion: 'Un usuario pide desactivar su cuenta.',
+  },
+  DESACTIVACION_RESUELTA: {
+    grupo: 'cuenta',
+    etiqueta: 'Solicitud de desactivación resuelta',
+    descripcion: 'Administración resuelve tu solicitud de desactivar la cuenta.',
+  },
+  AVISO_ASOCIACION: {
+    grupo: 'organizaciones',
+    etiqueta: 'Avisos de tu asociación',
+    descripcion: 'La junta de tu asociación envía un aviso a un grupo de estudiantes del que formas parte.',
+  },
   JUNTA_ASOCIACION: {
     grupo: 'organizaciones',
     etiqueta: 'Junta de asociación',
     descripcion: 'Administración te nombra, cambia o quita de la junta de una asociación.',
+  },
+  ALCANCE_COORDINADOR: {
+    grupo: 'organizaciones',
+    etiqueta: 'Alcance de coordinación',
+    descripcion: 'Administración te asigna o cambia las carreras que coordinas.',
   },
   SOLICITUD_CONTACTO: {
     grupo: 'cuenta',

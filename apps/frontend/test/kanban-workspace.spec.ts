@@ -3,6 +3,7 @@ import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useRouter } from 'next/navigation';
 import type { ProyectoDetalleDTO } from '../lib/dto/project.dto';
 import type { TareaPublicaDTO } from '../lib/types/tasks';
 
@@ -29,13 +30,14 @@ vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 vi.mock('../hooks/use-project-sprints', () => ({
   useProjectSprints: vi.fn(),
   useStartSprint: vi.fn(),
+  useUpdateSprintObjetivo: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 // Fuera de un app router real `useSearchParams()` devuelve null; se simula con
 // parámetros vacíos para no arrastrar el router completo.
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: vi.fn(() => ({ replace: vi.fn(), push: vi.fn() })),
 }));
 
 // Mismo mock que task-form-dialog.spec.ts/create-milestone-dialog.spec.ts:
@@ -653,7 +655,7 @@ describe('KanbanWorkspaceClient — sin Sprint activo (F2)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Sí, iniciar Sprint' }));
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
-    expect(mutateAsync).toHaveBeenCalledWith(fecha);
+    expect(mutateAsync).toHaveBeenCalledWith({ fechaFinPlaneada: fecha, objetivo: undefined });
     expect(useStartSprint).toHaveBeenCalledWith(42);
   });
 
@@ -727,5 +729,132 @@ describe('KanbanWorkspaceClient — sin Sprint activo (F2)', () => {
     expect(
       screen.getByText('Todavía no hay un Sprint activo en este proyecto'),
     ).toBeInTheDocument();
+  });
+});
+
+// MEJ-112: selector de vista y filtros comunes a Kanban, Lista y Tabla.
+describe('KanbanWorkspaceClient — vistas Kanban / Lista / Tabla (MEJ-112)', () => {
+  const angel = { idUsuario: 1, nombre: 'Angel', apellido: 'Sanabria', fotoUrl: null };
+  const maria = { idUsuario: 2, nombre: 'Maria', apellido: 'Lopez', fotoUrl: null };
+  const asignacion = (u: typeof angel) => ({ idAsignacion: u.idUsuario * 10, idUsuario: u.idUsuario, fechaAsignacion: '2026-01-02T00:00:00.000Z', usuario: u });
+  const backend = { idRolProyecto: 1, nombreRol: 'Backend' };
+  const diseno = { idRolProyecto: 2, nombreRol: 'Diseno' };
+
+  const tareasDePrueba = () => [
+    tarea({ idTarea: 1, tituloTarea: 'De Angel', asignacionActiva: asignacion(angel), responsables: [angel], rolProyecto: backend }),
+    tarea({ idTarea: 2, tituloTarea: 'De Maria', asignacionActiva: asignacion(maria), responsables: [maria], rolProyecto: diseno }),
+    tarea({ idTarea: 3, tituloTarea: 'Compartida', asignacionActiva: asignacion(maria), responsables: [maria, angel], rolProyecto: diseno }),
+  ];
+
+  const elegir = (filtro: string, opcion: string) => {
+    fireEvent.keyDown(screen.getByRole('combobox', { name: filtro }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('option', { name: opcion }));
+  };
+  const cambiarVista = (nombre: 'Kanban' | 'Lista' | 'Tabla') => fireEvent.click(screen.getByRole('radio', { name: `Vista ${nombre}` }));
+  const titulosVisibles = () => ['De Angel', 'De Maria', 'Compartida'].filter((t) => screen.queryByText(t) !== null);
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 1 } });
+    mockUseProjectLabels();
+    mockUseProjectMilestones();
+    mockUseProjectMembers({ members: [{ ...angel, correo: 'a@uvg', idRolProyecto: 1 }, { ...maria, correo: 'm@uvg', idRolProyecto: 2 }] });
+    mockUseProjectSprints();
+    mockUseStartSprint();
+    mockUseProjectTasks({ tasks: tareasDePrueba() });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('arranca en Kanban y cambia a Lista y a Tabla sin perder las tareas', () => {
+    renderWorkspace();
+    expect(screen.getByRole('heading', { name: 'Por hacer' })).toBeInTheDocument();
+    expect(titulosVisibles()).toHaveLength(3);
+
+    cambiarVista('Lista');
+    expect(screen.getByRole('list', { name: 'Lista de tareas' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Por hacer' })).not.toBeInTheDocument();
+    expect(titulosVisibles()).toHaveLength(3);
+
+    cambiarVista('Tabla');
+    expect(screen.getByRole('region', { name: 'Tabla de tareas' })).toBeInTheDocument();
+    expect(titulosVisibles()).toHaveLength(3);
+  });
+
+  it('recuerda la vista por proyecto y la restaura al volver', () => {
+    const primera = renderWorkspace();
+    cambiarVista('Tabla');
+    expect(window.localStorage.getItem('tablero-vista-42')).toBe('tabla');
+    primera.unmount();
+
+    renderWorkspace();
+    expect(screen.getByRole('region', { name: 'Tabla de tareas' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Vista Tabla' })).toBeChecked();
+  });
+
+  it('otro proyecto no hereda la vista guardada', () => {
+    window.localStorage.setItem('tablero-vista-77', 'lista');
+    renderWorkspace();
+    expect(screen.getByRole('heading', { name: 'Por hacer' })).toBeInTheDocument();
+  });
+
+  it('el filtro por responsable muestra a Angel en sus tareas y en las compartidas, y se conserva al cambiar de vista', () => {
+    renderWorkspace();
+    elegir('Filtrar por responsable', 'Angel Sanabria');
+    expect(titulosVisibles()).toEqual(['De Angel', 'Compartida']);
+
+    cambiarVista('Lista');
+    expect(titulosVisibles()).toEqual(['De Angel', 'Compartida']);
+    expect(screen.getByRole('combobox', { name: 'Filtrar por responsable' })).toHaveTextContent('Angel Sanabria');
+
+    cambiarVista('Tabla');
+    expect(titulosVisibles()).toEqual(['De Angel', 'Compartida']);
+
+    cambiarVista('Kanban');
+    expect(titulosVisibles()).toEqual(['De Angel', 'Compartida']);
+  });
+
+  it('el filtro por rol del proyecto se combina con el de responsable y se conserva al cambiar de vista', () => {
+    renderWorkspace();
+    cambiarVista('Lista');
+    elegir('Filtrar por rol', 'Diseno');
+    expect(titulosVisibles()).toEqual(['De Maria', 'Compartida']);
+
+    elegir('Filtrar por responsable', 'Angel Sanabria');
+    expect(titulosVisibles()).toEqual(['Compartida']);
+
+    cambiarVista('Tabla');
+    expect(titulosVisibles()).toEqual(['Compartida']);
+    cambiarVista('Kanban');
+    expect(titulosVisibles()).toEqual(['Compartida']);
+  });
+
+  it('sin coincidencias la Lista lo dice y «Limpiar filtros» devuelve todas', () => {
+    renderWorkspace();
+    cambiarVista('Lista');
+    elegir('Filtrar por rol', 'Backend');
+    elegir('Filtrar por responsable', 'Maria Lopez');
+    expect(screen.getByText('No hay tareas que coincidan con los filtros seleccionados.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Limpiar filtros' })[0]);
+    expect(titulosVisibles()).toHaveLength(3);
+  });
+
+  it('abrir una tarea desde la Lista o la Tabla navega al mismo detalle que el Kanban', () => {
+    const push = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({ replace: vi.fn(), push } as never);
+    renderWorkspace();
+
+    cambiarVista('Lista');
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir detalles de "De Maria"' }));
+    expect(push).toHaveBeenLastCalledWith('/dashboard/projects/42/kanban/tasks/2');
+
+    cambiarVista('Tabla');
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir detalles de "Compartida"' }));
+    expect(push).toHaveBeenLastCalledWith('/dashboard/projects/42/kanban/tasks/3');
   });
 });

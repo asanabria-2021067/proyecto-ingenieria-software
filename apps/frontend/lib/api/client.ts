@@ -1,5 +1,8 @@
 import { redirectToLoginOnSessionExpired } from './session';
 
+export const EVENTO_MANTENIMIENTO = 'uvg:mantenimiento';
+const NOMBRE_SERVICIO: Record<string, string> = { cloudinary: 'almacenamiento de archivos (Cloudinary)', redis: 'caché (Redis)' };
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '/api';
 
@@ -120,6 +123,15 @@ async function buildApiError(res: Response, method: string | undefined, path: st
   (error as any).details = body.message;
   if (typeof body.code === 'string') {
     (error as any).code = body.code;
+  } else if (typeof body.codigo === 'string') {
+    (error as any).code = body.codigo;
+  }
+  // 503 estable del backend: el aviso nombra el servicio afectado en vez del error genérico.
+  if (body.codigo === 'SERVICIO_NO_DISPONIBLE') {
+    error.message = `${body.message}. Servicio afectado: ${NOMBRE_SERVICIO[body.servicio] ?? body.servicio}.`;
+  }
+  if (body.codigo === 'MANTENIMIENTO' && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(EVENTO_MANTENIMIENTO));
   }
   // El cuerpo completo, para los rechazos con datos estructurados además del
   // mensaje (p. ej. `proyectos[].motivo` o `versionActual` de las reuniones de

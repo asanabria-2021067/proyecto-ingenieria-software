@@ -4,6 +4,7 @@ import { PageTitle } from '@/components/ui/page-title';
 import { useId, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ChevronDown, Loader2 } from 'lucide-react';
+import { useEsCoordinador } from '@/hooks/use-can';
 import { useAdminProjectDetail } from '@/hooks/use-admin-projects';
 import { useCloseReadiness, useClosureRevision, useClosureRevisions } from '@/hooks/use-closure';
 import { findRevisionEnviada, useClosureReview } from '@/hooks/use-closure-review';
@@ -252,6 +253,9 @@ export interface ClosureReviewClientProps {
  * `fingerprintEntrega`.
  */
 export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
+  // El coordinador vuelve a su propia bandeja de cierres, no a las de administración (403).
+  const esCoordinador = useEsCoordinador();
+  const hrefCierres = esCoordinador ? '/dashboard/coordinador/cierres' : adminProjectsGroupHref('cierres');
   const detalle = useAdminProjectDetail(id);
   const estado = detalle.data ? (isHistoricalDetail(detalle.data) ? detalle.data.resumen.estadoProyecto : detalle.data.resumen.estadoProyecto) : null;
   const enSolicitud = estado === 'EN_SOLICITUD_CIERRE';
@@ -282,7 +286,7 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
             <EmptyDescription>Vuelve a las solicitudes de cierre para continuar.</EmptyDescription>
           </EmptyHeader>
           <Button asChild size="sm">
-            <Link href={adminProjectsGroupHref('cierres')}>Volver a Solicitudes de cierre</Link>
+            <Link href={hrefCierres}>Volver a Solicitudes de cierre</Link>
           </Button>
         </Empty>
       </div>
@@ -375,17 +379,21 @@ export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Breadcrumb>
             <BreadcrumbList className="text-sm">
+              {!esCoordinador && (
+                <>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink asChild>
+                      <Link href={adminProjectsGroupHref('activos')} className="text-tertiary hover:text-on-surface">
+                        Proyectos
+                      </Link>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                </>
+              )}
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link href={adminProjectsGroupHref('activos')} className="text-tertiary hover:text-on-surface">
-                    Proyectos
-                  </Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <Link href={adminProjectsGroupHref('cierres')} className="text-tertiary hover:text-on-surface">
+                  <Link href={hrefCierres} className="text-tertiary hover:text-on-surface">
                     Solicitudes de cierre
                   </Link>
                 </BreadcrumbLink>

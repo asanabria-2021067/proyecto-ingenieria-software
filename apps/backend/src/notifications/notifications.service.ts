@@ -1,6 +1,8 @@
-import { Injectable, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma, TipoNotificacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from './push.service';
+import { usuariosEnSilencio } from './silencio-horario';
 import { LEADERSHIP_CHANGED, NotificationsGateway, SPRINT_HOURS_ADJUSTED } from './notifications.gateway';
 import {
   NOTIFICATION_TEMPLATES,
@@ -89,6 +91,7 @@ export class NotificationsService {
     // JwtService, así que nunca existió un ciclo que ocultar. Envolverlo
     // disfrazaría de circular una dependencia que es de un solo sentido.
     private gateway: NotificationsGateway,
+    @Optional() private push?: PushService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -259,6 +262,7 @@ export class NotificationsService {
     db: TxClient | PrismaService,
     userIds: number[],
     tipo: NotificationInput['tipoNotificacion'],
+    idActor?: number,
   ): Promise<number[]> {
     if (userIds.length === 0) return userIds;
     const bloqueados = await db.preferenciaNotificacion.findMany({
@@ -266,13 +270,21 @@ export class NotificationsService {
       select: { idUsuario: true },
     });
     const ids = new Set(bloqueados.map((p) => p.idUsuario));
+    // MEJ-153: quien silencio a la persona que origina el aviso no lo recibe.
+    const silenciaron = idActor === undefined ? [] : await db.restriccionUsuario.findMany({ where: { idObjetivo: idActor, tipo: 'SILENCIO', idUsuario: { in: userIds } }, select: { idUsuario: true } });
+    for (const x of silenciaron) ids.add(x.idUsuario);
     return userIds.filter((id) => !ids.has(id));
   }
 
   private async emitNotification(userIds: number[], payload: NotificationInput): Promise<void> {
+    // La notificacion ya esta guardada; el horario de silencio solo quita el aviso emergente y el push.
+    const silenciados = await usuariosEnSilencio(this.prisma, userIds);
     if (this.gateway?.server) {
-      await this.gateway.notifyUsers(userIds, payload);
+      const activos = userIds.filter((id) => !silenciados.has(id));
+      if (activos.length > 0) await this.gateway.notifyUsers(activos, payload);
+      if (silenciados.size > 0) await this.gateway.notifyUsers([...silenciados], { ...payload, silenciada: true });
     }
+    void this.push?.enviar(userIds, { titulo: payload.tituloNotificacion, mensaje: payload.mensajeNotificacion });
   }
 
   findAll(userId?: number, filtros: FiltroNotificaciones = {}) {
@@ -442,6 +454,7 @@ export class NotificationsService {
     templateKey: K,
     data: NotificationTemplateData[K],
     tx?: TxClient,
+    idActor?: number,
   ) {
     const template = NOTIFICATION_TEMPLATES[templateKey];
     // K liga templateKey con NotificationTemplateData[K] en la firma publica,
@@ -453,16 +466,10 @@ export class NotificationsService {
     const message = template.message(data as unknown as never);
     const datosJson = JSON.parse(JSON.stringify(data)) as Prisma.InputJsonValue;
 
-    await this.notifyUsers(
-      userIds,
-      {
-        tipoNotificacion: templateKey,
-        tituloNotificacion: title,
-        mensajeNotificacion: message,
-        datosJson,
-      },
-      tx,
-    );
+    const payload = { tipoNotificacion: templateKey, tituloNotificacion: title, mensajeNotificacion: message, datosJson };
+    // Sin actor, la llamada conserva su forma de siempre (tres argumentos).
+    if (idActor === undefined) await this.notifyUsers(userIds, payload, tx);
+    else await this.notifyUsers(userIds, payload, tx, idActor);
   }
 
   async notifyAdminsFromTemplate<K extends NotificationTemplateKey>(
@@ -494,11 +501,12 @@ export class NotificationsService {
       datosJson?: Prisma.InputJsonValue;
     },
     tx?: TxClient,
+    idActor?: number,
   ) {
     if (userIds.length === 0) return;
     const db = tx ?? this.prisma;
 
-    const recipients = await this.filterEnabledRecipients(db, userIds, payload.tipoNotificacion);
+    const recipients = await this.filterEnabledRecipients(db, userIds, payload.tipoNotificacion, idActor);
     if (recipients.length === 0) return;
 
     const notifications = await db.notificacion.createMany({
@@ -512,9 +520,12 @@ export class NotificationsService {
       skipDuplicates: false,
     });
 
-    if (this.gateway?.server) {
-      await this.gateway.notifyUsers(recipients, payload);
-    }
+    await this.emitNotification(recipients, {
+      tipoNotificacion: payload.tipoNotificacion,
+      tituloNotificacion: payload.tituloNotificacion,
+      mensajeNotificacion: payload.mensajeNotificacion,
+      datosJson: payload.datosJson,
+    });
 
     return notifications;
   }

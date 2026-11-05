@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { NivelHabilidad } from '@prisma/client';
+import { PreguntaRolDto, PreguntasDelRol } from '../../applications/dto/pregunta-rol.dto';
 
 /**
  * Requisito de habilidad de un rol. Misma forma que `RequisitoHabilidadDto`
@@ -65,4 +66,7 @@ export class CreateRoleDto {
   @ValidateNested({ each: true })
   @Type(() => RoleRequisitoDto)
   requisitos?: RoleRequisitoDto[];
+
+  @PreguntasDelRol()
+  preguntas?: PreguntaRolDto[];
 }

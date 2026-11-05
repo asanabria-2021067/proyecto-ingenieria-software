@@ -51,7 +51,8 @@ describe('AnunciosService', () => {
       OR: [
         { idOrganizacion: null, idAsociacion: null, audiencia: { in: ['TODOS', 'ESTUDIANTES'] } },
         { idOrganizacion: { in: [] } },
-        { idAsociacion: { in: [] } },
+        { idAsociacion: { in: [] }, destinatarios: { none: {} } },
+        { destinatarios: { some: { idUsuario: 7 } } },
       ],
       cierres: { none: { idUsuario: 7 } },
     });
@@ -120,7 +121,8 @@ describe('AnunciosService', () => {
     expect(prisma.anuncio.findMany.mock.calls[0][0].where.OR).toEqual([
       { idOrganizacion: null, idAsociacion: null, audiencia: { in: ['TODOS', 'ESTUDIANTES'] } },
       { idOrganizacion: { in: [4] } },
-      { idAsociacion: { in: [9] } },
+      { idAsociacion: { in: [9] }, destinatarios: { none: {} } },
+      { destinatarios: { some: { idUsuario: 7 } } },
     ]);
     expect(res.map((a) => [a.idAnuncio, a.origen])).toEqual([[2, null], [1, 'Robotica']]);
   });

@@ -25,10 +25,22 @@ export function getSprintDetail(idProyecto: number, idSprint: number): Promise<S
  * posterior a hoy y a lo sumo 90 días después. `fechaInicio` la fija el
  * servidor al iniciar; nunca viaja en el cuerpo.
  */
-export function startSprint(idProyecto: number, fechaFinPlaneada: string): Promise<SprintDto> {
+export function startSprint(idProyecto: number, fechaFinPlaneada: string, objetivo?: string): Promise<SprintDto> {
   return apiFetch<SprintDto>(`/proyectos/${idProyecto}/sprints`, {
     method: 'POST',
-    body: JSON.stringify({ fechaFinPlaneada }),
+    body: JSON.stringify(objetivo ? { fechaFinPlaneada, objetivo } : { fechaFinPlaneada }),
+  });
+}
+
+/** MEJ-117 — `PATCH /proyectos/:id/sprints/:sprintId/objetivo`; `null` borra el objetivo. */
+export function updateSprintObjetivo(
+  idProyecto: number,
+  idSprint: number,
+  objetivo: string | null,
+): Promise<{ idSprint: number; objetivo: string | null }> {
+  return apiFetch(`/proyectos/${idProyecto}/sprints/${idSprint}/objetivo`, {
+    method: 'PATCH',
+    body: JSON.stringify({ objetivo }),
   });
 }
 
@@ -82,4 +94,14 @@ export function getSprintsAnalytics(idProyecto: number): Promise<SprintComparati
 /** Burndown de un Sprint (T-240, HU-160) — `GET /proyectos/:id/sprints/:sprintId/burndown`. */
 export function getSprintBurndown(idProyecto: number, idSprint: number): Promise<SprintBurndownDto> {
   return apiFetch<SprintBurndownDto>(`/proyectos/${idProyecto}/sprints/${idSprint}/burndown`);
+}
+
+export interface TiempoPorColumnaDto {
+  idSprint: number;
+  columnas: Array<{ estado: 'POR_HACER' | 'EN_PROGRESO' | 'EN_REVISION' | 'HECHO'; promedioHoras: number; tareas: number }>;
+}
+
+/** MEJ-120 — `GET /proyectos/:id/sprints/:sprintId/informes/tiempo-por-columna`. */
+export function getSprintColumnTime(idProyecto: number, idSprint: number): Promise<TiempoPorColumnaDto> {
+  return apiFetch<TiempoPorColumnaDto>(`/proyectos/${idProyecto}/sprints/${idSprint}/informes/tiempo-por-columna`);
 }

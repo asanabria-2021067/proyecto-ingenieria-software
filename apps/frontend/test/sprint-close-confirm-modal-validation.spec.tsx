@@ -6,7 +6,40 @@ import { SprintCloseConfirmModal } from '../components/projects/sprint-close-con
 describe('SprintCloseConfirmModal', () => {
   afterEach(cleanup);
 
-  it('muestra el error junto al selector y permite volver a intentar', () => {
+  const renderModal = (onConfirm = vi.fn()) => {
+    render(
+      <SprintCloseConfirmModal
+        open
+        onOpenChange={vi.fn()}
+        tareasPendientes={[
+          { idTarea: 1, tituloTarea: 'Pendiente' },
+          { idTarea: 2, tituloTarea: 'Otra' },
+        ]}
+        isPending={false}
+        onConfirm={onConfirm}
+      />,
+    );
+    return onConfirm;
+  };
+
+  it('pasa todas las tareas al siguiente Sprint con un solo clic', () => {
+    const onConfirm = renderModal();
+    fireEvent.click(screen.getByRole('button', { name: 'Pasar las 2 tareas al siguiente Sprint' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith('SIGUIENTE_SPRINT');
+  });
+
+  it('deja las tareas en el backlog con un solo clic', () => {
+    const onConfirm = renderModal();
+    fireEvent.click(screen.getByRole('button', { name: 'Dejar en el backlog' }));
+    expect(onConfirm).toHaveBeenCalledWith('BACKLOG');
+  });
+});
+
+describe('SprintCloseConfirmModal (doble clic)', () => {
+  afterEach(cleanup);
+
+  it('dos clics seguidos envían el cierre una sola vez', () => {
     const onConfirm = vi.fn();
     render(
       <SprintCloseConfirmModal
@@ -17,15 +50,25 @@ describe('SprintCloseConfirmModal', () => {
         onConfirm={onConfirm}
       />,
     );
+    const boton = screen.getByRole('button', { name: 'Pasar la tarea al siguiente Sprint' });
+    fireEvent.click(boton);
+    fireEvent.click(boton);
+    fireEvent.click(screen.getByRole('button', { name: 'Dejar en el backlog' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
 
-    const confirmar = screen.getByRole('button', { name: 'Elige un destino para continuar' });
-    fireEvent.click(confirmar);
-    expect(screen.getByRole('alert')).toHaveTextContent('Selecciona el destino de las tareas pendientes.');
-    expect(confirmar).toBeEnabled();
-    expect(onConfirm).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByLabelText('Mover al backlog'));
-    fireEvent.click(screen.getByRole('button', { name: /Cerrar y mover 1 tarea al backlog/ }));
-    expect(onConfirm).toHaveBeenCalledWith('BACKLOG');
+  it('mientras el cierre está pendiente ningún botón envía', () => {
+    const onConfirm = vi.fn();
+    render(
+      <SprintCloseConfirmModal
+        open
+        onOpenChange={vi.fn()}
+        tareasPendientes={[{ idTarea: 1, tituloTarea: 'Pendiente' }]}
+        isPending
+        onConfirm={onConfirm}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Dejar en el backlog' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Pasar la tarea al siguiente Sprint' })).toBeDisabled();
   });
 });

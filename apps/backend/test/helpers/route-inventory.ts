@@ -27,6 +27,7 @@ export interface Ruta {
 export const RUTAS_PUBLICAS = new Set([
   'GET /api',
   'GET /api/carreras',
+  'GET /api/mantenimiento',
   'POST /api/auth/login',
   'POST /api/auth/register',
   'POST /api/auth/forgot-password',
@@ -34,6 +35,8 @@ export const RUTAS_PUBLICAS = new Set([
   'POST /api/auth/refresh',
   'POST /api/auth/logout',
   'POST /api/contacto',
+  // MEJ-146: portafolio publico por token opaco; solo devuelve la lista blanca de PortafolioService.publico.
+  'GET /api/publico/portafolio/:token',
 ]);
 
 function controllerFiles(dir: string): string[] {

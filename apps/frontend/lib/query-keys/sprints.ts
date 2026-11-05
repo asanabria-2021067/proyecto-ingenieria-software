@@ -51,3 +51,7 @@ export const sprintsAnalyticsQueryKey = (idProyecto: number) =>
  */
 export const sprintBurndownQueryKey = (idProyecto: number, idSprint: number) =>
   ['sprint-burndown', idProyecto, idSprint] as const;
+
+/** Tiempo promedio por columna de un Sprint (MEJ-120). */
+export const sprintColumnTimeQueryKey = (idProyecto: number, idSprint: number) =>
+  ['sprint-column-time', idProyecto, idSprint] as const;

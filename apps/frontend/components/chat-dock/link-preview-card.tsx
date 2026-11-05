@@ -14,6 +14,38 @@ export function firstUrl(text: string): string | null {
   return url.length <= 2048 && safeExternalHref(url) ? url : null;
 }
 
+/** Tarjeta de vista previa ya resuelta (sitio, título, descripción); la usan el chat y los enlaces de una tarea. */
+export function LinkPreviewView({
+  url,
+  sitio,
+  titulo,
+  descripcion,
+  icono,
+}: {
+  url: string;
+  sitio?: string | null;
+  titulo?: string | null;
+  descripcion?: string | null;
+  /** Icono propio del tipo de enlace; por defecto el de enlace externo. */
+  icono?: React.ReactNode;
+}) {
+  return (
+    <SafeExternalLink
+      url={url}
+      className="mt-2 flex max-w-full items-stretch gap-2 overflow-hidden rounded-lg border border-outline-variant bg-surface text-on-surface no-underline transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:bg-surface-container-low"
+    >
+      {icono && <span className="ml-2 flex shrink-0 items-center text-primary">{icono}</span>}
+      <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-2 py-1.5">
+        {sitio && <span className="truncate text-[10px] uppercase tracking-wide text-tertiary">{sitio}</span>}
+        {titulo && <span className="line-clamp-2 break-words text-xs font-semibold">{titulo}</span>}
+        {descripcion && <span className="line-clamp-2 break-words text-[11px] text-tertiary">{descripcion}</span>}
+        <span className="sr-only">Abre en una pestaña nueva</span>
+      </span>
+      <ExternalLink aria-hidden="true" className="mr-2 size-3 shrink-0 self-center text-tertiary" />
+    </SafeExternalLink>
+  );
+}
+
 interface LinkPreviewCardProps {
   idProyecto: number;
   idConversacion: number;
@@ -43,18 +75,5 @@ export function LinkPreviewCard({ idProyecto, idConversacion, contenido }: LinkP
   const hayContenido = data && (data.titulo || data.descripcion);
   if (!hayContenido) return <div ref={ref} aria-hidden="true" />;
 
-  return (
-    <SafeExternalLink
-      url={data.url}
-      className="mt-2 flex max-w-full items-stretch gap-2 overflow-hidden rounded-lg border border-outline-variant bg-surface text-on-surface no-underline transition-colors hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:bg-surface-container-low"
-    >
-      <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-2 py-1.5">
-        {data.sitio && <span className="truncate text-[10px] uppercase tracking-wide text-tertiary">{data.sitio}</span>}
-        {data.titulo && <span className="line-clamp-2 break-words text-xs font-semibold">{data.titulo}</span>}
-        {data.descripcion && <span className="line-clamp-2 break-words text-[11px] text-tertiary">{data.descripcion}</span>}
-        <span className="sr-only">Abre en una pestaña nueva</span>
-      </span>
-      <ExternalLink aria-hidden="true" className="mr-2 size-3 shrink-0 self-center text-tertiary" />
-    </SafeExternalLink>
-  );
+  return <LinkPreviewView url={data.url} sitio={data.sitio} titulo={data.titulo} descripcion={data.descripcion} />;
 }

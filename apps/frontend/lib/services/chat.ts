@@ -2,6 +2,7 @@ import { apiFetch, apiFetchBlob } from '@/lib/api/client';
 import type {
   ChatAdjuntoUrl,
   ChatArchivosPagina,
+  TipoArchivoChat,
   BuscarMensajesFiltros,
   BuscarMensajesResultado,
   ChatCanalCreado,
@@ -104,9 +105,36 @@ export function getFiles(
   idProyecto: number,
   idConversacion: number,
   cursor?: number,
+  tipo?: TipoArchivoChat,
 ): Promise<ChatArchivosPagina> {
-  const query = cursor ? `?cursor=${cursor}` : '';
+  const params = new URLSearchParams();
+  if (cursor) params.set('cursor', String(cursor));
+  if (tipo) params.set('tipo', tipo);
+  const query = params.size > 0 ? `?${params.toString()}` : '';
   return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/archivos${query}`);
+}
+
+/** MEJ-131: respuestas del hilo de un mensaje (las 30 más recientes o las 30 previas a `cursor`). */
+export function getHilo(
+  idProyecto: number,
+  idConversacion: number,
+  idMensaje: number,
+  cursor?: number,
+): Promise<ChatMensaje[]> {
+  const query = cursor ? `?cursor=${cursor}` : '';
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/${idMensaje}/respuestas${query}`);
+}
+
+export function sendRespuesta(
+  idProyecto: number,
+  idConversacion: number,
+  idMensaje: number,
+  contenido: string,
+): Promise<ChatMensaje> {
+  return apiFetch(`/proyectos/${idProyecto}/conversaciones/${idConversacion}/mensajes/${idMensaje}/respuestas`, {
+    method: 'POST',
+    body: JSON.stringify({ contenido }),
+  });
 }
 
 /** URL firmada de vida corta: se pide al usar el archivo, nunca se guarda. */
@@ -306,6 +334,12 @@ export async function setMiEstado(payload: SetEstadoChatPayload): Promise<ChatEs
     method: 'PUT',
     body: JSON.stringify(payload),
   });
+  return estado;
+}
+
+/** MEJ-132: estado de otra persona; el servidor solo lo entrega si compartes una conversación con ella. */
+export async function getEstadoDe(idUsuario: number): Promise<ChatEstado | null> {
+  const { estado } = await apiFetch<{ estado: ChatEstado | null }>(`/chats/estado/${idUsuario}`);
   return estado;
 }
 

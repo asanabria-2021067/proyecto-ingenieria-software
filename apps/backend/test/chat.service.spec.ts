@@ -11,6 +11,7 @@ import { ChatService } from '../src/chat/chat.service';
 
 function makePrisma() {
   const prisma = {
+    restriccionUsuario: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
     proyecto: { findFirst: vi.fn() },
     conversacion: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
     conversacionParticipante: { update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
@@ -86,6 +87,24 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       expect(resultado).toEqual({ ...mensaje, citado: null });
       expect(prisma.mensajeChat.create).toHaveBeenCalled();
       expect(gateway.broadcastMessage).toHaveBeenCalledWith(5, [2], { ...mensaje, citado: null });
+    });
+  });
+
+  describe('MEJ-153 bloqueos', () => {
+    it('abrir un mensaje directo con alguien bloqueado es 403 y no escribe nada', async () => {
+      prisma.proyecto.findFirst.mockResolvedValue(proyectoRow('EN_PROGRESO'));
+      prisma.participacionProyecto.findFirst.mockResolvedValue({ idParticipacion: 1 });
+      prisma.restriccionUsuario.findFirst.mockResolvedValue({ idRestriccion: 1 });
+      await expect(service.createConversation(10, 1, { tipo: 'INDIVIDUAL', idsParticipantes: [2] })).rejects.toThrow(ForbiddenException);
+      expect(prisma.conversacion.create).not.toHaveBeenCalled();
+    });
+
+    it('enviar en un mensaje directo ya abierto con alguien bloqueado es 403 y no escribe nada', async () => {
+      prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('EN_PROGRESO'));
+      prisma.restriccionUsuario.findFirst.mockResolvedValue({ idRestriccion: 1 });
+      await expect(service.createMessage(10, 5, 1, 'hola')).rejects.toThrow(ForbiddenException);
+      expect(prisma.mensajeChat.create).not.toHaveBeenCalled();
+      expect(gateway.broadcastMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -331,7 +350,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       expect(llamada.where.proyecto).toEqual({ estadoProyecto: { not: 'CERRADO' } });
     });
 
-    it('con q, busca por nombre, participante y contenido de mensajes', async () => {
+    it('con q, busca por nombre, proyecto, participante y contenido de mensajes', async () => {
       prisma.conversacion.findMany.mockResolvedValue([]);
 
       await service.listAllConversations(1, 'rosa');
@@ -340,6 +359,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
       expect(llamada.where.OR).toEqual([
         { nombre: { contains: 'rosa', mode: 'insensitive' } },
         { nombrePersonalizado: { contains: 'rosa', mode: 'insensitive' } },
+        { proyecto: { tituloProyecto: { contains: 'rosa', mode: 'insensitive' } } },
         {
           participantes: {
             some: {

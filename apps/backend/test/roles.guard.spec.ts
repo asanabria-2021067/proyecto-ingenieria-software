@@ -38,18 +38,25 @@ import { SYNTHETIC_JWT_SECRET } from './helpers/synthetic-jwt-secret';
  */
 
 /** Doble mínimo de Prisma: roles de acceso por usuario. */
-function makePrisma(rolesPorUsuario: Record<number, RolAccesoNombre[]>) {
+function makePrisma(rolesPorUsuario: Record<number, RolAccesoNombre[]>, usuariosConJunta: number[] = []) {
   const findFirst = vi.fn(
     async ({ where }: { where: { idUsuario: number; rolAcceso: { nombrePerfil: { in: string[] } } } }) => {
       const roles = rolesPorUsuario[where.idUsuario] ?? [];
       return roles.some((r) => where.rolAcceso.nombrePerfil.in.includes(r)) ? { idUsuarioRolAcceso: 1 } : null;
     },
   );
-  return { usuarioRolAcceso: { findFirst } };
+  const juntaFindFirst = vi.fn(async ({ where }: { where: { idUsuario: number } }) =>
+    usuariosConJunta.includes(where.idUsuario) ? { idJuntaAsociacion: 1 } : null,
+  );
+  return { usuarioRolAcceso: { findFirst }, juntaAsociacion: { findFirst: juntaFindFirst } };
 }
 
-function makeGuard(roles: RolAccesoNombre[] | undefined, rolesPorUsuario: Record<number, RolAccesoNombre[]> = {}) {
-  const prisma = makePrisma(rolesPorUsuario);
+function makeGuard(
+  roles: RolAccesoNombre[] | undefined,
+  rolesPorUsuario: Record<number, RolAccesoNombre[]> = {},
+  usuariosConJunta: number[] = [],
+) {
+  const prisma = makePrisma(rolesPorUsuario, usuariosConJunta);
   const reflector = { getAllAndOverride: vi.fn().mockReturnValue(roles) } as unknown as Reflector;
   return { guard: new RolesGuard(reflector, prisma as unknown as PrismaService), prisma, reflector };
 }
@@ -74,7 +81,7 @@ describe('RolesGuard', () => {
   });
 
   it('rechaza con 403 y el mensaje existente de admin a un rol no autorizado', async () => {
-    const { guard } = makeGuard(['administrador'], { 3: ['estudiante', 'mentor'] });
+    const { guard } = makeGuard(['administrador'], { 3: ['estudiante', 'coordinador_academico'] });
     const result = guard.canActivate(makeContext({ userId: 3 }));
     await expect(result).rejects.toBeInstanceOf(ForbiddenException);
     await expect(guard.canActivate(makeContext({ userId: 3 }))).rejects.toThrow(ADMIN_ONLY_MESSAGE);
@@ -88,6 +95,24 @@ describe('RolesGuard', () => {
   it('usa un mensaje genérico cuando la ruta admite roles distintos de administrador', async () => {
     const { guard } = makeGuard(['coordinador_academico', 'administrador'], { 5: ['estudiante'] });
     await expect(guard.canActivate(makeContext({ userId: 5 }))).rejects.toThrow(ROLE_FORBIDDEN_MESSAGE);
+  });
+
+  it('lider_asociacion se deriva de la junta: integrante pasa aunque no tenga la fila del rol', async () => {
+    const { guard, prisma } = makeGuard(['lider_asociacion'], { 8: ['estudiante'] }, [8]);
+    await expect(guard.canActivate(makeContext({ userId: 8 }))).resolves.toBe(true);
+    expect(prisma.usuarioRolAcceso.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('lider_asociacion: la fila vieja del rol sin junta no autoriza', async () => {
+    const { guard } = makeGuard(['lider_asociacion'], { 9: ['lider_asociacion'] });
+    await expect(guard.canActivate(makeContext({ userId: 9 }))).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('con roles mixtos basta el rol guardado o la junta', async () => {
+    const mixto: RolAccesoNombre[] = ['administrador', 'lider_asociacion'];
+    await expect(makeGuard(mixto, { 10: ['administrador'] }).guard.canActivate(makeContext({ userId: 10 }))).resolves.toBe(true);
+    await expect(makeGuard(mixto, {}, [11]).guard.canActivate(makeContext({ userId: 11 }))).resolves.toBe(true);
+    await expect(makeGuard(mixto, { 12: ['estudiante'] }).guard.canActivate(makeContext({ userId: 12 }))).rejects.toThrow(ROLE_FORBIDDEN_MESSAGE);
   });
 
   it('consulta en BD solo los roles exigidos para el usuario autenticado', async () => {
@@ -164,32 +189,32 @@ describe('Rutas exclusivas de administración (T-286)', () => {
     }
   });
 
-  it('RevisionesController: bandeja, reclamar y resolver exigen administrador', () => {
+  it('RevisionesController: bandeja, reclamar y resolver exigen administrador o coordinador académico', () => {
     expect(guardsOf(RevisionesController)).toEqual([JwtAuthGuard]);
     expect(guardsOf(RevisionesController.prototype.findAdminInbox)).toEqual([RolesGuard]);
     expect(guardsOf(RevisionesController.prototype.reclamar)).toEqual([RolesGuard, ProjectWriteGuard]);
     expect(guardsOf(RevisionesController.prototype.resolver)).toEqual([RolesGuard, ProjectWriteGuard]);
     for (const handler of ['findAdminInbox', 'reclamar', 'resolver'] as const) {
-      expect(rolesOf(RevisionesController.prototype[handler])).toEqual(['administrador']);
+      expect(rolesOf(RevisionesController.prototype[handler])).toEqual(['administrador', 'coordinador_academico']);
     }
     // El historial lo leen líder y admin: sin @Roles.
     expect(rolesOf(RevisionesController.prototype.findByProyecto)).toBeUndefined();
   });
 
-  it('ProjectClosureController: solo los veredictos exigen administrador', () => {
+  it('ProjectClosureController: solo los veredictos exigen administrador o coordinador académico', () => {
     expect(guardsOf(ProjectClosureController)).toEqual([JwtAuthGuard]);
     for (const handler of ['approve', 'returnToExecution', 'correction'] as const) {
       expect(guardsOf(ProjectClosureController.prototype[handler])).toEqual([RolesGuard, ProjectWriteGuard]);
-      expect(rolesOf(ProjectClosureController.prototype[handler])).toEqual(['administrador']);
+      expect(rolesOf(ProjectClosureController.prototype[handler])).toEqual(['administrador', 'coordinador_academico']);
     }
     for (const handler of ['resubmit', 'prepare', 'generateReport', 'requestClose', 'readiness'] as const) {
       expect(rolesOf(ProjectClosureController.prototype[handler])).toBeUndefined();
     }
   });
 
-  it('ProjectsController: solo GET :id/admin exige administrador', () => {
+  it('ProjectsController: GET :id/admin exige administrador o coordinador (alcance en el servicio)', () => {
     expect(guardsOf(ProjectsController.prototype.findOneAdmin)).toEqual([JwtAuthGuard, RolesGuard]);
-    expect(rolesOf(ProjectsController.prototype.findOneAdmin)).toEqual(['administrador']);
+    expect(rolesOf(ProjectsController.prototype.findOneAdmin)).toEqual(['administrador', 'coordinador_academico']);
     expect(rolesOf(ProjectsController.prototype.findOneOwner)).toBeUndefined();
     expect(rolesOf(ProjectsController.prototype.create)).toBeUndefined();
   });

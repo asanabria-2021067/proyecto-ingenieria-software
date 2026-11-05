@@ -1,11 +1,19 @@
 import { z } from 'zod';
 import type { TipoProyecto, ModalidadProyecto, NivelHabilidad } from '@/types';
+import { ENUNCIADO_MAX, PREGUNTAS_MAX } from '@/lib/forms/postulacion';
 
 export type RequisitoFormItem = {
   id: string;
   idHabilidad: number | null;
   nivelMinimo: NivelHabilidad | '';
   obligatorio: boolean;
+};
+
+export type PreguntaFormItem = {
+  id: string;
+  enunciado: string;
+  tipo: 'CORTA' | 'LARGA';
+  obligatoria: boolean;
 };
 
 export type RolFormItem = {
@@ -16,6 +24,7 @@ export type RolFormItem = {
   cupos: number | '';
   horasSemanalesEstimadas: number | '';
   requisitos: RequisitoFormItem[];
+  preguntas: PreguntaFormItem[];
 };
 
 export type FormData = {
@@ -29,6 +38,7 @@ export type FormData = {
   urlRecursoExterno: string;
   fechaInicio: string;
   fechaFinEstimada: string;
+  fechaLimitePostulacion: string;
   roles: RolFormItem[];
 };
 
@@ -63,6 +73,15 @@ export const requisitoSchema = z.object({
   obligatorio: z.boolean(),
 });
 
+export const preguntaSchema = z.object({
+  id: z.string(),
+  enunciado: z.string().trim()
+    .min(1, 'Escribe la pregunta.')
+    .max(ENUNCIADO_MAX, `La pregunta no puede superar ${ENUNCIADO_MAX} caracteres.`),
+  tipo: z.enum(['CORTA', 'LARGA']),
+  obligatoria: z.boolean(),
+});
+
 export const rolSchema = z.object({
   id: z.string(),
   nombreRol: z.string()
@@ -85,6 +104,7 @@ export const rolSchema = z.object({
       .optional(),
   ),
   requisitos: z.array(requisitoSchema),
+  preguntas: z.array(preguntaSchema).max(PREGUNTAS_MAX, `Máximo ${PREGUNTAS_MAX} preguntas por rol.`),
 });
 
 export const step1Schema = z
@@ -110,6 +130,7 @@ export const step1Schema = z
     urlRecursoExterno: z.string().max(255, 'La URL no puede superar 255 caracteres.'),
     fechaInicio: z.string().refine(fechaOpcionalValida, 'Selecciona una fecha de inicio válida.'),
     fechaFinEstimada: z.string().refine(fechaOpcionalValida, 'Selecciona una fecha de fin válida.'),
+    fechaLimitePostulacion: z.string().optional().refine((v) => v === undefined || fechaOpcionalValida(v), 'Selecciona una fecha límite válida.'),
     roles: z.array(z.any()),
   });
 
@@ -125,6 +146,7 @@ export const partialProjectSchema = step1Schema.pick({
   contextoAcademico: true,
   urlRecursoExterno: true,
   fechaFinEstimada: true,
+  fechaLimitePostulacion: true,
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -167,6 +189,7 @@ export function newRol(): RolFormItem {
     cupos: '',
     horasSemanalesEstimadas: '',
     requisitos: [],
+    preguntas: [],
   };
 }
 

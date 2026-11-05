@@ -84,7 +84,7 @@ describe('G06-C07: COOKIE_SECURE', () => {
 
   it.each([undefined, 'false'])('COOKIE_SECURE=%j: cookies actuales (HttpOnly, SameSite=Lax, Path=/, sin Secure)', async (value) => {
     const cookies = await loginCookies(value);
-    expect(cookies.map((cookie) => cookie.split('=')[0])).toEqual(['access_token', 'refresh_token']);
+    expect(cookies.map((cookie) => cookie.split('=')[0])).toEqual(['device_id', 'access_token', 'refresh_token']);
     for (const cookie of cookies) {
       const attrs = attributes(cookie);
       expect(attrs.has('httponly')).toBe(true);
@@ -96,7 +96,7 @@ describe('G06-C07: COOKIE_SECURE', () => {
 
   it('COOKIE_SECURE=true: añade Secure y conserva HttpOnly y SameSite=Lax', async () => {
     const cookies = await loginCookies('true');
-    expect(cookies).toHaveLength(2);
+    expect(cookies).toHaveLength(3);
     for (const cookie of cookies) {
       const attrs = attributes(cookie);
       expect(attrs.has('secure')).toBe(true);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AlarmClock, Bookmark, BookmarkCheck, Check, ClipboardPlus, MoreVertical, Pencil, Pin, PinOff, Reply, Trash2, X } from 'lucide-react';
+import { AlarmClock, Bookmark, BookmarkCheck, Check, ClipboardPlus, Flag, MessagesSquare, MoreVertical, Pencil, Pin, PinOff, Reply, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getIniciales } from '@/components/projects/available-project-card';
+import { ReportarDialog } from '@/components/profile/reportar-dialog';
 import { ChatAdjuntoChip } from './chat-adjunto';
 import { ChatCitaBloque } from './chat-cita';
 import { ChatEncuestaTarjeta } from './chat-encuesta';
@@ -21,6 +22,7 @@ import { NotaVozReproductor } from './chat-nota-voz';
 import { LinkPreviewCard } from './link-preview-card';
 import { MessageReactions } from './message-reactions';
 import { nombreReal } from '@/lib/chat-apodos';
+import { etiquetaRespuestas } from '@/lib/chat-hilos';
 import { claseBurbujaPropia } from '@/lib/chat-temas';
 import { extraerEnlacesInternos } from '@/lib/chat-tarjetas';
 import { contenidoAEditable, editableAContenido, mencionesPresentes, type MencionSeleccionada } from '@/lib/mentions/mention-tokens';
@@ -76,6 +78,8 @@ interface ChatMessageItemProps {
   participantes?: ChatUsuario[];
   onRecordar?: (mensaje: ChatMensaje) => void;
   onCrearTarea?: (mensaje: ChatMensaje) => void;
+  /** MEJ-131: abre el panel con las respuestas del mensaje. */
+  onAbrirHilo?: (mensaje: ChatMensaje) => void;
 }
 
 export function ChatMessageItem({
@@ -97,6 +101,7 @@ export function ChatMessageItem({
   participantes,
   onRecordar,
   onCrearTarea,
+  onAbrirHilo,
 }: ChatMessageItemProps) {
   const editar = useEditMessage(idProyecto, idConversacion);
   const eliminar = useDeleteMessage(idProyecto, idConversacion);
@@ -108,6 +113,8 @@ export function ChatMessageItem({
   const tieneEnlaceInterno =
     typeof window !== 'undefined' && extraerEnlacesInternos(m.contenido, window.location.origin).length > 0;
   const hayAcciones = !simple && (onRecordar !== undefined || onCrearTarea !== undefined);
+  // MEJ-154: cualquier mensaje ajeno se puede reportar, tambien en los canales simples.
+  const reportable = !propio && !!m.remitente?.idUsuario;
 
   const empezarEdicion = () => {
     // Las menciones se editan como `@Nombre`; al guardar vuelven a su token.
@@ -244,8 +251,19 @@ export function ChatMessageItem({
         {!eliminado && !simple && (
           <MessageReactions reacciones={m.reacciones ?? []} onToggle={(emoji) => onReaccionar(m.idMensaje, emoji)} />
         )}
+        {onAbrirHilo && !simple && (m.respuestas ?? 0) > 0 && (
+          <button
+            type="button"
+            onClick={() => onAbrirHilo(m)}
+            className="mt-1 flex items-center gap-1 text-[11px] font-semibold underline-offset-2 hover:underline"
+          >
+            <MessagesSquare className="size-3" aria-hidden="true" />
+            {etiquetaRespuestas(m.respuestas ?? 0)}
+            <span className="sr-only"> de {m.remitente.nombre}. Abrir hilo</span>
+          </button>
+        )}
       </div>
-      {(propio || fijable || hayAcciones) && !eliminado && !editando && (!simple || fijable) && (
+      {(propio || fijable || hayAcciones || reportable) && !eliminado && !editando && (!simple || fijable || reportable) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -281,6 +299,19 @@ export function ChatMessageItem({
                 Editar
               </DropdownMenuItem>
             )}
+            {reportable && (
+              <ReportarDialog
+                idReportado={m.remitente.idUsuario}
+                nombre={`${m.remitente.nombre} ${m.remitente.apellido}`.trim()}
+                idMensaje={m.idMensaje}
+                trigger={
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                    <Flag className="size-4" aria-hidden="true" />
+                    Reportar mensaje
+                  </DropdownMenuItem>
+                }
+              />
+            )}
             {propio && !simple && (
               <DropdownMenuItem variant="destructive" onClick={handleEliminar}>
                 <Trash2 className="size-4" aria-hidden="true" />
@@ -300,6 +331,17 @@ export function ChatMessageItem({
           >
             <Reply className="size-4" aria-hidden="true" />
           </button>
+          {onAbrirHilo && (
+            <button
+              type="button"
+              onClick={() => onAbrirHilo(m)}
+              aria-label={`Responder en hilo a ${m.remitente.nombre}`}
+              title="Responder en hilo"
+              className="rounded-control p-1 text-text-secondary opacity-0 hover:bg-on-surface/10 hover:text-text-primary focus-visible:opacity-100 group-hover:opacity-100"
+            >
+              <MessagesSquare className="size-4" aria-hidden="true" />
+            </button>
+          )}
           <SaveMessageButton idProyecto={idProyecto} idConversacion={idConversacion} idMensaje={m.idMensaje} guardado={m.guardado === true} />
         </>
       )}

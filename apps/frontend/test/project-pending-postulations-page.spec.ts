@@ -15,6 +15,7 @@ vi.mock('../hooks/use-project-pending-postulations', () => ({
   useProjectPendingPostulations: vi.fn(),
   useResolvePostulacion: vi.fn(),
 }));
+vi.mock('@/components/projects/bienvenida-proyecto-card', () => ({ BienvenidaProyectoCard: () => null }));
 vi.mock('@/lib/swal', () => ({ default: { fire: vi.fn() } }));
 
 const mensajesMock = vi.hoisted(() => ({
@@ -162,6 +163,27 @@ describe('ProjectPendingPostulationsPage — F13.1 vista dedicada', () => {
     expect(screen.getByText('0 pendientes')).toBeInTheDocument();
   });
 
+  it('muestra las respuestas del postulante a las preguntas del rol antes de resolver (MEJ-97)', () => {
+    mockLeader();
+    mockResolver();
+    mockPendientes({
+      postulaciones: [
+        postulacion({
+          respuestas: [
+            { idRespuesta: 1, enunciado: '¿Qué experiencia tienes con React?', respuesta: 'Tres años en proyectos de curso' },
+            { idRespuesta: 2, enunciado: '¿Tu usuario de GitHub?', respuesta: 'maria-lopez' },
+          ],
+        }),
+      ],
+    });
+
+    renderPage();
+
+    expect(screen.getByText('¿Qué experiencia tienes con React?')).toBeInTheDocument();
+    expect(screen.getByText('Tres años en proyectos de curso')).toBeInTheDocument();
+    expect(screen.getByText('maria-lopez')).toBeInTheDocument();
+  });
+
   it('el link "Volver a miembros" apunta a la vista de miembros', () => {
     mockLeader();
     mockResolver();
@@ -175,7 +197,7 @@ describe('ProjectPendingPostulationsPage — F13.1 vista dedicada', () => {
     );
   });
 
-  it('conecta Aceptar y Rechazar al flujo existente de resolución, cada uno con su propia confirmación', async () => {
+  it('Aceptar confirma y resuelve; Rechazar abre el diálogo de motivo y resuelve con él (MEJ-99)', async () => {
     mockLeader();
     const { mutate } = mockResolver();
     mockPendientes({ postulaciones: [postulacion()] });
@@ -194,19 +216,19 @@ describe('ProjectPendingPostulationsPage — F13.1 vista dedicada', () => {
       expect.objectContaining({ textoAccion: 'Aceptar postulación', destructiva: false }),
     );
 
+    // Rechazar ya no usa la confirmación genérica: el diálogo exige un motivo.
+    mensajesMock.confirmar.mockClear();
     fireEvent.click(screen.getByRole('button', { name: /rechazar postulación de maria lopez/i }));
-    await waitFor(() =>
-      expect(mutate).toHaveBeenCalledWith(
-        { postulacionId: 1, estadoPostulacion: 'RECHAZADA' },
-        expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
-      ),
-    );
-    expect(mensajesMock.confirmar).toHaveBeenCalledWith(
-      expect.objectContaining({ textoAccion: 'Rechazar postulación', destructiva: true }),
+    expect(mensajesMock.confirmar).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('radio', { name: 'El cupo del rol ya está lleno' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, rechazar' }));
+    expect(mutate).toHaveBeenLastCalledWith(
+      { postulacionId: 1, estadoPostulacion: 'RECHAZADA', motivoRechazo: 'CUPO_LLENO', comentarioResolucion: undefined },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
   });
 
-  it('cancelar la confirmación no resuelve la postulación', async () => {
+  it('cancelar la confirmación o el diálogo de motivo no resuelve la postulación', async () => {
     mockLeader();
     const { mutate } = mockResolver();
     mockPendientes({ postulaciones: [postulacion()] });
@@ -214,9 +236,13 @@ describe('ProjectPendingPostulationsPage — F13.1 vista dedicada', () => {
 
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: /rechazar postulación de maria lopez/i }));
-
+    fireEvent.click(screen.getByRole('button', { name: /aceptar postulación de maria lopez/i }));
     await waitFor(() => expect(mensajesMock.confirmar).toHaveBeenCalled());
     expect(mutate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /rechazar postulación de maria lopez/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar' }));
+    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

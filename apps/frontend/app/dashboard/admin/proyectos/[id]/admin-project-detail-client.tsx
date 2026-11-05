@@ -5,6 +5,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AlertCircle, ClipboardCheck, Crown, FileText, Layers, UserCog, Users } from 'lucide-react';
+import { BajaIntegranteDialog } from '@/components/projects/baja-integrante-dialog';
+import { CargaEquipoPanel } from '@/components/projects/carga-equipo-panel';
+import { useEsCoordinador } from '@/hooks/use-can';
 import { useAdminProjectDetail } from '@/hooks/use-admin-projects';
 import { useLeadershipHistory } from '@/hooks/use-leadership';
 import { isHistoricalDetail } from '@/lib/services/admin-projects';
@@ -179,10 +182,13 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
   const searchParams = useSearchParams();
   const grupoParam = searchParams.get('grupo');
   const { data, isPending, isError, error, refetch } = useAdminProjectDetail(id);
-  const historial = useLeadershipHistory(id, 1, Boolean(data));
+  // El coordinador solo lee el proyecto: sin liderazgo (403) ni enlaces a las bandejas de administración.
+  const esCoordinador = useEsCoordinador();
+  const historial = useLeadershipHistory(id, 1, Boolean(data) && !esCoordinador);
   // F014 (VIEW-19): UN solo botón general «Cambiar liderazgo» (nunca uno por
   // integrante); su autoridad es el endpoint admin, no esta pantalla.
   const [cambioAbierto, setCambioAbierto] = useState(false);
+  const [bajaDe, setBajaDe] = useState<{ idUsuario: number; nombre: string; apellido: string } | null>(null);
 
   if (isPending) return <DetailSkeleton />;
 
@@ -205,7 +211,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
               </Button>
             )}
             <Button asChild size="sm">
-              <Link href={adminProjectsGroupHref('activos')}>Volver a la bandeja</Link>
+              <Link href={esCoordinador ? '/dashboard/coordinador' : adminProjectsGroupHref('activos')}>Volver a la bandeja</Link>
             </Button>
           </div>
         </Empty>
@@ -216,6 +222,8 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
   const vista = toVista(data);
   const grupo: AdminProjectGroup = isAdminProjectGroup(grupoParam) ? grupoParam : grupoDeEstado(vista.estado);
   const integrantesActivos = new Set(vista.miembros.filter((m) => m.participacion === 'ACTIVO').map((m) => m.usuario.idUsuario)).size;
+  // La baja es de administración y de coordinación en su alcance (nunca del líder); no aplica a proyectos cerrados.
+  const puedeDarDeBaja = !vista.historico && vista.estado !== 'CERRADO';
   const sprintsCerrados = vista.sprints.filter((s) => s.estado === 'CERRADO');
   const revisionAprobada = vista.historico ? [...vista.historico.revisiones].reverse().find((r) => r.estadoRevision === 'APROBADA') ?? null : null;
 
@@ -225,20 +233,24 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
         <BreadcrumbList className="text-sm">
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href={adminProjectsGroupHref(grupo)} className="text-tertiary hover:text-on-surface">
-                Proyectos
+              <Link href={esCoordinador ? '/dashboard/coordinador' : adminProjectsGroupHref(grupo)} className="text-tertiary hover:text-on-surface">
+                {esCoordinador ? 'Coordinación' : 'Proyectos'}
               </Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href={adminProjectsGroupHref(grupo)} className="text-tertiary hover:text-on-surface">
-                {ADMIN_PROJECT_GROUP_LABEL[grupo]}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
+          {!esCoordinador && (
+            <>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href={adminProjectsGroupHref(grupo)} className="text-tertiary hover:text-on-surface">
+                    {ADMIN_PROJECT_GROUP_LABEL[grupo]}
+                  </Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+            </>
+          )}
           <BreadcrumbItem>
             <BreadcrumbPage className="max-w-xs truncate font-medium text-on-surface">{vista.titulo}</BreadcrumbPage>
           </BreadcrumbItem>
@@ -268,7 +280,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
-            {puedeTransferirLiderazgo(vista.estado) && (
+            {!esCoordinador && puedeTransferirLiderazgo(vista.estado) && (
               <Button
                 type="button"
                 onClick={() => setCambioAbierto(true)}
@@ -335,7 +347,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
         </div>
       )}
 
-      {puedeTransferirLiderazgo(vista.estado) && (
+      {!esCoordinador && puedeTransferirLiderazgo(vista.estado) && (
         <LeadershipChangeDialog
           projectId={vista.idProyecto}
           open={cambioAbierto}
@@ -343,6 +355,8 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
           liderDesde={historial.data?.items.at(-1)?.registradoEn ?? null}
         />
       )}
+
+      <BajaIntegranteDialog idProyecto={vista.idProyecto} integrante={bajaDe} onClose={() => setBajaDe(null)} />
 
       <Tabs defaultValue="resumen">
         <TabsList className={ADMIN_TAB_LIST}>
@@ -358,10 +372,12 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
             <Layers className="mr-1.5 size-4" aria-hidden="true" />
             Sprints
           </TabsTrigger>
-          <TabsTrigger value="liderazgo" className={TAB_TRIGGER}>
-            <Crown className="mr-1.5 size-4" aria-hidden="true" />
-            Liderazgo
-          </TabsTrigger>
+          {!esCoordinador && (
+            <TabsTrigger value="liderazgo" className={TAB_TRIGGER}>
+              <Crown className="mr-1.5 size-4" aria-hidden="true" />
+              Liderazgo
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="resumen" className="mt-4">
@@ -389,7 +405,8 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
           </div>
         </TabsContent>
 
-        <TabsContent value="miembros" className="mt-4">
+        <TabsContent value="miembros" className="mt-4 flex flex-col gap-4">
+          {!vista.historico && <CargaEquipoPanel idProyecto={vista.idProyecto} />}
           <div className={`${CARD} p-0`}>
             <div className="flex items-center justify-between px-5 py-4">
               <h2 className="text-base font-bold text-on-surface">
@@ -408,6 +425,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
                       <TableHead className={TH_MIEMBROS}>Participación</TableHead>
                       <TableHead className={TH_MIEMBROS}>Tareas</TableHead>
                       <TableHead className={TH_MIEMBROS}>Horas</TableHead>
+                      {puedeDarDeBaja && <TableHead className={TH_MIEMBROS}>Acciones</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -434,6 +452,21 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
                         </TableCell>
                         <TableCell className="px-5 py-3 text-sm text-on-surface">{m.tareas ?? '—'}</TableCell>
                         <TableCell className="px-5 py-3 text-sm text-on-surface">{m.horas != null ? `${formatearDecimal(m.horas)} h` : '—'}</TableCell>
+                        {puedeDarDeBaja && (
+                          <TableCell className="px-5 py-3">
+                            {m.participacion === 'ACTIVO' && m.usuario.idUsuario !== vista.lider.idUsuario && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                aria-label={`Dar de baja a ${m.usuario.nombre} ${m.usuario.apellido}`}
+                                onClick={() => setBajaDe(m.usuario)}
+                              >
+                                Dar de baja
+                              </Button>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>

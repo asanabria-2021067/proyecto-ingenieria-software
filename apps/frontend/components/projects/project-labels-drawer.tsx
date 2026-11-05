@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ColorPicker } from '@/components/ui/color-picker';
 import {
   Popover,
   PopoverContent,
@@ -44,19 +45,6 @@ interface LabelFormState {
 
 const DEFAULT_LABEL_COLOR = '#006735';
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
-
-const LABEL_COLOR_OPTIONS = [
-  { name: 'Verde UVG', value: '#006735' },
-  { name: 'Azul', value: '#2680C2' },
-  { name: 'Rojo', value: '#E5484D' },
-  { name: 'Naranja', value: '#F97316' },
-  { name: 'Amarillo', value: '#D9A400' },
-  { name: 'Violeta', value: '#8B7CE8' },
-  { name: 'Turquesa', value: '#0F9F9A' },
-  { name: 'Gris', value: '#64748B' },
-  { name: 'Lima', value: '#8BC34A' },
-  { name: 'Rosa', value: '#D946A6' },
-] as const;
 
 function normalizeHex(value: string): string {
   const raw = value.trim();
@@ -112,47 +100,7 @@ function LabelColorPicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 rounded-lg border-outline-variant bg-surface-container-lowest p-3">
-        <div className="grid grid-cols-5 gap-2" aria-label="Paleta de colores de etiqueta">
-          {LABEL_COLOR_OPTIONS.map((option) => {
-            const isSelected = selected === option.value.toUpperCase();
-            return (
-              <button
-                key={option.value}
-                type="button"
-                disabled={disabled}
-                aria-label={`Seleccionar color ${option.name}`}
-                onClick={() => onChange(option.value)}
-                className={cn(
-                  'inline-flex size-10 items-center justify-center rounded-md border border-outline-variant/50 transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35',
-                  isSelected && 'border-primary bg-primary/10',
-                )}
-              >
-                <span
-                  className="inline-flex size-6 items-center justify-center rounded-full border border-black/10"
-                  style={{ backgroundColor: option.value }}
-                >
-                  {isSelected && <Check className="size-3.5 text-white drop-shadow" aria-hidden="true" />}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <label className="mt-3 block text-xs font-semibold text-on-surface" htmlFor="label-color-hex">
-          Color personalizado
-        </label>
-        <div className="mt-1.5 flex items-center gap-2">
-          <ColorDot color={selected} className="size-5" />
-          <Input
-            id="label-color-hex"
-            value={value}
-            disabled={disabled}
-            onChange={(event) => onChange(normalizeHex(event.target.value))}
-            maxLength={7}
-            aria-label="Valor hexadecimal del color"
-            placeholder="#RRGGBB"
-            className="h-9 font-mono text-xs"
-          />
-        </div>
+        <ColorPicker value={selected} onChange={(hex) => onChange(hex.toUpperCase())} disabled={disabled} />
       </PopoverContent>
     </Popover>
   );

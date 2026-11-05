@@ -116,7 +116,10 @@ function tareaRow(overrides: Record<string, unknown> = {}) {
     rolProyecto: null,
     asignaciones: [],
     etiquetas: [],
-    _count: { comentarios: 0 },
+    _count: { comentarios: 0, enlaces: 0 },
+    subtareas: [],
+    responsables: [],
+    idTareaPadre: null,
     ...overrides,
   };
 }
@@ -893,7 +896,12 @@ describe('TasksService.create', () => {
           'bloqueadaPor',
           'repeticion',
           'repeticionProxima',
+          'esEjemplo',
           'checklist',
+          'idTareaPadre',
+          'subtareas',
+          'responsables',
+          'cantidadEnlaces',
         ].sort(),
       );
     });

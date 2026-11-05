@@ -28,5 +28,5 @@ export const useHorasComparativo = () =>
 export const useResumenAsociaciones = () =>
   useQuery({ queryKey: horasSemestreKeys.resumenAsociaciones, queryFn: getResumenAsociaciones });
 
-export const useAdminAsociaciones = () =>
-  useQuery({ queryKey: horasSemestreKeys.asociaciones, queryFn: getAsociacionesAdmin, staleTime: 5 * 60_000 });
+export const useAdminAsociaciones = (enabled = true) =>
+  useQuery({ queryKey: horasSemestreKeys.asociaciones, queryFn: getAsociacionesAdmin, staleTime: 5 * 60_000, enabled });

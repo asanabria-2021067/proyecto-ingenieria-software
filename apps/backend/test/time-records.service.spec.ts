@@ -66,6 +66,7 @@ function setup(txOverrides: Record<string, unknown> = {}) {
     }),
     assertActiveProjectParticipant: vi.fn().mockResolvedValue(undefined),
     getProjectOrThrow: vi.fn().mockResolvedValue({ idProyecto: PROJECT_ID, creadoPor: LEADER_ID }),
+    esResponsableAdicional: vi.fn().mockResolvedValue(false),
   };
 
   const notifications = {
@@ -172,6 +173,32 @@ describe('TimeRecordsService (HU-142 / T-170)', () => {
         ForbiddenException,
       );
       expect(tx.registroTiempoTarea.create).not.toHaveBeenCalled();
+    });
+
+    it('MEJ-109: un responsable adicional registra sus horas en el tramo activo con su propio idUsuario', async () => {
+      const { tx, tasksContext, service } = setup();
+      tasksContext.esResponsableAdicional.mockResolvedValue(true);
+
+      await service.create(PROJECT_ID, TASK_ID, OTHER_USER_ID, VALID_DTO);
+
+      expect(tasksContext.esResponsableAdicional).toHaveBeenCalledWith(TASK_ID, OTHER_USER_ID, tx);
+      expect(tx.registroTiempoTarea.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ idAsignacion: ASSIGNMENT_ID, idUsuario: OTHER_USER_ID }) }),
+      );
+    });
+
+    it('MEJ-109: el tramo solo acredita las horas de su titular, no las de otros responsables', async () => {
+      const { tx, service } = setup();
+      (tx.asignacionTarea as unknown as { findUniqueOrThrow: ReturnType<typeof vi.fn> }).findUniqueOrThrow.mockResolvedValue({
+        idUsuario: ASSIGNEE_ID, origenReporte: 'GRANULAR', horasReales: null, reconocidoEn: null, desasignadaEn: null,
+      });
+
+      await service.create(PROJECT_ID, TASK_ID, ASSIGNEE_ID, VALID_DTO);
+
+      expect(tx.registroTiempoTarea.aggregate).toHaveBeenCalledWith({
+        where: { idAsignacion: ASSIGNMENT_ID, revocadoEn: null, idUsuario: ASSIGNEE_ID },
+        _sum: { horas: true },
+      });
     });
 
     it('rechaza cuando el actor es el líder pero no es el usuario asignado (registrar horas no es un privilegio de liderazgo)', async () => {

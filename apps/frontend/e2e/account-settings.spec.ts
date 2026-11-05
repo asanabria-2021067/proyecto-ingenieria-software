@@ -6,7 +6,7 @@ import { desactivarTour } from './support/realtime';
 import { esperarAnimaciones } from './support/accesibilidad';
 
 /**
- * Menú de cuenta único (Mi perfil, Configuración, Cerrar sesión), vista
+ * Menú de cuenta único (Mi perfil, Configuración, Centro de ayuda, Reportar un problema, Cerrar sesión), vista
  * Configuración y separación con el perfil y la bandeja de notificaciones.
  * Solo lectura: no cambia ninguna preferencia (eso lo cubre
  * profile-notification-preferences.spec.ts).
@@ -35,7 +35,7 @@ async function sinDesborde(page: Page) {
 }
 
 test.describe('Cuenta: menú único, Configuración y perfil', () => {
-  test('estudiante en escritorio: la barra superior no tiene menú de cuenta y el de la barra lateral lleva a las tres acciones', async ({ browser }) => {
+  test('estudiante en escritorio: la barra superior no tiene menú de cuenta y el de la barra lateral lleva a sus cinco acciones', async ({ browser }) => {
     const page = await sesion(browser, ESTUDIANTE);
     try {
       await page.setViewportSize({ width: 1440, height: 900 });
@@ -54,7 +54,7 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       await page.keyboard.press('Enter');
       const menu = page.getByRole('menu');
       await expect(menu).toHaveAttribute('data-side', 'top');
-      await expect(menu.getByRole('menuitem')).toHaveText(['Mi perfil', 'Configuración', 'Cerrar sesión']);
+      await expect(menu.getByRole('menuitem')).toHaveText(['Mi perfil', 'Configuración', 'Centro de ayuda', 'Reportar un problema', 'Cerrar sesión']);
       // Se superpone: abrirlo no mueve el bloque de la cuenta. Se mide al terminar la entrada, que lo desliza
       // unos píxeles; medido a mitad, el borde inferior aún no ha llegado a su sitio.
       await esperarAnimaciones(page);
@@ -96,7 +96,7 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
         if (r.method() !== 'GET' && r.url().includes('/notificaciones/preferencias')) escrituras.push(r.method());
       });
       await page.goto('/dashboard/configuracion');
-      await expect(page.getByText('Administra qué notificaciones deseas recibir en UVGenius.')).toBeVisible();
+      await expect(page.getByText('Administra tus notificaciones, tus sesiones y los datos de tu cuenta en UVGenius.')).toBeVisible();
       const seccion = page.getByRole('region', { name: 'Preferencias de notificaciones', exact: true });
       await expect(seccion.getByText('Los cambios se guardan automáticamente.')).toBeVisible();
 
@@ -187,7 +187,8 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       await expect(page.getByText('Editar perfil').first()).toBeVisible();
       await page.waitForLoadState('networkidle');
       await expect(page.getByRole('region', { name: 'Preferencias de notificaciones' })).toHaveCount(0);
-      await expect(page.getByRole('switch')).toHaveCount(0);
+      // El unico interruptor legitimo del perfil es el del portafolio publico (MEJ-146).
+      await expect(page.getByRole('switch', { name: /^(?!Portafolio público activo$)/ })).toHaveCount(0);
       expect(pedidas).toEqual([]);
       await captura(page, 'perfil-sin-preferencias-1440');
     } finally {
@@ -232,7 +233,7 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
         await captura(page, `configuracion-${ancho}`);
 
         await cuentas(page).click();
-        await expect(page.getByRole('menuitem')).toHaveText(['Mi perfil', 'Configuración', 'Cerrar sesión']);
+        await expect(page.getByRole('menuitem')).toHaveText(['Mi perfil', 'Configuración', 'Centro de ayuda', 'Reportar un problema', 'Cerrar sesión']);
         await captura(page, `menu-cuenta-${ancho}`);
         await page.keyboard.press('Escape');
       }
@@ -248,7 +249,7 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       await page.goto('/dashboard/admin');
       const disparador = page.locator('[data-slot="admin-sidebar-footer"] button').first();
       await disparador.click();
-      await expect(page.getByRole('menuitem')).toHaveText(['Mi perfil', 'Configuración', 'Cerrar sesión']);
+      await expect(page.getByRole('menuitem')).toHaveText(['Mi perfil', 'Configuración', 'Centro de ayuda', 'Reportar un problema', 'Cerrar sesión']);
       await captura(page, 'menu-cuenta-admin-1440');
       await page.getByRole('menuitem', { name: 'Configuración' }).click();
       await expect(page).toHaveURL(/\/dashboard\/configuracion$/);

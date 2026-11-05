@@ -149,12 +149,13 @@ test.describe('FG05-C03: preferencias de notificación por tipo en el perfil', (
     // El perfil sigue ahí, ya sin las preferencias.
     await carlos.goto('/dashboard/perfil');
     await expect(carlos.getByRole('button', { name: 'Editar perfil' })).toBeVisible();
-    await expect(carlos.getByRole('switch')).toHaveCount(0);
+    // El unico interruptor legitimo del perfil es el del portafolio publico (MEJ-146).
+    await expect(carlos.getByRole('switch', { name: /^(?!Portafolio público activo$)/ })).toHaveCount(0);
   });
 
-  test('Chat: solo la mención (MEJ-44) tiene interruptor; los mensajes no generan notificaciones', async () => {
+  test('Chat: solo la mención (MEJ-44) y la respuesta en hilo (MEJ-131) tienen interruptor; los mensajes no generan notificaciones', async () => {
     const tipos = (await leer(carlos)).map((p) => p.tipo);
-    expect(tipos.filter((tipo) => /CHAT/.test(tipo))).toEqual(['MENCION_CHAT']);
+    expect(tipos.filter((tipo) => /CHAT/.test(tipo))).toEqual(['MENCION_CHAT', 'RESPUESTA_HILO_CHAT']);
     expect((await guardar(carlos, 'MENSAJE_CHAT', false)).status()).toBe(400);
 
     const seccion = await abrirPerfil(carlos);

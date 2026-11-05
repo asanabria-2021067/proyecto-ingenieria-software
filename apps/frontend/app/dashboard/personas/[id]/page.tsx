@@ -6,7 +6,6 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   Briefcase,
-  Code2,
   GraduationCap,
   MessageSquare,
   Share2,
@@ -34,7 +33,13 @@ import { aviso } from '@/lib/mensajes';
 import { InsigniasVitrina } from '@/components/insignias/insignias-vitrina';
 import { PerfilActividad, PerfilCvAcciones, PerfilOrganizaciones } from '@/components/profile/perfil-social-secciones';
 import { useEnviarMensaje, usePerfilResumen } from '@/hooks/use-perfil-social';
+import { AccionesModeracion } from '@/components/profile/acciones-moderacion';
+import { DisponibilidadSemanal } from '@/components/profile/disponibilidad-semanal';
+import { EnlacesPerfilSeccion } from '@/components/profile/enlaces-perfil';
+import { HabilidadesConfirmables } from '@/components/profile/habilidades-confirmables';
+import { PersonasParecidas } from '@/components/profile/personas-parecidas';
 import { InvitarARolDialog } from '@/components/projects/invitar-a-rol-dialog';
+import { EstadoPerfilAjeno } from '@/components/chat-dock/estado-chat';
 
 function compartirPerfil() {
   navigator.clipboard
@@ -142,6 +147,7 @@ export default function PerfilPersonaPage() {
               <div>
                 <PageTitle className="type-display text-text-primary">{nombreCompleto}</PageTitle>
                 {perfil.carrera && <p className="type-body text-text-secondary">{perfil.carrera}</p>}
+                <EstadoPerfilAjeno idUsuario={perfil.idUsuario} />
               </div>
 
               <div className="flex flex-wrap items-center justify-center gap-tight sm:justify-start">
@@ -166,8 +172,9 @@ export default function PerfilPersonaPage() {
                     Enviar mensaje
                   </Button>
                 )}
-                <div className="col-span-2 flex justify-center sm:justify-start">
+                <div className="col-span-2 flex items-center justify-center gap-tight sm:justify-start">
                   <InvitarARolDialog idUsuario={perfil.idUsuario} nombre={nombreCompleto} />
+                  <AccionesModeracion idUsuario={perfil.idUsuario} nombre={nombreCompleto} />
                 </div>
               </div>
             </div>
@@ -175,21 +182,7 @@ export default function PerfilPersonaPage() {
 
           {(perfil.habilidades.length > 0 || perfil.intereses.length > 0) && (
             <section className="card-base space-y-stack">
-              {perfil.habilidades.length > 0 && (
-                <div>
-                  <h2 className="type-meta flex items-center gap-tight uppercase tracking-wide">
-                    <Code2 className="size-4 text-primary" aria-hidden="true" />
-                    Habilidades
-                  </h2>
-                  <div className="mt-tight flex flex-wrap gap-tight">
-                    {perfil.habilidades.map((h) => (
-                      <span key={h} className={`pill font-semibold ${getHabilidadBadgeStyle(h)}`}>
-                        {h}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {perfil.habilidades.length > 0 && <HabilidadesConfirmables idUsuario={perfil.idUsuario} />}
               {perfil.intereses.length > 0 && (
                 <div>
                   <h2 className="type-meta uppercase tracking-wide">Intereses</h2>
@@ -206,6 +199,12 @@ export default function PerfilPersonaPage() {
           )}
 
           <InsigniasVitrina insignias={perfil.insignias} publica />
+
+          <EnlacesPerfilSeccion idUsuario={perfil.idUsuario} />
+
+          <DisponibilidadSemanal idUsuario={perfil.idUsuario} />
+
+          <PersonasParecidas idUsuario={perfil.idUsuario} />
 
           <PerfilOrganizaciones idUsuario={perfil.idUsuario} />
 

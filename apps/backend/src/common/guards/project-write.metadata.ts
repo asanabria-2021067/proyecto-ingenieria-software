@@ -50,6 +50,7 @@ export type EntitySprintRequirement = 'ACTIVO' | 'EN_FINALIZACION' | 'NO_CERRADO
 export type WriteActorRule =
   | 'LIDER'
   | 'ADMIN'
+  | 'ADMIN_O_COORDINADOR'
   | 'PARTICIPANTE_ACTIVO'
   | 'LIDER_O_PARTICIPANTE_ACTIVO'
   | 'ACTOR_EXISTENTE';
@@ -85,7 +86,9 @@ export type ProjectWriteFamily =
   | 'CIERRE_ENVIO'
   | 'CIERRE_VEREDICTO'
   | 'CIERRE_LIMPIEZA'
-  | 'ACTIVIDAD_ASISTENCIA';
+  | 'ACTIVIDAD_ASISTENCIA'
+  | 'BAJA_INTEGRANTE'
+  | 'SPRINT_OBJETIVO';
 
 export interface ProjectWriteMetadata {
   /** Fuente(s) enumerada(s) del identificador de proyecto; se usa la primera presente. */

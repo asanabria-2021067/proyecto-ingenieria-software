@@ -11,6 +11,7 @@ import type {
   MiOrganizacion,
   OrganizacionDetalle,
   OrganizacionResumen,
+  PlantillaOrganizacion,
   RolOrganizacion,
   SolicitudUnirse,
   UsuarioOrganizacion,
@@ -21,6 +22,8 @@ const json = (method: string, body: unknown): RequestInit => ({ method, body: JS
 
 export const crearOrganizacion = (input: CrearOrganizacionInput) =>
   apiFetch<OrganizacionResumen>(BASE, json('POST', input));
+
+export const getPlantillasOrganizacion = () => apiFetch<PlantillaOrganizacion[]>(`${BASE}/plantillas`);
 
 export const actualizarOrganizacion = (id: number, input: ActualizarOrganizacionInput) =>
   apiFetch<OrganizacionResumen>(`${BASE}/${id}`, json('PATCH', input));

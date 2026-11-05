@@ -8,6 +8,7 @@ const ROL = { idRolProyecto: 4, nombreRol: 'Backend', cupos: 2, proyecto: { idPr
 
 function crear(lider = 1) {
   const prisma: Record<string, any> = {
+    restriccionUsuario: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
     rolProyecto: { findUnique: vi.fn().mockResolvedValue(ROL) },
     proyecto: { findFirst: vi.fn() },
     usuario: {
@@ -57,6 +58,13 @@ describe('RoleInvitationsService.invitar (MEJ-22)', () => {
       expect.objectContaining({ roleName: 'Backend', invitationId: 50, invitedBy: 'Ana Paz', projectId: 9 }),
     ]);
     expect(ctx.notifications.publishEffects).toHaveBeenCalled();
+  });
+
+  it('MEJ-153: con un bloqueo es 403 y no crea la invitacion ni avisa', async () => {
+    ctx.prisma.restriccionUsuario.findFirst.mockResolvedValue({ idRestriccion: 1 });
+    await expect(ctx.service.invitar(1, { idRolProyecto: 4, idUsuario: 20 })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(ctx.prisma.invitacionRolProyecto.create).not.toHaveBeenCalled();
+    expect(ctx.notifications.persistTemplateTx).not.toHaveBeenCalled();
   });
 
   it('alguien que no es el líder no invita', async () => {

@@ -6,6 +6,8 @@ import { ChatArchivadoController } from './chat-archivado.controller';
 import { ChatCanalesController } from './chat-canales.controller';
 import { ChatCanalesService } from './chat-canales.service';
 import { ChatService } from './chat.service';
+import { ChatHilosController } from './chat-hilos.controller';
+import { ChatHilosService } from './chat-hilos.service';
 import { ChatEstadoController } from './chat-estado.controller';
 import { ChatEstadoService } from './chat-estado.service';
 import { MensajesProgramadosService } from './mensajes-programados.service';
@@ -34,9 +36,9 @@ import { WsAuthService } from '../ws-auth/ws-auth.service';
       }),
     }),
   ],
-  controllers: [ChatController, ChatArchivadoController, ChatEstadoController, MensajesProgramadosController, ChatCanalesController, ChatMensajesExtrasController],
+  controllers: [ChatController, ChatHilosController, ChatArchivadoController, ChatEstadoController, MensajesProgramadosController, ChatCanalesController, ChatMensajesExtrasController],
   // G07 (OWASP25-C025): política del handshake con el JwtService de este módulo.
-  providers: [ChatService, ChatCanalesService, ChatEstadoService, ChatGateway, WsAuthService, MensajesProgramadosService, LinkPreviewService, ChatTarjetasService, RecordatoriosMensajeService],
-  exports: [ChatCanalesService, ChatService, ChatGateway],
+  providers: [ChatService, ChatHilosService, ChatCanalesService, ChatEstadoService, ChatGateway, WsAuthService, MensajesProgramadosService, LinkPreviewService, ChatTarjetasService, RecordatoriosMensajeService],
+  exports: [ChatCanalesService, ChatService, ChatGateway, LinkPreviewService],
 })
 export class ChatModule {}

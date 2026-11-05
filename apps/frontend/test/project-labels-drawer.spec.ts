@@ -106,7 +106,7 @@ describe('ProjectLabelsDrawer', () => {
 
     fireEvent.change(screen.getByLabelText('Nombre de la etiqueta'), { target: { value: 'Nueva' } });
     fireEvent.click(screen.getByRole('button', { name: 'Seleccionar color para nueva etiqueta' }));
-    fireEvent.change(screen.getByLabelText('Valor hexadecimal del color'), { target: { value: '#123456' } });
+    fireEvent.change(screen.getByLabelText('Hexadecimal'), { target: { value: '#123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Agregar etiqueta' }));
 
     await waitFor(() =>
@@ -120,8 +120,8 @@ describe('ProjectLabelsDrawer', () => {
 
     expect(container.querySelector('input[type="color"]')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Seleccionar color para nueva etiqueta' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Seleccionar color Azul' }));
-    expect(screen.getByLabelText('Valor hexadecimal del color')).toHaveValue('#2680C2');
+    fireEvent.click(screen.getByRole('radio', { name: 'Azul' }));
+    expect(screen.getByLabelText('Hexadecimal')).toHaveValue('#2680C2');
   });
 
   it('editar etiqueta es inline, conserva la lista y usa la mutation canónica', async () => {
@@ -141,7 +141,7 @@ describe('ProjectLabelsDrawer', () => {
 
     fireEvent.change(screen.getByLabelText('Nombre de la etiqueta Backend'), { target: { value: 'Backend v2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Seleccionar color para la etiqueta Backend' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Seleccionar color Turquesa' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Turquesa' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios de la etiqueta Backend' }));
 
     await waitFor(() =>
@@ -282,16 +282,19 @@ describe('ProjectLabelsDrawer', () => {
     expect(payload).not.toHaveProperty('nombreNormalizado');
   });
 
-  it('color inválido bloquea el envío con mensaje accesible', async () => {
+  it('un color inválido se avisa y se envía el último color válido, nunca el inválido', async () => {
     const createLabel = mutationStub();
     renderDrawer({ createLabel });
 
     fireEvent.change(screen.getByLabelText('Nombre de la etiqueta'), { target: { value: 'X' } });
     fireEvent.click(screen.getByRole('button', { name: 'Seleccionar color para nueva etiqueta' }));
-    fireEvent.change(screen.getByLabelText('Valor hexadecimal del color'), { target: { value: '#XYZ' } });
+    fireEvent.change(screen.getByLabelText('Hexadecimal'), { target: { value: '#XYZ' } });
+    expect(screen.getByLabelText('Hexadecimal')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText(/El color debe tener el formato #RRGGBB/)).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Agregar etiqueta' }));
 
-    expect(await screen.findByText('El color debe tener el formato #RRGGBB.')).toBeInTheDocument();
-    expect(createLabel.mutateAsync).not.toHaveBeenCalled();
+    await waitFor(() => expect(createLabel.mutateAsync).toHaveBeenCalledTimes(1));
+    expect(createLabel.mutateAsync).toHaveBeenCalledWith({ nombreEtiqueta: 'X', color: '#006735' });
   });
 });

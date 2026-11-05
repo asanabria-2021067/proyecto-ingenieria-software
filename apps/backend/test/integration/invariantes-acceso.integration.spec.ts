@@ -183,8 +183,8 @@ describeIntegration('invariantes de acceso (PostgreSQL real)', () => {
     expect(distintas).toEqual([]);
   }, 120_000);
 
-  it('(b) un estudiante recibe 403 en todas las rutas de administracion (GET, POST, PATCH y DELETE)', async () => {
-    expect([...new Set(rutas.filter((r) => r.adminPath).map((r) => r.metodo))].sort()).toEqual(['DELETE', 'GET', 'PATCH', 'POST']);
+  it('(b) un estudiante recibe 403 en todas las rutas de administracion (GET, POST, PUT, PATCH y DELETE)', async () => {
+    expect([...new Set(rutas.filter((r) => r.adminPath).map((r) => r.metodo))].sort()).toEqual(['DELETE', 'GET', 'PATCH', 'POST', 'PUT']);
     const distintas: string[] = [];
     for (const [i, r] of rutas.entries()) {
       if (!r.adminPath) continue;

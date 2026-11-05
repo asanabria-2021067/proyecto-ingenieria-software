@@ -13,6 +13,7 @@ import { ChatCanalesService } from '../chat/chat-canales.service';
 import { AdminMeetingsService } from '../events/admin-meetings.service';
 import { INSIGNIAS_EVENTO } from '../insignias/insignias.catalog';
 import { calcularCoincidencia } from '../common/coincidencia-habilidades';
+import { assertSinBloqueo } from '../common/bloqueos';
 import { CreateInvitacionRolDto } from './dto/create-invitacion-rol.dto';
 
 export const SUGERENCIAS_MAXIMO = 20;
@@ -64,6 +65,7 @@ export class RoleInvitationsService {
         select: { idUsuario: true },
       });
       if (!invitado) throw new NotFoundException('Estudiante no encontrado');
+      await assertSinBloqueo(tx, userId, dto.idUsuario);
 
       const [activos, yaParticipa, pendiente, postulado] = await Promise.all([
         tx.participacionProyecto.count({ where: { idRolProyecto: rol.idRolProyecto, estadoParticipacion: 'ACTIVO' } }),

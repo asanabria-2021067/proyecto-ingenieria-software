@@ -72,7 +72,8 @@ import {
   useSolicitudesAmistadPendientes,
 } from '@/hooks/use-social';
 import { useCurrentUser } from '@/hooks/use-current-user';
-import { getHabilidades, getIntereses } from '@/lib/services/catalogs';
+import { DIAS } from '@/components/profile/disponibilidad-semanal';
+import { getCarreras, getHabilidades, getIntereses } from '@/lib/services/catalogs';
 import { getHabilidadBadgeStyle, getSemestreBadgeStyle } from '@/lib/social/badge-colors';
 import { formatMotivoRecomendacion } from '@/lib/social/recomendaciones';
 import uvgSwal from '@/lib/swal';
@@ -98,6 +99,7 @@ const COLUMNAS_PERSONAS = '@xl/personas:grid-cols-2 @5xl/personas:grid-cols-3';
 /** T-195: rangos fijos, mutuamente excluyentes (no acumulables como
  * habilidades/intereses) — "Todos" es la ausencia de filtro. */
 const SEMESTRE_TODOS = 'todos';
+const TODOS = 'todos';
 const SEMESTRE_OPCIONES: { id: SemestreRango | typeof SEMESTRE_TODOS; label: string }[] = [
   { id: SEMESTRE_TODOS, label: 'Todos los semestres' },
   { id: '1-4', label: '1.º–4.º' },
@@ -108,6 +110,9 @@ const SEMESTRE_OPCIONES: { id: SemestreRango | typeof SEMESTRE_TODOS; label: str
 /** El motivo se arma acá a partir de los datos estructurados del backend
  * (`amigosEnComun`, `mismaCarrera`); el backend nunca manda el texto armado. */
 function textoMotivo(usuario: UsuarioBusquedaDto): string | null {
+  if (usuario.coincidencia && usuario.coincidencia.enComun > 0) {
+    return `${usuario.coincidencia.enComun} de ${usuario.coincidencia.total} ${usuario.coincidencia.total === 1 ? 'habilidad' : 'habilidades'} en común`;
+  }
   if (usuario.amigosEnComun > 0) {
     return `${usuario.amigosEnComun} ${usuario.amigosEnComun === 1 ? 'amigo' : 'amigos'} en común`;
   }
@@ -361,6 +366,10 @@ function PersonasView() {
   const [interesesSel, setInteresesSel] = useState<number[]>([]);
   const [semestreRango, setSemestreRango] = useState<SemestreRango | undefined>(undefined);
   const [soloMiCarreraElegido, setSoloMiCarrera] = useState(false);
+  // MEJ-151: carrera concreta, día con disponibilidad y orden por coincidencia de habilidades.
+  const [idCarrera, setIdCarrera] = useState<number | undefined>(undefined);
+  const [diaDisponible, setDiaDisponible] = useState<number | undefined>(undefined);
+  const [porCoincidencia, setPorCoincidencia] = useState(false);
 
   // «Mi carrera» filtra por la carrera real del perfil; sin ese dato no hay filtro que aplicar.
   const { data: usuarioActual, isPending: cargandoUsuario } = useCurrentUser();
@@ -369,6 +378,7 @@ function PersonasView() {
 
   const { data: habilidades = [] } = useQuery({ queryKey: ['catalogo-habilidades'], queryFn: getHabilidades });
   const { data: intereses = [] } = useQuery({ queryKey: ['catalogo-intereses'], queryFn: getIntereses });
+  const { data: carreras = [] } = useQuery({ queryKey: ['catalogo-carreras'], queryFn: getCarreras });
   const opcionesHabilidades = habilidades.map((h) => ({ id: h.idHabilidad, nombre: h.nombreHabilidad }));
   const opcionesIntereses = intereses.map((i) => ({ id: i.idInteres, nombre: i.nombreInteres }));
 
@@ -381,6 +391,9 @@ function PersonasView() {
     habilidades: habilidadesSel,
     intereses: interesesSel,
     semestreRango,
+    idCarrera,
+    diaDisponible,
+    ordenar: porCoincidencia ? 'coincidencia' : undefined,
   });
 
   const { solicitudes } = useSolicitudesAmistadPendientes();
@@ -396,17 +409,26 @@ function PersonasView() {
     accion: 'aceptar' | 'rechazar';
   } | null>(null);
 
-  const totalFiltros = habilidadesSel.length + interesesSel.length + (semestreRango ? 1 : 0) + (soloMiCarrera ? 1 : 0);
+  const totalFiltros =
+    habilidadesSel.length + interesesSel.length + (semestreRango ? 1 : 0) + (soloMiCarrera ? 1 : 0) + (idCarrera ? 1 : 0) + (diaDisponible !== undefined ? 1 : 0);
 
   function limpiarFiltros() {
     setHabilidadesSel([]);
     setInteresesSel([]);
     setSemestreRango(undefined);
     setSoloMiCarrera(false);
+    setIdCarrera(undefined);
+    setDiaDisponible(undefined);
   }
 
   // Etiquetas de los criterios activos, cada una con su forma de quitarse.
   const chipsActivos = [
+    ...(idCarrera
+      ? [{ key: 'carrera', label: carreras.find((c) => c.idCarrera === idCarrera)?.nombreCarrera ?? 'Carrera', quitar: () => setIdCarrera(undefined) }]
+      : []),
+    ...(diaDisponible !== undefined
+      ? [{ key: 'dia', label: `Disponible el ${DIAS[diaDisponible].toLowerCase()}`, quitar: () => setDiaDisponible(undefined) }]
+      : []),
     ...(semestreRango
       ? [{ key: 'semestre', label: `Semestre ${SEMESTRE_OPCIONES.find((o) => o.id === semestreRango)?.label}`, quitar: () => setSemestreRango(undefined) }]
       : []),
@@ -565,6 +587,41 @@ function PersonasView() {
                 </SelectContent>
               </Select>
 
+              <Select value={idCarrera ? String(idCarrera) : TODOS} onValueChange={(v) => setIdCarrera(v === TODOS ? undefined : Number(v))}>
+                <SelectTrigger aria-label="Filtrar por carrera" className={`w-full sm:w-48 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-50">
+                  <SelectItem value={TODOS} className="focus:bg-primary focus:text-on-primary">
+                    Todas las carreras
+                  </SelectItem>
+                  {carreras.map((c) => (
+                    <SelectItem key={c.idCarrera} value={String(c.idCarrera)} className="focus:bg-primary focus:text-on-primary">
+                      {c.nombreCarrera}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={diaDisponible === undefined ? TODOS : String(diaDisponible)}
+                onValueChange={(v) => setDiaDisponible(v === TODOS ? undefined : Number(v))}
+              >
+                <SelectTrigger aria-label="Filtrar por día disponible" className={`w-full sm:w-48 ${DASHBOARD_FILTER_TRIGGER_CLASS}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-50">
+                  <SelectItem value={TODOS} className="focus:bg-primary focus:text-on-primary">
+                    Cualquier día
+                  </SelectItem>
+                  {DIAS.map((d, i) => (
+                    <SelectItem key={d} value={String(i)} className="focus:bg-primary focus:text-on-primary">
+                      Disponible el {d.toLowerCase()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <DashboardFilterMultiSelect
                 label="Habilidades"
                 ariaLabel="Filtrar por habilidades"
@@ -642,6 +699,15 @@ function PersonasView() {
                 </span>
               )}
             </div>
+
+            <label className="type-meta mt-tight flex w-fit items-center gap-tight">
+              <Checkbox
+                checked={porCoincidencia}
+                onCheckedChange={(v) => setPorCoincidencia(v === true)}
+                aria-label="Ordenar por coincidencia de habilidades"
+              />
+              Ordenar por coincidencia de habilidades
+            </label>
 
             {chipsActivos.length > 0 && (
               <div className="mt-tight flex flex-wrap items-center gap-tight" role="group" aria-label="Filtros aplicados">

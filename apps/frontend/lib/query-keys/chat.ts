@@ -10,8 +10,16 @@ export const conversationReadsQueryKey = (idProyecto: number, idConversacion: nu
 export const conversationLinksQueryKey = (idProyecto: number, idConversacion: number) =>
   ['proyecto-conversaciones', idProyecto, idConversacion, 'enlaces'] as const;
 
-export const conversationFilesQueryKey = (idProyecto: number, idConversacion: number) =>
-  ['proyecto-conversaciones', idProyecto, idConversacion, 'archivos'] as const;
+export const conversationFilesQueryKey = (idProyecto: number, idConversacion: number, tipo?: string) =>
+  tipo
+    ? (['proyecto-conversaciones', idProyecto, idConversacion, 'archivos', tipo] as const)
+    : (['proyecto-conversaciones', idProyecto, idConversacion, 'archivos'] as const);
+
+/** MEJ-131: respuestas del hilo de un mensaje. El cuarto elemento no es 'mensajes': no se mezcla con la lista del canal. */
+export const hiloQueryKey = (idProyecto: number, idConversacion: number, idMensaje: number) =>
+  ['proyecto-conversaciones', idProyecto, idConversacion, 'hilo', idMensaje] as const;
+
+export const estadoDeQueryKey = (idUsuario: number) => ['chat-estado', 'de', idUsuario] as const;
 
 export const attachmentThumbnailQueryKey = (idProyecto: number, idConversacion: number, idAdjunto: number) =>
   ['chat-adjunto-miniatura', idProyecto, idConversacion, idAdjunto] as const;

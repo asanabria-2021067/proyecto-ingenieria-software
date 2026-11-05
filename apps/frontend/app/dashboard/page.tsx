@@ -63,6 +63,7 @@ import { Skeleton, SkeletonCard, SkeletonRegion } from '@/components/ui/skeleton
 import { useFeedSocial } from '@/hooks/use-social';
 import { SocialProjectCard } from '@/components/social/social-project-card';
 import { dashboardPage } from '@/components/layout/dashboard-page';
+import { PrimerosPasos } from '@/components/dashboard/primeros-pasos';
 import { ContinuarDondeQuedaste } from '@/components/dashboard/continuar-donde-quedaste';
 
 /**
@@ -462,6 +463,7 @@ export default function DashboardPage() {
             }}
           />
         )}
+        <PrimerosPasos />
         <ContinuarDondeQuedaste idUsuario={user?.idUsuario} />
         {/* Welcome + Stats */}
         <section className="relative mb-section overflow-hidden rounded-card bg-sage-welcome p-card text-sage-ink shadow-card">

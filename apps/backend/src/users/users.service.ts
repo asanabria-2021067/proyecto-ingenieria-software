@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, TipoExperiencia } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { rolesEfectivos, SELECT_JUNTA_ACTIVA } from '../common/roles/roles-efectivos';
 import { ProjectHoursSummaryService } from '../sprints/project-hours-summary.service';
 import { resolverMetas, selectRegistroActual } from '../horas-semestre/metas-vigentes';
 import { semestreDe } from '../horas-semestre/semestre';
@@ -23,6 +24,54 @@ export class UsersService {
      */
     private readonly projectHours?: ProjectHoursSummaryService,
   ) {}
+
+  /** MEJ-88: avance de «Primeros pasos» calculado desde datos existentes; se oculta al completarse o cerrarse. */
+  async getPrimerosPasos(userId: number) {
+    const { anio, periodo } = semestreDe(new Date());
+    const [usuario, registro, postulaciones, organizaciones, mensajes] = await Promise.all([
+      this.prisma.usuario.findUnique({
+        where: { idUsuario: userId },
+        select: {
+          primerosPasosCerradosEn: true,
+          perfil: { select: { biografia: true } },
+          _count: { select: { habilidades: true } },
+        },
+      }),
+      this.prisma.registroHorasSemestre.findUnique({
+        where: { idUsuario_anio_periodo: { idUsuario: userId, anio, periodo } },
+        select: { idRegistro: true },
+      }),
+      this.prisma.postulacion.count({ where: { idUsuarioPostulante: userId } }),
+      this.prisma.usuarioOrganizacion.count({ where: { idUsuario: userId, estadoMembresia: 'ACTIVA' } }),
+      this.prisma.mensajeChat.count({ where: { idRemitente: userId, eliminadoEn: null } }),
+    ]);
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    const pasos = [
+      // Mismo criterio que el asistente «Completa tu perfil»: basta una biografía o una habilidad.
+      { clave: 'perfil', completado: usuario.perfil?.biografia != null || usuario._count.habilidades > 0 },
+      { clave: 'horas', completado: registro !== null },
+      { clave: 'postulacion', completado: postulaciones > 0 },
+      { clave: 'organizacion', completado: organizaciones > 0 },
+      { clave: 'mensaje', completado: mensajes > 0 },
+    ];
+    const completados = pasos.filter((p) => p.completado).length;
+    const cerrada = usuario.primerosPasosCerradosEn !== null;
+    return {
+      pasos,
+      completados,
+      total: pasos.length,
+      cerrada,
+      visible: !cerrada && completados < pasos.length,
+    };
+  }
+
+  async cerrarPrimerosPasos(userId: number) {
+    await this.prisma.usuario.update({
+      where: { idUsuario: userId },
+      data: { primerosPasosCerradosEn: new Date() },
+    });
+    return { cerrada: true };
+  }
 
   async getMe(userId: number) {
     const user = await this.prisma.usuario.findUnique({
@@ -50,12 +99,14 @@ export class UsersService {
         rolesAcceso: {
           include: { rolAcceso: true },
         },
+        juntasAsociacion: SELECT_JUNTA_ACTIVA,
       },
     });
 
     if (!user) throw new NotFoundException('Usuario no encontrado');
-    const roles = user.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil);
-    return { ...user, roles };
+    const { juntasAsociacion, ...resto } = user;
+    const roles = rolesEfectivos(user.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil), juntasAsociacion);
+    return { ...resto, roles };
   }
 
   /**

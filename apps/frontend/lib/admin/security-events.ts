@@ -14,6 +14,8 @@ export const SECURITY_EVENT_LABEL: Record<SecurityEventType, string> = {
   PASSWORD_RESET_ISSUED: 'Enlace de recuperación emitido',
   PASSWORD_RESET_COMPLETED: 'Contraseña restablecida',
   USER_STATUS_CHANGED: 'Cambio de estado de cuenta',
+  PASSWORD_CHANGED: 'Cambio de contraseña',
+  SESSION_REPORTED_UNKNOWN: 'Inicio de sesión reportado como ajeno',
 };
 
 /** Tonos compartidos del sistema de etiquetas (`components/ui/tag`); no define una familia nueva. */
@@ -24,6 +26,8 @@ export const SECURITY_EVENT_TONE: Record<SecurityEventType, TagTone> = {
   PASSWORD_RESET_ISSUED: 'blue',
   PASSWORD_RESET_COMPLETED: 'turquoise',
   USER_STATUS_CHANGED: 'slate',
+  PASSWORD_CHANGED: 'turquoise',
+  SESSION_REPORTED_UNKNOWN: 'amber',
 };
 
 const MOTIVO_LABEL: Record<string, string> = {
@@ -114,6 +118,12 @@ export function securityEventSummary(event: SecurityEvent): string {
       const nuevo = texto(detalle.estadoNuevo, ESTADO_LABEL);
       return anterior && nuevo ? `${anterior} → ${nuevo}` : SIN_DATO;
     }
+    case 'PASSWORD_CHANGED': {
+      const sesiones = entero(detalle.sesionesRevocadas);
+      return sesiones !== null ? `${sesiones} ${sesiones === 1 ? 'sesión revocada' : 'sesiones revocadas'}` : SIN_DATO;
+    }
+    case 'SESSION_REPORTED_UNKNOWN':
+      return 'Sesión cerrada por el usuario';
     default:
       return SIN_DATO;
   }
@@ -201,6 +211,8 @@ const DETALLE_VISIBLE: Record<SecurityEventType, Record<string, { etiqueta: stri
     ACCOUNT_LOCKED: { cuentaConocida, cuentaRef },
     PASSWORD_RESET_ISSUED: { idSolicitud, expiraEn: { etiqueta: 'El enlace vence', leer: fecha } },
     PASSWORD_RESET_COMPLETED: { idSolicitud, sesionesRevocadas: { etiqueta: 'Sesiones revocadas', leer: numero } },
+    PASSWORD_CHANGED: { sesionesRevocadas: { etiqueta: 'Sesiones revocadas', leer: numero } },
+    SESSION_REPORTED_UNKNOWN: {},
     USER_STATUS_CHANGED: {
       estadoAnterior: { etiqueta: 'Estado anterior', leer: (valor) => texto(valor, ESTADO_LABEL) },
       estadoNuevo: { etiqueta: 'Estado nuevo', leer: (valor) => texto(valor, ESTADO_LABEL) },

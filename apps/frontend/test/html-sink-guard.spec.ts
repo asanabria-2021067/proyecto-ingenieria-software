@@ -113,6 +113,7 @@ describe('G07-C10: guarda de sumideros de HTML', () => {
       'components/admin/metric-trend-plot.tsx',
       'components/hours/horas-por-proyecto-plot.tsx',
       'components/projects/burndown-chart-plot.tsx',
+      'components/projects/sprint-report-chart-plot.tsx',
       'components/projects/velocity-chart-plot.tsx',
     ]);
     for (const [file, source] of usesChart) {

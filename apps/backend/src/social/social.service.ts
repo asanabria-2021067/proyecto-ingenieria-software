@@ -3,6 +3,7 @@ import { Amistad, EstadoAmistad, EstadoProyecto, EstadoUsuario, Prisma } from '@
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { listarInsigniasUsuario } from '../insignias/insignias.service';
+import { assertSinBloqueo, idsBloqueados } from '../common/bloqueos';
 import { BuscarUsuariosQueryDto } from './dto/buscar-usuarios-query.dto';
 
 const USUARIO_RESUMEN_SELECT = {
@@ -57,6 +58,7 @@ export class SocialService {
       throw new BadRequestException('No puedes enviarte una solicitud de amistad a ti mismo');
     }
     await this.assertVisibleEnElDirectorio(idReceptor);
+    await assertSinBloqueo(this.prisma, idUsuario, idReceptor);
 
     // RTF-3.2: verificacion + escritura en una transaccion; el indice unico del
     // par no ordenado (migracion amistad_par_no_ordenado_unico) cierra la carrera
@@ -110,12 +112,12 @@ export class SocialService {
       await this.notifications.notifyFromTemplate([aceptadaDeId], 'AMISTAD_ACEPTADA', {
         userName,
         idAmistad: amistad.idAmistad,
-      });
+      }, undefined, idUsuario);
     } else {
       await this.notifications.notifyFromTemplate([idReceptor], 'SOLICITUD_AMISTAD', {
         userName,
         idAmistad: amistad.idAmistad,
-      });
+      }, undefined, idUsuario);
     }
     return amistad;
   }
@@ -240,6 +242,7 @@ export class SocialService {
       throw new BadRequestException('No puedes seguirte a ti mismo');
     }
     await this.assertVisibleEnElDirectorio(idSeguido);
+    await assertSinBloqueo(this.prisma, idUsuario, idSeguido);
 
     const existente = await this.prisma.seguimiento.findUnique({
       where: { idSeguidor_idSeguido: { idSeguidor: idUsuario, idSeguido } },
@@ -257,7 +260,7 @@ export class SocialService {
     });
     await this.notifications.notifyFromTemplate([idSeguido], 'NUEVO_SEGUIDOR', {
       userName: `${actor.nombre} ${actor.apellido}`,
-    });
+    }, undefined, idUsuario);
     return seguimiento;
   }
 
@@ -430,6 +433,14 @@ export class SocialService {
       condiciones.push({ idUsuario: { in: idsAmigosDeAmigos } });
     }
 
+    // MEJ-153: quien bloqueo o fue bloqueado no aparece en el directorio.
+    const bloqueados = await idsBloqueados(this.prisma, idUsuario);
+    if (bloqueados.length > 0) condiciones.push({ idUsuario: { notIn: bloqueados } });
+
+    // MEJ-151: filtros por carrera concreta y por dia con disponibilidad.
+    if (filtros.idCarrera) condiciones.push({ perfil: { idCarrera: filtros.idCarrera } });
+    if (filtros.diaDisponible !== undefined) condiciones.push({ disponibilidadSemanal: { some: { diaSemana: filtros.diaDisponible } } });
+
     const idsAmigoActual = await this.getAmigoIds(idUsuario);
     if (filtros.soloAmigos) {
       condiciones.push({ idUsuario: { in: idsAmigoActual } });
@@ -449,13 +460,36 @@ export class SocialService {
     }
 
     const page = filtros.page ?? 1;
-    const usuarios = await this.prisma.usuario.findMany({
-      where: { AND: condiciones },
-      select: USUARIO_BUSQUEDA_SELECT,
-      orderBy: { idUsuario: 'asc' },
-      skip: (page - 1) * PERSONAS_PAGE_SIZE,
-      take: PERSONAS_PAGE_SIZE + 1,
-    });
+    // MEJ-151: por coincidencia se compara contra las habilidades buscadas o, sin filtro, contra las propias.
+    let puntaje: Map<number, number> | null = null;
+    let totalBuscadas = 0;
+    let usuarios;
+    if (filtros.ordenar === 'coincidencia') {
+      const buscadas = filtros.habilidades?.length
+        ? filtros.habilidades
+        : (await this.prisma.usuarioHabilidad.findMany({ where: { idUsuario }, select: { idHabilidad: true } })).map((h) => h.idHabilidad);
+      const objetivo = new Set(buscadas);
+      totalBuscadas = objetivo.size;
+      // ponytail: sin tope; carga todos los candidatos del directorio para ordenar en memoria. Pasar a SQL (conteo por JOIN) si el directorio crece mucho.
+      const candidatos = await this.prisma.usuario.findMany({
+        where: { AND: condiciones },
+        select: { idUsuario: true, habilidades: { select: { idHabilidad: true } } },
+      });
+      puntaje = new Map(candidatos.map((c) => [c.idUsuario, c.habilidades.filter((h) => objetivo.has(h.idHabilidad)).length]));
+      const orden = candidatos.map((c) => c.idUsuario).sort((a, b) => (puntaje!.get(b)! - puntaje!.get(a)!) || a - b);
+      const idsPagina = orden.slice((page - 1) * PERSONAS_PAGE_SIZE, page * PERSONAS_PAGE_SIZE + 1);
+      const filas = await this.prisma.usuario.findMany({ where: { idUsuario: { in: idsPagina } }, select: USUARIO_BUSQUEDA_SELECT });
+      const porId = new Map(filas.map((f) => [f.idUsuario, f]));
+      usuarios = idsPagina.flatMap((id) => porId.get(id) ?? []);
+    } else {
+      usuarios = await this.prisma.usuario.findMany({
+        where: { AND: condiciones },
+        select: USUARIO_BUSQUEDA_SELECT,
+        orderBy: { idUsuario: 'asc' },
+        skip: (page - 1) * PERSONAS_PAGE_SIZE,
+        take: PERSONAS_PAGE_SIZE + 1,
+      });
+    }
 
     const hasMore = usuarios.length > PERSONAS_PAGE_SIZE;
     const pagina = hasMore ? usuarios.slice(0, PERSONAS_PAGE_SIZE) : usuarios;
@@ -542,6 +576,7 @@ export class SocialService {
         amigosEnComun: amigosEnComunPorUsuario.get(usuario.idUsuario)?.size ?? 0,
         habilidades: usuario.habilidades.map((h) => h.habilidad.nombreHabilidad),
         intereses: usuario.intereses.map((i) => i.interes.nombreInteres),
+        coincidencia: puntaje ? { enComun: puntaje.get(usuario.idUsuario) ?? 0, total: totalBuscadas } : null,
       };
     });
 

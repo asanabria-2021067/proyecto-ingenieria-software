@@ -3,10 +3,28 @@
 import { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useConversationFiles } from '@/hooks/use-chat';
 import { formatearTamano } from '@/lib/chat-adjuntos';
-import type { ChatArchivo } from '@/lib/types/chat';
+import type { ChatArchivo, TipoArchivoChat } from '@/lib/types/chat';
 import { AdjuntoIcono, descargarAdjunto, etiquetaAdjunto } from './chat-adjunto';
+import { NotaVozReproductor } from './chat-nota-voz';
+
+type Filtro = TipoArchivoChat | 'todos';
+
+const FILTROS: { valor: Filtro; etiqueta: string }[] = [
+  { valor: 'todos', etiqueta: 'Todos' },
+  { valor: 'imagen', etiqueta: 'Imágenes' },
+  { valor: 'documento', etiqueta: 'Documentos' },
+  { valor: 'audio', etiqueta: 'Notas de voz' },
+];
+
+const VACIO: Record<Filtro, string> = {
+  todos: 'Todavía no se han compartido archivos en esta conversación.',
+  imagen: 'Todavía no se han compartido imágenes en esta conversación.',
+  documento: 'Todavía no se han compartido documentos en esta conversación.',
+  audio: 'Todavía no se han enviado notas de voz en esta conversación.',
+};
 
 interface ChatFilesListProps {
   idProyecto: number;
@@ -24,6 +42,16 @@ function FilaArchivo({ archivo, idProyecto, idConversacion }: { archivo: ChatArc
     await descargarAdjunto(idProyecto, idConversacion, archivo);
     setDescargando(false);
   };
+  if (archivo.mime.startsWith('audio/')) {
+    return (
+      <li className="space-y-1 rounded-lg border border-outline-variant p-2 text-sm">
+        <NotaVozReproductor adjunto={archivo} idProyecto={idProyecto} idConversacion={idConversacion} />
+        <p className="text-xs text-tertiary">
+          Nota de voz · {archivo.remitente.nombre} {archivo.remitente.apellido} · {formatFecha(archivo.creadoEn)}
+        </p>
+      </li>
+    );
+  }
   return (
     <li className="flex items-center gap-2 rounded-lg border border-outline-variant p-2 text-sm">
       <AdjuntoIcono mime={archivo.mime} className="size-5 shrink-0 text-primary" />
@@ -47,33 +75,53 @@ function FilaArchivo({ archivo, idProyecto, idConversacion }: { archivo: ChatArc
 }
 
 export function ChatFilesList({ idProyecto, idConversacion }: ChatFilesListProps) {
-  const { archivos, hasMore, isLoading, isError, cargarMas, cargandoMas } = useConversationFiles(idProyecto, idConversacion, true);
+  const [filtro, setFiltro] = useState<Filtro>('todos');
+  const { archivos, hasMore, isLoading, isError, cargarMas, cargandoMas } = useConversationFiles(
+    idProyecto,
+    idConversacion,
+    true,
+    filtro === 'todos' ? undefined : filtro,
+  );
 
-  if (isLoading) {
-    return (
-      <p className="flex items-center gap-2 text-sm text-tertiary" role="status">
-        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        Cargando archivos…
-      </p>
-    );
-  }
-  if (isError) {
-    return <p role="alert" className="text-sm text-error">No se pudieron cargar los archivos. Intenta de nuevo.</p>;
-  }
-  if (archivos.length === 0) {
-    return <p className="text-sm text-tertiary">Todavía no se han compartido archivos en esta conversación.</p>;
-  }
   return (
     <>
-      <ul className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
-        {archivos.map((a) => (
-          <FilaArchivo key={a.idAdjunto} archivo={a} idProyecto={idProyecto} idConversacion={idConversacion} />
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        aria-label="Filtrar archivos por tipo"
+        value={filtro}
+        onValueChange={(valor) => valor && setFiltro(valor as Filtro)}
+        className="flex-wrap"
+      >
+        {FILTROS.map((f) => (
+          <ToggleGroupItem key={f.valor} value={f.valor} className="px-3 text-xs">
+            {f.etiqueta}
+          </ToggleGroupItem>
         ))}
-      </ul>
-      {hasMore && (
-        <Button type="button" variant="outline" size="sm" onClick={cargarMas} disabled={cargandoMas} className="self-center">
-          {cargandoMas ? 'Cargando…' : 'Cargar más'}
-        </Button>
+      </ToggleGroup>
+      {isLoading ? (
+        <p className="flex items-center gap-2 text-sm text-tertiary" role="status">
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          Cargando archivos…
+        </p>
+      ) : isError ? (
+        <p role="alert" className="text-sm text-error">No se pudieron cargar los archivos. Intenta de nuevo.</p>
+      ) : archivos.length === 0 ? (
+        <p className="text-sm text-tertiary">{VACIO[filtro]}</p>
+      ) : (
+        <>
+          <ul className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
+            {archivos.map((a) => (
+              <FilaArchivo key={a.idAdjunto} archivo={a} idProyecto={idProyecto} idConversacion={idConversacion} />
+            ))}
+          </ul>
+          {hasMore && (
+            <Button type="button" variant="outline" size="sm" onClick={cargarMas} disabled={cargandoMas} className="self-center">
+              {cargandoMas ? 'Cargando…' : 'Cargar más'}
+            </Button>
+          )}
+        </>
       )}
     </>
   );

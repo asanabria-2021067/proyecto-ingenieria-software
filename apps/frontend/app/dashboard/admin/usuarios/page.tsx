@@ -51,7 +51,6 @@ import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admi
 
 const ROL_LABELS: Record<string, string> = {
   estudiante: 'Estudiante',
-  mentor: 'Mentor',
   lider_asociacion: 'Líder de asociación',
   coordinador_academico: 'Coordinador académico',
   administrador: 'Administrador',
@@ -286,7 +285,6 @@ export default function AdminUsuariosPage() {
             <SelectContent className="z-50">
               <SelectItem value="__all__" className="focus:bg-primary focus:text-on-primary">Todos los roles</SelectItem>
               <SelectItem value="estudiante" className="focus:bg-primary focus:text-on-primary">Estudiante</SelectItem>
-              <SelectItem value="mentor" className="focus:bg-primary focus:text-on-primary">Mentor</SelectItem>
               <SelectItem value="lider_asociacion" className="focus:bg-primary focus:text-on-primary">Líder de asociación</SelectItem>
               <SelectItem value="coordinador_academico" className="focus:bg-primary focus:text-on-primary">Coordinador académico</SelectItem>
               <SelectItem value="administrador" className="focus:bg-primary focus:text-on-primary">Administrador</SelectItem>

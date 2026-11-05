@@ -1,5 +1,7 @@
 export const misOrganizacionesQueryKey = ['organizaciones', 'mias'] as const;
 
+export const plantillasOrgQueryKey = ['organizaciones', 'plantillas'] as const;
+
 export const misInvitacionesOrgQueryKey = ['organizaciones', 'invitaciones-mias'] as const;
 
 export const buscarOrganizacionesQueryKey = (q: string, page: number) =>

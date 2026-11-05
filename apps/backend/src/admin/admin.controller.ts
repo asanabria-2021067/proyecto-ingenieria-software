@@ -8,9 +8,10 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -20,6 +21,9 @@ import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 import { MetricasQueryDto } from './dto/metricas-query.dto';
 import { AprobarCuentasLoteDto } from './dto/aprobar-cuentas-lote.dto';
 import { AdminEntidadesService } from './admin-entidades.service';
+import { AdminTablasService } from './admin-tablas.service';
+import { AdminEstadoSistemaService } from './admin-estado-sistema.service';
+import { AdminTablasQueryDto } from './dto/admin-tablas-query.dto';
 import { UpdateAdminUserStatusDto } from './dto/update-admin-user-status.dto';
 import { securityRequestContext } from '../security-events/request-context';
 
@@ -30,6 +34,8 @@ export class AdminController {
   constructor(
     private adminService: AdminService,
     private entidades: AdminEntidadesService,
+    private tablas: AdminTablasService,
+    private estadoSistema: AdminEstadoSistemaService,
   ) {}
 
   @Get('estadisticas')
@@ -125,5 +131,48 @@ export class AdminController {
     @Req() req: Request,
   ) {
     return this.adminService.generarEnlaceRecuperacion(user.userId, id, securityRequestContext(req));
+  }
+
+  @Get('estado-sistema')
+  getEstadoSistema(@CurrentUser() user: { userId: number }) {
+    return this.estadoSistema.obtener(user.userId);
+  }
+
+  @Get('tablas')
+  listarTablas(@CurrentUser() user: { userId: number }) {
+    return this.tablas.listarEntidades(user.userId);
+  }
+
+  @Get('tablas/:entidad')
+  consultarTabla(
+    @CurrentUser() user: { userId: number },
+    @Param('entidad') entidad: string,
+    @Query() query: AdminTablasQueryDto,
+  ) {
+    return this.tablas.consultar(user.userId, entidad, query);
+  }
+
+  @Get('tablas/:entidad/exportar')
+  async exportarTabla(
+    @CurrentUser() user: { userId: number },
+    @Param('entidad') entidad: string,
+    @Query() query: AdminTablasQueryDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const csv = await this.tablas.exportar(user.userId, entidad, query);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', `attachment; filename="tabla-${entidad}.csv"`);
+    return csv;
+  }
+
+  @Get('tablas/:entidad/:id')
+  detalleTabla(
+    @CurrentUser() user: { userId: number },
+    @Param('entidad') entidad: string,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.tablas.detalle(user.userId, entidad, id);
   }
 }

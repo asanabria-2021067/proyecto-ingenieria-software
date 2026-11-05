@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { ConfirmActionDialog } from '@/components/admin/ConfirmActionDialog';
+import { CoordinadorAlcanceEditor } from '@/components/admin/CoordinadorAlcanceEditor';
 import uvgSwal from '@/lib/swal';
 import { getApiErrorMessage } from '@/components/projects/api-error';
 import { estadoBadgeLabel, estadoBadgeStyle } from '@/components/projects/available-project-card';
@@ -58,7 +59,6 @@ interface PendingAction {
 
 const ROL_LABELS: Record<string, string> = {
   estudiante: 'Estudiante',
-  mentor: 'Mentor',
   lider_asociacion: 'Líder de asociación',
   coordinador_academico: 'Coordinador académico',
   administrador: 'Administrador',
@@ -109,7 +109,6 @@ function getPrimaryRole(roles: string[]): string {
     'administrador',
     'coordinador_academico',
     'lider_asociacion',
-    'mentor',
     'estudiante',
   ];
   return priority.find((r) => roles.includes(r)) ?? roles[0] ?? '';
@@ -281,44 +280,6 @@ function EstudianteContent({ user }: { user: AdminUserDetail }) {
   );
 }
 
-function MentorContent({ user }: { user: AdminUserDetail }) {
-  const act = user.actividadMentor;
-
-  return (
-    <div className="space-y-card">
-      <Section title="Actividad como mentor">
-        <div className="grid grid-cols-2 gap-2">
-          <MetricCard label="Proyectos donde participa" value={act?.proyectosDondeParticipa ?? 0} />
-          <MetricCard label="Estudiantes mentorizados" value={act?.estudiantesMentorizados ?? 0} />
-          <MetricCard label="Proyectos activos" value={act?.proyectosActivos ?? 0} />
-          <MetricCard label="Proyectos cerrados" value={act?.proyectosCerrados ?? 0} />
-        </div>
-      </Section>
-
-      <Section title="Proyectos asociados">
-        {!act?.proyectosAsociados.length ? (
-          <p className="type-body text-text-secondary">No hay proyectos asociados.</p>
-        ) : (
-          <ul className="divide-y divide-outline-variant/40">
-            {act.proyectosAsociados.map((p) => (
-              <li key={p.idProyecto} className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
-                <span className="type-body line-clamp-1 flex-1 font-medium text-text-primary">
-                  {p.tituloProyecto}
-                </span>
-                <span
-                  className={`pill shrink-0 ${estadoBadgeStyle(p.estadoProyecto)}`}
-                >
-                  {estadoBadgeLabel(p.estadoProyecto)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-    </div>
-  );
-}
-
 function LiderContent({ user }: { user: AdminUserDetail }) {
   const act = user.actividadLider;
 
@@ -401,6 +362,10 @@ function CoordinadorContent({ user }: { user: AdminUserDetail }) {
           <MetricCard label="Proyectos cerrados" value={act?.proyectosCerrados ?? 0} />
           <MetricCard label="Estudiantes vinculados" value={act?.estudiantesVinculados ?? 0} />
         </div>
+      </Section>
+
+      <Section title="Alcance académico">
+        <CoordinadorAlcanceEditor idUsuario={user.idUsuario} />
       </Section>
 
       <Section title="Proyectos recientes">
@@ -732,7 +697,6 @@ function DetailContent({
       {primaryRole === 'administrador' && <AdministradorContent user={user} />}
       {primaryRole === 'coordinador_academico' && <CoordinadorContent user={user} />}
       {primaryRole === 'lider_asociacion' && <LiderContent user={user} />}
-      {primaryRole === 'mentor' && <MentorContent user={user} />}
       {primaryRole === 'estudiante' && <EstudianteContent user={user} />}
 
       {/* Admin actions */}

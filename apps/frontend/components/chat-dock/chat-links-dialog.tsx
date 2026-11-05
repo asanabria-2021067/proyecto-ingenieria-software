@@ -13,13 +13,15 @@ interface ChatLinksDialogProps {
   onOpenChange: (open: boolean) => void;
   idProyecto: number;
   idConversacion: number;
+  /** Pestaña con la que abre el diálogo. */
+  pestana?: 'enlaces' | 'archivos';
 }
 
 function formatFecha(iso: string): string {
   return new Date(iso).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function EnlacesLista({ idProyecto, idConversacion }: Omit<ChatLinksDialogProps, 'open' | 'onOpenChange'>) {
+function EnlacesLista({ idProyecto, idConversacion }: Pick<ChatLinksDialogProps, 'idProyecto' | 'idConversacion'>) {
   const { enlaces, hasMore, isLoading, isError, cargarMas, cargandoMas } = useConversationLinks(idProyecto, idConversacion, true);
   // El mismo enlace puede repetirse entre paginas: se muestra solo la primera aparicion (la mas reciente).
   const unicos = enlaces.filter((e, i) => enlaces.findIndex((o) => o.url === e.url) === i);
@@ -64,7 +66,7 @@ function EnlacesLista({ idProyecto, idConversacion }: Omit<ChatLinksDialogProps,
   );
 }
 
-export function ChatLinksDialog({ open, onOpenChange, idProyecto, idConversacion }: ChatLinksDialogProps) {
+export function ChatLinksDialog({ open, onOpenChange, idProyecto, idConversacion, pestana = 'enlaces' }: ChatLinksDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex flex-col gap-3 sm:max-w-md">
@@ -72,7 +74,7 @@ export function ChatLinksDialog({ open, onOpenChange, idProyecto, idConversacion
           <DialogTitle>Enlaces y archivos compartidos</DialogTitle>
           <DialogDescription>Lo que se ha enviado en esta conversación, del más reciente al más antiguo.</DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="enlaces">
+        <Tabs defaultValue={pestana}>
           <TabsList>
             <TabsTrigger value="enlaces">Enlaces</TabsTrigger>
             <TabsTrigger value="archivos">Archivos</TabsTrigger>

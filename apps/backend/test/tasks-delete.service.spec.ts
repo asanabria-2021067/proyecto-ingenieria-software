@@ -15,7 +15,7 @@ function makeTx() {
     // A12.1: findMany se usa exclusivamente por syncHitoEstado cuando la
     // tarea eliminada tiene idHito != null. Por defecto [] para no romper
     // los tests preexistentes.
-    tarea: { update: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    tarea: { update: vi.fn(), findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
     asignacionTarea: { updateMany: vi.fn() },
     // A12.1: presente únicamente en los tests que eliminan una tarea con
     // idHito != null; ausente (undefined) en el resto.

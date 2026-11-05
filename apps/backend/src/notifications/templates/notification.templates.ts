@@ -1,6 +1,9 @@
+import { ASOCIACION_TEMPLATES, type AsociacionTemplateData } from './asociacion.templates';
+import { CHAT_TEMPLATES, type ChatTemplateData } from './chat.templates';
+import { COORDINADOR_TEMPLATES, type CoordinadorTemplateData } from './coordinador.templates';
+import { CUENTA_TEMPLATES, type CuentaTemplateData } from './cuenta.templates';
 import { HORAS_TEMPLATES, type HorasTemplateData } from './horas.templates';
-
-export interface NotificationTemplateData extends HorasTemplateData {
+export interface NotificationTemplateData extends HorasTemplateData, CoordinadorTemplateData, CuentaTemplateData, ChatTemplateData, AsociacionTemplateData {
   NUEVA_POSTULACION: {
     userName: string;
     roleName: string;
@@ -98,7 +101,6 @@ export interface NotificationTemplateData extends HorasTemplateData {
     roleId: number;
     taskCount: number;
   };
-
   // Sección 18B: el líder se auto-asignó a un rol. El actor (líder) siempre se
   // excluye de los destinatarios, por lo que puede resultar en cero envíos.
   ROL_ASIGNADO_LIDER: {
@@ -322,15 +324,6 @@ export interface NotificationTemplateData extends HorasTemplateData {
     idHito: number | null;
   };
 
-  // MEJ-44: mención con @ en un mensaje del chat del proyecto.
-  MENCION_CHAT: {
-    autorNombre: string;
-    tituloProyecto: string;
-    idProyecto: number;
-    idConversacion: number;
-    idMensaje: number;
-  };
-
   // MEJ-46: «Recuérdamelo» sobre un mensaje del chat.
   RECORDATORIO_MENSAJE: {
     autorNombre: string;
@@ -428,7 +421,7 @@ export interface NotificationTemplateData extends HorasTemplateData {
 }
 
 export const NOTIFICATION_TEMPLATES = {
-  ...HORAS_TEMPLATES,
+  ...HORAS_TEMPLATES, ...COORDINADOR_TEMPLATES, ...CUENTA_TEMPLATES, ...CHAT_TEMPLATES, ...ASOCIACION_TEMPLATES,
   NUEVA_POSTULACION: {
     title: 'Nueva postulación recibida',
     message: (data: NotificationTemplateData['NUEVA_POSTULACION']) =>
@@ -698,12 +691,6 @@ export const NOTIFICATION_TEMPLATES = {
       const donde = { TAREA: 'la tarea', PROYECTO: 'el proyecto', HITO: 'el hito' }[data.contexto];
       return `${data.autorNombre} te mencionó en un comentario de ${donde} "${data.tituloContexto}".`;
     },
-  },
-
-  MENCION_CHAT: {
-    title: 'Te mencionaron en el chat',
-    message: (data: NotificationTemplateData['MENCION_CHAT']) =>
-      `${data.autorNombre} te mencionó en el chat del proyecto "${data.tituloProyecto}".`,
   },
 
   RECORDATORIO_MENSAJE: {

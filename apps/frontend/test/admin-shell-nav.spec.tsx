@@ -276,6 +276,7 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Panel Admin',
     'Gestión de Usuarios',
     'Recuperación de contraseña',
+    'Desactivación de cuentas',
     'Asociaciones y juntas',
     'Activos',
     'Solicitudes de publicación',
@@ -290,6 +291,9 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Bandeja única',
     'Cuentas pendientes',
     'Eventos de seguridad',
+    'Reportes de problemas',
+    'Modo mantenimiento',
+    'Tablas del sistema',
   ];
 
   function colapsar() {
@@ -386,7 +390,7 @@ describe('AdminLayout — acceso al visor de eventos de seguridad (T-310, FG02-C
   it('«Eventos de seguridad» vive en «Verificación y seguridad» junto a «Cuentas pendientes», enlazado una sola vez', () => {
     const grupo = adminNavEntries.find((e) => 'type' in e && e.type === 'group' && e.label === 'Verificación y seguridad');
     const items = grupo && 'items' in grupo ? grupo.items : [];
-    expect(items.map((i) => i.label)).toEqual(['Bandeja única', 'Cuentas pendientes', 'Eventos de seguridad']);
+    expect(items.map((i) => i.label)).toEqual(['Bandeja única', 'Cuentas pendientes', 'Eventos de seguridad', 'Reportes de problemas']);
 
     const destinos = flattenNavEntries(adminNavEntries);
     expect(destinos.filter((d) => d.href === HREF)).toHaveLength(1);
@@ -512,10 +516,10 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
   const grupos = () =>
     adminNavEntries.map((e) => ('type' in e && e.type === 'group' ? { grupo: e.label, items: e.items.map((i) => i.label) } : { enlace: e.label }));
 
-  it('el orden es estable: panel, usuarios, proyectos, gobernanza, métricas, comunicación y verificación', () => {
+  it('el orden es estable: panel, usuarios, proyectos, gobernanza, métricas, comunicación, verificación y sistema', () => {
     expect(grupos()).toEqual([
       { enlace: 'Panel Admin' },
-      { grupo: 'Usuarios', items: ['Gestión de Usuarios', 'Recuperación de contraseña', 'Asociaciones y juntas'] },
+      { grupo: 'Usuarios', items: ['Gestión de Usuarios', 'Recuperación de contraseña', 'Desactivación de cuentas', 'Asociaciones y juntas'] },
       {
         grupo: 'Proyectos',
         items: ['Activos', 'Solicitudes de publicación', 'Solicitudes de cierre', 'Cerrados', 'Calendario de Sprints'],
@@ -523,7 +527,8 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
       { grupo: 'Gobernanza', items: ['Apelaciones'] },
       { grupo: 'Métricas', items: ['Tendencias de uso', 'Horas por semestre', 'Asociaciones y organizaciones'] },
       { grupo: 'Comunicación', items: ['Anuncios'] },
-      { grupo: 'Verificación y seguridad', items: ['Bandeja única', 'Cuentas pendientes', 'Eventos de seguridad'] },
+      { grupo: 'Verificación y seguridad', items: ['Bandeja única', 'Cuentas pendientes', 'Eventos de seguridad', 'Reportes de problemas'] },
+      { grupo: 'Sistema', items: ['Modo mantenimiento', 'Tablas del sistema'] },
     ]);
   });
 
@@ -567,6 +572,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
   it.each([
     ['/dashboard/admin/usuarios', 'Usuarios', 'Gestión de Usuarios'],
     ['/dashboard/admin/solicitudes-recuperacion', 'Usuarios', 'Recuperación de contraseña'],
+    ['/dashboard/admin/solicitudes-desactivacion', 'Usuarios', 'Desactivación de cuentas'],
     ['/dashboard/admin/asociaciones', 'Usuarios', 'Asociaciones y juntas'],
     ['/dashboard/admin/sprints', 'Proyectos', 'Calendario de Sprints'],
     ['/dashboard/admin/apelaciones', 'Gobernanza', 'Apelaciones'],
@@ -574,6 +580,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
     ['/dashboard/admin/cuentas-pendientes', 'Verificación y seguridad', 'Cuentas pendientes'],
     ['/dashboard/admin/seguridad', 'Verificación y seguridad', 'Eventos de seguridad'],
     ['/dashboard/admin/anuncios', 'Comunicación', 'Anuncios'],
+    ['/dashboard/admin/reportes', 'Verificación y seguridad', 'Reportes de problemas'],
   ])('en %s se abre «%s» y «%s» es el único destino activo', (ruta, grupo, destino) => {
     pathnameMock.mockReturnValue(ruta);
     renderShell();
@@ -626,9 +633,13 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
   it.each([
     ['app/dashboard/admin/usuarios/page.tsx', '/dashboard/admin/usuarios', 'Gestión de Usuarios'],
     ['app/dashboard/admin/solicitudes-recuperacion/page.tsx', '/dashboard/admin/solicitudes-recuperacion', 'Recuperación de contraseña'],
+    ['app/dashboard/admin/solicitudes-desactivacion/page.tsx', '/dashboard/admin/solicitudes-desactivacion', 'Desactivación de cuentas'],
     ['app/dashboard/admin/cuentas-pendientes/page.tsx', '/dashboard/admin/cuentas-pendientes', 'Cuentas pendientes'],
     ['app/dashboard/admin/seguridad/page.tsx', '/dashboard/admin/seguridad', 'Eventos de seguridad'],
+    ['app/dashboard/admin/mantenimiento/page.tsx', '/dashboard/admin/mantenimiento', 'Modo mantenimiento'],
+    ['app/dashboard/admin/tablas/page.tsx', '/dashboard/admin/tablas', 'Tablas del sistema'],
     ['app/dashboard/admin/anuncios/page.tsx', '/dashboard/admin/anuncios', 'Anuncios'],
+    ['app/dashboard/admin/reportes/page.tsx', '/dashboard/admin/reportes', 'Reportes de problemas'],
     ['app/dashboard/admin/asociaciones/page.tsx', '/dashboard/admin/asociaciones', 'Asociaciones y juntas'],
     ['app/dashboard/admin/metricas/page.tsx', '/dashboard/admin/metricas', 'Tendencias de uso'],
     ['app/dashboard/admin/apelaciones/appeals-inbox-client.tsx', '/dashboard/admin/apelaciones', 'Apelaciones'],

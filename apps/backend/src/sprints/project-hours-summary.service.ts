@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { registrosDelTitular } from '../time-records/registros-titular';
 import {
   EstadoHoras,
   EstadoParticipacion,
@@ -176,8 +177,11 @@ const ESTADOS_PROYECTO_ABIERTO: EstadoProyecto[] = [
 ];
 
 /** Horas granulares de un tramo: sus registros efectivos (la consulta ya excluye los revocados). */
-const sumarRegistros = (tramo: { registrosTiempo: Array<{ horas: Prisma.Decimal }> }): Prisma.Decimal =>
-  tramo.registrosTiempo.reduce((acc, fila) => acc.plus(fila.horas), CERO);
+const sumarRegistros = (tramo: {
+  idUsuario: number;
+  registrosTiempo: Array<{ horas: Prisma.Decimal; idUsuario: number }>;
+}): Prisma.Decimal =>
+  registrosDelTitular(tramo).reduce((acc, fila) => acc.plus(fila.horas), CERO);
 
 /** Importe histórico del tramo; solo existe en tramos LEGACY (POR_CONCILIAR no aporta). */
 const legacyDe = (tramo: { origenReporte: OrigenReporteTramo; horasReales: Prisma.Decimal | null }): Prisma.Decimal =>
@@ -236,7 +240,7 @@ export class ProjectHoursSummaryService {
               rolProyecto: { select: { nombreRol: true } },
             },
           },
-          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, idUsuario: true } },
         },
       }),
       db.horasParticipacion.findMany({
@@ -360,7 +364,8 @@ export class ProjectHoursSummaryService {
         origenReporte: true,
         horasReales: true,
         tarea: { select: { idProyecto: true } },
-        registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+        idUsuario: true,
+        registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, idUsuario: true } },
       },
     });
 
@@ -419,7 +424,8 @@ export class ProjectHoursSummaryService {
         select: {
           origenReporte: true,
           horasReales: true,
-          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+          idUsuario: true,
+          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, idUsuario: true } },
           tarea: {
             select: {
               idTarea: true,
@@ -604,7 +610,8 @@ export class ProjectHoursSummaryService {
           horasReales: true,
           desasignadaEn: true,
           reconocidoEn: true,
-          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true } },
+          idUsuario: true,
+          registrosTiempo: { where: { revocadoEn: null }, select: { horas: true, idUsuario: true } },
           ajustes: { where: { anuladoEn: null }, select: { deltaHoras: true } },
         },
       }),

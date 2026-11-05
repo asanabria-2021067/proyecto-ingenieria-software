@@ -45,7 +45,6 @@ function baseUserDetail(overrides: Partial<AdminUserDetail> = {}): AdminUserDeta
     fechaUltimaSesion: null,
     perfilEstudiante: null,
     actividadEstudiante: null,
-    actividadMentor: null,
     actividadLider: null,
     actividadCoordinador: null,
     actividadAdmin: null,
@@ -112,7 +111,7 @@ describe('UserDetailSheet (T-203)', () => {
   it('muestra nombre, correo, rol principal y la info basica formateada', async () => {
     getAdminUserDetailMock.mockResolvedValue(
       baseUserDetail({
-        roles: ['estudiante', 'mentor'],
+        roles: ['estudiante', 'lider_asociacion'],
         fechaUltimaSesion: new Date(Date.now() - 5000).toISOString(),
       }),
     );
@@ -120,8 +119,8 @@ describe('UserDetailSheet (T-203)', () => {
 
     expect(await screen.findByText('Samuel Robledo')).toBeInTheDocument();
     expect(screen.getByText('sammy@uvg.edu.gt')).toBeInTheDocument();
-    // getPrimaryRole prioriza mentor sobre estudiante en la lista de roles
-    expect(screen.getAllByText('Mentor').length).toBeGreaterThan(0);
+    // getPrimaryRole prioriza lider_asociacion (derivado de la junta) sobre estudiante
+    expect(screen.getAllByText('Líder de asociación').length).toBeGreaterThan(0);
     expect(screen.getByText(/Hace un momento/i)).toBeInTheDocument();
   });
 
@@ -181,33 +180,12 @@ describe('UserDetailSheet (T-203)', () => {
     expect(screen.queryByText(/Estudiante en riesgo/i)).not.toBeInTheDocument();
   });
 
-  it('mentor sin proyectos asociados muestra el estado vacio; con proyectos los lista con su badge de estado', async () => {
-    getAdminUserDetailMock.mockResolvedValue(
-      baseUserDetail({ roles: ['mentor'], actividadMentor: {
-        proyectosDondeParticipa: 0,
-        estudiantesMentorizados: 0,
-        proyectosActivos: 0,
-        proyectosCerrados: 0,
-        proyectosAsociados: [],
-      } }),
-    );
+  it('el rol mentor ya no existe: un rol viejo no muestra seccion de mentor', async () => {
+    getAdminUserDetailMock.mockResolvedValue(baseUserDetail({ roles: ['mentor'] }));
     renderSheet();
-    expect(await screen.findByText('No hay proyectos asociados.')).toBeInTheDocument();
-
-    getAdminUserDetailMock.mockResolvedValue(
-      baseUserDetail({ idUsuario: 2, roles: ['mentor'], actividadMentor: {
-        proyectosDondeParticipa: 1,
-        estudiantesMentorizados: 1,
-        proyectosActivos: 1,
-        proyectosCerrados: 0,
-        proyectosAsociados: [
-          { idProyecto: 10, tituloProyecto: 'UVG Collab', estadoProyecto: 'EN_PROGRESO', rol: 'Mentor' },
-        ],
-      } }),
-    );
-    renderSheet({ userId: 2 });
-    expect(await screen.findByText('UVG Collab')).toBeInTheDocument();
-    expect(screen.getByText('En progreso')).toBeInTheDocument();
+    await screen.findByText('Samuel Robledo');
+    expect(screen.queryByText('Actividad como mentor')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mentor')).not.toBeInTheDocument();
   });
 
   it('lider con postulaciones pendientes marca "Requiere atencion" y el contador por proyecto', async () => {

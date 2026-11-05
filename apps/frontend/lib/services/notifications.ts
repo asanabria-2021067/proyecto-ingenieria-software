@@ -186,6 +186,7 @@ export function getNotificationLink(n: {
     }
     // MEJ-44/46: abre la conversacion y salta al mensaje; los ids se validan como enteros positivos.
     case 'MENCION_CHAT':
+    case 'RESPUESTA_HILO_CHAT':
     case 'RECORDATORIO_MENSAJE': {
       const conversacion = Number(datos.idConversacion);
       const mensaje = Number(datos.idMensaje);
@@ -226,6 +227,13 @@ export function getNotificationLink(n: {
       return '/dashboard/admin/usuarios';
     case 'CUENTA_PENDIENTE_VERIFICACION':
       return '/dashboard/admin/cuentas-pendientes';
+    // MEJ-81/85: el aviso de navegador nuevo abre las sesiones abiertas; la solicitud de desactivación, su bandeja.
+    case 'NUEVO_INICIO_SESION':
+      return '/dashboard/configuracion#sesiones';
+    case 'SOLICITUD_DESACTIVACION':
+      return '/dashboard/admin/solicitudes-desactivacion';
+    case 'DESACTIVACION_RESUELTA':
+      return '/dashboard/configuracion';
     // HU-184: alguien compartió su calendario. G03 (UI-40): el enlace lleva el
     // `ownerId` validado y la página lo activa solo si la API lo lista entre
     // los calendarios recibidos; notificaciones antiguas sin id abren el calendario.
@@ -241,4 +249,44 @@ export function getNotificationLink(n: {
     default:
       return null;
   }
+}
+
+/** MEJ-136: horario de silencio (hora de Guatemala). Sin toasts ni push; la bandeja guarda todo igual. */
+export interface HorarioSilencio {
+  activo: boolean;
+  horaInicio: string;
+  horaFin: string;
+  zona: string;
+  /** Solo lectura: si ahora mismo cae dentro del horario. */
+  enSilencio: boolean;
+}
+
+export const horarioSilencioQueryKey = ['horario-silencio'] as const;
+
+export function getHorarioSilencio(): Promise<HorarioSilencio> {
+  return apiFetch<HorarioSilencio>('/notificaciones/silencio');
+}
+
+export function updateHorarioSilencio(payload: Pick<HorarioSilencio, 'activo' | 'horaInicio' | 'horaFin'>): Promise<HorarioSilencio> {
+  const { activo, horaInicio, horaFin } = payload;
+  return apiFetch<HorarioSilencio>('/notificaciones/silencio', {
+    method: 'PUT',
+    body: JSON.stringify({ activo, horaInicio, horaFin }),
+  });
+}
+
+/** MEJ-137: Web Push. La clave pública viaja por la API (no se hornea en el build). */
+export function getClavePush(): Promise<{ clave: string | null }> {
+  return apiFetch<{ clave: string | null }>('/notificaciones/push/clave');
+}
+
+export function guardarSuscripcionPush(suscripcion: { endpoint: string; p256dh: string; auth: string }): Promise<{ suscrito: boolean }> {
+  return apiFetch<{ suscrito: boolean }>('/notificaciones/push/suscripciones', {
+    method: 'POST',
+    body: JSON.stringify(suscripcion),
+  });
+}
+
+export function borrarSuscripcionPush(endpoint: string): Promise<void> {
+  return apiFetch<void>(`/notificaciones/push/suscripciones?endpoint=${encodeURIComponent(endpoint)}`, { method: 'DELETE' });
 }

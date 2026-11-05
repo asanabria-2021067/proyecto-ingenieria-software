@@ -69,7 +69,7 @@ function makePrisma() {
     habilidad: { findMany: vi.fn() },
     requisitoHabilidadRol: { count: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn() },
     tarea: { count: vi.fn() },
-    postulacion: { count: vi.fn(), create: vi.fn() },
+    postulacion: { count: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
     asignacionTarea: { findMany: vi.fn(), updateMany: vi.fn() },
     usuario: { findUnique: vi.fn() },
     $transaction: vi.fn(),
@@ -285,6 +285,21 @@ describe('RolesService.deleteRole', () => {
     const res = await service.deleteRole(PROJECT_ID, ROLE_ID, LEADER_ID);
     expect(res).toEqual({ idRolProyecto: ROLE_ID, eliminado: true });
     expect(prisma.rolProyecto.delete).toHaveBeenCalled();
+  });
+
+  it('una postulación retirada no bloquea la eliminación: no se cuenta y se borra con el rol', async () => {
+    const prisma = makePrisma();
+    armarVacio(prisma);
+    const service = makeService(prisma);
+
+    await service.deleteRole(PROJECT_ID, ROLE_ID, LEADER_ID);
+
+    expect(prisma.postulacion.count).toHaveBeenCalledWith({
+      where: { idRolProyecto: ROLE_ID, estadoPostulacion: { not: 'RETIRADA' } },
+    });
+    expect(prisma.postulacion.deleteMany).toHaveBeenCalledWith({
+      where: { idRolProyecto: ROLE_ID, estadoPostulacion: 'RETIRADA' },
+    });
   });
 
   it('rol solo con requisitos: elimina requisitos y rol atómicamente', async () => {

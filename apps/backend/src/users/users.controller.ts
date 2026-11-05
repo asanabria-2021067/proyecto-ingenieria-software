@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Patch,
   Put,
   Post,
@@ -100,6 +102,17 @@ export class UsersController {
     @Body() dto: ReplaceExperienciasDto,
   ) {
     return this.usersService.replaceExperiencias(user.userId, dto.experiencias);
+  }
+
+  @Get('me/primeros-pasos')
+  getPrimerosPasos(@CurrentUser() user: { userId: number }) {
+    return this.usersService.getPrimerosPasos(user.userId);
+  }
+
+  @Post('me/primeros-pasos/cerrar')
+  @HttpCode(HttpStatus.OK)
+  cerrarPrimerosPasos(@CurrentUser() user: { userId: number }) {
+    return this.usersService.cerrarPrimerosPasos(user.userId);
   }
 
   @Get('me/dashboard')
