@@ -4,7 +4,8 @@ import { PageTitle } from '@/components/ui/page-title';
 import Link from 'next/link';
 import { useRef } from 'react';
 import { AlertCircle, ArrowLeft, BellRing, CheckCircle, Clock, LifeBuoy, type LucideIcon } from 'lucide-react';
-import { useCurrentUser, isAdminUser } from '@/hooks/use-current-user';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { rutaInicioDe } from '@/lib/permissions/ruta-inicio';
 import { MENSAJE_CONTACTO_ENVIADO, mensajeErrorContacto, useEnviarContacto } from '@/hooks/use-enviar-contacto';
 import { ContactForm, ContactFormSkeleton } from '@/components/contacto/contact-form';
 import { contactFormDefaults } from '@/components/contacto/contact-form.schema';
@@ -47,7 +48,7 @@ export default function ContactoPage() {
   useAnimacionEntrada(raiz);
 
   const volver = user
-    ? { href: isAdminUser(user) ? '/dashboard/admin' : '/dashboard', label: 'Volver al panel' }
+    ? { href: rutaInicioDe(user), label: 'Volver al panel' }
     : { href: '/', label: 'Volver al inicio' };
 
   return (

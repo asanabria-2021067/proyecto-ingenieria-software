@@ -8,6 +8,8 @@ vi.mock('next/navigation', () => ({
   useParams: () => ({ id: '42' }),
 }));
 
+// La carga del equipo hace su propia consulta (GET carga-equipo) y tiene sus pruebas en baja-carga-equipo.spec.
+vi.mock('../components/projects/carga-equipo-panel', () => ({ CargaEquipoPanel: () => null }));
 vi.mock('../hooks/use-project-team', () => ({ useProjectTeam: vi.fn() }));
 vi.mock('../hooks/use-project-pending-postulations', () => ({
   useProjectPendingPostulations: vi.fn(),

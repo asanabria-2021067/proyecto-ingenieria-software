@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { useAdminAsociaciones, useAdminHorasCentral, useAdminHorasTotales } from '@/hooks/use-admin-horas';
+import { useEsCoordinador } from '@/hooks/use-can';
 import { useHorasActual } from '@/hooks/use-horas-semestre';
 import { downloadBlob } from '@/lib/download-file';
 import { filtrosServidor, totalesPorAsociacion, type FiltrosUI } from '@/lib/hours/semestre';
@@ -34,7 +35,9 @@ export default function AdminHorasPage() {
   const [errorDescarga, setErrorDescarga] = useState(false);
 
   const { data: carreras = [] } = useQuery<Carrera[]>({ queryKey: ['carreras'], queryFn: getCarreras });
-  const { data: asociaciones = [] } = useAdminAsociaciones();
+  // El coordinador no consulta asociaciones ni el comparativo (403): solo ve las horas de sus carreras.
+  const esCoordinador = useEsCoordinador();
+  const { data: asociaciones = [] } = useAdminAsociaciones(!esCoordinador);
   const filtros = useMemo(() => filtrosServidor(ui), [ui]);
 
   const central = useAdminHorasCentral(filtros);
@@ -65,11 +68,11 @@ export default function AdminHorasPage() {
 
   return (
     <div className={ADMIN_PAGE}>
-      <AdminBreadcrumb seccion="Métricas" pagina="Horas por semestre" />
+      <AdminBreadcrumb seccion={esCoordinador ? 'Coordinación' : 'Métricas'} pagina="Horas por semestre" />
       <section className="mb-8">
         <PageTitle className={ADMIN_PAGE_TITLE}>Horas por semestre</PageTitle>
         <p className={ADMIN_PAGE_LEAD}>
-          Horas beca y de extensión de todos los estudiantes activos. Las declaradas por el estudiante se muestran
+          Horas beca y de extensión de {esCoordinador ? 'los estudiantes activos de tus carreras' : 'todos los estudiantes activos'}. Las declaradas por el estudiante se muestran
           siempre aparte de las acreditadas en UVGenius. Solo consulta.
         </p>
       </section>
@@ -80,6 +83,7 @@ export default function AdminHorasPage() {
           onChange={setUi}
           carreras={carreras}
           asociaciones={asociaciones}
+          conAsociaciones={!esCoordinador}
           semestreActual={semestreActual}
         />
 
@@ -101,7 +105,7 @@ export default function AdminHorasPage() {
 
         <HorasTotalesAsociacion totales={totalesAsociacion} />
 
-        <HorasComparativo />
+        {!esCoordinador && <HorasComparativo />}
 
         {central.isError ? (
           <Empty tone="danger" role="alert">

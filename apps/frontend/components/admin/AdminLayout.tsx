@@ -18,6 +18,8 @@ import {
   Inbox,
   Landmark,
   BellRing,
+  CalendarDays,
+  MessageCircle,
   Megaphone,
   Gavel,
   KeyRound,
@@ -37,7 +39,7 @@ import {
 } from 'lucide-react';
 import { ADMIN_METRICS_ROUTE } from '@/components/admin/admin-page';
 import { useCurrentUser } from '@/hooks/use-current-user';
-import { avisarSinPermiso, useCan, RUTA_SIN_PERMISO } from '@/hooks/use-can';
+import { avisarSinPermiso, useCan, useEsCoordinador, RUTA_SIN_PERMISO } from '@/hooks/use-can';
 import { useLogout } from '@/hooks/use-logout';
 import { useCuentasPendientes } from '@/hooks/use-cuentas-pendientes';
 import { NotificationsBell } from '@/components/layout/notifications-bell';
@@ -49,6 +51,8 @@ import {
   type NavLeaf,
 } from '@/components/dashboard/SidebarNav';
 import { useAdminSidebarCollapsed } from '@/components/dashboard/use-dashboard-sidebar-collapsed';
+import { ChatDockProvider, RUTA_MENSAJES } from '@/components/chat-dock/chat-dock-context';
+import { ChatDock, ChatSocketProvider } from '@/components/chat-dock/chat-dock';
 import { ThemeToggle } from '@/components/theme-toggle';
 import logo from '@/public/logo.png';
 import { ShellSkeleton } from '@/components/layout/shell-skeleton';
@@ -162,6 +166,36 @@ export const adminNavItemsMobile: NavLeaf[] = [
   { href: '/dashboard/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
 ];
 
+/**
+ * Menú del coordinador académico: solo lo que su rol puede abrir (revisiones, cierres, horas y su bandeja de
+ * pendientes, más mensajes y calendario como cualquier usuario). Nada de usuarios, roles, asociaciones, juntas,
+ * configuración del sistema ni mantenimiento: el backend responde 403 a todo eso. Perfil, notificaciones y
+ * configuración de la cuenta salen del menú de usuario.
+ */
+export const coordinadorNavEntries: NavEntry[] = [
+  { href: '/dashboard/coordinador', label: 'Panel del coordinador', icon: LayoutDashboard, exact: true },
+  { href: '/dashboard/coordinador/pendientes', label: 'Bandeja de pendientes', icon: Inbox },
+  {
+    type: 'group',
+    label: 'Proyectos',
+    icon: FolderKanban,
+    items: [
+      { href: '/dashboard/projects/admin/reviews', label: 'Solicitudes de publicación', icon: FileSearch },
+      { href: '/dashboard/coordinador/cierres', label: 'Solicitudes de cierre', icon: Clock },
+    ],
+  },
+  { href: '/dashboard/admin/horas', label: 'Horas y estudiantes en riesgo', icon: BarChart3 },
+  { href: RUTA_MENSAJES, label: 'Mensajes', icon: MessageCircle },
+  { href: '/dashboard/calendario', label: 'Calendario', icon: CalendarDays },
+];
+
+export const coordinadorNavItemsMobile: NavLeaf[] = [
+  { href: '/dashboard/coordinador', label: 'Panel del coordinador', icon: LayoutDashboard, exact: true },
+  { href: '/dashboard/coordinador/pendientes', label: 'Bandeja de pendientes', icon: Inbox },
+  { href: '/dashboard/admin/horas', label: 'Horas y estudiantes en riesgo', icon: BarChart3 },
+  { href: RUTA_MENSAJES, label: 'Mensajes', icon: MessageCircle },
+];
+
 /** `useSearchParams` exige un límite de Suspense en el prerender: se aísla aquí. */
 function AdminSidebarNav({ entries }: { entries: NavEntry[] }) {
   const searchParams = useSearchParams();
@@ -182,7 +216,13 @@ function withCuentasPendientes(entries: NavEntry[], total: number): NavEntry[] {
   );
 }
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+  children,
+  variant = 'admin',
+}: {
+  children: React.ReactNode;
+  variant?: 'admin' | 'coordinador';
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: user, isLoading, isError } = useCurrentUser();
@@ -203,29 +243,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   const esAdmin = useCan('admin.panel');
-  const { data: cuentasPendientes } = useCuentasPendientes(esAdmin);
+  const esCoordinador = useEsCoordinador();
+  const coordinador = variant === 'coordinador';
+  const permitido = coordinador ? esCoordinador : esAdmin;
+  const { data: cuentasPendientes } = useCuentasPendientes(esAdmin && !coordinador);
   const totalPendientes = cuentasPendientes?.total ?? 0;
   const navEntries = useMemo(
-    () => withCuentasPendientes(adminNavEntries, totalPendientes),
-    [totalPendientes],
+    () => (coordinador ? coordinadorNavEntries : withCuentasPendientes(adminNavEntries, totalPendientes)),
+    [coordinador, totalPendientes],
   );
+  const navItemsMobile = coordinador ? coordinadorNavItemsMobile : adminNavItemsMobile;
 
   useEffect(() => {
     if (isLoading) return;
     if (isError) {
       router.replace('/login');
-    } else if (!esAdmin) {
+    } else if (!permitido) {
       // HU-178 (T-302): quien no es administrador vuelve a su dashboard.
       avisarSinPermiso();
       router.replace(RUTA_SIN_PERMISO);
     }
-  }, [isLoading, isError, esAdmin, router]);
+  }, [isLoading, isError, permitido, router]);
 
-  if (isLoading || isError || !esAdmin) {
+  if (isLoading || isError || !permitido) {
     return <ShellSkeleton />;
   }
 
-  return (
+  const shell = (
     <div className="h-screen bg-surface flex overflow-hidden">
       {/* Sidebar - Desktop Only */}
       <aside
@@ -260,7 +304,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             data-slot="admin-nav-section-label"
             className="admin-nav-section-label px-6 pt-6 type-micro font-semibold uppercase tracking-wider"
           >
-            Administración
+            {coordinador ? 'Coordinación' : 'Administración'}
           </p>
         )}
 
@@ -320,10 +364,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Bottom Navigation - Mobile Only */}
       <nav
-        aria-label="Navegación administrativa móvil"
+        aria-label={coordinador ? 'Navegación del coordinador móvil' : 'Navegación administrativa móvil'}
         className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container-low border-t border-outline-variant flex items-center justify-around z-40 pb-safe shadow-lg px-2"
       >
-        {adminNavItemsMobile.map(({ href, label, icon: Icon, exact }) => {
+        {navItemsMobile.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
@@ -343,6 +387,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <UserMenu user={user} onLogout={handleLogout} variant="compact" theme="admin" />
       </nav>
       <DashboardExtras recordarVista={false} destinos={navEntries.flatMap((e) => (e.type === 'group' ? e.items : [e]))} />
+      {coordinador && <ChatDock />}
     </div>
+  );
+
+  // Mensajes del coordinador usa el mismo chat que el estudiante: necesita sus proveedores.
+  return coordinador ? (
+    <ChatDockProvider>
+      <ChatSocketProvider>{shell}</ChatSocketProvider>
+    </ChatDockProvider>
+  ) : (
+    shell
   );
 }

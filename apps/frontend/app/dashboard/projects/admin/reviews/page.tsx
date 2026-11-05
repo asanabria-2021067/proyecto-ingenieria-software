@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { ProjectReviewSheet } from '@/components/admin/ProjectReviewSheet';
 import { ProjectFeedbackSheet } from '@/components/admin/ProjectFeedbackSheet';
 import uvgSwal from '@/lib/swal';
+import { useEsCoordinador } from '@/hooks/use-can';
 import { getAdminReviewInbox, resolverRevision } from '@/lib/services/projects';
 import { getApiErrorMessage, getApiErrorStatus } from '@/components/projects/api-error';
 import { TipoBadge } from '@/components/projects/tipo-badge';
@@ -50,6 +51,8 @@ function DetalleSolicitud({ titulo, tipo, children }: { titulo: string; tipo: Ti
 }
 
 export default function AdminReviewsInboxPage() {
+  // El coordinador no abre las bandejas de proyectos de la administración (403): su miga no enlaza a ellas.
+  const esCoordinador = useEsCoordinador();
   const queryClient = useQueryClient();
   const [reviewSheet, setReviewSheet] = useState<{ open: boolean; idProyecto: number | null }>({
     open: false,
@@ -140,7 +143,11 @@ export default function AdminReviewsInboxPage() {
   return (
     <>
       <div className={ADMIN_PAGE}>
-        <AdminBreadcrumb seccion="Proyectos" seccionHref="/dashboard/admin/proyectos?grupo=activos" pagina="Solicitudes de publicación" />
+        {!esCoordinador ? (
+          <AdminBreadcrumb seccion="Proyectos" seccionHref="/dashboard/admin/proyectos?grupo=activos" pagina="Solicitudes de publicación" />
+        ) : (
+          <AdminBreadcrumb seccion="Coordinación" pagina="Solicitudes de publicación" />
+        )}
         {/* Header */}
         <section className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">

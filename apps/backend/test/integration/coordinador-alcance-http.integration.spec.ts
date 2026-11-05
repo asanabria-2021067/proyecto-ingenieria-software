@@ -21,6 +21,13 @@ import { AdminEntidadesService } from '../../src/admin/admin-entidades.service';
 import { AdminAssociationsController } from '../../src/associations/admin-associations.controller';
 import { AssociationsService } from '../../src/associations/associations.service';
 import { AdminProjectsController } from '../../src/project-closure/admin-projects.controller';
+import type { Cache } from 'cache-manager';
+import { ProjectsController } from '../../src/projects/projects.controller';
+import { ProjectsService } from '../../src/projects/projects.service';
+import { SocialService } from '../../src/social/social.service';
+import { ProjectTransactionService } from '../../src/common/project-policy/project-transaction.service';
+import { ProjectPolicyService } from '../../src/common/project-policy/project-policy.service';
+import { ProjectIdResolverService } from '../../src/common/project-policy/project-id-resolver.service';
 import { HistoricalProjectReadService } from '../../src/project-closure/historical-project-read.service';
 import { ProjectClosureController } from '../../src/project-closure/project-closure.controller';
 import { ProjectClosureService } from '../../src/project-closure/project-closure.service';
@@ -160,6 +167,15 @@ describeIntegration('ROL-1 coordinador académico: alcance por carrera (PostgreS
     const coordinador = new CoordinadorService(prisma, notifications);
     const mensajes = new MensajesRevisionService(prisma, notifications, stack.runner, stack.policy, new ProjectReadPolicyService(prisma));
     const historico = historicalStack(db).service;
+    const proyectos = new ProjectsService(
+      prisma,
+      notifications,
+      { del: vi.fn() } as unknown as Cache,
+      new ProjectTransactionService(prisma),
+      new ProjectPolicyService(new ProjectIdResolverService(prisma)),
+      new ProjectReadPolicyService(prisma),
+      new SocialService(prisma, notifications),
+    );
 
     Reflect.defineMetadata(PARAMTYPES_METADATA, [Reflector, PrismaService], RolesGuard);
     http = await startIntegrationHttpHarness({
@@ -182,6 +198,7 @@ describeIntegration('ROL-1 coordinador académico: alcance por carrera (PostgreS
         },
         { controller: AdminCoordinadoresController, deps: [CoordinadorService], handlers: { guardar: [Object, Number, GuardarAlcanceDto] } },
         { controller: CoordinadorController, deps: [CoordinadorService] },
+        { controller: ProjectsController, deps: [ProjectsService] },
       ],
       providers: [
         { provide: AdminService, useValue: {} },
@@ -196,6 +213,7 @@ describeIntegration('ROL-1 coordinador académico: alcance por carrera (PostgreS
         { provide: RevisionesService, useValue: revisiones },
         { provide: HorasSemestreService, useValue: horas },
         { provide: CoordinadorService, useValue: coordinador },
+        { provide: ProjectsService, useValue: proyectos },
       ],
     });
   }, 60_000);
@@ -283,6 +301,14 @@ describeIntegration('ROL-1 coordinador académico: alcance por carrera (PostgreS
       expect((await get(`/proyectos/${f.cierreB.idProyecto}/cierre/readiness?phase=APPROVE`, tokens.coord)).status).toBe(403);
       expect((await get(`/mensajes-revision/proyectos/${f.pubB}`, tokens.coord)).status).toBe(403);
       expect((await get(`/admin/proyectos/${f.pubB}`, tokens.coord)).status).toBe(403);
+      expect((await get(`/proyectos/${f.pubB}/admin`, tokens.coord)).status).toBe(403);
+    });
+
+    it('GET /proyectos/:id/admin: el coordinador lee el de su carrera, el admin sigue leyendo y el estudiante no', async () => {
+      expect((await get(`/proyectos/${f.pubA}/admin`, tokens.coord)).status).toBe(200);
+      expect((await get(`/proyectos/${f.pubA}/admin`, tokens.admin)).status).toBe(200);
+      expect((await get(`/proyectos/${f.pubA}/admin`, tokens.estudiante)).status).toBe(403);
+      expect((await get(`/proyectos/${f.pubPropia}/admin`, tokens.coord)).status).toBe(403);
     });
 
     it('validar o rechazar un cierre de otra carrera -> 403 y el cierre no cambia', async () => {

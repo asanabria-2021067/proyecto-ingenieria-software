@@ -11,6 +11,13 @@ Toda ruta bajo `/dashboard/admin/*` y `/dashboard/projects/admin/*` se sirve den
 `/login`; con sesión y sin el rol, a `/dashboard`; mientras decide no pinta el contenido. El backend repite la
 comprobación en cada endpoint administrativo. Ninguna ruta de este inventario es visible para un estudiante.
 
+Excepción (ROL-2): el coordinador académico (que no es administrador) también entra a cuatro rutas de este inventario,
+porque el backend se las abre dentro de su alcance: `/dashboard/projects/admin/reviews`, `/dashboard/admin/horas`,
+`/dashboard/admin/proyectos/[id]` y `/dashboard/admin/proyectos/[id]/cierre`. Para él el layout raíz
+(`isCoordinadorSharedRoute`) las sirve con `AdminLayout variant="coordinador"`, que tiene su propio menú
+(`coordinadorNavEntries`) y no enlaza ninguna otra ruta administrativa. El resto de `/dashboard/admin/*` sigue exigiendo
+`administrador`.
+
 ## 2. Rutas enlazadas desde el menú lateral
 
 | Ruta | Etiqueta en el menú | Origen | Depende de |

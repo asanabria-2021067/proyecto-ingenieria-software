@@ -215,6 +215,7 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
       'GET /api/admin/horas-semestre/pdf',
       'GET /api/admin/horas-semestre/totales',
       'GET /api/admin/proyectos/:projectId',
+      'GET /api/proyectos/:id/admin',
       'GET /api/coordinador/mi-alcance',
       'GET /api/coordinador/pendientes',
       'GET /api/revisiones/admin/bandeja',
