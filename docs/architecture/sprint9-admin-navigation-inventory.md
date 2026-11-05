@@ -31,6 +31,8 @@ comprobación en cada endpoint administrativo. Ninguna ruta de este inventario e
 | `/dashboard/admin/solicitudes-desactivacion` | Desactivación de cuentas | MEJ-85 · solicitudes de estudiantes que piden desactivar su cuenta; solo del administrador | `GET /admin/solicitudes-desactivacion` |
 | `/dashboard/admin/cuentas-pendientes` | Cuentas pendientes | HU-179 (PR #270); colocada en la estructura por T-321 | `GET /admin/cuentas-pendientes` |
 | `/dashboard/admin/seguridad` | Eventos de seguridad | Sprint 9 · T-310 (Vernel) | `GET /admin/eventos-seguridad` |
+| `/dashboard/admin/mantenimiento` | Modo mantenimiento | ADM-1 · interruptor, mensaje, regreso estimado e inicio programado del modo mantenimiento | `GET/PUT /admin/mantenimiento` |
+| `/dashboard/admin/tablas` | Tablas del sistema | ADM-1 · consulta de solo lectura de once tablas, con búsqueda, filtros, orden, detalle y exportación CSV | `GET /admin/tablas`, `GET /admin/tablas/:entidad` |
 | `/dashboard/admin/anuncios` | Anuncios | Sprint 9 · HU-191 · T-352 | `GET/POST/PATCH /admin/anuncios` |
 | `/dashboard/admin/asociaciones` | Asociaciones y juntas | ASO · gestión de asociaciones oficiales y de su junta directiva, solo del administrador | `GET/POST/PATCH /admin/asociaciones` |
 
@@ -49,6 +51,7 @@ El menú se agrupa por tema de trabajo. «Panel Admin» va suelto arriba y los g
 | Métricas | Tendencias de uso · Horas por semestre · Asociaciones y organizaciones | Las métricas de uso de la plataforma (HU-178), la vista central de horas del semestre con su comparativo (HRS) y la actividad de asociaciones y organizaciones, cada una en su propia página. |
 | Comunicación | Anuncios | Avisos que la administración publica como banner en el dashboard (HU-191): crear, editar y despublicar. |
 | Verificación y seguridad | Bandeja única · Cuentas pendientes · Eventos de seguridad | Supervisión de accesos y cuentas: la bandeja de cuentas que esperan verificación (HU-179), con su contador, y el visor de eventos. |
+| Sistema | Modo mantenimiento · Tablas del sistema | Configuración y consulta del sistema (ADM-1): el modo mantenimiento y la vista de solo lectura de las tablas. El estado de los servicios vive en una tarjeta del Panel Admin. |
 
 Antes de Sprint 9 existía un grupo genérico «Administración» que mezclaba cuentas, seguridad y la página temporal
 de etiquetas; se repartió entre «Usuarios», «Verificación y seguridad» y «Diagnóstico». Ninguna ruta cambió: solo

@@ -1,7 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
 import type { ChatStoragePort } from './chat-storage.port';
+import { ServicioNoDisponibleException } from '../common/servicio-no-disponible.exception';
 
 // Todo viaja como raw + authenticated: nada es publico por URL adivinable.
 const OPTS = { resource_type: 'raw', type: 'authenticated' } as const;
@@ -18,7 +19,8 @@ export class CloudinaryChatStorageAdapter implements ChatStoragePort {
     const api_key = this.config.get<string>('CLOUDINARY_API_KEY');
     const api_secret = this.config.get<string>('CLOUDINARY_API_SECRET');
     if (!cloud_name || !api_key || !api_secret) {
-      throw new ServiceUnavailableException(
+      throw new ServicioNoDisponibleException(
+        'cloudinary',
         'El almacenamiento de archivos no está configurado (faltan credenciales de Cloudinary)',
       );
     }
@@ -37,7 +39,7 @@ export class CloudinaryChatStorageAdapter implements ChatStoragePort {
       });
     } catch {
       this.logger.warn('Fallo la carga de un adjunto de chat al proveedor');
-      throw new ServiceUnavailableException('No se pudo guardar el archivo, intenta de nuevo');
+      throw new ServicioNoDisponibleException('cloudinary', 'No se pudo guardar el archivo, intenta de nuevo');
     }
   }
 

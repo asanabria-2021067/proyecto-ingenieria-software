@@ -43,6 +43,8 @@ motivo de comentario» de `docs/design-system.md`.
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/metricas/page.tsx` |
 | `/dashboard/admin/horas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/horas/page.tsx` |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/seguridad/page.tsx` |
+| `/dashboard/admin/mantenimiento` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/mantenimiento/page.tsx` |
+| `/dashboard/admin/tablas` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/tablas/page.tsx` |
 | `/dashboard/admin/anuncios` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/anuncios/page.tsx` |
 | `/dashboard/admin/asociaciones` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/asociaciones/page.tsx` |
 | `/dashboard/admin/bandeja` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/bandeja/page.tsx` |
@@ -113,6 +115,8 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin/metricas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/horas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/seguridad` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/mantenimiento` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/tablas` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/anuncios` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/asociaciones` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/bandeja` | sí | 0 | 0 | 0 | 0 |

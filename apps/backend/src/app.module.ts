@@ -57,6 +57,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { FollowsModule } from './follows/follows.module';
 import { RoleInvitationsModule } from './role-invitations/role-invitations.module';
 import { CoordinadorModule } from './coordinador/coordinador.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 
 const skipThrottling = () => isThrottlerDisabled();
 
@@ -150,6 +151,7 @@ const skipThrottling = () => isThrottlerDisabled();
     FollowsModule,
     RoleInvitationsModule,
     CoordinadorModule,
+    MaintenanceModule,
   ],
   controllers: [AppController],
   providers: [

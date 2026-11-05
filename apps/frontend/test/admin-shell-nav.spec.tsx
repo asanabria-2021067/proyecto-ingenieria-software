@@ -291,6 +291,8 @@ describe('AdminLayout — sidebar colapsable', () => {
     'Bandeja única',
     'Cuentas pendientes',
     'Eventos de seguridad',
+    'Modo mantenimiento',
+    'Tablas del sistema',
   ];
 
   function colapsar() {
@@ -513,7 +515,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
   const grupos = () =>
     adminNavEntries.map((e) => ('type' in e && e.type === 'group' ? { grupo: e.label, items: e.items.map((i) => i.label) } : { enlace: e.label }));
 
-  it('el orden es estable: panel, usuarios, proyectos, gobernanza, métricas, comunicación y verificación', () => {
+  it('el orden es estable: panel, usuarios, proyectos, gobernanza, métricas, comunicación, verificación y sistema', () => {
     expect(grupos()).toEqual([
       { enlace: 'Panel Admin' },
       { grupo: 'Usuarios', items: ['Gestión de Usuarios', 'Recuperación de contraseña', 'Desactivación de cuentas', 'Asociaciones y juntas'] },
@@ -525,6 +527,7 @@ describe('Menú agrupado por tema (T-319, FG06-C02)', () => {
       { grupo: 'Métricas', items: ['Tendencias de uso', 'Horas por semestre', 'Asociaciones y organizaciones'] },
       { grupo: 'Comunicación', items: ['Anuncios'] },
       { grupo: 'Verificación y seguridad', items: ['Bandeja única', 'Cuentas pendientes', 'Eventos de seguridad'] },
+      { grupo: 'Sistema', items: ['Modo mantenimiento', 'Tablas del sistema'] },
     ]);
   });
 
@@ -631,6 +634,8 @@ describe('Miga de pan y menú comparten nombres (T-319, FG06-C03)', () => {
     ['app/dashboard/admin/solicitudes-desactivacion/page.tsx', '/dashboard/admin/solicitudes-desactivacion', 'Desactivación de cuentas'],
     ['app/dashboard/admin/cuentas-pendientes/page.tsx', '/dashboard/admin/cuentas-pendientes', 'Cuentas pendientes'],
     ['app/dashboard/admin/seguridad/page.tsx', '/dashboard/admin/seguridad', 'Eventos de seguridad'],
+    ['app/dashboard/admin/mantenimiento/page.tsx', '/dashboard/admin/mantenimiento', 'Modo mantenimiento'],
+    ['app/dashboard/admin/tablas/page.tsx', '/dashboard/admin/tablas', 'Tablas del sistema'],
     ['app/dashboard/admin/anuncios/page.tsx', '/dashboard/admin/anuncios', 'Anuncios'],
     ['app/dashboard/admin/asociaciones/page.tsx', '/dashboard/admin/asociaciones', 'Asociaciones y juntas'],
     ['app/dashboard/admin/metricas/page.tsx', '/dashboard/admin/metricas', 'Tendencias de uso'],

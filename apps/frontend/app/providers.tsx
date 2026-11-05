@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ThemeProvider, useTheme } from 'next-themes';
 import { Toaster } from 'sonner';
+import { MantenimientoGate } from '@/components/mantenimiento/mantenimiento-gate';
 import { ConfirmacionHost } from '@/components/mensajes/confirmacion-host';
 
 /** Aparte para poder leer `useTheme()` (necesita estar DENTRO de ThemeProvider). */
@@ -35,7 +36,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        {children}
+        <MantenimientoGate>{children}</MantenimientoGate>
         <ConfirmacionHost />
         <AppToaster />
       </ThemeProvider>

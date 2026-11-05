@@ -27,6 +27,8 @@ const LINEA_BASE: Record<string, Medida> = {
   '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/horas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/mantenimiento': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/tablas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   // HU-191 (T-352): nació ya con los tokens; su línea base es su primera medición.
   '/dashboard/admin/anuncios': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/asociaciones': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
@@ -52,6 +54,8 @@ const ESTADO_ACTUAL: Record<string, Medida> = {
   '/dashboard/admin/metricas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/horas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/seguridad': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/mantenimiento': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
+  '/dashboard/admin/tablas': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/anuncios': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/asociaciones': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },
   '/dashboard/admin/bandeja': { px: 0, radio: 0, hex: 0, boton: 0, titular: true },

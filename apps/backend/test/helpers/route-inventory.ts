@@ -27,6 +27,7 @@ export interface Ruta {
 export const RUTAS_PUBLICAS = new Set([
   'GET /api',
   'GET /api/carreras',
+  'GET /api/mantenimiento',
   'POST /api/auth/login',
   'POST /api/auth/register',
   'POST /api/auth/forgot-password',

@@ -9,6 +9,7 @@ vi.mock('../lib/services/admin', async (importOriginal) => {
   return { ...actual, getAdminStats: vi.fn(), getAdminMetricas: vi.fn() };
 });
 vi.mock('../lib/services/admin-sprints', () => ({ getAdminSprintCalendar: vi.fn() }));
+vi.mock('../lib/services/admin-sistema', () => ({ getEstadoSistema: vi.fn().mockRejectedValue(new Error('sin estado')) }));
 
 import AdminPanelPage from '../app/dashboard/admin/page';
 import { getAdminMetricas, getAdminStats, type AdminMetricas, type AdminStats } from '../lib/services/admin';
@@ -100,7 +101,7 @@ describe('Panel de Administración (/dashboard/admin)', () => {
     expect(screen.getByText('Resumen general de actividad, usuarios y proyectos en UVGenius.')).toBeInTheDocument();
   });
 
-  it('ordena el panel en cinco secciones: Global, Operación, Seguimiento, Datos 2026 y Tendencias de uso', async () => {
+  it('ordena el panel en seis secciones: Global, Operación, Seguimiento, Datos 2026, Estado del sistema y Tendencias de uso', async () => {
     renderPage();
     await screen.findByRole('heading', { level: 1 });
 
@@ -109,6 +110,7 @@ describe('Panel de Administración (/dashboard/admin)', () => {
       'Operación',
       'Seguimiento',
       'Datos 2026',
+      'Estado del sistema',
       'Tendencias de uso',
     ]);
   });

@@ -242,6 +242,9 @@ jobs:
           push: true
           tags: |
             ${{ steps.vars.outputs.backend_tag }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp || 'desconocido' }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
 
