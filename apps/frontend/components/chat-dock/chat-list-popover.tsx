@@ -247,7 +247,7 @@ export function ChatListPopover({ onClose, onOpenSaved, pagina = false, idActiva
         {isLoading && (
           <SkeletonList label="Cargando chats" count={4} lines={2} avatar="circle" layout="plain" className="px-4 py-stack" />
         )}
-        {!isLoading && filtradas.length === 0 && organizaciones.length === 0 && (
+        {!isLoading && filtradas.length === 0 && canales.length === 0 && organizaciones.length === 0 && (
           <p className="px-4 py-6 text-center text-xs text-tertiary">
             {debouncedQuery ? 'Sin resultados para esa búsqueda.' : 'No tienes chats aquí todavía.'}
           </p>
