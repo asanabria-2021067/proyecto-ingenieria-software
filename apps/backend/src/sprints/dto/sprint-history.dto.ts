@@ -24,6 +24,7 @@ export interface SprintListItemDto {
   fechaInicio: Date;
   fechaFinalizacionIniciada: Date | null;
   fechaCierre: Date | null;
+  objetivo: string | null;
   tareas: number;
   hitos: number;
   horasEstimadas: number;

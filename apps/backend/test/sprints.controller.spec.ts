@@ -20,7 +20,7 @@ function makeService() {
 }
 
 function makeController(service: ReturnType<typeof makeService>) {
-  return new SprintsController(service as unknown as SprintsService);
+  return new SprintsController(service as unknown as SprintsService, {} as never, {} as never);
 }
 
 describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
@@ -40,7 +40,7 @@ describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
     controller.start(5, { userId: 9 }, { fechaFinPlaneada: '2026-12-01' });
 
     expect(service.startSprint).toHaveBeenCalledTimes(1);
-    expect(service.startSprint).toHaveBeenCalledWith(5, 9, '2026-12-01');
+    expect(service.startSprint).toHaveBeenCalledWith(5, 9, '2026-12-01', undefined);
   });
 
   it('solo pasa fechaFinPlaneada al servicio: fechaInicio nunca viaja desde el controller', () => {
@@ -49,7 +49,17 @@ describe('SprintsController.start (POST /proyectos/:projectId/sprints)', () => {
 
     controller.start(5, { userId: 9 }, { fechaFinPlaneada: '2026-12-01' });
 
-    expect(service.startSprint.mock.calls[0]).toHaveLength(3);
+    // MEJ-117: el cuarto argumento es el objetivo opcional; fechaInicio sigue sin viajar.
+    expect(service.startSprint.mock.calls[0]).toEqual([5, 9, '2026-12-01', undefined]);
+  });
+
+  it('MEJ-117: pasa el objetivo opcional al servicio', () => {
+    const service = makeService();
+    const controller = makeController(service);
+
+    controller.start(5, { userId: 9 }, { fechaFinPlaneada: '2026-12-01', objetivo: 'Cerrar pagos' });
+
+    expect(service.startSprint).toHaveBeenCalledWith(5, 9, '2026-12-01', 'Cerrar pagos');
   });
 
   it('retorna exactamente lo que resuelve SprintsService.startSprint, sin transformarlo', async () => {

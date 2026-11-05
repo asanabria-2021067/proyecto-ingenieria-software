@@ -282,6 +282,22 @@ describe('SprintsService', () => {
       }
     });
 
+    it('MEJ-117: guarda el objetivo opcional al crear el Sprint', async () => {
+      const tx = makeTx();
+      tx.sprint.findFirst.mockResolvedValue(null);
+      tx.sprint.create.mockResolvedValue({ idSprint: 1, idProyecto: PROJECT_ID, numero: 1, estado: 'ACTIVO' });
+      const prisma = makePrisma(tx);
+      const context = makeSprintsContext();
+      context.getCurrentSprint.mockResolvedValue(null);
+      const service = new SprintsService(prisma, context, makeSprintsAuthorization(), makeNotifications(), new ProjectTransactionService(prisma as unknown as PrismaService), makeProjectPolicyDouble(), makeProjectReadPolicyDouble());
+
+      await service.startSprint(PROJECT_ID, LIDER_ID, '2026-10-04', 'Cerrar el módulo de pagos');
+
+      expect(tx.sprint.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ objetivo: 'Cerrar el módulo de pagos' }),
+      });
+    });
+
     it('caso 3: rechaza si ya existe un Sprint ACTIVO, sin crear ninguna fila', async () => {
       const tx = makeTx();
       const prisma = makePrisma(tx);

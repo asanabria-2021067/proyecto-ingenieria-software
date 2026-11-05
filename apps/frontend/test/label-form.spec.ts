@@ -38,7 +38,7 @@ describe('LabelForm', () => {
     const onSubmit = vi.fn();
     renderForm({ onSubmit });
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: '  Urgente  ' } });
-    fireEvent.change(screen.getByLabelText('Color'), { target: { value: '#ABCDEF' } });
+    fireEvent.change(screen.getByLabelText('Hexadecimal'), { target: { value: '#ABCDEF' } });
     fireEvent.click(screen.getByRole('button', { name: 'Crear etiqueta' }));
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith({ nombreEtiqueta: 'Urgente', color: '#ABCDEF' }, expect.anything()),
@@ -48,40 +48,48 @@ describe('LabelForm', () => {
   it('rechaza nombre vacío', async () => {
     const onSubmit = vi.fn();
     renderForm({ onSubmit });
-    fireEvent.change(screen.getByLabelText('Color'), { target: { value: '#ABCDEF' } });
+    fireEvent.change(screen.getByLabelText('Hexadecimal'), { target: { value: '#ABCDEF' } });
     fireEvent.click(screen.getByRole('button', { name: 'Crear etiqueta' }));
     expect(await screen.findByText('El nombre no puede estar vacío.')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it('rechaza un color con formato inválido', async () => {
+  it('un color con formato inválido se avisa y se envía el último color válido, nunca el inválido', async () => {
     const onSubmit = vi.fn();
     renderForm({ onSubmit });
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Backend' } });
-    fireEvent.change(screen.getByLabelText('Color'), { target: { value: '#FFF' } });
+    fireEvent.change(screen.getByLabelText('Hexadecimal'), { target: { value: '#FFF' } });
+    expect(screen.getByLabelText('Hexadecimal')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText(/El color debe tener el formato #RRGGBB/)).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Crear etiqueta' }));
-    expect(await screen.findByText('El color debe tener el formato #RRGGBB.')).toBeInTheDocument();
-    expect(onSubmit).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toEqual({ nombreEtiqueta: 'Backend', color: '#006735' });
+    expect(onSubmit.mock.calls[0][0].color).not.toBe('#FFF');
+  });
+
+  it('la etiqueta «Color» está asociada al campo del selector', () => {
+    renderForm();
+    expect(screen.getByLabelText('Color')).toBe(screen.getByLabelText('Hexadecimal'));
   });
 
   it('acepta un color válido de 6 dígitos', async () => {
     const onSubmit = vi.fn();
     renderForm({ onSubmit });
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Backend' } });
-    fireEvent.change(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
+    fireEvent.change(screen.getByLabelText('Hexadecimal'), { target: { value: '#00ff00' } });
     fireEvent.click(screen.getByRole('button', { name: 'Crear etiqueta' }));
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith({ nombreEtiqueta: 'Backend', color: '#00FF00' }, expect.anything()),
     );
   });
 
-  it('sincroniza el input de texto y el selector de color nativo', () => {
+  it('sincroniza el hexadecimal con la paleta', () => {
     renderForm();
-    const picker = screen.getByLabelText('Selector de color') as HTMLInputElement;
-    const texto = screen.getByLabelText('Color') as HTMLInputElement;
 
-    fireEvent.change(texto, { target: { value: '#123abc' } });
-    expect(picker.value.toLowerCase()).toBe('#123abc');
+    fireEvent.change(screen.getByLabelText('Hexadecimal'), { target: { value: '#2680c2' } });
+    expect(screen.getByRole('radio', { name: 'Azul' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('muestra el error diferenciado recibido por props', () => {

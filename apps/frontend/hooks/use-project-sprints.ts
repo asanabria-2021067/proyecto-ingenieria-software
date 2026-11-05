@@ -5,6 +5,7 @@ import {
   projectSprintsQueryKey,
   sprintAnalyticsQueryKey,
   sprintBurndownQueryKey,
+  sprintColumnTimeQueryKey,
   sprintClosingSummaryQueryKey,
   sprintDetailQueryKey,
   sprintsAnalyticsQueryKey,
@@ -16,9 +17,11 @@ import {
   getSprintAnalytics,
   getSprintBurndown,
   getSprintClosingSummary,
+  getSprintColumnTime,
   getSprintDetail,
   getSprintsAnalytics,
   startSprint,
+  updateSprintObjetivo,
 } from '@/lib/services/sprints';
 import type {
   SprintAnalyticsDto,
@@ -75,7 +78,21 @@ export function useStartSprint(idProyecto: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (fechaFinPlaneada: string) => startSprint(idProyecto, fechaFinPlaneada),
+    mutationFn: ({ fechaFinPlaneada, objetivo }: { fechaFinPlaneada: string; objetivo?: string }) =>
+      startSprint(idProyecto, fechaFinPlaneada, objetivo),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: projectSprintsQueryKey(idProyecto) });
+    },
+  });
+}
+
+/** MEJ-117: edita el objetivo del Sprint (líder). */
+export function useUpdateSprintObjetivo(idProyecto: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ idSprint, objetivo }: { idSprint: number; objetivo: string | null }) =>
+      updateSprintObjetivo(idProyecto, idSprint, objetivo),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectSprintsQueryKey(idProyecto) });
     },
@@ -224,4 +241,13 @@ export function useSprintBurndown(idProyecto: number, idSprint: number) {
     error: query.error,
     refetch: query.refetch,
   };
+}
+
+/** Tiempo promedio por columna del tablero (MEJ-120). Read-only. */
+export function useSprintColumnTime(idProyecto: number, idSprint: number) {
+  return useQuery({
+    queryKey: sprintColumnTimeQueryKey(idProyecto, idSprint),
+    queryFn: () => getSprintColumnTime(idProyecto, idSprint),
+    enabled: isValidId(idProyecto) && isValidId(idSprint),
+  });
 }

@@ -1403,6 +1403,8 @@ model Sprint {
   cerradoPor                Int?         @map("cerrado_por")
   /// Sprint de ejemplo que se ofrece al líder del primer proyecto; se borra de una vez.
   esEjemplo                 Boolean      @default(false) @map("es_ejemplo")
+  /// MEJ-117: objetivo opcional del Sprint (texto saneado, hasta 280 caracteres).
+  objetivo                  String?      @db.VarChar(280)
 
   /// T-239 (HU-160): instantánea congelada de la fila al cerrar el Sprint —
   /// null hasta CERRADO, escrita una única vez dentro de la misma transacción

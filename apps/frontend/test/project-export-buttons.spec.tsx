@@ -27,6 +27,11 @@ function mockMutation(overrides: Record<string, unknown> = {}) {
   return { mutate: vi.fn(), isPending: false, isError: false, ...overrides };
 }
 
+/** El PDF es un diálogo por pasos: avanza `n` veces con «Siguiente». */
+function avanzar(n: number) {
+  for (let i = 0; i < n; i += 1) fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+}
+
 function renderButtons() {
   return render(createElement(ProjectExportButtons, { idProyecto: 5 }));
 }
@@ -144,7 +149,9 @@ describe('ProjectExportButtons', () => {
 
     renderButtons();
     fireEvent.click(screen.getByRole('button', { name: /exportar pdf/i }));
+    avanzar(2); // qué incluir -> rango de fechas -> apariencia
     fireEvent.click(screen.getByRole('radio', { name: /grande/i }));
+    avanzar(1); // vista previa
     fireEvent.click(screen.getByRole('button', { name: /descargar pdf/i }));
 
     expect(exportPdf.mutate).toHaveBeenCalledTimes(1);
@@ -165,6 +172,7 @@ describe('ProjectExportButtons', () => {
 
     renderButtons();
     fireEvent.click(screen.getByRole('button', { name: /exportar pdf/i }));
+    avanzar(3); // hasta la vista previa
     fireEvent.click(screen.getByRole('button', { name: /descargar pdf/i }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -204,6 +212,7 @@ describe('ProjectExportButtons', () => {
 
     renderButtons();
     fireEvent.click(screen.getByRole('button', { name: /exportar pdf/i }));
+    avanzar(1); // paso del rango de fechas
 
     expect(screen.getByLabelText(/desde/i)).toHaveAttribute('min', '2026-01-10');
   });

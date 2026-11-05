@@ -33,6 +33,7 @@ import { TaskListView } from '@/components/projects/task-list-view';
 import { TaskTableView } from '@/components/projects/task-table-view';
 import { SEGMENTED_ITEM_CLASS, ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { StartSprintButton } from '@/components/projects/start-sprint-button';
+import { SprintObjetivo } from '@/components/projects/sprint-objetivo';
 import { SprintReconocimientos, candidatosAReconocer } from '@/components/projects/sprint-extras';
 import { HitosSection } from '@/components/projects/hitos-section';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
@@ -682,6 +683,14 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               </div>
             ) : haySprintDeTrabajo ? (
               <>
+              {sprintActual && (
+                <SprintObjetivo
+                  idProyecto={idProyecto}
+                  idSprint={sprintActual.idSprint}
+                  objetivo={sprintActual.objetivo}
+                  puedeEditar={isLeader}
+                />
+              )}
               {soloMias && !isLoadingTasks && !isErrorTasks && tasks.length > 0 && tareasVisibles.length === 0 && (
                 <Empty tone="muted" size="compact" role="status" className="mb-4">
                   <EmptyMedia variant="compact" className="size-10 rounded-control border-transparent text-text-secondary">

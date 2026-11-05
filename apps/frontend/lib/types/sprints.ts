@@ -29,6 +29,8 @@ export interface SprintDto {
   fechaFinalizacionIniciada: string | null;
   fechaCierre: string | null;
   cerradoPor?: number | null;
+  /** MEJ-117 — objetivo opcional; solo viene en la lista de Sprints. */
+  objetivo?: string | null;
   /** A10.1 — presente en `GET /proyectos/:id/sprints`, ausente en las mutaciones. */
   tareas?: number;
   hitos?: number;
