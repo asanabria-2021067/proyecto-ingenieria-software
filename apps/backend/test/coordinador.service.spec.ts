@@ -88,6 +88,14 @@ describe('CoordinadorService.pendientes', () => {
     }
   });
 
+  it('los cierres cuentan todo proyecto EN_SOLICITUD_CIERRE del alcance, igual que el panel del admin', async () => {
+    const { prisma } = makePrisma(['coordinador_academico'], [{ idCarrera: 1, facultad: null }]);
+    await makeService(prisma).service.pendientes(5);
+    const { where } = (prisma.proyecto.count.mock.calls as unknown as [{ where: Record<string, unknown> }][])[1][0];
+    expect(where.estadoProyecto).toBe('EN_SOLICITUD_CIERRE');
+    expect(where.revisionesCierre).toBeUndefined();
+  });
+
   it('el coordinador sin alcance filtra con una lista vacía de carreras', async () => {
     const { prisma } = makePrisma(['coordinador_academico']);
     await makeService(prisma).service.pendientes(5);

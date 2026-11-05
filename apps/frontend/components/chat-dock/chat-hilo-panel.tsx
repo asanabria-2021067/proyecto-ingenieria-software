@@ -34,9 +34,14 @@ export function ChatHiloPanel({ idProyecto, idConversacion, mensaje, idUsuarioAc
   const inputRef = useRef<HTMLInputElement>(null);
   const ultimoId = respuestas[respuestas.length - 1]?.idMensaje;
 
-  useEffect(() => inputRef.current?.focus(), []);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
   // Solo al llegar una respuesta nueva: cargar anteriores no debe mover la vista al final.
-  useEffect(() => listaRef.current?.scrollTo({ top: listaRef.current.scrollHeight }), [ultimoId]);
+  // Con llaves: Chrome devuelve una Promise en scrollTo y React la tomaria por la limpieza ("is not a function").
+  useEffect(() => {
+    listaRef.current?.scrollTo({ top: listaRef.current.scrollHeight });
+  }, [ultimoId]);
 
   const enviar = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

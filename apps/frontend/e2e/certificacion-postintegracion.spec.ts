@@ -192,7 +192,7 @@ test.describe('GPI01-C16: administración y regresiones H-02 a H-07', () => {
         expect((await pedir(anonimo, consulta)).status, `anónimo ${consulta}`).toBe(401);
         const comoEstudiante = await pedir(estudiante.contexto, consulta);
         expect(comoEstudiante.status, `estudiante ${consulta}`).toBe(403);
-        expect(comoEstudiante.mensaje).toBe('Acceso restringido a administradores');
+        expect(comoEstudiante.mensaje).toBe('No tienes permisos para realizar esta acción');
       }
       for (const consulta of ['', '?grupo=todos']) {
         expect(await pedir(admin.contexto, consulta)).toEqual({

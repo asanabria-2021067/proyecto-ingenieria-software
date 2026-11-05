@@ -1,6 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { ProjectPolicyService } from '../src/common/project-policy/project-policy.service';
 import { HistoricalProjectReadService } from '../src/project-closure/historical-project-read.service';
 
 /**
@@ -52,7 +51,7 @@ function makePrisma(proyectos = PROYECTOS, revisiones = REVISIONES) {
       findMany: vi.fn().mockResolvedValue(proyectos),
     },
     revisionCierreProyecto: { findMany: vi.fn().mockResolvedValue(revisiones) },
-    usuarioRolAcceso: { findFirst: vi.fn().mockResolvedValue(null) },
+    usuarioRolAcceso: { findFirst: vi.fn().mockResolvedValue({ idUsuarioRolAcceso: 1 }) },
   };
 }
 
@@ -178,11 +177,10 @@ describe('Bandeja administrativa — grupo cierres', () => {
     );
   });
 
-  it('quien no es administrador (líder o estudiante) recibe 403 antes de leer ningún proyecto', async () => {
+  it('quien no es administrador ni coordinador (líder o estudiante) recibe 403 antes de leer ningún proyecto', async () => {
     const prisma = makePrisma();
-    // Política real: sin perfil `administrador` no hay bandeja, sea quien sea.
-    const policy = new ProjectPolicyService({} as never);
-    const { service } = makeService(prisma, policy);
+    prisma.usuarioRolAcceso.findFirst.mockResolvedValue(null);
+    const { service } = makeService(prisma);
 
     await expect(service.adminList(42, { grupo: 'cierres' } as never)).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.usuarioRolAcceso.findFirst).toHaveBeenCalledWith(
@@ -190,5 +188,34 @@ describe('Bandeja administrativa — grupo cierres', () => {
     );
     expect(prisma.proyecto.findMany).not.toHaveBeenCalled();
     expect(prisma.revisionCierreProyecto.findMany).not.toHaveBeenCalled();
+  });
+
+  describe('coordinador académico', () => {
+    const comoCoordinador = () => {
+      const prisma = makePrisma();
+      // 1.ª consulta (¿admin?): no; 2.ª (¿coordinador?): sí; luego sus asignaciones.
+      prisma.usuarioRolAcceso.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ idUsuarioRolAcceso: 2 });
+      (prisma as unknown as { alcanceCoordinador: unknown }).alcanceCoordinador = {
+        findMany: vi.fn().mockResolvedValue([{ idCarrera: 4, facultad: null }]),
+      };
+      return { prisma, ...makeService(prisma) };
+    };
+
+    it('cierres: acota el where a su alcance y excluye lo propio', async () => {
+      const { prisma, service } = comoCoordinador();
+      await service.adminList(9, { grupo: 'cierres' } as never);
+      const { where } = prisma.proyecto.findMany.mock.calls[0][0];
+      expect(where.estadoProyecto).toEqual({ in: ['EN_SOLICITUD_CIERRE'] });
+      expect(where.creadoPor).toEqual({ not: 9 });
+      expect(where.OR[0]).toEqual({ idCarrera: { in: [4] } });
+    });
+
+    it('los demás grupos siguen siendo solo del administrador: 403 sin leer proyectos', async () => {
+      for (const grupo of ['activos', 'revision', 'cerrados']) {
+        const { prisma, service } = comoCoordinador();
+        await expect(service.adminList(9, { grupo } as never)).rejects.toBeInstanceOf(ForbiddenException);
+        expect(prisma.proyecto.findMany).not.toHaveBeenCalled();
+      }
+    });
   });
 });

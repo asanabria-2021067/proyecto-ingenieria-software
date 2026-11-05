@@ -154,10 +154,12 @@ export async function getAdminReviewInbox(): Promise<{
     proyecto: { tituloProyecto: string; tipoProyecto: TipoProyecto; creadoPor: number; creador: { nombre: string; apellido: string } };
   }>;
   cierresPendientes: Array<{
+    idRevisionCierre: number;
     idProyecto: number;
-    tituloProyecto: string;
-    creadoPor: number;
-    fechaActualizacion: string | null;
+    numeroRevision: number;
+    enviadaEn: string | null;
+    fingerprintEntrega: string | null;
+    proyecto: { tituloProyecto: string; creadoPor: number };
   }>;
   correccionesEnviadas: Array<{
     idProyecto: number;

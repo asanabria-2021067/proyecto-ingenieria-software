@@ -144,6 +144,19 @@ describe('ChatHiloPanel', () => {
     expect(await screen.findByText('tercera')).toBeInTheDocument();
   });
 
+  it('abre el hilo aunque scrollTo devuelva una Promise (Chrome) y la lista cambie despues', async () => {
+    const scrollTo = vi.spyOn(Element.prototype, 'scrollTo').mockImplementation((() => Promise.resolve()) as never);
+    getHiloMock.mockResolvedValue([mensaje(8, { idMensajePadre: 1, contenido: 'primera' })]);
+    sendRespuestaMock.mockResolvedValue(mensaje(10, { idMensajePadre: 1, contenido: 'tercera' }));
+    abrirPanel();
+    expect(await screen.findByText('primera')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Responder en el hilo'), { target: { value: 'tercera' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar respuesta' }));
+    expect(await screen.findByText('tercera')).toBeInTheDocument();
+    cleanup();
+    scrollTo.mockRestore();
+  });
+
   it('Escape y el boton cierran el panel', async () => {
     getHiloMock.mockResolvedValue([]);
     const { onCerrar } = abrirPanel();

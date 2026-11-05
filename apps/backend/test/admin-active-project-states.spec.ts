@@ -51,6 +51,7 @@ describe('ADMIN_ACTIVE_PROJECT_STATES', () => {
   it('el grupo activos de la bandeja administrativa filtra la misma población', async () => {
     const prisma = {
       proyecto: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) },
+      usuarioRolAcceso: { findFirst: vi.fn().mockResolvedValue({ idUsuarioRolAcceso: 1 }) },
     };
     const policy = { assertAdminTx: vi.fn().mockResolvedValue(undefined) };
     const service = new HistoricalProjectReadService(

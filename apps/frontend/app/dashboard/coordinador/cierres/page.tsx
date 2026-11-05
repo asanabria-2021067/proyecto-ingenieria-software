@@ -1,33 +1,19 @@
 'use client';
 
-import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
 import { PageTitle } from '@/components/ui/page-title';
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb';
 import { ADMIN_PAGE, ADMIN_PAGE_LEAD, ADMIN_PAGE_TITLE } from '@/components/admin/admin-page';
-import { REQUEST_INBOX_BUTTON } from '@/components/admin/request-inbox-details';
-import {
-  RequestInboxCard,
-  RequestInboxKpis,
-  RequestInboxMeta,
-  RequestInboxSection,
-  RequestInboxTitle,
-} from '@/components/admin/request-inbox';
-import { ResumenKpi } from '@/components/dashboard/resumen-kpi';
-import { BOTON_CERRADO } from '@/components/projects/available-project-card';
-import { Button } from '@/components/ui/button';
 import { SkeletonCard, SkeletonList, SkeletonRegion } from '@/components/ui/skeleton';
-import { SITUACION_PUBLICACION } from '@/lib/admin/request-status';
-import { formatInstanteGuatemala } from '@/lib/admin/sprint-calendar';
-import { getAdminReviewInbox } from '@/lib/services/projects';
+import { useAdminProjects } from '@/hooks/use-admin-projects';
+import { ADMIN_PROJECTS_DEFAULT_LIMIT } from '@/lib/types/admin-projects';
+import { ClosureRequestsInbox } from '../../admin/proyectos/closure-requests-inbox';
 
 /**
- * Solicitudes de cierre de los proyectos del alcance del coordinador. Salen de la misma bandeja que las
- * revisiones (el servidor ya la filtra a su alcance); la revisión del cierre es la misma pantalla del admin.
+ * Solicitudes de cierre de los proyectos del alcance del coordinador. Es la misma bandeja por etapas del admin
+ * (`GET /admin/proyectos?grupo=cierres`), que el servidor acota a su alcance; la revisión es la misma pantalla.
  */
 export default function CoordinadorCierresPage() {
-  const { data: inbox, isLoading, error } = useQuery({ queryKey: ['adminReviewInbox'], queryFn: getAdminReviewInbox });
-  const cierres = inbox?.cierresPendientes ?? [];
+  const { data, isLoading, error } = useAdminProjects('cierres', 1, ADMIN_PROJECTS_DEFAULT_LIMIT);
 
   return (
     <div className={ADMIN_PAGE}>
@@ -45,41 +31,14 @@ export default function CoordinadorCierresPage() {
         </div>
       )}
 
-      {isLoading && !inbox && (
+      {isLoading && !data && (
         <SkeletonRegion label="Cargando solicitudes de cierre" className="space-y-10">
           <SkeletonCard count={1} lines={1} className="md:grid-cols-3 lg:grid-cols-3" />
           <SkeletonList count={3} lines={2} trailing={1} layout="rows" />
         </SkeletonRegion>
       )}
 
-      {inbox && (
-        <div className="space-y-10">
-          <RequestInboxKpis columns={3}>
-            <ResumenKpi label="Pendientes de evaluación" valor={cierres.length} punto={SITUACION_PUBLICACION.PENDIENTE_DE_REVISION.punto} />
-          </RequestInboxKpis>
-          <RequestInboxSection
-            title="Pendientes de evaluación"
-            empty="No hay solicitudes de cierre en tu alcance"
-            isEmpty={cierres.length === 0}
-          >
-            {cierres.map((c) => (
-              <RequestInboxCard
-                key={c.idProyecto}
-                actions={
-                  <Button asChild size="sm" className={`${REQUEST_INBOX_BUTTON} ${BOTON_CERRADO}`}>
-                    <Link href={`/dashboard/admin/proyectos/${c.idProyecto}/cierre`} aria-label={`Revisar cierre: ${c.tituloProyecto}`}>
-                      Revisar cierre
-                    </Link>
-                  </Button>
-                }
-              >
-                <RequestInboxTitle>{c.tituloProyecto}</RequestInboxTitle>
-                {c.fechaActualizacion && <RequestInboxMeta>Actualizada el {formatInstanteGuatemala(c.fechaActualizacion)}</RequestInboxMeta>}
-              </RequestInboxCard>
-            ))}
-          </RequestInboxSection>
-        </div>
-      )}
+      {data && <ClosureRequestsInbox data={data} />}
     </div>
   );
 }
