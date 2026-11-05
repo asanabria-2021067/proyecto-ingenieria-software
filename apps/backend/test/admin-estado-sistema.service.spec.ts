@@ -29,7 +29,8 @@ function montar(
     get: vi.fn(async (k: string) => guardado.get(k)),
   };
   const config = { get: (k: string) => (cloudinary && k.startsWith('CLOUDINARY') ? 'x' : undefined) };
-  const gateway = { server: socket ? { engine: { clientsCount: 3 } } : undefined };
+  // Como en produccion: `server` es un Namespace cuyo Server raiz tiene el engine.
+  const gateway = { server: socket ? { server: { engine: { clientsCount: 3 } } } : undefined };
   const service = new AdminEstadoSistemaService(prisma as unknown as PrismaService, config as never, gateway as never, cache as never);
   return { service, prisma };
 }
@@ -42,7 +43,7 @@ afterEach(() => {
 
 describe('AdminEstadoSistemaService', () => {
   it('todo operativo: base, Redis, Cloudinary, socket, versión y últimas migraciones', async () => {
-    ping.mockResolvedValue({ status: 'OK' });
+    ping.mockResolvedValue({ status: 'ok' });
     process.env.GIT_SHA = 'abc1234';
     process.env.BUILD_DATE = '2026-12-02T10:00:00Z';
     const res = await montar().service.obtener(1);
@@ -58,7 +59,7 @@ describe('AdminEstadoSistemaService', () => {
   });
 
   it('sin variables de build la versión es desconocida', async () => {
-    ping.mockResolvedValue({ status: 'OK' });
+    ping.mockResolvedValue({ status: 'ok' });
     expect((await montar().service.obtener(1)).version).toEqual({ commit: 'desconocido', fecha: 'desconocido' });
   });
 
@@ -75,7 +76,7 @@ describe('AdminEstadoSistemaService', () => {
   });
 
   it('la consulta de migraciones pide solo nombre y fecha de las últimas cinco', async () => {
-    ping.mockResolvedValue({ status: 'OK' });
+    ping.mockResolvedValue({ status: 'ok' });
     const { service, prisma } = montar();
     await service.obtener(1);
     const sql = prisma.$queryRaw.mock.calls.map((c) => c[0].join('')).find((t) => t.includes('_prisma_migrations'))!;
