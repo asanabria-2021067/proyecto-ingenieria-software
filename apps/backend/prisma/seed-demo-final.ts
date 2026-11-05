@@ -11,7 +11,10 @@
  *
  * Idempotente: todo se localiza por clave natural (correo, nombre, titulo) y
  * una segunda corrida no duplica nada. Solo crea o actualiza entidades de
- * demo; no usa updateMany ni deleteMany y nunca toca otras cuentas.
+ * demo y nunca toca otras cuentas. Limpieza (DEMO-11): marca como leidos los avisos
+ * de nuevo inicio de sesion de demo.cs01-15 y borra definitivamente los «Mensaje
+ * eliminado» de Valeria en el #general del Hackathon (si alguno es padre de un hilo
+ * con respuestas vivas o esta citado por un mensaje vivo, se restaura con texto normal).
  *
  * Requiere DEMO_PASSWORD y DEMO_COORDINADOR_PASSWORD (contrasenas de las cuentas
  * demo NUEVAS; nunca se imprimen ni se guardan) y que carlos.mendoza@uvg.edu.gt ya exista.
@@ -328,6 +331,102 @@ async function sembrarChatProyecto(idProyecto: number, creadaPor: number, miembr
         () => prisma.reaccionMensajeChat.create({ data: { idMensaje: mensaje.idMensaje, idUsuario, emoji } }),
       );
     }
+  }
+}
+
+const TEXTOS_LIMPIEZA = [
+  'Revisé el cronograma del evento y todo va en orden.',
+  'Quedé pendiente de los permisos del auditorio, les aviso mañana.',
+  'Ya actualicé el tablero con los avances de logística.',
+  'Gracias por las ideas, las incorporo al plan del hackathon.',
+  'Mañana comparto el borrador del programa con el equipo.',
+  'Confirmé el horario de la charla inaugural con el equipo.',
+  'Subí la agenda actualizada a la carpeta compartida.',
+  'Quedamos en revisar los pendientes después de la reunión.',
+];
+const MAX_VIVOS_CANAL = 8;
+const MIN_VIVOS_CANAL = 5;
+
+/** Transaccion interna; en DRY_RUN `prisma` ya es el cliente de la transaccion externa y se usa tal cual. */
+const enTransaccion = <T>(fn: (p: Prisma.TransactionClient) => Promise<T>): Promise<T> => ('$transaction' in prisma ? (prisma as PrismaClient).$transaction(fn) : fn(prisma));
+
+/** Un mensaje eliminado solo se borra sin tocar datos vivos: sin encuesta, sin hilo vivo, sin cita viva y con respuestas de hilo que sean hojas muertas sin encuesta ni citas vivas. */
+async function hijosBorrables(p: Prisma.TransactionClient, idMensaje: number): Promise<number[] | null> {
+  const vivosDependen = (id: number) =>
+    p.mensajeChat.count({ where: { OR: [{ idMensajeCitado: id }, { idMensajePadre: id }], eliminadoEn: null } });
+  if ((await p.encuestaChat.count({ where: { idMensaje } })) > 0 || (await vivosDependen(idMensaje)) > 0) return null;
+  const hijos = await p.mensajeChat.findMany({ where: { idMensajePadre: idMensaje }, select: { idMensaje: true, eliminadoEn: true } });
+  for (const h of hijos) {
+    if (h.eliminadoEn === null) return null;
+    const [encuesta, nietos, citas] = await Promise.all([
+      p.encuestaChat.count({ where: { idMensaje: h.idMensaje } }),
+      p.mensajeChat.count({ where: { idMensajePadre: h.idMensaje } }),
+      vivosDependen(h.idMensaje),
+    ]);
+    if (encuesta + nietos + citas > 0) return null;
+  }
+  return hijos.map((h) => h.idMensaje);
+}
+
+/**
+ * DEMO-11: limpia los «Mensaje eliminado» de Valeria en el #general del Hackathon y deja 5 a 8 mensajes vivos.
+ * - Borra definitivamente (en una transaccion por mensaje) los que no tienen dependencias vivas; las respuestas de hilo muertas se van con el padre.
+ * - Los que si las tienen se restauran con texto normal, de menor a mayor id, mientras el canal no pase de 8 vivos; el resto queda intacto (nunca se altera un mensaje vivo).
+ * - Si quedan menos de 5 vivos, agrega mensajes normales con textos que no existan aun en el canal.
+ */
+async function limpiarMensajesEliminados(idProyecto: number, valeria: number) {
+  stats.limpieza_mensajes_eliminados ??= { creado: 0, actualizado: 0 };
+  const general = await prisma.conversacion.findFirst({ where: { idProyecto, esCanal: true, nombreCanal: 'general' } });
+  if (!general) return;
+  const idConversacion = general.idConversacion;
+  const candidatos = await prisma.mensajeChat.findMany({
+    where: { idConversacion, idRemitente: valeria, eliminadoEn: { not: null } },
+    select: { idMensaje: true },
+    orderBy: { idMensaje: 'desc' },
+  });
+  // De mayor a menor id: las respuestas se procesan antes que su padre y los ya borrados se omiten.
+  const restaurables: number[] = [];
+  for (const { idMensaje } of candidatos) {
+    const borrado = await enTransaccion(async (p) => {
+      const actual = await p.mensajeChat.findUnique({ where: { idMensaje }, select: { eliminadoEn: true } });
+      if (!actual || actual.eliminadoEn === null) return 'omitido' as const;
+      const hijos = await hijosBorrables(p, idMensaje);
+      if (!hijos) return 'restaurable' as const;
+      const ids = [idMensaje, ...hijos];
+      await p.adjuntoMensajeChat.deleteMany({ where: { idMensaje: { in: ids } } });
+      await p.recordatorioMensaje.deleteMany({ where: { idMensaje: { in: ids } } });
+      await p.mensajeChat.deleteMany({ where: { idMensaje: { in: hijos } } });
+      await p.mensajeChat.deleteMany({ where: { idMensaje } });
+      return 'borrado' as const;
+    });
+    if (borrado === 'restaurable') restaurables.push(idMensaje);
+    if (borrado === 'borrado') contar('limpieza_mensajes_eliminados', 'actualizado');
+  }
+
+  const textoLibre = async () => {
+    const usados = new Set((await prisma.mensajeChat.findMany({ where: { idConversacion, contenido: { in: TEXTOS_LIMPIEZA } }, select: { contenido: true } })).map((x) => x.contenido));
+    const libre = TEXTOS_LIMPIEZA.find((t) => !usados.has(t));
+    return libre ?? `${TEXTOS_LIMPIEZA[0]} (${await prisma.mensajeChat.count({ where: { idConversacion } })})`;
+  };
+  const vivos = () => prisma.mensajeChat.count({ where: { idConversacion, eliminadoEn: null } });
+  let pendientes = 0;
+  for (const idMensaje of restaurables.sort((a, b) => a - b)) {
+    if ((await vivos()) >= MAX_VIVOS_CANAL) {
+      pendientes++;
+      continue;
+    }
+    await prisma.mensajeChat.update({ where: { idMensaje }, data: { contenido: await textoLibre(), eliminadoEn: null, editadoEn: null } });
+    contar('limpieza_mensajes_eliminados', 'actualizado');
+  }
+  if (pendientes > 0) console.log(`limpieza_mensajes_pendientes: ${pendientes} (restaurarlos pasaria de ${MAX_VIVOS_CANAL} mensajes vivos; se dejan sin tocar)`);
+
+  for (let n = await vivos(); n < MIN_VIVOS_CANAL; n++) {
+    const contenido = await textoLibre();
+    await asegurar(
+      'limpieza_mensajes_relleno',
+      () => prisma.mensajeChat.findFirst({ where: { idConversacion, idRemitente: valeria, contenido } }),
+      () => prisma.mensajeChat.create({ data: { idConversacion, idRemitente: valeria, contenido, enviadoEn: new Date(Date.now() - (20 + n) * 3_600_000) } }),
+    );
   }
 }
 
@@ -959,6 +1058,15 @@ async function main() {
     hoy,
     'base de datos',
   );
+
+  // DEMO-11: solo las cuentas demo.cs01-15 (ids de `est`); nunca otras cuentas.
+  await limpiarMensajesEliminados(armados[3].idProyecto, est[0]);
+  stats.notificaciones_inicio_sesion_leidas ??= { creado: 0, actualizado: 0 };
+  const leidas = await prisma.notificacion.updateMany({
+    where: { idUsuario: { in: est }, tipoNotificacion: 'NUEVO_INICIO_SESION', leidaEn: null },
+    data: { leidaEn: new Date() },
+  });
+  stats.notificaciones_inicio_sesion_leidas.actualizado += leidas.count;
 
   for (const [entidad, c] of Object.entries(stats)) console.log(`${entidad}: creados ${c.creado}, actualizados ${c.actualizado}`);
   console.log('Demo final seed completed successfully');
