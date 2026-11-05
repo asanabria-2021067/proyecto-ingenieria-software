@@ -6,6 +6,9 @@
  * anterior para 8 de ellos (comparativo) y un rol con requisitos de habilidad
  * y postulaciones pendientes (ordenar por coincidencia).
  *
+ * Entrega 9 (DEMO-9): rol con preguntas, postulaciones con linea de tiempo y rechazo, tarea con subtareas/enlaces/responsables,
+ * objetivo de sprint, hilo de chat, portafolio publico y disponibilidad semanal.
+ *
  * Idempotente: todo se localiza por clave natural (correo, nombre, titulo) y
  * una segunda corrida no duplica nada. Solo crea o actualiza entidades de
  * demo; no usa updateMany ni deleteMany y nunca toca otras cuentas.
@@ -19,7 +22,7 @@
  */
 import { Prisma, PrismaClient, type EstadoProyecto, type EstadoTarea, type RolOrganizacion, type TipoProyecto } from '@prisma/client';
 import { hashSync } from 'bcryptjs';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { addDaysToDay, todayInGuatemala } from '../src/common/utils/guatemala-date';
 import { esEnRiesgo, semestreDe, type Semestre } from '../src/horas-semestre/semestre';
 
@@ -323,6 +326,172 @@ async function sembrarChatProyecto(idProyecto: number, creadaPor: number, miembr
         'chat_proyecto_reacciones',
         () => prisma.reaccionMensajeChat.findUnique({ where: { idMensaje_idUsuario_emoji: { idMensaje: mensaje.idMensaje, idUsuario, emoji } } }),
         () => prisma.reaccionMensajeChat.create({ data: { idMensaje: mensaje.idMensaje, idUsuario, emoji } }),
+      );
+    }
+  }
+}
+
+interface PostulacionDef {
+  idUsuario: number;
+  justificacion: string;
+  estado: 'PENDIENTE' | 'RECHAZADA';
+  respuestas: string[];
+  /** Pasos de la linea de tiempo (MEJ-100), con su antiguedad en horas. */
+  pasos: ['ENVIADA' | 'VISTA' | 'EN_REVISION' | 'RECHAZADA', number][];
+  rechazo?: { motivo: 'HORARIO'; comentario: string };
+}
+
+/** Rol con preguntas propias del lider (MEJ-97) y una postulacion con linea de tiempo (MEJ-100) y/o rechazo con motivo (MEJ-99). */
+async function sembrarRolConPostulacion(idProyecto: number, resolutor: number, nombreRol: string, descripcion: string, preguntas: [string, 'CORTA' | 'LARGA', boolean][], p: PostulacionDef) {
+  const rol = await asegurar(
+    'roles_proyecto',
+    () => prisma.rolProyecto.findFirst({ where: { idProyecto, nombreRol } }),
+    () => prisma.rolProyecto.create({ data: { idProyecto, nombreRol, descripcionRolProyecto: descripcion, cupos: 1 } }),
+  );
+  const filas = [];
+  for (const [orden, [enunciado, tipo, obligatoria]] of preguntas.entries()) {
+    filas.push(
+      await asegurar(
+        'preguntas_rol',
+        () => prisma.preguntaRol.findFirst({ where: { idRolProyecto: rol.idRolProyecto, enunciado } }),
+        () => prisma.preguntaRol.create({ data: { idRolProyecto: rol.idRolProyecto, enunciado, tipo, obligatoria, orden } }),
+      ),
+    );
+  }
+  const rechazada = p.estado === 'RECHAZADA';
+  const postulacion = await asegurar(
+    'postulaciones_release9',
+    () => prisma.postulacion.findFirst({ where: { idUsuarioPostulante: p.idUsuario, idRolProyecto: rol.idRolProyecto } }),
+    () =>
+      prisma.postulacion.create({
+        data: {
+          idUsuarioPostulante: p.idUsuario, idRolProyecto: rol.idRolProyecto, justificacion: p.justificacion, estadoPostulacion: p.estado,
+          ...(rechazada && { resueltaPor: resolutor, fechaResolucion: new Date(), motivoRechazo: p.rechazo!.motivo, comentarioResolucion: p.rechazo!.comentario }),
+        },
+      }),
+  );
+  for (const [orden, f] of filas.entries()) {
+    await asegurar(
+      'respuestas_postulacion',
+      () => prisma.respuestaPostulacion.findFirst({ where: { idPostulacion: postulacion.idPostulacion, idPregunta: f.idPregunta } }),
+      () => prisma.respuestaPostulacion.create({ data: { idPostulacion: postulacion.idPostulacion, idPregunta: f.idPregunta, enunciado: f.enunciado, tipo: f.tipo, respuesta: p.respuestas[orden], orden } }),
+    );
+  }
+  for (const [tipo, horas] of p.pasos) {
+    await asegurar(
+      'eventos_postulacion',
+      () => prisma.eventoPostulacion.findUnique({ where: { idPostulacion_tipo: { idPostulacion: postulacion.idPostulacion, tipo } } }),
+      () => prisma.eventoPostulacion.create({ data: { idPostulacion: postulacion.idPostulacion, tipo, fecha: new Date(Date.now() - horas * 3_600_000) } }),
+    );
+  }
+}
+
+/** Mejoras de la entrega 9: tarea con subtareas/enlaces/responsables, objetivo de sprint, hilo de chat, portafolio y disponibilidad. */
+async function sembrarEntrega9(est: number[], tutorias: number, hackathon: number, presidente: number, habilidades: { idHabilidad: number }[]) {
+  const [valeria, , daniela] = est;
+  const [paula, marco, lucia] = [est[4], est[5], est[6]];
+
+  // MEJ-97 / MEJ-100: rol con preguntas y postulacion en curso; MEJ-99: otra rechazada con motivo.
+  await sembrarRolConPostulacion(
+    tutorias, paula, 'Diseñador/a UX', 'Diseño de la experiencia de la app de tutorías.',
+    [['¿Qué herramienta de diseño usas con más frecuencia?', 'CORTA', true], ['Cuéntanos de un proyecto de diseño en el que hayas participado.', 'LARGA', false]],
+    {
+      idUsuario: est[12], justificacion: 'Me gustaría aportar el diseño de la experiencia de las tutorías.', estado: 'PENDIENTE',
+      respuestas: ['Figma', 'Rediseñé el flujo de inscripción de un curso del semestre pasado junto con dos compañeros.'],
+      pasos: [['ENVIADA', 50], ['VISTA', 30], ['EN_REVISION', 6]],
+    },
+  );
+  await sembrarRolConPostulacion(
+    hackathon, presidente, 'Logística del evento', 'Apoyo en la logística presencial del hackathon.',
+    [['¿Qué días puedes asistir al evento?', 'CORTA', true]],
+    {
+      idUsuario: est[14], justificacion: 'Quiero apoyar con la logística del hackathon.', estado: 'RECHAZADA', respuestas: ['Solo los sábados'],
+      pasos: [['ENVIADA', 120], ['VISTA', 100], ['RECHAZADA', 90]],
+      rechazo: { motivo: 'HORARIO', comentario: 'El evento es entre semana y tu disponibilidad no coincide. Te invitamos a postularte a la próxima edición.' },
+    },
+  );
+
+  // MEJ-117: objetivo del sprint activo de «Tutorias».
+  const objetivo = 'Entregar un prototipo navegable de la búsqueda de tutores listo para validar con estudiantes.';
+  const sprint = await prisma.sprint.findFirstOrThrow({ where: { idProyecto: tutorias, estado: 'ACTIVO' } });
+  await asegurar(
+    'sprints_objetivo',
+    async () => (sprint.objetivo === objetivo ? sprint : null),
+    async () => prisma.sprint.update({ where: { idSprint: sprint.idSprint }, data: { objetivo } }),
+  );
+
+  // MEJ-106 / MEJ-107 / MEJ-109: tarea con dos subtareas, dos enlaces y dos responsables (principal + uno adicional).
+  const rolDev = await prisma.rolProyecto.findFirstOrThrow({ where: { idProyecto: tutorias, nombreRol: 'Desarrollador/a' } });
+  const crearTarea = (titulo: string, estado: EstadoTarea, orden: number, idTareaPadre: number | null) =>
+    asegurar(
+      'tareas_release9',
+      () => prisma.tarea.findFirst({ where: { idProyecto: tutorias, tituloTarea: titulo } }),
+      () =>
+        prisma.tarea.create({
+          data: { idProyecto: tutorias, idSprint: sprint.idSprint, idRolProyecto: rolDev.idRolProyecto, tituloTarea: titulo, estadoTarea: estado, prioridad: 'ALTA', orden, creadaPor: paula, fechaLimite: enDias(6), idTareaPadre },
+        }),
+    );
+  const padre = await crearTarea('Tutorías: diseñar la pantalla de búsqueda', 'EN_PROGRESO', 20, null);
+  await crearTarea('Tutorías: maquetar los filtros por curso', 'HECHO', 21, padre.idTarea);
+  await crearTarea('Tutorías: conectar la búsqueda con la API', 'POR_HACER', 22, padre.idTarea);
+  const participacion = await prisma.participacionProyecto.findFirst({ where: { idUsuario: marco, idRolProyecto: rolDev.idRolProyecto } });
+  await asegurar(
+    'asignaciones_release9',
+    () => prisma.asignacionTarea.findFirst({ where: { idTarea: padre.idTarea, idUsuario: marco, desasignadaEn: null } }),
+    () => prisma.asignacionTarea.create({ data: { idTarea: padre.idTarea, idUsuario: marco, idParticipacion: participacion?.idParticipacion, asignadoPor: paula } }),
+  );
+  await asegurar(
+    'tarea_responsables',
+    () => prisma.tareaResponsable.findUnique({ where: { idTarea_idUsuario: { idTarea: padre.idTarea, idUsuario: lucia } } }),
+    () => prisma.tareaResponsable.create({ data: { idTarea: padre.idTarea, idUsuario: lucia } }),
+  );
+  for (const e of [
+    { url: 'https://www.figma.com/file/demo-busqueda-de-tutores', titulo: 'Prototipo de la búsqueda de tutores', sitio: 'figma.com', tipo: 'FIGMA' },
+    { url: 'https://github.com/uvg-demo/app-tutorias/issues/12', titulo: 'Issue 12: filtros por curso', sitio: 'github.com', tipo: 'GITHUB' },
+  ]) {
+    await asegurar(
+      'tarea_enlaces',
+      () => prisma.tareaEnlace.findUnique({ where: { idTarea_url: { idTarea: padre.idTarea, url: e.url } } }),
+      () => prisma.tareaEnlace.create({ data: { idTarea: padre.idTarea, ...e, creadoPor: paula } }),
+    );
+  }
+
+  // MEJ-131: hilo de respuestas bajo un mensaje del chat del Hackathon (canal creado por sembrarChatProyecto).
+  const general = await prisma.conversacion.findFirstOrThrow({ where: { idProyecto: hackathon, esCanal: true, nombreCanal: 'general' } });
+  const raiz = await prisma.mensajeChat.findFirstOrThrow({ where: { idConversacion: general.idConversacion, idRemitente: valeria, contenido: { startsWith: 'Ya tengo la lista de patrocinadores' } } });
+  for (const [de, texto, horas] of [
+    [presidente, 'Excelente, Valeria. ¿Ya los contactaste o lo hago yo?', 80],
+    [daniela, 'Yo puedo ayudarte a escribirles esta semana.', 74],
+  ] as const) {
+    await asegurar(
+      'chat_hilo_respuestas',
+      () => prisma.mensajeChat.findFirst({ where: { idConversacion: general.idConversacion, idMensajePadre: raiz.idMensaje, idRemitente: de, contenido: texto } }),
+      () => prisma.mensajeChat.create({ data: { idConversacion: general.idConversacion, idRemitente: de, contenido: texto, idMensajePadre: raiz.idMensaje, enviadoEn: new Date(Date.now() - horas * 3_600_000) } }),
+    );
+  }
+
+  // MEJ-146: portafolio publico activo con token opaco (como PortafolioService: 32 bytes en base64url). Un token existente nunca se regenera.
+  for (const h of habilidades) {
+    await asegurar(
+      'habilidades_usuario',
+      () => prisma.usuarioHabilidad.findUnique({ where: { idUsuario_idHabilidad: { idUsuario: paula, idHabilidad: h.idHabilidad } } }),
+      () => prisma.usuarioHabilidad.create({ data: { idUsuario: paula, idHabilidad: h.idHabilidad, nivelHabilidad: 'INTERMEDIO' } }),
+    );
+  }
+  await asegurar(
+    'portafolio_publico',
+    () => prisma.portafolioPublico.findUnique({ where: { idUsuario: paula } }),
+    () => prisma.portafolioPublico.create({ data: { idUsuario: paula, token: randomBytes(32).toString('base64url'), activo: true } }),
+    (f) => (f.activo ? undefined : prisma.portafolioPublico.update({ where: { idUsuario: paula }, data: { activo: true } })),
+  );
+
+  // MEJ-148: disponibilidad semanal (0 = lunes), bloques de 1 hora.
+  for (const [diaSemana, horas] of [[0, [16, 17]], [2, [16, 17]], [5, [9, 10]]] as const) {
+    for (const hora of horas) {
+      await asegurar(
+        'disponibilidad_semanal',
+        () => prisma.disponibilidadSemanal.findUnique({ where: { idUsuario_diaSemana_hora: { idUsuario: paula, diaSemana, hora } } }),
+        () => prisma.disponibilidadSemanal.create({ data: { idUsuario: paula, diaSemana, hora } }),
       );
     }
   }
@@ -755,6 +924,7 @@ async function main() {
   }
 
   await sembrarCoordinador(passwordCoordinador, carrera.idCarrera, [est[2], est[3]]);
+  await sembrarEntrega9(est, armados[0].idProyecto, armados[3].idProyecto, presidente.idUsuario, [react, typescript]);
 
   // ─── Verificacion final contra la base ────────────────────────────────────
   // Mismo universo que la asociacion: estudiantes activos de sus carreras.
