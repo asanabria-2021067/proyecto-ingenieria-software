@@ -110,9 +110,8 @@ async function main() {
     prisma.rolAcceso.upsert({ where: { nombrePerfil: 'lider_asociacion' }, update: {}, create: { nombrePerfil: 'lider_asociacion', descripcion: 'Líder o administrador de una asociación estudiantil' } }),
     prisma.rolAcceso.upsert({ where: { nombrePerfil: 'coordinador_academico' }, update: {}, create: { nombrePerfil: 'coordinador_academico', descripcion: 'Coordinador que valida horas y emite certificados' } }),
     prisma.rolAcceso.upsert({ where: { nombrePerfil: 'administrador' }, update: {}, create: { nombrePerfil: 'administrador', descripcion: 'Administrador del sistema' } }),
-    prisma.rolAcceso.upsert({ where: { nombrePerfil: 'mentor' }, update: {}, create: { nombrePerfil: 'mentor', descripcion: 'Mentor que guía a estudiantes en proyectos' } }),
   ]);
-  const [rolEstudiante, rolLider, rolCoordinador, rolAdmin, rolMentor] = rolesAcceso;
+  const [rolEstudiante, rolLider, rolCoordinador, rolAdmin] = rolesAcceso;
 
   // ─── Rol ↔ Permiso ──────────────────────────────────────
   const rolPermisoData = [
@@ -195,7 +194,7 @@ async function main() {
   const usuarioRolData = [
     { idUsuario: carlos.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
     { idUsuario: maria.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
-    { idUsuario: jose.idUsuario, idRolAcceso: rolLider.idRolAcceso },
+    { idUsuario: jose.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
     { idUsuario: ana.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
     { idUsuario: luis.idUsuario, idRolAcceso: rolCoordinador.idRolAcceso },
     { idUsuario: sofia.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
@@ -207,6 +206,18 @@ async function main() {
       create: ur,
     });
   }
+
+  // El perfil de líder de asociación se deriva de la junta (no hay rol que asignar a mano).
+  const asociacionSeed = await prisma.asociacion.upsert({
+    where: { nombre: 'Asociación de Estudiantes de Ingeniería' },
+    update: {},
+    create: { nombre: 'Asociación de Estudiantes de Ingeniería', descripcion: 'Asociación de ejemplo para el seed de desarrollo' },
+  });
+  await prisma.juntaAsociacion.upsert({
+    where: { idAsociacion_idUsuario: { idAsociacion: asociacionSeed.idAsociacion, idUsuario: jose.idUsuario } },
+    update: {},
+    create: { idAsociacion: asociacionSeed.idAsociacion, idUsuario: jose.idUsuario, cargo: 'PRESIDENTE', nivelPermiso: 'ADMINISTRADOR' },
+  });
 
   // ─── Habilidades → Usuarios ─────────────────────────────
   const uhData = [
@@ -1231,7 +1242,7 @@ async function main() {
 
   // ─── Datos adicionales para verificación de vistas de administrador ──────────
 
-  // Usuarios mentores (rol mentor para MentorContent en UserDetailSheet)
+  // Usuarios mentores de proyecto (rol de acceso estudiante; el rol mentor ya no existe)
   const mentorRosa = await prisma.usuario.upsert({
     where: { correo: 'rosa.fuentes@uvg.edu.gt' },
     update: {},
@@ -1244,9 +1255,9 @@ async function main() {
   });
   for (const u of [mentorRosa, mentorTomas]) {
     await prisma.usuarioRolAcceso.upsert({
-      where: { idUsuario_idRolAcceso: { idUsuario: u.idUsuario, idRolAcceso: rolMentor.idRolAcceso } },
+      where: { idUsuario_idRolAcceso: { idUsuario: u.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
       update: {},
-      create: { idUsuario: u.idUsuario, idRolAcceso: rolMentor.idRolAcceso },
+      create: { idUsuario: u.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
     });
   }
 
@@ -1277,14 +1288,19 @@ async function main() {
     create: { idUsuario: bloqueadoEst.idUsuario, carne: '22001', idCarrera: computacion.idCarrera, semestre: 6, disponibilidadHorasSemana: 10 },
   });
   await prisma.usuarioRolAcceso.upsert({
-    where: { idUsuario_idRolAcceso: { idUsuario: bloqueadoLider2.idUsuario, idRolAcceso: rolLider.idRolAcceso } },
+    where: { idUsuario_idRolAcceso: { idUsuario: bloqueadoLider2.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
     update: {},
-    create: { idUsuario: bloqueadoLider2.idUsuario, idRolAcceso: rolLider.idRolAcceso },
+    create: { idUsuario: bloqueadoLider2.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
+  });
+  await prisma.juntaAsociacion.upsert({
+    where: { idAsociacion_idUsuario: { idAsociacion: asociacionSeed.idAsociacion, idUsuario: bloqueadoLider2.idUsuario } },
+    update: {},
+    create: { idAsociacion: asociacionSeed.idAsociacion, idUsuario: bloqueadoLider2.idUsuario, cargo: 'VOCAL', nivelPermiso: 'LECTURA' },
   });
   await prisma.usuarioRolAcceso.upsert({
-    where: { idUsuario_idRolAcceso: { idUsuario: bloqueadoMentor.idUsuario, idRolAcceso: rolMentor.idRolAcceso } },
+    where: { idUsuario_idRolAcceso: { idUsuario: bloqueadoMentor.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
     update: {},
-    create: { idUsuario: bloqueadoMentor.idUsuario, idRolAcceso: rolMentor.idRolAcceso },
+    create: { idUsuario: bloqueadoMentor.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
   });
 
   // Usuarios INACTIVO (creados en 2026 → contarán en nuevosInactivos2026; botón "Activar" en drawer)
@@ -1478,7 +1494,7 @@ async function main() {
     },
   });
 
-  // Participaciones de mentores (para MentorContent: proyectos activos y cerrados)
+  // Participaciones de mentores (proyectos activos y cerrados)
   await prisma.participacionProyecto.upsert({
     where: { idParticipacion: 12 },
     update: {},

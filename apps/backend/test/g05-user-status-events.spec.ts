@@ -12,7 +12,7 @@ import { AdminService } from '../src/admin/admin.service';
 
 function setup(estadoActual: string, esAdminCaller = true) {
   const create = vi.fn().mockResolvedValue({});
-  const persona = { idUsuario: 5, nombre: 'Ana', apellido: 'Pérez', correo: 'ana@uvg.edu.gt', fechaCreacion: new Date('2026-01-01T00:00:00Z'), rolesAcceso: [] };
+  const persona = { idUsuario: 5, nombre: 'Ana', apellido: 'Pérez', correo: 'ana@uvg.edu.gt', fechaCreacion: new Date('2026-01-01T00:00:00Z'), rolesAcceso: [], juntasAsociacion: [] };
   const update = vi.fn(async ({ data }: { data: { estado: string } }) => ({ ...persona, estado: data.estado }));
   const revocar = vi.fn().mockResolvedValue({ count: 0 });
   const prisma = {

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { EstadoParticipacion, EstadoProyecto } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SocialService } from './social.service';
+import { JUNTA_ACTIVA, rolesEfectivos } from '../common/roles/roles-efectivos';
 
 const ESTADOS_VISIBLES: EstadoProyecto[] = [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO];
 const MAX_PROYECTOS_POR_SECCION = 10;
@@ -56,11 +57,14 @@ export class SocialFeedService {
   }
 
   private async getNombrePerfil(idUsuario: number): Promise<string> {
-    const roles = await this.prisma.usuarioRolAcceso.findMany({
-      where: { idUsuario },
-      select: { rolAcceso: { select: { nombrePerfil: true } } },
-    });
-    const nombres = roles.map((r) => r.rolAcceso.nombrePerfil);
+    const [roles, juntas] = await Promise.all([
+      this.prisma.usuarioRolAcceso.findMany({
+        where: { idUsuario },
+        select: { rolAcceso: { select: { nombrePerfil: true } } },
+      }),
+      this.prisma.juntaAsociacion.findMany({ where: { idUsuario, ...JUNTA_ACTIVA }, select: { idJuntaAsociacion: true }, take: 1 }),
+    ]);
+    const nombres = rolesEfectivos(roles.map((r) => r.rolAcceso.nombrePerfil), juntas);
     if (nombres.includes('administrador')) return 'administrador';
     if (nombres.includes('lider_asociacion')) return 'lider_asociacion';
     return 'estudiante';

@@ -21,7 +21,7 @@ import { ACCOUNT_ACCESS_REVOKED } from '../src/ws-auth/account-access.events';
 
 function adminSetup(estadoActual: string, options: { esAdminCaller?: boolean; events?: Pick<EventEmitter2, 'emit'> } = {}) {
   const create = vi.fn().mockResolvedValue({});
-  const persona = { idUsuario: 5, nombre: 'Ana', apellido: 'Pérez', correo: 'ana@uvg.edu.gt', fechaCreacion: new Date('2026-01-01T00:00:00Z'), rolesAcceso: [] };
+  const persona = { idUsuario: 5, nombre: 'Ana', apellido: 'Pérez', correo: 'ana@uvg.edu.gt', fechaCreacion: new Date('2026-01-01T00:00:00Z'), rolesAcceso: [], juntasAsociacion: [] };
   const prisma = {
     usuarioRolAcceso: { findFirst: vi.fn().mockResolvedValue(options.esAdminCaller === false ? null : { idUsuario: 1 }) },
     usuario: {

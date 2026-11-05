@@ -36,9 +36,36 @@ function prismaMock() {
 describe('UsersService', () => {
   it('getMe retorna usuario', async () => {
     const prisma = prismaMock();
-    prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 1, rolesAcceso: [] });
+    prisma.usuario.findUnique.mockResolvedValue({ idUsuario: 1, rolesAcceso: [], juntasAsociacion: [] });
     const service = new UsersService(prisma);
     await expect(service.getMe(1)).resolves.toEqual({ idUsuario: 1, rolesAcceso: [], roles: [] });
+  });
+
+  it('getMe deriva lider_asociacion de la junta y no expone la lista de juntas', async () => {
+    const prisma = prismaMock();
+    prisma.usuario.findUnique.mockResolvedValue({
+      idUsuario: 1,
+      rolesAcceso: [{ rolAcceso: { nombrePerfil: 'estudiante' } }],
+      juntasAsociacion: [{ idJuntaAsociacion: 7 }],
+    });
+    const service = new UsersService(prisma);
+
+    const me = await service.getMe(1);
+
+    expect(me.roles).toEqual(['estudiante', 'lider_asociacion']);
+    expect(me).not.toHaveProperty('juntasAsociacion');
+  });
+
+  it('getMe ignora la fila vieja de lider_asociacion si el usuario no integra ninguna junta', async () => {
+    const prisma = prismaMock();
+    prisma.usuario.findUnique.mockResolvedValue({
+      idUsuario: 1,
+      rolesAcceso: [{ rolAcceso: { nombrePerfil: 'estudiante' } }, { rolAcceso: { nombrePerfil: 'lider_asociacion' } }],
+      juntasAsociacion: [],
+    });
+    const service = new UsersService(prisma);
+
+    await expect(service.getMe(1)).resolves.toMatchObject({ roles: ['estudiante'] });
   });
 
   it('getMe falla si no existe', async () => {

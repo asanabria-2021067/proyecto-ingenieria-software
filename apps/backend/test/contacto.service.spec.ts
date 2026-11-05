@@ -108,7 +108,7 @@ describe('ContactoService con el NotificationsService real', () => {
     { idUsuario: 1, roles: ['administrador'] },
     { idUsuario: 2, roles: ['administrador', 'estudiante'] },
     { idUsuario: 3, roles: ['estudiante'] },
-    { idUsuario: 4, roles: ['mentor'] },
+    { idUsuario: 4, roles: ['coordinador_academico'] },
     { idUsuario: 5, roles: [] },
   ];
 

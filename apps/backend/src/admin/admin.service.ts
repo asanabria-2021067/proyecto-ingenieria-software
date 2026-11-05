@@ -21,6 +21,7 @@ import {
   TipoProyecto,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { JUNTA_ACTIVA, ROL_LIDER_ASOCIACION, rolesEfectivos, SELECT_JUNTA_ACTIVA } from '../common/roles/roles-efectivos';
 import { resolverMetas, selectRegistroActual } from '../horas-semestre/metas-vigentes';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailService } from '../mail/mail.service';
@@ -273,7 +274,10 @@ export class AdminService {
       ];
     }
 
-    if (query.rol) {
+    if (query.rol === ROL_LIDER_ASOCIACION) {
+      // Se deriva de la junta: la fila guardada ya no cuenta.
+      where.juntasAsociacion = { some: JUNTA_ACTIVA };
+    } else if (query.rol) {
       where.rolesAcceso = { some: { rolAcceso: { nombrePerfil: query.rol } } };
     }
 
@@ -314,6 +318,7 @@ export class AdminService {
           rolesAcceso: {
             select: { rolAcceso: { select: { nombrePerfil: true } } },
           },
+          juntasAsociacion: SELECT_JUNTA_ACTIVA,
         },
       }),
     ]);
@@ -325,7 +330,7 @@ export class AdminService {
       correo: u.correo,
       fotoUrl: u.fotoUrl,
       estado: u.estado,
-      roles: u.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil),
+      roles: rolesEfectivos(u.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil), u.juntasAsociacion),
       fechaCreacion: u.fechaCreacion.toISOString(),
     }));
 
@@ -357,12 +362,13 @@ export class AdminService {
         rolesAcceso: {
           select: { rolAcceso: { select: { nombrePerfil: true } } },
         },
+        juntasAsociacion: SELECT_JUNTA_ACTIVA,
       },
     });
 
     if (!user) throw new NotFoundException(`Usuario ${targetId} no encontrado`);
 
-    const roles = user.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil);
+    const roles = rolesEfectivos(user.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil), user.juntasAsociacion);
 
     const base = {
       idUsuario: user.idUsuario,
@@ -379,13 +385,11 @@ export class AdminService {
     const [
       perfilEstudiante,
       actividadEstudiante,
-      actividadMentor,
       actividadLider,
       actividadCoordinador,
     ] = await Promise.all([
       roles.includes('estudiante') ? this.getPerfilEstudiante(targetId) : null,
       roles.includes('estudiante') ? this.getActividadEstudiante(targetId) : null,
-      roles.includes('mentor') ? this.getActividadMentor(targetId) : null,
       roles.includes('lider_asociacion') ? this.getActividadLider(targetId) : null,
       roles.includes('coordinador_academico') ? this.getActividadCoordinador(targetId) : null,
     ]);
@@ -398,7 +402,6 @@ export class AdminService {
       ...base,
       perfilEstudiante,
       actividadEstudiante,
-      actividadMentor,
       actividadLider,
       actividadCoordinador,
       actividadAdmin,
@@ -478,52 +481,6 @@ export class AdminService {
         aceptadas: postMap[EstadoPostulacion.ACEPTADA] ?? 0,
         rechazadas: postMap[EstadoPostulacion.RECHAZADA] ?? 0,
       },
-    };
-  }
-
-  private async getActividadMentor(userId: number) {
-    // No hay modelo explícito de mentoría: se usa ParticipacionProyecto
-    const participaciones = await this.prisma.participacionProyecto.findMany({
-      where: { idUsuario: userId },
-      select: {
-        estadoParticipacion: true,
-        rolProyecto: {
-          select: {
-            proyecto: {
-              select: {
-                idProyecto: true,
-                tituloProyecto: true,
-                estadoProyecto: true,
-              },
-            },
-          },
-        },
-      },
-      take: 20,
-    });
-
-    const proyectosMap = new Map<
-      number,
-      { idProyecto: number; tituloProyecto: string; estadoProyecto: EstadoProyecto }
-    >();
-    for (const p of participaciones) {
-      const proj = p.rolProyecto.proyecto;
-      proyectosMap.set(proj.idProyecto, proj);
-    }
-    const proyectos = [...proyectosMap.values()];
-
-    return {
-      proyectosDondeParticipa: proyectos.length,
-      estudiantesMentorizados: 0, // fallback: no hay relación mentor-estudiante explícita en el schema
-      proyectosActivos: proyectos.filter((p) => ADMIN_ACTIVE_PROJECT_STATES.includes(p.estadoProyecto)).length,
-      proyectosCerrados: proyectos.filter((p) => p.estadoProyecto === EstadoProyecto.CERRADO)
-        .length,
-      proyectosAsociados: proyectos.slice(0, 5).map((p) => ({
-        idProyecto: p.idProyecto,
-        tituloProyecto: p.tituloProyecto,
-        estadoProyecto: p.estadoProyecto,
-        rol: 'Mentor',
-      })),
     };
   }
 
@@ -699,6 +656,7 @@ export class AdminService {
         rolesAcceso: {
           select: { rolAcceso: { select: { nombrePerfil: true } } },
         },
+        juntasAsociacion: SELECT_JUNTA_ACTIVA,
       },
     });
 
@@ -738,7 +696,7 @@ export class AdminService {
       apellido: updated.apellido,
       correo: updated.correo,
       estado: updated.estado,
-      roles: updated.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil),
+      roles: rolesEfectivos(updated.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil), updated.juntasAsociacion),
       fechaCreacion: updated.fechaCreacion.toISOString(),
     };
   }

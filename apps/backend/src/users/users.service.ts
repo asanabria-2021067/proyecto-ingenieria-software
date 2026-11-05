@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, TipoExperiencia } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { rolesEfectivos, SELECT_JUNTA_ACTIVA } from '../common/roles/roles-efectivos';
 import { ProjectHoursSummaryService } from '../sprints/project-hours-summary.service';
 import { resolverMetas, selectRegistroActual } from '../horas-semestre/metas-vigentes';
 import { semestreDe } from '../horas-semestre/semestre';
@@ -98,12 +99,14 @@ export class UsersService {
         rolesAcceso: {
           include: { rolAcceso: true },
         },
+        juntasAsociacion: SELECT_JUNTA_ACTIVA,
       },
     });
 
     if (!user) throw new NotFoundException('Usuario no encontrado');
-    const roles = user.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil);
-    return { ...user, roles };
+    const { juntasAsociacion, ...resto } = user;
+    const roles = rolesEfectivos(user.rolesAcceso.map((r) => r.rolAcceso.nombrePerfil), juntasAsociacion);
+    return { ...resto, roles };
   }
 
   /**
