@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertCircle, ChevronRight, ClipboardList, Undo2 } from 'lucide-react';
 import { ESTADO_POSTULACION_STYLE, MOTIVO_RECHAZO_LABEL } from '@/components/projects/application-status.utils';
-import { PostulacionLineaTiempo } from '@/components/projects/postulacion-linea-tiempo';
+import { PostulacionLineaTiempo, fechasPostulacion, formatearFechaPostulacion } from '@/components/projects/postulacion-linea-tiempo';
 import { Tag } from '@/components/ui/tag';
 import { useState } from 'react';
 import { apiFetch } from '@/lib/api/client';
@@ -249,6 +249,7 @@ export default function MisPostulacionesPage() {
           {filtradas.map((p, index) => {
             const config = ESTADO_POSTULACION_STYLE[p.estadoPostulacion];
             const Icon = config.icon;
+            const fechas = fechasPostulacion(p);
             return (
               <div
                 key={p.idPostulacion}
@@ -296,12 +297,8 @@ export default function MisPostulacionesPage() {
 
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-tertiary">
-                    Enviada el{' '}
-                    {new Date(p.fechaPostulacion).toLocaleDateString('es-GT', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })}
+                    Enviada el {formatearFechaPostulacion(fechas.enviada)}
+                    {fechas.resuelta && <> · Resuelta el {formatearFechaPostulacion(fechas.resuelta)}</>}
                   </span>
                   <div className="flex items-center gap-2">
                     {p.estadoPostulacion === 'PENDIENTE' && (
