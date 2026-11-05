@@ -129,6 +129,17 @@ describe('ChatListPopover - seccion Canales', () => {
     expect(screen.queryByText('Rosa Fuentes')).not.toBeInTheDocument();
   });
 
+  it('al buscar, si solo coincide un canal no muestra el aviso de sin resultados', async () => {
+    getMyProjectsMock.mockResolvedValue([]);
+    listAllConversationsMock.mockImplementation(async (q?: string) => (q ? [general] : []));
+    render(conQuery(createElement(ChatListPopover, { onClose: vi.fn() })));
+
+    fireEvent.change(screen.getByPlaceholderText('Buscar mensajes'), { target: { value: 'Hackathon' } });
+    expect(await screen.findByRole('region', { name: 'Canales' })).toHaveTextContent('#general');
+    expect(screen.queryByText('Sin resultados para esa búsqueda.')).not.toBeInTheDocument();
+    expect(screen.queryByText('No tienes chats aquí todavía.')).not.toBeInTheDocument();
+  });
+
   it('sin canales no renderiza la seccion', async () => {
     getMyProjectsMock.mockResolvedValue([]);
     listAllConversationsMock.mockResolvedValue([conversacion()]);
