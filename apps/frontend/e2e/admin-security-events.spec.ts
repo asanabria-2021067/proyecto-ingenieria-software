@@ -302,7 +302,7 @@ test.describe('FG05-C02: eventos reales en el visor', () => {
     expect(cuenta.estado).toBe('ACTIVO');
 
     const todo = await eventos('limit=50');
-    expect(todo.tipos).toEqual(['LOGIN_FAILED', 'LOGIN_SUCCEEDED', 'ACCOUNT_LOCKED', 'PASSWORD_RESET_ISSUED', 'PASSWORD_RESET_COMPLETED', 'USER_STATUS_CHANGED']);
+    expect(todo.tipos).toEqual(['LOGIN_FAILED', 'LOGIN_SUCCEEDED', 'ACCOUNT_LOCKED', 'PASSWORD_RESET_ISSUED', 'PASSWORD_RESET_COMPLETED', 'USER_STATUS_CHANGED', 'PASSWORD_CHANGED', 'SESSION_REPORTED_UNKNOWN']);
     expect(todo.data.every((evento: { tipo: string }) => todo.tipos.includes(evento.tipo))).toBe(true);
   });
 });

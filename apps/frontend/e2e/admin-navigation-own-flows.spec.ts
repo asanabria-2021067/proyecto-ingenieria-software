@@ -52,6 +52,14 @@ const MENU: [string, [string, string, RegExp][]][] = [
     [
       ['Cuentas pendientes', '/dashboard/admin/cuentas-pendientes', /Cuentas pendientes/],
       ['Eventos de seguridad', '/dashboard/admin/seguridad', /Eventos de seguridad/],
+      ['Reportes de problemas', '/dashboard/admin/reportes', /Reportes de problemas/],
+    ],
+  ],
+  [
+    'Sistema',
+    [
+      ['Modo mantenimiento', '/dashboard/admin/mantenimiento', /Modo mantenimiento/],
+      ['Tablas del sistema', '/dashboard/admin/tablas', /Tablas del sistema/],
     ],
   ],
 ];
