@@ -96,6 +96,18 @@ describe('PushService', () => {
     expect(prisma.suscripcionPush.deleteMany).toHaveBeenCalledWith({ where: { idSuscripcion: 2 } });
   });
 
+  it('no envia a un endpoint con host no permitido y borra esa suscripcion', async () => {
+    const { service, prisma } = makeService();
+    prisma.suscripcionPush.findMany.mockResolvedValue([
+      { ...sub(1, 7), endpoint: 'https://169.254.169.254/latest' },
+      sub(2, 7),
+    ]);
+    await service.enviar([7], { titulo: 'x' }, TARDE);
+    expect(enviarMock).toHaveBeenCalledTimes(1);
+    expect(enviarMock.mock.calls[0][0].endpoint).toBe(`${ENDPOINT}2`);
+    expect(prisma.suscripcionPush.deleteMany).toHaveBeenCalledWith({ where: { idSuscripcion: { in: [1] } } });
+  });
+
   it('suscribir guarda para el usuario autenticado y descarta las que pasan del limite', async () => {
     const { service, prisma } = makeService();
     prisma.suscripcionPush.findMany.mockResolvedValue([{ idSuscripcion: 9 }]);
@@ -113,6 +125,7 @@ describe('PushService', () => {
       'https://169.254.169.254/latest',
       'https://localhost.evil.test/x',
       'https://fcm.googleapis.com.evil.test/x',
+      'http://fcm.googleapis.com/fcm/send/abc',
     ]) {
       await expect(service.suscribir(7, { endpoint, p256dh: 'p', auth: 'a' })).rejects.toThrow(BadRequestException);
     }

@@ -111,6 +111,10 @@ Closure cleanup no disponible: motivosCleanup=[...]
 Un arranque con esos avisos es válido para desarrollo, pero **no** para operar
 el cierre de proyectos.
 
+## Migraciones de Prisma
+
+No renombrar migraciones ya aplicadas en producción (p. ej. `20261212000000_perfil_portafolio` comparte timestamp con `20261212000000_org_asociacion_metas_avisos`: Prisma las ordena alfabéticamente y ya están aplicadas).
+
 ## Backfill de insignias en producción
 
 El script compilado queda en `dist/scripts/insignias-backfill.js` (no requiere `tsx`). Es idempotente y no crea notificaciones. Después del deploy, en la VM (servicio `backend`, perfil `app`):

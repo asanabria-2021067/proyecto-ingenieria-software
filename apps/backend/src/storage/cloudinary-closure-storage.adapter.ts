@@ -55,7 +55,12 @@ export class CloudinaryClosureStorageAdapter implements ClosureStoragePort {
    */
   protected availability(): ClosureAvailability {
     // Gate único: sin configuración válida ninguna operación remota empieza.
-    return assertClosureAvailable(this.config.get<ClosureAvailability>('closure'));
+    const closure = assertClosureAvailable(this.config.get<ClosureAvailability>('closure'));
+    // El SDK guarda su configuración en un singleton global que nadie más garantiza:
+    // se fija aquí, en cada paso por el gate, con la configuración ya validada.
+    const { apiKey, apiSecret } = this.credentials();
+    cloudinary.config({ cloud_name: closure.cloudName ?? undefined, api_key: apiKey, api_secret: apiSecret, secure: true });
+    return closure;
   }
 
   /** Nombre de cuenta configurado, expuesto para reconstruir una identidad ya persistida. */

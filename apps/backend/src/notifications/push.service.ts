@@ -13,6 +13,15 @@ export const MAX_SUSCRIPCIONES_PUSH = 5;
 const HOSTS_PUSH =
   /^(fcm\.googleapis\.com|android\.googleapis\.com|web\.push\.apple\.com|([\w-]+\.)+push\.services\.mozilla\.com|([\w-]+\.)+notify\.windows\.com|([\w-]+\.)+push\.apple\.com)$/;
 
+const hostPermitido = (endpoint: string) => {
+  try {
+    const url = new URL(endpoint);
+    return url.protocol === 'https:' && HOSTS_PUSH.test(url.hostname);
+  } catch {
+    return false;
+  }
+};
+
 export interface PushPayload {
   titulo: string;
   mensaje?: string;
@@ -41,7 +50,7 @@ export class PushService {
   }
 
   async suscribir(userId: number, dto: SuscripcionPushDto) {
-    if (!HOSTS_PUSH.test(new URL(dto.endpoint).hostname)) {
+    if (!hostPermitido(dto.endpoint)) {
       throw new BadRequestException('El servicio de notificaciones del navegador no es compatible');
     }
     const data = { idUsuario: userId, p256dh: dto.p256dh, auth: dto.auth };
@@ -89,9 +98,16 @@ export class PushService {
         ...noMolestar.filter((n) => estaEnNoMolestar(n, ahora)).map((n) => n.idUsuario),
       ]);
       const cuerpo = JSON.stringify({ titulo: payload.titulo, mensaje: payload.mensaje ?? '' });
+      // Se revalida el host: una fila guardada antes de la lista permitida no debe provocar un POST interno.
+      const invalidas = suscripciones.filter((s) => !hostPermitido(s.endpoint));
+      if (invalidas.length > 0) {
+        await this.prisma.suscripcionPush.deleteMany({
+          where: { idSuscripcion: { in: invalidas.map((s) => s.idSuscripcion) } },
+        });
+      }
       await Promise.all(
         suscripciones
-          .filter((s) => !callados.has(s.idUsuario))
+          .filter((s) => !callados.has(s.idUsuario) && hostPermitido(s.endpoint))
           .map(async (s) => {
             try {
               await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, cuerpo, {

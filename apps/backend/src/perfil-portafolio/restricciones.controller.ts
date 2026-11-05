@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -10,7 +10,11 @@ import { RestriccionesService } from './restricciones.service';
 
 type Actor = { userId: number };
 
-const tipoDe = (tipo: string) => (tipo === 'silencio' ? 'SILENCIO' : 'BLOQUEO');
+export const tipoDe = (tipo: string) => {
+  if (tipo === 'silencio') return 'SILENCIO';
+  if (tipo === 'bloqueo') return 'BLOQUEO';
+  throw new BadRequestException('Tipo de restricción no válido');
+};
 
 /** Bloqueos y silencios propios (MEJ-153) y reportes de perfil/mensaje (MEJ-154). Permisos en los servicios; el actor sale del JWT. */
 @Controller()

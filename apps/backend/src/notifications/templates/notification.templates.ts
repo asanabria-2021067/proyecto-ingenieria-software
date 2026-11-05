@@ -356,6 +356,12 @@ export interface NotificationTemplateData extends HorasTemplateData, Coordinador
     idUsuario: number | null;
   };
 
+  // MEJ-154: aviso a administradores de un reporte de perfil o de mensaje.
+  REPORTE_PERFIL: {
+    idReportePerfil: number;
+    esMensaje: boolean;
+  };
+
   JUNTA_ASOCIACION: {
     idAsociacion: number;
     nombreAsociacion: string;
@@ -715,6 +721,12 @@ export const NOTIFICATION_TEMPLATES = {
     title: 'Nueva solicitud de contacto',
     message: (data: NotificationTemplateData['SOLICITUD_CONTACTO']) =>
       `${data.nombre} (${data.correo}) escribió sobre "${data.asunto}": ${data.mensaje}`,
+  },
+
+  REPORTE_PERFIL: {
+    title: (data: NotificationTemplateData['REPORTE_PERFIL']) =>
+      data.esMensaje ? 'Nuevo reporte de un mensaje' : 'Nuevo reporte de un perfil',
+    message: () => 'Hay un reporte pendiente en la bandeja de reportes de perfil.',
   },
 
   JUNTA_ASOCIACION: {

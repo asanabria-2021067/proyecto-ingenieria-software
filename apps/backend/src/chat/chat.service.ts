@@ -260,7 +260,7 @@ export class ChatService {
             usuario: PARTICIPANTE_USUARIO,
           },
         },
-        mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
+        mensajes: { where: { idMensajePadre: null }, orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
     });
@@ -272,6 +272,7 @@ export class ChatService {
           where: {
             idConversacion: c.idConversacion,
             idRemitente: { not: userId },
+            idMensajePadre: null,
             ...(propia?.ultimaLecturaEn ? { enviadoEn: { gt: propia.ultimaLecturaEn } } : {}),
           },
         });
@@ -612,7 +613,12 @@ export class ChatService {
       throw new BadRequestException('desde no puede ser posterior a hasta');
     }
 
-    const condiciones = [Prisma.sql`id_conversacion = ${idConversacion}`, Prisma.sql`eliminado_en IS NULL`];
+    // MEJ-131: no hay busqueda dentro del hilo, asi que las respuestas no son resultados del canal.
+    const condiciones = [
+      Prisma.sql`id_conversacion = ${idConversacion}`,
+      Prisma.sql`eliminado_en IS NULL`,
+      Prisma.sql`id_mensaje_padre IS NULL`,
+    ];
     if (q) {
       condiciones.push(
         Prisma.sql`immutable_unaccent(lower(contenido)) LIKE immutable_unaccent(lower(${likePattern(q)})) ESCAPE '\\'`,
@@ -1098,7 +1104,7 @@ export class ChatService {
                     },
                   },
                 },
-                { mensajes: { some: { eliminadoEn: null, contenido: { contains: query, mode: 'insensitive' } } } },
+                { mensajes: { some: { eliminadoEn: null, idMensajePadre: null, contenido: { contains: query, mode: 'insensitive' } } } },
               ],
             }
           : {}),
@@ -1117,7 +1123,7 @@ export class ChatService {
             usuario: PARTICIPANTE_USUARIO,
           },
         },
-        mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
+        mensajes: { where: { idMensajePadre: null }, orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
     });
@@ -1129,6 +1135,7 @@ export class ChatService {
           where: {
             idConversacion: c.idConversacion,
             idRemitente: { not: userId },
+            idMensajePadre: null,
             ...(propia?.ultimaLecturaEn ? { enviadoEn: { gt: propia.ultimaLecturaEn } } : {}),
           },
         });
@@ -1355,7 +1362,7 @@ export class ChatService {
       include: {
         proyecto: { select: { idProyecto: true, tituloProyecto: true } },
         participantes: { select: { idUsuario: true, usuario: USUARIO_SELECT } },
-        mensajes: { orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
+        mensajes: { where: { idMensajePadre: null }, orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
       skip: (page - 1) * ARCHIVADOS_PAGE_SIZE,

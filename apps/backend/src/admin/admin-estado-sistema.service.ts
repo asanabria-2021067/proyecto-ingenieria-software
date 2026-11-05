@@ -37,7 +37,7 @@ export class AdminEstadoSistemaService {
     const api_secret = this.config.get<string>('CLOUDINARY_API_SECRET');
     if (!cloud_name || !api_key || !api_secret) return 'no_configurado';
     cloudinary.config({ cloud_name, api_key, api_secret, secure: true });
-    return comoEstado(async () => (await cloudinary.api.ping()).status === 'OK');
+    return comoEstado(async () => (await cloudinary.api.ping()).status?.toLowerCase() === 'ok');
   }
 
   async obtener(idActor: number) {
@@ -56,7 +56,9 @@ export class AdminEstadoSistemaService {
         ORDER BY started_at DESC
         LIMIT 5`.catch(() => []),
     ]);
-    const server = this.notifications.server as { engine?: { clientsCount: number } } | undefined;
+    // Con namespace, `server` es un Namespace: el engine vive en el Server raiz, que cuenta los dos gateways (/chat y /notifications).
+    const gw = this.notifications.server as { server?: unknown } | undefined;
+    const server = (gw?.server ?? gw) as { engine?: { clientsCount: number } } | undefined;
     return {
       baseDatos,
       redis,
