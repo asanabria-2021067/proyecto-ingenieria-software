@@ -238,6 +238,7 @@ describe('TasksService', () => {
           'bloqueadaPor',
           'repeticion',
           'repeticionProxima',
+          'esEjemplo',
           'checklist',
         ].sort(),
       );
@@ -550,6 +551,7 @@ describe('TasksService', () => {
         bloqueante: { idTarea: 99, tituloTarea: 'Diseñar esquema', estadoTarea: 'EN_PROGRESO', eliminadoEn: null },
         repeticion: 'SEMANAL',
         repeticionProxima: new Date('2026-08-22T00:00:00.000Z'),
+        esEjemplo: false,
         checklist: [{ idItem: 1, texto: 'Medir', completado: true }],
         hito: { idHito: 4, tituloHito: 'MVP funcional' },
         rolProyecto: { idRolProyecto: 6, nombreRol: 'Fullstack' },
@@ -603,6 +605,7 @@ describe('TasksService', () => {
         bloqueadaPor: { idTarea: 99, tituloTarea: 'Diseñar esquema', estadoTarea: 'EN_PROGRESO' },
         repeticion: 'SEMANAL',
         repeticionProxima: '2026-08-22',
+        esEjemplo: false,
         checklist: [{ idItem: 1, texto: 'Medir', completado: true }],
       });
 

@@ -14,6 +14,8 @@ import { useProjectSprints } from '@/hooks/use-project-sprints';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useTaskSelection } from '@/hooks/use-task-selection';
 import { Button } from '@/components/ui/button';
+import { BorrarEjemploBoton, OfertaEjemploPrimerProyecto } from '@/components/projects/ejemplo-proyecto';
+import { BotonAyudaTour } from '@/components/ayuda/boton-ayuda-tour';
 import { Kbd } from '@/components/ui/kbd';
 import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import {
@@ -178,6 +180,13 @@ function WorkspaceSkeleton() {
 }
 
 // ─── Workspace ─────────────────────────────────────────────────────────────
+const PASOS_AYUDA = [
+  { target: '#tour-kanban-pestanas', title: 'Tablero e hitos', content: 'Alterna entre el tablero de tareas y los hitos del proyecto.' },
+  { target: '#tour-kanban-filtros', title: 'Filtros', content: 'Filtra por rol o hito, o quédate solo con tus tareas.' },
+  { target: '#tour-kanban-nueva', title: 'Nueva tarea', content: 'Crea una tarea en el sprint activo.' },
+  { target: '#tour-kanban-tablero', title: 'Tus tareas', content: 'Abre una tarjeta para cambiar su estado o registrar horas.' },
+];
+
 function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const idProyecto = proyecto.idProyecto;
   const router = useRouter();
@@ -299,8 +308,17 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
     return proyecto.roles.filter((rol) => misIds.has(rol.idRolProyecto));
   }, [currentUser, members, proyecto.roles]);
 
+  const ofrecerEjemplo =
+    isLeader &&
+    !!currentUser &&
+    !isLoadingSprints &&
+    !isErrorSprints &&
+    sprints.length === 0 &&
+    (estadoProyecto === 'PUBLICADO' || estadoProyecto === 'EN_PROGRESO');
+
   return (
     <ProjectPageShell>
+      {ofrecerEjemplo && <OfertaEjemploPrimerProyecto idProyecto={idProyecto} idUsuario={currentUser.idUsuario} />}
       {/* Identidad de la página fuera de las tarjetas: la vuelta al proyecto
           (antes breadcrumb + botón dentro de la tarjeta) va en el encabezado. */}
       <ProjectPageHeader
@@ -310,6 +328,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
         }}
         title="Tablero (Kanban)"
         description="Tus tareas y las del equipo por estado. Abre una tarjeta para cambiar su estado o registrar horas."
+        actions={<BotonAyudaTour pasos={PASOS_AYUDA} />}
       />
 
       <OrgSoloLecturaBanner proyecto={proyecto} participantes={cargandoMiembros ? undefined : members} className="mb-grid" />
@@ -358,7 +377,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
           del tablero pertenece al área interna del board, no a la página. */}
       <div className="card-base min-h-0 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 gap-0">
-          <TabsList className="mb-7 h-9 w-full justify-start gap-0 rounded-none border-b border-outline-variant/40 bg-transparent p-0">
+          <TabsList id="tour-kanban-pestanas" className="mb-7 h-9 w-full justify-start gap-0 rounded-none border-b border-outline-variant/40 bg-transparent p-0">
             <TabsTrigger
               value="tablero"
               className="relative h-9 flex-none rounded-none border-x border-t border-transparent bg-transparent px-2.5 pb-2 text-sm font-semibold text-tertiary shadow-none data-[state=active]:border-outline-variant/50 data-[state=active]:border-b-surface-container-lowest data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:after:absolute data-[state=active]:after:inset-x-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-0.5 data-[state=active]:after:bg-primary"
@@ -389,7 +408,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <div id="tour-kanban-filtros" className="flex flex-wrap items-center gap-2 lg:justify-end">
               <Select value={filtroRol} onValueChange={setFiltroRol}>
                 <SelectTrigger
                   size="sm"
@@ -450,6 +469,8 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 </Button>
               )}
 
+              {isLeader && <BorrarEjemploBoton idProyecto={idProyecto} />}
+
               {isLeader && (
                 <Button
                   type="button"
@@ -494,6 +515,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                   que ocultarlo cierra por completo esa vía. */}
               {puedeCrear && haySprintDeTrabajo && (
                 <Button
+                  id="tour-kanban-nueva"
                   type="button"
                   size="sm"
                   onClick={() => setCrearAbierto(true)}
@@ -520,7 +542,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             </p>
           )}
 
-          <TabsContent value="tablero" className="mt-0 min-h-0">
+          <TabsContent id="tour-kanban-tablero" value="tablero" className="mt-0 min-h-0">
             {isLoadingSprints ? (
               <SkeletonRegion label="Cargando sprints" className="space-y-3">
                 <Skeleton className="h-9 w-48" />

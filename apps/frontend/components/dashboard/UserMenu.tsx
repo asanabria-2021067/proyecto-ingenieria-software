@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronsUpDown, LogOut, Settings, User } from 'lucide-react';
+import { ChevronsUpDown, CircleQuestionMark, Flag, LogOut, Settings, User } from 'lucide-react';
+import { ReportarProblemaDialog } from '@/components/ayuda/reportar-problema-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,6 +69,7 @@ function UserAvatar({ user, theme }: { user: UserMenuUser | null | undefined; th
 const ACCOUNT_LINKS = [
   { href: '/dashboard/perfil', label: 'Mi perfil', icon: User },
   { href: '/dashboard/configuracion', label: 'Configuración', icon: Settings },
+  { href: '/dashboard/ayuda', label: 'Centro de ayuda', icon: CircleQuestionMark },
 ] as const;
 
 function UserMenuContent({
@@ -75,12 +78,14 @@ function UserMenuContent({
   theme,
   menuClassName,
   juntas,
+  onReportar,
 }: {
   user: UserMenuUser | null | undefined;
   onLogout: () => void;
   theme: 'default' | 'admin';
   menuClassName?: string;
   juntas: MiJunta[];
+  onReportar: () => void;
 }) {
   const pathname = usePathname();
   const vista = String(asociacionDeRuta(pathname) ?? 'estudiante');
@@ -136,6 +141,10 @@ function UserMenuContent({
           </DropdownMenuItem>
         );
       })}
+      <DropdownMenuItem className="cursor-pointer" onSelect={onReportar}>
+        <Flag className="size-4" aria-hidden="true" />
+        Reportar un problema
+      </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem
         variant="destructive"
@@ -158,9 +167,23 @@ function UserMenuContent({
  *  cuenta en cada ancho: la barra superior no lo repite. */
 export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default', menuClassName, juntas = [] }: UserMenuProps) {
   const isAdmin = theme === 'admin';
+  const [reportando, setReportando] = useState(false);
+  const contenido = (
+    <UserMenuContent
+      user={user}
+      onLogout={onLogout}
+      theme={theme}
+      menuClassName={menuClassName}
+      juntas={juntas}
+      onReportar={() => setReportando(true)}
+    />
+  );
+  // El diálogo vive fuera del menú: al elegir la opción el menú se desmonta.
+  const dialogo = reportando && <ReportarProblemaDialog onClose={() => setReportando(false)} />;
 
   if (variant === 'compact') {
     return (
+      <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -175,12 +198,15 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
             <UserAvatar user={user} theme={theme} />
           </button>
         </DropdownMenuTrigger>
-        <UserMenuContent user={user} onLogout={onLogout} theme={theme} menuClassName={menuClassName} juntas={juntas} />
+        {contenido}
       </DropdownMenu>
+      {dialogo}
+      </>
     );
   }
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -208,7 +234,9 @@ export function UserMenu({ user, onLogout, variant = 'sidebar', theme = 'default
           />
         </button>
       </DropdownMenuTrigger>
-      <UserMenuContent user={user} onLogout={onLogout} theme={theme} menuClassName={menuClassName} juntas={juntas} />
+      {contenido}
     </DropdownMenu>
+    {dialogo}
+    </>
   );
 }

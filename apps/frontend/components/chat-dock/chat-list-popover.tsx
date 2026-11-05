@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { BellOff, Bookmark, Hash, Search, SquarePen, Users as UsersIcon, UserCog } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
+import { BotonAyudaTour } from '@/components/ayuda/boton-ayuda-tour';
 import { getIniciales } from '@/components/projects/available-project-card';
 import { nombreMostrado, nombreReal } from '@/lib/chat-apodos';
 import { useAllConversations } from '@/hooks/use-chat';
@@ -44,6 +45,12 @@ interface ChatListPopoverProps {
   pagina?: boolean;
   idActiva?: number | null;
 }
+
+const PASOS_AYUDA = [
+  { target: '#tour-chat-nuevo', title: 'Nuevo chat', content: 'Inicia una conversación individual o grupal con el equipo de uno de tus proyectos.' },
+  { target: '#tour-chat-buscar', title: 'Buscar', content: 'Encuentra un chat por su nombre o por un mensaje que enviaste.' },
+  { target: '#tour-chat-tabs', title: 'Prioritarios y otros', content: 'Separa los chats importantes del resto para no perderlos.' },
+];
 
 export function ChatListPopover({ onClose, onOpenSaved, pagina = false, idActiva = null }: ChatListPopoverProps) {
   const { data: user } = useCurrentUser();
@@ -95,6 +102,7 @@ export function ChatListPopover({ onClose, onOpenSaved, pagina = false, idActiva
           <p className="text-sm font-bold text-on-surface">Mensajes</p>
           <div className="flex items-center gap-1">
             <MiEstadoBoton />
+            {pagina && <BotonAyudaTour pasos={PASOS_AYUDA} compacto />}
             {onOpenSaved && (
               <button
                 type="button"
@@ -112,6 +120,7 @@ export function ChatListPopover({ onClose, onOpenSaved, pagina = false, idActiva
             <button
               type="button"
               onClick={() => setNuevoChatAbierto(true)}
+              id={pagina ? 'tour-chat-nuevo' : undefined}
               aria-label="Nuevo chat"
               title="Nuevo chat"
               className="flex size-7 items-center justify-center rounded-md text-text-secondary motion-icon hover:bg-on-surface/10 hover:text-text-primary"
@@ -134,6 +143,7 @@ export function ChatListPopover({ onClose, onOpenSaved, pagina = false, idActiva
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" aria-hidden="true" />
           <Input
+            id={pagina ? 'tour-chat-buscar' : undefined}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar mensajes"
@@ -141,7 +151,7 @@ export function ChatListPopover({ onClose, onOpenSaved, pagina = false, idActiva
             className="h-9 rounded-full border-outline-variant pl-8 text-sm"
           />
         </div>
-        <div className="mt-2 flex gap-1">
+        <div id={pagina ? 'tour-chat-tabs' : undefined} className="mt-2 flex gap-1">
           <button
             type="button"
             onClick={() => setTab('prioritarios')}

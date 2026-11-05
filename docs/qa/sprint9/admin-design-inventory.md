@@ -48,6 +48,7 @@ motivo de comentario» de `docs/design-system.md`.
 | `/dashboard/admin/anuncios` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/anuncios/page.tsx` |
 | `/dashboard/admin/asociaciones` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/asociaciones/page.tsx` |
 | `/dashboard/admin/bandeja` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/bandeja/page.tsx` |
+| `/dashboard/admin/reportes` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/reportes/page.tsx` |
 | `/dashboard/admin/entidades` | sí | 0 | 0 | 0 | 0 | `app/dashboard/admin/entidades/page.tsx` |
 | `/dashboard/admin/botones` | sí | 0 | 0 | 1 | 0 | `app/dashboard/admin/botones/page.tsx` |
 | `/dashboard/admin/etiquetas` | sí | 0 | 0 | 0 | 6 | `app/dashboard/admin/etiquetas/page.tsx` |
@@ -120,6 +121,7 @@ Medido sobre el mismo código con la misma herramienta.
 | `/dashboard/admin/anuncios` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/asociaciones` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/bandeja` | sí | 0 | 0 | 0 | 0 |
+| `/dashboard/admin/reportes` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/entidades` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/apelaciones` | sí | 0 | 0 | 0 | 0 |
 | `/dashboard/admin/apelaciones/[apelacionId]` | sí | 0 | 0 | 0 | 0 |

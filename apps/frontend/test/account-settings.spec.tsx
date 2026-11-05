@@ -166,10 +166,10 @@ describe('Menú de cuenta', () => {
     await screen.findByRole('menuitem', { name: 'Cerrar sesión' });
   }
 
-  it('ofrece Mi perfil, Configuración y Cerrar sesión, en ese orden, en ambas variantes', async () => {
+  it('ofrece Mi perfil, Configuración, Centro de ayuda, Reportar un problema y Cerrar sesión, en ese orden, en ambas variantes', async () => {
     for (const variant of ['sidebar', 'compact'] as const) {
       await abrir(variant);
-      expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Mi perfil', 'Configuración', 'Cerrar sesión']);
+      expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Mi perfil', 'Configuración', 'Centro de ayuda', 'Reportar un problema', 'Cerrar sesión']);
       expect(screen.getByRole('menuitem', { name: 'Mi perfil' })).toHaveAttribute('href', '/dashboard/perfil');
       expect(screen.getByRole('menuitem', { name: 'Configuración' })).toHaveAttribute('href', '/dashboard/configuracion');
       cleanup();

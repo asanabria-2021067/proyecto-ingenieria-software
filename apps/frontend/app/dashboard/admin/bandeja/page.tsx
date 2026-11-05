@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Clock,
   Gavel,
+  Bug,
   Inbox,
   KeyRound,
   UserCheck,
@@ -60,6 +61,12 @@ const DESTINOS: Record<ClavePendiente, { titulo: string; descripcion: string; hr
     descripcion: 'Estudiantes que piden desactivar su cuenta',
     href: '/dashboard/admin/solicitudes-desactivacion',
     icono: UserX,
+  },
+  reportes: {
+    titulo: 'Reportes de problemas',
+    descripcion: 'Problemas que reportaron los usuarios',
+    href: '/dashboard/admin/reportes',
+    icono: Bug,
   },
 };
 

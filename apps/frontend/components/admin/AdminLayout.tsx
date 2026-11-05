@@ -8,6 +8,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Archive,
   BarChart3,
+  Bug,
   Building2,
   CalendarRange,
   Clock,
@@ -133,6 +134,8 @@ export const adminNavEntries: NavEntry[] = [
       { href: ADMIN_CUENTAS_PENDIENTES_HREF, label: 'Cuentas pendientes', icon: UserCheck },
       // T-310: visor de solo lectura de los eventos de seguridad que ya se registran.
       { href: '/dashboard/admin/seguridad', label: 'Eventos de seguridad', icon: ScrollText },
+      // MEJ-90: problemas que reportan los usuarios desde el menú de cuenta.
+      { href: '/dashboard/admin/reportes', label: 'Reportes de problemas', icon: Bug },
     ],
   },
   {

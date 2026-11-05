@@ -106,6 +106,7 @@ const PUBLIC_TAREA_KEYS = [
   'bloqueadaPor',
   'repeticion',
   'repeticionProxima',
+  'esEjemplo',
   'checklist',
 ].sort();
 

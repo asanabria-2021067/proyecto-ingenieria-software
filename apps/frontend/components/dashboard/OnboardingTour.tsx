@@ -94,6 +94,8 @@ export default function OnboardingTour() {
   const { data: horasActual, isPending: horasPendientes } = useHorasActual();
   const pathname = usePathname();
   const [run, setRun] = useState(false);
+  // Tour corto de la pantalla actual (botón «?»): se pasa por evento y no toca el estado de primera vez.
+  const [pantalla, setPantalla] = useState<any[] | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -159,6 +161,16 @@ export default function OnboardingTour() {
   }, [startTour]);
 
   useEffect(() => {
+    const handlePantalla = (e: Event) => {
+      cancelTimer();
+      setPantalla((e as CustomEvent<any[]>).detail);
+      setRun(true);
+    };
+    window.addEventListener('start-pantalla-tour', handlePantalla);
+    return () => window.removeEventListener('start-pantalla-tour', handlePantalla);
+  }, [cancelTimer]);
+
+  useEffect(() => {
     const handlePospuesto = () => startTour();
     window.addEventListener('perfil-asistente-pospuesto', handlePospuesto);
     return () => window.removeEventListener('perfil-asistente-pospuesto', handlePospuesto);
@@ -172,6 +184,10 @@ export default function OnboardingTour() {
       // Un arranque pendiente (retardo de 800 ms) no debe reabrir la guía tras terminarla o saltarla.
       cancelTimer();
       setRun(false);
+      if (pantalla) {
+        setPantalla(null);
+        return;
+      }
       if (user) {
         const tourKey = `onboarding_seen_${user.idUsuario}`;
         localStorage.setItem(tourKey, 'true');
@@ -179,7 +195,7 @@ export default function OnboardingTour() {
     }
   };
 
-  const steps: any[] = [
+  const stepsBienvenida: any[] = [
     {
       target: 'body',
       title: '¡Bienvenido a UVGenius!',
@@ -238,6 +254,8 @@ export default function OnboardingTour() {
     },
   ];
 
+  const steps = pantalla ?? stepsBienvenida;
+
   const { Tour } = useJoyride({
     run,
     steps,
@@ -268,7 +286,7 @@ export default function OnboardingTour() {
           cualquier otra ruta react-joyride no encuentra el target y revienta
           intentando reposicionarse (visto en vivo navegando desde el
           buscador a /dashboard/personas/:id con el tour activo). */}
-      {pathname === RUTA_TOUR && Tour}
+      {(pathname === RUTA_TOUR || pantalla) && Tour}
       <style
         dangerouslySetInnerHTML={{
           __html: `

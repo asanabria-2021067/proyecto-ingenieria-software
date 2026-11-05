@@ -338,6 +338,28 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
     expect(nuevas.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
   });
 
+  // MEJ-88/89/90: primeros pasos, contenido de ejemplo del primer proyecto y reportes de problemas.
+  it('primeros pasos, ejemplo del proyecto y reportes de problema: rutas con JwtAuthGuard y las de admin solo para administrador', () => {
+    const esperadas = [
+      'GET /api/usuarios/me/primeros-pasos',
+      'POST /api/usuarios/me/primeros-pasos/cerrar',
+      'GET /api/proyectos/:projectId/ejemplo',
+      'POST /api/proyectos/:projectId/ejemplo',
+      'DELETE /api/proyectos/:projectId/ejemplo',
+      'POST /api/reportes-problema',
+      'GET /api/admin/reportes-problema',
+      'PATCH /api/admin/reportes-problema/:id/atender',
+    ];
+    const nuevas = rutas.filter((r) => esperadas.includes(r.id));
+    expect(nuevas.map((r) => r.id).sort()).toEqual([...esperadas].sort());
+    expect(nuevas.filter((r) => !r.guards.includes(JwtAuthGuard)).map((r) => r.id)).toEqual([]);
+    expect(nuevas.filter((r) => PUBLICAS.has(r.id))).toEqual([]);
+    const deAdmin = nuevas.filter((r) => r.path.startsWith('admin/'));
+    expect(deAdmin).toHaveLength(2);
+    expect(deAdmin.every((r) => r.guards.includes(RolesGuard) && r.roles.includes('administrador'))).toBe(true);
+    expect(nuevas.filter((r) => r.path === 'reportes-problema').every((r) => !r.guards.includes(RolesGuard))).toBe(true);
+  });
+
   // MEJ-26/27/28/63/64/33/34/66: perfil y social, .ics, calendario y anuncios de organizaciones y asociaciones.
   it('perfil, calendario y anuncios de entidades: las rutas nuevas existen y exigen JwtAuthGuard', () => {
     const esperadas = [
