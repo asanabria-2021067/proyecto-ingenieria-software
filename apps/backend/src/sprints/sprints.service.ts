@@ -263,7 +263,7 @@ export class SprintsService {
    * un posible número duplicado pudiera materializarse en una fila
    * persistida.
    */
-  async startSprint(projectId: number, userId: number, fechaFinPlaneada: string) {
+  async startSprint(projectId: number, userId: number, fechaFinPlaneada: string, objetivo?: string | null) {
     return this.projectTx.run(projectId, userId, 'sprints.startSprint', async (ctx) => {
       const { tx } = ctx;
       await this.sprintsAuthorization.assertCanStartSprint(projectId, userId, tx);
@@ -304,6 +304,7 @@ export class SprintsService {
             estado: EstadoSprint.ACTIVO,
             fechaInicio,
             fechaFinPlaneada: fechaFinPlaneadaResuelta,
+            ...(objetivo ? { objetivo } : {}),
           },
         });
       } catch (error) {

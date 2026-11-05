@@ -268,6 +268,13 @@ export const PROJECT_WRITE_POLICY_CATALOG: Readonly<Record<ProjectWriteFamily, P
     entity: 'ANY',
     descripcion: 'Baja de un integrante por administración o coordinador en alcance (MEJ-105); el líder no puede',
   },
+  SPRINT_OBJETIVO: {
+    actor: 'LIDER',
+    states: OPERATIVE,
+    sprint: 'ANY',
+    entity: 'ANY',
+    descripcion: 'Objetivo del Sprint (MEJ-117): el líder lo edita con el proyecto en P/E; el service rechaza Sprints cerrados',
+  },
 };
 
 export interface WriteEntityContext {

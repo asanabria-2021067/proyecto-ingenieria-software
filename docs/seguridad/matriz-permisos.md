@@ -180,8 +180,9 @@ protección actual ya es correcta.
 | POST | `/proyectos/:projectId/sprints/:sprintId/finalizar` | Finalizar Sprint | ❌ | ✅ | ❌ | ❌ | `JWT` + `PWG` + `W:SPRINT_FINALIZE→LIDER` | — |
 | POST | `/proyectos/:projectId/sprints/:sprintId/cerrar` | Cerrar Sprint | ❌ | ✅ | ❌ | ❌ | `JWT` + `PWG` + `W:SPRINT_CLOSE→LIDER` | — |
 | POST | `/proyectos/:projectId/sprints/:sprintId/instantanea` | Regenerar instantánea del día | ❌ | ✅ | ❌ | ❌ | `JWT` + `SprintsAuthorizationService.assertCanManageSprintSnapshot` | — |
+| PATCH | `/proyectos/:projectId/sprints/:sprintId/objetivo` | Editar objetivo del Sprint (MEJ-117) | ❌ | ✅ | ❌ | ❌ | `JWT` + `ProjectWriteGuard` (SPRINT_OBJETIVO, P/E) + `SprintsAuthorizationService.assertCanFinalizeSprint` | — |
 | GET | `/proyectos/:projectId/sprints/:sprintId/resumen-cierre[/miembros/:userId]` | Resumen de cierre de Sprint | ❌ | ✅ | ❌ | ❌ | `JWT` + `R:sprints` + check de líder en service | — |
-| GET | `/proyectos/:projectId/sprints`, `/…/:sprintId`, `/…/analytics`, `/…/:sprintId/analytics`, `/…/:sprintId/burndown` | Leer Sprints y analítica | ⚠️ participante | ✅ | ⚠️ participante | ⚠️ solo cerrados | `JWT` + `R:sprints` | — |
+| GET | `/proyectos/:projectId/sprints`, `/…/:sprintId`, `/…/analytics`, `/…/:sprintId/analytics`, `/…/:sprintId/burndown`, `/…/:sprintId/informes/tiempo-por-columna` | Leer Sprints y analítica | ⚠️ participante | ✅ | ⚠️ participante | ⚠️ solo cerrados | `JWT` + `R:sprints` | — |
 | GET | `/proyectos/:projectId/eventos` | Eventos del proyecto | ⚠️ participante | ✅ | ⚠️ participante | ❌ | `JWT` + check de acceso en service | — |
 | POST/PATCH/DELETE | `/proyectos/:projectId/eventos[/:eventId]` | Gestionar eventos | ❌ | ✅ | ❌ | ❌ | `JWT` + `S:owner` | — |
 | GET | `/proyectos/:projectId/actividades[/:actividadId]` | Ver actividades / asistencia | ⚠️ participante | ✅ | ⚠️ participante | ⚠️ | `JWT` + `R:asistencia` | — |
@@ -303,6 +304,7 @@ Mecanismos de protección del frontend encontrados:
 | `/dashboard/proyectos/[id]/sprints`, `/sprints/[sprintId]` | Gestionar Sprints | ⚠️ solo lectura | ✅ | ❌ | `isLeader` / `puedeOperar` + `LeaderOnlyNotice` | — |
 | `/dashboard/proyectos/[id]/sprints/[sprintId]/finalizar` | Finalizar/cerrar Sprint, ajustar horas | ❌ | ✅ | ❌ | `LeaderOnlyNotice` | — |
 | `/dashboard/proyectos/[id]/sprints/analytics`, `/sprints/[sprintId]/analytics`, `/sprints/[sprintId]/informes/burndown`, `/sprints/informes/velocidad` | Analítica de Sprints | ⚠️ participante | ✅ | ❌ | Sin chequeo en cliente; backend `R:sprints`; muestra error genérico | — (lectura ya protegida en backend) |
+| `/dashboard/proyectos/[id]/sprints/[sprintId]/informes/graficas` | Informes de equipo y tiempo del Sprint (MEJ-120) | ❌ | ✅ | ❌ | Solo líder: el detalle del Sprint lo exige el backend (`assertCanViewSprintHistory`); el enlace se oculta a los demás | — (lectura protegida en backend) |
 | `/dashboard/proyectos/[id]/editar`, `/equipo`, `/tablero` | Redirecciones legacy | — | — | — | Redirigen a rutas protegidas | — |
 | `/dashboard/projects/mine` | Mis proyectos como líder | ✅ | ✅ | ❌ | `DashboardLayout` (`S:self`) | — |
 | `/dashboard/projects/mine/form` (sin `id`) | Crear proyecto | ✅ | ✅ | ❌ | `DashboardLayout` | — |

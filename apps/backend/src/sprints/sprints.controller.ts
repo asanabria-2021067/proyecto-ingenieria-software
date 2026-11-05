@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -14,6 +15,9 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ProjectWriteGuard } from '../common/guards/project-write.guard';
 import { ProjectWrite, type ProjectWriteMetadata } from '../common/guards/project-write.metadata';
 import { SprintsService } from './sprints.service';
+import { SprintObjetivoService } from './sprint-objetivo.service';
+import { SprintColumnTimeService } from './sprint-column-time.service';
+import { UpdateSprintObjetivoDto } from './dto/sprint-objetivo.dto';
 import { StartSprintDto } from './dto/start-sprint.dto';
 import { CloseSprintDto } from './dto/close-sprint.dto';
 
@@ -34,6 +38,11 @@ const SPRINT_FINALIZE: ProjectWriteMetadata = {
   sprint: 'ACTIVO',
   family: 'SPRINT_FINALIZE',
 };
+const SPRINT_OBJETIVO: ProjectWriteMetadata = {
+  ...SPRINT_START,
+  sprint: 'ANY',
+  family: 'SPRINT_OBJETIVO',
+};
 const SPRINT_CLOSE: ProjectWriteMetadata = {
   ...SPRINT_START,
   sprint: 'EN_FINALIZACION',
@@ -43,7 +52,11 @@ const SPRINT_CLOSE: ProjectWriteMetadata = {
 @Controller('proyectos/:projectId/sprints')
 @UseGuards(JwtAuthGuard)
 export class SprintsController {
-  constructor(private readonly sprintsService: SprintsService) {}
+  constructor(
+    private readonly sprintsService: SprintsService,
+    private readonly objetivoService: SprintObjetivoService,
+    private readonly columnTime: SprintColumnTimeService,
+  ) {}
 
   /** E060: iniciar Sprint (líder, sin Sprint operable). */
   @Post()
@@ -55,7 +68,21 @@ export class SprintsController {
     @CurrentUser() user: { userId: number },
     @Body() body: StartSprintDto,
   ) {
-    return this.sprintsService.startSprint(projectId, user.userId, body.fechaFinPlaneada);
+    return this.sprintsService.startSprint(projectId, user.userId, body.fechaFinPlaneada, body.objetivo);
+  }
+
+  /** MEJ-117: editar el objetivo del Sprint (líder; Sprint no cerrado). */
+  @Patch(':sprintId/objetivo')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ProjectWriteGuard)
+  @ProjectWrite(SPRINT_OBJETIVO)
+  updateObjetivo(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+    @Body() body: UpdateSprintObjetivoDto,
+  ) {
+    return this.objetivoService.update(projectId, sprintId, user.userId, body.objetivo ?? null);
   }
 
   /** E061: finalizar el Sprint ACTIVO. */
@@ -186,5 +213,16 @@ export class SprintsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.sprintsService.getSprintBurndown(projectId, sprintId, user.userId);
+  }
+
+  /** MEJ-120: tiempo promedio por columna del tablero (mismo alcance que la analítica del Sprint). */
+  @Get(':sprintId/informes/tiempo-por-columna')
+  @HttpCode(HttpStatus.OK)
+  getColumnTime(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('sprintId', ParseIntPipe) sprintId: number,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.columnTime.get(projectId, sprintId, user.userId);
   }
 }

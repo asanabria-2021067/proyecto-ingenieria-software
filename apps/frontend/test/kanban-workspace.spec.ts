@@ -30,6 +30,7 @@ vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 vi.mock('../hooks/use-project-sprints', () => ({
   useProjectSprints: vi.fn(),
   useStartSprint: vi.fn(),
+  useUpdateSprintObjetivo: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 // Fuera de un app router real `useSearchParams()` devuelve null; se simula con
@@ -654,7 +655,7 @@ describe('KanbanWorkspaceClient — sin Sprint activo (F2)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Sí, iniciar Sprint' }));
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
-    expect(mutateAsync).toHaveBeenCalledWith(fecha);
+    expect(mutateAsync).toHaveBeenCalledWith({ fechaFinPlaneada: fecha, objetivo: undefined });
     expect(useStartSprint).toHaveBeenCalledWith(42);
   });
 

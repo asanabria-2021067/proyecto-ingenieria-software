@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronDown, GitCommitHorizontal, LineChart, TrendingDown, TrendingUp, Waypoints } from 'lucide-react';
+import { ChevronDown, GitCommitHorizontal, LineChart, Scale, TrendingDown, TrendingUp, Users, Waypoints } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,9 +16,15 @@ interface ReporteCard {
   titulo: string;
   descripcion: string;
   href?: string;
+  /** Se oculta a quien no es líder del proyecto. */
+  soloLider?: boolean;
 }
 
-function buildReportes(idProyecto: number, idSprintBurndown: number | null): ReporteCard[] {
+function buildReportes(idProyecto: number, idSprintBurndown: number | null, esLider: boolean): ReporteCard[] {
+  // El detalle del Sprint que alimenta estas gráficas es solo del líder (backend).
+  const graficas = idSprintBurndown && esLider
+    ? `/dashboard/proyectos/${idProyecto}/sprints/${idSprintBurndown}/informes/graficas`
+    : undefined;
   return [
     {
       icono: TrendingDown,
@@ -33,14 +39,32 @@ function buildReportes(idProyecto: number, idSprintBurndown: number | null): Rep
       href: `/dashboard/proyectos/${idProyecto}/sprints/informes/velocidad`,
     },
     {
+      icono: Users,
+      titulo: 'Horas por integrante',
+      soloLider: true,
+      descripcion: 'Cuántas horas reportó cada integrante en las tareas del Sprint.',
+      href: graficas,
+    },
+    {
       icono: Waypoints,
-      titulo: 'Diagrama de flujo acumulado',
-      descripcion: 'Muestra como se acumulan las tareas en cada estado del tablero a lo largo del tiempo.',
+      titulo: 'Tareas por estado a lo largo del Sprint',
+      soloLider: true,
+      descripcion: 'Cómo se reparten las tareas pendientes y completadas día a día.',
+      href: graficas,
     },
     {
       icono: LineChart,
-      titulo: 'Informe de duración del ciclo',
-      descripcion: 'Cuanto tiempo tardan las tareas en moverse por el tablero, de inicio a terminado.',
+      titulo: 'Tiempo promedio por columna',
+      soloLider: true,
+      descripcion: 'Cuánto tiempo pasan las tareas en Por hacer, En progreso y En revisión.',
+      href: graficas,
+    },
+    {
+      icono: Scale,
+      titulo: 'Horas estimadas contra reales',
+      soloLider: true,
+      descripcion: 'Compara lo que se estimó con lo que realmente se trabajó en cada tarea.',
+      href: graficas,
     },
     {
       icono: GitCommitHorizontal,
@@ -56,17 +80,19 @@ export interface SprintReportsDialogProps {
   idProyecto: number;
   /** Sprint al que enlaza la tarjeta de burndown — normalmente el mas reciente (activo o, si no hay, el ultimo cerrado). `null` si el proyecto aun no tiene ningun Sprint. */
   idSprintBurndown: number | null;
+  /** Líder del proyecto: solo él ve los informes de equipo y tiempo. */
+  esLider?: boolean;
 }
 
 /**
  * "Más informes" al estilo Jira: un catalogo de graficas de analitica de
  * Sprint. Burndown y Velocidad son reales y enlazan a su pagina dedicada;
- * el resto necesitaria metricas que hoy no registramos (flujo acumulado,
- * duracion de ciclo, frecuencia de cierre) y se muestran como Proximamente
- * en vez de inventar el dato.
+ * los informes de equipo y tiempo enlazan a la pagina de graficas del Sprint;
+ * la frecuencia de cierre necesita una metrica que hoy no registramos y se
+ * muestra como Proximamente en vez de inventar el dato.
  */
-export function SprintReportsDialog({ open, onOpenChange, idProyecto, idSprintBurndown }: SprintReportsDialogProps) {
-  const reportes = buildReportes(idProyecto, idSprintBurndown);
+export function SprintReportsDialog({ open, onOpenChange, idProyecto, idSprintBurndown, esLider = false }: SprintReportsDialogProps) {
+  const reportes = buildReportes(idProyecto, idSprintBurndown, esLider).filter((r) => esLider || !r.soloLider);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AlertCircle, Repeat } from 'lucide-react';
 import { useSprintsAnalytics, useSprintBurndown } from '@/hooks/use-project-sprints';
+import { useIsProjectLeader } from '@/hooks/use-is-project-leader';
 import { ProjectExportButtons } from '@/components/projects/project-export-buttons';
 import { BurndownChart } from '@/components/projects/burndown-chart';
 import { VelocityChart } from '@/components/projects/velocity-chart';
@@ -194,6 +195,7 @@ export default function SprintsAnalyticsPage() {
   const { id } = useParams<{ id: string }>();
   const idProyecto = Number(id);
   const [informesAbierto, setInformesAbierto] = useState(false);
+  const esLider = useIsProjectLeader(idProyecto);
 
   const { sprints, isLoading, isError, error, refetch } = useSprintsAnalytics(idProyecto);
   const sprintParaInformes = sprintMasReciente(sprints);
@@ -216,6 +218,7 @@ export default function SprintsAnalyticsPage() {
         onOpenChange={setInformesAbierto}
         idProyecto={idProyecto}
         idSprintBurndown={sprintParaInformes?.idSprint ?? null}
+        esLider={esLider}
       />
 
       {isLoading && (

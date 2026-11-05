@@ -111,6 +111,7 @@ export class SprintsReadService {
           fechaInicio: true,
           fechaFinalizacionIniciada: true,
           fechaCierre: true,
+          objetivo: true,
         },
       }),
       this.getSprintAggregatesByProject(projectId),
