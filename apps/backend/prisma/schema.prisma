@@ -350,6 +350,8 @@ enum TipoNotificacion {
   REUNION_CANCELADA
   // HU-205 (T-394): solicitud enviada desde la página de contacto, solo para administradores.
   SOLICITUD_CONTACTO
+  // MEJ-154: aviso a administradores de un reporte de perfil o de mensaje.
+  REPORTE_PERFIL
   // ASO: el admin nombra, cambia o quita a un usuario de la junta de una asociación.
   JUNTA_ASOCIACION
   INVITACION_ORGANIZACION

@@ -234,6 +234,9 @@ export function getNotificationLink(n: {
       return '/dashboard/admin/solicitudes-desactivacion';
     case 'DESACTIVACION_RESUELTA':
       return '/dashboard/configuracion';
+    // MEJ-154: el reporte de perfil o de mensaje se revisa en la bandeja de reportes.
+    case 'REPORTE_PERFIL':
+      return '/dashboard/admin/reportes';
     // HU-184: alguien compartió su calendario. G03 (UI-40): el enlace lleva el
     // `ownerId` validado y la página lo activa solo si la API lo lista entre
     // los calendarios recibidos; notificaciones antiguas sin id abren el calendario.

@@ -68,11 +68,9 @@ export class ReportesPerfilService {
       },
       select: { idReporte: true },
     });
-    await this.notifications.notifyAdmins({
-      tipoNotificacion: 'SOLICITUD_CONTACTO',
-      tituloNotificacion: dto.idMensaje !== undefined ? 'Nuevo reporte de un mensaje' : 'Nuevo reporte de un perfil',
-      mensajeNotificacion: 'Hay un reporte pendiente en la bandeja de reportes de perfil.',
-      datosJson: { idReportePerfil: reporte.idReporte },
+    await this.notifications.notifyAdminsFromTemplate('REPORTE_PERFIL', {
+      idReportePerfil: reporte.idReporte,
+      esMensaje: dto.idMensaje !== undefined,
     });
     return { mensaje: MENSAJE_REPORTE_PERFIL };
   }

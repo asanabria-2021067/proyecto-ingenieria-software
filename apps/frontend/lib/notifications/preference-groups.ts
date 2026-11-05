@@ -213,6 +213,11 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
     etiqueta: 'Alcance de coordinación',
     descripcion: 'Administración te asigna o cambia las carreras que coordinas.',
   },
+  REPORTE_PERFIL: {
+    grupo: 'cuenta',
+    etiqueta: 'Reporte de perfil o mensaje',
+    descripcion: 'Alguien reporta un perfil o un mensaje y queda pendiente en la bandeja de administración.',
+  },
   SOLICITUD_CONTACTO: {
     grupo: 'cuenta',
     etiqueta: 'Solicitud de contacto',
