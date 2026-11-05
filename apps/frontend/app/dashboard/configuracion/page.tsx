@@ -8,6 +8,7 @@ import { PushSection } from '@/components/profile/push-section';
 import { SesionesSection } from '@/components/profile/sesiones-section';
 import { CambiarContrasenaSection } from '@/components/profile/cambiar-contrasena-section';
 import { MisDatosSection } from '@/components/profile/mis-datos-section';
+import { BloqueosSection } from '@/components/profile/bloqueos-section';
 import { DesactivacionSection } from '@/components/profile/desactivacion-section';
 import { dashboardPage } from '@/components/layout/dashboard-page';
 
@@ -34,6 +35,7 @@ export default function ConfiguracionPage() {
       <NotificationPreferencesSection />
       <HorarioSilencioSection />
       <PushSection />
+      <BloqueosSection />
       <SesionesSection />
       <CambiarContrasenaSection />
       <MisDatosSection />

@@ -41,6 +41,7 @@ vi.mock('@/hooks/use-chat', () => ({
   useAttachmentThumbnail: () => ({ data: undefined }),
   useLinkPreview: () => ({ data: undefined }),
 }));
+vi.mock('@/components/profile/reportar-dialog', () => ({ ReportarDialog: ({ trigger }: { trigger: unknown }) => trigger }));
 vi.mock('@/hooks/use-current-user', () => ({ useCurrentUser: () => ({ data: { idUsuario: 1 } }) }));
 const orgEstado = vi.hoisted(() => ({ enviar: vi.fn() }));
 vi.mock('@/hooks/use-organizations', () => ({
@@ -396,7 +397,8 @@ describe('mensajes fijados (MEJ-43)', () => {
     cleanup();
 
     renderItem({}, false, { puedeFijar: false, onFijar });
-    expect(screen.queryByRole('button', { name: 'Acciones del mensaje' })).toBeNull();
+    // Sin permiso de fijar el menu solo ofrece reportar (MEJ-154).
+    expect(within(await abrirMenu()).queryByRole('menuitem', { name: /Fijar/ })).toBeNull();
   });
 });
 
@@ -410,7 +412,7 @@ describe('fijados en el chat de la organizacion (MEJ-43)', () => {
 
     render(createElement(OrgChat, { idOrganizacion: 7 }));
     expect(screen.getByText('Hola equipo')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Acciones del mensaje' })).toBeNull();
+    expect(within(await abrirMenu()).queryByRole('menuitem', { name: /Fijar/ })).toBeNull();
   });
 
   it('muestra la barra de fijados a cualquier miembro, pero solo gestores desfijan', () => {

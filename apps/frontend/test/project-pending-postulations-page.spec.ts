@@ -15,6 +15,7 @@ vi.mock('../hooks/use-project-pending-postulations', () => ({
   useProjectPendingPostulations: vi.fn(),
   useResolvePostulacion: vi.fn(),
 }));
+vi.mock('@/components/projects/bienvenida-proyecto-card', () => ({ BienvenidaProyectoCard: () => null }));
 vi.mock('@/lib/swal', () => ({ default: { fire: vi.fn() } }));
 
 const mensajesMock = vi.hoisted(() => ({

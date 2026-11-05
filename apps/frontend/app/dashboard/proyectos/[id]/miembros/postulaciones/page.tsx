@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { BienvenidaProyectoCard } from '@/components/projects/bienvenida-proyecto-card';
 import { LeaderOnlyNotice } from '@/components/projects/leader-only-notice';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useProjectDetail } from '@/hooks/use-project-detail';
@@ -133,6 +134,8 @@ export default function ProjectPendingPostulationsPage() {
             title="Postulaciones pendientes"
             description="Personas que han solicitado unirse a roles de este proyecto y están esperando una resolución."
           />
+
+          <BienvenidaProyectoCard idProyecto={idProyecto} />
 
           <section aria-label="Resumen de postulaciones" className="mb-6 grid gap-4 md:grid-cols-3">
             <MetricCard

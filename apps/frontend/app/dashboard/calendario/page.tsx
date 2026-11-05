@@ -4,7 +4,7 @@ import { PageTitle } from '@/components/ui/page-title';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
-import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Share2 } from 'lucide-react';
+import { AlertCircle, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Share2 } from 'lucide-react';
 import {
   Empty,
   EmptyContent,
@@ -62,6 +62,7 @@ import { TimeGridView } from '@/components/calendar/time-grid-view';
 import { AgendaItemRow } from '@/components/calendar/agenda-item-row';
 import { EventFormDialog } from '@/components/calendar/event-form-dialog';
 import { EventDetailDialog } from '@/components/calendar/event-detail-dialog';
+import { AsistenteReunionesDialog } from '@/components/calendar/asistente-reuniones-dialog';
 import { ShareCalendarDialog } from '@/components/calendar/share-calendar-dialog';
 import { CalendarSidebar, type MetaHoras } from '@/components/calendar/calendar-sidebar';
 import { CalendarFilterMenu } from '@/components/calendar/calendar-filter-menu';
@@ -243,6 +244,7 @@ export default function CalendarioPage() {
   const [preferenciasDe, setPreferenciasDe] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [asistenteOpen, setAsistenteOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventoProyectoDTO | null>(null);
   // G01 (UI-01): un evento compartido llega reducido (EventoCompartidoDTO), nunca como MiEventoDTO.
   const [detalle, setDetalle] = useState<
@@ -581,6 +583,15 @@ export default function CalendarioPage() {
             <Share2 className="size-4" aria-hidden="true" />
             Compartir agenda
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setAsistenteOpen(true)}
+            className="h-9 gap-1.5 rounded-pill border-outline-variant text-xs font-bold"
+          >
+            <CalendarClock className="size-4" aria-hidden="true" />
+            Buscar horario
+          </Button>
           <ExportarIcsBoton className="h-9 gap-1.5 rounded-pill border-outline-variant text-xs font-bold" />
           {misProyectos.length > 0 && (
             <Button
@@ -844,6 +855,7 @@ export default function CalendarioPage() {
         restaurarFocoEn={editingEvent ? undefined : botonAgendarRef}
       />
 
+      <AsistenteReunionesDialog open={asistenteOpen} onOpenChange={setAsistenteOpen} />
       <ShareCalendarDialog open={shareOpen} onOpenChange={setShareOpen} restaurarFocoEn={botonCompartirRef} />
     </div>
   );

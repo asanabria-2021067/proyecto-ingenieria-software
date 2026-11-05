@@ -65,6 +65,9 @@ export function buscarUsuarios(filtros: BuscarUsuariosFiltros): Promise<BuscarUs
   if (filtros.habilidades?.length) params.set('habilidades', filtros.habilidades.join(','));
   if (filtros.intereses?.length) params.set('intereses', filtros.intereses.join(','));
   if (filtros.semestreRango) params.set('semestreRango', filtros.semestreRango);
+  if (filtros.idCarrera) params.set('idCarrera', String(filtros.idCarrera));
+  if (filtros.diaDisponible !== undefined) params.set('diaDisponible', String(filtros.diaDisponible));
+  if (filtros.ordenar) params.set('ordenar', filtros.ordenar);
   if (filtros.page) params.set('page', String(filtros.page));
   return apiFetch<BuscarUsuariosResultado>(`/social/usuarios/buscar?${params.toString()}`);
 }

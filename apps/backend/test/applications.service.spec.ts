@@ -315,6 +315,20 @@ describe('ApplicationsService', () => {
     expect(notifications.publishEffects).toHaveBeenCalledTimes(1);
   });
 
+  it('MEJ-102: al aceptar se envia la bienvenida del lider; al rechazar no', async () => {
+    const bienvenida = { enviarSinFallar: vi.fn().mockResolvedValue(undefined) };
+    for (const estado of ['ACEPTADA', 'RECHAZADA'] as const) {
+      const prisma = makePrisma();
+      mockPostulacionPendiente(prisma);
+      prisma._tx.postulacion.findUniqueOrThrow.mockResolvedValue({ idPostulacion: 1, estadoPostulacion: estado });
+      const service = makeService(prisma);
+      (service as unknown as { bienvenida: typeof bienvenida }).bienvenida = bienvenida;
+      await service.updateEstado(1, { estadoPostulacion: estado, motivoRechazo: 'CUPO_LLENO' } as UpdateEstadoPostulacionDto, 9);
+    }
+    expect(bienvenida.enviarSinFallar).toHaveBeenCalledTimes(1);
+    expect(bienvenida.enviarSinFallar).toHaveBeenCalledWith(expect.any(Number), 4);
+  });
+
   it('updateEstado (ACEPTADA) emite el recálculo de insignias de postulaciones del postulante; RECHAZADA no (HU-190)', async () => {
     const prisma = makePrisma();
     mockPostulacionPendiente(prisma);

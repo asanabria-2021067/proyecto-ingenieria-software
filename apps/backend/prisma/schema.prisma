@@ -544,6 +544,16 @@ model Usuario {
   reunionesAdministracionEditables ReunionAdministradorEditor[] @relation("ReunionesAdministracionEditables")
   reportesProblema                 ReporteProblema[]            @relation("ReporteProblemaAutor")
   reportesProblemaAtendidos        ReporteProblema[]            @relation("ReporteProblemaAtendidoPor")
+  portafolioPublico                PortafolioPublico?
+  confirmacionesRecibidas          ConfirmacionHabilidad[]      @relation("ConfirmacionReceptor")
+  confirmacionesDadas              ConfirmacionHabilidad[]      @relation("ConfirmacionConfirmador")
+  disponibilidadSemanal            DisponibilidadSemanal[]
+  enlacesPerfil                    EnlacePerfil[]
+  restriccionesDadas               RestriccionUsuario[]         @relation("RestriccionAutor")
+  restriccionesRecibidas           RestriccionUsuario[]         @relation("RestriccionObjetivo")
+  reportesPerfilHechos             ReportePerfil[]              @relation("ReportePerfilAutor")
+  reportesPerfilRecibidos          ReportePerfil[]              @relation("ReportePerfilObjetivo")
+  reportesPerfilResueltos          ReportePerfil[]              @relation("ReportePerfilResolutor")
 
   @@index([estado, fechaCreacion])
   @@map("usuario")
@@ -769,6 +779,7 @@ model Habilidad {
   usuarioHabilidades UsuarioHabilidad[]
   experiencias       ExperienciaPrevia[]
   requisitosRol      RequisitoHabilidadRol[]
+  confirmaciones     ConfirmacionHabilidad[]
 
   @@map("habilidad")
 }
@@ -946,6 +957,8 @@ model Proyecto {
   fechaPublicacion    DateTime?         @map("fecha_publicacion") @db.Date
   /// MEJ-95: último día para postularse; null = sin fecha límite. Explorar marca «Cierra pronto» a 7 días o menos.
   fechaLimitePostulacion DateTime?      @map("fecha_limite_postulacion") @db.Date
+  /// MEJ-102: texto que el lider envia a #general al aceptar a alguien; null = el texto por defecto.
+  mensajeBienvenida      String?        @map("mensaje_bienvenida") @db.VarChar(1000)
   fechaInicio         DateTime?         @map("fecha_inicio") @db.Date
   fechaFinEstimada    DateTime?         @map("fecha_fin_estimada") @db.Date
   /// Fuente de verdad del líder del proyecto. No existe una `ParticipacionProyecto` equivalente para el líder: no asumirla ni inventarla.
@@ -2769,4 +2782,120 @@ model ReconocimientoCompanero {
   @@index([idReceptor])
   @@index([idProyecto])
   @@map("reconocimiento_companero")
+}
+
+/// MEJ-146: portafolio publico opcional. El token opaco es el unico identificador publico.
+model PortafolioPublico {
+  idUsuario     Int      @id @map("id_usuario")
+  token         String   @unique @db.VarChar(64)
+  activo        Boolean  @default(false)
+  indexable     Boolean  @default(false)
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+
+  @@map("portafolio_publico")
+}
+
+/// MEJ-147: un companero de proyecto confirma una habilidad de otro, una sola vez.
+model ConfirmacionHabilidad {
+  idConfirmacion Int      @id @default(autoincrement()) @map("id_confirmacion")
+  idUsuario      Int      @map("id_usuario")
+  idHabilidad    Int      @map("id_habilidad")
+  idConfirmador  Int      @map("id_confirmador")
+  creadaEn       DateTime @default(now()) @map("creada_en")
+
+  usuario     Usuario   @relation("ConfirmacionReceptor", fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  habilidad   Habilidad @relation(fields: [idHabilidad], references: [idHabilidad], onDelete: Restrict)
+  confirmador Usuario   @relation("ConfirmacionConfirmador", fields: [idConfirmador], references: [idUsuario], onDelete: Restrict)
+
+  @@unique([idUsuario, idHabilidad, idConfirmador])
+  @@index([idConfirmador])
+  @@map("confirmacion_habilidad")
+}
+
+/// MEJ-148: bloques de 1 hora disponibles. dia_semana 0 = lunes ... 6 = domingo; hora 0-23 (Guatemala).
+model DisponibilidadSemanal {
+  idDisponibilidad Int @id @default(autoincrement()) @map("id_disponibilidad")
+  idUsuario        Int @map("id_usuario")
+  diaSemana        Int @map("dia_semana") @db.SmallInt
+  hora             Int @db.SmallInt
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+
+  @@unique([idUsuario, diaSemana, hora])
+  @@map("disponibilidad_semanal")
+}
+
+/// MEJ-149: enlaces externos del perfil (GitHub, LinkedIn, Behance, sitio propio).
+model EnlacePerfil {
+  idEnlace  Int      @id @default(autoincrement()) @map("id_enlace")
+  idUsuario Int      @map("id_usuario")
+  url       String   @db.VarChar(2048)
+  orden     Int      @default(0)
+  creadoEn  DateTime @default(now()) @map("creado_en")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+
+  @@unique([idUsuario, url])
+  @@map("enlace_perfil")
+}
+
+enum TipoRestriccion {
+  BLOQUEO
+  SILENCIO
+}
+
+/// MEJ-153: bloquear (impide DM, amistad e invitaciones) o silenciar (oculta notificaciones) a otro usuario.
+model RestriccionUsuario {
+  idRestriccion Int             @id @default(autoincrement()) @map("id_restriccion")
+  idUsuario     Int             @map("id_usuario")
+  idObjetivo    Int             @map("id_objetivo")
+  tipo          TipoRestriccion
+  creadaEn      DateTime        @default(now()) @map("creada_en")
+
+  usuario  Usuario @relation("RestriccionAutor", fields: [idUsuario], references: [idUsuario], onDelete: Restrict)
+  objetivo Usuario @relation("RestriccionObjetivo", fields: [idObjetivo], references: [idUsuario], onDelete: Restrict)
+
+  @@unique([idUsuario, idObjetivo, tipo])
+  @@index([idObjetivo, tipo])
+  @@map("restriccion_usuario")
+}
+
+enum MotivoReportePerfil {
+  SPAM
+  ACOSO
+  CONTENIDO_INAPROPIADO
+  SUPLANTACION
+  OTRO
+}
+
+enum EstadoReportePerfil {
+  PENDIENTE
+  DESCARTADO
+  ATENDIDO
+}
+
+/// MEJ-154: reporte de un perfil o de un mensaje del chat. El texto del mensaje se copia (maximo 500) para que el admin lo vea aunque se borre.
+model ReportePerfil {
+  idReporte    Int                 @id @default(autoincrement()) @map("id_reporte")
+  idReportante Int                 @map("id_reportante")
+  idReportado  Int                 @map("id_reportado")
+  idMensaje    Int?                @map("id_mensaje")
+  textoMensaje String?             @map("texto_mensaje") @db.VarChar(500)
+  motivo       MotivoReportePerfil
+  detalle      String?             @db.VarChar(500)
+  estado       EstadoReportePerfil @default(PENDIENTE)
+  nota         String?             @db.VarChar(500)
+  creadoEn     DateTime            @default(now()) @map("creado_en")
+  resueltoEn   DateTime?           @map("resuelto_en")
+  resueltoPor  Int?                @map("resuelto_por")
+
+  reportante Usuario  @relation("ReportePerfilAutor", fields: [idReportante], references: [idUsuario], onDelete: Restrict)
+  reportado  Usuario  @relation("ReportePerfilObjetivo", fields: [idReportado], references: [idUsuario], onDelete: Restrict)
+  resolutor  Usuario? @relation("ReportePerfilResolutor", fields: [resueltoPor], references: [idUsuario], onDelete: SetNull)
+
+  @@index([estado, creadoEn])
+  @@map("reporte_perfil")
 }
