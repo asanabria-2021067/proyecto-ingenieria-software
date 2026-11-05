@@ -52,8 +52,8 @@ const FAMILIAS = [
   ['Red de contactos', 5],
   // ORG-1 y ASO-1: INVITACION_ORGANIZACION, SOLICITUD_UNIRSE_ORGANIZACION, ORGANIZACION_ACTUALIZADA, JUNTA_ASOCIACION. ROL-1: + ALCANCE_COORDINADOR. MEJ-161: + AVISO_ASOCIACION.
   ['Organizaciones y asociaciones', 6],
-  // MEJ-81/82/85: + NUEVO_INICIO_SESION, SOLICITUD_DESACTIVACION, DESACTIVACION_RESUELTA.
-  ['Cuenta y seguridad', 8],
+  // MEJ-81/82/85: + NUEVO_INICIO_SESION, SOLICITUD_DESACTIVACION, DESACTIVACION_RESUELTA. MEJ-154: + REPORTE_PERFIL.
+  ['Cuenta y seguridad', 9],
 ] as const;
 
 const familia = (titulo: string) => screen.getByRole('button', { name: new RegExp(`^${titulo}`) });

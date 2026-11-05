@@ -16,7 +16,7 @@ describe('MEJ-154 reportes de perfil', () => {
       },
       usuarioRolAcceso: { findFirst: vi.fn().mockResolvedValue(admin ? { idUsuario: 99 } : null) },
     };
-    const notifications = { notifyAdmins: vi.fn().mockResolvedValue(undefined) };
+    const notifications = { notifyAdminsFromTemplate: vi.fn().mockResolvedValue(undefined) };
     return { prisma, notifications, servicio: new ReportesPerfilService(prisma as never, notifications as never) };
   }
 
@@ -29,7 +29,7 @@ describe('MEJ-154 reportes de perfil', () => {
     expect(prisma.reportePerfil.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ idReportante: 1, idReportado: 2, idMensaje: 5, textoMensaje: 'texto ofensivo', motivo: 'ACOSO' }) }),
     );
-    expect(notifications.notifyAdmins).toHaveBeenCalledTimes(1);
+    expect(notifications.notifyAdminsFromTemplate).toHaveBeenCalledWith('REPORTE_PERFIL', { idReportePerfil: 10, esMensaje: true });
   });
 
   it('no deja reportarse, reportar un mensaje que no se ve ni repetir un reporte pendiente', async () => {
