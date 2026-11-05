@@ -1,9 +1,9 @@
+import { ASOCIACION_TEMPLATES, type AsociacionTemplateData } from './asociacion.templates';
 import { CHAT_TEMPLATES, type ChatTemplateData } from './chat.templates';
 import { COORDINADOR_TEMPLATES, type CoordinadorTemplateData } from './coordinador.templates';
 import { CUENTA_TEMPLATES, type CuentaTemplateData } from './cuenta.templates';
 import { HORAS_TEMPLATES, type HorasTemplateData } from './horas.templates';
-
-export interface NotificationTemplateData extends HorasTemplateData, CoordinadorTemplateData, CuentaTemplateData, ChatTemplateData {
+export interface NotificationTemplateData extends HorasTemplateData, CoordinadorTemplateData, CuentaTemplateData, ChatTemplateData, AsociacionTemplateData {
   NUEVA_POSTULACION: {
     userName: string;
     roleName: string;
@@ -421,7 +421,7 @@ export interface NotificationTemplateData extends HorasTemplateData, Coordinador
 }
 
 export const NOTIFICATION_TEMPLATES = {
-  ...HORAS_TEMPLATES, ...COORDINADOR_TEMPLATES, ...CUENTA_TEMPLATES, ...CHAT_TEMPLATES,
+  ...HORAS_TEMPLATES, ...COORDINADOR_TEMPLATES, ...CUENTA_TEMPLATES, ...CHAT_TEMPLATES, ...ASOCIACION_TEMPLATES,
   NUEVA_POSTULACION: {
     title: 'Nueva postulación recibida',
     message: (data: NotificationTemplateData['NUEVA_POSTULACION']) =>

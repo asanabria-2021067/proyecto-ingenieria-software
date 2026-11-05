@@ -5,16 +5,24 @@ import { asociacionesKeys } from '@/lib/query-keys/asociaciones';
 import {
   actualizarAsociacion,
   actualizarJunta,
+  actualizarMetaAsociacion,
   asignarJunta,
+  contarDestinatariosAviso,
   crearAsociacion,
+  crearMetaAsociacion,
+  eliminarMetaAsociacion,
+  enviarAvisoAsociacion,
   getAsociacionesAdmin,
   getCandidatosParticipantes,
   getEstudiantesAsociacion,
+  getMetasAsociacion,
   getMisJuntas,
   getProyectosAsociacion,
   quitarJunta,
   type AsignarJuntaInput,
   type AsociacionInput,
+  type AvisoAsociacionInput,
+  type CrearMetaInput,
   type CargoJunta,
   type FiltrosAsociacion,
   type NivelPermisoJunta,
@@ -42,6 +50,35 @@ export const useCandidatosParticipantes = (id: number | null, q: string) =>
 
 export const useProyectosAsociacion = (id: number) =>
   useQuery({ queryKey: asociacionesKeys.proyectos(id), queryFn: () => getProyectosAsociacion(id) });
+
+export const useMetasAsociacion = (id: number) =>
+  useQuery({ queryKey: asociacionesKeys.metas(id), queryFn: () => getMetasAsociacion(id) });
+
+/** Crear, cambiar o quitar una meta refresca la lista con su avance. */
+export function useMetasAsociacionMutations(id: number) {
+  const queryClient = useQueryClient();
+  const refrescar = () => queryClient.invalidateQueries({ queryKey: asociacionesKeys.metas(id) });
+  return {
+    crear: useMutation({ mutationFn: (input: CrearMetaInput) => crearMetaAsociacion(id, input), onSuccess: refrescar }),
+    cambiar: useMutation({
+      mutationFn: ({ idMeta, porcentajeObjetivo }: { idMeta: number; porcentajeObjetivo: number }) =>
+        actualizarMetaAsociacion(id, idMeta, porcentajeObjetivo),
+      onSuccess: refrescar,
+    }),
+    quitar: useMutation({ mutationFn: (idMeta: number) => eliminarMetaAsociacion(id, idMeta), onSuccess: refrescar }),
+  };
+}
+
+export const useDestinatariosAviso = (id: number, filtros: FiltrosAsociacion, enabled: boolean) =>
+  useQuery({
+    queryKey: asociacionesKeys.destinatarios(id, filtros),
+    queryFn: () => contarDestinatariosAviso(id, filtros),
+    enabled,
+    gcTime: 0,
+  });
+
+export const useEnviarAviso = (id: number) =>
+  useMutation({ mutationFn: (input: AvisoAsociacionInput) => enviarAvisoAsociacion(id, input) });
 
 export const useAsociacionesAdmin = (enabled = true) =>
   useQuery({ queryKey: asociacionesKeys.admin, queryFn: getAsociacionesAdmin, enabled });

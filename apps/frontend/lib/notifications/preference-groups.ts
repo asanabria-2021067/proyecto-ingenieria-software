@@ -198,6 +198,11 @@ export const NOTIFICATION_TYPE_PRESENTATION: Record<string, TypePresentation> = 
     etiqueta: 'Solicitud de desactivación resuelta',
     descripcion: 'Administración resuelve tu solicitud de desactivar la cuenta.',
   },
+  AVISO_ASOCIACION: {
+    grupo: 'organizaciones',
+    etiqueta: 'Avisos de tu asociación',
+    descripcion: 'La junta de tu asociación envía un aviso a un grupo de estudiantes del que formas parte.',
+  },
   JUNTA_ASOCIACION: {
     grupo: 'organizaciones',
     etiqueta: 'Junta de asociación',

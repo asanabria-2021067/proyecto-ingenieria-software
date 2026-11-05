@@ -39,6 +39,7 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
   it('las rutas de organizaciones existen todas y exigen JwtAuthGuard (permisos por rol en el servicio)', () => {
     const esperadas = [
       'POST /api/organizaciones',
+      'GET /api/organizaciones/plantillas',
       'GET /api/organizaciones/buscar',
       'GET /api/organizaciones/mias',
       'GET /api/organizaciones/invitaciones/mias',
@@ -329,19 +330,25 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
       'POST /api/admin/asociaciones/:idAsociacion/junta',
     ]);
     expect(ids((r) => r.path.startsWith('asociaciones'))).toEqual([
+      'DELETE /api/asociaciones/:idAsociacion/metas/:idMeta',
       'GET /api/asociaciones/:idAsociacion/anuncios',
+      'GET /api/asociaciones/:idAsociacion/avisos/destinatarios',
       'GET /api/asociaciones/:idAsociacion/candidatos-participantes',
       'GET /api/asociaciones/:idAsociacion/estudiantes',
       'GET /api/asociaciones/:idAsociacion/estudiantes/csv',
       'GET /api/asociaciones/:idAsociacion/estudiantes/pdf',
       'GET /api/asociaciones/:idAsociacion/membresia',
+      'GET /api/asociaciones/:idAsociacion/metas',
       'GET /api/asociaciones/:idAsociacion/portafolio',
       'GET /api/asociaciones/:idAsociacion/proyectos',
       'GET /api/asociaciones/:idAsociacion/proyectos/csv',
       'GET /api/asociaciones/:idAsociacion/proyectos/pdf',
       'GET /api/asociaciones/mis-juntas',
       'PATCH /api/asociaciones/:idAsociacion/anuncios/:idAnuncio/despublicar',
+      'PATCH /api/asociaciones/:idAsociacion/metas/:idMeta',
       'POST /api/asociaciones/:idAsociacion/anuncios',
+      'POST /api/asociaciones/:idAsociacion/avisos',
+      'POST /api/asociaciones/:idAsociacion/metas',
     ]);
     const conJunta = rutas.filter((r) => r.path.startsWith('asociaciones/:idAsociacion'));
     expect(conJunta.every((r) => r.guards.includes(JuntaGuard))).toBe(true);

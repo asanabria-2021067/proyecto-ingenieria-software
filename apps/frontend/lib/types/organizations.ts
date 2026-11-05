@@ -114,6 +114,15 @@ export interface SolicitudUnirse {
   usuario: UsuarioOrganizacion;
 }
 
+export type ClavePlantillaOrganizacion = 'CLUB' | 'VOLUNTARIADO' | 'INVESTIGACION' | 'OTRO';
+
+/** MEJ-156: el backend es la fuente de las plantillas (descripcion sugerida). */
+export interface PlantillaOrganizacion {
+  clave: ClavePlantillaOrganizacion;
+  etiqueta: string;
+  descripcion: string;
+}
+
 export interface CrearOrganizacionInput {
   nombreOrganizacion: string;
   descripcionOrganizacion?: string;

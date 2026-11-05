@@ -105,7 +105,9 @@ export class AnunciosService {
       OR: [
         { ...GLOBAL, audiencia: { in: audiencias } },
         { idOrganizacion: { in: idsOrganizacion } },
-        { idAsociacion: { in: idsAsociacion } },
+        // MEJ-161: un aviso con destinatarios solo lo ven ellos; sin destinatarios, toda la asociacion.
+        { idAsociacion: { in: idsAsociacion }, destinatarios: { none: {} } },
+        { destinatarios: { some: { idUsuario } } },
       ],
       ...(sinCerrar ? { cierres: { none: { idUsuario } } } : {}),
     };

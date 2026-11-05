@@ -67,6 +67,49 @@ export const descargarEstudiantesAsociacion = (id: number, formato: 'csv' | 'pdf
 export const descargarProyectosAsociacion = (id: number, formato: 'csv' | 'pdf') =>
   apiFetchBlob(`${base(id)}/proyectos/${formato}`, { headers: { Accept: '*/*' } });
 
+export interface MetaAsociacion {
+  idMeta: number;
+  tipo: TipoHorasFiltro;
+  porcentajeObjetivo: number;
+  avance: { alDia: number; total: number; porcentaje: number };
+  cumplida: boolean;
+}
+
+export interface MetasAsociacionRespuesta {
+  semestre: { anio: number; periodo: 1 | 2 };
+  metas: MetaAsociacion[];
+}
+
+export interface CrearMetaInput {
+  anio: number;
+  periodo: 1 | 2;
+  tipo: TipoHorasFiltro;
+  porcentajeObjetivo: number;
+}
+
+export const getMetasAsociacion = (id: number) => apiFetch<MetasAsociacionRespuesta>(`${base(id)}/metas`);
+
+export const crearMetaAsociacion = (id: number, input: CrearMetaInput) =>
+  apiFetch<unknown>(`${base(id)}/metas`, { method: 'POST', body: JSON.stringify(input) });
+
+export const actualizarMetaAsociacion = (id: number, idMeta: number, porcentajeObjetivo: number) =>
+  apiFetch<unknown>(`${base(id)}/metas/${idMeta}`, { method: 'PATCH', body: JSON.stringify({ porcentajeObjetivo }) });
+
+export const eliminarMetaAsociacion = (id: number, idMeta: number) =>
+  apiFetch<unknown>(`${base(id)}/metas/${idMeta}`, { method: 'DELETE' });
+
+export interface AvisoAsociacionInput {
+  mensaje: string;
+  filtros: FiltrosAsociacion;
+  cantidadEsperada: number;
+}
+
+export const contarDestinatariosAviso = (id: number, filtros: FiltrosAsociacion) =>
+  apiFetch<{ cantidad: number; maximo: number }>(`${base(id)}/avisos/destinatarios${query(filtros)}`);
+
+export const enviarAvisoAsociacion = (id: number, input: AvisoAsociacionInput) =>
+  apiFetch<{ idAnuncio: number; destinatarios: number }>(`${base(id)}/avisos`, { method: 'POST', body: JSON.stringify(input) });
+
 export interface MiembroJunta {
   idJuntaAsociacion: number;
   idUsuario: number;
