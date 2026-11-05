@@ -55,6 +55,7 @@ describe('ChatService.searchMessages', () => {
     const { sql, values } = sqlDe();
     expect(sql).not.toContain('LIKE');
     expect(sql).not.toContain('id_remitente');
+    expect(sql).toContain('id_mensaje_padre IS NULL');
     expect(values).toEqual([5, 21, 0]);
   });
 

@@ -175,6 +175,49 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
     });
   });
 
+  describe('MEJ-131: las respuestas de hilo no cuentan en la lista', () => {
+    const conv = {
+      idConversacion: 5,
+      tipo: 'INDIVIDUAL',
+      nombre: null,
+      participantes: [{ idUsuario: 1, ultimaLecturaEn: null, usuario: USUARIO }],
+      apodos: [],
+      mensajes: [],
+    };
+
+    it('listConversations excluye respuestas del ultimo mensaje y de los no leidos', async () => {
+      prisma.proyecto.findFirst.mockResolvedValue(proyectoRow('PUBLICADO'));
+      prisma.conversacion.findMany.mockResolvedValue([conv]);
+      prisma.mensajeChat.count.mockResolvedValue(0);
+
+      await service.listConversations(10, 1);
+
+      expect(prisma.conversacion.findMany.mock.calls[0][0].include.mensajes.where).toEqual({ idMensajePadre: null });
+      expect(prisma.mensajeChat.count.mock.calls[0][0].where).toMatchObject({ idMensajePadre: null });
+    });
+
+    it('listAllConversations excluye respuestas del ultimo mensaje, de los no leidos y de la busqueda', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([conv]);
+      prisma.mensajeChat.count.mockResolvedValue(0);
+
+      await service.listAllConversations(1, 'hola');
+
+      const args = prisma.conversacion.findMany.mock.calls[0][0];
+      expect(args.include.mensajes.where).toEqual({ idMensajePadre: null });
+      expect(prisma.mensajeChat.count.mock.calls[0][0].where).toMatchObject({ idMensajePadre: null });
+    });
+
+    it('listArchivedConversations excluye respuestas del ultimo mensaje', async () => {
+      prisma.conversacion.findMany.mockResolvedValue([
+        { ...conv, proyecto: { idProyecto: 17, tituloProyecto: 'P' }, participantes: [{ idUsuario: 1, usuario: USUARIO }] },
+      ]);
+
+      await service.listArchivedConversations(1, {});
+
+      expect(prisma.conversacion.findMany.mock.calls[0][0].include.mensajes.where).toEqual({ idMensajePadre: null });
+    });
+  });
+
   describe('getMessages — el historial sigue completo y legible tras archivar', () => {
     it('devuelve el historial normalmente aunque el proyecto esté CERRADO (solo lectura, no oculta nada)', async () => {
       prisma.conversacion.findFirst.mockResolvedValue(conversacionRow('CERRADO'));
@@ -373,7 +416,7 @@ describe('ChatService — T-234/T-237: archivado derivado de Proyecto.estadoProy
             },
           },
         },
-        { mensajes: { some: { eliminadoEn: null, contenido: { contains: 'rosa', mode: 'insensitive' } } } },
+        { mensajes: { some: { eliminadoEn: null, idMensajePadre: null, contenido: { contains: 'rosa', mode: 'insensitive' } } } },
       ]);
     });
 
