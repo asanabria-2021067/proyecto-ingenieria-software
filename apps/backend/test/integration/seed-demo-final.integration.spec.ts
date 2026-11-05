@@ -251,5 +251,156 @@ describeIntegration('DEMO seed-demo-final', () => {
     expect(await db.disponibilidadSemanal.count({ where: { idUsuario: portafolio[0].idUsuario } })).toBe(6);
 
     expect(await db.tarea.groupBy({ by: ['estadoTarea'] }).then((g) => g.map((x) => x.estadoTarea).sort())).toEqual(['EN_PROGRESO', 'EN_REVISION', 'HECHO', 'POR_HACER']);
-  }, 120_000);
+
+    // DEMO-11: avisos de inicio de sesion leidos solo en demo.cs01-15 y «Mensaje eliminado» de Valeria limpiados solo en el #general del Hackathon.
+    const u = async (correo: string) => (await db.usuario.findUniqueOrThrow({ where: { correo } })).idUsuario;
+    const [valeria, daniela, andres, cs15, carlosId, pru] = await Promise.all([u('demo.cs01@uvg.edu.gt'), u('demo.cs03@uvg.edu.gt'), u('demo.cs04@uvg.edu.gt'), u('demo.cs15@uvg.edu.gt'), u('carlos.mendoza@uvg.edu.gt'), u('pru26200@uvg.edu.gt')]);
+    const hackathonGeneral = await db.conversacion.findFirstOrThrow({ where: { esCanal: true, nombreCanal: 'general', proyecto: { tituloProyecto: 'Demo - Hackathon de Computación' } } });
+    const tutoriasGeneral = await db.conversacion.findFirstOrThrow({ where: { esCanal: true, nombreCanal: 'general', proyecto: { tituloProyecto: 'Demo - App de tutorías entre pares' } } });
+    const idConv = hackathonGeneral.idConversacion;
+    const leidaPrevia = new Date('2026-01-01T00:00:00Z');
+    const aviso = (idUsuario: number, tipoNotificacion: 'NUEVO_INICIO_SESION' | 'TAREA_ASIGNADA', leidaEn: Date | null) =>
+      db.notificacion.create({ data: { idUsuario, tipoNotificacion, tituloNotificacion: 'Aviso de prueba', leidaEn } });
+    const [login1, login2, otroTipo, yaLeida, loginPru, loginCarlos] = await Promise.all([
+      aviso(daniela, 'NUEVO_INICIO_SESION', null), aviso(daniela, 'NUEVO_INICIO_SESION', null), aviso(daniela, 'TAREA_ASIGNADA', null),
+      aviso(cs15, 'NUEVO_INICIO_SESION', leidaPrevia), aviso(pru, 'NUEVO_INICIO_SESION', null), aviso(carlosId, 'NUEVO_INICIO_SESION', null),
+    ]);
+    const msg = (idRemitente: number, contenido: string, extra: { padre?: number; cita?: number; muerto?: boolean; idConversacion?: number } = {}) =>
+      db.mensajeChat.create({
+        data: { idConversacion: extra.idConversacion ?? idConv, idRemitente, contenido, idMensajePadre: extra.padre, idMensajeCitado: extra.cita, eliminadoEn: extra.muerto ? new Date() : null },
+      });
+    const muerto = (idRemitente: number, extra: { padre?: number; idConversacion?: number } = {}) => msg(idRemitente, 'Mensaje eliminado', { ...extra, muerto: true });
+    const vivos = () => db.mensajeChat.count({ where: { idConversacion: idConv, eliminadoEn: null } });
+    const existe = async (idMensaje: number) => (await db.mensajeChat.findUnique({ where: { idMensaje } })) !== null;
+    const fila = (idMensaje: number) => db.mensajeChat.findUniqueOrThrow({ where: { idMensaje } });
+    const lineasCreadosActualizados = (salida: string) => salida.split('\n').filter((l) => l.includes(': creados'));
+
+    // El canal parte con 8 mensajes vivos: se marcan 5 ajenos como eliminados para dejar margen (3 vivos) y probar el tope de 8.
+    const ultimoSeed = (await db.mensajeChat.aggregate({ where: { idConversacion: idConv }, _max: { idMensaje: true } }))._max.idMensaje!;
+    const semillas = await db.mensajeChat.findMany({ where: { idConversacion: idConv, eliminadoEn: null, idRemitente: { not: valeria } }, orderBy: { idMensaje: 'asc' }, take: 5 });
+    await db.mensajeChat.updateMany({ where: { idMensaje: { in: semillas.map((s) => s.idMensaje) } }, data: { eliminadoEn: new Date() } });
+    expect(await vivos()).toBe(3);
+
+    // Pendientes por dependencias vivas (en orden de id: el primero se restaura, el resto excede el tope).
+    const conHiloVivo = await muerto(valeria);
+    const respVivaHilo = await msg(daniela, 'Respuesta viva en hilo', { padre: conHiloVivo.idMensaje });
+    const citado = await muerto(valeria);
+    const citadorVivo = await msg(andres, 'Cita viva', { cita: citado.idMensaje });
+    const citado2 = await muerto(valeria);
+    const citadorVivo2 = await msg(andres, 'Otra cita viva', { cita: citado2.idMensaje });
+    // B2: la respuesta muerta tiene encuesta / respuestas propias / una cita viva; el padre no debe borrarse ni fallar el seed.
+    const padreEnc = await muerto(valeria);
+    const hijoEnc = await muerto(daniela, { padre: padreEnc.idMensaje });
+    await db.encuestaChat.create({ data: { idMensaje: hijoEnc.idMensaje, pregunta: '¿Prueba?' } });
+    const padreNieto = await muerto(valeria);
+    const hijoConNieto = await muerto(daniela, { padre: padreNieto.idMensaje });
+    const nieto = await muerto(daniela, { padre: hijoConNieto.idMensaje });
+    const padreCitaHijo = await muerto(valeria);
+    const hijoCitado = await muerto(daniela, { padre: padreCitaHijo.idMensaje });
+    const citadorHijo = await msg(andres, 'Cita viva al hijo', { cita: hijoCitado.idMensaje });
+    // Borrables: simple con reaccion, hilo muerto de otra usuaria y B1 (respuesta muerta de Valeria dentro de un hilo muerto de Valeria).
+    const simple = await muerto(valeria);
+    await db.reaccionMensajeChat.create({ data: { idMensaje: simple.idMensaje, idUsuario: daniela, emoji: EMOJIS_REACCION[0] } });
+    const conHiloMuerto = await muerto(valeria);
+    const hijoDaniela = await muerto(daniela, { padre: conHiloMuerto.idMensaje });
+    const padreB1 = await muerto(valeria);
+    const hijoB1 = await muerto(valeria, { padre: padreB1.idMensaje });
+    // No son de Valeria en el canal: no se tocan.
+    const deDaniela = await muerto(daniela);
+    const otroCanal = await muerto(valeria, { idConversacion: tutoriasGeneral.idConversacion });
+    expect(await vivos()).toBe(7);
+
+    const limpieza = correrSeed(password);
+    expect(limpieza).toContain('limpieza_mensajes_eliminados: creados 0, actualizados 5');
+    expect(limpieza).toContain('limpieza_mensajes_pendientes: 5');
+    expect(limpieza).toContain('notificaciones_inicio_sesion_leidas: creados 0, actualizados 2');
+    expect(limpieza).not.toContain(password);
+    const leida = async (id: number) => (await db.notificacion.findUniqueOrThrow({ where: { idNotificacion: id } })).leidaEn;
+    expect(await leida(login1.idNotificacion)).not.toBeNull();
+    expect(await leida(login2.idNotificacion)).not.toBeNull();
+    expect(await leida(otroTipo.idNotificacion)).toBeNull();
+    expect((await leida(yaLeida.idNotificacion))?.getTime()).toBe(leidaPrevia.getTime());
+    expect(await leida(loginPru.idNotificacion)).toBeNull();
+    expect(await leida(loginCarlos.idNotificacion)).toBeNull();
+    const idsDemo = (await db.usuario.findMany({ where: { correo: { startsWith: 'demo.cs' } } })).map((x) => x.idUsuario);
+    expect(await db.notificacion.count({ where: { idUsuario: { in: idsDemo }, tipoNotificacion: 'NUEVO_INICIO_SESION', leidaEn: null } })).toBe(0);
+
+    // Borrados definitivos (incluye B1 sin fallar a medias) y su reaccion.
+    for (const b of [simple, conHiloMuerto, hijoDaniela, padreB1, hijoB1]) expect(await existe(b.idMensaje), String(b.idMensaje)).toBe(false);
+    expect(await db.reaccionMensajeChat.count({ where: { idMensaje: simple.idMensaje } })).toBe(0);
+    // Tope: solo cabia uno (7 vivos + 1 = 8); se restaura el de menor id y el resto queda intacto.
+    const restaurado = await fila(conHiloVivo.idMensaje);
+    expect(restaurado.eliminadoEn).toBeNull();
+    expect(restaurado.contenido).not.toBe('Mensaje eliminado');
+    expect((await fila(respVivaHilo.idMensaje)).idMensajePadre).toBe(conHiloVivo.idMensaje);
+    expect(await vivos()).toBe(8);
+    for (const p of [citado, citado2, padreEnc, padreNieto, padreCitaHijo]) expect((await fila(p.idMensaje)).eliminadoEn, String(p.idMensaje)).not.toBeNull();
+    // B2: ninguna respuesta con dependencias se borra y las citas vivas siguen apuntando a su mensaje.
+    for (const h of [hijoEnc, hijoConNieto, nieto, hijoCitado]) expect(await existe(h.idMensaje), String(h.idMensaje)).toBe(true);
+    expect(await db.encuestaChat.count({ where: { idMensaje: hijoEnc.idMensaje } })).toBe(1);
+    expect((await fila(citadorVivo.idMensaje)).idMensajeCitado).toBe(citado.idMensaje);
+    expect((await fila(citadorVivo2.idMensaje)).idMensajeCitado).toBe(citado2.idMensaje);
+    expect((await fila(citadorHijo.idMensaje)).idMensajeCitado).toBe(hijoCitado.idMensaje);
+    expect(await existe(deDaniela.idMensaje)).toBe(true);
+    expect(await existe(otroCanal.idMensaje)).toBe(true);
+
+    // Segunda corrida: nada cambia (los pendientes siguen igual y no hay cambios).
+    const trasLimpieza = await conteos();
+    const repetida = correrSeed(password);
+    expect(lineasCreadosActualizados(repetida).length).toBeGreaterThan(0);
+    for (const l of lineasCreadosActualizados(repetida)) expect(l, l).toMatch(/creados 0, actualizados 0$/);
+    expect(await conteos()).toEqual(trasLimpieza);
+    expect(await vivos()).toBe(8);
+
+    // Relleno: por debajo de 5 vivos se agregan mensajes normales sin repetir un texto que ya existe en el canal.
+    await db.encuestaChat.deleteMany({ where: { mensaje: { idConversacion: idConv, idMensaje: { gt: ultimoSeed } } } });
+    await db.mensajeChat.updateMany({ where: { idConversacion: idConv, idMensaje: { gt: ultimoSeed } }, data: { idMensajeCitado: null, idMensajePadre: null } });
+    await db.mensajeChat.deleteMany({ where: { idConversacion: idConv, idMensaje: { gt: ultimoSeed } } });
+    expect(await vivos()).toBe(3);
+    const textoExistente = 'Revisé el cronograma del evento y todo va en orden.';
+    await msg(daniela, textoExistente, { muerto: true });
+    const simple2 = await muerto(valeria);
+    const relleno = correrSeed(password);
+    expect(relleno).toContain('limpieza_mensajes_eliminados: creados 0, actualizados 1');
+    expect(relleno).toContain('limpieza_mensajes_relleno: creados 2, actualizados 0');
+    expect(relleno).not.toContain('limpieza_mensajes_pendientes');
+    expect(await existe(simple2.idMensaje)).toBe(false);
+    expect(await vivos()).toBe(5);
+    const nuevos = await db.mensajeChat.findMany({ where: { idConversacion: idConv, eliminadoEn: null, idMensaje: { gt: simple2.idMensaje } } });
+    expect(nuevos).toHaveLength(2);
+    expect(new Set(nuevos.map((n) => n.contenido)).size).toBe(2);
+    for (const n of nuevos) {
+      expect(n.idRemitente).toBe(valeria);
+      expect(n.contenido).not.toBe(textoExistente);
+      expect(n.contenido).not.toBe('Mensaje eliminado');
+    }
+
+    // DRY_RUN con eliminados presentes: no escribe nada (ni borra, ni restaura, ni marca leidos).
+    await muerto(valeria);
+    const paraRestaurar = await muerto(valeria);
+    await msg(andres, 'Cita viva en dry run', { cita: paraRestaurar.idMensaje });
+    const pendienteDry = await aviso(daniela, 'NUEVO_INICIO_SESION', null);
+    const antesDry2 = await conteos();
+    const sinLeerAntes = await db.notificacion.count({ where: { leidaEn: null } });
+    const dry2 = correrSeed(password, { DRY_RUN: '1' });
+    expect(dry2).toContain('limpieza_mensajes_eliminados: creados 0, actualizados 2');
+    expect(dry2).toContain('notificaciones_inicio_sesion_leidas: creados 0, actualizados 1');
+    expect(dry2).toContain('transaccion revertida');
+    expect(await conteos()).toEqual(antesDry2);
+    expect(await db.notificacion.count({ where: { leidaEn: null } })).toBe(sinLeerAntes);
+    expect(await leida(pendienteDry.idNotificacion)).toBeNull();
+    expect((await fila(paraRestaurar.idMensaje)).eliminadoEn).not.toBeNull();
+    expect(await db.mensajeChat.count({ where: { idConversacion: idConv, idRemitente: valeria, eliminadoEn: { not: null } } })).toBe(2);
+
+    // Corrida real y despues una idempotente.
+    correrSeed(password);
+    expect(await db.mensajeChat.count({ where: { idConversacion: idConv, idRemitente: valeria, eliminadoEn: { not: null } } })).toBe(0);
+    expect((await fila(paraRestaurar.idMensaje)).eliminadoEn).toBeNull();
+    expect(await leida(pendienteDry.idNotificacion)).not.toBeNull();
+    expect(await vivos()).toBeLessThanOrEqual(8);
+    const final = await conteos();
+    const ultima = correrSeed(password);
+    for (const l of lineasCreadosActualizados(ultima)) expect(l, l).toMatch(/creados 0, actualizados 0$/);
+    expect(await conteos()).toEqual(final);
+  }, 600_000);
 });
