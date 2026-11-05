@@ -7,7 +7,6 @@ export type AdminUserStatus = 'ACTIVO' | 'INACTIVO' | 'BLOQUEADO' | 'PENDIENTE_V
 
 export type AdminRole =
   | 'estudiante'
-  | 'mentor'
   | 'lider_asociacion'
   | 'coordinador_academico'
   | 'administrador'
@@ -157,21 +156,6 @@ export interface AdminActividadEstudiante {
   };
 }
 
-export interface AdminProyectoAsociadoMentor {
-  idProyecto: number;
-  tituloProyecto: string;
-  estadoProyecto: string;
-  rol: 'Mentor' | string;
-}
-
-export interface AdminActividadMentor {
-  proyectosDondeParticipa: number;
-  estudiantesMentorizados: number;
-  proyectosActivos: number;
-  proyectosCerrados: number;
-  proyectosAsociados: AdminProyectoAsociadoMentor[];
-}
-
 export interface AdminProyectoRecienteLider {
   idProyecto: number;
   tituloProyecto: string;
@@ -218,7 +202,6 @@ export interface AdminUserDetail {
   fechaUltimaSesion: string | null;
   perfilEstudiante: AdminPerfilEstudiante | null;
   actividadEstudiante: AdminActividadEstudiante | null;
-  actividadMentor: AdminActividadMentor | null;
   actividadLider: AdminActividadLider | null;
   actividadCoordinador: AdminActividadCoordinador | null;
   actividadAdmin: AdminActividadAdmin | null;

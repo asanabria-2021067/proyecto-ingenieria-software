@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ROLES_METADATA_KEY, type RolAccesoNombre } from '../decorators/roles.decorator';
+import { JUNTA_ACTIVA, ROL_LIDER_ASOCIACION } from '../roles/roles-efectivos';
 
 /** Mensaje que ya devuelven los services cuando exigen administrador. */
 export const ADMIN_ONLY_MESSAGE = 'Acceso restringido a administradores';
@@ -43,13 +44,22 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException(message);
     }
 
-    const record = await this.prisma.usuarioRolAcceso.findFirst({
-      where: { idUsuario: userId, rolAcceso: { nombrePerfil: { in: roles } } },
-      select: { idUsuarioRolAcceso: true },
-    });
-    if (!record) {
-      throw new ForbiddenException(message);
+    // lider_asociacion no se lee de usuario_rol_acceso: se deriva de la junta.
+    const guardados = roles.filter((r) => r !== ROL_LIDER_ASOCIACION);
+    if (guardados.length > 0) {
+      const record = await this.prisma.usuarioRolAcceso.findFirst({
+        where: { idUsuario: userId, rolAcceso: { nombrePerfil: { in: guardados } } },
+        select: { idUsuarioRolAcceso: true },
+      });
+      if (record) return true;
     }
-    return true;
+    if (roles.includes(ROL_LIDER_ASOCIACION)) {
+      const junta = await this.prisma.juntaAsociacion.findFirst({
+        where: { idUsuario: userId, ...JUNTA_ACTIVA },
+        select: { idJuntaAsociacion: true },
+      });
+      if (junta) return true;
+    }
+    throw new ForbiddenException(message);
   }
 }

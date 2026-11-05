@@ -74,7 +74,6 @@ function rolLabel(rol: string) {
   const map: Record<string, string> = {
     administrador: 'Administrador',
     estudiante: 'Estudiante',
-    mentor: 'Mentor',
     lider_asociacion: 'Líder de asociación',
     coordinador_academico: 'Coordinador académico',
   };

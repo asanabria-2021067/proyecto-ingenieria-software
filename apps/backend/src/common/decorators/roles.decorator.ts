@@ -8,8 +8,7 @@ import { SetMetadata } from '@nestjs/common';
  */
 export type RolAccesoNombre =
   | 'estudiante'
-  | 'lider_asociacion'
-  | 'mentor'
+  | 'lider_asociacion' // derivado de la junta (roles-efectivos.ts), no se asigna a mano
   | 'coordinador_academico'
   | 'administrador';
 

@@ -111,7 +111,6 @@ const ACCIONES_NO_LIDER: AccionPermiso[] = ['proyecto.postular', 'proyecto.salid
 
 const ESPERADO: Record<PerfilPermiso, AccionPermiso[]> = {
   estudiante: [...ACCIONES_COMPARTIDAS, ...ACCIONES_PARTICIPANTE, ...ACCIONES_NO_LIDER],
-  mentor: [...ACCIONES_COMPARTIDAS, ...ACCIONES_PARTICIPANTE, ...ACCIONES_NO_LIDER],
   coordinador: [...ACCIONES_COMPARTIDAS, ...ACCIONES_PARTICIPANTE, ...ACCIONES_NO_LIDER, ...ACCIONES_COORDINACION],
   lider: [...ACCIONES_COMPARTIDAS, ...ACCIONES_PARTICIPANTE, ...ACCIONES_LIDER],
   administracion: [...ACCIONES_COMPARTIDAS, ...ACCIONES_ADMINISTRACION, ...ACCIONES_COORDINACION],
@@ -120,7 +119,6 @@ const ESPERADO: Record<PerfilPermiso, AccionPermiso[]> = {
 const USUARIOS: Record<PerfilPermiso, { roles: string[]; esLider: boolean }> = {
   estudiante: { roles: ['estudiante'], esLider: false },
   lider: { roles: ['estudiante'], esLider: true },
-  mentor: { roles: ['mentor'], esLider: false },
   coordinador: { roles: ['coordinador_academico'], esLider: false },
   administracion: { roles: ['administrador'], esLider: false },
 };
@@ -168,7 +166,7 @@ describe('matriz de permisos', () => {
     expect(resolverPerfil(undefined)).toBe('estudiante');
     expect(resolverPerfil(['lider_asociacion'])).toBe('estudiante');
     expect(resolverPerfil(['estudiante'], true)).toBe('lider');
-    expect(resolverPerfil(['mentor'])).toBe('mentor');
+    expect(resolverPerfil(['mentor'])).toBe('estudiante');
     expect(resolverPerfil(['coordinador_academico'])).toBe('coordinador');
     expect(resolverPerfil(['Administrador'])).toBe('administracion');
     expect(resolverPerfil(['administrador'], true)).toBe('administracion');
@@ -201,7 +199,7 @@ describe('useCan', () => {
     });
   });
 
-  it('el mentor tiene los mismos permisos que un estudiante y el coordinador, los de estudiante más la coordinación', () => {
+  it('un rol mentor viejo no da permisos propios (como estudiante) y el coordinador, los de estudiante más la coordinación', () => {
     ACCIONES.forEach((accion) => {
       expect(puede(accion, ['mentor'])).toBe(puede(accion, ['estudiante']));
       expect(puede(accion, ['coordinador_academico'])).toBe(

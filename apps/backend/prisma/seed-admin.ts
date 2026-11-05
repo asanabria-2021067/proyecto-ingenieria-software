@@ -13,9 +13,7 @@ async function main() {
 
   // ─── Roles de acceso existentes ──────────────────────────────────────────────
   const rolEstudiante = await prisma.rolAcceso.findUniqueOrThrow({ where: { nombrePerfil: 'estudiante' } });
-  const rolLider = await prisma.rolAcceso.findUniqueOrThrow({ where: { nombrePerfil: 'lider_asociacion' } });
   const rolCoordinador = await prisma.rolAcceso.findUniqueOrThrow({ where: { nombrePerfil: 'coordinador_academico' } });
-  const rolMentor = await prisma.rolAcceso.findUniqueOrThrow({ where: { nombrePerfil: 'mentor' } });
 
   // ─── Asignar roles y perfiles a usuarios existentes (sin perfil aún) ─────────
   // carlos.mendoza → estudiante, semestre 7 (aparecerá en riesgo)
@@ -78,15 +76,9 @@ async function main() {
     create: { idUsuario: luis.idUsuario, idRolAcceso: rolCoordinador.idRolAcceso },
   });
 
-  // jose.ramirez → lider_asociacion
   const jose = await prisma.usuario.findUniqueOrThrow({ where: { correo: 'jose.ramirez@uvg.edu.gt' } });
-  await prisma.usuarioRolAcceso.upsert({
-    where: { idUsuario_idRolAcceso: { idUsuario: jose.idUsuario, idRolAcceso: rolLider.idRolAcceso } },
-    update: {},
-    create: { idUsuario: jose.idUsuario, idRolAcceso: rolLider.idRolAcceso },
-  });
 
-  // ─── Nuevos usuarios mentores (MentorContent en UserDetailSheet) ─────────────
+  // ─── Usuarios mentores de proyecto (rol de acceso estudiante) ────────────────
   const mentorRosa = await prisma.usuario.upsert({
     where: { correo: 'rosa.fuentes@uvg.edu.gt' },
     update: {},
@@ -99,9 +91,9 @@ async function main() {
   });
   for (const u of [mentorRosa, mentorTomas]) {
     await prisma.usuarioRolAcceso.upsert({
-      where: { idUsuario_idRolAcceso: { idUsuario: u.idUsuario, idRolAcceso: rolMentor.idRolAcceso } },
+      where: { idUsuario_idRolAcceso: { idUsuario: u.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
       update: {},
-      create: { idUsuario: u.idUsuario, idRolAcceso: rolMentor.idRolAcceso },
+      create: { idUsuario: u.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
     });
   }
 
@@ -132,14 +124,14 @@ async function main() {
     create: { idUsuario: bloqueadoEst.idUsuario, carne: '25010', idCarrera: 1, semestre: 5, disponibilidadHorasSemana: 10 },
   });
   await prisma.usuarioRolAcceso.upsert({
-    where: { idUsuario_idRolAcceso: { idUsuario: bloqueadoLider.idUsuario, idRolAcceso: rolLider.idRolAcceso } },
+    where: { idUsuario_idRolAcceso: { idUsuario: bloqueadoLider.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
     update: {},
-    create: { idUsuario: bloqueadoLider.idUsuario, idRolAcceso: rolLider.idRolAcceso },
+    create: { idUsuario: bloqueadoLider.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
   });
   await prisma.usuarioRolAcceso.upsert({
-    where: { idUsuario_idRolAcceso: { idUsuario: bloqueadoMentor.idUsuario, idRolAcceso: rolMentor.idRolAcceso } },
+    where: { idUsuario_idRolAcceso: { idUsuario: bloqueadoMentor.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso } },
     update: {},
-    create: { idUsuario: bloqueadoMentor.idUsuario, idRolAcceso: rolMentor.idRolAcceso },
+    create: { idUsuario: bloqueadoMentor.idUsuario, idRolAcceso: rolEstudiante.idRolAcceso },
   });
 
   // ─── Usuarios INACTIVO (nuevosInactivos2026 stat + filtro + botón Activar) ────
@@ -434,7 +426,7 @@ async function main() {
     },
   });
 
-  // ─── Participaciones para mentores (MentorContent) ───────────────────────────
+  // ─── Participaciones de los mentores de proyecto ───────────────────────────
   // Rosa: 1 proyecto activo (PUBLICADO, rol 1) + 1 proyecto cerrado (CERRADO, rol 31)
   const partRosa1 = await prisma.participacionProyecto.upsert({
     where: { idParticipacion: 50 },
@@ -540,14 +532,14 @@ async function main() {
   console.log('✓ Seed de datos de administrador completado');
   console.log('');
   console.log('Resumen de datos creados/actualizados:');
-  console.log('  Usuarios mentores:     Rosa Fuentes, Tomás Guerrero');
-  console.log('  Usuarios BLOQUEADO:    Pedro Castillo (est), Miguel Santos (líder), Diana Ramírez (mentor)');
+  console.log('  Mentores de proyecto:  Rosa Fuentes, Tomás Guerrero (estudiantes)');
+  console.log('  Usuarios BLOQUEADO:    Pedro Castillo (est), Miguel Santos, Diana Ramírez (estudiantes)');
   console.log('  Usuarios INACTIVO:     Laura García (est), Daniel Vásquez (coord)');
   console.log('  Estudiantes en riesgo: Héctor Méndez (s10), Valentina Soto (s8), Óscar Pérez (s9)');
   console.log('  Proyectos EN_REVISION: Voluntariado (20), Bienestar (21), Mentores (22)');
   console.log('  Proyectos EN_CIERRE:   Intercambio (23), Datos Abiertos (24)');
   console.log('  Proyectos CERRADOS:    Feria Ciencias (25), Hackathon (26)');
-  console.log('  Roles asignados:       carlos→est(s7), maria→est, ana→est, sofia→est, luis→coord, jose→lider');
+  console.log('  Roles asignados:       carlos→est(s7), maria→est, ana→est, sofia→est, luis→coord, jose→junta');
 }
 
 main()

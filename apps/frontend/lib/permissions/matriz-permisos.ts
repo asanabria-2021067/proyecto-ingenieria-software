@@ -1,20 +1,19 @@
 export const ROLES_ACCESO = [
   'estudiante',
   'lider_asociacion',
-  'mentor',
   'coordinador_academico',
   'administrador',
 ] as const;
 
 export type RolAccesoNombre = (typeof ROLES_ACCESO)[number];
 
-export const PERFILES_PERMISO = ['estudiante', 'lider', 'mentor', 'coordinador', 'administracion'] as const;
+export const PERFILES_PERMISO = ['estudiante', 'lider', 'coordinador', 'administracion'] as const;
 
 export type PerfilPermiso = (typeof PERFILES_PERMISO)[number];
 
 const TODOS: readonly PerfilPermiso[] = PERFILES_PERMISO;
-const SIN_ADMINISTRACION: readonly PerfilPermiso[] = ['estudiante', 'lider', 'mentor', 'coordinador'];
-const SIN_LIDER_NI_ADMINISTRACION: readonly PerfilPermiso[] = ['estudiante', 'mentor', 'coordinador'];
+const SIN_ADMINISTRACION: readonly PerfilPermiso[] = ['estudiante', 'lider', 'coordinador'];
+const SIN_LIDER_NI_ADMINISTRACION: readonly PerfilPermiso[] = ['estudiante', 'coordinador'];
 const SOLO_LIDER: readonly PerfilPermiso[] = ['lider'];
 const SOLO_ADMINISTRACION: readonly PerfilPermiso[] = ['administracion'];
 const COORDINACION_Y_ADMINISTRACION: readonly PerfilPermiso[] = ['coordinador', 'administracion'];
@@ -67,7 +66,6 @@ export function resolverPerfil(roles?: readonly string[] | null, esLider = false
   const normalizados = (roles ?? []).map((rol) => rol.toLowerCase());
   if (normalizados.includes('administrador')) return 'administracion';
   if (esLider) return 'lider';
-  if (normalizados.includes('mentor')) return 'mentor';
   if (normalizados.includes('coordinador_academico')) return 'coordinador';
   return 'estudiante';
 }
