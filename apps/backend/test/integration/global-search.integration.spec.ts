@@ -13,6 +13,7 @@ import {
 import { cleanupIntegrationFixtures, type IntegrationCleanupScope } from './setup/cleanup';
 import { GlobalSearchService } from '../../src/search/global-search.service';
 import { UserNameSearchService } from '../../src/common/search/user-name-search.service';
+import type { ChatService } from '../../src/chat/chat.service';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
@@ -30,7 +31,10 @@ describeIntegration('GlobalSearchService — permisos y acentos (Postgres real)'
   beforeAll(async () => {
     prisma = createIntegrationPrismaClient();
     const prismaService = prisma as unknown as PrismaService;
-    service = new GlobalSearchService(prismaService, new UserNameSearchService(prismaService));
+    service = new GlobalSearchService(prismaService, new UserNameSearchService(prismaService), {
+      // Mensajes/canales tienen su propia prueba (global-search.service.spec.ts).
+      listAllConversations: async () => [],
+    } as unknown as ChatService);
     await prisma.$connect();
   });
 
@@ -181,6 +185,7 @@ describeIntegration('GlobalSearchService — permisos y acentos (Postgres real)'
       proyectos: { items: [], hasMore: false },
       personas: { items: [], hasMore: false },
       tareas: { items: [], hasMore: false },
+      mensajes: { items: [], hasMore: false },
     });
   });
 });

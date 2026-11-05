@@ -26,8 +26,16 @@ export interface TareaResultadoBusquedaDTO {
   estadoTarea: string;
 }
 
+export interface MensajeResultadoBusquedaDTO {
+  idConversacion: number;
+  nombre: string;
+  esCanal: boolean;
+  tituloProyecto: string | null;
+}
+
 export interface GlobalSearchResponseDTO {
   proyectos: GlobalSearchGroupDTO<ProyectoResultadoBusquedaDTO>;
   personas: GlobalSearchGroupDTO<PersonaResultadoBusquedaDTO>;
   tareas: GlobalSearchGroupDTO<TareaResultadoBusquedaDTO>;
+  mensajes: GlobalSearchGroupDTO<MensajeResultadoBusquedaDTO>;
 }

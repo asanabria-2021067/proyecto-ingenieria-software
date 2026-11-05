@@ -3,28 +3,31 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { FolderKanban, ListChecks, Loader2, Search } from 'lucide-react';
+import { FolderKanban, ListChecks, Loader2, MessageSquare, Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGlobalSearch } from '@/hooks/use-global-search';
 import type {
   GlobalSearchResponseDTO,
+  MensajeResultadoBusquedaDTO,
   ProyectoResultadoBusquedaDTO,
   PersonaResultadoBusquedaDTO,
   TareaResultadoBusquedaDTO,
 } from '@/lib/dto/global-search.dto';
 
-type Tipo = 'proyecto' | 'persona' | 'tarea';
+type Tipo = 'proyecto' | 'persona' | 'tarea' | 'mensaje';
 type Pestana = 'todo' | Tipo;
 
 type ResultadoAplanado =
   | { tipo: 'proyecto'; id: string; href: string; data: ProyectoResultadoBusquedaDTO }
   | { tipo: 'persona'; id: string; href: string; data: PersonaResultadoBusquedaDTO }
-  | { tipo: 'tarea'; id: string; href: string; data: TareaResultadoBusquedaDTO };
+  | { tipo: 'tarea'; id: string; href: string; data: TareaResultadoBusquedaDTO }
+  | { tipo: 'mensaje'; id: string; href: string; data: MensajeResultadoBusquedaDTO };
 
 const TITULOS: Record<Tipo, string> = {
   proyecto: 'Proyectos',
   persona: 'Personas',
   tarea: 'Tareas',
+  mensaje: 'Mensajes y canales',
 };
 
 function aplanar(resultado: GlobalSearchResponseDTO | undefined): ResultadoAplanado[] {
@@ -47,6 +50,12 @@ function aplanar(resultado: GlobalSearchResponseDTO | undefined): ResultadoAplan
       id: `tarea-${t.idTarea}`,
       href: `/dashboard/projects/${t.idProyecto}/kanban/tasks/${t.idTarea}`,
       data: t,
+    })),
+    ...resultado.mensajes.items.map((m): ResultadoAplanado => ({
+      tipo: 'mensaje',
+      id: `mensaje-${m.idConversacion}`,
+      href: `/dashboard/mensajes/${m.idConversacion}`,
+      data: m,
     })),
   ];
 }
@@ -105,6 +114,13 @@ function Mosaico({ resultado }: { resultado: ResultadoAplanado }) {
       </span>
     );
   }
+  if (resultado.tipo === 'mensaje') {
+    return (
+      <span className={base} aria-hidden="true">
+        <MessageSquare className="size-5" />
+      </span>
+    );
+  }
   if (resultado.tipo === 'tarea') {
     return (
       <span className={base} aria-hidden="true">
@@ -134,6 +150,9 @@ function Contenido({ resultado, consulta }: { resultado: ResultadoAplanado; cons
   } else if (resultado.tipo === 'persona') {
     titulo = `${resultado.data.nombre} ${resultado.data.apellido}`;
     detalle = resultado.data.carrera ?? 'Persona';
+  } else if (resultado.tipo === 'mensaje') {
+    titulo = resultado.data.nombre;
+    detalle = resultado.data.tituloProyecto ? `en ${resultado.data.tituloProyecto}` : 'Conversación';
   } else {
     titulo = resultado.data.tituloTarea;
     detalle = `en ${resultado.data.tituloProyecto} · ${humanizar(resultado.data.estadoTarea)}`;
@@ -268,16 +287,18 @@ export function GlobalSearchInput({
     { tipo: 'proyecto', items: flat.filter((r) => r.tipo === 'proyecto'), hasMore: data?.proyectos.hasMore ?? false },
     { tipo: 'persona', items: flat.filter((r) => r.tipo === 'persona'), hasMore: data?.personas.hasMore ?? false },
     { tipo: 'tarea', items: flat.filter((r) => r.tipo === 'tarea'), hasMore: data?.tareas.hasMore ?? false },
+    { tipo: 'mensaje', items: flat.filter((r) => r.tipo === 'mensaje'), hasMore: data?.mensajes.hasMore ?? false },
   ];
 
   const conteo = (tipo: Tipo): string => {
     if (!data) return '0';
-    const grupo = tipo === 'proyecto' ? data.proyectos : tipo === 'persona' ? data.personas : data.tareas;
+    const grupo =
+      tipo === 'proyecto' ? data.proyectos : tipo === 'persona' ? data.personas : tipo === 'tarea' ? data.tareas : data.mensajes;
     return `${grupo.items.length}${grupo.hasMore ? '+' : ''}`;
   };
   const conteoTodo = (): string => {
     if (!data) return '0';
-    const hayMas = data.proyectos.hasMore || data.personas.hasMore || data.tareas.hasMore;
+    const hayMas = data.proyectos.hasMore || data.personas.hasMore || data.tareas.hasMore || data.mensajes.hasMore;
     return `${todos.length}${hayMas ? '+' : ''}`;
   };
 
@@ -286,6 +307,7 @@ export function GlobalSearchInput({
     { valor: 'proyecto', titulo: TITULOS.proyecto, cuenta: conteo('proyecto') },
     { valor: 'persona', titulo: TITULOS.persona, cuenta: conteo('persona') },
     { valor: 'tarea', titulo: TITULOS.tarea, cuenta: conteo('tarea') },
+    { valor: 'mensaje', titulo: TITULOS.mensaje, cuenta: conteo('mensaje') },
   ];
 
   return (
@@ -306,7 +328,7 @@ export function GlobalSearchInput({
           type="text"
           autoFocus={autoFocus}
           value={query}
-          aria-label="Buscar proyectos, personas y tareas"
+          aria-label="Buscar proyectos, personas, tareas y mensajes"
           aria-expanded={showDropdown}
           aria-controls={listboxId}
           aria-autocomplete="list"

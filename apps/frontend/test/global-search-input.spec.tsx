@@ -47,7 +47,7 @@ beforeEach(() => {
   vi.useRealTimers();
   searchGlobalMock.mockReset();
   pushMock.mockReset();
-  searchGlobalMock.mockResolvedValue({ proyectos: vacio, personas: vacio, tareas: vacio });
+  searchGlobalMock.mockResolvedValue({ proyectos: vacio, personas: vacio, tareas: vacio, mensajes: vacio });
 });
 
 describe('GlobalSearchInput', () => {
@@ -68,6 +68,7 @@ describe('GlobalSearchInput', () => {
       proyectos: { items: [{ idProyecto: 1, tituloProyecto: 'App móvil', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' }], hasMore: false },
       personas: { items: [{ idUsuario: 2, nombre: 'Ana', apellido: 'Pérez', fotoUrl: null, carrera: null }], hasMore: false },
       tareas: { items: [{ idTarea: 3, tituloTarea: 'Login', idProyecto: 4, tituloProyecto: 'Otro proyecto', estadoTarea: 'POR_HACER' }], hasMore: false },
+      mensajes: { items: [{ idConversacion: 9, nombre: '#Demo - Hackathon', esCanal: true, tituloProyecto: 'Hackathon' }], hasMore: false },
     });
     await renderInput();
 
@@ -79,6 +80,25 @@ describe('GlobalSearchInput', () => {
     expect(opcionGet(/App móvil/)).toBeInTheDocument();
     expect(opcionGet(/Ana Pérez/)).toBeInTheDocument();
     expect(opcionGet(/Login/)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Mensajes y canales' })).toBeInTheDocument();
+    expect(opcionGet(/#Demo - Hackathon/)).toBeInTheDocument();
+  });
+
+  it('muestra canales/mensajes encontrados aunque no haya proyectos, personas ni tareas, y abre la conversacion', async () => {
+    searchGlobalMock.mockResolvedValue({
+      proyectos: vacio,
+      personas: vacio,
+      tareas: vacio,
+      mensajes: { items: [{ idConversacion: 9, nombre: '#Demo - Hackathon', esCanal: true, tituloProyecto: 'Hackathon' }], hasMore: false },
+    });
+    await renderInput();
+
+    escribir('patrocinadores');
+    const opcion = await opcionFind(/#Demo - Hackathon/);
+
+    expect(screen.queryByText('Sin coincidencias')).not.toBeInTheDocument();
+    fireEvent.click(opcion);
+    expect(pushMock).toHaveBeenCalledWith('/dashboard/mensajes/9');
   });
 
   it('muestra pestañas con contador por tipo y filtra al elegir una', async () => {
@@ -92,6 +112,7 @@ describe('GlobalSearchInput', () => {
         hasMore: true,
       },
       tareas: vacio,
+      mensajes: vacio,
     });
     await renderInput();
     escribir('uno');
@@ -112,6 +133,7 @@ describe('GlobalSearchInput', () => {
       proyectos: vacio,
       personas: { items: [{ idUsuario: 2, nombre: 'José', apellido: 'Ramírez', fotoUrl: null, carrera: null }], hasMore: false },
       tareas: vacio,
+      mensajes: vacio,
     });
     await renderInput();
     escribir('RAMIREZ');
@@ -146,6 +168,7 @@ describe('GlobalSearchInput', () => {
       proyectos: { items: [{ idProyecto: 1, tituloProyecto: 'Primero', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' }], hasMore: false },
       personas: { items: [{ idUsuario: 2, nombre: 'Segundo', apellido: 'Persona', fotoUrl: null, carrera: null }], hasMore: false },
       tareas: vacio,
+      mensajes: vacio,
     });
     await renderInput();
     const input = escribir('a');
@@ -166,7 +189,7 @@ describe('GlobalSearchInput', () => {
     escribir('zzz');
     expect(screen.queryByText(/sin coincidencias/i)).not.toBeInTheDocument();
 
-    resolver({ proyectos: vacio, personas: vacio, tareas: vacio });
+    resolver({ proyectos: vacio, personas: vacio, tareas: vacio, mensajes: vacio });
 
     expect(await screen.findByText(/sin coincidencias/i)).toBeInTheDocument();
   });
@@ -179,7 +202,7 @@ describe('GlobalSearchInput', () => {
     escribir('a');
 
     expect(await screen.findByRole('status', { name: /buscando/i })).toBeInTheDocument();
-    resolver({ proyectos: vacio, personas: vacio, tareas: vacio });
+    resolver({ proyectos: vacio, personas: vacio, tareas: vacio, mensajes: vacio });
   });
 
   it('avisa cuando un grupo tiene mas resultados de los mostrados', async () => {
@@ -187,6 +210,7 @@ describe('GlobalSearchInput', () => {
       proyectos: { items: [{ idProyecto: 1, tituloProyecto: 'Uno de varios', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' }], hasMore: true },
       personas: vacio,
       tareas: vacio,
+      mensajes: vacio,
     });
     await renderInput();
 
@@ -201,6 +225,7 @@ describe('GlobalSearchInput', () => {
       proyectos: { items: [{ idProyecto: 1, tituloProyecto: 'Primero', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' }], hasMore: false },
       personas: vacio,
       tareas: vacio,
+      mensajes: vacio,
     });
     await renderInput();
     const input = escribir('a');
@@ -218,6 +243,7 @@ describe('GlobalSearchInput', () => {
       proyectos: { items: [{ idProyecto: 1, tituloProyecto: 'X', tipoProyecto: 'SOCIAL', modalidadProyecto: 'MIXTA' }], hasMore: false },
       personas: vacio,
       tareas: vacio,
+      mensajes: vacio,
     });
     const { GlobalSearchInput } = await import('@/components/layout/global-search-input');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

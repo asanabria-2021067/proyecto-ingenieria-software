@@ -356,6 +356,21 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     expect(screen.queryByRole('button', { name: /gestionar etiquetas/i })).not.toBeInTheDocument();
   });
 
+  it('muestra el boton "Atajos" en la barra del workspace para el lider y para un tercero, y abre la ayuda', () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+
+    const { unmount } = renderWorkspace();
+    expect(screen.getByRole('button', { name: /atajos/i })).toBeInTheDocument();
+    unmount();
+
+    (useCurrentUser as any).mockReturnValue({ data: { idUsuario: 999 } });
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: /atajos/i }));
+
+    expect(screen.getByRole('dialog', { name: /atajos del tablero/i })).toBeInTheDocument();
+  });
+
   describe('selección múltiple y acciones masivas (HU-202)', () => {
     const dosTareas = () => [
       tarea({ idTarea: 1, tituloTarea: 'Primera' }),
