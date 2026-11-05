@@ -187,7 +187,8 @@ test.describe('Cuenta: menú único, Configuración y perfil', () => {
       await expect(page.getByText('Editar perfil').first()).toBeVisible();
       await page.waitForLoadState('networkidle');
       await expect(page.getByRole('region', { name: 'Preferencias de notificaciones' })).toHaveCount(0);
-      await expect(page.getByRole('switch')).toHaveCount(0);
+      // El unico interruptor legitimo del perfil es el del portafolio publico (MEJ-146).
+      await expect(page.getByRole('switch', { name: /^(?!Portafolio público activo$)/ })).toHaveCount(0);
       expect(pedidas).toEqual([]);
       await captura(page, 'perfil-sin-preferencias-1440');
     } finally {
