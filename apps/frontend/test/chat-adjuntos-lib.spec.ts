@@ -66,6 +66,7 @@ describe('utilidades de adjuntos', () => {
 
   it.each([
     ['image/png', 'imagen'],
+    ['audio/webm', 'audio'],
     ['application/pdf', 'pdf'],
     [DOCX, 'word'],
     [XLSX, 'excel'],

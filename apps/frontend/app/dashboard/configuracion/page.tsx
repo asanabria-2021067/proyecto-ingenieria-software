@@ -3,6 +3,8 @@
 import { PageTitle } from '@/components/ui/page-title';
 import { Settings } from 'lucide-react';
 import { NotificationPreferencesSection } from '@/components/profile/notification-preferences-section';
+import { HorarioSilencioSection } from '@/components/profile/horario-silencio-section';
+import { PushSection } from '@/components/profile/push-section';
 import { SesionesSection } from '@/components/profile/sesiones-section';
 import { CambiarContrasenaSection } from '@/components/profile/cambiar-contrasena-section';
 import { MisDatosSection } from '@/components/profile/mis-datos-section';
@@ -30,6 +32,8 @@ export default function ConfiguracionPage() {
       </div>
 
       <NotificationPreferencesSection />
+      <HorarioSilencioSection />
+      <PushSection />
       <SesionesSection />
       <CambiarContrasenaSection />
       <MisDatosSection />

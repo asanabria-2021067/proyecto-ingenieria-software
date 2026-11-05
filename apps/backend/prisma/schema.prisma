@@ -355,6 +355,7 @@ enum TipoNotificacion {
   ORGANIZACION_ACTUALIZADA
   // MEJ-44: alguien mencionó al usuario con @ en un mensaje del chat.
   MENCION_CHAT
+  RESPUESTA_HILO_CHAT
   // MEJ-46: recordatorio programado de un mensaje del chat.
   RECORDATORIO_MENSAJE
   // MEJ-16: proyecto nuevo de mi carrera, mis intereses o una organización/asociación que sigo.
@@ -445,6 +446,8 @@ model Usuario {
 
   telefonos                        UsuarioTelefono[]
   preferenciaNoMolestar            PreferenciaNoMolestar?
+  preferenciaSilencio              PreferenciaSilencioNotificacion?
+  suscripcionesPush                SuscripcionPush[]
   perfil                           PerfilEstudiante?
   registrosHorasSemestre           RegistroHorasSemestre[]
   habilidades                      UsuarioHabilidad[]
@@ -2355,6 +2358,34 @@ model PreferenciaNoMolestar {
   @@map("preferencia_no_molestar")
 }
 
+/// MEJ-136: horario de silencio de notificaciones (hora de Guatemala): sin toasts ni push, la bandeja se guarda igual.
+model PreferenciaSilencioNotificacion {
+  idUsuario     Int      @id @map("id_usuario")
+  activo        Boolean  @default(false)
+  horaInicio    String   @default("22:00") @map("hora_inicio") @db.VarChar(5)
+  horaFin       String   @default("07:00") @map("hora_fin") @db.VarChar(5)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@map("preferencia_silencio_notificacion")
+}
+
+/// MEJ-137: suscripcion Web Push de un navegador del usuario.
+model SuscripcionPush {
+  idSuscripcion Int      @id @default(autoincrement()) @map("id_suscripcion")
+  idUsuario     Int      @map("id_usuario")
+  endpoint      String   @unique @db.VarChar(1000)
+  p256dh        String   @db.VarChar(255)
+  auth          String   @db.VarChar(255)
+  creadaEn      DateTime @default(now()) @map("creada_en")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@index([idUsuario])
+  @@map("suscripcion_push")
+}
+
 model MensajeChat {
   idMensaje       Int       @id @default(autoincrement()) @map("id_mensaje")
   idConversacion  Int       @map("id_conversacion")
@@ -2366,7 +2397,11 @@ model MensajeChat {
   idMensajeCitado Int?      @map("id_mensaje_citado")
   // MEJ-43: mensaje fijado (hasta 3 por conversacion, validado en ChatService).
   fijadoEn        DateTime? @map("fijado_en")
+  // MEJ-131: si no es null, el mensaje es una respuesta dentro del hilo de otro mensaje (no se confunde con la cita).
+  idMensajePadre  Int?      @map("id_mensaje_padre")
 
+  padre        MensajeChat?          @relation("HiloMensaje", fields: [idMensajePadre], references: [idMensaje], onDelete: Restrict)
+  hilo         MensajeChat[]         @relation("HiloMensaje")
   conversacion Conversacion          @relation(fields: [idConversacion], references: [idConversacion], onDelete: Restrict)
   remitente    Usuario               @relation("MensajesChatEnviados", fields: [idRemitente], references: [idUsuario], onDelete: Restrict)
   adjunto      AdjuntoMensajeChat?
@@ -2379,6 +2414,7 @@ model MensajeChat {
 
   @@index([idConversacion, enviadoEn])
   @@index([idConversacion, fijadoEn])
+  @@index([idMensajePadre, idMensaje])
   @@map("mensaje_chat")
 }
 
@@ -2486,6 +2522,7 @@ enum TipoEstadoChat {
   OCUPADO
   DISPONIBLE
   PERSONALIZADO
+  EN_REUNION
 }
 
 model EstadoChatUsuario {

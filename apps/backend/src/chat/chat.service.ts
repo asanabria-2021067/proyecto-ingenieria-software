@@ -11,6 +11,7 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListArchivedConversationsQueryDto } from './dto/list-archived-conversations-query.dto';
 import { DuracionSilencio } from './dto/silenciar-conversation.dto';
 import { ListLinksQueryDto } from './dto/list-links-query.dto';
+import { ListArchivosQueryDto } from './dto/list-archivos-query.dto';
 import { extraerEnlaces } from './extract-links';
 import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
 import { ListSavedMessagesQueryDto } from './dto/list-saved-messages-query.dto';
@@ -76,6 +77,7 @@ const MENSAJE_SELECT = {
   editadoEn: true,
   eliminadoEn: true,
   fijadoEn: true,
+  idMensajePadre: true,
   remitente: USUARIO_SELECT,
   // Solo metadatos: la clave de almacenamiento y las URL nunca salen en el listado.
   adjunto: { select: { idAdjunto: true, nombreOriginal: true, mime: true, tamanoBytes: true, duracionSegundos: true } },
@@ -369,16 +371,24 @@ export class ChatService {
     return this.mensajesDe(idConversacion, userId, cursorId);
   }
 
-  /** Página de historial sin chequeo de acceso: el llamador ya verificó que `userId` puede leer la conversación. */
-  async mensajesDe(idConversacion: number, userId: number, cursorId?: number) {
+  /**
+   * Página de historial sin chequeo de acceso: el llamador ya verificó que `userId` puede leer la conversación.
+   * MEJ-131: sin `idMensajePadre` es el canal (sin respuestas de hilo, con su conteo); con él, solo ese hilo.
+   */
+  async mensajesDe(idConversacion: number, userId: number, cursorId?: number, idMensajePadre?: number) {
     const mensajes = await this.prisma.mensajeChat.findMany({
-      where: { idConversacion, ...(cursorId ? { idMensaje: { lt: cursorId } } : {}) },
+      where: {
+        idConversacion,
+        idMensajePadre: idMensajePadre ?? null,
+        ...(cursorId ? { idMensaje: { lt: cursorId } } : {}),
+      },
       orderBy: { idMensaje: 'desc' },
       take: 30,
       select: {
         ...MENSAJE_CON_CITA_SELECT,
         reacciones: REACCIONES_SELECT,
         guardadoPor: { where: { idUsuario: userId }, select: { idUsuario: true } },
+        _count: { select: { hilo: { where: { eliminadoEn: null } } } },
       },
     });
     const apodos = await this.prisma.apodoConversacion.findMany({
@@ -387,8 +397,9 @@ export class ChatService {
     });
     const porUsuario = new Map(apodos.map((a) => [a.idUsuarioObjetivo, a.apodo]));
     // `guardado` es solo del usuario autenticado: nunca se expone quién más guardó.
-    return mensajes.reverse().map(({ reacciones, guardadoPor, ...m }) => ({
+    return mensajes.reverse().map(({ reacciones, guardadoPor, _count, ...m }) => ({
       ...ocultarEliminado(conResumenDeCita(m)),
+      respuestas: _count?.hilo ?? 0,
       reacciones: reaccionesParaUsuario(agruparReacciones(reacciones), userId),
       apodoRemitente: porUsuario.get(m.remitente.idUsuario) ?? null,
       guardado: guardadoPor.length > 0,
@@ -500,13 +511,20 @@ export class ChatService {
     return { items, nextCursor };
   }
 
-  /** Galeria de archivos compartidos, paginada por idAdjunto descendente. */
-  async getArchivos(idProyecto: number, idConversacion: number, userId: number, query: ListLinksQueryDto = {}) {
+  /** Galeria de archivos compartidos (imagenes, documentos y notas de voz), paginada por idAdjunto descendente. */
+  async getArchivos(idProyecto: number, idConversacion: number, userId: number, query: ListArchivosQueryDto = {}) {
     await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     const limite = query.limite ?? 20;
+    const porTipo: Prisma.AdjuntoMensajeChatWhereInput =
+      query.tipo === 'imagen'
+        ? { mime: { startsWith: 'image/' } }
+        : query.tipo === 'audio'
+          ? { mime: { startsWith: 'audio/' } }
+          : query.tipo === 'documento'
+            ? { NOT: [{ mime: { startsWith: 'image/' } }, { mime: { startsWith: 'audio/' } }] }
+            : {};
     const filas = await this.prisma.adjuntoMensajeChat.findMany({
-      // Las notas de voz tienen su reproductor en el mensaje: no van a la galeria de archivos.
-      where: { idConversacion, duracionSegundos: null, mensaje: { eliminadoEn: null }, ...(query.cursor ? { idAdjunto: { lt: query.cursor } } : {}) },
+      where: { idConversacion, mensaje: { eliminadoEn: null }, ...porTipo, ...(query.cursor ? { idAdjunto: { lt: query.cursor } } : {}) },
       orderBy: { idAdjunto: 'desc' },
       take: limite,
       select: {
@@ -515,6 +533,7 @@ export class ChatService {
         nombreOriginal: true,
         mime: true,
         tamanoBytes: true,
+        duracionSegundos: true,
         creadoEn: true,
         mensaje: { select: { remitente: USUARIO_SELECT } },
       },
@@ -626,7 +645,7 @@ export class ChatService {
     contenido: string,
     archivo?: ArchivoSubido,
     idMensajeCitado?: number,
-    extra: { duracionSegundos?: number; encuesta?: CreatePollDto } = {},
+    extra: { duracionSegundos?: number; encuesta?: CreatePollDto; idMensajePadre?: number } = {},
   ) {
     const conversacion = await this.getConversacionOrThrow(idProyecto, idConversacion, userId);
     // T-234: único punto real de creación de mensajes (REST) — el gateway de
@@ -649,6 +668,17 @@ export class ChatService {
       });
       if (!citado) {
         throw new BadRequestException('El mensaje citado no existe en esta conversación');
+      }
+    }
+
+    if (extra.idMensajePadre !== undefined) {
+      // MEJ-131: el hilo cuelga de un mensaje vivo del canal (no de otra respuesta) y de la misma conversacion.
+      const padre = await this.prisma.mensajeChat.findFirst({
+        where: { idMensaje: extra.idMensajePadre, idConversacion, idMensajePadre: null, eliminadoEn: null },
+        select: { idMensaje: true },
+      });
+      if (!padre) {
+        throw new BadRequestException('El mensaje al que respondes no existe en esta conversación');
       }
     }
 
@@ -695,6 +725,7 @@ export class ChatService {
               idRemitente: userId,
               contenido: encuesta ? encuesta.pregunta : contenido.trim(),
               idMensajeCitado,
+              idMensajePadre: extra.idMensajePadre,
               ...(adjunto ? { adjunto: { create: adjunto } } : {}),
               ...(encuesta
                 ? {

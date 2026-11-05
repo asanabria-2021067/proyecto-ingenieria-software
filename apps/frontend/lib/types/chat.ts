@@ -1,4 +1,4 @@
-export type TipoEstadoChat = 'EN_CLASE' | 'OCUPADO' | 'DISPONIBLE' | 'PERSONALIZADO';
+export type TipoEstadoChat = 'EN_CLASE' | 'OCUPADO' | 'EN_REUNION' | 'DISPONIBLE' | 'PERSONALIZADO';
 
 /** Estado personalizado vigente; `venceEn` null = sin caducidad. */
 export interface ChatEstado {
@@ -98,6 +98,10 @@ export interface ChatMensaje {
   apodoRemitente?: string | null;
   /** Marcador personal del usuario autenticado; ausente en mensajes que llegan por socket. */
   guardado?: boolean;
+  /** MEJ-131: si no es null, es una respuesta dentro del hilo de ese mensaje y no sale en la lista del canal. */
+  idMensajePadre?: number | null;
+  /** MEJ-131: cuántas respuestas tiene el hilo de este mensaje (solo en la lista del canal). */
+  respuestas?: number;
 }
 
 /** MEJ-45: tarjeta de un enlace interno; `accesible: false` = sin permiso o inexistente (sin datos). */
@@ -115,6 +119,9 @@ export interface ChatArchivo extends ChatAdjunto {
   creadoEn: string;
   remitente: ChatUsuario;
 }
+
+/** MEJ-135: filtro de la pestaña Archivos. */
+export type TipoArchivoChat = 'imagen' | 'documento' | 'audio';
 
 export interface ChatArchivosPagina {
   items: ChatArchivo[];

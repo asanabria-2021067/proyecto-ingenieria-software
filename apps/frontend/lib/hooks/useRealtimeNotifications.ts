@@ -29,6 +29,8 @@ export interface Notification {
   tituloNotificacion: string;
   mensajeNotificacion?: string;
   datosJson?: any;
+  /** MEJ-136: el usuario está en su horario de silencio; se guarda y cuenta, pero sin aviso emergente. */
+  silenciada?: boolean;
 }
 
 /** Payload real de A4/A9.1 — ver notifications.gateway.ts (backend): `{ projectId, sprintId }`. */

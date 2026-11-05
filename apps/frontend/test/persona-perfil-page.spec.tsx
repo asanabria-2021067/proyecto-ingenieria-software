@@ -10,6 +10,9 @@ vi.mock('next/navigation', () => ({
 // MEJ-22: el diálogo de invitar a un rol usa TanStack Query; aquí solo importa el perfil.
 vi.mock('@/components/projects/invitar-a-rol-dialog', () => ({ InvitarARolDialog: () => null }));
 
+// MEJ-132: el estado de la persona usa TanStack Query y tiene su propio spec.
+vi.mock('@/components/chat-dock/estado-chat', () => ({ EstadoPerfilAjeno: () => null }));
+
 const usePerfilUsuarioMock = vi.fn();
 const useAccionesAmistadMock = vi.fn();
 vi.mock('@/hooks/use-social', () => ({

@@ -1,8 +1,9 @@
+import { CHAT_TEMPLATES, type ChatTemplateData } from './chat.templates';
 import { COORDINADOR_TEMPLATES, type CoordinadorTemplateData } from './coordinador.templates';
 import { CUENTA_TEMPLATES, type CuentaTemplateData } from './cuenta.templates';
 import { HORAS_TEMPLATES, type HorasTemplateData } from './horas.templates';
 
-export interface NotificationTemplateData extends HorasTemplateData, CoordinadorTemplateData, CuentaTemplateData {
+export interface NotificationTemplateData extends HorasTemplateData, CoordinadorTemplateData, CuentaTemplateData, ChatTemplateData {
   NUEVA_POSTULACION: {
     userName: string;
     roleName: string;
@@ -323,15 +324,6 @@ export interface NotificationTemplateData extends HorasTemplateData, Coordinador
     idHito: number | null;
   };
 
-  // MEJ-44: mención con @ en un mensaje del chat del proyecto.
-  MENCION_CHAT: {
-    autorNombre: string;
-    tituloProyecto: string;
-    idProyecto: number;
-    idConversacion: number;
-    idMensaje: number;
-  };
-
   // MEJ-46: «Recuérdamelo» sobre un mensaje del chat.
   RECORDATORIO_MENSAJE: {
     autorNombre: string;
@@ -429,7 +421,7 @@ export interface NotificationTemplateData extends HorasTemplateData, Coordinador
 }
 
 export const NOTIFICATION_TEMPLATES = {
-  ...HORAS_TEMPLATES, ...COORDINADOR_TEMPLATES, ...CUENTA_TEMPLATES,
+  ...HORAS_TEMPLATES, ...COORDINADOR_TEMPLATES, ...CUENTA_TEMPLATES, ...CHAT_TEMPLATES,
   NUEVA_POSTULACION: {
     title: 'Nueva postulación recibida',
     message: (data: NotificationTemplateData['NUEVA_POSTULACION']) =>
@@ -699,12 +691,6 @@ export const NOTIFICATION_TEMPLATES = {
       const donde = { TAREA: 'la tarea', PROYECTO: 'el proyecto', HITO: 'el hito' }[data.contexto];
       return `${data.autorNombre} te mencionó en un comentario de ${donde} "${data.tituloContexto}".`;
     },
-  },
-
-  MENCION_CHAT: {
-    title: 'Te mencionaron en el chat',
-    message: (data: NotificationTemplateData['MENCION_CHAT']) =>
-      `${data.autorNombre} te mencionó en el chat del proyecto "${data.tituloProyecto}".`,
   },
 
   RECORDATORIO_MENSAJE: {
