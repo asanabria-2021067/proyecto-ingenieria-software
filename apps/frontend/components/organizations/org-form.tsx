@@ -316,7 +316,7 @@ export function OrgForm({ org }: { org?: OrganizacionDetalle }) {
             </fieldset>
 
             <div className="space-y-1.5 rounded-xl border border-outline-variant p-4">
-              <h2 className="mb-2 text-sm font-bold text-on-surface">Resumen</h2>
+              <h2 className="type-section mb-2">Resumen</h2>
               <p className="text-sm">
                 <span className="text-tertiary">Nombre: </span>
                 {nombre.trim()}

@@ -95,7 +95,7 @@ export function TaskSubtareas({ idProyecto, tarea, subtareas, members, isLeader,
       aria-labelledby="subtareas-titulo"
     >
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 id="subtareas-titulo" className="flex items-center gap-2 text-sm font-bold text-on-surface">
+        <h2 id="subtareas-titulo" className="type-section flex items-center gap-2">
           <ListTree className="size-4 text-tertiary" aria-hidden="true" />
           Subtareas
         </h2>

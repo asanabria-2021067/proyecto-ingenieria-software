@@ -48,7 +48,7 @@ export function TaskChecklist({ idProyecto, idTarea, items, puedeEditar, tituloT
       aria-labelledby="checklist-titulo"
     >
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 id="checklist-titulo" className="flex items-center gap-2 text-sm font-bold text-on-surface">
+        <h2 id="checklist-titulo" className="type-section flex items-center gap-2">
           <ListChecks className="size-4 text-tertiary" aria-hidden="true" />
           Checklist
         </h2>

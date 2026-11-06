@@ -409,7 +409,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
           {!vista.historico && <CargaEquipoPanel idProyecto={vista.idProyecto} />}
           <div className={`${CARD} p-0`}>
             <div className="flex items-center justify-between px-5 py-4">
-              <h2 className="text-base font-bold text-on-surface">
+              <h2 className="type-section">
                 {integrantesActivos} {integrantesActivos === 1 ? 'integrante activo' : 'integrantes activos'}
               </h2>
             </div>
@@ -478,7 +478,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
 
         <TabsContent value="sprints" className="mt-4">
           <div className={CARD}>
-            <h2 className="mb-1 text-base font-bold text-on-surface">
+            <h2 className="type-section mb-1">
               {vista.historico ? 'Sprints cerrados del histórico' : 'Sprints cerrados'}
             </h2>
             <p className="mb-4 text-xs text-tertiary">

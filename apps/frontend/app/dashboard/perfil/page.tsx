@@ -264,7 +264,7 @@ export default function PerfilPage() {
             {/* Main info section */}
             {isAdmin ? (
               <section className="rounded-2xl bg-surface-container-lowest p-8 shadow-sm">
-                <h2 className="text-2xl font-black tracking-tight text-on-surface">
+                <h2 className="type-section">
                   Información de cuenta
                 </h2>
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -315,7 +315,7 @@ export default function PerfilPage() {
               </section>
             ) : (
               <section className="rounded-2xl bg-surface-container-lowest p-8 shadow-sm">
-                <h2 className="text-2xl font-black tracking-tight text-on-surface">
+                <h2 className="type-section">
                   Perfil académico
                 </h2>
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -403,7 +403,7 @@ export default function PerfilPage() {
             {isAdmin ? (
               <>
                 <section className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
-                  <h2 className="text-xl font-black flex items-center gap-2">
+                  <h2 className="type-section flex items-center gap-2">
                     <Lock className="h-5 w-5 text-primary" />
                     Permisos del sistema
                   </h2>
@@ -444,7 +444,7 @@ export default function PerfilPage() {
                 </section>
 
                 <section className="rounded-2xl bg-inverse-surface p-6 text-inverse-on-surface shadow-lg">
-                  <h2 className="text-xl font-black flex items-center gap-2">
+                  <h2 className="type-section text-inverse-on-surface flex items-center gap-2">
                     <Shield className="h-5 w-5 text-primary-fixed" />
                     Roles asignados
                   </h2>
@@ -469,7 +469,7 @@ export default function PerfilPage() {
             ) : (
               <>
                 <section className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
-                  <h2 className="text-xl font-black flex items-center gap-2">
+                  <h2 className="type-section flex items-center gap-2">
                     <UserRound className="h-5 w-5 text-primary" />
                     Intereses y cualidades
                   </h2>
@@ -514,7 +514,7 @@ export default function PerfilPage() {
                 </section>
 
                 <section className="rounded-2xl bg-inverse-surface p-6 text-inverse-on-surface shadow-lg">
-                  <h2 className="text-xl font-black flex items-center gap-2">
+                  <h2 className="type-section text-inverse-on-surface flex items-center gap-2">
                     <Info className="h-5 w-5 text-primary-fixed" />
                     Experiencias previas
                   </h2>
@@ -583,7 +583,7 @@ export default function PerfilPage() {
             {/* Habilidades - students only */}
             {!isAdmin && (
               <section className="rounded-2xl bg-surface-container-low p-8">
-                <h2 className="text-2xl font-black tracking-tight">Habilidades validadas</h2>
+                <h2 className="type-section">Habilidades validadas</h2>
                 {user?.habilidades && user.habilidades.length > 0 ? (
                   <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
                     {user.habilidades.map((item) => (

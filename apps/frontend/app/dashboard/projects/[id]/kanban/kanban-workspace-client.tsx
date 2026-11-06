@@ -468,7 +468,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
 
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2.5">
-              <h2 className="whitespace-nowrap text-xl font-bold text-on-surface md:text-[22px]">
+              <h2 className="type-section whitespace-nowrap">
                 {activeTab === 'hitos' ? 'Hitos' : 'Tablero de tareas'}
               </h2>
               <span className="pill pill-sm pill-green">

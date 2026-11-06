@@ -33,6 +33,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PageTitle } from '@/components/ui/page-title';
 import {
   Dialog,
   DialogContent,
@@ -307,6 +308,7 @@ export function ChatWindow({ idProyecto, idConversacion, minimized, onMinimize, 
           : 'relative flex w-[36rem] shrink-0 flex-col rounded-t-xl border border-b-0 border-outline-variant bg-surface-container-lowest shadow-raised max-w-[calc(100vw-2rem)]'
       }
     >
+      {pagina && <PageTitle className="sr-only">{titulo}</PageTitle>}
       <div className={`flex shrink-0 items-center gap-2 border-b border-outline-variant bg-surface-container px-3 py-2 ${pagina ? '' : 'rounded-t-xl'} ${claseAcentoCabecera(conversacion?.temaColor)}`}>
         {pagina && (
           <button type="button" onClick={onClose} aria-label="Volver a la lista de mensajes" className="motion-icon motion-focus rounded-md p-1 text-text-secondary hover:bg-on-surface/10 hover:text-text-primary md:hidden">

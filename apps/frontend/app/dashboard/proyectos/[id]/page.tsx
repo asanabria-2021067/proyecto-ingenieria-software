@@ -777,13 +777,13 @@ function HistoricalProjectPage({
         <TabsContent value="resumen" className="mt-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-[58fr_42fr]">
             <CardShell className="p-5">
-              <h2 className="mb-3 text-[15px] font-bold text-on-surface">Descripción del proyecto</h2>
+              <h2 className="type-section mb-3">Descripción del proyecto</h2>
               <p className="whitespace-pre-wrap text-[13px] leading-4.75 text-on-surface-variant">
                 {resumen.descripcionProyecto || 'Sin descripción disponible.'}
               </p>
             </CardShell>
             <CardShell className="p-5">
-              <h2 className="mb-3 text-[15px] font-bold text-on-surface">Objetivos</h2>
+              <h2 className="type-section mb-3">Objetivos</h2>
               {objetivos.length > 0 ? (
                 <ul className="space-y-2.5">
                   {objetivos.map((objetivo, i) => (
@@ -804,7 +804,7 @@ function HistoricalProjectPage({
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Miembros históricos */}
             <CardShell className="p-5">
-              <h2 className="mb-3 flex items-center gap-2 text-[15px] font-bold text-on-surface">
+              <h2 className="type-section mb-3 flex items-center gap-2">
                 <Users className="size-4 text-primary" aria-hidden="true" />
                 Miembros históricos ({miembrosHistoricos.length})
               </h2>
@@ -832,7 +832,7 @@ function HistoricalProjectPage({
 
             {/* Sprints cerrados */}
             <CardShell className="p-5">
-              <h2 className="mb-3 flex items-center gap-2 text-[15px] font-bold text-on-surface">
+              <h2 className="type-section mb-3 flex items-center gap-2">
                 <Layers className="size-4 text-primary" aria-hidden="true" />
                 Sprints cerrados ({sprintsCerrados.length})
               </h2>
@@ -857,7 +857,7 @@ function HistoricalProjectPage({
 
             {/* Horas acreditadas */}
             <CardShell className="p-5">
-              <h2 className="mb-3 flex items-center gap-2 text-[15px] font-bold text-on-surface">
+              <h2 className="type-section mb-3 flex items-center gap-2">
                 <Clock className="size-4 text-primary" aria-hidden="true" />
                 Horas acreditadas
               </h2>
@@ -880,7 +880,7 @@ function HistoricalProjectPage({
 
             {/* Revisiones de cierre */}
             <CardShell className="p-5">
-              <h2 className="mb-3 flex items-center gap-2 text-[15px] font-bold text-on-surface">
+              <h2 className="type-section mb-3 flex items-center gap-2">
                 <FileText className="size-4 text-primary" aria-hidden="true" />
                 Revisiones de cierre ({revisiones.length})
               </h2>
@@ -906,7 +906,7 @@ function HistoricalProjectPage({
 
           {/* Informe oficial */}
           <CardShell className="p-5">
-            <h2 className="mb-3 flex items-center gap-2 text-[15px] font-bold text-on-surface">
+            <h2 className="type-section mb-3 flex items-center gap-2">
               <FileText className="size-4 text-primary" aria-hidden="true" />
               Informe oficial
             </h2>

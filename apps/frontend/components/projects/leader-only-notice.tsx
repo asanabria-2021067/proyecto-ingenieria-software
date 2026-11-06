@@ -20,7 +20,7 @@ export function LeaderOnlyNotice({ title = '¡No eres líder!', description }: L
   return (
     <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-10 text-center" role="alert">
       <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-error" aria-hidden="true" />
-      <PageTitle className="mb-1 text-lg font-bold text-on-surface">{title}</PageTitle>
+      <PageTitle className="mb-1">{title}</PageTitle>
       <p className="text-sm text-tertiary">{description}</p>
     </div>
   );

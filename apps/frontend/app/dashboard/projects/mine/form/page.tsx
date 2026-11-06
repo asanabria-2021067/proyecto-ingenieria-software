@@ -476,7 +476,7 @@ function NewProjectFormContent() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-8">
           <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-2xl">
             <div className="px-8 pb-4 pt-8">
-              <PageTitle className="text-xl font-extrabold text-on-surface">Editar información</PageTitle>
+              <PageTitle>Editar información</PageTitle>
               <p className="mt-0.5 text-sm text-tertiary">
                 Este proyecto está {proyectoExistente!.estadoProyecto === 'PUBLICADO' ? 'publicado' : 'en progreso'}: solo puedes editar la información general.
                 El tipo, la modalidad, la fecha de inicio y los roles no se modifican aquí.
@@ -521,7 +521,7 @@ function NewProjectFormContent() {
 
           {/* Header */}
           <div className="px-8 pt-8 pb-4">
-            <PageTitle className="text-xl font-extrabold text-on-surface">{editId ? 'Editar proyecto' : 'Crear proyecto'}</PageTitle>
+            <PageTitle>{editId ? 'Editar proyecto' : 'Crear proyecto'}</PageTitle>
             <p className="text-tertiary text-sm mt-0.5">{TITULO_PASO[pasoActual]} — Paso {step + 1} de {pasos.length}</p>
           </div>
 

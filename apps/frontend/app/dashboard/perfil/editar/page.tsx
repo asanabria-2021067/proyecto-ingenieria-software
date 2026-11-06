@@ -408,7 +408,7 @@ export default function EditarPerfilPage() {
           {/* STEP 1: Datos Personales & Académicos */}
           {step === 0 && (
             <div className="space-y-6">
-              <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+              <h2 className="type-section border-b border-outline-variant/30 pb-3">
                 Información Personal y Académica
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -511,7 +511,7 @@ export default function EditarPerfilPage() {
           {/* STEP 2: Habilidades */}
           {step === 1 && (
             <div className="space-y-6">
-              <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+              <h2 className="type-section border-b border-outline-variant/30 pb-3">
                 Gestión de Habilidades
               </h2>
               
@@ -601,7 +601,7 @@ export default function EditarPerfilPage() {
           {step === 2 && (
             <div className="space-y-8">
               <div className="space-y-4">
-                <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+                <h2 className="type-section border-b border-outline-variant/30 pb-3">
                   Áreas de Interés
                 </h2>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
@@ -665,7 +665,7 @@ export default function EditarPerfilPage() {
               </div>
 
               <div className="space-y-4 border-t border-outline-variant/30 pt-6">
-                <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+                <h2 className="type-section border-b border-outline-variant/30 pb-3">
                   Tus Cualidades Personales
                 </h2>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
@@ -733,7 +733,7 @@ export default function EditarPerfilPage() {
           {/* STEP 4: Experiencias Previas */}
           {step === 3 && (
             <div className="space-y-6">
-              <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+              <h2 className="type-section border-b border-outline-variant/30 pb-3">
                 Experiencias Previas
               </h2>
 
@@ -825,7 +825,7 @@ export default function EditarPerfilPage() {
           {/* STEP 5: Enlaces y CV */}
           {step === 4 && (
             <div className="space-y-6">
-              <h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant/30 pb-3">
+              <h2 className="type-section border-b border-outline-variant/30 pb-3">
                 Enlaces y Portafolio Digital
               </h2>
 
