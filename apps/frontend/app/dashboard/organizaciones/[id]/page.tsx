@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { SkeletonDetail } from '@/components/ui/skeleton';
+import { ADMIN_TAB_LIST, ADMIN_TAB_TRIGGER } from '@/components/admin/admin-tabs';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tag } from '@/components/ui/tag';
 import { useCurrentUser } from '@/hooks/use-current-user';
@@ -39,7 +40,6 @@ import { getApiErrorStatus } from '@/components/projects/api-error';
 export default function OrganizacionPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const tabUrl = useSearchParams().get('tab');
   const id = Number(params.id);
   const { data: usuario } = useCurrentUser();
   const { data: org, isLoading, isError, error } = useOrganizacion(id);
@@ -79,13 +79,10 @@ export default function OrganizacionPage() {
   }
 
   const esMiembro = org.miRol !== null;
-  // Las pestañas solo de miembros caen en Proyectos si quien llega por un enlace ya no lo es.
-  const tab = !tabUrl || (!esMiembro && ['chat', 'anuncios', 'calendario'].includes(tabUrl)) ? 'proyectos' : tabUrl;
   const gestiona = puedeGestionar(org.miRol);
   const esPropietario = org.miRol === 'PROPIETARIO';
   const sitio = safeExternalHref(org.sitioWeb);
   const idUsuario = usuario?.idUsuario ?? null;
-  const pendientes = (org.invitacionesPendientes ?? 0) + (org.solicitudesPendientes ?? 0);
 
   // Una sola acción principal visible; el resto vive en el menú «Más».
   const puedeNuevoProyecto = puedePublicarComo(org.miRol) && org.puedePublicar;
@@ -276,57 +273,94 @@ export default function OrganizacionPage() {
         )}
       </section>
 
-      <Tabs value={tab} onValueChange={(v) => router.replace(`?tab=${v}`, { scroll: false })}>
-        <TabsList className="mb-4.5 h-auto flex-wrap">
-          <TabsTrigger value="proyectos">Proyectos</TabsTrigger>
-          <TabsTrigger value="portafolio">Portafolio</TabsTrigger>
-          {org.miembros && <TabsTrigger value="miembros">Miembros ({org.miembros.length})</TabsTrigger>}
-          {esMiembro && <TabsTrigger value="chat">Chat</TabsTrigger>}
-          {esMiembro && <TabsTrigger value="anuncios">Anuncios</TabsTrigger>}
-          {esMiembro && <TabsTrigger value="calendario">Calendario</TabsTrigger>}
-          {gestiona && (
-            <TabsTrigger value="pendientes">Solicitudes e invitaciones{pendientes > 0 ? ` (${pendientes})` : ''}</TabsTrigger>
-          )}
-        </TabsList>
-
-        <TabsContent value="proyectos" className="card-base">
-          <OrgProyectos proyectos={org.proyectos} />
-        </TabsContent>
-        <TabsContent value="portafolio">
-          <PortafolioProyectos tipo="organizacion" id={org.idOrganizacion} />
-        </TabsContent>
-        {org.miembros && (
-          <TabsContent value="miembros" className="card-base">
-            <OrgMiembros
-              idOrganizacion={org.idOrganizacion}
-              miembros={org.miembros}
-              miRol={org.miRol}
-              idUsuarioActual={idUsuario}
-              archivada={org.archivada}
-            />
-          </TabsContent>
-        )}
-        {esMiembro && (
-          <TabsContent value="chat">
-            <OrgChat idOrganizacion={org.idOrganizacion} puedeFijar={gestiona} />
-          </TabsContent>
-        )}
-        {esMiembro && (
-          <TabsContent value="anuncios">
-            <AnunciosEntidad tipo="organizaciones" id={org.idOrganizacion} puedePublicar={gestiona && !org.archivada} />
-          </TabsContent>
-        )}
-        {esMiembro && (
-          <TabsContent value="calendario">
-            <OrgCalendario idOrganizacion={org.idOrganizacion} />
-          </TabsContent>
-        )}
-        {gestiona && (
-          <TabsContent value="pendientes" className="card-base">
-            <OrgPendientes idOrganizacion={org.idOrganizacion} archivada={org.archivada} />
-          </TabsContent>
-        )}
-      </Tabs>
+      <OrgPestanas org={org} idUsuario={idUsuario} />
     </div>
+  );
+}
+
+type OrgDetalle = NonNullable<ReturnType<typeof useOrganizacion>['data']>;
+
+// La pestaña vive en estado local y en este componente: cambiarla no navega ni vuelve a renderizar la cabecera.
+function OrgPestanas({ org, idUsuario }: { org: OrgDetalle; idUsuario: number | null }) {
+  const paramTab = useSearchParams().get('tab');
+  const [tabUrl, setTabUrl] = useState(paramTab);
+  const [paramVisto, setParamVisto] = useState(paramTab);
+  // Cambios externos de la URL (enlaces, atrás/adelante) se reflejan en el estado.
+  if (paramTab !== paramVisto) {
+    setParamVisto(paramTab);
+    setTabUrl(paramTab);
+  }
+  const esMiembro = org.miRol !== null;
+  const gestiona = puedeGestionar(org.miRol);
+  const pendientes = (org.invitacionesPendientes ?? 0) + (org.solicitudesPendientes ?? 0);
+  const visibles = [
+    'proyectos',
+    'portafolio',
+    ...(org.miembros ? ['miembros'] : []),
+    ...(esMiembro ? ['chat', 'anuncios', 'calendario'] : []),
+    ...(gestiona ? ['pendientes'] : []),
+  ];
+  // Una pestaña inexistente o no visible para quien llega por un enlace cae en Proyectos.
+  const tab = tabUrl && visibles.includes(tabUrl) ? tabUrl : 'proyectos';
+
+  return (
+    <Tabs
+      value={tab}
+      className="gap-stack"
+      onValueChange={(v) => {
+        setTabUrl(v);
+        window.history.replaceState(window.history.state, '', `?tab=${v}`);
+      }}
+    >
+      <TabsList className={ADMIN_TAB_LIST}>
+        <TabsTrigger className={ADMIN_TAB_TRIGGER} value="proyectos">Proyectos</TabsTrigger>
+        <TabsTrigger className={ADMIN_TAB_TRIGGER} value="portafolio">Portafolio</TabsTrigger>
+        {org.miembros && <TabsTrigger className={ADMIN_TAB_TRIGGER} value="miembros">Miembros ({org.miembros.length})</TabsTrigger>}
+        {esMiembro && <TabsTrigger className={ADMIN_TAB_TRIGGER} value="chat">Chat</TabsTrigger>}
+        {esMiembro && <TabsTrigger className={ADMIN_TAB_TRIGGER} value="anuncios">Anuncios</TabsTrigger>}
+        {esMiembro && <TabsTrigger className={ADMIN_TAB_TRIGGER} value="calendario">Calendario</TabsTrigger>}
+        {gestiona && (
+          <TabsTrigger className={ADMIN_TAB_TRIGGER} value="pendientes">Solicitudes e invitaciones{pendientes > 0 ? ` (${pendientes})` : ''}</TabsTrigger>
+        )}
+      </TabsList>
+
+      <TabsContent value="proyectos" className="card-base">
+        <OrgProyectos proyectos={org.proyectos} />
+      </TabsContent>
+      <TabsContent value="portafolio">
+        <PortafolioProyectos tipo="organizacion" id={org.idOrganizacion} />
+      </TabsContent>
+      {org.miembros && (
+        <TabsContent value="miembros" className="card-base">
+          <OrgMiembros
+            idOrganizacion={org.idOrganizacion}
+            miembros={org.miembros}
+            miRol={org.miRol}
+            idUsuarioActual={idUsuario}
+            archivada={org.archivada}
+          />
+        </TabsContent>
+      )}
+      {esMiembro && (
+        <TabsContent value="chat">
+          <OrgChat idOrganizacion={org.idOrganizacion} puedeFijar={gestiona} />
+        </TabsContent>
+      )}
+      {esMiembro && (
+        <TabsContent value="anuncios">
+          <AnunciosEntidad tipo="organizaciones" id={org.idOrganizacion} puedePublicar={gestiona && !org.archivada} />
+        </TabsContent>
+      )}
+      {esMiembro && (
+        <TabsContent value="calendario">
+          <OrgCalendario idOrganizacion={org.idOrganizacion} />
+        </TabsContent>
+      )}
+      {gestiona && (
+        <TabsContent value="pendientes" className="card-base">
+          <OrgPendientes idOrganizacion={org.idOrganizacion} archivada={org.archivada} />
+        </TabsContent>
+      )}
+    </Tabs>
   );
 }
