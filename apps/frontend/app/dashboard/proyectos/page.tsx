@@ -20,6 +20,7 @@ import {
   AvailableProjectCard,
   AvailableProjectCardSkeleton,
   PROJECT_CARD_GRID,
+  PROJECT_CARD_GRID_SKELETON,
   type ProyectoDisponibleResumen,
 } from '@/components/projects/available-project-card';
 import { apiFetch } from '@/lib/api/client';
@@ -251,7 +252,7 @@ function ProyectosContenido() {
         </div>
 
         {isLoading && (
-          <SkeletonRegion className={PROJECT_CARD_GRID} label="Cargando proyectos">
+          <SkeletonRegion className={PROJECT_CARD_GRID_SKELETON} label="Cargando proyectos">
             {Array.from({ length: 6 }).map((_, i) => (
               <AvailableProjectCardSkeleton key={i} />
             ))}

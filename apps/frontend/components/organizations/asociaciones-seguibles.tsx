@@ -3,7 +3,7 @@
 import { AlertCircle, Landmark } from 'lucide-react';
 import { BotonSeguir } from '@/components/organizations/boton-seguir';
 import { OrgAvatar } from '@/components/organizations/org-avatar';
-import { PROJECT_CARD_GRID, AvailableProjectCardSkeleton } from '@/components/projects/available-project-card';
+import { PROJECT_CARD_GRID, PROJECT_CARD_GRID_SKELETON, AvailableProjectCardSkeleton } from '@/components/projects/available-project-card';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { SkeletonRegion } from '@/components/ui/skeleton';
@@ -16,7 +16,7 @@ export function AsociacionesSeguibles() {
 
   if (isLoading) {
     return (
-      <SkeletonRegion className={PROJECT_CARD_GRID} label="Cargando asociaciones">
+      <SkeletonRegion className={PROJECT_CARD_GRID_SKELETON} label="Cargando asociaciones">
         {Array.from({ length: 4 }).map((_, i) => (
           <AvailableProjectCardSkeleton key={i} />
         ))}

@@ -10,6 +10,7 @@ import {
   AvailableProjectCard,
   AvailableProjectCardSkeleton,
   PROJECT_CARD_GRID,
+  PROJECT_CARD_GRID_SKELETON,
 } from '@/components/projects/available-project-card';
 import { getMyProjects, getContributorProjects, deleteProject } from '@/lib/services/projects';
 import { useDuplicarProyecto } from '@/hooks/use-descubrimiento';
@@ -198,7 +199,7 @@ export default function MyProjectsPage() {
         </div>
 
         {isLoading && (
-          <SkeletonRegion className={PROJECT_CARD_GRID} label="Cargando proyectos">
+          <SkeletonRegion className={PROJECT_CARD_GRID_SKELETON} label="Cargando proyectos">
             {Array.from({ length: 6 }).map((_, i) => (
               <AvailableProjectCardSkeleton key={i} />
             ))}
@@ -303,7 +304,7 @@ export default function MyProjectsPage() {
         )}
 
         {!isLoading && isLoadingParticipo && (
-          <SkeletonRegion label="Cargando proyectos donde participo" className={`mt-8 ${PROJECT_CARD_GRID}`}>
+          <SkeletonRegion label="Cargando proyectos donde participo" className={`mt-8 ${PROJECT_CARD_GRID_SKELETON}`}>
             {Array.from({ length: 3 }).map((_, i) => (
               <AvailableProjectCardSkeleton key={i} />
             ))}
