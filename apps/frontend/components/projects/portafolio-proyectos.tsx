@@ -19,7 +19,7 @@ export function formatearHoras(horas: number): string {
 /** Lista de proyectos cerrados con sus cifras; cada tarjeta lleva a la página de resultados. */
 export function PortafolioLista({ proyectos }: { proyectos: ProyectoCerradoResumenDTO[] }) {
   return (
-    <ul className="grid grid-cols-1 gap-stack md:grid-cols-2" aria-label="Proyectos cerrados">
+    <ul className="grid grid-cols-1 gap-stack md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2" aria-label="Proyectos cerrados">
       {proyectos.map((p) => (
         <li key={p.idProyecto} className="card-base flex flex-col gap-tight" data-testid={`portafolio-${p.idProyecto}`}>
           <div className="flex flex-wrap items-start justify-between gap-tight">

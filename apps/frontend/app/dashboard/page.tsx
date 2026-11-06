@@ -143,6 +143,13 @@ function HorasKpiCard({
   );
 }
 
+/** Columnas del resumen por cantidad de tarjetas (3 a 5, según las horas que exige el perfil) para que la fila quede llena. */
+const COLUMNAS_STATS: Record<number, string> = {
+  3: 'lg:grid-cols-3',
+  4: 'lg:grid-cols-4',
+  5: 'lg:grid-cols-5',
+};
+
 const TIPOS_ACREDITACION: TipoProyecto[] = [
   'ACADEMICO_HORAS_BECA',
   'ACADEMICO_EXPERIENCIA',
@@ -487,7 +494,7 @@ export default function DashboardPage() {
           {/* Stats */}
           <div
             id="stats-container"
-            className="relative z-10 mt-card grid grid-cols-1 gap-gap sm:grid-cols-2 lg:grid-cols-4"
+            className={`relative z-10 mt-card grid grid-cols-1 gap-gap sm:grid-cols-2 ${COLUMNAS_STATS[3 + Number(requiereHorasBeca) + Number(requiereHorasExtension)]}`}
           >
             {/* Horas Beca */}
             {requiereHorasBeca && (
@@ -599,7 +606,7 @@ export default function DashboardPage() {
                 <div className="mb-card flex flex-wrap items-center justify-between gap-stack">
                   <h2 className="type-section">Proyectos de tus amigos</h2>
                 </div>
-                <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-gap md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2">
                   {proyectosDeAmigos.map((p) => (
                     <SocialProjectCard key={p.idProyecto} proyecto={p} />
                   ))}
@@ -615,7 +622,7 @@ export default function DashboardPage() {
                     <span className="pill pill-neutral">Actividad reciente</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-gap md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-gap md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2">
                   {proyectosDeSeguidos.map((p) => (
                     <SocialProjectCard key={p.idProyecto} proyecto={p} />
                   ))}
@@ -681,7 +688,7 @@ export default function DashboardPage() {
               </div>
 
               {projectTab === 'destacados' ? (
-                <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-gap md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2">
                   {featured.slice(0, 4).map((p) => (
                     <DashboardProjectCard key={p.idProyecto} project={p} />
                   ))}
@@ -710,7 +717,7 @@ export default function DashboardPage() {
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-gap md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-gap md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2">
                   {projects.slice(0, 4).map((p) => (
                     <DashboardProjectCard key={p.idProyecto} project={p} />
                   ))}

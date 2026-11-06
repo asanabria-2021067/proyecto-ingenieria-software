@@ -82,7 +82,7 @@ export function SprintReportButtons({ idProyecto, idSprint }: { idProyecto: numb
 /** Tarjetas de los reconocimientos ya dados en el Sprint. */
 export function ListaReconocimientos({ items }: { items: ReconocimientoDTO[] }) {
   return (
-    <ul className="grid grid-cols-1 gap-3 md:grid-cols-2" aria-label="Reconocimientos del sprint">
+    <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2" aria-label="Reconocimientos del sprint">
       {items.map((r) => (
         <li key={r.idReconocimiento} className="card-base flex flex-col gap-1">
           <p className="type-body text-text-primary">&ldquo;{r.mensaje}&rdquo;</p>

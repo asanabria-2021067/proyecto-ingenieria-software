@@ -618,7 +618,7 @@ export function HitosSection({
   return (
     <div className="min-h-0">
       {!filtroPorHitoSinHito && hitosVisibles.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:max-2xl:[&>:last-child:nth-child(odd)]:col-span-2 2xl:grid-cols-4">
           {hitosVisibles.map(({ hito, tareasTotales, tareasVisibles }, index) => (
             <MilestoneCard
               key={hito.idHito}

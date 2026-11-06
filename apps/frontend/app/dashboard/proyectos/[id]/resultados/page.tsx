@@ -15,8 +15,8 @@ function ResultadosSkeleton() {
   return (
     <SkeletonRegion label="Cargando los resultados" className="flex flex-col gap-section">
       <Skeleton className="h-10 w-80" />
-      <div className="grid grid-cols-2 gap-grid @3xl/project:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => (
+      <div className="grid grid-cols-2 gap-grid @3xl/project:grid-cols-3">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
           <Skeleton key={i} className="h-24 w-full rounded-card" />
         ))}
       </div>
