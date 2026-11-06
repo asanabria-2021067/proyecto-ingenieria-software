@@ -19,6 +19,10 @@ describe('Novedades (MEJ-75)', () => {
     render(<Novedades />);
     expect(toastMock).toHaveBeenCalledTimes(1);
     expect(toastMock.mock.calls[0][0]).toBe('Qué hay de nuevo');
+    const opciones = toastMock.mock.calls[0][1];
+    expect(opciones.position).toBe('bottom-left');
+    expect(opciones.duration).toBe(8000);
+    expect(localStorage.getItem('uvg-novedades-visto')).not.toBeNull();
 
     cleanup();
     render(<Novedades />);
@@ -27,6 +31,18 @@ describe('Novedades (MEJ-75)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent(window, new Event(EVENTO_ABRIR_NOVEDADES));
     expect(await screen.findByRole('dialog', { name: 'Qué hay de nuevo' })).toBeInTheDocument();
+  });
+});
+
+describe('Novedades con localStorage roto (FIX-42)', () => {
+  it('no truena ni muestra el aviso si el storage lanza', async () => {
+    const { Novedades } = await import('@/components/layout/novedades');
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    expect(() => render(<Novedades />)).not.toThrow();
+    expect(toastMock).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });
 
