@@ -396,79 +396,6 @@ export default function PerfilPage() {
                 </div>
               </section>
             )}
-
-            {/* Insignias - students only */}
-            {!isAdmin && (
-              <InsigniasVitrina
-                insignias={insignias.data ?? []}
-                isLoading={insignias.isLoading}
-                isError={insignias.isError}
-              />
-            )}
-
-            {/* Horas del semestre - students only */}
-            {!isAdmin && (
-              <>
-                <SemestreHorasCard editable />
-                <SemestreHorasHistorial />
-                <HorasPorProyecto />
-              </>
-            )}
-
-            {/* Organizaciones, asociación, actividad reciente y CV (MEJ-26, MEJ-27, MEJ-63, MEJ-64) - students only */}
-            {!isAdmin && user?.idUsuario && (
-              <>
-                <PerfilOrganizaciones idUsuario={user.idUsuario} propio mostrarHoras={false} />
-                <PerfilActividad idUsuario={user.idUsuario} propio />
-                <section className="card-base space-y-tight">
-                  <h2 className="type-subtitle">Mi CV de proyectos</h2>
-                  <p className="type-meta">Tus proyectos cerrados con rol, fechas y horas acreditadas. El enlace solo abre con sesión iniciada.</p>
-                  <PerfilCvAcciones idUsuario={user.idUsuario} />
-                </section>
-                <MiSemestreCard />
-                <EnlacesPerfilSeccion idUsuario={user.idUsuario} propio />
-                <DisponibilidadSemanal idUsuario={user.idUsuario} editable />
-                <PortafolioPublicoAjustes />
-                <PersonasParecidas idUsuario={user.idUsuario} propio />
-              </>
-            )}
-
-            {/* Habilidades - students only */}
-            {!isAdmin && (
-              <section className="rounded-2xl bg-surface-container-low p-8">
-                <h2 className="text-2xl font-black tracking-tight">Habilidades validadas</h2>
-                {user?.habilidades && user.habilidades.length > 0 ? (
-                  <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {user.habilidades.map((item) => (
-                      <article
-                        key={item.idUsuarioHabilidad}
-                        className="rounded-xl bg-surface-container-lowest p-4 shadow-sm"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <Sparkles className="h-4 w-4 text-primary" />
-                          <span className="text-[10px] font-black uppercase text-outline">
-                            {nivelLabel(item.nivelHabilidad)}
-                          </span>
-                        </div>
-                        <h3 className="text-sm font-bold leading-snug">
-                          {item.habilidad.nombreHabilidad}
-                        </h3>
-                        <p className="mt-1 text-[11px] text-outline">
-                          {item.habilidad.categoriaHabilidad || 'General'}
-                        </p>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-4 text-sm text-tertiary">No tienes habilidades registradas.</p>
-                )}
-                {user?.idUsuario && (
-                  <div className="mt-6">
-                    <HabilidadesConfirmables idUsuario={user.idUsuario} />
-                  </div>
-                )}
-              </section>
-            )}
           </div>
 
           {/* Right column */}
@@ -613,6 +540,81 @@ export default function PerfilPage() {
                   )}
                 </section>
               </>
+            )}
+          </div>
+
+          <div className="col-span-12 space-y-8">
+            {/* Insignias - students only */}
+            {!isAdmin && (
+              <InsigniasVitrina
+                insignias={insignias.data ?? []}
+                isLoading={insignias.isLoading}
+                isError={insignias.isError}
+              />
+            )}
+
+            {/* Horas del semestre - students only */}
+            {!isAdmin && (
+              <>
+                <SemestreHorasCard editable />
+                <SemestreHorasHistorial />
+                <HorasPorProyecto />
+              </>
+            )}
+
+            {/* Organizaciones, asociación, actividad reciente y CV (MEJ-26, MEJ-27, MEJ-63, MEJ-64) - students only */}
+            {!isAdmin && user?.idUsuario && (
+              <>
+                <PerfilOrganizaciones idUsuario={user.idUsuario} propio mostrarHoras={false} />
+                <PerfilActividad idUsuario={user.idUsuario} propio />
+                <section className="card-base space-y-tight">
+                  <h2 className="type-subtitle">Mi CV de proyectos</h2>
+                  <p className="type-meta">Tus proyectos cerrados con rol, fechas y horas acreditadas. El enlace solo abre con sesión iniciada.</p>
+                  <PerfilCvAcciones idUsuario={user.idUsuario} />
+                </section>
+                <MiSemestreCard />
+                <EnlacesPerfilSeccion idUsuario={user.idUsuario} propio />
+                <DisponibilidadSemanal idUsuario={user.idUsuario} editable />
+                <PortafolioPublicoAjustes />
+                <PersonasParecidas idUsuario={user.idUsuario} propio />
+              </>
+            )}
+
+            {/* Habilidades - students only */}
+            {!isAdmin && (
+              <section className="rounded-2xl bg-surface-container-low p-8">
+                <h2 className="text-2xl font-black tracking-tight">Habilidades validadas</h2>
+                {user?.habilidades && user.habilidades.length > 0 ? (
+                  <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {user.habilidades.map((item) => (
+                      <article
+                        key={item.idUsuarioHabilidad}
+                        className="rounded-xl bg-surface-container-lowest p-4 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                          <span className="text-[10px] font-black uppercase text-outline">
+                            {nivelLabel(item.nivelHabilidad)}
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-bold leading-snug">
+                          {item.habilidad.nombreHabilidad}
+                        </h3>
+                        <p className="mt-1 text-[11px] text-outline">
+                          {item.habilidad.categoriaHabilidad || 'General'}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-tertiary">No tienes habilidades registradas.</p>
+                )}
+                {user?.idUsuario && (
+                  <div className="mt-6">
+                    <HabilidadesConfirmables idUsuario={user.idUsuario} />
+                  </div>
+                )}
+              </section>
             )}
           </div>
         </div>

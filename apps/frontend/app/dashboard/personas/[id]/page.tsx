@@ -197,54 +197,6 @@ export default function PerfilPersonaPage() {
               )}
             </section>
           )}
-
-          <InsigniasVitrina insignias={perfil.insignias} publica />
-
-          <EnlacesPerfilSeccion idUsuario={perfil.idUsuario} />
-
-          <DisponibilidadSemanal idUsuario={perfil.idUsuario} />
-
-          <PersonasParecidas idUsuario={perfil.idUsuario} />
-
-          <PerfilOrganizaciones idUsuario={perfil.idUsuario} />
-
-          <PerfilActividad idUsuario={perfil.idUsuario} />
-
-          {/* Proyectos activos */}
-          <section className="card-base">
-            <div className="mb-stack flex items-center justify-between gap-tight">
-              <h2 className="type-subtitle flex items-center gap-tight text-text-primary">
-                <Briefcase className="size-4 text-primary" aria-hidden="true" />
-                Proyectos activos
-              </h2>
-              <span className="pill pill-neutral">
-                {perfil.proyectosActivos.length}{' '}
-                {perfil.proyectosActivos.length === 1 ? 'colaboración' : 'colaboraciones'}
-              </span>
-            </div>
-            {perfil.proyectosActivos.length === 0 ? (
-              <p className="type-body text-text-secondary">Sin proyectos activos por ahora.</p>
-            ) : (
-              <ul className="flex flex-col gap-tight">
-                {perfil.proyectosActivos.map((p) => (
-                  <li key={p.idProyecto}>
-                    <Link
-                      href={`/dashboard/proyectos/${p.idProyecto}`}
-                      className="flex items-center justify-between gap-tight rounded-control border border-outline-variant p-tight transition-colors hover:bg-surface-container"
-                    >
-                      <div className="min-w-0">
-                        <p className="type-body truncate font-medium text-text-primary">{p.tituloProyecto}</p>
-                        <p className="type-meta">{p.rolNombre}</p>
-                      </div>
-                      <span className={`pill shrink-0 ${estadoBadgeStyle(p.estadoProyecto)}`}>
-                        {estadoBadgeLabel(p.estadoProyecto)}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
         </div>
 
         {/* Right Column */}
@@ -298,6 +250,56 @@ export default function PerfilPersonaPage() {
             </div>
           )}
         </aside>
+      </div>
+
+      <div className="mx-auto mt-grid max-w-content space-y-section">
+          <InsigniasVitrina insignias={perfil.insignias} publica />
+
+          <EnlacesPerfilSeccion idUsuario={perfil.idUsuario} />
+
+          <DisponibilidadSemanal idUsuario={perfil.idUsuario} />
+
+          <PersonasParecidas idUsuario={perfil.idUsuario} />
+
+          <PerfilOrganizaciones idUsuario={perfil.idUsuario} />
+
+          <PerfilActividad idUsuario={perfil.idUsuario} />
+
+          {/* Proyectos activos */}
+          <section className="card-base">
+            <div className="mb-stack flex items-center justify-between gap-tight">
+              <h2 className="type-subtitle flex items-center gap-tight text-text-primary">
+                <Briefcase className="size-4 text-primary" aria-hidden="true" />
+                Proyectos activos
+              </h2>
+              <span className="pill pill-neutral">
+                {perfil.proyectosActivos.length}{' '}
+                {perfil.proyectosActivos.length === 1 ? 'colaboración' : 'colaboraciones'}
+              </span>
+            </div>
+            {perfil.proyectosActivos.length === 0 ? (
+              <p className="type-body text-text-secondary">Sin proyectos activos por ahora.</p>
+            ) : (
+              <ul className="flex flex-col gap-tight">
+                {perfil.proyectosActivos.map((p) => (
+                  <li key={p.idProyecto}>
+                    <Link
+                      href={`/dashboard/proyectos/${p.idProyecto}`}
+                      className="flex items-center justify-between gap-tight rounded-control border border-outline-variant p-tight transition-colors hover:bg-surface-container"
+                    >
+                      <div className="min-w-0">
+                        <p className="type-body truncate font-medium text-text-primary">{p.tituloProyecto}</p>
+                        <p className="type-meta">{p.rolNombre}</p>
+                      </div>
+                      <span className={`pill shrink-0 ${estadoBadgeStyle(p.estadoProyecto)}`}>
+                        {estadoBadgeLabel(p.estadoProyecto)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
       </div>
 
       <ConfirmActionDialog {...confirmarEliminarAmistad} />
