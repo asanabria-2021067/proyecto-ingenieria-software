@@ -97,11 +97,8 @@ export class HistoricalProjectReadService {
    * detenidos a la espera de un veredicto.
    */
   async adminList(actorId: number, query: AdminProjectsQueryDto): Promise<AdminProjectsPage> {
-    // Administrador: `undefined` (todo). Coordinador: solo `cierres` y solo su alcance. Cualquier otro: 403.
+    // Administrador: `undefined` (todo). Coordinador: solo su alcance. Cualquier otro: 403.
     const ids = await alcanceDelActor(this.prisma, actorId);
-    if (ids && query.grupo !== 'cierres') {
-      throw new ForbiddenException('Acceso restringido a administradores');
-    }
     const esCierres = query.grupo === 'cierres';
     const page = esCierres ? ADMIN_PROJECTS_DEFAULT_PAGE : (query.page ?? ADMIN_PROJECTS_DEFAULT_PAGE);
     const limit = query.limit ?? ADMIN_PROJECTS_DEFAULT_LIMIT;

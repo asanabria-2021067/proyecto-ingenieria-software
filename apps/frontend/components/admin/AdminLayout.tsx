@@ -167,32 +167,48 @@ export const adminNavItemsMobile: NavLeaf[] = [
 ];
 
 /**
- * Menú del coordinador académico: solo lo que su rol puede abrir (revisiones, cierres, horas y su bandeja de
- * pendientes, más mensajes y calendario como cualquier usuario). Nada de usuarios, roles, asociaciones, juntas,
- * configuración del sistema ni mantenimiento: el backend responde 403 a todo eso. Perfil, notificaciones y
- * configuración de la cuenta salen del menú de usuario.
+ * El coordinador académico usa ESTE mismo menú: ve las pantallas de administración con los datos de sus carreras
+ * (el servidor los acota). Solo se le ocultan las entradas de administración pura, que el backend responde con
+ * 403: usuarios y cuentas, recuperación de contraseña, desactivaciones, apelaciones, asociaciones y juntas,
+ * anuncios, seguridad, reportes, tablas, mantenimiento y estado del sistema. A cambio tiene Mensajes y Calendario.
  */
+const SOLO_ADMIN_HREFS = new Set([
+  '/dashboard/admin/usuarios',
+  '/dashboard/admin/solicitudes-recuperacion',
+  '/dashboard/admin/solicitudes-desactivacion',
+  '/dashboard/admin/asociaciones',
+  '/dashboard/admin/apelaciones',
+  '/dashboard/admin/anuncios',
+  ADMIN_CUENTAS_PENDIENTES_HREF,
+  '/dashboard/admin/seguridad',
+  '/dashboard/admin/reportes',
+  '/dashboard/admin/mantenimiento',
+  '/dashboard/admin/tablas',
+]);
+
+const esDeCoordinador = (href: string) => !SOLO_ADMIN_HREFS.has(href.split('?')[0]);
+
+const PANEL_COORDINADOR: NavLeaf = {
+  href: '/dashboard/coordinador',
+  label: 'Panel de Coordinación',
+  icon: LayoutDashboard,
+  exact: true,
+};
+
 export const coordinadorNavEntries: NavEntry[] = [
-  { href: '/dashboard/coordinador', label: 'Panel del coordinador', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/coordinador/pendientes', label: 'Bandeja de pendientes', icon: Inbox },
-  {
-    type: 'group',
-    label: 'Proyectos',
-    icon: FolderKanban,
-    items: [
-      { href: '/dashboard/projects/admin/reviews', label: 'Solicitudes de publicación', icon: FileSearch },
-      { href: '/dashboard/coordinador/cierres', label: 'Solicitudes de cierre', icon: Clock },
-    ],
-  },
-  { href: '/dashboard/admin/horas', label: 'Horas y estudiantes en riesgo', icon: BarChart3 },
+  PANEL_COORDINADOR,
+  ...adminNavEntries
+    .slice(1)
+    .map((entry) => (entry.type === 'group' ? { ...entry, items: entry.items.filter((i) => esDeCoordinador(i.href)) } : entry))
+    .filter((entry) => entry.type !== 'group' || entry.items.length > 0),
   { href: RUTA_MENSAJES, label: 'Mensajes', icon: MessageCircle },
   { href: '/dashboard/calendario', label: 'Calendario', icon: CalendarDays },
 ];
 
 export const coordinadorNavItemsMobile: NavLeaf[] = [
-  { href: '/dashboard/coordinador', label: 'Panel del coordinador', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/coordinador/pendientes', label: 'Bandeja de pendientes', icon: Inbox },
-  { href: '/dashboard/admin/horas', label: 'Horas y estudiantes en riesgo', icon: BarChart3 },
+  PANEL_COORDINADOR,
+  ...adminNavItemsMobile.slice(1).filter((i) => esDeCoordinador(i.href)),
+  { href: '/dashboard/admin/bandeja', label: 'Bandeja única', icon: Inbox },
   { href: RUTA_MENSAJES, label: 'Mensajes', icon: MessageCircle },
 ];
 

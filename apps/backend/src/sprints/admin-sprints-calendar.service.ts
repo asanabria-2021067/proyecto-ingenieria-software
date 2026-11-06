@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EstadoSprint, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { ProjectPolicyService } from '../common/project-policy/project-policy.service';
+import { alcanceDelActor, proyectoEnAlcanceWhere } from '../coordinador/coordinador-alcance';
 import { ADMIN_ACTIVE_PROJECT_STATES } from '../common/project-policy/admin-active-project-states';
 import { dateOnlyToDay, todayInGuatemala } from '../common/utils/guatemala-date';
 import { classifySprintTemporalStatus, type SituacionSprint } from './sprint-temporal-status';
@@ -69,11 +69,11 @@ const ORDEN_SITUACION: Record<SituacionSprint, number> = {
 export class AdminSprintsCalendarService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly policy: ProjectPolicyService,
   ) {}
 
   async getCalendar(actorId: number): Promise<AdminSprintCalendarResponseDto> {
-    await this.policy.assertAdminTx(this.prisma as unknown as Prisma.TransactionClient, actorId);
+    // Administrador: todo. Coordinador: solo proyectos de su alcance. Otro rol: 403.
+    const alcance = await alcanceDelActor(this.prisma, actorId);
 
     const sprints = await this.prisma.sprint.findMany({
       where: {
@@ -81,6 +81,7 @@ export class AdminSprintsCalendarService {
         proyecto: {
           eliminadoEn: null,
           estadoProyecto: { in: [...ADMIN_ACTIVE_PROJECT_STATES] },
+          ...(alcance ? proyectoEnAlcanceWhere(alcance, actorId) : {}),
         },
       },
       select: CALENDAR_SELECT,

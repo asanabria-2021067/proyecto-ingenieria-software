@@ -5,7 +5,7 @@ import { PARAMTYPES_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import type { PrismaClient } from '@prisma/client';
 import { createIntegrationPrismaClient, describeIntegration } from './setup/database';
-import { createIntegrationParticipation, createIntegrationProject, createIntegrationProjectRole, createIntegrationUser } from './setup/fixtures';
+import { createIntegrationParticipation, createIntegrationProject, createIntegrationProjectRole, createIntegrationSprint, createIntegrationUser } from './setup/fixtures';
 import { accessTokenFor, requestJson, startIntegrationHttpHarness, type IntegrationHttpHarness } from './setup/http-harness';
 import { cleanupLeadershipFixture, collectInto, createIntegrationAdmin, type LeadershipCleanupScope } from './setup/leadership';
 import { cleanupClosureLifecycle, closureLifecycleStack, closureReadyFixture } from './setup/closure-lifecycle';
@@ -47,6 +47,10 @@ import { HorasCentralListQueryDto, HorasCentralQueryDto } from '../../src/horas-
 import { AdminCoordinadoresController, CoordinadorController } from '../../src/coordinador/coordinador.controller';
 import { CoordinadorService } from '../../src/coordinador/coordinador.service';
 import { GuardarAlcanceDto } from '../../src/coordinador/dto/alcance-coordinador.dto';
+import { AdminSprintsController } from '../../src/sprints/admin-sprints.controller';
+import { AdminSprintsCalendarService } from '../../src/sprints/admin-sprints-calendar.service';
+import { AdminSprintCalendarQueryDto } from '../../src/sprints/dto/admin-sprint-calendar-query.dto';
+import type { JwtService } from '@nestjs/jwt';
 
 interface Scope extends LeadershipCleanupScope {
   carreraIds?: number[];
@@ -245,12 +249,8 @@ describeIntegration('ROL-1 coordinador académico: alcance por carrera (PostgreS
   describe('lo que NO puede el coordinador', () => {
     it.each([
       '/admin/usuarios',
-      '/admin/estadisticas',
-      '/admin/pendientes',
+      '/admin/cuentas-pendientes',
       '/admin/asociaciones',
-      '/admin/proyectos?grupo=activos',
-      '/admin/horas-semestre/comparativo',
-      '/admin/horas-semestre/resumen-asociaciones',
     ])('GET %s -> 403', async (ruta) => {
       expect((await get(ruta, tokens.coord)).status).toBe(403);
     });
@@ -374,7 +374,8 @@ describeIntegration('ROL-1 coordinador académico: alcance por carrera (PostgreS
       expect(vacio.body.items).toEqual([]);
       expect((await get('/admin/proyectos?grupo=cierres', tokens.estudiante)).status).toBe(403);
       for (const grupo of ['revision', 'cerrados']) {
-        expect((await get(`/admin/proyectos?grupo=${grupo}`, tokens.coord)).status).toBe(403);
+        expect((await get(`/admin/proyectos?grupo=${grupo}`, tokens.coord)).status).toBe(200);
+        expect((await get(`/admin/proyectos?grupo=${grupo}`, tokens.estudiante)).status).toBe(403);
       }
     });
 
@@ -576,4 +577,229 @@ describeIntegration('ROL-1 el coordinador aprueba el cierre de su alcance y se a
     expect(horas.length).toBeGreaterThan(0);
     expect(horas.every((h) => h.estadoHoras === 'APROBADA' && Number(h.horasAprobadas) > 0)).toBe(true);
   }, 60_000);
+});
+
+describeIntegration('Panel del coordinador = vista del admin acotada a su alcance (PostgreSQL real, HTTP)', () => {
+  let db: PrismaClient;
+  let http: IntegrationHttpHarness;
+  const scope: Scope = {};
+  const sufijo = randomUUID().slice(0, 8);
+  const tokens = { admin: '', coord: '', vacio: '', estudiante: '' };
+  const f = {} as {
+    pA: number;
+    pB: number;
+    cerradoA: number;
+    cerradoB: number;
+    revA: number;
+    revB: number;
+    cierreA: number;
+    cierreB: number;
+    asocA: number;
+    asocB: number;
+  };
+  const asociaciones: number[] = [];
+  const get = (ruta: string, token: string) => requestJson(`${http.url}${ruta}`, { token });
+  const ids = (body: { items: { idProyecto: number }[] }) => body.items.map((i) => i.idProyecto);
+
+  async function alumno(idCarrera: number, etiqueta: string) {
+    const u = await createIntegrationUser(db);
+    collectInto(scope, 'userIds', [u.idUsuario]);
+    await db.perfilEstudiante.create({ data: { idUsuario: u.idUsuario, carne: `vis-${etiqueta}-${sufijo}`, idCarrera } });
+    return u;
+  }
+
+  async function proyecto(lider: number, estadoProyecto: 'PUBLICADO' | 'EN_REVISION' | 'EN_SOLICITUD_CIERRE' | 'CERRADO', conSprint = false) {
+    const p = await createIntegrationProject(db, lider, { estadoProyecto });
+    collectInto(scope, 'projectIds', [p.idProyecto]);
+    if (conSprint) {
+      const sp = await createIntegrationSprint(db, p.idProyecto, { estado: 'ACTIVO' });
+      collectInto(scope, 'sprintIds', [sp.idSprint]);
+    }
+    return p.idProyecto;
+  }
+
+  beforeAll(async () => {
+    db = createIntegrationPrismaClient();
+    await db.$connect();
+    const a = await db.carrera.create({ data: { nombreCarrera: `Vista A ${sufijo}`, facultad: `Facultad vista ${sufijo}` } });
+    const b = await db.carrera.create({ data: { nombreCarrera: `Vista B ${sufijo}`, facultad: `Otra vista ${sufijo}` } });
+    scope.carreraIds = [a.idCarrera, b.idCarrera];
+
+    const admin = await createIntegrationAdmin(db, scope);
+    const coord = await createIntegrationUser(db);
+    const vacio = await createIntegrationUser(db);
+    const plano = await createIntegrationUser(db);
+    collectInto(scope, 'userIds', [coord.idUsuario, vacio.idUsuario, plano.idUsuario]);
+    const rol = await db.rolAcceso.upsert({ where: { nombrePerfil: 'coordinador_academico' }, update: {}, create: { nombrePerfil: 'coordinador_academico' } });
+    await db.usuarioRolAcceso.createMany({
+      data: [coord.idUsuario, vacio.idUsuario].map((idUsuario) => ({ idUsuario, idRolAcceso: rol.idRolAcceso })),
+    });
+    collectInto(scope, 'accessRoleUserIds', [coord.idUsuario, vacio.idUsuario]);
+    await db.alcanceCoordinador.create({ data: { idUsuario: coord.idUsuario, idCarrera: a.idCarrera, asignadoPor: admin.idUsuario } });
+
+    const liderA = await alumno(a.idCarrera, 'A');
+    const liderB = await alumno(b.idCarrera, 'B');
+    f.pA = await proyecto(liderA.idUsuario, 'PUBLICADO', true);
+    f.pB = await proyecto(liderB.idUsuario, 'PUBLICADO', true);
+    f.cerradoA = await proyecto(liderA.idUsuario, 'CERRADO');
+    f.cerradoB = await proyecto(liderB.idUsuario, 'CERRADO');
+    f.revA = await proyecto(liderA.idUsuario, 'EN_REVISION');
+    f.revB = await proyecto(liderB.idUsuario, 'EN_REVISION');
+    f.cierreA = await proyecto(liderA.idUsuario, 'EN_SOLICITUD_CIERRE');
+    f.cierreB = await proyecto(liderB.idUsuario, 'EN_SOLICITUD_CIERRE');
+    const asocA = await db.asociacion.create({ data: { nombre: `Asoc vista A ${sufijo}` } });
+    const asocB = await db.asociacion.create({ data: { nombre: `Asoc vista B ${sufijo}` } });
+    asociaciones.push(asocA.idAsociacion, asocB.idAsociacion);
+    await db.asociacionCarrera.create({ data: { idAsociacion: asocA.idAsociacion, idCarrera: a.idCarrera } });
+    await db.asociacionCarrera.create({ data: { idAsociacion: asocB.idAsociacion, idCarrera: b.idCarrera } });
+    f.asocA = asocA.idAsociacion;
+    f.asocB = asocB.idAsociacion;
+
+    tokens.admin = accessTokenFor(admin);
+    tokens.coord = accessTokenFor(coord);
+    tokens.vacio = accessTokenFor(vacio);
+    tokens.estudiante = accessTokenFor(plano);
+
+    const prisma = db as unknown as PrismaService;
+    Reflect.defineMetadata(PARAMTYPES_METADATA, [Reflector, PrismaService], RolesGuard);
+    http = await startIntegrationHttpHarness({
+      prisma: db,
+      controllers: [
+        { controller: AdminController, deps: [AdminService, AdminEntidadesService] },
+        { controller: AdminProjectsController, deps: [HistoricalProjectReadService], handlers: { list: [Object, Object], detail: [Number, Object] } },
+        { controller: AdminSprintsController, deps: [AdminSprintsCalendarService], handlers: { getCalendario: [Object, AdminSprintCalendarQueryDto] } },
+        { controller: AdminHorasSemestreController, deps: [HorasSemestreService], handlers: { comparativo: [Object], resumenAsociaciones: [Object, HorasCentralQueryDto] } },
+      ],
+      providers: [
+        { provide: AdminService, useValue: new AdminService(prisma, {} as JwtService) },
+        { provide: AdminEntidadesService, useValue: new AdminEntidadesService(prisma) },
+        { provide: HistoricalProjectReadService, useValue: historicalStack(db).service },
+        { provide: AdminSprintsCalendarService, useValue: new AdminSprintsCalendarService(prisma) },
+        { provide: HorasSemestreService, useValue: new HorasSemestreService(prisma) },
+      ],
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    await http?.close();
+    const usuarios = scope.userIds ?? [];
+    await db.asociacionCarrera.deleteMany({ where: { idAsociacion: { in: asociaciones } } });
+    await db.asociacion.deleteMany({ where: { idAsociacion: { in: asociaciones } } });
+    await db.bitacoraAuditoria.deleteMany({ where: { idUsuario: { in: usuarios } } });
+    await db.alcanceCoordinador.deleteMany({ where: { idUsuario: { in: usuarios } } });
+    await db.perfilEstudiante.deleteMany({ where: { idUsuario: { in: usuarios } } });
+    await cleanupLeadershipFixture(db, scope);
+    await db.carrera.deleteMany({ where: { idCarrera: { in: scope.carreraIds ?? [] } } });
+    await db.$disconnect();
+  });
+
+  it('proyectos: activos, cerrados y detalle solo de su carrera; el admin ve ambas', async () => {
+    const activos = await get('/admin/proyectos?grupo=activos', tokens.coord);
+    expect(activos.status).toBe(200);
+    expect(ids(activos.body)).toContain(f.pA);
+    expect(ids(activos.body)).not.toContain(f.pB);
+    const cerrados = await get('/admin/proyectos?grupo=cerrados', tokens.coord);
+    expect(ids(cerrados.body)).toContain(f.cerradoA);
+    expect(ids(cerrados.body)).not.toContain(f.cerradoB);
+    expect((await get(`/admin/proyectos/${f.pA}`, tokens.coord)).status).toBe(200);
+    expect((await get(`/admin/proyectos/${f.pB}`, tokens.coord)).status).toBe(403);
+    expect(ids((await get('/admin/proyectos?grupo=activos', tokens.admin)).body)).toEqual(expect.arrayContaining([f.pA, f.pB]));
+  });
+
+  it('calendario de sprints: solo los sprints de proyectos de su carrera', async () => {
+    const res = await get('/admin/sprints/calendario', tokens.coord);
+    expect(res.status).toBe(200);
+    expect(ids(res.body)).toContain(f.pA);
+    expect(ids(res.body)).not.toContain(f.pB);
+    expect(ids((await get('/admin/sprints/calendario', tokens.admin)).body)).toEqual(expect.arrayContaining([f.pA, f.pB]));
+  });
+
+  it('bandeja única: solo revisiones y cierres de su carrera, con su conteo', async () => {
+    const res = await get('/admin/pendientes', tokens.coord);
+    expect(res.status).toBe(200);
+    expect(res.body.items).toEqual([
+      { clave: 'revisiones', total: 1 },
+      { clave: 'cierres', total: 1 },
+    ]);
+    expect(res.body.total).toBe(2);
+    expect((await get('/admin/pendientes', tokens.admin)).body.items.length).toBe(7);
+  });
+
+  it('panel: conteos y actividad solo de su carrera', async () => {
+    const res = await get('/admin/estadisticas', tokens.coord);
+    expect(res.status).toBe(200);
+    expect(res.body.proyectosActivos).toBe(1);
+    expect(res.body.enRevision).toBe(1);
+    expect(res.body.cierrePendiente).toBe(1);
+    expect(res.body.usuariosActivos).toBe(1);
+    expect(res.body.usuariosBloqueados).toBe(0);
+    const actividad = ids({ items: res.body.actividadReciente });
+    expect(actividad.length).toBeGreaterThan(0);
+    expect(actividad.every((id) => [f.pA, f.cerradoA, f.revA, f.cierreA].includes(id))).toBe(true);
+    expect((await get('/admin/estadisticas', tokens.admin)).body.proyectosActivos).toBeGreaterThanOrEqual(2);
+  });
+
+  it('tendencias: cuenta solo lo creado en su carrera', async () => {
+    const suma = (r: { body: { serie: { proyectosCreados: number }[] } }) => r.body.serie.reduce((t, p) => t + p.proyectosCreados, 0);
+    const coord = await get('/admin/metricas?periodo=mes', tokens.coord);
+    expect(coord.status).toBe(200);
+    expect(suma(coord)).toBe(4);
+    expect(suma(await get('/admin/metricas?periodo=mes', tokens.admin))).toBeGreaterThanOrEqual(8);
+  });
+
+  it('entidades: solo las asociaciones de sus carreras', async () => {
+    const res = await get('/admin/metricas/entidades', tokens.coord);
+    expect(res.status).toBe(200);
+    const propias = res.body.asociaciones.map((x: { idAsociacion: number }) => x.idAsociacion);
+    expect(propias).toContain(f.asocA);
+    expect(propias).not.toContain(f.asocB);
+    const todas = (await get('/admin/metricas/entidades', tokens.admin)).body.asociaciones.map((x: { idAsociacion: number }) => x.idAsociacion);
+    expect(todas).toEqual(expect.arrayContaining([f.asocA, f.asocB]));
+  });
+
+  it('horas: el resumen por asociación y el comparativo solo cuentan su carrera', async () => {
+    const res = await get('/admin/horas-semestre/resumen-asociaciones', tokens.coord);
+    expect(res.status).toBe(200);
+    const propias = res.body.asociaciones.map((x: { idAsociacion: number }) => x.idAsociacion);
+    expect(propias).toContain(f.asocA);
+    expect(propias).not.toContain(f.asocB);
+    expect((await get('/admin/horas-semestre/comparativo', tokens.coord)).body.semestres).toHaveLength(4);
+    const todas = (await get('/admin/horas-semestre/resumen-asociaciones', tokens.admin)).body.asociaciones.map((x: { idAsociacion: number }) => x.idAsociacion);
+    expect(todas).toEqual(expect.arrayContaining([f.asocA, f.asocB]));
+    const vacio = await get('/admin/horas-semestre/resumen-asociaciones', tokens.vacio);
+    expect(vacio.body.asociaciones).toEqual([]);
+    const comp = (await get('/admin/horas-semestre/comparativo', tokens.vacio)).body.semestres as { estudiantesConRegistro: number }[];
+    expect(comp.every((x) => x.estudiantesConRegistro === 0)).toBe(true);
+  });
+
+  it('coordinador sin carreras asignadas: todo vacío', async () => {
+    expect(ids((await get('/admin/proyectos?grupo=activos', tokens.vacio)).body)).toEqual([]);
+    expect(ids((await get('/admin/proyectos?grupo=cerrados', tokens.vacio)).body)).toEqual([]);
+    expect((await get('/admin/sprints/calendario', tokens.vacio)).body.items).toEqual([]);
+    expect((await get('/admin/pendientes', tokens.vacio)).body.total).toBe(0);
+    expect((await get('/admin/metricas/entidades', tokens.vacio)).body).toEqual({ asociaciones: [], organizaciones: [] });
+    const panel = (await get('/admin/estadisticas', tokens.vacio)).body;
+    expect([panel.proyectosActivos, panel.usuariosActivos, panel.enRevision, panel.cierrePendiente]).toEqual([0, 0, 0, 0]);
+    expect(panel.actividadReciente).toEqual([]);
+    expect(panel.estudiantesEnRiesgo).toEqual([]);
+    const serie = (await get('/admin/metricas?periodo=mes', tokens.vacio)).body.serie as Record<string, number>[];
+    expect(serie.every((p) => p.proyectosCreados === 0 && p.usuariosNuevos === 0 && p.horasConfirmadas === 0)).toBe(true);
+  });
+
+  it.each([
+    '/admin/estadisticas',
+    '/admin/metricas',
+    '/admin/metricas/entidades',
+    '/admin/pendientes',
+    '/admin/proyectos?grupo=activos',
+    '/admin/sprints/calendario',
+    '/admin/horas-semestre/comparativo',
+    '/admin/horas-semestre/resumen-asociaciones',
+  ])('un estudiante recibe 403 en GET %s', async (ruta) => {
+    expect((await get(ruta, tokens.estudiante)).status).toBe(403);
+  });
+
+  it.each(['/admin/usuarios', '/admin/cuentas-pendientes'])('lo exclusivo del admin sigue en 403 para el coordinador: GET %s', async (ruta) => {
+    expect((await get(ruta, tokens.coord)).status).toBe(403);
+  });
 });

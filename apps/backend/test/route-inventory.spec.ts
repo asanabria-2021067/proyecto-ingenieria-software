@@ -229,7 +229,14 @@ describe('inventario de rutas: ninguna ruta nueva queda abierta ni sin rol de ad
   // ROL-1: unica lista de rutas abiertas al coordinador academico; el alcance se verifica en cada servicio.
   it('solo estas rutas admiten coordinador_academico, todas con JwtAuthGuard y RolesGuard', () => {
     const esperadas = [
+      'GET /api/admin/estadisticas',
+      'GET /api/admin/metricas',
+      'GET /api/admin/metricas/entidades',
+      'GET /api/admin/pendientes',
+      'GET /api/admin/sprints/calendario',
       'GET /api/admin/horas-semestre',
+      'GET /api/admin/horas-semestre/comparativo',
+      'GET /api/admin/horas-semestre/resumen-asociaciones',
       'GET /api/admin/horas-semestre/csv',
       'GET /api/admin/horas-semestre/pdf',
       'GET /api/admin/horas-semestre/totales',
