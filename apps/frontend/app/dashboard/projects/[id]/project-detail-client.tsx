@@ -301,7 +301,7 @@ export default function ProjectDetailClient({ id }: Props) {
     return (
         <ProjectPageShell>
           <div className="mx-auto max-w-prose py-16 text-center">
-            <h2 className="text-lg font-bold text-on-surface">
+            <h2 className="type-section">
               {noEncontrado ? 'Proyecto no encontrado' : 'No fue posible cargar la información del proyecto.'}
             </h2>
             <p className="mt-2 text-sm text-on-surface-variant">

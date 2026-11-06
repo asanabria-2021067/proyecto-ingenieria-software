@@ -415,7 +415,7 @@ function SprintDetailContent({
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <ListChecks className="h-5 w-5 text-primary" aria-hidden="true" />
-          <h2 className="font-headline text-lg font-bold text-on-surface">Tareas del Sprint</h2>
+          <h2 className="type-section">Tareas del Sprint</h2>
         </div>
         {detail.tareas.length === 0 ? (
           <SeccionVacia icon={ListChecks} mensaje="Este Sprint no tiene tareas registradas." />
@@ -459,7 +459,7 @@ function SprintDetailContent({
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-primary" aria-hidden="true" />
-          <h2 className="font-headline text-lg font-bold text-on-surface">Participantes y contribución</h2>
+          <h2 className="type-section">Participantes y contribución</h2>
         </div>
         {participantes.length === 0 ? (
           <SeccionVacia icon={Users} mensaje="No hay participantes registrados para este Sprint." />
@@ -493,7 +493,7 @@ function SprintDetailContent({
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Flag className="h-5 w-5 text-primary" aria-hidden="true" />
-          <h2 className="font-headline text-lg font-bold text-on-surface">Hitos del Sprint</h2>
+          <h2 className="type-section">Hitos del Sprint</h2>
         </div>
         {detail.hitos.length === 0 ? (
           <SeccionVacia icon={Flag} mensaje="Este Sprint no tiene hitos asociados." />

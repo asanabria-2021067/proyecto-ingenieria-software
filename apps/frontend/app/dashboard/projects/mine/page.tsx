@@ -312,7 +312,7 @@ export default function MyProjectsPage() {
 
         {!isLoadingParticipo && participoFiltrados.length > 0 && (
           <div className="mt-8">
-            <h2 className="mb-3 text-[19px] font-bold text-on-surface">
+            <h2 className="type-section mb-3">
               Proyectos donde participo
             </h2>
             <div className={PROJECT_CARD_GRID}>

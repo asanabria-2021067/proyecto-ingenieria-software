@@ -328,7 +328,7 @@ export default function AdminSolicitudesRecuperacionPage() {
         {/* Generated links (this session) */}
         {generated.length > 0 && (
           <div className="mt-8">
-            <h2 className="mb-3 font-headline text-lg font-bold text-on-surface">
+            <h2 className="type-section mb-3">
               Enlaces generados
             </h2>
             <div className="space-y-3">

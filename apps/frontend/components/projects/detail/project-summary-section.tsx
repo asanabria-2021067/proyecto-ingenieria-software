@@ -112,7 +112,7 @@ export function ProjectSummarySection({
                 </div>
 
                 {/* Título + descripción (Sección 11) */}
-                <PageTitle className="text-2xl font-black leading-tight text-on-surface md:text-[28px]">
+                <PageTitle>
                   {proyecto.tituloProyecto}
                 </PageTitle>
                 <p className="max-w-2xl text-sm leading-relaxed text-on-surface-variant">

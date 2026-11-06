@@ -136,7 +136,7 @@ export default function PostularPage() {
         <div className="flex items-center justify-center min-h-[80vh] px-8">
           <div className="text-center max-w-md">
             <CheckCircle className="w-16 h-16 text-primary mx-auto mb-4" />
-            <h2 className="font-headline font-extrabold text-2xl text-on-surface mb-2">
+            <h2 className="type-section mb-2">
               ¡Postulación enviada!
             </h2>
             <p className="text-tertiary text-sm mb-6">

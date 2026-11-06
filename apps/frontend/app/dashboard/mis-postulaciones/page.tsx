@@ -258,7 +258,7 @@ export default function MisPostulacionesPage() {
               >
                 <div className="flex items-start justify-between gap-4 mb-2">
                   <div>
-                    <h2 className="font-headline font-bold text-on-surface text-lg leading-tight">
+                    <h2 className="type-section">
                       {p.rolProyecto.nombreRol}
                     </h2>
                     <p className="text-tertiary text-sm mt-0.5">

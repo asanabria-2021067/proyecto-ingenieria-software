@@ -307,7 +307,7 @@ export default function PostulacionesProyectoPage() {
             className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-7 w-full max-w-md mx-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="font-headline font-bold text-on-surface text-xl mb-2">Aceptar postulación</h2>
+            <h2 className="type-section mb-2">Aceptar postulación</h2>
 
             <p className="text-tertiary text-sm mb-5">¿Confirmas que deseas aceptar esta postulación?</p>
 

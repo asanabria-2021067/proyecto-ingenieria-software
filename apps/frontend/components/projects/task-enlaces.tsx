@@ -67,7 +67,7 @@ export function TaskEnlaces({ idProyecto, idTarea, puedeEditar }: Props) {
       className="rounded-[11px] border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-sm"
       aria-labelledby="enlaces-titulo"
     >
-      <h2 id="enlaces-titulo" className="mb-3 flex items-center gap-2 text-sm font-bold text-on-surface">
+      <h2 id="enlaces-titulo" className="type-section mb-3 flex items-center gap-2">
         <Link2 className="size-4 text-tertiary" aria-hidden="true" />
         Enlaces{enlaces.length > 0 ? ` (${enlaces.length})` : ''}
       </h2>

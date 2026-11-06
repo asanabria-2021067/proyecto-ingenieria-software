@@ -99,7 +99,7 @@ const CARD = 'rounded-[11px] border border-outline-variant/40 bg-surface-contain
 
 function SeccionTitulo({ icon: Icon, children }: { icon?: typeof Tag; children: React.ReactNode }) {
   return (
-    <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-on-surface">
+    <h2 className="type-section mb-3 flex items-center gap-2">
       {Icon && <Icon className="size-4 text-tertiary" aria-hidden="true" />}
       {children}
     </h2>
@@ -818,7 +818,7 @@ export default function TaskDetailClient({ idProyecto, idTarea }: Props) {
   if (idsValidos && (proyectoError || tasksError) && (!proyecto || !tarea)) {
     return (
         <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-          <PageTitle className="text-lg font-bold text-on-surface">
+          <PageTitle>
             No fue posible cargar la información de la tarea.
           </PageTitle>
           <div className="mt-5 flex justify-center gap-2">
@@ -845,7 +845,7 @@ export default function TaskDetailClient({ idProyecto, idTarea }: Props) {
   if (!proyecto || !tarea) {
     return (
         <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-          <PageTitle className="text-lg font-bold text-on-surface">Tarea no encontrada</PageTitle>
+          <PageTitle>Tarea no encontrada</PageTitle>
           <p className="mt-2 text-sm text-on-surface-variant">
             Esta tarea no existe o ya no está disponible.
           </p>

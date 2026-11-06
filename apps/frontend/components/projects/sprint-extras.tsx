@@ -28,7 +28,7 @@ function fechaHora(iso: string): string {
 
 function Titulo({ id, icon: Icon, children }: { id: string; icon: typeof Sparkles; children: React.ReactNode }) {
   return (
-    <h2 id={id} className="flex items-center gap-2 font-headline text-lg font-bold text-on-surface">
+    <h2 id={id} className="type-section flex items-center gap-2">
       <Icon className="h-5 w-5 text-primary" aria-hidden="true" />
       {children}
     </h2>

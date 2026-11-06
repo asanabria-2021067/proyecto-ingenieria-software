@@ -227,7 +227,7 @@ export function NotificationInbox() {
             </span>
           )}
         </div>
-        <h2 className="mt-micro text-sm font-bold text-on-surface">Bandeja de entrada</h2>
+        <h2 className="type-section mt-micro">Bandeja de entrada</h2>
         <p className="type-meta truncate text-[11px]" aria-live="polite">
           {lista.isPending ? 'Cargando…' : `${plural(totalFiltrado, 'aviso', 'avisos')} · ${pendientesFiltro} sin leer`}
         </p>

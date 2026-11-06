@@ -36,7 +36,7 @@ export function PendingLeaderReview({ solicitadaEn, motivo }: PendingLeaderRevie
         <Clock className="size-7 text-on-primary-container" aria-hidden="true" />
       </div>
 
-      <h2 className="text-2xl font-bold text-on-surface">Solicitud enviada</h2>
+      <h2 className="type-section">Solicitud enviada</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-on-surface-variant">
         Tu solicitud está esperando la revisión del líder del proyecto.
       </p>
