@@ -37,6 +37,19 @@ describe('migasDe (MEJ-74)', () => {
     expect(migaEnLayout('/dashboard/personas')).toBe(false);
   });
 
+  it('panel del coordinador: etiquetas con mayuscula y el panel enlazado desde sus subpaginas', () => {
+    expect(migasDe('/dashboard/coordinador')).toEqual([
+      { label: 'Inicio', href: '/dashboard' },
+      { label: 'Coordinador', href: undefined },
+    ]);
+    expect(migasDe('/dashboard/coordinador/pendientes')).toEqual([
+      { label: 'Inicio', href: '/dashboard' },
+      { label: 'Coordinador', href: '/dashboard/coordinador' },
+      { label: 'Pendientes', href: undefined },
+    ]);
+    expect(migasDe('/dashboard/coordinador/cierres')![2].label).toBe('Cierres');
+  });
+
   it('ignora query y barra final', () => {
     expect(migasDe('/dashboard/personas/?seccion=amigos')?.map((m) => m.label)).toEqual(['Inicio', 'Personas']);
   });

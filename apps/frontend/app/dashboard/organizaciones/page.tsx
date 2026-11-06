@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { AlertCircle, Building2, Plus, SearchX } from 'lucide-react';
 import { DashboardSearchField } from '@/components/dashboard/dashboard-search-field';
 import { dashboardPage } from '@/components/layout/dashboard-page';
-import { PROJECT_CARD_GRID, AvailableProjectCardSkeleton } from '@/components/projects/available-project-card';
+import { PROJECT_CARD_GRID, PROJECT_CARD_GRID_SKELETON, AvailableProjectCardSkeleton } from '@/components/projects/available-project-card';
 import { OrgCard } from '@/components/organizations/org-card';
 import { MisInvitaciones } from '@/components/organizations/mis-invitaciones';
 import { AsociacionesSeguibles } from '@/components/organizations/asociaciones-seguibles';
@@ -27,7 +27,7 @@ import { aviso } from '@/lib/mensajes';
 
 function GridSkeleton({ label }: { label: string }) {
   return (
-    <SkeletonRegion className={PROJECT_CARD_GRID} label={label}>
+    <SkeletonRegion className={PROJECT_CARD_GRID_SKELETON} label={label}>
       {Array.from({ length: 4 }).map((_, i) => (
         <AvailableProjectCardSkeleton key={i} />
       ))}

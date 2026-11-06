@@ -276,7 +276,14 @@ const PROJECT_CARD_SHELL = 'card-base flex min-h-56 flex-col';
  * Grilla de ambas vistas. Dos columnas desde `lg`: con la sidebar visible,
  * a 768 px cada columna quedaba más angosta que el footer de la tarjeta.
  */
-export const PROJECT_CARD_GRID = 'grid grid-cols-1 gap-grid lg:grid-cols-2';
+export const PROJECT_CARD_GRID_SKELETON = 'grid grid-cols-1 gap-grid lg:grid-cols-2';
+
+/**
+ * Con cantidad impar la última tarjeta ocupa las dos columnas en vez de dejar
+ * una celda vacía. Las tarjetas deben ser hijas directas. Los esqueletos usan
+ * la variante sin span: `SkeletonRegion` antepone un `sr-only` que cambia la paridad.
+ */
+export const PROJECT_CARD_GRID = `${PROJECT_CARD_GRID_SKELETON} lg:[&>:last-child:nth-child(odd)]:col-span-2`;
 
 /** MEJ-25: % de tareas del proyecto y del sprint actual, solo en «Mis proyectos» y si hay tareas. */
 function AvanceTarjeta({ proyecto }: { proyecto: MiProyectoListItemDTO }) {

@@ -11,6 +11,7 @@ vi.mock('@/lib/mensajes', () => ({ aviso: { exito: vi.fn(), error: vi.fn(), adve
 // La tarjeta real trae sus propios hooks; aquí importa qué proyectos y qué chip se pintan.
 vi.mock('@/components/projects/available-project-card', () => ({
   PROJECT_CARD_GRID: 'grid',
+  PROJECT_CARD_GRID_SKELETON: 'grid',
   AvailableProjectCardSkeleton: () => null,
   AvailableProjectCard: ({ proyecto }: { proyecto: { tituloProyecto: string; coincidencia?: { porcentaje: number } } }) => (
     <article>
