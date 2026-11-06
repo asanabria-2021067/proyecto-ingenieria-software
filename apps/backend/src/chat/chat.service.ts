@@ -1057,7 +1057,7 @@ export class ChatService {
    * pero para las NO archivadas/eliminadas). La búsqueda cubre nombre del
    * chat, nombre de la otra persona y contenido de mensajes enviados.
    */
-  async listAllConversations(userId: number, q?: string) {
+  async listAllConversations(userId: number, q?: string, limit?: number) {
     const query = (q ?? '').trim();
 
     const conversaciones = await this.prisma.conversacion.findMany({
@@ -1126,6 +1126,7 @@ export class ChatService {
         mensajes: { where: { idMensajePadre: null }, orderBy: { enviadoEn: 'desc' }, take: 1, select: MENSAJE_SELECT },
       },
       orderBy: { creadaEn: 'desc' },
+      take: limit,
     });
 
     const mapeadas = await Promise.all(

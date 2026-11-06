@@ -46,7 +46,7 @@ export function OrgCalendario({ idOrganizacion }: { idOrganizacion: number }) {
           <Button type="button" variant="outline" size="icon-sm" aria-label="Mes anterior" onClick={() => setMes(mesSiguiente(mes, -1))}>
             <ChevronLeft aria-hidden="true" />
           </Button>
-          <h2 id="org-calendario-titulo" className="type-subtitle min-w-40 text-center capitalize">
+          <h2 id="org-calendario-titulo" className="type-subtitle min-w-40 text-center">
             {mesTexto(mes)}
           </h2>
           <Button type="button" variant="outline" size="icon-sm" aria-label="Mes siguiente" onClick={() => setMes(mesSiguiente(mes, 1))}>

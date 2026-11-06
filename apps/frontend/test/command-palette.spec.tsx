@@ -35,6 +35,7 @@ beforeEach(() => {
       ],
       hasMore: false,
     },
+    mensajes: vacio,
   });
 });
 afterEach(cleanup);
@@ -84,8 +85,23 @@ describe('CommandPalette (MEJ-73)', () => {
     expect(searchGlobalMock).toHaveBeenCalledWith('feria');
   });
 
+  it('lista mensajes y canales y no dice "sin coincidencias" si solo hay de esos', async () => {
+    searchGlobalMock.mockResolvedValue({
+      proyectos: vacio,
+      personas: vacio,
+      tareas: vacio,
+      mensajes: { items: [{ idConversacion: 9, nombre: '#Demo', esCanal: true, tituloProyecto: 'Hackathon' }], hasMore: false },
+    });
+    await montar();
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'patrocinadores' } });
+    fireEvent.click(await screen.findByText('#Demo'));
+    expect(screen.queryByText(/Sin coincidencias/)).not.toBeInTheDocument();
+    expect(pushMock).toHaveBeenCalledWith('/dashboard/mensajes/9');
+  });
+
   it('sin coincidencias ofrece un mensaje', async () => {
-    searchGlobalMock.mockResolvedValue({ proyectos: vacio, personas: vacio, tareas: vacio });
+    searchGlobalMock.mockResolvedValue({ proyectos: vacio, personas: vacio, tareas: vacio, mensajes: vacio });
     await montar();
     fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
     fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'zzzz' } });

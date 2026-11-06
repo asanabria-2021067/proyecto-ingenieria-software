@@ -111,6 +111,36 @@ describe('Mis postulaciones: retiro, motivo y línea de tiempo (MEJ-96, 99, 100)
   });
 });
 
+describe('Mis postulaciones: fechas del pie salen de la línea de tiempo (FIX-31)', () => {
+  it('"Enviada el" usa el evento ENVIADA aunque fechaPostulacion difiera, y "Resuelta el" el evento de resolución', async () => {
+    apiFetchMock.mockImplementation(async (url: string) => {
+      if (url === '/postulaciones/mis-postulaciones') {
+        return [
+          {
+            idPostulacion: 9,
+            justificacion: 'Desfase',
+            estadoPostulacion: 'RECHAZADA',
+            fechaPostulacion: '2026-11-05T15:00:00.000Z',
+            rolProyecto: rol('Soporte'),
+            eventos: [{ tipo: 'ENVIADA', fecha: '2026-10-31T15:00:00.000Z' }, { tipo: 'RECHAZADA', fecha: '2026-11-03T15:00:00.000Z' }],
+          },
+          {
+            idPostulacion: 10,
+            justificacion: 'Sin eventos',
+            estadoPostulacion: 'PENDIENTE',
+            fechaPostulacion: '2026-11-05T15:00:00.000Z',
+            rolProyecto: rol('Sin eventos'),
+          },
+        ];
+      }
+      return {};
+    });
+    renderPagina();
+    expect(await screen.findByText(/Enviada el 31 de octubre de 2026/)).toHaveTextContent('Resuelta el 3 de noviembre de 2026');
+    expect(screen.getByText(/Enviada el 5 de noviembre de 2026/)).not.toHaveTextContent('Resuelta el');
+  });
+});
+
 describe('PostulacionLineaTiempo', () => {
   it('no pinta nada sin eventos', () => {
     const { container } = render(<PostulacionLineaTiempo eventos={[]} />);

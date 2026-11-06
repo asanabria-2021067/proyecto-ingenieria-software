@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FolderKanban, ListChecks, Sparkles, User } from 'lucide-react';
+import { FolderKanban, ListChecks, MessageSquare, Sparkles, User } from 'lucide-react';
 import {
   CommandDialog,
   CommandEmpty,
@@ -57,7 +57,7 @@ export function CommandPalette({ destinos }: { destinos: Pick<NavLeaf, 'href' | 
   const q = normalizar(query.trim());
   const paginas = destinos.filter((d) => !q || normalizar(d.label).includes(q));
   const cargando = q.length > 0 && (isFetching || isDebouncing);
-  const hayEntidades = !!data && (data.proyectos.items.length + data.personas.items.length + data.tareas.items.length > 0);
+  const hayEntidades = !!data && (data.proyectos.items.length + data.personas.items.length + data.tareas.items.length + data.mensajes.items.length > 0);
   const sinResultados = paginas.length === 0 && !hayEntidades && !cargando;
 
   return (
@@ -131,6 +131,17 @@ export function CommandPalette({ destinos }: { destinos: Pick<NavLeaf, 'href' | 
                     <ListChecks aria-hidden="true" />
                     {t.tituloTarea}
                     <span className="ml-auto truncate text-xs text-muted-foreground">{t.tituloProyecto}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {data.mensajes.items.length > 0 && (
+              <CommandGroup heading="Mensajes y canales">
+                {data.mensajes.items.map((m) => (
+                  <CommandItem key={m.idConversacion} value={`mensaje-${m.idConversacion}`} onSelect={() => ir(`/dashboard/mensajes/${m.idConversacion}`)}>
+                    <MessageSquare aria-hidden="true" />
+                    {m.nombre}
+                    {m.tituloProyecto && <span className="ml-auto truncate text-xs text-muted-foreground">{m.tituloProyecto}</span>}
                   </CommandItem>
                 ))}
               </CommandGroup>

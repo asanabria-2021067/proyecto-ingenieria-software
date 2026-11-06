@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FileText, Kanban, List, MousePointerClick, Plus, Table2, Tags, UserCheck } from 'lucide-react';
+import { FileText, Kanban, Keyboard, List, MousePointerClick, Plus, Table2, Tags, UserCheck } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { useProjectLabels } from '@/hooks/use-project-labels';
@@ -274,6 +274,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   // MEJ-112: responsable y vista viven aquí, no en cada vista, para conservarse al cambiar de Kanban a Lista o Tabla.
   const [filtroResponsable, setFiltroResponsable] = useState(FILTRO_TODOS);
   const [vista, setVista] = useVistaTablero(idProyecto);
+  const [atajosAbierto, setAtajosAbierto] = useState(false);
   // MEJ-51: «Solo mis tareas» (asignación activa del usuario actual).
   const [soloMias, setSoloMias] = useState(false);
   const [plantillasAbierto, setPlantillasAbierto] = useState(false);
@@ -588,6 +589,19 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 </Button>
               )}
 
+              {activeTab === 'tablero' && vista === 'kanban' && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAtajosAbierto(true)}
+                  className={`${WORKSPACE_CONTROL_CLASS} hidden gap-1.5 md:inline-flex`}
+                >
+                  <Keyboard className="size-3.5" aria-hidden="true" />
+                  Atajos
+                </Button>
+              )}
+
               {isLeader && <BorrarEjemploBoton idProyecto={idProyecto} />}
 
               {isLeader && (
@@ -749,6 +763,8 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 onFiltroRolChange={setFiltroRol}
                 onFiltroHitoChange={setFiltroHito}
                 mostrarToolbar={false}
+                atajosAbierto={atajosAbierto}
+                onAtajosChange={setAtajosAbierto}
                 seleccion={puedeSeleccionar ? seleccion.control : undefined}
                 fijarResponsables={fijarResponsables}
               />

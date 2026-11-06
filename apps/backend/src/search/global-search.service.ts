@@ -3,6 +3,7 @@ import { EstadoParticipacion, EstadoProyecto, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserNameSearchService } from '../common/search/user-name-search.service';
 import { FILTRO_DIRECTORIO } from '../social/social.service';
+import { ChatService } from '../chat/chat.service';
 
 export const GLOBAL_SEARCH_LIMIT = 5;
 
@@ -34,10 +35,18 @@ export interface TareaResultadoBusqueda {
   estadoTarea: string;
 }
 
+export interface MensajeResultadoBusqueda {
+  idConversacion: number;
+  nombre: string;
+  esCanal: boolean;
+  tituloProyecto: string | null;
+}
+
 export interface GlobalSearchResult {
   proyectos: GlobalSearchGroup<ProyectoResultadoBusqueda>;
   personas: GlobalSearchGroup<PersonaResultadoBusqueda>;
   tareas: GlobalSearchGroup<TareaResultadoBusqueda>;
+  mensajes: GlobalSearchGroup<MensajeResultadoBusqueda>;
 }
 
 const ESTADOS_PROYECTO_VISIBLES: EstadoProyecto[] = [EstadoProyecto.PUBLICADO, EstadoProyecto.EN_PROGRESO];
@@ -58,7 +67,28 @@ export class GlobalSearchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly userNameSearch: UserNameSearchService,
+    private readonly chat: ChatService,
   ) {}
+
+  /**
+   * Mensajes y canales: reutiliza la busqueda de /dashboard/mensajes
+   * (ChatService.listAllConversations), que ya limita a las conversaciones donde
+   * el usuario participa y busca por nombre, proyecto, personas y texto de mensajes.
+   */
+  async buscarMensajes(q: string, userId: number): Promise<GlobalSearchGroup<MensajeResultadoBusqueda>> {
+    const conversaciones = await this.chat.listAllConversations(userId, q, GLOBAL_SEARCH_LIMIT + 1);
+    const items = conversaciones.map((c) => {
+      const otro = c.participantes.find((p) => p.idUsuario !== userId);
+      const nombre = c.esCanal
+        ? `#${c.nombre ?? 'canal'}`
+        : (c.nombrePersonalizado ??
+          (c.tipo === 'GRUPAL' ? c.nombre : null) ??
+          (otro ? (otro.apodo ?? `${otro.nombre} ${otro.apellido}`) : null) ??
+          'Conversación');
+      return { idConversacion: c.idConversacion, nombre, esCanal: c.esCanal, tituloProyecto: c.proyecto?.tituloProyecto ?? null };
+    });
+    return truncar(items, GLOBAL_SEARCH_LIMIT);
+  }
 
   async buscarProyectos(q: string): Promise<GlobalSearchGroup<ProyectoResultadoBusqueda>> {
     const patron = likePattern(q);
@@ -171,7 +201,7 @@ export class GlobalSearchService {
     const q = (qRaw ?? '').trim();
     if (q.length === 0) {
       const vacio = { items: [], hasMore: false };
-      return { proyectos: vacio, personas: vacio, tareas: vacio };
+      return { proyectos: vacio, personas: vacio, tareas: vacio, mensajes: vacio };
     }
     // Mismo mínimo que SocialService.buscarUsuarios: un solo carácter
     // hace fan-out contra toda la tabla sin acotar nada útil.
@@ -179,12 +209,13 @@ export class GlobalSearchService {
       throw new BadRequestException('La búsqueda requiere al menos 2 caracteres');
     }
 
-    const [proyectos, personas, tareas] = await Promise.all([
+    const [proyectos, personas, tareas, mensajes] = await Promise.all([
       this.buscarProyectos(q),
       this.buscarPersonas(q),
       this.buscarTareas(q, userId),
+      this.buscarMensajes(q, userId),
     ]);
 
-    return { proyectos, personas, tareas };
+    return { proyectos, personas, tareas, mensajes };
   }
 }
