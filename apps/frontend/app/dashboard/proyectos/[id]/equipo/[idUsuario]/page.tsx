@@ -332,7 +332,7 @@ function LeadershipEligibilityCard({
     <section aria-labelledby="elegibilidad-title" className="card-base overflow-hidden p-0">
       <details className="group" open={totalMotivos > 0}>
         <summary className={`flex flex-wrap items-center gap-x-stack gap-y-tight px-card py-inline ${DISCLOSURE_SUMMARY}`}>
-          <h2 id="elegibilidad-title" className="type-body font-semibold text-text-primary">
+          <h2 id="elegibilidad-title" className="type-section">
             Elegibilidad para liderazgo
           </h2>
           <span className={`pill ${candidato.esElegible ? 'pill-success' : 'pill-neutral'}`}>

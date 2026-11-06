@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ForbiddenException } from '@nestjs/common';
 import { EstadoProyecto, EstadoSprint } from '@prisma/client';
 import type { PrismaService } from '../src/prisma/prisma.service';
-import type { ProjectPolicyService } from '../src/common/project-policy/project-policy.service';
 import { AdminSprintsCalendarService } from '../src/sprints/admin-sprints-calendar.service';
 
 const ADMIN_ID = 1;
@@ -33,13 +32,13 @@ function fila(overrides: Record<string, unknown> = {}) {
 }
 
 function makeService(filas: unknown[] = []) {
-  const prisma = { sprint: { findMany: vi.fn().mockResolvedValue(filas) } };
-  const policy = { assertAdminTx: vi.fn().mockResolvedValue(undefined) };
-  const service = new AdminSprintsCalendarService(
-    prisma as unknown as PrismaService,
-    policy as unknown as ProjectPolicyService,
-  );
-  return { service, prisma, policy };
+  // `alcanceDelActor`: el primer findFirst busca el rol administrador; por defecto el actor lo tiene.
+  const prisma = {
+    sprint: { findMany: vi.fn().mockResolvedValue(filas) },
+    usuarioRolAcceso: { findFirst: vi.fn().mockResolvedValue({ idUsuarioRolAcceso: 1 }) },
+  };
+  const service = new AdminSprintsCalendarService(prisma as unknown as PrismaService);
+  return { service, prisma };
 }
 
 describe('AdminSprintsCalendarService.getCalendar', () => {
@@ -56,20 +55,20 @@ describe('AdminSprintsCalendarService.getCalendar', () => {
 
   describe('autorización', () => {
     it('valida al administrador en BD con el actor recibido, antes de leer nada', async () => {
-      const { service, prisma, policy } = makeService();
+      const { service, prisma } = makeService();
 
       await service.getCalendar(ADMIN_ID);
 
-      expect(policy.assertAdminTx).toHaveBeenCalledTimes(1);
-      expect(policy.assertAdminTx).toHaveBeenCalledWith(prisma, ADMIN_ID);
-      expect(policy.assertAdminTx.mock.invocationCallOrder[0]).toBeLessThan(
+      expect(prisma.usuarioRolAcceso.findFirst).toHaveBeenCalledTimes(1);
+      expect(prisma.usuarioRolAcceso.findFirst.mock.calls[0][0].where.idUsuario).toBe(ADMIN_ID);
+      expect(prisma.usuarioRolAcceso.findFirst.mock.invocationCallOrder[0]).toBeLessThan(
         prisma.sprint.findMany.mock.invocationCallOrder[0],
       );
     });
 
-    it('si el actor no es administrador propaga el 403 y no consulta ningún Sprint', async () => {
-      const { service, prisma, policy } = makeService([fila()]);
-      policy.assertAdminTx.mockRejectedValue(new ForbiddenException('Acceso restringido a administradores'));
+    it('si el actor no es administrador ni coordinador responde 403 y no consulta ningún Sprint', async () => {
+      const { service, prisma } = makeService([fila()]);
+      prisma.usuarioRolAcceso.findFirst.mockResolvedValue(null);
 
       await expect(service.getCalendar(99)).rejects.toBeInstanceOf(ForbiddenException);
       expect(prisma.sprint.findMany).not.toHaveBeenCalled();

@@ -270,7 +270,7 @@ function MembersGroupSection({
 
   return (
     <section aria-labelledby={headingId}>
-      <h2 id={headingId} className="mb-1 font-headline text-xl font-extrabold text-on-surface">
+      <h2 id={headingId} className="type-section mb-1">
         {title}
       </h2>
       <p className="mb-4 text-sm text-tertiary">{description}</p>

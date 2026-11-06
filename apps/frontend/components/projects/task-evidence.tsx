@@ -77,7 +77,7 @@ export function TaskEvidence({ idProyecto, idTarea, idUsuarioActual, esLider, pu
       className="rounded-[11px] border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-sm"
       aria-labelledby="evidencias-titulo"
     >
-      <h2 id="evidencias-titulo" className="mb-3 flex items-center gap-2 text-sm font-bold text-on-surface">
+      <h2 id="evidencias-titulo" className="type-section mb-3 flex items-center gap-2">
         <Paperclip className="size-4 text-tertiary" aria-hidden="true" />
         Evidencias{evidencias.length > 0 ? ` (${evidencias.length})` : ''}
       </h2>

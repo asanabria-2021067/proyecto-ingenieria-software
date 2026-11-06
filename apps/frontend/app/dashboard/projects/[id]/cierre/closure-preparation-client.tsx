@@ -493,7 +493,7 @@ export default function ClosurePreparationClient({ id }: Props) {
   if (isError || !proyecto) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-        <PageTitle className="text-lg font-bold text-on-surface">
+        <PageTitle>
           {getApiErrorStatus(error) === 404 ? 'Este proyecto ya no existe.' : 'No fue posible cargar el proyecto.'}
         </PageTitle>
         <div className="mt-5 flex justify-center gap-2">

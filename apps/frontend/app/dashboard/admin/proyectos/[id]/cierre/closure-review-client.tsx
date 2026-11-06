@@ -255,7 +255,7 @@ export interface ClosureReviewClientProps {
 export default function ClosureReviewClient({ id }: ClosureReviewClientProps) {
   // El coordinador vuelve a su propia bandeja de cierres, no a las de administración (403).
   const esCoordinador = useEsCoordinador();
-  const hrefCierres = esCoordinador ? '/dashboard/coordinador/cierres' : adminProjectsGroupHref('cierres');
+  const hrefCierres = adminProjectsGroupHref('cierres');
   const detalle = useAdminProjectDetail(id);
   const estado = detalle.data ? (isHistoricalDetail(detalle.data) ? detalle.data.resumen.estadoProyecto : detalle.data.resumen.estadoProyecto) : null;
   const enSolicitud = estado === 'EN_SOLICITUD_CIERRE';

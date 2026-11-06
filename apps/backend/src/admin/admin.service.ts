@@ -34,6 +34,7 @@ import { ACCOUNT_ACCESS_REVOKED, type AccountAccessRevokedEvent } from '../ws-au
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 import type { PeriodoMetricas } from './dto/metricas-query.dto';
 import { construirPeriodos, indicePeriodo } from './metricas-periodos.util';
+import { alcanceDelActor, proyectoEnAlcanceWhere } from '../coordinador/coordinador-alcance';
 
 const RESET_TOKEN_TTL = '1h';
 
@@ -73,7 +74,10 @@ export class AdminService {
   // ─── Estadísticas (Tarea 2) ───────────────────────────────────────────────────
 
   async getEstadisticas(userId: number) {
-    await this.requireAdmin(userId);
+    // Administrador: sin filtro. Coordinador: solo sus carreras. Otro rol: 403.
+    const alcance = await alcanceDelActor(this.prisma, userId);
+    const proyectoEn: Prisma.ProyectoWhereInput = alcance ? proyectoEnAlcanceWhere(alcance, userId) : {};
+    const usuarioEn: Prisma.UsuarioWhereInput = alcance ? { perfil: { idCarrera: { in: alcance } } } : {};
 
     // Proxy de fecha: fechaCreacion para nuevosInactivos, fechaActualizacion para proyectosCerrados
     const startOf2026 = new Date('2026-01-01T00:00:00.000Z');
@@ -91,19 +95,21 @@ export class AdminService {
         where: {
           estadoProyecto: { in: [...ADMIN_ACTIVE_PROJECT_STATES] },
           eliminadoEn: null,
+          ...proyectoEn,
         },
       }),
-      this.prisma.usuario.count({ where: { estado: EstadoUsuario.ACTIVO } }),
+      this.prisma.usuario.count({ where: { estado: EstadoUsuario.ACTIVO, ...usuarioEn } }),
       this.prisma.proyecto.count({
-        where: { estadoProyecto: EstadoProyecto.EN_REVISION, eliminadoEn: null },
+        where: { estadoProyecto: EstadoProyecto.EN_REVISION, eliminadoEn: null, ...proyectoEn },
       }),
       this.prisma.proyecto.count({
-        where: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE, eliminadoEn: null },
+        where: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE, eliminadoEn: null, ...proyectoEn },
       }),
-      this.prisma.usuario.count({ where: { estado: EstadoUsuario.BLOQUEADO } }),
+      // Los bloqueos son de administración: el coordinador no recibe ese conteo.
+      alcance ? Promise.resolve(0) : this.prisma.usuario.count({ where: { estado: EstadoUsuario.BLOQUEADO } }),
       // nuevosInactivos2026: usa fechaCreacion como proxy (no hay campo de cambio de estado)
       this.prisma.usuario.count({
-        where: { estado: EstadoUsuario.INACTIVO, fechaCreacion: { gte: startOf2026 } },
+        where: { estado: EstadoUsuario.INACTIVO, fechaCreacion: { gte: startOf2026 }, ...usuarioEn },
       }),
       // proyectosCerrados2026: usa fechaActualizacion como proxy de fecha de cierre
       this.prisma.proyecto.count({
@@ -111,12 +117,13 @@ export class AdminService {
           estadoProyecto: EstadoProyecto.CERRADO,
           fechaActualizacion: { gte: startOf2026 },
           eliminadoEn: null,
+          ...proyectoEn,
         },
       }),
     ]);
 
     const actividadReciente = await this.prisma.proyecto.findMany({
-      where: { eliminadoEn: null },
+      where: { eliminadoEn: null, ...proyectoEn },
       orderBy: { fechaActualizacion: 'desc' },
       take: 5,
       select: {
@@ -129,7 +136,7 @@ export class AdminService {
     });
 
     const perfilesRiesgo = await this.prisma.perfilEstudiante.findMany({
-      where: { semestre: { gte: 7 } },
+      where: { semestre: { gte: 7 }, ...(alcance ? { idCarrera: { in: alcance } } : {}) },
       select: {
         idUsuario: true,
         semestre: true,
@@ -196,34 +203,45 @@ export class AdminService {
   // ─── Métricas por periodo (HU-178, T-300) ─────────────────────────────────────
 
   async getMetricas(userId: number, periodo: PeriodoMetricas = 'semana') {
-    await this.requireAdmin(userId);
+    const alcance = await alcanceDelActor(this.prisma, userId);
+    const proyectoEn: Prisma.ProyectoWhereInput = alcance ? proyectoEnAlcanceWhere(alcance, userId) : {};
+    const usuarioEn: Prisma.UsuarioWhereInput = alcance ? { perfil: { idCarrera: { in: alcance } } } : {};
 
     const periodos = construirPeriodos(periodo);
     const rango = { gte: periodos[0].inicio, lt: periodos[periodos.length - 1].fin };
 
     const [usuariosNuevos, usuariosActivos, proyectos, tareas, horas] = await Promise.all([
       this.prisma.usuario.findMany({
-        where: { fechaCreacion: rango },
+        where: { fechaCreacion: rango, ...usuarioEn },
         select: { fechaCreacion: true },
       }),
       // fechaUltimaSesion solo guarda el último login: cada usuario cuenta
       // una vez, en el periodo de su sesión más reciente.
       this.prisma.usuario.findMany({
-        where: { fechaUltimaSesion: rango },
+        where: { fechaUltimaSesion: rango, ...usuarioEn },
         select: { fechaUltimaSesion: true },
       }),
       this.prisma.proyecto.findMany({
-        where: { fechaCreacion: rango, eliminadoEn: null },
+        where: { fechaCreacion: rango, eliminadoEn: null, ...proyectoEn },
         select: { fechaCreacion: true },
       }),
       // Tarea no tiene fecha de completado: actualizadaEn es el proxy, igual
       // que fechaActualizacion para proyectosCerrados2026.
       this.prisma.tarea.findMany({
-        where: { estadoTarea: EstadoTarea.HECHO, eliminadoEn: null, actualizadaEn: rango },
+        where: {
+          estadoTarea: EstadoTarea.HECHO,
+          eliminadoEn: null,
+          actualizadaEn: rango,
+          ...(alcance ? { proyecto: proyectoEn } : {}),
+        },
         select: { actualizadaEn: true },
       }),
       this.prisma.horasParticipacion.findMany({
-        where: { estadoHoras: EstadoHoras.APROBADA, fechaAprobacion: rango },
+        where: {
+          estadoHoras: EstadoHoras.APROBADA,
+          fechaAprobacion: rango,
+          ...(alcance ? { participacion: { rolProyecto: { proyecto: proyectoEn } } } : {}),
+        },
         select: { fechaAprobacion: true, horasAprobadas: true },
       }),
     ]);
@@ -767,7 +785,22 @@ export class AdminService {
 
   /** MEJ-69: todo lo que espera una decision del administrador, con su contador. */
   async getPendientes(callerId: number) {
-    await this.requireAdmin(callerId);
+    const alcance = await alcanceDelActor(this.prisma, callerId);
+    if (alcance) {
+      // El coordinador solo decide revisiones y cierres de sus carreras.
+      const enAlcance = proyectoEnAlcanceWhere(alcance, callerId);
+      const [revisiones, cierres] = await Promise.all([
+        this.prisma.proyecto.count({ where: { estadoProyecto: EstadoProyecto.EN_REVISION, eliminadoEn: null, ...enAlcance } }),
+        this.prisma.proyecto.count({ where: { estadoProyecto: EstadoProyecto.EN_SOLICITUD_CIERRE, eliminadoEn: null, ...enAlcance } }),
+      ]);
+      return {
+        total: revisiones + cierres,
+        items: [
+          { clave: 'revisiones', total: revisiones },
+          { clave: 'cierres', total: cierres },
+        ],
+      };
+    }
     const [cuentas, revisiones, cierres, recuperaciones, apelaciones, desactivaciones, reportes] = await Promise.all([
       this.prisma.usuario.count({ where: { estado: EstadoUsuario.PENDIENTE_VERIFICACION } }),
       this.prisma.proyecto.count({ where: { estadoProyecto: EstadoProyecto.EN_REVISION, eliminadoEn: null } }),

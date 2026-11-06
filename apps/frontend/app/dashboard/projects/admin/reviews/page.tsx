@@ -143,11 +143,7 @@ export default function AdminReviewsInboxPage() {
   return (
     <>
       <div className={ADMIN_PAGE}>
-        {!esCoordinador ? (
-          <AdminBreadcrumb seccion="Proyectos" seccionHref="/dashboard/admin/proyectos?grupo=activos" pagina="Solicitudes de publicación" />
-        ) : (
-          <AdminBreadcrumb seccion="Coordinación" pagina="Solicitudes de publicación" />
-        )}
+        <AdminBreadcrumb seccion="Proyectos" seccionHref="/dashboard/admin/proyectos?grupo=activos" pagina="Solicitudes de publicación" />
         {/* Header */}
         <section className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">

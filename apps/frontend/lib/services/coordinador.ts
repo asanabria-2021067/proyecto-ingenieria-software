@@ -13,14 +13,6 @@ export interface MiAlcance {
   regla: string;
 }
 
-export type ClavePendienteCoordinador = 'revisiones' | 'cierres';
-
-/** GET /coordinador/pendientes: conteos filtrados al alcance del coordinador. */
-export interface PendientesCoordinador {
-  total: number;
-  items: Array<{ clave: ClavePendienteCoordinador; total: number }>;
-}
-
 /** GET|PUT /admin/coordinadores/:idUsuario/alcance. */
 export interface AlcanceCoordinador {
   idUsuario: number;
@@ -36,8 +28,6 @@ export interface GuardarAlcancePayload {
 }
 
 export const getMiAlcance = () => apiFetch<MiAlcance>('/coordinador/mi-alcance');
-
-export const getPendientesCoordinador = () => apiFetch<PendientesCoordinador>('/coordinador/pendientes');
 
 export const getAlcanceCoordinador = (idUsuario: number) =>
   apiFetch<AlcanceCoordinador>(`/admin/coordinadores/${idUsuario}/alcance`);

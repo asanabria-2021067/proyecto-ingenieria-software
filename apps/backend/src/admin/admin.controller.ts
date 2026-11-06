@@ -39,11 +39,13 @@ export class AdminController {
   ) {}
 
   @Get('estadisticas')
+  @Roles('administrador', 'coordinador_academico')
   getEstadisticas(@CurrentUser() user: { userId: number }) {
     return this.adminService.getEstadisticas(user.userId);
   }
 
   @Get('metricas')
+  @Roles('administrador', 'coordinador_academico')
   getMetricas(
     @CurrentUser() user: { userId: number },
     @Query() query: MetricasQueryDto,
@@ -52,11 +54,13 @@ export class AdminController {
   }
 
   @Get('metricas/entidades')
+  @Roles('administrador', 'coordinador_academico')
   getMetricasEntidades(@CurrentUser() user: { userId: number }) {
     return this.entidades.metricas(user.userId);
   }
 
   @Get('pendientes')
+  @Roles('administrador', 'coordinador_academico')
   getPendientes(@CurrentUser() user: { userId: number }) {
     return this.adminService.getPendientes(user.userId);
   }

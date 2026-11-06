@@ -170,10 +170,7 @@ describeIntegration('GET /admin/sprints/calendario — autorización, población
       new ProjectReadPolicyService(db),
     );
     const observadoDb = observado as unknown as PrismaService;
-    const calendar = new AdminSprintsCalendarService(
-      observadoDb,
-      new ProjectPolicyService(new ProjectIdResolverService(observadoDb)),
-    );
+    const calendar = new AdminSprintsCalendarService(observadoDb);
     // Lo que `emitDecoratorMetadata` genera en el build real.
     Reflect.defineMetadata(PARAMTYPES_METADATA, [Reflector, PrismaService], RolesGuard);
     harness = await startIntegrationHttpHarness({

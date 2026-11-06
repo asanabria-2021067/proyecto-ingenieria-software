@@ -373,7 +373,7 @@ export default function MyProjectViewClient({ id }: Props) {
               <p className="type-meta font-black uppercase tracking-widest text-text-primary">
                 Mis Proyectos · Editando correcciones
               </p>
-              <PageTitle className="text-lg font-black text-on-surface leading-tight truncate">
+              <PageTitle className="truncate">
                 {proyecto?.tituloProyecto ?? 'Mi proyecto'}
               </PageTitle>
             </div>
@@ -392,7 +392,7 @@ export default function MyProjectViewClient({ id }: Props) {
               <p className="text-[10px] font-black uppercase tracking-widest text-primary">
                 Mis Proyectos · Solicitud
               </p>
-              <PageTitle className="text-lg font-black text-on-surface leading-tight truncate">
+              <PageTitle className="truncate">
                 {proyecto?.tituloProyecto ?? 'Mi solicitud'}
               </PageTitle>
               {revisionesRevisadas.length > 0 && (
@@ -759,7 +759,7 @@ export default function MyProjectViewClient({ id }: Props) {
                 <p className="text-[10px] font-black uppercase tracking-widest text-primary">
                   Historial · Solo lectura · Revisión {selectedRevision.numeroEnvio}
                 </p>
-                <PageTitle className="text-lg font-black text-on-surface leading-tight truncate">
+                <PageTitle className="truncate">
                   {snap?.tituloProyecto ?? proyecto.tituloProyecto}
                 </PageTitle>
               </div>

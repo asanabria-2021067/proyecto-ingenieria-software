@@ -113,7 +113,7 @@ export default function ProjectPendingExitRequestsPage() {
 
           <section className="rounded-xl border border-outline-variant bg-surface-container-lowest p-4 shadow-sm md:p-5">
             <div className="mb-4 flex flex-wrap items-center gap-3">
-              <h2 className="font-headline text-xl font-extrabold text-on-surface">Solicitudes recibidas</h2>
+              <h2 className="type-section">Solicitudes recibidas</h2>
               <span className="pill pill-neutral">
                 {isLoading ? 'Cargando' : `${requests.length} pendientes`}
               </span>

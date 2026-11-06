@@ -105,7 +105,7 @@ export default function AdminHorasPage() {
 
         <HorasTotalesAsociacion totales={totalesAsociacion} />
 
-        {!esCoordinador && <HorasComparativo />}
+        <HorasComparativo />
 
         {central.isError ? (
           <Empty tone="danger" role="alert">

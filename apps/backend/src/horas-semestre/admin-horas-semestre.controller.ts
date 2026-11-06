@@ -34,13 +34,11 @@ export class AdminHorasSemestreController {
   }
 
   @Get('comparativo')
-  @Roles('administrador')
   comparativo(@CurrentUser() user: { userId: number }) {
     return this.service.comparativo(user.userId);
   }
 
   @Get('resumen-asociaciones')
-  @Roles('administrador')
   resumenAsociaciones(@CurrentUser() user: { userId: number }, @Query() query: HorasCentralQueryDto) {
     return this.service.resumenPorAsociacion(user.userId, query);
   }

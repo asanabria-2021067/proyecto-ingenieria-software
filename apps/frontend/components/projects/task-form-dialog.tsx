@@ -377,6 +377,7 @@ function TaskFormDialogContent({
               idProyecto={idProyecto}
               mode={mode}
               idTareaActual={task?.idTarea ?? null}
+              isLeader={isLeader}
               value={extras}
               onChange={setExtras}
             />

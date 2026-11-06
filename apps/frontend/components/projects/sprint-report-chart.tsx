@@ -101,7 +101,7 @@ export function SprintReportChart({ titulo, datos, ejeX, series, apilado = false
 
   return (
     <section aria-label={titulo} className="card-base">
-      <h2 className="mb-3 font-headline text-lg font-bold text-on-surface">{titulo}</h2>
+      <h2 className="type-section mb-3">{titulo}</h2>
       {hayDatos ? (
         <>
           <div role="img" aria-label={`Gráfica: ${titulo}`}>

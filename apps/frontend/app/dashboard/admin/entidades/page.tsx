@@ -18,6 +18,7 @@ import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tag } from '@/components/ui/tag';
 import { useResumenAsociaciones } from '@/hooks/use-admin-horas';
+import { useEsCoordinador } from '@/hooks/use-can';
 import { adminEntidadesQueryKey } from '@/lib/query-keys/admin-accounts';
 import { getAdminMetricasEntidades } from '@/lib/services/admin';
 
@@ -77,6 +78,7 @@ function Seccion({ id, titulo, children }: { id: string; titulo: string; childre
 
 function ResumenAsociaciones() {
   const { data, isLoading, isError, refetch } = useResumenAsociaciones();
+  const esCoordinador = useEsCoordinador();
   const lista = data?.asociaciones ?? [];
   return (
     <Seccion id="resumen-asociaciones" titulo="Resumen por asociación">
@@ -91,13 +93,17 @@ function ResumenAsociaciones() {
           </EmptyMedia>
           <EmptyHeader>
             <EmptyTitle>Aún no hay asociaciones activas</EmptyTitle>
-            <EmptyDescription>Crea una asociación y nombra su junta para ver su resumen aquí.</EmptyDescription>
+            <EmptyDescription>
+              {esCoordinador ? 'Ninguna asociación activa cubre tus carreras.' : 'Crea una asociación y nombra su junta para ver su resumen aquí.'}
+            </EmptyDescription>
           </EmptyHeader>
-          <EmptyContent>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard/admin/asociaciones">Ir a Asociaciones y juntas</Link>
-            </Button>
-          </EmptyContent>
+          {!esCoordinador && (
+            <EmptyContent>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/dashboard/admin/asociaciones">Ir a Asociaciones y juntas</Link>
+              </Button>
+            </EmptyContent>
+          )}
         </Empty>
       ) : (
         <>

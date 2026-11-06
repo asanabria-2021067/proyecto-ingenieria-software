@@ -80,7 +80,7 @@ describe('FG10-C02 · A11Y-06: jerarquía de encabezados de «Editar perfil»', 
   });
 
   it('los títulos conservan sus clases: el cambio de nivel no altera el aspecto', () => {
-    expect(pagina.match(/<h2 className="text-xl font-black text-on-surface font-headline border-b border-outline-variant\/30 pb-3">/g)).toHaveLength(6);
+    expect(pagina.match(/<h2 className="type-section border-b border-outline-variant\/30 pb-3">/g)).toHaveLength(6);
   });
 });
 

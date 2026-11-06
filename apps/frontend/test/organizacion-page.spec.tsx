@@ -23,6 +23,7 @@ vi.mock('@/components/organizations/boton-seguir', () => ({
   useSeguirOrganizacion: () => ({ siguiendo: false, pendiente: false, alternar: () => {} }),
 }));
 vi.mock('@/components/organizations/org-chat', () => ({ OrgChat: () => null }));
+vi.mock('@/components/anuncios/anuncios-entidad', () => ({ AnunciosEntidad: () => null }));
 vi.mock('@/lib/mensajes', () => ({
   aviso: { exito: vi.fn(), error: vi.fn(), advertencia: vi.fn() },
   confirmar: vi.fn().mockResolvedValue(true),
@@ -221,12 +222,22 @@ describe('pagina de la organizacion', () => {
     render(<OrganizacionPage />);
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Anuncios' }));
-    expect(estado.replace).toHaveBeenCalledWith('?tab=anuncios', { scroll: false });
+    expect(window.location.search).toBe('?tab=anuncios');
+    expect(estado.replace).not.toHaveBeenCalled();
+    expect(screen.getByRole('tab', { name: 'Anuncios' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('?tab=chat sin ser miembro cae en Proyectos en vez de dejar la pestaña vacía', () => {
     estado.org = orgCon(null);
     estado.query = 'tab=chat';
+    render(<OrganizacionPage />);
+
+    expect(screen.getByRole('tab', { name: /Proyectos/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('?tab invalido o de otro rol cae en Proyectos', () => {
+    estado.org = orgCon('LECTURA');
+    estado.query = 'tab=pendientes';
     render(<OrganizacionPage />);
 
     expect(screen.getByRole('tab', { name: /Proyectos/ })).toHaveAttribute('aria-selected', 'true');

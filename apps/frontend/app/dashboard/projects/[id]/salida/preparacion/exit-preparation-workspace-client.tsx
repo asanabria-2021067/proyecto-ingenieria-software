@@ -553,7 +553,7 @@ function ExitPreparationWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleD
 
             <div className="min-h-0 overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm md:p-5">
               <div className="mb-5 flex items-center gap-2.5">
-                <h2 className="text-xl font-bold text-on-surface md:text-[22px]">
+                <h2 className="type-section">
                   Mis responsabilidades para salida
                 </h2>
                 <span className="pill pill-sm pill-green">

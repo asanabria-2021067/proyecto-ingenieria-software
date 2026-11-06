@@ -611,7 +611,7 @@ export function TaskBoard({
         {mostrarToolbar && (
         <div className="flex flex-col gap-3 pb-1 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h2 className="text-xl font-bold text-on-surface md:text-[22px]">
+            <h2 className="type-section">
               Tablero de tareas
             </h2>
             <span className="pill pill-sm pill-green">

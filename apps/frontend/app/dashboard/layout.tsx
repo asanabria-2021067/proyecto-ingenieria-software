@@ -19,15 +19,16 @@ function isAdminOnlyRoute(pathname: string) {
   );
 }
 
-// Pantallas que el backend abre al coordinador académico dentro del árbol administrativo
-// (revisiones de publicación, horas por semestre, detalle y revisión de cierre). El coordinador las ve
-// con su propio shell; el resto de `/dashboard/admin/*` sigue siendo solo de administración.
+// Pantallas de administración que el coordinador académico también abre, con los datos de sus carreras:
+// bandeja única, proyectos (y su detalle y revisión de cierre), calendario de sprints, horas, tendencias y
+// entidades, más las revisiones de publicación. El resto de `/dashboard/admin/*` es solo de administración.
+const COORDINADOR_ADMIN_SEGMENTS = ['bandeja', 'proyectos', 'sprints', 'horas', 'metricas', 'entidades'];
 function isCoordinadorSharedRoute(pathname: string) {
-  return (
-    pathname === '/dashboard/projects/admin/reviews' ||
-    pathname === '/dashboard/admin/horas' ||
-    /^\/dashboard\/admin\/proyectos\/\d+(\/cierre)?$/.test(pathname)
-  );
+  if (pathname === '/dashboard/projects/admin/reviews') return true;
+  const [, , , seccion, ...resto] = pathname.split('/');
+  if (pathname !== '/dashboard/admin' && !pathname.startsWith('/dashboard/admin/')) return false;
+  if (seccion === 'proyectos') return resto.length === 0 || /^\d+(\/cierre)?$/.test(resto.join('/'));
+  return COORDINADOR_ADMIN_SEGMENTS.includes(seccion) && resto.length === 0;
 }
 
 // Rutas de cualquier usuario que el coordinador ve con su shell (mensajes y calendario; perfil y cuenta, abajo).

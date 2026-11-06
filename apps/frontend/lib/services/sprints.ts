@@ -25,22 +25,10 @@ export function getSprintDetail(idProyecto: number, idSprint: number): Promise<S
  * posterior a hoy y a lo sumo 90 días después. `fechaInicio` la fija el
  * servidor al iniciar; nunca viaja en el cuerpo.
  */
-export function startSprint(idProyecto: number, fechaFinPlaneada: string, objetivo?: string): Promise<SprintDto> {
+export function startSprint(idProyecto: number, fechaFinPlaneada: string): Promise<SprintDto> {
   return apiFetch<SprintDto>(`/proyectos/${idProyecto}/sprints`, {
     method: 'POST',
-    body: JSON.stringify(objetivo ? { fechaFinPlaneada, objetivo } : { fechaFinPlaneada }),
-  });
-}
-
-/** MEJ-117 — `PATCH /proyectos/:id/sprints/:sprintId/objetivo`; `null` borra el objetivo. */
-export function updateSprintObjetivo(
-  idProyecto: number,
-  idSprint: number,
-  objetivo: string | null,
-): Promise<{ idSprint: number; objetivo: string | null }> {
-  return apiFetch(`/proyectos/${idProyecto}/sprints/${idSprint}/objetivo`, {
-    method: 'PATCH',
-    body: JSON.stringify({ objetivo }),
+    body: JSON.stringify({ fechaFinPlaneada }),
   });
 }
 

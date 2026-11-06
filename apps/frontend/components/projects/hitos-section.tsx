@@ -607,7 +607,7 @@ export function HitosSection({
   if (hitos.length === 0 && tareasSinHitoTotales.length === 0) {
     return (
       <div className="rounded-[10px] border border-dashed border-outline-variant/50 bg-surface-container-low px-6 py-12 text-center">
-        <h2 className="text-base font-bold text-on-surface">Aún no hay hitos registrados</h2>
+        <h2 className="type-section">Aún no hay hitos registrados</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-on-surface-variant">
           Los hitos permiten organizar las tareas del proyecto por etapas y objetivos.
         </p>
@@ -618,7 +618,7 @@ export function HitosSection({
   return (
     <div className="min-h-0">
       {!filtroPorHitoSinHito && hitosVisibles.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:max-2xl:[&>:last-child:nth-child(odd)]:col-span-2 2xl:grid-cols-4">
           {hitosVisibles.map(({ hito, tareasTotales, tareasVisibles }, index) => (
             <MilestoneCard
               key={hito.idHito}
@@ -638,7 +638,7 @@ export function HitosSection({
 
       {!filtroPorHitoSinHito && hitos.length > 0 && hitosVisibles.length === 0 && (
         <div className="rounded-[10px] border border-dashed border-outline-variant/50 bg-surface-container-low px-6 py-10 text-center">
-          <h2 className="text-base font-bold text-on-surface">
+          <h2 className="type-section">
             No hay hitos con tareas que coincidan con los filtros.
           </h2>
           {onLimpiarFiltros && (
@@ -657,7 +657,7 @@ export function HitosSection({
 
       {hitos.length === 0 && tareasSinHitoTotales.length > 0 && !filtroPorHitoSinHito && (
         <div className="rounded-[10px] border border-dashed border-outline-variant/50 bg-surface-container-low px-6 py-8 text-center">
-          <h2 className="text-base font-bold text-on-surface">Aún no hay hitos registrados</h2>
+          <h2 className="type-section">Aún no hay hitos registrados</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-on-surface-variant">
             Los hitos permiten organizar las tareas del proyecto por etapas y objetivos.
           </p>

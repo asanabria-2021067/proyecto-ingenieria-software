@@ -36,7 +36,7 @@ export function RequestInboxSection({
 }) {
   return (
     <section>
-      <h2 className="mb-4 font-headline text-lg font-black tracking-tight text-on-surface">{title}</h2>
+      <h2 className="type-section mb-4">{title}</h2>
       {isEmpty ? (
         <div className="flex flex-col items-center justify-center rounded-card border border-outline-variant bg-surface-container-lowest py-12 text-center">
           <CheckCheck className="mb-3 h-10 w-10 text-primary opacity-40" aria-hidden="true" />

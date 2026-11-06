@@ -83,7 +83,7 @@ export default function ReportesProyectoPage() {
               ) : (
                 <FileSpreadsheet className="mb-3 h-8 w-8 text-primary" aria-hidden="true" />
               )}
-              <h2 className="mb-1 font-headline text-lg font-bold text-on-surface">CSV de miembros y horas</h2>
+              <h2 className="type-section mb-1">CSV de miembros y horas</h2>
               <p className="text-sm text-tertiary">
                 Un integrante por fila, con sus horas confirmadas y pendientes. Se abre correctamente en
                 Excel en español, con acentos y ñ intactos.
@@ -100,7 +100,7 @@ export default function ReportesProyectoPage() {
               ) : (
                 <FileText className="mb-3 h-8 w-8 text-primary" aria-hidden="true" />
               )}
-              <h2 className="mb-1 font-headline text-lg font-bold text-on-surface">Reporte PDF del proyecto</h2>
+              <h2 className="type-section mb-1">Reporte PDF del proyecto</h2>
               <p className="text-sm text-tertiary">
                 Documento listo para entregar: datos del proyecto, líder, miembros, horas y avance por
                 Sprint. Incluye el burndown de cada Sprint cerrado (disponible desde que se cierra el
