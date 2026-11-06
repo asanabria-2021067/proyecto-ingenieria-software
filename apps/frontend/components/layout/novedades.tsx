@@ -32,7 +32,12 @@ export function Novedades() {
     }
     toast('Qué hay de nuevo', {
       description: `Novedades de ${novedades.id}.`,
-      duration: 10_000,
+      // FIX-42: abajo-izquierda para no tapar la cabecera (el Toaster global va arriba-derecha).
+      // md+: margen para librar el sidebar (231px, con el menu de cuenta abajo); movil: sube sobre la
+      // barra inferior (h-16) y el boton del chat (h-10, abajo a la derecha).
+      position: 'bottom-left',
+      className: 'md:ml-52 max-md:mb-28',
+      duration: 8_000,
       action: { label: 'Ver', onClick: () => setOpen(true) },
     });
   }, []);
