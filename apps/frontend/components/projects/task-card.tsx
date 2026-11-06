@@ -209,15 +209,19 @@ export function TaskCard({
         )}
 
         <h4 className="min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={onAbrirDetalles}
-            title={tarea.tituloTarea}
-            aria-label={`Abrir detalles de "${tarea.tituloTarea}"`}
-            className="line-clamp-2 w-full text-left text-sm font-semibold leading-snug text-on-surface hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
-          >
-            {tarea.tituloTarea}
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onAbrirDetalles}
+                aria-label={`Abrir detalles de "${tarea.tituloTarea}"`}
+                className="line-clamp-2 w-full break-words text-left text-sm font-semibold leading-snug text-on-surface hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+              >
+                {tarea.tituloTarea}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs break-words">{tarea.tituloTarea}</TooltipContent>
+          </Tooltip>
         </h4>
       </div>
 
