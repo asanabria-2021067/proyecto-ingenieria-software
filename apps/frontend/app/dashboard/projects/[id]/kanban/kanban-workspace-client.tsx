@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FileText, Kanban, Keyboard, List, MousePointerClick, Plus, Table2, Tags, UserCheck } from 'lucide-react';
+import { Kanban, Keyboard, List, MousePointerClick, Plus, Table2, Tags, UserCheck } from 'lucide-react';
 import { useProjectDetail } from '@/hooks/use-project-detail';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 import { useProjectLabels } from '@/hooks/use-project-labels';
@@ -33,13 +33,11 @@ import { TaskListView } from '@/components/projects/task-list-view';
 import { TaskTableView } from '@/components/projects/task-table-view';
 import { SEGMENTED_ITEM_CLASS, ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { StartSprintButton } from '@/components/projects/start-sprint-button';
-import { SprintObjetivo } from '@/components/projects/sprint-objetivo';
 import { SprintReconocimientos, candidatosAReconocer } from '@/components/projects/sprint-extras';
 import { HitosSection } from '@/components/projects/hitos-section';
 import { ProjectLabelsDrawer } from '@/components/projects/project-labels-drawer';
 import { CreateMilestoneDialog } from '@/components/projects/create-milestone-dialog';
 import { TaskFormDialog } from '@/components/projects/task-form-dialog';
-import { TaskTemplatesDialog } from '@/components/projects/task-templates-dialog';
 import { soloMisTareas } from '@/lib/tasks/extras';
 import { TaskBulkActionsBar } from '@/components/projects/task-bulk-actions-bar';
 import {
@@ -277,7 +275,6 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
   const [atajosAbierto, setAtajosAbierto] = useState(false);
   // MEJ-51: «Solo mis tareas» (asignación activa del usuario actual).
   const [soloMias, setSoloMias] = useState(false);
-  const [plantillasAbierto, setPlantillasAbierto] = useState(false);
   const [crearAbierto, setCrearAbierto] = useState(false);
   const [etiquetasAbierto, setEtiquetasAbierto] = useState(false);
   const [crearHitoAbierto, setCrearHitoAbierto] = useState(false);
@@ -469,9 +466,9 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             </TabsTrigger>
           </TabsList>
 
-          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-xl font-bold text-on-surface md:text-[22px]">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="whitespace-nowrap text-xl font-bold text-on-surface md:text-[22px]">
                 {activeTab === 'hitos' ? 'Hitos' : 'Tablero de tareas'}
               </h2>
               <span className="pill pill-sm pill-green">
@@ -483,9 +480,6 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                   Sincronizando...
                 </span>
               )}
-            </div>
-
-            <div id="tour-kanban-filtros" className="flex flex-wrap items-center gap-2 lg:justify-end">
               {activeTab === 'tablero' && (
                 <ToggleGroup
                   type="single"
@@ -494,7 +488,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                   value={vista}
                   onValueChange={(valor) => valor && setVista(valor as VistaTablero)}
                   aria-label="Vista del tablero"
-                  className="w-full sm:w-auto"
+                  className="w-auto"
                 >
                   <ToggleGroupItem value="kanban" aria-label="Vista Kanban" className={`${SEGMENTED_ITEM_CLASS} h-10 gap-1.5 px-3`}>
                     <Kanban className="size-3.5" aria-hidden="true" />
@@ -510,7 +504,56 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                   </ToggleGroupItem>
                 </ToggleGroup>
               )}
+            </div>
 
+            <div className="flex flex-wrap items-center gap-2">
+              {isLeader && <BorrarEjemploBoton idProyecto={idProyecto} />}
+
+              {isLeader && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEtiquetasAbierto(true)}
+                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 bg-surface-container-lowest sm:w-auto md:min-w-40`}
+                >
+                  <Tags className="size-3.5" aria-hidden="true" />
+                  Gestionar etiquetas
+                </Button>
+              )}
+              {/* Acciones de creación juntas: «Agregar hito» va pegado a
+                  «Nueva tarea», con el mismo gap del grupo. */}
+              {puedeCrear && activeTab === 'hitos' && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setCrearHitoAbierto(true)}
+                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
+                >
+                  <Plus className="size-3.5" aria-hidden="true" />
+                  Agregar hito
+                </Button>
+              )}
+              {/* Sin Sprint de trabajo (F2), la creación de tareas queda
+                  bloqueada: este botón es la única entrada que abre
+                  TaskFormDialog en modo creación (`setCrearAbierto`), así
+                  que ocultarlo cierra por completo esa vía. */}
+              {puedeCrear && haySprintDeTrabajo && (
+                <Button
+                  id="tour-kanban-nueva"
+                  type="button"
+                  size="sm"
+                  onClick={() => setCrearAbierto(true)}
+                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
+                >
+                  <Plus className="size-3.5" aria-hidden="true" />
+                  Nueva tarea
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div id="tour-kanban-filtros" className="mb-5 flex flex-wrap items-center gap-2">
               <Select value={filtroResponsable} onValueChange={setFiltroResponsable}>
                 <SelectTrigger
                   size="sm"
@@ -602,64 +645,7 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
                 </Button>
               )}
 
-              {isLeader && <BorrarEjemploBoton idProyecto={idProyecto} />}
-
-              {isLeader && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPlantillasAbierto(true)}
-                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 bg-surface-container-lowest sm:w-auto`}
-                >
-                  <FileText className="size-3.5" aria-hidden="true" />
-                  Plantillas
-                </Button>
-              )}
-
-              {isLeader && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEtiquetasAbierto(true)}
-                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 bg-surface-container-lowest sm:w-auto md:min-w-40`}
-                >
-                  <Tags className="size-3.5" aria-hidden="true" />
-                  Gestionar etiquetas
-                </Button>
-              )}
-              {/* Acciones de creación juntas: «Agregar hito» va pegado a
-                  «Nueva tarea», con el mismo gap del grupo. */}
-              {puedeCrear && activeTab === 'hitos' && (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setCrearHitoAbierto(true)}
-                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
-                >
-                  <Plus className="size-3.5" aria-hidden="true" />
-                  Agregar hito
-                </Button>
-              )}
-              {/* Sin Sprint de trabajo (F2), la creación de tareas queda
-                  bloqueada: este botón es la única entrada que abre
-                  TaskFormDialog en modo creación (`setCrearAbierto`), así
-                  que ocultarlo cierra por completo esa vía. */}
-              {puedeCrear && haySprintDeTrabajo && (
-                <Button
-                  id="tour-kanban-nueva"
-                  type="button"
-                  size="sm"
-                  onClick={() => setCrearAbierto(true)}
-                  className={`${WORKSPACE_CONTROL_CLASS} w-full gap-1.5 border-primary bg-primary text-on-primary hover:bg-primary/90 sm:w-auto md:min-w-36`}
-                >
-                  <Plus className="size-3.5" aria-hidden="true" />
-                  Nueva tarea
-                </Button>
-              )}
             </div>
-          </div>
 
           {puedeSeleccionar && tasks.length > 0 && (
             <p
@@ -697,14 +683,6 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
               </div>
             ) : haySprintDeTrabajo ? (
               <>
-              {sprintActual && (
-                <SprintObjetivo
-                  idProyecto={idProyecto}
-                  idSprint={sprintActual.idSprint}
-                  objetivo={sprintActual.objetivo}
-                  puedeEditar={isLeader}
-                />
-              )}
               {soloMias && !isLoadingTasks && !isErrorTasks && tasks.length > 0 && tareasVisibles.length === 0 && (
                 <Empty tone="muted" size="compact" role="status" className="mb-4">
                   <EmptyMedia variant="compact" className="size-10 rounded-control border-transparent text-text-secondary">
@@ -842,9 +820,6 @@ function KanbanWorkspaceView({ proyecto }: { proyecto: ProyectoDetalleDTO }) {
             />
           </TabsContent>
         </Tabs>
-        {isLeader && (
-          <TaskTemplatesDialog idProyecto={idProyecto} open={plantillasAbierto} onOpenChange={setPlantillasAbierto} />
-        )}
         <TaskFormDialog
           open={crearAbierto}
           mode="create"

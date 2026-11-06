@@ -1,6 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TaskTemplatesDialog } from '@/components/projects/task-templates-dialog';
 import { useFormContext } from 'react-hook-form';
 import { Label } from '@/components/ui/label';
 import {
@@ -32,10 +35,13 @@ interface Props {
   onChange: (value: TaskExtrasValue) => void;
   /** En la creación por pasos: la plantilla va primero (rellena el título) y bloqueo/repetición con la planificación. */
   parte?: 'plantilla' | 'planificacion';
+  /** Solo el líder gestiona las plantillas del proyecto. */
+  isLeader?: boolean;
 }
 
 /** MEJ-48 (bloqueada por), MEJ-47 (repetición) y MEJ-52 (plantilla) dentro del formulario de tarea. */
-export function TaskFormExtras({ idProyecto, mode, idTareaActual, value, onChange, parte }: Props) {
+export function TaskFormExtras({ idProyecto, mode, idTareaActual, value, onChange, parte, isLeader }: Props) {
+  const [gestionAbierta, setGestionAbierta] = useState(false);
   const form = useFormContext<TaskFormValues>();
   const { tasks } = useProjectTasks(idProyecto);
   const { plantillas } = useTaskTemplates(idProyecto, mode === 'create');
@@ -57,10 +63,18 @@ export function TaskFormExtras({ idProyecto, mode, idTareaActual, value, onChang
     <div className="mt-6 space-y-4 border-t border-outline-variant/40 pt-5">
       {mode === 'create' && parte !== 'planificacion' && (
         <div className="space-y-1.5">
-          <Label htmlFor="tarea-plantilla">Plantilla</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="tarea-plantilla">Plantilla</Label>
+            {isLeader && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setGestionAbierta(true)} className="h-7 gap-1.5 px-2 text-xs">
+                <FileText className="size-3.5" aria-hidden="true" />
+                Gestionar plantillas
+              </Button>
+            )}
+          </div>
           {plantillas.length === 0 ? (
             <p className="text-xs text-tertiary">
-              El proyecto aún no tiene plantillas. El líder puede crearlas desde «Plantillas» en el tablero.
+              El proyecto aún no tiene plantillas. {isLeader ? 'Crea la primera con «Gestionar plantillas».' : 'Pídele al líder que cree alguna.'}
             </p>
           ) : (
             <>
@@ -83,6 +97,12 @@ export function TaskFormExtras({ idProyecto, mode, idTareaActual, value, onChang
               )}
             </>
           )}
+        </div>
+      )}
+      {mode === 'create' && isLeader && parte !== 'planificacion' && (
+        // El diálogo se portalea pero sus eventos suben por React hasta el <form> de la tarea.
+        <div onSubmit={(e) => e.stopPropagation()}>
+          <TaskTemplatesDialog idProyecto={idProyecto} open={gestionAbierta} onOpenChange={setGestionAbierta} />
         </div>
       )}
 

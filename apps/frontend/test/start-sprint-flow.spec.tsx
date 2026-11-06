@@ -209,7 +209,7 @@ describe('StartSprintButton — confirmación', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(startSprintMock).toHaveBeenCalledTimes(1);
-    expect(startSprintMock).toHaveBeenCalledWith(32, fecha, undefined);
+    expect(startSprintMock).toHaveBeenCalledWith(32, fecha);
   });
 
   it('al iniciar invalida la lista de Sprints del proyecto para que el Tablero se actualice', async () => {

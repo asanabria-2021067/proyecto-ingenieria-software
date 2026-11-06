@@ -21,7 +21,6 @@ import {
   getSprintDetail,
   getSprintsAnalytics,
   startSprint,
-  updateSprintObjetivo,
 } from '@/lib/services/sprints';
 import type {
   SprintAnalyticsDto,
@@ -78,21 +77,8 @@ export function useStartSprint(idProyecto: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ fechaFinPlaneada, objetivo }: { fechaFinPlaneada: string; objetivo?: string }) =>
-      startSprint(idProyecto, fechaFinPlaneada, objetivo),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectSprintsQueryKey(idProyecto) });
-    },
-  });
-}
-
-/** MEJ-117: edita el objetivo del Sprint (líder). */
-export function useUpdateSprintObjetivo(idProyecto: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ idSprint, objetivo }: { idSprint: number; objetivo: string | null }) =>
-      updateSprintObjetivo(idProyecto, idSprint, objetivo),
+    mutationFn: ({ fechaFinPlaneada }: { fechaFinPlaneada: string }) =>
+      startSprint(idProyecto, fechaFinPlaneada),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectSprintsQueryKey(idProyecto) });
     },

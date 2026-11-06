@@ -30,7 +30,6 @@ vi.mock('../hooks/use-current-user', () => ({ useCurrentUser: vi.fn() }));
 vi.mock('../hooks/use-project-sprints', () => ({
   useProjectSprints: vi.fn(),
   useStartSprint: vi.fn(),
-  useUpdateSprintObjetivo: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 // Fuera de un app router real `useSearchParams()` devuelve null; se simula con
@@ -497,6 +496,19 @@ describe('KanbanWorkspaceClient — Tablero/Hitos (Sección 19/29)', () => {
     expect(hito.parentElement).toHaveClass('gap-2');
   });
 
+  it('en Tablero, etiquetas y «Nueva tarea» van juntos; ya no hay «Plantillas» ni «Agregar objetivo»', () => {
+    (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
+    mockUseProjectTasks();
+
+    renderWorkspace();
+
+    const etiquetas = screen.getByRole('button', { name: /gestionar etiquetas/i });
+    expect(etiquetas.nextElementSibling).toBe(screen.getByRole('button', { name: /nueva tarea/i }));
+    expect(screen.queryByRole('button', { name: /plantillas/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /agregar objetivo/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tablero de tareas' })).toHaveClass('whitespace-nowrap');
+  });
+
   it('"Agregar hito" no se muestra en la pestaña Tablero', () => {
     (useProjectDetail as any).mockReturnValue({ data: proyectoFixture, isLoading: false, error: null });
     mockUseProjectTasks();
@@ -670,7 +682,7 @@ describe('KanbanWorkspaceClient — sin Sprint activo (F2)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Sí, iniciar Sprint' }));
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
-    expect(mutateAsync).toHaveBeenCalledWith({ fechaFinPlaneada: fecha, objetivo: undefined });
+    expect(mutateAsync).toHaveBeenCalledWith({ fechaFinPlaneada: fecha });
     expect(useStartSprint).toHaveBeenCalledWith(42);
   });
 
