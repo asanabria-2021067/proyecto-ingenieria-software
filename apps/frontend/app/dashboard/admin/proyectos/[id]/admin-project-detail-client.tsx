@@ -211,7 +211,7 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
               </Button>
             )}
             <Button asChild size="sm">
-              <Link href={esCoordinador ? '/dashboard/coordinador' : adminProjectsGroupHref('activos')}>Volver a la bandeja</Link>
+              <Link href={adminProjectsGroupHref('activos')}>Volver a la bandeja</Link>
             </Button>
           </div>
         </Empty>
@@ -233,8 +233,8 @@ export default function AdminProjectDetailClient({ id }: AdminProjectDetailClien
         <BreadcrumbList className="text-sm">
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href={esCoordinador ? '/dashboard/coordinador' : adminProjectsGroupHref(grupo)} className="text-tertiary hover:text-on-surface">
-                {esCoordinador ? 'Coordinación' : 'Proyectos'}
+              <Link href={adminProjectsGroupHref(grupo)} className="text-tertiary hover:text-on-surface">
+                Proyectos
               </Link>
             </BreadcrumbLink>
           </BreadcrumbItem>

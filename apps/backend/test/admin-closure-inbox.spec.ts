@@ -210,11 +210,13 @@ describe('Bandeja administrativa — grupo cierres', () => {
       expect(where.OR[0]).toEqual({ idCarrera: { in: [4] } });
     });
 
-    it('los demás grupos siguen siendo solo del administrador: 403 sin leer proyectos', async () => {
+    it('los demás grupos también se acotan a su alcance y excluyen lo propio', async () => {
       for (const grupo of ['activos', 'revision', 'cerrados']) {
         const { prisma, service } = comoCoordinador();
-        await expect(service.adminList(9, { grupo } as never)).rejects.toBeInstanceOf(ForbiddenException);
-        expect(prisma.proyecto.findMany).not.toHaveBeenCalled();
+        await service.adminList(9, { grupo } as never);
+        const { where } = prisma.proyecto.findMany.mock.calls[0][0];
+        expect(where.creadoPor).toEqual({ not: 9 });
+        expect(where.OR[0]).toEqual({ idCarrera: { in: [4] } });
       }
     });
   });

@@ -38,7 +38,7 @@ vi.mock('../components/chat-dock/chat-dock', () => ({
   ChatDock: () => null,
 }));
 
-import AdminLayout, { coordinadorNavEntries, coordinadorNavItemsMobile } from '../components/admin/AdminLayout';
+import AdminLayout, { adminNavEntries, coordinadorNavEntries, coordinadorNavItemsMobile } from '../components/admin/AdminLayout';
 import { flattenNavEntries } from '../components/dashboard/SidebarNav';
 
 const COORDINADOR = { idUsuario: 7, nombre: 'Cora', apellido: 'Dina', roles: ['coordinador_academico'] };
@@ -60,57 +60,67 @@ afterEach(() => {
 
 describe('shell del coordinador: menú', () => {
   const destinos = flattenNavEntries(coordinadorNavEntries).map((d) => d.href);
+  const destinosAdmin = flattenNavEntries(adminNavEntries).map((d) => d.href);
+  const SOLO_ADMIN = [
+    '/dashboard/admin/usuarios',
+    '/dashboard/admin/solicitudes-recuperacion',
+    '/dashboard/admin/solicitudes-desactivacion',
+    '/dashboard/admin/asociaciones',
+    '/dashboard/admin/apelaciones',
+    '/dashboard/admin/anuncios',
+    '/dashboard/admin/cuentas-pendientes',
+    '/dashboard/admin/seguridad',
+    '/dashboard/admin/reportes',
+    '/dashboard/admin/mantenimiento',
+    '/dashboard/admin/tablas',
+  ];
 
-  it('enlaza revisiones, cierres, horas, bandeja de pendientes, mensajes y calendario', () => {
+  it('es el menú del admin sin lo exclusivo de administración, más mensajes y calendario', () => {
     expect(destinos).toEqual([
       '/dashboard/coordinador',
-      '/dashboard/coordinador/pendientes',
+      '/dashboard/admin/proyectos?grupo=activos',
       '/dashboard/projects/admin/reviews',
-      '/dashboard/coordinador/cierres',
+      '/dashboard/admin/proyectos?grupo=cierres',
+      '/dashboard/admin/proyectos?grupo=cerrados',
+      '/dashboard/admin/sprints',
+      '/dashboard/admin/metricas',
       '/dashboard/admin/horas',
+      '/dashboard/admin/entidades',
+      '/dashboard/admin/bandeja',
       '/dashboard/mensajes',
       '/dashboard/calendario',
     ]);
   });
 
-  it('no enlaza nada de lo que el backend le responde con 403', () => {
-    const prohibidos = [
-      '/dashboard/admin/usuarios',
-      '/dashboard/admin/solicitudes-recuperacion',
-      '/dashboard/admin/asociaciones',
-      '/dashboard/admin/cuentas-pendientes',
-      '/dashboard/admin/entidades',
-      '/dashboard/admin/anuncios',
-      '/dashboard/admin/apelaciones',
-      '/dashboard/admin/seguridad',
-      '/dashboard/admin/metricas',
-      '/dashboard/admin/sprints',
-      '/dashboard/admin/bandeja',
-      '/dashboard/admin/proyectos',
-      '/dashboard/configuracion',
-    ];
+  it('el menú del admin sí enlaza todo lo exclusivo de administración', () => {
+    for (const href of SOLO_ADMIN) expect(destinosAdmin, href).toContain(href);
+  });
+
+  it('no enlaza nada de lo que el backend le responde con 403 (menú ni barra móvil)', () => {
     for (const href of [...destinos, ...coordinadorNavItemsMobile.map((d) => d.href)]) {
-      expect(prohibidos, href).not.toContain(href.split('?')[0]);
-      expect(href).not.toMatch(/mantenimiento|tablas|juntas|roles/);
+      expect(SOLO_ADMIN, href).not.toContain(href.split('?')[0]);
     }
   });
 
   it('la barra móvil solo usa destinos del menú', () => {
-    for (const { href } of coordinadorNavItemsMobile) expect(destinos).toContain(href);
+    const rutas = destinos.map((d) => d.split('?')[0]);
+    for (const { href } of coordinadorNavItemsMobile) expect(rutas).toContain(href);
   });
 
-  it('la sidebar renderizada muestra esos enlaces y ninguno de administración', () => {
+  it('la sidebar renderizada muestra esos enlaces y ninguno de administración pura', () => {
     currentUserMock.mockReturnValue({ data: COORDINADOR, isLoading: false, isError: false });
     renderShell();
     const nav = within(document.querySelector('aside') as HTMLElement);
 
-    expect(nav.getByRole('link', { name: 'Panel del coordinador' })).toHaveAttribute('href', '/dashboard/coordinador');
-    expect(nav.getByRole('link', { name: 'Bandeja de pendientes' })).toBeInTheDocument();
-    expect(nav.getByRole('link', { name: 'Horas y estudiantes en riesgo' })).toHaveAttribute('href', '/dashboard/admin/horas');
+    expect(nav.getByRole('link', { name: 'Panel de Coordinación' })).toHaveAttribute('href', '/dashboard/coordinador');
+    for (const grupo of ['Proyectos', 'Métricas', 'Verificación y seguridad']) {
+      expect(nav.getByRole('button', { name: grupo }), grupo).toBeInTheDocument();
+    }
     expect(nav.getByRole('link', { name: 'Mensajes' })).toBeInTheDocument();
     expect(nav.getByRole('link', { name: 'Calendario' })).toBeInTheDocument();
-    expect(nav.queryByRole('link', { name: /Usuarios/ })).not.toBeInTheDocument();
-    expect(nav.queryByRole('link', { name: /Asociaciones/ })).not.toBeInTheDocument();
+    for (const oculto of ['Usuarios', 'Gobernanza', 'Comunicación', 'Sistema']) {
+      expect(nav.queryByRole('button', { name: oculto }), oculto).not.toBeInTheDocument();
+    }
     expect(nav.queryByText('Panel Admin')).not.toBeInTheDocument();
   });
 });

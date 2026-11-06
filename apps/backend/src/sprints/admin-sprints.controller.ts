@@ -24,6 +24,7 @@ export class AdminSprintsController {
 
   /** Calendario de Sprints operables de proyectos activos; sin parámetros. */
   @Get('calendario')
+  @Roles('administrador', 'coordinador_academico')
   getCalendario(
     @CurrentUser() user: { userId: number },
     // Sin uso a propósito: declararlo es lo que hace rechazar con 400

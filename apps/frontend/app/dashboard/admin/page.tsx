@@ -31,6 +31,8 @@ import {
   ADMIN_PAGE_TITLE,
 } from '@/components/admin/admin-page';
 import { formatearHoras } from '@/lib/hours/format';
+import { useEsCoordinador } from '@/hooks/use-can';
+import { useMiAlcance } from '@/hooks/use-coordinador';
 import {
   getAdminMetricas,
   getAdminStats,
@@ -287,7 +289,7 @@ function ActividadRecienteCard({ items }: { items: AdminActividadRecienteItem[] 
 const RIESGO_COL_SEMESTRE = 'w-16 shrink-0 text-center sm:w-44';
 const RIESGO_COL_HORAS = 'flex w-24 shrink-0 justify-center sm:w-28';
 
-function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) {
+function EstudiantesRiesgoCard({ items, coordinador }: { items: AdminEstudianteEnRiesgo[]; coordinador: boolean }) {
   const tituloId = useId();
   return (
     <section aria-labelledby={tituloId} className="card-base flex h-full flex-col overflow-hidden p-0">
@@ -331,7 +333,7 @@ function EstudiantesRiesgoCard({ items }: { items: AdminEstudianteEnRiesgo[] }) 
           </ul>
           <div className="mt-auto border-t border-outline-variant/50 px-card py-inline">
             <Link
-              href="/dashboard/admin/usuarios?riesgo=horas"
+              href={coordinador ? '/dashboard/admin/horas' : '/dashboard/admin/usuarios?riesgo=horas'}
               className="type-meta -my-tight inline-flex items-center gap-micro rounded-control py-tight font-semibold text-primary outline-none motion-link focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               Ver todos
@@ -415,7 +417,23 @@ function ResumenTendencias() {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-function AdminPanelContent({ stats }: { stats: AdminStats }) {
+/** Subtítulo del Panel de Coordinación: las carreras de su alcance (o por qué no hay datos). */
+function AlcanceCoordinador() {
+  const { data, isError } = useMiAlcance();
+  if (isError) return <>No pudimos cargar tu alcance.</>;
+  if (!data) return <>Cargando tu alcance…</>;
+  if (data.carreras.length === 0) {
+    return (
+      <>
+        Aún no tienes carreras asignadas: tus listas aparecen vacías y no puedes resolver proyectos. Pide a un
+        administrador que te asigne carreras o una facultad.
+      </>
+    );
+  }
+  return <>{data.carreras.map((c) => c.nombreCarrera).join(' · ')}</>;
+}
+
+function AdminPanelContent({ stats, coordinador }: { stats: AdminStats; coordinador: boolean }) {
   // Compatibilidad con `/dashboard/admin#metricas`, el destino que tuvo «Tendencias de uso» en el
   // menú (T-321): al llegar desde otra vista el panel aún muestra su esqueleto y el ancla no existe
   // cuando el navegador intenta desplazarse. Se repite el desplazamiento al montar el contenido.
@@ -439,10 +457,14 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
             </BreadcrumbList>
           </Breadcrumb>
           <PageTitle className={ADMIN_PAGE_TITLE}>
-            Panel de Administración
+            {coordinador ? 'Panel de Coordinación' : 'Panel de Administración'}
           </PageTitle>
           <p className={ADMIN_PAGE_LEAD}>
-            Resumen general de actividad, usuarios y proyectos en UVGenius.
+            {coordinador ? (
+              <AlcanceCoordinador />
+            ) : (
+              'Resumen general de actividad, usuarios y proyectos en UVGenius.'
+            )}
           </p>
         </header>
 
@@ -470,7 +492,7 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
           <AdminAttentionQueue
             enRevision={stats.enRevision}
             cierrePendiente={stats.cierrePendiente}
-            usuariosBloqueados={stats.usuariosBloqueados}
+            usuariosBloqueados={coordinador ? undefined : stats.usuariosBloqueados}
           />
         </DashboardSection>
 
@@ -491,7 +513,7 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
               completo para que sus filas se lean en una sola línea. */}
           <div className="flex flex-col gap-grid">
             <ActividadRecienteCard items={stats.actividadReciente} />
-            <EstudiantesRiesgoCard items={stats.estudiantesEnRiesgo} />
+            <EstudiantesRiesgoCard items={stats.estudiantesEnRiesgo} coordinador={coordinador} />
           </div>
         </DashboardSection>
 
@@ -518,9 +540,11 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
         </DashboardSection>
 
         {/* Estado del sistema: servicios, versión desplegada y últimas migraciones. */}
-        <DashboardSection titulo="Estado del sistema" className={COL_PRINCIPAL}>
-          <EstadoSistemaCard />
-        </DashboardSection>
+        {!coordinador && (
+          <DashboardSection titulo="Estado del sistema" className={COL_PRINCIPAL}>
+            <EstadoSistemaCard />
+          </DashboardSection>
+        )}
 
         {/* 5. Tendencias de uso (HU-178): solo un resumen; las gráficas están en su página.
             El `id` conserva el destino de los enlaces antiguos a `#metricas`, y `scroll-mt`
@@ -536,6 +560,7 @@ function AdminPanelContent({ stats }: { stats: AdminStats }) {
 }
 
 export default function AdminPanelPage() {
+  const coordinador = useEsCoordinador();
   const {
     data: stats,
     isLoading,
@@ -562,5 +587,5 @@ export default function AdminPanelPage() {
     );
   }
 
-  return <AdminPanelContent stats={stats} />;
+  return <AdminPanelContent stats={stats} coordinador={coordinador} />;
 }

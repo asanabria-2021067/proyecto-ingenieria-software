@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { TipoProyecto } from '@prisma/client';
 import { addDaysToDay, guatemalaDayOf, todayInGuatemala } from '../common/utils/guatemala-date';
 import type { DatosConstancia } from '../exports/constancia-horas.builder';
@@ -14,7 +14,7 @@ import {
   type Semestre,
 } from './semestre';
 import { compararEstudiantes } from './orden-estudiantes';
-import { alcanceDelActor } from '../coordinador/coordinador-alcance';
+import { alcanceDelActor, proyectoEnAlcanceWhere } from '../coordinador/coordinador-alcance';
 
 interface Acreditadas {
   beca: number;
@@ -301,13 +301,6 @@ export class HorasSemestreService {
     return this.paginaCentral({ ...q, carreraIds: await alcanceDelActor(this.prisma, idActor) });
   }
 
-  private async requireAdmin(idUsuario: number) {
-    const rol = await this.prisma.usuarioRolAcceso.findFirst({
-      where: { idUsuario, rolAcceso: { nombrePerfil: 'administrador' } },
-    });
-    if (!rol) throw new ForbiddenException('Acceso restringido a administradores');
-  }
-
   /** Proyectos activos (participacion activa) por usuario. */
   private async proyectosActivosPorUsuario(idsUsuario: number[]) {
     const filas = await this.prisma.participacionProyecto.findMany({
@@ -443,7 +436,12 @@ export class HorasSemestreService {
 
   /** MEJ-72: los ultimos `cantidad` semestres (el mas reciente primero) con las horas de todos los estudiantes. */
   async comparativo(idActor: number, cantidad = 4) {
-    await this.requireAdmin(idActor);
+    // Administrador: todos los estudiantes. Coordinador: los de sus carreras. Otro rol: 403.
+    const alcance = await alcanceDelActor(this.prisma, idActor);
+    const poblacion = alcance ? { ...ESTUDIANTE_ACTIVO, perfil: { idCarrera: { in: alcance } } } : ESTUDIANTE_ACTIVO;
+    const idsAlcance = alcance
+      ? (await this.prisma.usuario.findMany({ where: poblacion, select: { idUsuario: true } })).map((u) => u.idUsuario)
+      : undefined;
     const semestres: Semestre[] = [];
     let { anio, periodo } = semestreDe(new Date());
     for (let i = 0; i < cantidad; i++) {
@@ -457,11 +455,11 @@ export class HorasSemestreService {
       semestres.map(async (semestre) => {
         const [registros, acreditadas] = await Promise.all([
           this.prisma.registroHorasSemestre.aggregate({
-            where: { anio: semestre.anio, periodo: semestre.periodo, usuario: ESTUDIANTE_ACTIVO },
+            where: { anio: semestre.anio, periodo: semestre.periodo, usuario: poblacion },
             _count: { _all: true },
             _sum: { metaBeca: true, becaDeclarada: true, metaExtension: true, extensionDeclarada: true },
           }),
-          this.acreditadasPorUsuario(semestre),
+          this.acreditadasPorUsuario(semestre, idsAlcance),
         ]);
         let becaAcreditada = 0;
         let extensionAcreditada = 0;
@@ -487,17 +485,25 @@ export class HorasSemestreService {
 
   /** MEJ-68: por asociacion, estudiantes de sus carreras con horas del semestre, en riesgo, proyectos y junta. */
   async resumenPorAsociacion(idActor: number, q: HorasCentralQueryDto) {
-    await this.requireAdmin(idActor);
+    // Coordinador: solo las asociaciones con alguna de sus carreras, con los estudiantes y proyectos de su alcance.
+    const alcance = await alcanceDelActor(this.prisma, idActor);
     const [{ semestre, filas }, asociaciones] = await Promise.all([
-      this.recorrerTodas({ anio: q.anio, periodo: q.periodo }),
+      this.recorrerTodas({ anio: q.anio, periodo: q.periodo, carreraIds: alcance }),
       this.prisma.asociacion.findMany({
-        where: { archivada: false },
+        where: { archivada: false, ...(alcance ? { carreras: { some: { idCarrera: { in: alcance } } } } : {}) },
         orderBy: { nombre: 'asc' },
         select: {
           idAsociacion: true,
           nombre: true,
           carreras: { select: { idCarrera: true, carrera: { select: { nombreCarrera: true } } } },
-          proyectos: { where: { eliminadoEn: null, estadoProyecto: { in: [...ESTADOS_ACTIVOS] } }, select: { idProyecto: true } },
+          proyectos: {
+            where: {
+              eliminadoEn: null,
+              estadoProyecto: { in: [...ESTADOS_ACTIVOS] },
+              ...(alcance ? proyectoEnAlcanceWhere(alcance, idActor) : {}),
+            },
+            select: { idProyecto: true },
+          },
           _count: { select: { junta: true } },
         },
       }),

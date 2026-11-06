@@ -55,7 +55,8 @@ interface AttentionRow {
 interface AdminAttentionQueueProps {
   enRevision: number;
   cierrePendiente: number;
-  usuariosBloqueados: number;
+  /** Solo administración: sin valor (coordinador) la fila no se muestra. */
+  usuariosBloqueados?: number;
 }
 
 /**
@@ -90,17 +91,21 @@ export function AdminAttentionQueue({ enRevision, cierrePendiente, usuariosBloqu
       icono: Clock,
       tono: 'cierre',
     },
-    {
-      clave: 'bloqueados',
-      titulo: 'Bloqueados',
-      descripcion: 'Usuarios con acceso restringido',
-      valor: usuariosBloqueados,
-      accion: 'Revisar',
-      href: '/dashboard/admin/usuarios',
-      enlaceLabel: 'Ver gestión de usuarios',
-      icono: AlertTriangle,
-      tono: 'bloqueo',
-    },
+    ...(usuariosBloqueados === undefined
+      ? []
+      : [
+          {
+            clave: 'bloqueados',
+            titulo: 'Bloqueados',
+            descripcion: 'Usuarios con acceso restringido',
+            valor: usuariosBloqueados,
+            accion: 'Revisar',
+            href: '/dashboard/admin/usuarios',
+            enlaceLabel: 'Ver gestión de usuarios',
+            icono: AlertTriangle,
+            tono: 'bloqueo' as const,
+          },
+        ]),
   ];
   const total = filas.reduce((suma, fila) => suma + fila.valor, 0);
 
