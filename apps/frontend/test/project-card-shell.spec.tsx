@@ -9,6 +9,7 @@ import {
   AvailableProjectCard,
   AvailableProjectCardSkeleton,
   PROJECT_CARD_GRID,
+  PROJECT_CARD_GRID_SKELETON,
 } from '../components/projects/available-project-card';
 import type { MiProyectoListItemDTO } from '../lib/dto/project.dto';
 
@@ -54,7 +55,14 @@ describe('Carcasa compartida de las tarjetas de proyecto', () => {
   });
 
   it('la grilla compartida pasa a dos columnas desde lg con el gap de grilla', () => {
-    expect(PROJECT_CARD_GRID.split(' ')).toEqual(['grid', 'grid-cols-1', 'gap-grid', 'lg:grid-cols-2']);
+    expect(PROJECT_CARD_GRID_SKELETON.split(' ')).toEqual(['grid', 'grid-cols-1', 'gap-grid', 'lg:grid-cols-2']);
+  });
+
+  it('la grilla de tarjetas estira la última tarjeta impar solo desde lg', () => {
+    expect(PROJECT_CARD_GRID.split(' ')).toEqual([
+      ...PROJECT_CARD_GRID_SKELETON.split(' '),
+      'lg:[&>:last-child:nth-child(odd)]:col-span-2',
+    ]);
   });
 
   it.each(VISTAS)('%s usa la grilla compartida y no una local', (ruta) => {

@@ -22,6 +22,7 @@ vi.mock('@/lib/api/client', () => ({ apiFetch: apiFetchMock }));
 // La tarjeta trae sus propios hooks (usuario, anclados); aquí solo importa qué proyectos se pintan.
 vi.mock('@/components/projects/available-project-card', () => ({
   PROJECT_CARD_GRID: 'grid',
+  PROJECT_CARD_GRID_SKELETON: 'grid',
   AvailableProjectCardSkeleton: () => null,
   AvailableProjectCard: ({ proyecto }: { proyecto: { tituloProyecto: string } }) => <article>{proyecto.tituloProyecto}</article>,
 }));
