@@ -143,7 +143,7 @@ describe('useStartSprint', () => {
     result.current.mutate({ fechaFinPlaneada: '2026-12-01' });
 
     await waitFor(() => expect(startSprint).toHaveBeenCalledTimes(1));
-    expect(startSprint).toHaveBeenCalledWith(7, '2026-12-01', undefined);
+    expect(startSprint).toHaveBeenCalledWith(7, '2026-12-01');
   });
 
   it('en éxito invalida exactamente project-sprints del proyecto', async () => {

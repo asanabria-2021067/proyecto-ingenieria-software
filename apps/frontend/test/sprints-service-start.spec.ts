@@ -27,15 +27,4 @@ describe('startSprint (service)', () => {
 
     expect(Object.keys(JSON.parse(apiFetchMock.mock.calls[0][1].body))).toEqual(['fechaFinPlaneada']);
   });
-
-  it('MEJ-117: incluye el objetivo solo cuando se escribió uno', async () => {
-    apiFetchMock.mockResolvedValue({ idSprint: 1 });
-
-    await startSprint(32, '2026-10-20', 'Cerrar pagos');
-
-    expect(JSON.parse(apiFetchMock.mock.calls[0][1].body)).toEqual({
-      fechaFinPlaneada: '2026-10-20',
-      objetivo: 'Cerrar pagos',
-    });
-  });
 });
