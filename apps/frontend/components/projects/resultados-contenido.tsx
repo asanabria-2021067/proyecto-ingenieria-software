@@ -65,7 +65,7 @@ export function ResultadosContenido({ resultados, idProyecto }: { resultados: Re
         </p>
       </ProjectPageHeader>
 
-      <div className="grid grid-cols-2 gap-grid @3xl/project:grid-cols-4" data-testid="resultados-metricas">
+      <div className="grid grid-cols-2 gap-grid @3xl/project:grid-cols-3" data-testid="resultados-metricas">
         <HoursKpiCard variante="en-linea" icon={Users} label="Integrantes" value={String(metricas.integrantes)} />
         <HoursKpiCard
           variante="en-linea"

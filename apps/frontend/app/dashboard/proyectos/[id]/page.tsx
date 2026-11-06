@@ -303,7 +303,7 @@ export default function ProyectoDetallePage() {
               </p>
             </CardShell>
           ) : (
-            <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2">
               {proyecto.roles.map((rol) => {
                 const rolAdmin = rolesAdmin.find((r) => r.idRolProyecto === rol.idRolProyecto);
                 const esMiRol = rolAdmin?.isMine ?? false;

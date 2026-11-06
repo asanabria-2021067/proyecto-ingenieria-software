@@ -48,9 +48,9 @@ export function PrimerosPasos() {
         aria-label="Avance de Primeros pasos"
         className="h-1.5 max-w-sm"
       />
-      <ul className="grid gap-tight sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid gap-tight sm:grid-cols-2 lg:grid-cols-6">
         {data.pasos.map(({ clave, completado }) => (
-          <li key={clave}>
+          <li key={clave} className="sm:max-lg:last:col-span-2 lg:col-span-2 lg:[&:nth-last-child(-n+2)]:col-span-3">
             <Link
               href={PASOS[clave].href}
               className="flex items-center gap-tight rounded-control bg-surface-container p-tight transition-colors hover:bg-surface-container-high"
