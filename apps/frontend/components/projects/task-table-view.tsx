@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { Tag } from '@/components/ui/tag';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DATA_TABLE_CARD,
@@ -97,14 +98,19 @@ export function TaskTableView({ tasks, onAbrir }: Props) {
               return (
                 <TableRow key={tarea.idTarea} className={`${DATA_TABLE_ROW_BORDER} ${DATA_TABLE_ROW_HOVER}`}>
                   <TableCell className={`${TD} min-w-56 whitespace-normal`}>
-                    <button
-                      type="button"
-                      onClick={() => onAbrir(tarea)}
-                      aria-label={`Abrir detalles de "${tarea.tituloTarea}"`}
-                      className="line-clamp-2 rounded-sm text-left text-sm font-semibold text-on-surface hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      {tarea.tituloTarea}
-                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => onAbrir(tarea)}
+                          aria-label={`Abrir detalles de "${tarea.tituloTarea}"`}
+                          className="line-clamp-2 break-words rounded-sm text-left text-sm font-semibold text-on-surface hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          {tarea.tituloTarea}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs break-words">{tarea.tituloTarea}</TooltipContent>
+                    </Tooltip>
                   </TableCell>
                   <TableCell className={TD}>
                     <Tag tone={ESTADO_TAREA_TONE[tarea.estadoTarea]} size="sm">

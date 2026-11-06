@@ -472,3 +472,40 @@ describe('TaskResponsablesField (MEJ-109)', () => {
     expect(screen.getByRole('button', { name: 'Quitar a Diana Rivas de los responsables' })).toBeInTheDocument();
   });
 });
+
+describe('Título de tarea: dos líneas y tooltip con el título completo (FIX-39)', () => {
+  beforeAll(() => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  });
+  afterEach(cleanup);
+
+  const largo = 'Implementar la integración completa del módulo de reportes con el servicio externo de analítica';
+  const t = tarea({ idTarea: 9, tituloTarea: largo });
+  const nombre = `Abrir detalles de "${largo}"`;
+
+  const verifica = () => {
+    const boton = screen.getByRole('button', { name: nombre });
+    expect(boton).toHaveClass('line-clamp-2');
+    expect(boton).not.toHaveClass('truncate');
+    fireEvent.focus(boton);
+    return boton;
+  };
+
+  it('tarjeta: line-clamp-2, nombre accesible completo y tooltip al enfocar', async () => {
+    renderCard(t);
+    verifica();
+    expect((await screen.findAllByText(largo)).length).toBeGreaterThan(1);
+  });
+
+  it('lista: mismo tratamiento', async () => {
+    render(<TaskListView tasks={[t]} onAbrir={vi.fn()} />);
+    verifica();
+    expect((await screen.findAllByText(largo)).length).toBeGreaterThan(1);
+  });
+
+  it('tabla: mismo tratamiento', async () => {
+    render(<TaskTableView tasks={[t]} onAbrir={vi.fn()} />);
+    verifica();
+    expect((await screen.findAllByText(largo)).length).toBeGreaterThan(1);
+  });
+});

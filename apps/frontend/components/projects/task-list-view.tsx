@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Calendar } from 'lucide-react';
 import { Tag } from '@/components/ui/tag';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DATA_TABLE_CARD, DATA_TABLE_ROW_HOVER, DATA_TABLE_ROWS } from '@/components/dashboard/data-table';
 import { TaskAvatares, textoResponsables } from '@/components/projects/task-avatares';
 import {
@@ -37,15 +38,19 @@ export function TaskListView({ tasks, onAbrir }: Props) {
             key={tarea.idTarea}
             className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 px-stack py-inline ${DATA_TABLE_ROW_HOVER}`}
           >
-            <button
-              type="button"
-              onClick={() => onAbrir(tarea)}
-              title={tarea.tituloTarea}
-              aria-label={`Abrir detalles de "${tarea.tituloTarea}"`}
-              className="min-w-0 flex-1 basis-56 truncate rounded-sm text-left text-sm font-semibold text-on-surface hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              {tarea.tituloTarea}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => onAbrir(tarea)}
+                  aria-label={`Abrir detalles de "${tarea.tituloTarea}"`}
+                  className="line-clamp-2 min-w-0 flex-1 basis-56 break-words rounded-sm text-left text-sm font-semibold text-on-surface hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {tarea.tituloTarea}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs break-words">{tarea.tituloTarea}</TooltipContent>
+            </Tooltip>
             <Tag tone={ESTADO_TAREA_TONE[tarea.estadoTarea]} size="sm">
               {ESTADO_LABEL[tarea.estadoTarea]}
             </Tag>
