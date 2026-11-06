@@ -498,9 +498,8 @@ function TaskDetailView({
         )}
       </div>
 
-      {/* LAYOUT PRINCIPAL (Sección 15-16) */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.8fr)_minmax(340px,1fr)]">
-        {/* COLUMNA IZQUIERDA */}
+      {/* LAYOUT PRINCIPAL: descripción/datos junto a comentarios solo en xl+; el resto a todo el ancho */}
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
         <div className="min-w-0 space-y-4">
           {/* Descripción (Sección 29) */}
           <section className={CARD}>
@@ -626,25 +625,8 @@ function TaskDetailView({
               </DatoOrganizacion>
             </div>
           </section>
-
-          <TaskChecklist
-            idProyecto={idProyecto}
-            idTarea={tarea.idTarea}
-            items={tarea.checklist}
-            puedeEditar={puedeCambiarEstado}
-            tituloTarea={tarea.tituloTarea}
-          />
-
-          <TaskSubtareas
-            idProyecto={idProyecto}
-            tarea={tarea}
-            subtareas={subtareas}
-            members={members}
-            isLeader={isLeader}
-            idUsuarioActual={currentUser?.idUsuario ?? null}
-            puedeAgregar={puedeGestionarTarea || esResponsable}
-          />
-
+        </div>
+        <div className="min-w-0 space-y-4 xl:col-span-2 xl:row-start-2">
           {/* Horas de la tarea (HU-142 · S7 VIEW-04): el resumen del backend
               gobierna crear/editar/revocar; aquí no se infiere permiso alguno. */}
           <section className={CARD} aria-labelledby="horas-tarea-titulo">
@@ -670,6 +652,24 @@ function TaskDetailView({
               />
             )}
           </section>
+
+          <TaskChecklist
+            idProyecto={idProyecto}
+            idTarea={tarea.idTarea}
+            items={tarea.checklist}
+            puedeEditar={puedeCambiarEstado}
+            tituloTarea={tarea.tituloTarea}
+          />
+
+          <TaskSubtareas
+            idProyecto={idProyecto}
+            tarea={tarea}
+            subtareas={subtareas}
+            members={members}
+            isLeader={isLeader}
+            idUsuarioActual={currentUser?.idUsuario ?? null}
+            puedeAgregar={puedeGestionarTarea || esResponsable}
+          />
 
           {/* Etiquetas (Sección 40) */}
           <section className={CARD}>
@@ -701,11 +701,9 @@ function TaskDetailView({
             marca={[tarea.estadoTarea, tarea.fechaLimite, tarea.asignacionActiva?.idUsuario, tarea.actualizadaEn].join('|')}
           />
         </div>
-
-        {/* COLUMNA DERECHA: COMENTARIOS (Sección 41-51) */}
-        <div className="min-w-0">
+        <div className="min-w-0 xl:col-start-2 xl:row-start-1">
           <section
-            className={`${CARD} flex flex-col lg:sticky lg:top-22 lg:max-h-[calc(100vh-140px)]`}
+            className={`${CARD} flex flex-col xl:sticky xl:top-22 xl:max-h-[calc(100vh-140px)]`}
           >
             <div className="mb-3 shrink-0">
               <h2

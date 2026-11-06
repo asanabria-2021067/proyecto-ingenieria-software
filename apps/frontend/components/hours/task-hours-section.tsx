@@ -569,9 +569,9 @@ export function TaskHoursSection({ idProyecto, idTarea, idUsuarioActual, enabled
                         </Badge>
                       )}
                     </td>
-                    <td className="max-w-[320px] px-3 py-2 text-xs text-on-surface-variant">
+                    <td className="px-3 py-2 text-xs text-on-surface-variant">
                       {registro.nota ? (
-                        <span className="line-clamp-2 whitespace-pre-wrap break-words">{registro.nota}</span>
+                        <span className="whitespace-pre-wrap break-words">{registro.nota}</span>
                       ) : (
                         <span aria-label="Sin nota">—</span>
                       )}
