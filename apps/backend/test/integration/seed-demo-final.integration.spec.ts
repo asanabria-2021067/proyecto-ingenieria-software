@@ -254,6 +254,7 @@ describeIntegration('DEMO seed-demo-final', () => {
 
     // DEMO-11: avisos de inicio de sesion leidos solo en demo.cs01-15 y «Mensaje eliminado» de Valeria limpiados solo en el #general del Hackathon.
     const u = async (correo: string) => (await db.usuario.findUniqueOrThrow({ where: { correo } })).idUsuario;
+    const adminId = (await db.usuario.create({ data: { correo: 'admin@uvg.edu.gt', contrasena: 'hash-previo', nombre: 'Admin', apellido: 'Demo' } })).idUsuario;
     const [valeria, daniela, andres, cs15, carlosId, pru] = await Promise.all([u('demo.cs01@uvg.edu.gt'), u('demo.cs03@uvg.edu.gt'), u('demo.cs04@uvg.edu.gt'), u('demo.cs15@uvg.edu.gt'), u('carlos.mendoza@uvg.edu.gt'), u('pru26200@uvg.edu.gt')]);
     const hackathonGeneral = await db.conversacion.findFirstOrThrow({ where: { esCanal: true, nombreCanal: 'general', proyecto: { tituloProyecto: 'Demo - Hackathon de Computación' } } });
     const tutoriasGeneral = await db.conversacion.findFirstOrThrow({ where: { esCanal: true, nombreCanal: 'general', proyecto: { tituloProyecto: 'Demo - App de tutorías entre pares' } } });
@@ -261,9 +262,10 @@ describeIntegration('DEMO seed-demo-final', () => {
     const leidaPrevia = new Date('2026-01-01T00:00:00Z');
     const aviso = (idUsuario: number, tipoNotificacion: 'NUEVO_INICIO_SESION' | 'TAREA_ASIGNADA', leidaEn: Date | null) =>
       db.notificacion.create({ data: { idUsuario, tipoNotificacion, tituloNotificacion: 'Aviso de prueba', leidaEn } });
-    const [login1, login2, otroTipo, yaLeida, loginPru, loginCarlos] = await Promise.all([
+    const [login1, login2, otroTipo, yaLeida, loginPru, loginCarlos, loginAdmin, otroTipoCarlos, otroTipoAdmin] = await Promise.all([
       aviso(daniela, 'NUEVO_INICIO_SESION', null), aviso(daniela, 'NUEVO_INICIO_SESION', null), aviso(daniela, 'TAREA_ASIGNADA', null),
       aviso(cs15, 'NUEVO_INICIO_SESION', leidaPrevia), aviso(pru, 'NUEVO_INICIO_SESION', null), aviso(carlosId, 'NUEVO_INICIO_SESION', null),
+      aviso(adminId, 'NUEVO_INICIO_SESION', null), aviso(carlosId, 'TAREA_ASIGNADA', null), aviso(adminId, 'TAREA_ASIGNADA', null),
     ]);
     const msg = (idRemitente: number, contenido: string, extra: { padre?: number; cita?: number; muerto?: boolean; idConversacion?: number } = {}) =>
       db.mensajeChat.create({
@@ -313,7 +315,7 @@ describeIntegration('DEMO seed-demo-final', () => {
     const limpieza = correrSeed(password);
     expect(limpieza).toContain('limpieza_mensajes_eliminados: creados 0, actualizados 5');
     expect(limpieza).toContain('limpieza_mensajes_pendientes: 5');
-    expect(limpieza).toContain('notificaciones_inicio_sesion_leidas: creados 0, actualizados 2');
+    expect(limpieza).toContain('notificaciones_inicio_sesion_leidas: creados 0, actualizados 4');
     expect(limpieza).not.toContain(password);
     const leida = async (id: number) => (await db.notificacion.findUniqueOrThrow({ where: { idNotificacion: id } })).leidaEn;
     expect(await leida(login1.idNotificacion)).not.toBeNull();
@@ -321,7 +323,11 @@ describeIntegration('DEMO seed-demo-final', () => {
     expect(await leida(otroTipo.idNotificacion)).toBeNull();
     expect((await leida(yaLeida.idNotificacion))?.getTime()).toBe(leidaPrevia.getTime());
     expect(await leida(loginPru.idNotificacion)).toBeNull();
-    expect(await leida(loginCarlos.idNotificacion)).toBeNull();
+    // DEMO-12: carlos y admin tambien quedan leidos, pero solo el tipo NUEVO_INICIO_SESION.
+    expect(await leida(loginCarlos.idNotificacion)).not.toBeNull();
+    expect(await leida(loginAdmin.idNotificacion)).not.toBeNull();
+    expect(await leida(otroTipoCarlos.idNotificacion)).toBeNull();
+    expect(await leida(otroTipoAdmin.idNotificacion)).toBeNull();
     const idsDemo = (await db.usuario.findMany({ where: { correo: { startsWith: 'demo.cs' } } })).map((x) => x.idUsuario);
     expect(await db.notificacion.count({ where: { idUsuario: { in: idsDemo }, tipoNotificacion: 'NUEVO_INICIO_SESION', leidaEn: null } })).toBe(0);
 

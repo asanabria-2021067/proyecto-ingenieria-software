@@ -11,8 +11,8 @@
  *
  * Idempotente: todo se localiza por clave natural (correo, nombre, titulo) y
  * una segunda corrida no duplica nada. Solo crea o actualiza entidades de
- * demo y nunca toca otras cuentas. Limpieza (DEMO-11): marca como leidos los avisos
- * de nuevo inicio de sesion de demo.cs01-15 y borra definitivamente los «Mensaje
+ * demo y nunca toca otras cuentas. Limpieza (DEMO-11/12): marca como leidos los avisos
+ * de nuevo inicio de sesion de demo.cs01-15, carlos.mendoza y admin@uvg.edu.gt (si existen) y borra definitivamente los «Mensaje
  * eliminado» de Valeria en el #general del Hackathon (si alguno es padre de un hilo
  * con respuestas vivas o esta citado por un mensaje vivo, se restaura con texto normal).
  *
@@ -1059,11 +1059,12 @@ async function main() {
     'base de datos',
   );
 
-  // DEMO-11: solo las cuentas demo.cs01-15 (ids de `est`); nunca otras cuentas.
+  // DEMO-11/12: solo demo.cs01-15 (ids de `est`) y las cuentas de la demo carlos/admin; nunca otras cuentas.
+  const cuentasAviso = await prisma.usuario.findMany({ where: { correo: { in: ['carlos.mendoza@uvg.edu.gt', 'admin@uvg.edu.gt'] } }, select: { idUsuario: true } });
   await limpiarMensajesEliminados(armados[3].idProyecto, est[0]);
   stats.notificaciones_inicio_sesion_leidas ??= { creado: 0, actualizado: 0 };
   const leidas = await prisma.notificacion.updateMany({
-    where: { idUsuario: { in: est }, tipoNotificacion: 'NUEVO_INICIO_SESION', leidaEn: null },
+    where: { idUsuario: { in: [...est, ...cuentasAviso.map((c) => c.idUsuario)] }, tipoNotificacion: 'NUEVO_INICIO_SESION', leidaEn: null },
     data: { leidaEn: new Date() },
   });
   stats.notificaciones_inicio_sesion_leidas.actualizado += leidas.count;
