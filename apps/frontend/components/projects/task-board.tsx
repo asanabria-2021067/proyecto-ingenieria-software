@@ -154,7 +154,7 @@ function ColumnasSkeleton() {
   return (
     <>
       <div className="hidden overflow-x-auto md:block">
-        <div className="grid min-w-[1120px] grid-cols-4 gap-4 xl:min-w-0">
+        <div className="grid grid-cols-[repeat(4,minmax(260px,1fr))] gap-4">
           {COLUMNAS_TABLERO.map((columna) => (
             <div
               key={columna.estado}
@@ -208,7 +208,7 @@ function KanbanColumn({
       ref={setNodeRef}
       aria-labelledby={`columna-${estado}-heading`}
       data-column-estado={estado}
-      className={KANBAN_COLUMN_CLASS}
+      className={`${KANBAN_COLUMN_CLASS} snap-start`}
     >
       {/* Encabezado fuera del contenedor: punto de color + nombre + contador (Sección 33) */}
       <KanbanColumnHeader
@@ -606,7 +606,7 @@ export function TaskBoard({
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
-      <div className="min-h-0 space-y-4">
+      <div className="min-h-0 min-w-0 space-y-4">
         {/* TOOLBAR (Sección 20-26) */}
         {mostrarToolbar && (
         <div className="flex flex-col gap-3 pb-1 lg:flex-row lg:items-center lg:justify-between">
@@ -782,12 +782,16 @@ export function TaskBoard({
               </div>
             </div>
           ) : (
-            <div className="-mx-1 overflow-x-auto px-1 pb-2">
+            <div
+              className={`-mx-1 scroll-pl-1 overflow-x-auto px-1 pb-2 ${activeDrag ? '' : 'snap-x snap-mandatory'}`}
+            >
+              {/* El snap obligatorio revierte el auto-scroll de dnd-kit (incrementos
+                  pequeños), así que se desactiva mientras se arrastra. */}
               {/* Altura natural (como Hitos): las columnas crecen con su contenido
                   y es la página la que hace scroll (la sidebar queda fija por el
                   layout). `min-h` da un piso de ~4 tarjetas por columna. No se usa
                   una altura ligada al viewport para no reservar franja en blanco. */}
-              <div className="grid min-h-105 min-w-280 grid-cols-4 gap-4 xl:min-w-0">
+              <div className="grid min-h-105 grid-cols-[repeat(4,minmax(260px,1fr))] gap-4">
                 {COLUMNAS_TABLERO.map((columna) => {
                   const tareasColumna = ordenarTareas(
                     tareasFiltradas.filter((t) => t.estadoTarea === columna.estado),

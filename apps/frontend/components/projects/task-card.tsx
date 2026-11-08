@@ -147,7 +147,7 @@ export function TaskCard({
             }
           : undefined
       }
-      className={`group relative space-y-2 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg border bg-surface-container-lowest p-3 pl-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-outline-variant/60 hover:shadow-md ${
+      className={`group relative space-y-2 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg border bg-surface-container-lowest p-2.5 pl-3.5 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-outline-variant/60 hover:shadow-md ${
         seleccionada
           ? 'border-primary bg-primary/5 ring-2 ring-primary/40'
           : resaltada
@@ -172,7 +172,7 @@ export function TaskCard({
       )}
 
       {/* Fila superior: casilla + handle + título (Sección 36) */}
-      <div className="flex items-start gap-1.5">
+      <div className="flex items-start gap-1">
         {seleccionable && (
           // La casilla aparece al pasar el mouse o al enfocarla; en pantallas
           // táctiles (sin hover) y con alguna tarea ya marcada, siempre.
@@ -199,7 +199,7 @@ export function TaskCard({
                 {...listeners}
                 {...attributes}
                 aria-label={`Mover "${tarea.tituloTarea}" entre estados`}
-                className="-ml-1 -mt-0.5 flex size-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-tertiary hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary active:cursor-grabbing"
+                className="-ml-1.5 -mt-0.5 flex size-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-tertiary hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary active:cursor-grabbing"
               >
                 <GripVertical className="size-4" aria-hidden="true" />
               </button>
