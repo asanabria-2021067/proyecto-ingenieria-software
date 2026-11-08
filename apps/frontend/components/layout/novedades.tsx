@@ -36,7 +36,9 @@ export function Novedades() {
       // md+: margen para librar el sidebar (231px, con el menu de cuenta abajo); movil: sube sobre la
       // barra inferior (h-16) y el boton del chat (h-10, abajo a la derecha).
       position: 'bottom-left',
-      className: 'md:ml-52 max-md:mb-28',
+      // FIX-45: con la sidebar del proyecto (lg+, data-project-sidebar en <html>): global fija 231px + proyecto en rem (16rem abierta, 3.5rem colapsada) - offset 32px + 24px de aire; en px+rem para no solaparse con A-.
+      className:
+        'md:ml-52 max-md:mb-28 lg:[html[data-project-sidebar=open]_&]:ml-[calc(16rem_+_223px)] lg:[html[data-project-sidebar=collapsed]_&]:ml-[calc(3.5rem_+_223px)]',
       duration: 8_000,
       action: { label: 'Ver', onClick: () => setOpen(true) },
     });

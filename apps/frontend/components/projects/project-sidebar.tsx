@@ -71,6 +71,14 @@ export function ProjectSidebar({ idProyecto }: ProjectSidebarProps) {
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  // FIX-45: el aviso de novedades (abajo-izquierda) lee este atributo para quedar a la derecha de ambas barras.
+  useEffect(() => {
+    document.documentElement.dataset.projectSidebar = collapsed ? 'collapsed' : 'open';
+    return () => {
+      delete document.documentElement.dataset.projectSidebar;
+    };
+  }, [collapsed]);
+
   const alternar = (next: boolean) => {
     moverFoco.current = true;
     setCollapsed(next);
