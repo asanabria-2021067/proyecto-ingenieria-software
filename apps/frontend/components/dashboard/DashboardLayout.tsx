@@ -42,14 +42,14 @@ import { useDashboardSidebarCollapsed } from '@/components/dashboard/use-dashboa
 import { useRealtimeNotifications } from '@/lib/hooks/useRealtimeNotifications';
 import { getNotificationLink } from '@/lib/services/notifications';
 import { resolveCommentNotificationLink } from '@/components/notifications/comment-notification-link';
-import { resolveAssignedTaskToastLink } from '@/components/notifications/task-notification-link';
+import { resolveAssignedTaskToastLink, resolveTaskNotificationLink } from '@/components/notifications/task-notification-link';
 import { ProjectFinalizationBannerHost } from '@/components/projects/project-finalization-banner-host';
 import { AnuncioBanner } from '@/components/anuncios/anuncio-banner';
 import { ChatDockProvider, RUTA_MENSAJES } from '@/components/chat-dock/chat-dock-context';
 import { ChatConexion, ChatDock, ChatSocketProvider } from '@/components/chat-dock/chat-dock';
 import { ChatListLauncher } from '@/components/chat-dock/chat-list-launcher';
 import { useChatNoLeidos } from '@/components/chat-dock/use-chat-no-leidos';
-import { toast } from 'sonner';
+import { mostrarNotificacionToast } from '@/components/notifications/notificacion-toast';
 import logo from '@/public/logo.png';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { FontScaleToggle } from '@/components/font-scale-toggle';
@@ -210,26 +210,18 @@ export default function DashboardLayout({
     // MEJ-136: en horario de silencio la bandeja se actualiza, pero no aparece el aviso emergente.
     if (latestNotification.silenciada) return;
 
-    // HU-200: una mención o un comentario nuevo enlazan al comentario desde el aviso en vivo.
+    // NL-T4: tarea asignada con botón directo al detalle («Ver mi tarea»). El resto, a su vista si la tiene.
     const tareaHref = resolveAssignedTaskToastLink(latestNotification);
     if (tareaHref) {
-      // NL-T4: tarea asignada. Variante `info` (color con contraste, `richColors` del Toaster),
-      // 10 s y botón directo al detalle. Misma esquina que el resto de avisos: abajo a la
-      // derecha está el chat y taparía el aviso.
-      toast.info(latestNotification.tituloNotificacion, {
-        description: latestNotification.mensajeNotificacion,
-        duration: 10_000,
-        action: { label: 'Ver mi tarea', onClick: () => router.push(tareaHref) },
-      });
+      mostrarNotificacionToast(latestNotification, { href: tareaHref, accion: 'Ver mi tarea' });
       return;
     }
-    const href = getNotificationLink(latestNotification) ?? resolveCommentNotificationLink(latestNotification);
-    toast(latestNotification.tituloNotificacion, {
-      description: latestNotification.mensajeNotificacion,
-      duration: 6000,
-      action: href ? { label: 'Ver', onClick: () => router.push(href) } : undefined,
-    });
-  }, [latestNotification, queryClient, router]);
+    // HU-200: una mención o un comentario nuevo enlazan al comentario desde el aviso en vivo.
+    const href = getNotificationLink(latestNotification) ??
+      resolveCommentNotificationLink(latestNotification) ??
+      resolveTaskNotificationLink(latestNotification);
+    mostrarNotificacionToast(latestNotification, { href });
+  }, [latestNotification, queryClient]);
 
   if (isLoading || isError || (!allowAdmin && isAdminUser(user))) {
     return <ShellSkeleton />;

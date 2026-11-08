@@ -1,13 +1,13 @@
 import '@testing-library/jest-dom/vitest';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// NL-T4: el aviso en vivo de TAREA_ASIGNADA es un toast.info de 10 s con «Ver mi tarea».
+// NL-T4: el aviso en vivo de TAREA_ASIGNADA es un toast.custom (NotificacionToast) con «Ver mi tarea».
 
 const push = vi.hoisted(() => vi.fn());
-const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { info: vi.fn() }));
+const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { info: vi.fn(), custom: vi.fn(), dismiss: vi.fn() }));
 const realtime = vi.hoisted(() => ({ latestNotification: null as unknown }));
 
 vi.mock('sonner', () => ({ toast: toastMock }));
@@ -53,32 +53,37 @@ const base = {
   creadaEn: '2026-01-01T00:00:00.000Z',
 };
 
-describe('DashboardLayout - aviso de tarea asignada (NL-T4)', () => {
+describe('DashboardLayout - aviso en vivo (NL-T4)', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
     realtime.latestNotification = null;
   });
 
-  it('TAREA_ASIGNADA: toast.info de 10 s con «Ver mi tarea» que abre el detalle', () => {
+  function montarToast() {
+    const [render_, opciones] = toastMock.custom.mock.calls[0];
+    expect(opciones.duration).toBe(Infinity);
+    render(<QueryClientProvider client={new QueryClient()}>{render_('t1')}</QueryClientProvider>);
+  }
+
+  it('TAREA_ASIGNADA: toast personalizado con «Ver mi tarea» que abre el detalle', () => {
     realtime.latestNotification = {
       ...base,
       tipoNotificacion: 'TAREA_ASIGNADA',
-      datosJson: { projectId: 12, taskId: 34 },
+      datosJson: { projectId: 12, taskId: 34, assignedBy: 'Luis Gómez' },
     };
     renderLayout();
 
-    expect(toastMock.info).toHaveBeenCalledTimes(1);
-    expect(toastMock).not.toHaveBeenCalled();
-    const [titulo, opciones] = toastMock.info.mock.calls[0];
-    expect(titulo).toBe('Nueva tarea asignada');
-    expect(opciones.duration).toBe(10_000);
-    expect(opciones.action.label).toBe('Ver mi tarea');
-    opciones.action.onClick();
+    expect(toastMock.custom).toHaveBeenCalledTimes(1);
+    expect(toastMock.info).not.toHaveBeenCalled();
+    montarToast();
+    expect(screen.getByText('Nueva tarea asignada')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver mi tarea' }));
     expect(push).toHaveBeenCalledWith('/dashboard/projects/12/kanban/tasks/34');
+    expect(toastMock.dismiss).toHaveBeenCalledWith('t1');
   });
 
-  it('otros tipos siguen usando el toast normal', () => {
+  it('otros tipos también usan el toast personalizado, con su botón por categoría', () => {
     realtime.latestNotification = {
       ...base,
       tipoNotificacion: 'TAREA_ACTUALIZADA',
@@ -86,7 +91,14 @@ describe('DashboardLayout - aviso de tarea asignada (NL-T4)', () => {
     };
     renderLayout();
 
-    expect(toastMock.info).not.toHaveBeenCalled();
-    expect(toastMock).toHaveBeenCalledTimes(1);
+    expect(toastMock.custom).toHaveBeenCalledTimes(1);
+    montarToast();
+    expect(screen.getByRole('button', { name: 'Ver tarea' })).toBeInTheDocument();
+  });
+
+  it('en horario de silencio no hay aviso emergente', () => {
+    realtime.latestNotification = { ...base, tipoNotificacion: 'TAREA_ASIGNADA', datosJson: { projectId: 12, taskId: 34 }, silenciada: true };
+    renderLayout();
+    expect(toastMock.custom).not.toHaveBeenCalled();
   });
 });
