@@ -367,6 +367,16 @@ describe('ProjectSidebar — navegación agrupada y colapsable', () => {
     expect(document.getElementById('project-nav-42')).toBeInTheDocument();
   });
 
+  it('publica data-project-sidebar en <html> segun el estado y lo limpia al desmontar (FIX-45)', () => {
+    mockLeader();
+    const { unmount } = renderSidebar();
+    expect(document.documentElement.dataset.projectSidebar).toBe('open');
+    colapsar();
+    expect(document.documentElement.dataset.projectSidebar).toBe('collapsed');
+    unmount();
+    expect(document.documentElement.dataset.projectSidebar).toBeUndefined();
+  });
+
   it('colapsada (w-14) conserva TODOS los destinos permitidos, con nombre accesible y en el mismo orden', () => {
     mockLeader({ estadoProyecto: 'EN_PROGRESO' });
     renderSidebar();

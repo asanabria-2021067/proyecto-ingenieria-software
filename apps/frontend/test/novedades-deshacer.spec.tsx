@@ -22,6 +22,9 @@ describe('Novedades (MEJ-75)', () => {
     const opciones = toastMock.mock.calls[0][1];
     expect(opciones.position).toBe('bottom-left');
     expect(opciones.duration).toBe(8000);
+    expect(opciones.className).toContain('md:ml-52');
+    expect(opciones.className).toContain('[html[data-project-sidebar=open]_&]:ml-[calc(16rem_+_223px)]');
+    expect(opciones.className).toContain('[html[data-project-sidebar=collapsed]_&]:ml-[calc(3.5rem_+_223px)]');
     expect(localStorage.getItem('uvg-novedades-visto')).not.toBeNull();
 
     cleanup();
