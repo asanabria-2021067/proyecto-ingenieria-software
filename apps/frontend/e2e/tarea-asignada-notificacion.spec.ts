@@ -17,6 +17,7 @@ test('el aviso de tarea asignada abre el detalle con «Ver mi tarea» y permite 
   await desactivarTour(paginaAsignada);
 
   const marca = `${test.info().workerIndex}-${Math.random().toString(36).slice(2, 8)}`;
+  const tituloTarea = `NL-T4 ${marca}`;
   let idProyecto = 0;
   let tareas: Awaited<ReturnType<typeof crearTareas>> = [];
 
@@ -29,7 +30,7 @@ test('el aviso de tarea asignada abre el detalle con «Ver mi tarea» y permite 
     await expect(paginaAsignada.getByRole('status', { name: 'Notificaciones en vivo conectadas' })).toBeVisible();
 
     idProyecto = await idProyectoPorTitulo(paginaLider, PROYECTO_TUTORIAS);
-    tareas = await crearTareas(paginaLider, idProyecto, [{ tituloTarea: `NL-T4 ${marca}`, prioridad: 'MEDIA' }]);
+    tareas = await crearTareas(paginaLider, idProyecto, [{ tituloTarea, prioridad: 'MEDIA' }]);
 
     const yo = await pedir(paginaAsignada, 'GET', '/api/usuarios/me');
     expect(yo.status()).toBe(200);
@@ -39,8 +40,18 @@ test('el aviso de tarea asignada abre el detalle con «Ver mi tarea» y permite 
     });
     expect(asignar.ok(), 'asignar la tarea').toBeTruthy();
 
+    // Aviso personalizado (NotificacionToast): categoría de tarea, informativo, con quien asignó y la acción principal y cerrar.
+    // Estricto: solo el aviso de la tarea creada por esta prueba, aunque haya otros avisos a la vez.
+    const aviso = paginaAsignada.locator('[data-slot="notificacion-toast"]').filter({ hasText: tituloTarea });
+    await expect(aviso).toBeVisible({ timeout: 15_000 });
+    await expect(aviso).toHaveAttribute('data-categoria', 'tarea');
+    await expect(aviso).toHaveAttribute('data-severidad', 'info');
+    await expect(aviso).not.toHaveAttribute('role');
+    await expect(aviso.getByText('Nueva tarea asignada')).toBeVisible();
+    await expect(aviso.getByRole('button', { name: 'Cerrar aviso' })).toBeVisible();
+
     // Un solo clic desde el aviso: detalle de la tarea.
-    await paginaAsignada.getByRole('button', { name: 'Ver mi tarea' }).click({ timeout: 15_000 });
+    await aviso.getByRole('button', { name: 'Ver mi tarea' }).click();
     await expect(paginaAsignada).toHaveURL(new RegExp(`/dashboard/projects/${idProyecto}/kanban/tasks/${tareas[0].idTarea}(\\?|$)`));
     await expect(paginaAsignada.getByRole('heading', { name: 'Horas de la tarea' })).toBeVisible();
     await expect(paginaAsignada.getByRole('form', { name: 'Registrar horas' })).toBeVisible();
