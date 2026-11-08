@@ -142,6 +142,17 @@ describe('TaskBoard — responsive (Tarea 39)', () => {
     expect(screen.queryByRole('tablist', { name: 'Estados de tareas' })).not.toBeInTheDocument();
   });
 
+  it('las columnas miden mínimo 260px y el scroll horizontal es del tablero, no de la página', () => {
+    const { container } = renderBoard({ tasks: [tarea({ idTarea: 1 })] });
+    const grid = container.querySelector('[class*="minmax(260px,1fr)"]') as HTMLElement;
+    expect(grid).toHaveClass('grid-cols-[repeat(4,minmax(260px,1fr))]');
+    expect(grid).not.toHaveClass('xl:min-w-0');
+    expect(grid.parentElement).toHaveClass('overflow-x-auto', 'snap-x', 'snap-mandatory', 'scroll-pl-1');
+    expect(grid.firstElementChild).toHaveClass('snap-start');
+    const card = screen.getByRole('button', { name: /Mover "Tarea"/ }).closest('[class*="group"]') as HTMLElement;
+    expect(card).toHaveClass('p-2.5', 'pl-3.5');
+  });
+
   it('en móvil (matchMedia coincide) solo se ve una columna a la vez, mediante la navegación de estados', () => {
     mockMatchMedia(true);
     renderBoard({
