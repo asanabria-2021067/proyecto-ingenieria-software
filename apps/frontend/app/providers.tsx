@@ -17,9 +17,9 @@ function AppToaster() {
       closeButton
       visibleToasts={3}
       theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
-      // Cabecera del dashboard = 4rem (h-16): la pila nace 8px debajo; el chat (abajo a la derecha) queda libre.
-      offset={{ top: 72, right: 24, bottom: 32, left: 24 }}
-      mobileOffset={{ top: 72, right: 16, bottom: 16, left: 16 }}
+      // Cabecera del dashboard = 4rem (64px). Al expandir la pila (hover) sonner la sube 10px: 76-10=66 > 64, no tapa la cabecera. El chat (abajo a la derecha) queda libre.
+      offset={{ top: 76, right: 24, bottom: 32, left: 24 }}
+      mobileOffset={{ top: 76, right: 16, bottom: 16, left: 16 }}
       style={
         {
           '--normal-bg': 'var(--color-card)',
